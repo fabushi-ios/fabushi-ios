@@ -80,8 +80,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/inference_router.rs",
-      "blobSha": "510f0f62728d78ee306e6909e201724db183e9b6",
-      "size": 40157
+      "blobSha": "7696ff8da2f4282a890b7ceb159338fb843b5d15",
+      "size": 40256
     },
     {
       "path": "source/node-agent-coordinator/src/lib.rs",
@@ -105,8 +105,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/main.rs",
-      "blobSha": "27eb92721ad83b9258b5e276b65b2f945b900571",
-      "size": 112592
+      "blobSha": "6c7ba5c9cf0ad3a9b84794a5e0204fb7bce474a5",
+      "size": 112594
     },
     {
       "path": "source/node-agent-coordinator/src/mcp.rs",
@@ -210,8 +210,8 @@
     },
     {
       "path": "source/node-agent-coordinator/tests/inference_host_boundary_contract.rs",
-      "blobSha": "463ecc2c95086792b4bec68bca4d6feb2f79e177",
-      "size": 13569
+      "blobSha": "d234f18299ed1b919e8b3011a22d1fe96588ccd4",
+      "size": 13791
     },
     {
       "path": "source/node-agent-coordinator/tests/inference_router_attachments.rs",
