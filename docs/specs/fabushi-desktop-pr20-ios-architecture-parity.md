@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `8556281e5eb20aeb6dba781bd5ecf8c623206d6e`
+- pinned source commit for this baseline: `ea6da4779f508679549599d15121c74fe384ad96`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -34,6 +34,16 @@ Fabushi iOS PR #3
 ```
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
+
+### 1.0 Current exact-HEAD authority: 2026-10-04 / `ea6da4779f508679549599d15121c74fe384ad96`
+
+The live Desktop PR #20 authority is now `ea6da4779f508679549599d15121c74fe384ad96`. Relative to the previously machine-pinned `8556281e5eb20aeb6dba781bd5ecf8c623206d6e`, Desktop advanced 26 commits. The selected `frontend/** + source/**` inventory grows from 7,938 to 7,943 paths because five shipping Fabushi product-account sources were added under `source/product/fabushi/**`; all other selected changes are modifications of existing rows.
+
+The new shipping responsibility makes the Fabushi product account the first-party authentication owner for inference. Product startup settles the Fabushi account before Coordinator/Host startup, the Host receives only the current access credential, durable sessions retain refresh credentials inside the account owner, protected GitHub Actions sessions are bounded and refresh-token-free, and Fabushi product mode defaults Coordinator inference to Codex while explicit user settings remain authoritative. Focused Desktop acceptance uses the real Fabushi account -> private Host credential -> `/v1/ai/responses` path rather than seeding a parallel Cursor inference credential.
+
+The native iOS adaptation is already present in canonical production owners: `mahayana-product` owns account/session storage and refresh, `mahayana-app-host` forces the first-party Fabushi Responses owner in production, `mahayana-host` resolves the current Product session credential at inference time, `mahayana-model` sends that bearer over the Responses transport, and the iOS Coordinator/settings default to Codex while retaining explicit provider overrides. These rows are `implemented`, not `verified`, until the rebased iOS exact HEAD passes the ordinary and protected GitHub Actions gates.
+
+The top-level manifest and ledger pin this current authority and 7,943-path inventory. Per-chunk `sourceCommit` fields are snapshot provenance: unchanged large chunks need not be mechanically rewritten when their blobs are unchanged, while every changed or newly added Desktop path must carry its current blob identity. This prevents a stale top-level authority from appearing green while avoiding false source-history rewrites of unchanged chunks.
 
 ### 1.1 Exact-HEAD rebaseline: 2026-10-03 / `486c478c6ca5e511de989190c63ec9b35d2ff2a6`
 
