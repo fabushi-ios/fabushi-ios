@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "8556281e5eb20aeb6dba781bd5ecf8c623206d6e",
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
   "group": "source-node-agent-coordinator",
   "rowCount": 53,
   "rows": [
@@ -231,7 +231,7 @@
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/inference_router.rs",
-      "desktop_blob_sha": "fd05df0ae09b0e4373f4aeb508b4e5ae452f08ac",
+      "desktop_blob_sha": "510f0f62728d78ee306e6909e201724db183e9b6",
       "desktop_responsibility": "Own Coordinator inference request admission versus terminal turn settlement, preserving the original request identity when awaitTurn is explicitly true.",
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Ordinary sends return after durable admission, while workflow-reference/explicit awaitTurn requests do not settle until the accepted operation completes, is interrupted, or fails.",
@@ -242,7 +242,7 @@
       "implementation_status": "implemented",
       "production_evidence": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/LocalHostRecoveryTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebaselined for Desktop PR #20 3e735e6e: Coordinator now owns explicit awaitTurn parsing; only boolean true requests renderer request settlement at Runner terminal. Workflow-reference run-now stamps awaitTurn=true and source=workflow-reference. iOS has no equivalent terminal-wait routing owner yet; status invalidated pending production port. iOS production port now treats only literal awaitTurn=true on feature.execute as terminal-wait semantics. The same accepted operationId is held until Host-owned terminal completion/interruption/failure; cancellation cleans only the waiter registration. Exact-HEAD CI is still required before verified."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebaselined for Desktop PR #20 3e735e6e: Coordinator now owns explicit awaitTurn parsing; only boolean true requests renderer request settlement at Runner terminal. Workflow-reference run-now stamps awaitTurn=true and source=workflow-reference. iOS has no equivalent terminal-wait routing owner yet; status invalidated pending production port. iOS production port now treats only literal awaitTurn=true on feature.execute as terminal-wait semantics. The same accepted operationId is held until Host-owned terminal completion/interruption/failure; cancellation cleans only the waiter registration. Exact-HEAD CI is still required before verified. Revalidated against Desktop PR #20 ea6da477: Fabushi product mode now supplies Codex as Coordinator fallback while explicit settings remain authoritative; the iOS Coordinator default is Codex and settings overrides remain supported. Current exact-HEAD CI is required before promotion."
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/lib.rs",
@@ -306,7 +306,7 @@
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/main.rs",
-      "desktop_blob_sha": "0e58365c9e525eb1b735dd5dcdc66617cf89bac6",
+      "desktop_blob_sha": "27eb92721ad83b9258b5e276b65b2f945b900571",
       "desktop_responsibility": "Own Coordinator inference request admission versus terminal turn settlement, preserving the original request identity when awaitTurn is explicitly true.",
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Ordinary sends return after durable admission, while workflow-reference/explicit awaitTurn requests do not settle until the accepted operation completes, is interrupted, or fails.",
@@ -317,7 +317,7 @@
       "implementation_status": "implemented",
       "production_evidence": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/LocalHostRecoveryTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebaselined for Desktop PR #20 3e735e6e: inference request admission now separates immediate acceptance from terminal request settlement. awaitTurn requests preserve the original request identity until execute_local_inference terminates, returning success only at terminal or the normalized failure on error/cancel. iOS current MahayanaCoordinator returns Host acceptance immediately and therefore does not yet satisfy this responsibility. iOS production port now treats only literal awaitTurn=true on feature.execute as terminal-wait semantics. The same accepted operationId is held until Host-owned terminal completion/interruption/failure; cancellation cleans only the waiter registration. Exact-HEAD CI is still required before verified."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebaselined for Desktop PR #20 3e735e6e: inference request admission now separates immediate acceptance from terminal request settlement. awaitTurn requests preserve the original request identity until execute_local_inference terminates, returning success only at terminal or the normalized failure on error/cancel. iOS current MahayanaCoordinator returns Host acceptance immediately and therefore does not yet satisfy this responsibility. iOS production port now treats only literal awaitTurn=true on feature.execute as terminal-wait semantics. The same accepted operationId is held until Host-owned terminal completion/interruption/failure; cancellation cleans only the waiter registration. Exact-HEAD CI is still required before verified. Revalidated against Desktop PR #20 ea6da477: Fabushi product mode now supplies Codex as Coordinator fallback while explicit settings remain authoritative; the iOS Coordinator default is Codex and settings overrides remain supported. Current exact-HEAD CI is required before promotion."
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/mcp.rs",
@@ -561,7 +561,7 @@
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/coordinator_contract.rs",
-      "desktop_blob_sha": "12fc350c2c5a5dda701c56bfcf0eb5e5253d136e",
+      "desktop_blob_sha": "6edad185dfe613efa9a4d9f426f495c5888db944",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "pending-review",
@@ -572,7 +572,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Revalidated against Desktop PR #20 ea6da477: Fabushi product mode now supplies Codex as Coordinator fallback while explicit settings remain authoritative; the iOS Coordinator default is Codex and settings overrides remain supported. Current exact-HEAD CI is required before promotion."
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/gateway_command_policy.rs",
