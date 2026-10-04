@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `b6d314bd7a8f7cbed011a3003a3902f254a16132`
+- pinned source commit for this baseline: `82bdf3d38da2c423f44bc710fab2853a6c650e1c`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,7 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `b6d314bd7a8f7cbed011a3003a3902f254a16132`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `82bdf3d38da2c423f44bc710fab2853a6c650e1c`
 
 Desktop PR #20 is open, draft, based on `main`, and not merged. Relative to the previously pinned `f65d29682533f377f433cedac88aa67148008b3a`, the current exact HEAD is three commits ahead and changes exactly five selected Host files; no selected path is added or removed, so the authoritative inventory remains **7,943** rows. The current blob identities are: `main.rs@eedb687e...`, `production_runtime.rs@9e20bfed...`, `routed_provider_runtime.rs@485f92a...`, `send_message_tool.rs@facb03a7...`, and `runner_routed_provider_contract.rs@7c1a16b...`.
 
@@ -1221,3 +1221,9 @@ Desktop `frontend/packages/mcp-app-sdk/src/bridge.ts` binds sandboxed MCP App RP
 iOS does not emulate a browser-to-parent MessagePort. Its platform replacement is the private `WKScriptMessageHandler` channel restricted to the local Mini App origin. The same security/lifecycle responsibility still applies: each local Mini App source load receives a fresh instance identity and nonce; native calls must present both and name a tool included in that load's explicit grants; duplicate request identities are rejected; pending native tasks are owned by the bridge session and cancelled when the WebView is torn down, replaced by a hosted source, or the page sends its one-shot disposal on `pagehide`; responses are delivered only while the exact originating bridge session remains active. The page must reject its own pending promises on disposal and abort every native WebMCP registration signal.
 
 The existing `window.__fabushiWebMcp` registry remains the iOS compatibility path. If `document.modelContext.registerTool` exists, the same granted tools are additionally registered through that draft native API; registration failure does not remove the local registry or create a second runtime owner. Per-tool approval continues to be enforced by the native Coordinator before a mutating runtime call. This bridge/session work changes lifecycle and capability fencing only; canonical Mini App runtime/tool truth remains in the existing model/runtime owner rather than the WebView.
+
+### Recovery rebaseline 2026-10-05: `82bdf3d3`
+
+Desktop PR #20 advanced from `b6d314bd7a8f7cbed011a3003a3902f254a16132` to `82bdf3d38da2c423f44bc710fab2853a6c650e1c` by one production Host commit affecting exactly two selected rows: `source/host/src/extensions/auth/auth_service.rs` and `source/host/tests/extensions_auth_service_contract.rs`. The source inventory remains 7,943 rows. Desktop now forbids `FABUSHI_HOST_ACCESS_CREDENTIAL_FILE` from acting as a Cursor/Sand HostAuth renewal source; first-party Fabushi account credentials belong only to Fabushi API/Responses transport, so they cannot be sent to Cursor endpoints and surface misleading `ERROR_NOT_LOGGED_IN` failures.
+
+For iOS the Desktop Cursor renewal mechanism is not a shipping component, but the credential-domain security responsibility is applicable. The native replacement already preserves it: production Feature Host forces the first-party Fabushi provider, `mahayana-host` resolves that provider from the Rust-owned product session, and `model_bearer_token` is consulted only for an explicit `UserConfiguredRemote` provider. The two changed Desktop rows are reviewed as `not-applicable-with-replacement`; no renderer/UI credential owner or parallel HostAuth service is introduced. Previous Desktop-bound CI and acceptance evidence is historical, and the resulting iOS exact HEAD must obtain fresh exact-HEAD Actions/protected evidence before any acceptance promotion.

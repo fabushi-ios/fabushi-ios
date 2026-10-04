@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "b6d314bd7a8f7cbed011a3003a3902f254a16132",
+  "sourceCommit": "82bdf3d38da2c423f44bc710fab2853a6c650e1c",
   "group": "source-host",
   "fileCount": 967,
   "files": [
@@ -400,8 +400,8 @@
     },
     {
       "path": "source/host/src/extensions/auth/auth_service.rs",
-      "blobSha": "3347723efb416f06fcf04e4158120db9a1f4f6f2",
-      "size": 13383
+      "blobSha": "bda88d5260936f3c43a4e32b2eabbf8dae95ff6d",
+      "size": 13381
     },
     {
       "path": "source/host/src/extensions/auth/credential_renewer.rs",
@@ -3655,8 +3655,8 @@
     },
     {
       "path": "source/host/tests/extensions_auth_service_contract.rs",
-      "blobSha": "c241dee559ff5dd277def8ef2fdd8f7508a36fe5",
-      "size": 4951
+      "blobSha": "f1dfaa235fb943d4bc0389f65df07795a611fbd1",
+      "size": 5909
     },
     {
       "path": "source/host/tests/extensions_box_lifecycle_contract.rs",

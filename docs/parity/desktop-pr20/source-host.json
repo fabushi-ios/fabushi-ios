@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "b6d314bd7a8f7cbed011a3003a3902f254a16132",
+  "sourceCommit": "82bdf3d38da2c423f44bc710fab2853a6c650e1c",
   "group": "source-host",
   "rowCount": 967,
   "rows": [
@@ -32,7 +32,7 @@
       "implementation_status": "implemented",
       "production_evidence": "RuntimeKernelEventBridge now owns streaming_assistant and upsert_assistant_stream, persists each provider delta into the canonical ConversationState, reuses the same canonical assistant Message on completion, and emits existing RuntimeEvent::MessageDelta/MessageCompleted surfaces.",
       "test_evidence": "Focused kernel_conversation provider-stream contract added on the PR branch; exact-HEAD GitHub Actions pending.",
-      "notes": "Re-reviewed for Desktop f65d29682533f377f433cedac88aa67148008b3a -> b6d314bd7a8f7cbed011a3003a3902f254a16132. Desktop Host now directly projects fast-lane provider text and records Host delivery separately from SendMessage-tool success. Older blob/evidence is historical; current iOS implementation is not verified until same-HEAD acceptance completes."
+      "notes": "Re-reviewed for Desktop f65d29682533f377f433cedac88aa67148008b3a -> 82bdf3d38da2c423f44bc710fab2853a6c650e1c. Desktop Host now directly projects fast-lane provider text and records Host delivery separately from SendMessage-tool success. Older blob/evidence is historical; current iOS implementation is not verified until same-HEAD acceptance completes."
     },
     {
       "desktop_path": "source/host/build.rs",
@@ -1191,18 +1191,18 @@
     },
     {
       "desktop_path": "source/host/src/extensions/auth/auth_service.rs",
-      "desktop_blob_sha": "3347723efb416f06fcf04e4158120db9a1f4f6f2",
-      "desktop_responsibility": "pending-review",
+      "desktop_blob_sha": "bda88d5260936f3c43a4e32b2eabbf8dae95ff6d",
+      "desktop_responsibility": "Own the Desktop Cursor/Sand short-lived inference credential lifecycle and fail closed when no Cursor renewal credential exists; a Fabushi account credential file is explicitly not a HostAuth renewal source and must never be sent to Cursor/Sand endpoints.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "A valid Fabushi account session cannot be misrouted to Cursor/Sand HostAuth, preventing misleading ERROR_NOT_LOGGED_IN failures while leaving Cursor inference unavailable until its own renewal credential is provisioned.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "iOS does not instantiate Desktop Cursor/Sand HostAuth in the shipping production composition. Production Feature Host forces the first-party Fabushi provider, resolves its credential only from the Rust-owned product session, and uses model_bearer_token only for an explicitly UserConfiguredRemote provider. This native provider/credential split preserves the product security effect without porting the Desktop Cursor renewal service.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs: production create_feature_host forces provider=fabushi/FirstPartyDacheng and credential_key=mahayana.account.session; source/packages/mahayana-rs/mahayana-host/src/lib.rs: ModelCredentialResolver returns configured model_bearer_token only for UserConfiguredRemote and otherwise resolves product_client.session_token().",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs fabushi_shipping_inference_tests: production_feature_host_forces_fabushi_inference_owner and test_feature_host_keeps_explicit_provider_for_contract_coverage; exact-HEAD Actions required after this rebaseline.",
+      "notes": "Reviewed against Desktop PR #20 82bdf3d38da2c423f44bc710fab2853a6c650e1c. The b6d314bd -> 82bdf3d3 delta removes FABUSHI_HOST_ACCESS_CREDENTIAL_FILE from Cursor/Sand HostAuth renewal. iOS preserves the security/product effect through its provider-specific native credential resolver rather than porting the Desktop renewal service."
     },
     {
       "desktop_path": "source/host/src/extensions/auth/credential_renewer.rs",
@@ -5612,7 +5612,7 @@
       "implementation_status": "implemented",
       "production_evidence": "ConversationState::upsert_assistant_stream plus RuntimeKernelEventBridge::streaming_assistant implement append-on-first-delta/update-on-following-delta/finalize-same-id semantics in the shipping native runtime.",
       "test_evidence": "Focused provider_stream_reuses_one_canonical_message_and_preserves_reply_fork_identity contract added; exact-HEAD Actions pending.",
-      "notes": "Desktop blob changed in f65d29682533f377f433cedac88aa67148008b3a -> b6d314bd7a8f7cbed011a3003a3902f254a16132; previous lifecycle-only mapping does not prove this new streaming mutation responsibility. Re-reviewed and adapted in the existing iOS canonical transcript owner."
+      "notes": "Desktop blob changed in f65d29682533f377f433cedac88aa67148008b3a -> 82bdf3d38da2c423f44bc710fab2853a6c650e1c; previous lifecycle-only mapping does not prove this new streaming mutation responsibility. Re-reviewed and adapted in the existing iOS canonical transcript owner."
     },
     {
       "desktop_path": "source/host/src/extensions/transcript/profile_watch.rs",
@@ -7337,7 +7337,7 @@
       "implementation_status": "implemented",
       "production_evidence": "NativeEngine now returns an empty tool vector for the direct fast lane, injects a CHAT-013 plain-text instruction, uses the streaming ModelCollector, emits MessageCompleted directly and bypasses reply-nudge/send_message delivery for that lane.",
       "test_evidence": "Focused zero-tool/provider-scope contracts plus direct_conversation_fast_lane_streams_canonical_text_without_send_message_tool added; exact-HEAD Actions pending.",
-      "notes": "Re-reviewed for f65d29682533f377f433cedac88aa67148008b3a -> b6d314bd7a8f7cbed011a3003a3902f254a16132. The old SendMessage-only fast lane is superseded; direct provider text streaming is the current authority."
+      "notes": "Re-reviewed for f65d29682533f377f433cedac88aa67148008b3a -> 82bdf3d38da2c423f44bc710fab2853a6c650e1c. The old SendMessage-only fast lane is superseded; direct provider text streaming is the current authority."
     },
     {
       "desktop_path": "source/host/src/runner/runner_prompt_glue.rs",
@@ -8162,7 +8162,7 @@
       "implementation_status": "implemented",
       "production_evidence": "RuntimeKernelEventBridge has separate KernelEvent::MessageCompleted provider-stream handling and send_message ToolCompleted canonicalization; the direct fast lane never emits a send_message tool event, so each path produces exactly one canonical assistant delivery.",
       "test_evidence": "NativeEngine fast-lane test asserts no send_message ToolStarted/ToolCompleted; kernel conversation stream test asserts one canonical assistant message. Exact-HEAD Actions pending.",
-      "notes": "Newly reviewed because Desktop f65d29682533f377f433cedac88aa67148008b3a -> b6d314bd7a8f7cbed011a3003a3902f254a16132 changed this blob to add record_host_delivery alongside real sink record_success."
+      "notes": "Newly reviewed because Desktop f65d29682533f377f433cedac88aa67148008b3a -> 82bdf3d38da2c423f44bc710fab2853a6c650e1c changed this blob to add record_host_delivery alongside real sink record_success."
     },
     {
       "desktop_path": "source/host/src/runner/tools/tool_input_error.rs",
@@ -10956,18 +10956,18 @@
     },
     {
       "desktop_path": "source/host/tests/extensions_auth_service_contract.rs",
-      "desktop_blob_sha": "c241dee559ff5dd277def8ef2fdd8f7508a36fe5",
-      "desktop_responsibility": "pending-review",
+      "desktop_blob_sha": "f1dfaa235fb943d4bc0389f65df07795a611fbd1",
+      "desktop_responsibility": "Prove the Desktop HostAuth service expiry/fail-closed/renewal behavior and specifically prove that FABUSHI_HOST_ACCESS_CREDENTIAL_FILE can never become a Cursor/Sand HostAuth credential.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Regression coverage prevents a first-party Fabushi bearer from being accepted by Cursor/Sand HostAuth and catches any future collapse of those credential domains.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "The exact Desktop HostAuth test harness is not an iOS shipping component. iOS replaces it with production-provider selection and credential-resolution contracts: shipping mode is first-party Fabushi, while alternate remote providers use only their separately configured bearer.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs fabushi_shipping_inference_tests cover shipping-provider ownership and explicit test-provider routing; current exact-HEAD GitHub Actions pending.",
+      "notes": "Reviewed replacement for Desktop contract blob f1dfaa235fb943d4bc0389f65df07795a611fbd1 at 82bdf3d38da2c423f44bc710fab2853a6c650e1c. The Desktop-specific renewal-service harness is not copied; the iOS contract is enforced at its native shipping provider/credential ownership boundary."
     },
     {
       "desktop_path": "source/host/tests/extensions_box_lifecycle_contract.rs",
@@ -12827,7 +12827,7 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping NativeEngine owns classifier, zero-tool selection, direct streaming and completion; KernelConversation owns canonical stream persistence. No test-only bypass is used.",
       "test_evidence": "conversation_fast_lane_uses_native_text_stream_without_tool_schema and direct_conversation_fast_lane_streams_canonical_text_without_send_message_tool are added; exact-HEAD Actions pending.",
-      "notes": "Desktop focused contract blob changed under f65d29682533f377f433cedac88aa67148008b3a -> b6d314bd7a8f7cbed011a3003a3902f254a16132; old SendMessage-only assertions are historical and not promoted."
+      "notes": "Desktop focused contract blob changed under f65d29682533f377f433cedac88aa67148008b3a -> 82bdf3d38da2c423f44bc710fab2853a6c650e1c; old SendMessage-only assertions are historical and not promoted."
     },
     {
       "desktop_path": "source/host/tests/runner_small_modules_contract.rs",
