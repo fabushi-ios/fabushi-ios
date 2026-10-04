@@ -7,17 +7,17 @@
     {
       "desktop_path": "source/packaging/offline-asr-engine.json",
       "desktop_blob_sha": "aca72ae2bd3753b7c95bc9f9f0dc8e22b91e544a",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "packaging",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "New Desktop PR #20 selected source at 7c00ea34; rebaseline only. Product responsibility and iOS disposition require explicit review before promotion."
+      "desktop_responsibility": "Pins the mandatory offline ASR engine provenance/model inputs consumed by Desktop exact-source packaging so shipping voice-input transcription has a local engine with auditable source identity.",
+      "desktop_owner": "packaging / voice input",
+      "desktop_visible_effect": "Voice input can be transcribed locally without a network transcription dependency, and the shipping ASR implementation has an explicit provenance boundary.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "mobile/ios/Fabushi/OfflineSpeechTranscriber.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS uses the native Speech framework with requiresOnDeviceRecognition=true instead of a macOS whisper-cli bundle; AVFoundation VoiceRecorder remains the single microphone-capture owner and unsupported on-device recognition fails closed.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/OfflineSpeechTranscriber.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/project.yml",
+      "test_evidence": "mobile/ios/FabushiTests/OfflineSpeechTranscriberTests.swift; same-head GitHub Actions pending",
+      "notes": "Desktop mechanism is replaced, not the product effect. Agent/Bot voice input transcribes locally into the editable draft and never auto-sends; Human voice-message capture continues to reuse VoiceRecorder."
     }
   ]
 }

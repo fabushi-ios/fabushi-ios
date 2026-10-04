@@ -15,6 +15,10 @@ internal struct MobileBotChat: View {
     @State private var openedMiniApp = false
     @State private var replyTargetId: String?
     @State private var replyIsFork = false
+    @State private var voiceRecorder = VoiceRecorder()
+    @State private var voiceTranscriber = OfflineSpeechTranscriber()
+    @State private var transcribingVoice = false
+    @State private var voiceInputGeneration = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -89,6 +93,24 @@ internal struct MobileBotChat: View {
                 .padding(.horizontal, 16).padding(.top, 7)
             }
 
+            if voiceRecorder.isRecording || transcribingVoice {
+                HStack(spacing: 9) {
+                    if transcribingVoice {
+                        ProgressView().controlSize(.small)
+                        Text("正在离线转写…").font(.caption.weight(.semibold))
+                    } else {
+                        Circle().fill(Color.red).frame(width: 8, height: 8)
+                        Text("正在录音 \(voiceRecorder.elapsedSeconds / 60):\(String(format: "%02d", voiceRecorder.elapsedSeconds % 60))")
+                            .font(.caption.weight(.semibold))
+                    }
+                    Spacer()
+                    Button("取消") { cancelVoiceInput() }
+                        .font(.caption.weight(.semibold))
+                        .disabled(transcribingVoice)
+                }
+                .padding(.horizontal, 16).padding(.top, 7)
+            }
+
             HStack(alignment: .bottom, spacing: 8) {
                 TextField("Message", text: $draft, axis: .vertical)
                     .lineLimit(1...5)
@@ -113,6 +135,24 @@ internal struct MobileBotChat: View {
                     .accessibilityIdentifier("mobile-bot-open-miniapp")
                 }
 
+                if !busy && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button {
+                        if voiceRecorder.isRecording {
+                            Task { await finishVoiceInput() }
+                        } else {
+                            Task { await startVoiceInput() }
+                        }
+                    } label: {
+                        Image(systemName: voiceRecorder.isRecording ? "stop.fill" : "mic.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 39, height: 39)
+                            .background(voiceRecorder.isRecording ? Color.red : Color.black, in: Circle())
+                    }
+                    .disabled(transcribingVoice)
+                    .accessibilityIdentifier(voiceRecorder.isRecording ? "mobile-bot-voice-stop" : "mobile-bot-voice-start")
+                }
+
                 Button {
                     if busy { Task { await stop() } } else { Task { await send() } }
                 } label: {
@@ -131,6 +171,8 @@ internal struct MobileBotChat: View {
         .background(Color(red: 0.985, green: 0.985, blue: 0.975))
         .accessibilityIdentifier("mobile-bot-chat")
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
+        .onChange(of: bot.id) { _, _ in cancelVoiceInput() }
+        .onDisappear { cancelVoiceInput() }
         .fullScreenCover(isPresented: $openedMiniApp) {
             GlobalDharmaMiniAppView(model: model, bridge: bridge)
         }
@@ -300,6 +342,48 @@ internal struct MobileBotChat: View {
                 }
             }
         }
+    }
+
+    @MainActor
+    private func startVoiceInput() async {
+        guard !busy, !transcribingVoice, !voiceRecorder.isRecording else { return }
+        voiceInputGeneration += 1
+        errorText = nil
+        await voiceRecorder.start()
+        if let recorderError = voiceRecorder.errorMessage {
+            errorText = recorderError
+        }
+    }
+
+    @MainActor
+    private func finishVoiceInput() async {
+        guard !busy, !transcribingVoice, let recording = voiceRecorder.stop() else { return }
+        let generation = voiceInputGeneration
+        let agentId = bot.id
+        transcribingVoice = true
+        defer {
+            transcribingVoice = false
+            try? FileManager.default.removeItem(at: recording.url)
+        }
+        do {
+            let text = try await voiceTranscriber.transcribe(fileURL: recording.url)
+            guard generation == voiceInputGeneration, agentId == bot.id else { return }
+            draft = text
+            errorText = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard generation == voiceInputGeneration, agentId == bot.id else { return }
+            errorText = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func cancelVoiceInput() {
+        voiceInputGeneration += 1
+        voiceRecorder.cancel()
+        voiceTranscriber.cancel()
+        transcribingVoice = false
     }
 
     @MainActor

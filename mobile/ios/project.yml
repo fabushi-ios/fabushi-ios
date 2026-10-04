@@ -73,7 +73,8 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
         NSLocationWhenInUseUsageDescription: 用于在聊天中按你的选择分享当前位置。
-        NSMicrophoneUsageDescription: 用于在聊天中按你的操作录制并发送语音消息。
+        NSMicrophoneUsageDescription: 用于在聊天中按你的操作录制语音消息或语音输入。
+        NSSpeechRecognitionUsageDescription: 用于在设备本地把你的语音输入转成可编辑文字，不使用网络转写回退。
         CFBundleIconName: AppIcon
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
