@@ -5,7 +5,7 @@
 - Source repository: bhrumom/fabushi-desktop
 - Source pull request: #20
 - Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: ca2e4caba082cb858fa2d253da1749de5530b164
+- Pinned source commit: c64035cca2bdb301e948036250ed6ffcc6ea7e42
 - Target repository: fabushi-ios/fabushi-ios
 - Target pull request: #3
 - Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md
@@ -16,7 +16,7 @@ Grok Bot 0.18 is historical architecture/provenance context through Desktop PR #
 
 The current Desktop `frontend/** + source/**` inventory contains 7,943 source-bearing paths at the pinned exact HEAD.
 
-The `266ca48a...` baseline and Actions runs `37206582726` / `37206582744` are historical only after the current authority advance. The `266ca48a... -> ca2e4caba082cb858fa2d253da1749de5530b164` delta is six commits across twelve files: first-party Fabushi provider/routing/settings/experiments/checkpoint responsibility changes, canonical Host and Coordinator product routing to Fabushi, plus a Linux-only pressure-profiler readiness fix. Applicable inference responsibilities are implemented natively in iOS; the Linux `perf` readiness change is reviewed not-applicable. Chunk `sourceCommit` fields record the provenance SHA of each materialized snapshot; the top-level manifest/ledger authority and each changed blob identity are the exact-current acceptance boundary.
+The previous `ca2e4caba082cb858fa2d253da1749de5530b164` baseline and Actions runs `37209380010` / `37209379990` are historical only after the current authority advance. The `ca2e4caba082cb858fa2d253da1749de5530b164 -> c64035cca2bdb301e948036250ed6ffcc6ea7e42` delta is two commits across four `source/product/fabushi/**` files. It moves the shipping first-party Responses default from the obsolete `/v1/ai/responses` path to the deployed `/codex-deepseek/v1/responses` adapter and re-exports that policy from the account service. The iOS Rust AppHost owns the corresponding native production endpoint and is updated to the same deployed path. Chunk `sourceCommit` fields preserve extraction provenance; the top-level manifest/ledger authority and every changed Desktop blob identity are the exact-current acceptance boundary.
 
 ## Historical repository extraction provenance
 

@@ -1054,12 +1054,12 @@ fn effective_inference_provider(
 
 fn normalize_fabushi_responses_url(raw: &str) -> String {
     let base = raw.trim().trim_end_matches('/');
-    if base.ends_with("/v1/ai/responses") {
+    if base.ends_with("/responses") {
         base.to_string()
-    } else if base.ends_with("/v1/ai") {
+    } else if base.ends_with("/codex-deepseek/v1") || base.ends_with("/v1/ai") {
         format!("{base}/responses")
     } else {
-        format!("{base}/v1/ai/responses")
+        format!("{base}/codex-deepseek/v1/responses")
     }
 }
 
@@ -1296,15 +1296,15 @@ mod fabushi_shipping_inference_tests {
     fn fabushi_responses_url_matches_desktop_shipping_contract() {
         assert_eq!(
             normalize_fabushi_responses_url("https://api.ombhrum.com"),
-            "https://api.ombhrum.com/v1/ai/responses"
+            "https://api.ombhrum.com/codex-deepseek/v1/responses"
         );
         assert_eq!(
-            normalize_fabushi_responses_url("https://api.ombhrum.com/v1/ai"),
-            "https://api.ombhrum.com/v1/ai/responses"
+            normalize_fabushi_responses_url("https://api.ombhrum.com/codex-deepseek/v1"),
+            "https://api.ombhrum.com/codex-deepseek/v1/responses"
         );
         assert_eq!(
-            normalize_fabushi_responses_url("https://api.ombhrum.com/v1/ai/responses"),
-            "https://api.ombhrum.com/v1/ai/responses"
+            normalize_fabushi_responses_url("https://api.ombhrum.com/codex-deepseek/v1/responses"),
+            "https://api.ombhrum.com/codex-deepseek/v1/responses"
         );
     }
 }

@@ -21,10 +21,10 @@
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-adapters.ts",
-      "desktop_blob_sha": "1f0f847f690090c32c004f2ddcfaa294d6e91aa8",
-      "desktop_responsibility": "Bind the shipping Fabushi account owner into startup, install the first-party Responses endpoint/product policy and private Host credential path, set Fabushi as the fresh-profile inference default, preserve explicit provider selection, and supply product feature-gate fallbacks.",
+      "desktop_blob_sha": "1d8f0245cfbdee37aaa104c76364c68a2c899b80",
+      "desktop_responsibility": "Bind the shipping Fabushi account owner into startup, install the deployed first-party Responses endpoint/product policy and private Host credential path, set Fabushi as the fresh-profile inference default, preserve explicit provider selection, and supply product feature-gate fallbacks.",
       "desktop_owner": "product/fabushi/account",
-      "desktop_visible_effect": "A fresh signed-in Fabushi profile uses first-party Responses with the account credential and sand_agent_network fallback, while stored provider choice remains persisted for settings semantics, the shipping Fabushi product Host route remains first-party Fabushi; live remote gate state remains authoritative over fallback.",
+      "desktop_visible_effect": "A fresh signed-in Fabushi profile uses the deployed first-party `/codex-deepseek/v1/responses` adapter with the account credential and sand_agent_network fallback, while stored provider choice remains persisted for settings semantics and live remote gate state remains authoritative over fallback.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Rust",
@@ -32,12 +32,12 @@
       "implementation_status": "implemented",
       "production_evidence": "source/shared/node/settings/sand-settings-store.swift; source/shared/node/experiments/cursor-experiments.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/host/MahayanaHostRuntime.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs",
       "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift; mobile/ios/FabushiTests/SharedExperimentServiceParityTests.swift; Rust app-host shipping inference tests; current exact-HEAD GitHub Actions pending",
-      "notes": "Revalidated against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1. Fresh default is Fabushi, explicit persisted provider is not overwritten, and account bearer resolution remains Rust-owned."
+      "notes": "Revalidated against Desktop PR #20 c64035cca2bdb301e948036250ed6ffcc6ea7e42. iOS Rust AppHost now targets the deployed /codex-deepseek/v1/responses path; fresh default remains Fabushi and account bearer resolution remains Rust-owned."
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-policy.ts",
-      "desktop_blob_sha": "75dc77e1aa1d6bd6729cd69a985fe428c6195dff",
-      "desktop_responsibility": "Validate Fabushi durable account sessions, bounded refresh-token-free GitHub Actions sessions, expiration/identity fields, and HTTPS-first API origin policy without credential/query smuggling.",
+      "desktop_blob_sha": "c7faad3934f84b088736409fc490ba50597fce58",
+      "desktop_responsibility": "Own the canonical Fabushi API origin and deployed first-party Responses URL policy, validate durable account sessions and bounded refresh-token-free GitHub Actions sessions, expiration/identity fields, and HTTPS-first API origins without credential/query smuggling.",
       "desktop_owner": "product/fabushi/account-policy",
       "desktop_visible_effect": "Only structurally valid account sessions are accepted; protected CI can use a bounded refreshless session, while durable user sessions require refresh credentials and first-party API origins fail closed.",
       "ios_disposition": "ios-adapted",
@@ -47,12 +47,12 @@
       "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
       "test_evidence": ".github/scripts/prepare-ios-ci-session.test.mjs; exact-HEAD GitHub Actions pending",
-      "notes": "The Rust owner validates bounded CI session transport and keeps refresh credentials in Rust-owned storage. Revalidated against Desktop PR #20 ea6da477."
+      "notes": "Revalidated against Desktop PR #20 c64035cca2bdb301e948036250ed6ffcc6ea7e42. The canonical production Responses URL is https://api.ombhrum.com/codex-deepseek/v1/responses; iOS maps this endpoint responsibility into the native Rust AppHost."
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
-      "desktop_blob_sha": "5024a86e37aef45c355196847024db6b58f0ed85",
-      "desktop_responsibility": "Contract-test bounded refresh-token-free CI session acceptance, durable refresh-token requirements, and trusted Fabushi API origin validation.",
+      "desktop_blob_sha": "4c0ce7213c1b36422222bcb9af900c616a67c499",
+      "desktop_responsibility": "Contract-test bounded refresh-token-free CI session acceptance, durable refresh-token requirements, trusted Fabushi API origin validation, and the deployed first-party Responses endpoint.",
       "desktop_owner": "product/fabushi/account-contract",
       "desktop_visible_effect": "Shipping account policy regressions that would admit unbounded CI credentials, refreshless durable sessions, or unsafe API origins are rejected by focused contracts.",
       "ios_disposition": "ios-adapted",
@@ -61,12 +61,12 @@
       "ios_platform_delta": "The corresponding iOS contract is split between Rust Product tests and the protected-session preparation self-tests used by GitHub Actions.",
       "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs; .github/scripts/prepare-ios-ci-session.mjs",
-      "test_evidence": ".github/scripts/prepare-ios-ci-session.test.mjs; exact-HEAD GitHub Actions pending",
-      "notes": "Mapped as a contract responsibility, not production UI. Revalidated against Desktop PR #20 ea6da477."
+      "test_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs shipping inference tests; .github/scripts/prepare-ios-ci-session.test.mjs; exact-HEAD GitHub Actions pending",
+      "notes": "Mapped as a contract responsibility, not production UI. Revalidated against Desktop PR #20 c64035cca2bdb301e948036250ed6ffcc6ea7e42; the iOS Rust contract asserts the deployed /codex-deepseek/v1/responses endpoint."
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-service.ts",
-      "desktop_blob_sha": "1b3b65e4c28b7156b11819c5e6a01b43c5aa714a",
+      "desktop_blob_sha": "b0bd689dc430fd36ce1e2089027563f80d47b54e",
       "desktop_responsibility": "Own shipping Fabushi browser login, encrypted durable session persistence, identity verification, access-token refresh, logout/revocation, bounded CI session admission, and private Host access credential projection without exposing refresh credentials.",
       "desktop_owner": "product/fabushi/account-service",
       "desktop_visible_effect": "Users sign in through Fabushi, long-lived sessions refresh with stable identity, logout/account changes revoke stale model credentials, and model inference receives only the current account access credential.",
@@ -77,7 +77,7 @@
       "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs; source/packages/mahayana-rs/mahayana-model/src/responses.rs",
       "test_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs; source/packages/mahayana-rs/mahayana-model/src/responses.rs; exact-HEAD GitHub Actions pending",
-      "notes": "Current inference credential resolver rereads the Product session for each inference so logout/account switching cannot retain a stale bearer. Revalidated against Desktop PR #20 ea6da477."
+      "notes": "Current inference credential resolver rereads the Product session for each inference so logout/account switching cannot retain a stale bearer. Desktop c64035cca2bdb301e948036250ed6ffcc6ea7e42 also re-exports the canonical deployed Responses URL policy; iOS keeps endpoint ownership in Rust AppHost rather than Swift/UI."
     }
   ]
 }
