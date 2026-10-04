@@ -57,6 +57,7 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
             pluginId: "bridge-session-test",
             displayName: "Bridge Session Test",
             description: "test",
+            latestVersion: nil,
             tools: [
                 .init(name: "status", description: "status", approval: "none"),
                 .init(name: "start", description: "start", approval: "confirm"),
@@ -68,6 +69,6 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertNotEqual(first.pluginInstanceId, second.pluginInstanceId)
         XCTAssertNotEqual(first.nonce, second.nonce)
         XCTAssertGreaterThanOrEqual(first.nonce.count, 16)
-        XCTAssertEqual(first.grants, ["status", "start"])
+        XCTAssertEqual(first.grants, Set(["status", "start"]))
     }
 }
