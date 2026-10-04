@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "8556281e5eb20aeb6dba781bd5ecf8c623206d6e",
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
   "group": "source-node-agent-coordinator",
   "fileCount": 53,
   "files": [
@@ -80,8 +80,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/inference_router.rs",
-      "blobSha": "fd05df0ae09b0e4373f4aeb508b4e5ae452f08ac",
-      "size": 39871
+      "blobSha": "510f0f62728d78ee306e6909e201724db183e9b6",
+      "size": 40157
     },
     {
       "path": "source/node-agent-coordinator/src/lib.rs",
@@ -105,8 +105,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/main.rs",
-      "blobSha": "0e58365c9e525eb1b735dd5dcdc66617cf89bac6",
-      "size": 112310
+      "blobSha": "27eb92721ad83b9258b5e276b65b2f945b900571",
+      "size": 112592
     },
     {
       "path": "source/node-agent-coordinator/src/mcp.rs",
@@ -190,8 +190,8 @@
     },
     {
       "path": "source/node-agent-coordinator/tests/coordinator_contract.rs",
-      "blobSha": "12fc350c2c5a5dda701c56bfcf0eb5e5253d136e",
-      "size": 81415
+      "blobSha": "6edad185dfe613efa9a4d9f426f495c5888db944",
+      "size": 82399
     },
     {
       "path": "source/node-agent-coordinator/tests/gateway_command_policy.rs",
