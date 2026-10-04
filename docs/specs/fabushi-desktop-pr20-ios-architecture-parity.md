@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `f65d29682533f377f433cedac88aa67148008b3a`
+- pinned source commit for this baseline: `b6d314bd7a8f7cbed011a3003a3902f254a16132`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,17 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `f65d29682533f377f433cedac88aa67148008b3a`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `b6d314bd7a8f7cbed011a3003a3902f254a16132`
+
+Desktop PR #20 is open, draft, based on `main`, and not merged. Relative to the previously pinned `f65d29682533f377f433cedac88aa67148008b3a`, the current exact HEAD is three commits ahead and changes exactly five selected Host files; no selected path is added or removed, so the authoritative inventory remains **7,943** rows. The current blob identities are: `main.rs@eedb687e...`, `production_runtime.rs@9e20bfed...`, `routed_provider_runtime.rs@485f92a...`, `send_message_tool.rs@facb03a7...`, and `runner_routed_provider_contract.rs@7c1a16b...`.
+
+The applicable product responsibility is the revised CHAT-013 direct conversation fast lane. A visible, short, plain-text first-party Fabushi conversation turn advertises **no tool schema** and receives an explicit instruction to answer directly in plain text. Provider text deltas are Host-owned user-visible output: the first delta creates one canonical assistant transcript entry, later deltas update that same entry, completion retains the same identity, and the Host records delivery through an explicit Host-delivery counter path. Real SendMessage sink successes remain a distinct path. Action/resource/ambiguous turns and non-first-party or hidden/recovery turns retain the full tool surface and normal ownership.
+
+iOS adapts this responsibility inside existing native owners. `mahayana-native-engine` scopes the zero-tool path to visible `ModelProviderMode::FirstPartyDacheng` turns that pass the conservative classifier, injects the direct-text instruction, streams `MessageDelta`, and emits direct `MessageCompleted` without a synthetic `send_message` call. `mahayana-runtime/src/kernel_conversation.rs` keeps one stable provider-stream `Message` in the canonical `ConversationState`, persists deltas in place, finalizes the same `MessageId`, and preserves valid reply/fork identity. The existing send_message ToolCompleted path stays separate, so direct Host delivery cannot be double-counted as a tool success. No parallel Router, transcript owner, or test-only bypass is introduced.
+
+All acceptance bound to Desktop `f65d29682533f377f433cedac88aa67148008b3a` or intermediate `a8d840c89fb3bb70e54ddcbcfe4fd1c723937f24`/`b4e11c9bcaa0c7efd6c4d9b29e1a5c56e7f3e6ab`, including iOS runs `37231366076` and `37231366048`, is historical only. The resulting iOS exact HEAD must complete fresh ordinary and protected same-HEAD acceptance before CHAT-013 can be promoted to verified or the 7,943-row responsibility audit can resume.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-05 / `f65d29682533f377f433cedac88aa67148008b3a`
 
 Desktop PR #20 remains open and draft on `refactor/grok-018-architecture-rebuild`. Direct GitHub compare from the previously pinned `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf` baseline reports **1 commit and exactly 2 changed selected Host files**: `source/host/src/runner/routed_provider_runtime.rs` and `source/host/tests/runner_routed_provider_contract.rs`. No selected path was added or removed, so the authoritative `frontend/** + source/**` inventory remains exactly **7,943** rows. The changed Desktop blob identities are `3483d292213fcff507d48f63b4d6a17c6379cd47` and `2da31a1e284e5a6df0b1306216350d8dde8ed3eb`.
 
