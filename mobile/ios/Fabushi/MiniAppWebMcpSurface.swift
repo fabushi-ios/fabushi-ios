@@ -6,6 +6,26 @@ private let webMcpOriginHost = "fabushi.ombhrum.com"
 private let localWebMcpOriginHost = "miniapp.local.fabushi.invalid"
 private let webMcpMessageHandler = "fabushiWebMcp"
 
+struct MiniAppWebMcpBridgeSession: Equatable {
+    let pluginInstanceId: String
+    let nonce: String
+    let grants: Set<String>
+
+    static func fresh(plugin: MarketplacePlugin) -> Self {
+        Self(
+            pluginInstanceId: "\(plugin.pluginId):\(UUID().uuidString)",
+            nonce: UUID().uuidString.replacingOccurrences(of: "-", with: ""),
+            grants: Set(plugin.tools.map(\.name))
+        )
+    }
+
+    func allows(pluginInstanceId: String, nonce: String, toolName: String) -> Bool {
+        self.pluginInstanceId == pluginInstanceId
+            && self.nonce == nonce
+            && grants.contains(toolName)
+    }
+}
+
 struct MiniAppWebMcpSurface: View {
     let plugin: MarketplacePlugin
     let model: MarketplaceModel
@@ -130,14 +150,19 @@ private struct MiniAppWebView: UIViewRepresentable {
             let key = "local:\(plugin.pluginId)"
             guard context.coordinator.loadedSourceKey != key else { return }
             context.coordinator.loadedSourceKey = key
+            let bridgeSession = context.coordinator.prepareLocalBridgeSession()
             let baseURL = URL(string: "https://\(localWebMcpOriginHost)/miniapps/\(plugin.pluginId)/")
-            webView.loadHTMLString(injectLocalWebMcp(localHtml, plugin: plugin), baseURL: baseURL)
+            webView.loadHTMLString(
+                injectLocalWebMcp(localHtml, plugin: plugin, bridgeSession: bridgeSession),
+                baseURL: baseURL
+            )
             return
         }
 
         let key = "hosted:\(plugin.pluginId)"
         guard context.coordinator.loadedSourceKey != key else { return }
         context.coordinator.loadedSourceKey = key
+        context.coordinator.disposeLocalBridgeSession()
         var components = URLComponents()
         components.scheme = "https"
         components.host = webMcpOriginHost
@@ -151,6 +176,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(forName: webMcpMessageHandler)
+        coordinator.disposeLocalBridgeSession()
         webView.loadHTMLString("", baseURL: nil)
         coordinator.webView = nil
     }
@@ -163,12 +189,29 @@ private struct MiniAppWebView: UIViewRepresentable {
         weak var webView: WKWebView?
         var loadedSourceKey: String?
         private let toolByName: [String: MiniAppToolContract]
+        private var activeBridgeSession: MiniAppWebMcpBridgeSession?
+        private var pendingRequests: [String: Task<Void, Never>] = [:]
 
         init(plugin: MarketplacePlugin, model: MarketplaceModel, status: Binding<String>) {
             self.plugin = plugin
             self.model = model
             self.toolByName = Dictionary(uniqueKeysWithValues: plugin.tools.map { ($0.name, $0) })
             _status = status
+        }
+
+        func prepareLocalBridgeSession() -> MiniAppWebMcpBridgeSession {
+            disposeLocalBridgeSession()
+            let session = MiniAppWebMcpBridgeSession.fresh(plugin: plugin)
+            activeBridgeSession = session
+            return session
+        }
+
+        func disposeLocalBridgeSession() {
+            for task in pendingRequests.values {
+                task.cancel()
+            }
+            pendingRequests.removeAll()
+            activeBridgeSession = nil
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
@@ -253,45 +296,88 @@ private struct MiniAppWebView: UIViewRepresentable {
                   let webView,
                   webView.url?.host == localWebMcpOriginHost,
                   let body = message.body as? [String: Any],
+                  let pluginInstanceId = body["pluginInstanceId"] as? String,
+                  let nonce = body["nonce"] as? String,
+                  let session = activeBridgeSession,
+                  session.pluginInstanceId == pluginInstanceId,
+                  session.nonce == nonce
+            else { return }
+
+            if body["kind"] as? String == "dispose" {
+                disposeLocalBridgeSession()
+                return
+            }
+
+            guard body["kind"] as? String == "call",
                   let requestId = body["requestId"] as? String,
+                  !requestId.isEmpty,
+                  pendingRequests[requestId] == nil,
                   let name = body["name"] as? String,
+                  session.allows(pluginInstanceId: pluginInstanceId, nonce: nonce, toolName: name),
                   let tool = toolByName[name],
                   let input = body["input"] as? [String: Any]
             else { return }
 
-            Task { @MainActor in
+            let task = Task { @MainActor [weak self, weak webView] in
+                guard let self, let webView else { return }
+                defer { self.pendingRequests.removeValue(forKey: requestId) }
                 do {
+                    try Task.checkCancellation()
+                    guard self.activeBridgeSession == session else { throw CancellationError() }
                     if tool.approval != "none" {
-                        guard await requestApproval(tool) else {
-                            resolve(webView: webView, requestId: requestId, payload: [
-                                "ok": false,
-                                "error": "用户取消了 WebMCP Tool 调用",
-                            ])
+                        guard await self.requestApproval(tool) else {
+                            self.resolve(
+                                webView: webView,
+                                session: session,
+                                requestId: requestId,
+                                payload: ["ok": false, "error": "用户取消了 WebMCP Tool 调用"]
+                            )
                             return
                         }
                     }
+                    try Task.checkCancellation()
+                    guard self.activeBridgeSession == session else { throw CancellationError() }
+
                     let result: Any
-                    if plugin.pluginId == GlobalDharmaCommerceModel.miniAppId && name == "status" {
-                        let runtime = try await model.globalDharmaCommerce.fetchCanonicalSharedRuntime()
+                    if self.plugin.pluginId == GlobalDharmaCommerceModel.miniAppId && name == "status" {
+                        let runtime = try await self.model.globalDharmaCommerce.fetchCanonicalSharedRuntime()
                         result = [
                             "content": [["type": "text", "text": "已读取全球法布施状态。"]],
                             "structuredContent": ["runtime": runtime],
                         ] as [String: Any]
                     } else {
-                        result = try await model.callRuntimeTool(
-                            pluginId: plugin.pluginId,
+                        result = try await self.model.callRuntimeTool(
+                            pluginId: self.plugin.pluginId,
                             name: name,
                             arguments: input
                         )
                     }
-                    resolve(webView: webView, requestId: requestId, payload: ["ok": true, "result": result])
+
+                    try Task.checkCancellation()
+                    guard self.activeBridgeSession == session else { throw CancellationError() }
+                    self.resolve(
+                        webView: webView,
+                        session: session,
+                        requestId: requestId,
+                        payload: ["ok": true, "result": result]
+                    )
+                } catch is CancellationError {
+                    self.resolve(
+                        webView: webView,
+                        session: session,
+                        requestId: requestId,
+                        payload: ["ok": false, "error": "MCP App bridge disposed"]
+                    )
                 } catch {
-                    resolve(webView: webView, requestId: requestId, payload: [
-                        "ok": false,
-                        "error": error.localizedDescription,
-                    ])
+                    self.resolve(
+                        webView: webView,
+                        session: session,
+                        requestId: requestId,
+                        payload: ["ok": false, "error": error.localizedDescription]
+                    )
                 }
             }
+            pendingRequests[requestId] = task
         }
 
         private func requestApproval(_ tool: MiniAppToolContract) async -> Bool {
@@ -326,14 +412,24 @@ private struct MiniAppWebView: UIViewRepresentable {
             return controller
         }
 
-        private func resolve(webView: WKWebView, requestId: String, payload: [String: Any]) {
-            guard JSONSerialization.isValidJSONObject(payload),
+        private func resolve(
+            webView: WKWebView,
+            session: MiniAppWebMcpBridgeSession,
+            requestId: String,
+            payload: [String: Any]
+        ) {
+            guard activeBridgeSession == session,
+                  JSONSerialization.isValidJSONObject(payload),
                   let data = try? JSONSerialization.data(withJSONObject: payload),
                   let json = String(data: data, encoding: .utf8),
                   let requestData = try? JSONEncoder().encode(requestId),
                   let requestJson = String(data: requestData, encoding: .utf8)
             else { return }
-            webView.evaluateJavaScript("window.__fabushiNativeResolve?.(\(requestJson),\(json));")
+            let instanceJson = jsonString(session.pluginInstanceId)
+            let nonceJson = jsonString(session.nonce)
+            webView.evaluateJavaScript(
+                "window.__fabushiNativeResolve?.(\(requestJson),\(instanceJson),\(nonceJson),\(json));"
+            )
         }
     }
 }
@@ -353,7 +449,11 @@ private func hardenGeneratedMiniAppDocument(_ html: String) -> String {
     return "<!doctype html><html><head>\(policy)</head><body>\(html)</body></html>"
 }
 
-private func injectLocalWebMcp(_ html: String, plugin: MarketplacePlugin) -> String {
+private func injectLocalWebMcp(
+    _ html: String,
+    plugin: MarketplacePlugin,
+    bridgeSession: MiniAppWebMcpBridgeSession
+) -> String {
     let definitions = plugin.tools.map { tool in
         [
             "name": tool.name,
@@ -367,15 +467,19 @@ private func injectLocalWebMcp(_ html: String, plugin: MarketplacePlugin) -> Str
     <script>
     (function(){
       const definitions=\(toolsJson);
-      const localTools=new Map();const controllers=[];const pending=new Map();let sequence=0;
-      window.__fabushiNativeResolve=(requestId,payload)=>{const task=pending.get(requestId);if(!task)return;pending.delete(requestId);if(payload&&payload.ok)task.resolve(payload.result);else task.reject(new Error(payload?.error||'WebMCP runtime call failed'));};
-      function callNative(name,input){return new Promise((resolve,reject)=>{const requestId='webmcp-'+Date.now()+'-'+(++sequence);pending.set(requestId,{resolve,reject});window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({requestId,name,input:input||{}});});}
+      const pluginInstanceId=\(jsonString(bridgeSession.pluginInstanceId));
+      const nonce=\(jsonString(bridgeSession.nonce));
+      const grants=new Set(\(jsonStringArray(Array(bridgeSession.grants).sorted())));
+      const localTools=new Map();const controllers=[];const pending=new Map();let sequence=0;let disposed=false;
+      function rejectPending(reason){for(const task of pending.values())task.reject(new Error(reason));pending.clear();}
+      window.__fabushiNativeResolve=(requestId,responseInstanceId,responseNonce,payload)=>{if(disposed||responseInstanceId!==pluginInstanceId||responseNonce!==nonce)return;const task=pending.get(requestId);if(!task)return;pending.delete(requestId);if(payload&&payload.ok)task.resolve(payload.result);else task.reject(new Error(payload?.error||'WebMCP runtime call failed'));};
+      function callNative(name,input){if(disposed)return Promise.reject(new Error('MCP App bridge disposed'));if(!grants.has(name))return Promise.reject(new Error('MCP App bridge capability not granted: '+name));return new Promise((resolve,reject)=>{const requestId='webmcp-'+Date.now()+'-'+(++sequence);pending.set(requestId,{resolve,reject});window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({kind:'call',pluginInstanceId,nonce,requestId,name,input:input||{}});});}
       function publicTool(tool){const copy={...tool};delete copy.execute;return copy;}
-      function register(item){const tool={name:item.name,description:item.description||item.name,inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:item.readOnlyHint===true},execute:(input)=>callNative(item.name,input)};localTools.set(tool.name,tool);if(document.modelContext&&typeof document.modelContext.registerTool==='function'){const controller=new AbortController();controllers.push(controller);Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}}
+      function register(item){if(!grants.has(item.name))return;const tool={name:item.name,description:item.description||item.name,inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:item.readOnlyHint===true},execute:(input)=>callNative(item.name,input)};localTools.set(tool.name,tool);if(document.modelContext&&typeof document.modelContext.registerTool==='function'){const controller=new AbortController();controllers.push(controller);Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}}
       for(const item of definitions)register(item);
       Object.defineProperty(window,'__fabushiWebMcp',{configurable:true,value:{version:1,list:()=>Array.from(localTools.values()).map(publicTool),call:async(name,input={})=>{const tool=localTools.get(name);if(!tool)throw new Error('Unknown WebMCP tool: '+name);return tool.execute(input);}}});
-      window.addEventListener('pagehide',()=>{for(const controller of controllers)controller.abort();pending.clear();},{once:true});
-      window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:\(jsonString(plugin.pluginId)),tools:definitions.map(t=>t.name)}}));
+      window.addEventListener('pagehide',()=>{if(disposed)return;disposed=true;for(const controller of controllers)controller.abort();window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({kind:'dispose',pluginInstanceId,nonce});rejectPending('MCP App bridge disposed');},{once:true});
+      window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:\(jsonString(plugin.pluginId)),pluginInstanceId,grants:Array.from(grants),tools:Array.from(localTools.keys())}}));
     })();
     </script>
     """
@@ -390,4 +494,9 @@ private func injectLocalWebMcp(_ html: String, plugin: MarketplacePlugin) -> Str
 private func jsonString(_ value: String) -> String {
     guard let data = try? JSONEncoder().encode(value) else { return "\"\"" }
     return String(data: data, encoding: .utf8) ?? "\"\""
+}
+
+private func jsonStringArray(_ values: [String]) -> String {
+    guard let data = try? JSONEncoder().encode(values) else { return "[]" }
+    return String(data: data, encoding: .utf8) ?? "[]"
 }

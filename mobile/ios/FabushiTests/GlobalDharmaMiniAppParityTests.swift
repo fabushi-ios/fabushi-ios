@@ -22,4 +22,52 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(bot.miniAppId, "global-dharma")
         XCTAssertEqual(bot.menuButtonText, "打开应用")
     }
+
+    func testMiniAppBridgeSessionRequiresExactInstanceNonceAndExplicitGrant() {
+        let session = MiniAppWebMcpBridgeSession(
+            pluginInstanceId: "global-dharma:instance-1",
+            nonce: "0123456789abcdef0123456789abcdef",
+            grants: ["status", "start"]
+        )
+
+        XCTAssertTrue(session.allows(
+            pluginInstanceId: "global-dharma:instance-1",
+            nonce: "0123456789abcdef0123456789abcdef",
+            toolName: "status"
+        ))
+        XCTAssertFalse(session.allows(
+            pluginInstanceId: "global-dharma:instance-2",
+            nonce: "0123456789abcdef0123456789abcdef",
+            toolName: "status"
+        ))
+        XCTAssertFalse(session.allows(
+            pluginInstanceId: "global-dharma:instance-1",
+            nonce: "wrong-nonce",
+            toolName: "status"
+        ))
+        XCTAssertFalse(session.allows(
+            pluginInstanceId: "global-dharma:instance-1",
+            nonce: "0123456789abcdef0123456789abcdef",
+            toolName: "deploy_latest"
+        ))
+    }
+
+    func testMiniAppBridgeFreshSessionUsesPerLoadIdentityAndBoundedExplicitGrants() {
+        let plugin = MarketplacePlugin(
+            pluginId: "bridge-session-test",
+            displayName: "Bridge Session Test",
+            description: "test",
+            tools: [
+                .init(name: "status", description: "status", approval: "none"),
+                .init(name: "start", description: "start", approval: "confirm"),
+            ]
+        )
+        let first = MiniAppWebMcpBridgeSession.fresh(plugin: plugin)
+        let second = MiniAppWebMcpBridgeSession.fresh(plugin: plugin)
+
+        XCTAssertNotEqual(first.pluginInstanceId, second.pluginInstanceId)
+        XCTAssertNotEqual(first.nonce, second.nonce)
+        XCTAssertGreaterThanOrEqual(first.nonce.count, 16)
+        XCTAssertEqual(first.grants, ["status", "start"])
+    }
 }
