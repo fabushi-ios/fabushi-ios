@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `a71ac22020e969c6077ecd78a8a050078d7b134e`
+- pinned source commit for this baseline: `266ca48a220edae3ce12820fb951c731723810d6`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,15 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-04 / `a71ac22020e969c6077ecd78a8a050078d7b134e`
+### 1.0 Current exact-HEAD authority: 2026-10-04 / `266ca48a220edae3ce12820fb951c731723810d6`
+
+Desktop PR #20 advanced exactly one commit from `a71ac22020e969c6077ecd78a8a050078d7b134e` to `266ca48a220edae3ce12820fb951c731723810d6` while remaining open and draft on `refactor/grok-018-architecture-rebuild`. A direct GitHub compare reports one changed file only: `source/host/tests/agent_to_agent_messaging_contract.rs`, with 4 additions and 1 deletion. The authoritative `frontend/** + source/**` inventory therefore remains exactly **7,943** paths, but this selected test file has a new Desktop blob identity (`7292a8b53882c5533db97da7e3c87626df963c57`).
+
+The upstream commit, `test: isolate parallel agent messaging temp roots`, changes only the Desktop focused-test harness. Its `temp_root()` helper now appends a process-local `AtomicUsize` ordinal in addition to process id and nanosecond timestamp so parallel tests cannot accidentally reuse the same temporary root. No shipping Host implementation, product ownership, state machine, protocol contract, or user-visible production behavior changed.
+
+Applicability review for iOS: this is a Desktop test-isolation contract, not a new iOS production responsibility. The iOS branch does not contain the Desktop `source/host/tests/agent_to_agent_messaging_contract.rs` test, and its existing native messaging/agent contract tests do not use a matching timestamp-only temp-root helper. iOS must therefore **not** mechanically copy this Desktop test and must not create a new production ledger row or alter production ownership. The already-existing selected-source ledger row for this Desktop test is reviewed as `not-applicable` with a platform note explaining that iOS keeps its native XCTest contract coverage; only the changed Desktop blob identity and top-level authority are rebound. The previous current-head runs `37204861838` and `37204861848` remain historical and cannot be promoted for this authority.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-04 / `a71ac22020e969c6077ecd78a8a050078d7b134e`
 
 Desktop PR #20 advanced exactly one commit from `da503ef7af80501b1c7bbf5dd22ee727155edf54` to `a71ac22020e969c6077ecd78a8a050078d7b134e` while remaining open and draft on `refactor/grok-018-architecture-rebuild`. A direct GitHub compare reports one changed file only: `desktop/e2e/openbot-packaged-acceptance.spec.ts`, with 14 additions and 10 deletions. No file under the authoritative iOS-selected `frontend/** + source/**` roots changed, was added, removed, or renamed. The selected production inventory therefore remains exactly **7,943** files and all selected per-path Desktop blob identities remain unchanged.
 

@@ -3055,8 +3055,8 @@
     },
     {
       "path": "source/host/tests/agent_to_agent_messaging_contract.rs",
-      "blobSha": "b993281ba9c6cee6cd2adb1732437f7041a7b4d6",
-      "size": 16684
+      "blobSha": "7292a8b53882c5533db97da7e3c87626df963c57",
+      "size": 16816
     },
     {
       "path": "source/host/tests/agent_worker_pool_lifecycle_contract.rs",
