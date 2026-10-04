@@ -85,6 +85,20 @@ impl ConversationState {
         self.history.push(message);
         true
     }
+
+    fn upsert_assistant_stream(&mut self, message: Message, hidden: bool) -> bool {
+        if hidden {
+            return false;
+        }
+        if let Some(existing) = self.history.iter_mut().find(|existing| {
+            existing.conversation_id == message.conversation_id && existing.id == message.id
+        }) {
+            *existing = message;
+        } else {
+            self.history.push(message);
+        }
+        true
+    }
 }
 
 fn history_request_marks_read(limit: u32) -> bool {
@@ -479,6 +493,7 @@ impl ConversationProvider for KernelConversationProvider {
             reply_to_message_id: request.reply_to_message_id.clone(),
             is_fork: request.is_fork,
             attachment_batch_id: Some(turn_attachment_batch_id),
+            streaming_assistant: Mutex::new(None),
         });
         let result = self
             .backend
@@ -608,6 +623,7 @@ struct RuntimeKernelEventBridge {
     reply_to_message_id: Option<String>,
     is_fork: bool,
     attachment_batch_id: Option<String>,
+    streaming_assistant: Mutex<Option<Message>>,
 }
 
 impl RuntimeKernelEventBridge {
@@ -615,6 +631,43 @@ impl RuntimeKernelEventBridge {
         self.events
             .emit(event)
             .map_err(|error| KernelError::Backend(error.to_string()))
+    }
+
+    fn provider_stream_message(&self, text: String, state: &ConversationState) -> Message {
+        let reply_to = self
+            .reply_to_message_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .filter(|candidate| {
+                state.history.iter().any(|message| {
+                    message.conversation_id == self.conversation_id
+                        && message.id.as_str() == *candidate
+                })
+            });
+        let mut metadata = json!({
+            "runtime": "mahayana-kernel",
+            "providerStream": true,
+        });
+        if let Some(object) = metadata.as_object_mut()
+            && let Some(reply_to) = reply_to
+        {
+            object.insert(
+                "replyToMessageId".into(),
+                Value::String(reply_to.to_string()),
+            );
+            if self.is_fork {
+                object.insert("branched".into(), Value::Bool(true));
+            }
+        }
+        Message {
+            id: MessageId::generated("provider-stream"),
+            conversation_id: self.conversation_id.clone(),
+            role: MessageRole::Assistant,
+            text,
+            created_at_ms: now_ms(),
+            metadata,
+        }
     }
 
     fn activity(
@@ -645,6 +698,22 @@ impl KernelEventSink for RuntimeKernelEventBridge {
                 if self.hide_assistant_output {
                     return Ok(());
                 }
+                let mut stream = self.streaming_assistant.lock().map_err(|_| {
+                    KernelError::Backend("provider stream mutex poisoned".into())
+                })?;
+                let mut state = self.state.lock().map_err(|_| {
+                    KernelError::Backend("kernel conversation state mutex poisoned".into())
+                })?;
+                let message = stream
+                    .get_or_insert_with(|| self.provider_stream_message(String::new(), &state));
+                message.text.push_str(&delta);
+                let should_persist =
+                    state.upsert_assistant_stream(message.clone(), self.hide_assistant_output);
+                drop(state);
+                drop(stream);
+                if should_persist {
+                    persist_history(&self.state, self.history_path.as_deref())?;
+                }
                 self.emit_runtime(RuntimeEvent::MessageDelta {
                     operation_id: self.operation_id.clone(),
                     conversation_id: self.conversation_id.clone(),
@@ -652,21 +721,22 @@ impl KernelEventSink for RuntimeKernelEventBridge {
                 })
             }
             KernelEvent::MessageCompleted { text, .. } => {
-                let message = Message {
-                    id: MessageId::generated("message"),
-                    conversation_id: self.conversation_id.clone(),
-                    role: MessageRole::Assistant,
-                    text,
-                    created_at_ms: now_ms(),
-                    metadata: json!({"runtime": "mahayana-kernel"}),
+                let mut stream = self.streaming_assistant.lock().map_err(|_| {
+                    KernelError::Backend("provider stream mutex poisoned".into())
+                })?;
+                let mut state = self.state.lock().map_err(|_| {
+                    KernelError::Backend("kernel conversation state mutex poisoned".into())
+                })?;
+                let message = if let Some(mut message) = stream.take() {
+                    message.text = text;
+                    message
+                } else {
+                    self.provider_stream_message(text, &state)
                 };
-                let should_persist = self
-                    .state
-                    .lock()
-                    .map_err(|_| {
-                        KernelError::Backend("kernel conversation state mutex poisoned".into())
-                    })?
-                    .record_assistant_completion(message.clone(), self.hide_assistant_output);
+                let should_persist =
+                    state.upsert_assistant_stream(message.clone(), self.hide_assistant_output);
+                drop(state);
+                drop(stream);
                 if should_persist {
                     persist_history(&self.state, self.history_path.as_deref())?;
                 }
@@ -1045,6 +1115,88 @@ mod tests {
             created_at_ms: 1,
             metadata: Value::Null,
         }
+    }
+
+    #[derive(Default)]
+    struct CapturedRuntimeEvents(Mutex<Vec<RuntimeEvent>>);
+
+    impl mahayana_conversation::ConversationEventSink for CapturedRuntimeEvents {
+        fn emit(&self, event: RuntimeEvent) -> Result<(), ConversationError> {
+            self.0
+                .lock()
+                .map_err(|_| ConversationError::Provider("event capture poisoned".into()))?
+                .push(event);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn provider_stream_reuses_one_canonical_message_and_preserves_reply_fork_identity() {
+        let conversation_id = conversation(mahayana_core::MAHAYANA_AI_CONVERSATION_ID);
+        let reply = message(&conversation_id, MessageRole::User, "reply target");
+        let reply_id = reply.id.as_str().to_string();
+        let state = Arc::new(Mutex::new(ConversationState::new(vec![reply])));
+        let events = Arc::new(CapturedRuntimeEvents::default());
+        let bridge = RuntimeKernelEventBridge {
+            conversation_id: conversation_id.clone(),
+            operation_id: OperationId::generated("operation"),
+            events: events.clone(),
+            state: state.clone(),
+            history_path: None,
+            hide_assistant_output: false,
+            reply_to_message_id: Some(reply_id.clone()),
+            is_fork: true,
+            attachment_batch_id: None,
+            streaming_assistant: Mutex::new(None),
+        };
+        let kernel_operation_id = KernelOperationId::from_string("kernel-fast-lane");
+
+        bridge
+            .emit(KernelEvent::MessageDelta {
+                operation_id: kernel_operation_id.clone(),
+                delta: "般若".into(),
+            })
+            .expect("first provider delta");
+        bridge
+            .emit(KernelEvent::MessageDelta {
+                operation_id: kernel_operation_id.clone(),
+                delta: "波罗蜜".into(),
+            })
+            .expect("second provider delta");
+        bridge
+            .emit(KernelEvent::MessageCompleted {
+                operation_id: kernel_operation_id,
+                text: "般若波罗蜜".into(),
+            })
+            .expect("provider stream completion");
+
+        let state = state.lock().expect("state");
+        let assistant = state
+            .history
+            .iter()
+            .filter(|message| message.role == MessageRole::Assistant)
+            .collect::<Vec<_>>();
+        assert_eq!(assistant.len(), 1);
+        assert_eq!(assistant[0].text, "般若波罗蜜");
+        assert_eq!(assistant[0].metadata["providerStream"], true);
+        assert_eq!(assistant[0].metadata["replyToMessageId"], reply_id);
+        assert_eq!(assistant[0].metadata["branched"], true);
+        let canonical_id = assistant[0].id.clone();
+        drop(state);
+
+        let events = events.0.lock().expect("events");
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| matches!(event, RuntimeEvent::MessageDelta { .. }))
+                .count(),
+            2
+        );
+        assert!(events.iter().any(|event| matches!(
+            event,
+            RuntimeEvent::MessageCompleted { message, .. }
+                if message.id == canonical_id && message.text == "般若波罗蜜"
+        )));
     }
 
     #[test]
