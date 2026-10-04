@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "8556281e5eb20aeb6dba781bd5ecf8c623206d6e",
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
   "group": "source-host",
   "fileCount": 967,
   "files": [
@@ -400,8 +400,8 @@
     },
     {
       "path": "source/host/src/extensions/auth/auth_service.rs",
-      "blobSha": "d7add5621bba6d56ac775dd494a2ac046c6b8417",
-      "size": 12340
+      "blobSha": "3347723efb416f06fcf04e4158120db9a1f4f6f2",
+      "size": 13383
     },
     {
       "path": "source/host/src/extensions/auth/credential_renewer.rs",
@@ -1040,13 +1040,13 @@
     },
     {
       "path": "source/host/src/extensions/inference/production.rs",
-      "blobSha": "7b02110371bd452e23fd6ab28d0a92b075699402",
-      "size": 19400
+      "blobSha": "3d99cd67c3dad837a40b17f8db0c19d921cf3c5c",
+      "size": 19532
     },
     {
       "path": "source/host/src/extensions/inference/provider_session.rs",
-      "blobSha": "73ae462c5e8241566afb408df6cb7440d1f3227c",
-      "size": 70160
+      "blobSha": "3d3d950eb7614e012b5ef74fe866b94eb4ba605d",
+      "size": 75377
     },
     {
       "path": "source/host/src/extensions/inference/sand_labeling.rs",
