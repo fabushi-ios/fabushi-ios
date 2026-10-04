@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "798cf51d96cb1cb98cf657af212bb47274ccb701",
   "group": "source-node-agent-coordinator",
   "fileCount": 53,
   "files": [
@@ -105,8 +105,8 @@
     },
     {
       "path": "source/node-agent-coordinator/src/main.rs",
-      "blobSha": "6c7ba5c9cf0ad3a9b84794a5e0204fb7bce474a5",
-      "size": 112594
+      "blobSha": "58b61e7ae0ecd2e74a7a9ea3c0e7442884f850d9",
+      "size": 112849
     },
     {
       "path": "source/node-agent-coordinator/src/mcp.rs",

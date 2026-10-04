@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "798cf51d96cb1cb98cf657af212bb47274ccb701",
   "group": "source-node-agent-coordinator",
   "rowCount": 53,
   "rows": [
@@ -306,18 +306,18 @@
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/main.rs",
-      "desktop_blob_sha": "6c7ba5c9cf0ad3a9b84794a5e0204fb7bce474a5",
-      "desktop_responsibility": "Compose the production Coordinator inference fallback so Fabushi product mode chooses the Fabushi provider rather than the historical Codex fallback, while non-product composition retains its independent fallback.",
+      "desktop_blob_sha": "58b61e7ae0ecd2e74a7a9ea3c0e7442884f850d9",
+      "desktop_responsibility": "Compose the production Coordinator inference route so Fabushi product mode selects the first-party Fabushi provider, and keep durable post-admission execution free of obsolete fixed presentation sleeps before the live Runner event stream becomes the readiness gate.",
       "desktop_owner": "coordinator",
-      "desktop_visible_effect": "Fabushi product Coordinator requests enter the first-party Fabushi route before Host execution instead of being mislabeled as Codex.",
+      "desktop_visible_effect": "Fabushi product Coordinator requests enter the first-party Fabushi route before Host execution and are not unconditionally delayed by a fixed 1.2-second post-admission sleep before first output.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/mahayana-agent-coordinator/coordinator-inference-router.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS has no Node main/env composition. CoordinatorInferenceRouter is constructed with .fabushi as the native product default, and Rust AppHost independently enforces Fabushi for shipping production execution.",
+      "ios_platform_delta": "iOS has no Node main/env composition. CoordinatorInferenceRouter is constructed with .fabushi as the native product default, Rust AppHost independently enforces Fabushi for shipping execution, and neither native owner inserts a fixed post-admission presentation sleep before Host/Runner progress.",
       "implementation_status": "implemented",
       "production_evidence": "source/mahayana-agent-coordinator/coordinator-inference-router.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "test_evidence": "mobile/ios/FabushiTests/SharedCursorInferenceParityTests.swift; Rust AppHost production provider tests; current exact-HEAD GitHub Actions pending",
-      "notes": "Revalidated against Desktop PR #20 ca2e4caba082cb858fa2d253da1749de5530b164. This supersedes the earlier ea6da477-era note that product fallback was Codex; current authority requires Fabushi and iOS now matches."
+      "notes": "Revalidated against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. The upstream delta removes a legacy fixed 1.2-second sleep before Runner-event-stream readiness. Current iOS Coordinator/AppHost production owners contain no equivalent fixed delay, so the responsibility remains ios-adapted/implemented pending fresh exact-HEAD Actions evidence."
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/mcp.rs",

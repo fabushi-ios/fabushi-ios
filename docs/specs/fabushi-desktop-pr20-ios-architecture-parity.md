@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `d18de3f688859946ddf80526e366328fae2de718`
+- pinned source commit for this baseline: `798cf51d96cb1cb98cf657af212bb47274ccb701`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,15 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `d18de3f688859946ddf80526e366328fae2de718`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `798cf51d96cb1cb98cf657af212bb47274ccb701`
+
+Desktop PR #20 is open, draft, based on `main`, and not merged. Relative to the previously pinned `d18de3f688859946ddf80526e366328fae2de718`, the current exact HEAD is one commit ahead and changes exactly one selected Coordinator production file: `source/node-agent-coordinator/src/main.rs`. No selected path is added or removed, so the authoritative `frontend/** + source/**` inventory remains **7,943** rows. The current blob is `58b61e7ae0ecd2e74a7a9ea3c0e7442884f850d9` (112849 bytes).
+
+The material responsibility is first-output critical-path ownership. Desktop removes an obsolete fixed 1.2-second presentation sleep that ran after durable inference admission and before `wait_for_runner_event_stream`; routed first-party Fabushi turns now wait only on the live Runner event-stream readiness gate. iOS must preserve the same product invariant without copying Node process mechanics: after the native Coordinator admits a turn, neither `CoordinatorInferenceRouter` nor the Rust AppHost may insert a fixed presentation delay before Host/Runner execution or first output. Direct inspection of the current iOS owners finds no fixed 1200 ms sleep in the Swift Coordinator router, and the AppHost only uses bounded operation/receive timeouts rather than a post-admission presentation sleep. The existing single Coordinator -> AppHost -> Runtime ownership therefore already satisfies this delta; no shipping production code change is required.
+
+All ordinary/protected acceptance tied to Desktop `d18de3f688859946ddf80526e366328fae2de718` and iOS `b148d15fe2b0f4faa5d4970d606b6adee6139165`, including runs `37240646557` and `37240646550`, is historical after this authority move. The resulting iOS exact HEAD must obtain fresh same-HEAD ordinary and protected evidence before the 7,943-row audit resumes.
+
+### 1.0.1 Historical exact-HEAD authority: 2026-10-05 / `d18de3f688859946ddf80526e366328fae2de718`
 
 Desktop PR #20 is open, draft, based on `main`, and not merged. Relative to the previously pinned `82bdf3d38da2c423f44bc710fab2853a6c650e1c`, the current exact HEAD is one commit ahead and changes exactly one selected Host production file: `source/host/src/extensions/managed_setup/team_rules.rs`. No selected path is added or removed, so the authoritative `frontend/** + source/**` inventory remains **7,943** rows. The current `team_rules.rs` blob is `16ead6a31a8b9f5dc7b5882f79b1026834c3d903` (11,732 bytes).
 

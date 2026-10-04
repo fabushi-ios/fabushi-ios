@@ -5,7 +5,7 @@
 - Source repository: bhrumom/fabushi-desktop
 - Source pull request: #20
 - Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: d18de3f688859946ddf80526e366328fae2de718
+- Pinned source commit: 798cf51d96cb1cb98cf657af212bb47274ccb701
 - Target repository: fabushi-ios/fabushi-ios
 - Target pull request: #3
 - Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md
@@ -15,6 +15,8 @@ Fabushi iOS is a standalone downstream port of Desktop PR #20. Source may be reu
 Grok Bot 0.18 is historical architecture/provenance context through Desktop PR #20. It is no longer the direct iOS migration authority.
 
 The current Desktop `frontend/** + source/**` inventory contains 7,943 source-bearing paths at the pinned exact HEAD.
+
+The current `d18de3f688859946ddf80526e366328fae2de718 -> 798cf51d96cb1cb98cf657af212bb47274ccb701` authority move is **1 commit across exactly 1 selected Coordinator production file**, `source/node-agent-coordinator/src/main.rs`. Desktop removes an obsolete fixed 1.2-second presentation sleep between durable inference admission and `wait_for_runner_event_stream`, so routed first-party Fabushi execution is gated only by the live Runner event stream instead of an artificial delay. The iOS native Coordinator/Host path has no equivalent fixed post-admission delay in `CoordinatorInferenceRouter` or the Rust AppHost; the responsibility is therefore revalidated as already adapted, with no new platform mechanism or parallel owner introduced. All ordinary/protected acceptance tied to the previous Desktop authority is historical only.
 
 The current `82bdf3d38da2c423f44bc710fab2853a6c650e1c -> d18de3f688859946ddf80526e366328fae2de718` authority move is **1 commit across exactly 1 selected Host production file**, `source/host/src/extensions/managed_setup/team_rules.rs`. Desktop now returns the cached managed-team-rule snapshot first; when there is no cached snapshot and no cached Cursor/Sand renewal credential, it returns without invoking synchronous HostAuth renewal, keeping missing Cursor credentials off the ordinary-turn first-output critical path. An already cached Cursor token still permits the established refresh path. Fabushi account credentials remain exclusive to first-party Fabushi/Responses transport.
 
