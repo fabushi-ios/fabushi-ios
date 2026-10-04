@@ -78,13 +78,13 @@ final class GlobalDharmaCommerceModel {
 
     init(
         bridge: IOSPreloadBridge,
-        platformBaseURL: URL = URL(string: "https://api.ombhrum.com")!,
+        platformBaseURL: URL? = nil,
         paymentBaseURL: URL = URL(string: "https://pay.ombhrum.com")!,
         session: URLSession = .shared,
         canonicalLedgerTestMode: Bool? = nil
     ) {
         self.bridge = bridge
-        self.platformBaseURL = platformBaseURL
+        self.platformBaseURL = platformBaseURL ?? Self.resolvePlatformBaseURL()
         self.paymentBaseURL = paymentBaseURL
         self.session = session
         self.canonicalLedgerTestMode = canonicalLedgerTestMode ?? Self.detectCanonicalLedgerTestMode()
@@ -315,12 +315,28 @@ final class GlobalDharmaCommerceModel {
         }
     }
 
+
+    nonisolated static func resolvePlatformBaseURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        for key in ["FABUSHI_API_BASE_URL", "MAHAYANA_API_BASE_URL"] {
+            guard let raw = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty,
+                  let url = URL(string: raw),
+                  url.scheme?.lowercased() == "https",
+                  url.host?.isEmpty == false
+            else { continue }
+            return url
+        }
+        return URL(string: "https://api.ombhrum.com")!
+    }
+
     nonisolated static func detectCanonicalLedgerTestMode(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
         let trustedRepositories: Set<String> = [
             "bhrumom/fabushi",
-            "bhrumom/fabushi-ios",
+            "fabushi-ios/fabushi-ios",
         ]
         guard environment["GITHUB_ACTIONS"] == "true",
               let repository = environment["GITHUB_REPOSITORY"],
