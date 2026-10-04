@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `38be2a105ccf5dbd23f2c6e81886d10539ad018f`
+- pinned source commit for this baseline: `ba58a474050e05943f6282d3e57aea45a75a237e`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,17 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `38be2a105ccf5dbd23f2c6e81886d10539ad018f`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `ba58a474050e05943f6282d3e57aea45a75a237e`
+
+Desktop PR #20 remains open and draft on `refactor/grok-018-architecture-rebuild`. GitHub compare from `38be2a105ccf5dbd23f2c6e81886d10539ad018f` to this exact HEAD reports **1 commit and exactly 1 changed file**, `desktop/e2e/openbot-packaged-acceptance.spec.ts`, with no change under the authoritative selected `frontend/** + source/**` roots. The selected production inventory therefore remains exactly **7,943** paths and every selected per-path Desktop blob identity remains unchanged.
+
+The upstream commit, `fix(acceptance): measure local paint from send gesture`, tightens signed packaged performance evidence rather than shipping ownership. PERF-001 is now timed from the real renderer Send gesture, not from Playwright setup work; the canonical user row must cross a paint opportunity before local submit paint is recorded. PERF-002/first-output/first-text/completion timing uses the same send-gesture origin, and raw `timings.json` is written before threshold assertions so a failing gate still leaves inspectable evidence.
+
+This is applicable to iOS as an **acceptance contract**, not as a reason to create a second runtime or modify current shipping message ownership. Native signed/archive acceptance must eventually measure from the real iOS Send tap through the first rendered canonical user-turn boundary, preserve raw timing evidence before enforcing applicable thresholds, and keep later acceptance/output/completion timings on that same gesture origin. That packaged/release evidence is still pending; this rebaseline does not claim it exists.
+
+Because no selected production blob changed, existing reviewed iOS production dispositions, chunk snapshot `sourceCommit` values, and blob mappings remain valid after explicit revalidation. No old exact-HEAD Actions result can be promoted to this authority. Both top-level indexes, the strict checker, and active authority documents are rebound to `ba58a474050e05943f6282d3e57aea45a75a237e`; the resulting iOS exact HEAD must obtain fresh ordinary and protected same-HEAD success before any current-authority promotion.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-05 / `38be2a105ccf5dbd23f2c6e81886d10539ad018f`
 
 Desktop PR #20 remains open and draft on `refactor/grok-018-architecture-rebuild`. GitHub compare from the previous pinned `88dcc3b0ac83d8c3aabff8050551eabdd1726455` baseline to this exact HEAD reports **5 commits and exactly 3 changed files**: `desktop/e2e/openbot-packaged-acceptance.spec.ts`, `source/host/src/extensions/transcript/turn_runtime.rs`, and `source/host/tests/turn_runtime_recovery_contract.rs`. No selected `frontend/** + source/**` path was added or removed, so the authoritative selected inventory remains exactly **7,943** paths. The two changed selected Host blobs are `50272d988ed531632d970cf2904138f92f392172` and `49778612dfe89fd6247d5461e2b8b5c944a4306a`.
 

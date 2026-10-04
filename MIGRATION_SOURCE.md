@@ -5,7 +5,7 @@
 - Source repository: bhrumom/fabushi-desktop
 - Source pull request: #20
 - Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: 38be2a105ccf5dbd23f2c6e81886d10539ad018f
+- Pinned source commit: ba58a474050e05943f6282d3e57aea45a75a237e
 - Target repository: fabushi-ios/fabushi-ios
 - Target pull request: #3
 - Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md
@@ -24,7 +24,9 @@ The third changed file is Desktop packaged E2E acceptance outside the selected `
 
 The newest `a667bdf5b3ad98ef2e69f2443a753233c0ad0667 -> 38be2a105ccf5dbd23f2c6e81886d10539ad018f` commit changes only `desktop/e2e/openbot-packaged-acceptance.spec.ts`: packaged acceptance now reads the canonical `.sand-agent-avatar[data-avatar-shape]` identity instead of the retired avatar test attributes. This file is outside the selected `frontend/** + source/**` migration inventory, so no selected Desktop blob identity changes. iOS already renders Bot identity through one native `ClothGhostAvatar` shape owner across the Bot chat surfaces; the strict architecture checker now fences that reusable production owner and stable accessibility identity rather than copying an Electron selector.
 
-The authoritative selected inventory remains exactly 7,943 paths. The affected `source-host` manifest/ledger provenance, both top-level indexes, the strict checker, and the two changed selected blob identities are rebound to `38be2a105ccf5dbd23f2c6e81886d10539ad018f`. Changed responsibilities remain `implemented`, not `verified`, until the resulting single iOS exact HEAD completes both required ordinary and protected GitHub Actions.
+The newest `38be2a105ccf5dbd23f2c6e81886d10539ad018f -> ba58a474050e05943f6282d3e57aea45a75a237e` commit is also acceptance-only and changes only `desktop/e2e/openbot-packaged-acceptance.spec.ts`. Desktop PERF-001 now measures local submit paint from the real Send gesture through the canonical user-turn paint boundary, and raw `timings.json` evidence is persisted before thresholds are enforced so failures remain diagnosable. No selected `frontend/** + source/**` blob changed. The iOS adaptation is an acceptance responsibility, not a new shipping runtime owner: eventual signed/archive acceptance must measure from the real native Send tap through a rendered user-turn boundary and preserve raw timing evidence before asserting the applicable latency thresholds.
+
+The authoritative selected inventory remains exactly 7,943 paths. The `38be2a105ccf5dbd23f2c6e81886d10539ad018f -> ba58a474050e05943f6282d3e57aea45a75a237e` move changes no selected blob identity, so per-path blob SHAs, chunk snapshot `sourceCommit` provenance, and reviewed production dispositions remain unchanged after revalidation. Both top-level indexes, the strict checker, and the active authority documents are rebound to `ba58a474050e05943f6282d3e57aea45a75a237e`. Older iOS runs remain regression evidence only; current responsibilities are not promoted until the resulting single iOS exact HEAD completes both required ordinary and protected GitHub Actions, while signed/archive performance acceptance remains pending until it produces the native gesture-to-paint evidence described above.
 
 ## Historical repository extraction provenance
 
