@@ -47,7 +47,7 @@ use web_research::{WebResearchClient, WebResearchConfig};
 
 const MAIN_ASSISTANT_CONVERSATION_ID: &str = "mahayana-ai:agent:assistant";
 const CONVERSATION_FAST_LANE_MAX_CHARS: usize = 280;
-const SEND_MESSAGE_TOOL_NAME: &str = "send_message";
+const CONVERSATION_FAST_LANE_INSTRUCTION: &str = "CHAT-013 direct conversation fast lane: answer this simple conversational turn directly in plain text. Do not emit tool syntax or attempt a send_message call; the native Host streams provider text into the canonical user-visible transcript.";
 const MAX_TOOL_OUTPUT_BYTES: usize = 64 * 1024;
 const DEFAULT_MAX_MODEL_TURNS: usize = 16;
 const MAX_REPLY_NUDGES: usize = 3;
@@ -579,12 +579,23 @@ impl NativeEngine {
 
             let full_declared_tools =
                 tool_definitions(self.config.enable_process_tools, self.web_research.is_some());
+            let direct_conversation_fast_lane = visible_user_turn
+                && self.model.provider_mode() == ModelProviderMode::FirstPartyDacheng
+                && is_conversation_fast_lane(&session.history);
             let declared_tools = model_turn_tools(
                 self.model.provider_mode(),
+                visible_user_turn,
                 &session.history,
                 &full_declared_tools,
             );
-            let collector = Arc::new(if visible_user_turn {
+            let mut model_instructions = self.config.system_instructions.clone();
+            if direct_conversation_fast_lane {
+                if !model_instructions.trim().is_empty() {
+                    model_instructions.push_str("\n\n");
+                }
+                model_instructions.push_str(CONVERSATION_FAST_LANE_INSTRUCTION);
+            }
+            let collector = Arc::new(if visible_user_turn && !direct_conversation_fast_lane {
                 ModelCollector::buffered()
             } else {
                 ModelCollector::streaming(Arc::clone(&events), operation_id.clone())
@@ -598,7 +609,7 @@ impl NativeEngine {
                         model: self.config.model.clone(),
                         input: Value::Array(session.history.clone()),
                         metadata: json!({
-                            "instructions": self.config.system_instructions,
+                            "instructions": model_instructions,
                             "tools": declared_tools.clone(),
                             "tool_choice": "auto",
                             "parallel_tool_calls": false,
@@ -681,6 +692,13 @@ impl NativeEngine {
                         )
                     })?;
                 stream_output_produced |= !text.is_empty();
+                if direct_conversation_fast_lane {
+                    events.emit(KernelEvent::MessageCompleted {
+                        operation_id: operation_id.clone(),
+                        text: text.clone(),
+                    })?;
+                    return Ok(text);
+                }
                 if visible_user_turn
                     && should_attempt_reply_nudge(delivered_message, reply_nudge_attempts, control)
                 {
@@ -2904,27 +2922,18 @@ fn is_conversation_fast_lane(history: &[Value]) -> bool {
     !ACTION_MARKERS.iter().any(|marker| padded.contains(marker))
 }
 
-fn conversation_fast_lane_tools(history: &[Value], tools: &[Value]) -> Option<Vec<Value>> {
-    if !is_conversation_fast_lane(history) {
-        return None;
-    }
-    let send_message = tools
-        .iter()
-        .filter(|tool| {
-            tool.get("name").and_then(Value::as_str) == Some(SEND_MESSAGE_TOOL_NAME)
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    (!send_message.is_empty()).then_some(send_message)
+fn conversation_fast_lane_tools(history: &[Value]) -> Option<Vec<Value>> {
+    is_conversation_fast_lane(history).then(Vec::new)
 }
 
 fn model_turn_tools(
     provider_mode: ModelProviderMode,
+    visible_user_turn: bool,
     history: &[Value],
     tools: &[Value],
 ) -> Vec<Value> {
-    if provider_mode == ModelProviderMode::FirstPartyDacheng {
-        if let Some(reduced) = conversation_fast_lane_tools(history, tools) {
+    if visible_user_turn && provider_mode == ModelProviderMode::FirstPartyDacheng {
+        if let Some(reduced) = conversation_fast_lane_tools(history) {
             return reduced;
         }
     }
@@ -3137,7 +3146,7 @@ mod tests {
     }
 
     #[test]
-    fn conversation_fast_lane_keeps_only_send_message_and_fails_closed_without_it() {
+    fn conversation_fast_lane_uses_native_text_stream_without_tool_schema() {
         let history = vec![json!({
             "role":"user",
             "content":"In one sentence, explain what a database index is for."
@@ -3154,30 +3163,19 @@ mod tests {
                 json!({"type":"object","properties":{}}),
             ),
         ];
-        let reduced =
-            conversation_fast_lane_tools(&history, &tools).expect("simple turn fast lane");
-        assert_eq!(reduced.len(), 1);
+        let reduced = conversation_fast_lane_tools(&history).expect("simple turn fast lane");
+        assert!(reduced.is_empty(), "direct conversation fast lane must advertise no tool schema");
         assert_eq!(
-            reduced[0].get("name").and_then(Value::as_str),
-            Some("send_message")
-        );
-
-        let no_send = vec![function_tool(
-            "workspace_read",
-            "read workspace",
-            json!({"type":"object","properties":{}}),
-        )];
-        assert!(
-            conversation_fast_lane_tools(&history, &no_send).is_none(),
-            "missing send_message must fail closed to the full tool path",
-        );
-
-        assert_eq!(
-            model_turn_tools(ModelProviderMode::FirstPartyDacheng, &history, &tools).len(),
-            1
+            model_turn_tools(ModelProviderMode::FirstPartyDacheng, true, &history, &tools).len(),
+            0
         );
         assert_eq!(
-            model_turn_tools(ModelProviderMode::UserConfiguredRemote, &history, &tools).len(),
+            model_turn_tools(ModelProviderMode::FirstPartyDacheng, false, &history, &tools).len(),
+            2,
+            "hidden/recovery turns must keep the full tool schema",
+        );
+        assert_eq!(
+            model_turn_tools(ModelProviderMode::UserConfiguredRemote, true, &history, &tools).len(),
             2,
             "non-first-party providers must keep the full tool schema",
         );
@@ -3308,6 +3306,38 @@ mod tests {
 
         fn provider_mode(&self) -> ModelProviderMode {
             ModelProviderMode::LocalModel
+        }
+    }
+
+    struct FirstPartyStreamingModel {
+        requests: Mutex<Vec<Value>>,
+    }
+
+    #[async_trait]
+    impl ModelRuntime for FirstPartyStreamingModel {
+        async fn infer(
+            &self,
+            request: ModelRequest,
+            events: SharedModelEventSink,
+        ) -> Result<(), ModelError> {
+            self.requests
+                .lock()
+                .map_err(|_| ModelError::Inference("request capture poisoned".into()))?
+                .push(request.metadata);
+            events.emit(ModelEvent::OutputTextDelta("般若".into()))?;
+            events.emit(ModelEvent::OutputTextDelta("波罗蜜".into()))?;
+            events.emit(ModelEvent::Completed {
+                output: json!({
+                    "output": [{
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "般若波罗蜜"}]
+                    }]
+                }),
+            })
+        }
+
+        fn provider_mode(&self) -> ModelProviderMode {
+            ModelProviderMode::FirstPartyDacheng
         }
     }
 
@@ -3499,6 +3529,68 @@ mod tests {
         assert_eq!(metrics.operations_started, 1);
         assert_eq!(metrics.operations_completed, 1);
         assert_eq!(metrics.model_calls, 1);
+    }
+
+    #[tokio::test]
+    async fn direct_conversation_fast_lane_streams_canonical_text_without_send_message_tool() {
+        let model = Arc::new(FirstPartyStreamingModel {
+            requests: Mutex::new(Vec::new()),
+        });
+        let engine = NativeEngine::new(model.clone(), NativeEngineConfig::embedded("model"))
+            .expect("create engine");
+        let session = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                workspace_root: None,
+                model: None,
+                metadata: Value::Null,
+            })
+            .await
+            .expect("open session");
+        let events = Arc::new(Events::default());
+        engine
+            .run(
+                RunRequest {
+                    session_id: session,
+                    operation_id: OperationId::new(),
+                    input: "In one sentence, explain why the sky is blue.".into(),
+                    policy: ExecutionPolicy::mobile_default(),
+                    required_capabilities: CapabilitySet::new([Capability::Model]),
+                    metadata: json!({"hidden": false}),
+                },
+                events.clone(),
+            )
+            .await
+            .expect("run direct conversation fast lane");
+
+        let requests = model.requests.lock().expect("requests");
+        assert_eq!(requests.len(), 1, "fast lane must not enter reply-nudge inference");
+        assert_eq!(requests[0]["tools"], json!([]));
+        assert!(
+            requests[0]["instructions"]
+                .as_str()
+                .is_some_and(|value| value.contains("CHAT-013 direct conversation fast lane")),
+        );
+        drop(requests);
+
+        let events = events.0.lock().expect("events");
+        let deltas = events
+            .iter()
+            .filter_map(|event| match event {
+                KernelEvent::MessageDelta { delta, .. } => Some(delta.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(deltas, vec!["般若", "波罗蜜"]);
+        assert!(events.iter().any(|event| matches!(
+            event,
+            KernelEvent::MessageCompleted { text, .. } if text == "般若波罗蜜"
+        )));
+        assert!(!events.iter().any(|event| matches!(
+            event,
+            KernelEvent::ToolStarted { tool, .. } | KernelEvent::ToolCompleted { tool, .. }
+                if tool == "send_message"
+        )));
     }
 
     #[tokio::test]
