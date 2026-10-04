@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `c92a2ccae3e022942475c4d3db00c8f910f8243a`
+- pinned source commit for this baseline: `7c00ea34fd64102cfe71266e646720369f2397e8`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -1078,3 +1078,12 @@ The upstream commit, `test: launch signed macOS candidate through production pat
 
 All CI, archive, protected-session, and acceptance evidence tied to the prior Desktop authority remains historical only. The new iOS exact HEAD created by this rebaseline must obtain its own required GitHub Actions and protected-account evidence before any current-head acceptance promotion.
 
+
+
+### Recovery rebaseline 2026-10-04: `7c00ea34`
+
+Desktop PR #20 advanced four commits from `c92a2ccae3e022942475c4d3db00c8f910f8243a` to `7c00ea34fd64102cfe71266e646720369f2397e8` while remaining open and draft on `refactor/grok-018-architecture-rebuild`. A direct GitHub compare reports exactly one change under the authoritative iOS-selected `frontend/** + source/**` roots: the new file `source/packaging/offline-asr-engine.json`. No previously selected source file changed, was removed, or was renamed. The selected inventory therefore increases from 7,937 to exactly 7,938 files.
+
+The new source is Desktop packaging provenance/configuration for the mandatory offline ASR engine: whisper.cpp tag/commit plus the default model URL, SHA-256, and byte size. Rebaseline does not assume that Desktop packaging mechanics are directly applicable to iOS. The new `source-packaging` row begins `unreviewed`; its product responsibility, iOS-native replacement/disposition, production wiring, and acceptance evidence must be reviewed before promotion. Existing row dispositions/statuses are preserved because their Desktop blobs are unchanged.
+
+All Desktop-bound manifest and ledger chunks, both indexes, the active authority files, and the strict architecture checker are rebound to `7c00ea34fd64102cfe71266e646720369f2397e8`. CI and acceptance evidence from the prior Desktop authority remain historical only; the resulting iOS exact HEAD must obtain its own same-HEAD Actions evidence before any current-baseline acceptance claim is made. Desktop PR #26 remains observation-only because it is still unmerged into PR #20.
