@@ -146,9 +146,15 @@ jobs:
           with open(path, "rb") as handle:
               payload = plistlib.load(handle)
 
+          api_base = os.environ["FABUSHI_API_BASE_URL"].strip()
+          if not api_base.startswith("https://"):
+              raise SystemExit("Protected Fabushi API/model base must use HTTPS")
+
           forwarded = {
               "FABUSHI_CI_ACCOUNT_SESSION_BASE64": encoded_session,
-              "FABUSHI_API_BASE_URL": os.environ["FABUSHI_API_BASE_URL"],
+              "FABUSHI_API_BASE_URL": api_base,
+              "MAHAYANA_API_BASE_URL": api_base,
+              "FABUSHI_RESPONSES_URL": api_base,
               "FABUSHI_E2E_SOURCE_SHA": os.environ["SOURCE_SHA"],
               "FABUSHI_DEVICE_NAME": "Fabushi Protected iOS Simulator",
           }

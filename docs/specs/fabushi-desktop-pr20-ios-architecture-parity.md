@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `ea6da4779f508679549599d15121c74fe384ad96`
+- pinned source commit for this baseline: `0d6e4095f18ec7662e169ecaec98d95e43bcdfec`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,9 +35,19 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-04 / `ea6da4779f508679549599d15121c74fe384ad96`
+### 1.0 Current exact-HEAD authority: 2026-10-04 / `0d6e4095f18ec7662e169ecaec98d95e43bcdfec`
 
-The live Desktop PR #20 authority is now `ea6da4779f508679549599d15121c74fe384ad96`. Relative to the previously machine-pinned `8556281e5eb20aeb6dba781bd5ecf8c623206d6e`, Desktop advanced 26 commits. The selected `frontend/** + source/**` inventory grows from 7,938 to 7,943 paths because five shipping Fabushi product-account sources were added under `source/product/fabushi/**`; all other selected changes are modifications of existing rows.
+Desktop PR #20 advanced six commits from `ea6da4779f508679549599d15121c74fe384ad96` to `0d6e4095f18ec7662e169ecaec98d95e43bcdfec`. The selected `frontend/** + source/**` inventory remains exactly 7,943 paths; six existing source-bearing blobs changed, so acceptance bound to their older blob identities is historical only.
+
+The applicable new product responsibility is user-controlled interruption of a running Agent turn. Desktop exposes a Stop control, admits `interruptAgent` through the closed Coordinator contract, delegates cancellation to the canonical Host/Runner owner, waits for settlement, and verifies a fresh post-cancel turn. The native iOS shipping path already exposes `mobile-bot-stop`, sends `feature.interrupt(operationId)` through the Rust app-host boundary, delegates cancellation through `FeatureHostController::interrupt` to the canonical runtime, and treats `operation.interrupted` as terminal. This remains implemented rather than verified until same-iOS-HEAD Actions and product acceptance close.
+
+Desktop POWER-005 also narrows renderer-scoped event delivery at the shipping production-composition boundary: `source/electron-main/window-broadcast.ts` stays byte-identical to the frozen Grok all-window helper, while renderer-only MCP OAuth/dev-control events are sent directly to the trusted main WebContents. iOS has no Electron BrowserWindow/WebContents fanout; the platform replacement is its native scene/runtime ownership. Because `source/electron-main/main-production-services.ts` contains many unrelated responsibilities, its whole-file ledger row remains unreviewed rather than being falsely promoted from this one reviewed delta.
+
+The current protected iOS journey independently exposed a startup failure where the shipping Rust Host correctly rejected a non-HTTPS remote model endpoint. Acceptance wiring now derives `FABUSHI_RESPONSES_URL`, `FABUSHI_API_BASE_URL`, and `MAHAYANA_API_BASE_URL` from the same validated HTTPS first-party API base before XCTest launches the app. The Rust HTTPS guard remains unchanged and fail-closed.
+
+### 1.0a Historical exact-HEAD rebaseline: 2026-10-04 / `ea6da4779f508679549599d15121c74fe384ad96`
+
+At that historical rebaseline, the live Desktop PR #20 authority was `ea6da4779f508679549599d15121c74fe384ad96`. Relative to the previously machine-pinned `8556281e5eb20aeb6dba781bd5ecf8c623206d6e`, Desktop advanced 26 commits. The selected `frontend/** + source/**` inventory grows from 7,938 to 7,943 paths because five shipping Fabushi product-account sources were added under `source/product/fabushi/**`; all other selected changes are modifications of existing rows.
 
 The new shipping responsibility makes the Fabushi product account the first-party authentication owner for inference. Product startup settles the Fabushi account before Coordinator/Host startup, the Host receives only the current access credential, durable sessions retain refresh credentials inside the account owner, protected GitHub Actions sessions are bounded and refresh-token-free, and Fabushi product mode defaults Coordinator inference to Codex while explicit user settings remain authoritative. Focused Desktop acceptance uses the real Fabushi account -> private Host credential -> `/v1/ai/responses` path rather than seeding a parallel Cursor inference credential.
 

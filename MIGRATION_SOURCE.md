@@ -5,7 +5,7 @@
 - Source repository: bhrumom/fabushi-desktop
 - Source pull request: #20
 - Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: ea6da4779f508679549599d15121c74fe384ad96
+- Pinned source commit: 0d6e4095f18ec7662e169ecaec98d95e43bcdfec
 - Target repository: fabushi-ios/fabushi-ios
 - Target pull request: #3
 - Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md

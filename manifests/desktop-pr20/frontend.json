@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
   "group": "frontend",
   "fileCount": 340,
   "files": [
@@ -115,8 +115,8 @@
     },
     {
       "path": "frontend/src/production/ProductionRenderer.tsx",
-      "blobSha": "56bcd9a62cb429d273c3003947e35f714d0b8927",
-      "size": 216786
+      "blobSha": "ee97740316fa1a9b48bfaa0bd2bc582cbed73c07",
+      "size": 217198
     },
     {
       "path": "frontend/src/production/agent-name-editor-model.ts",
@@ -1595,8 +1595,8 @@
     },
     {
       "path": "frontend/src/recovered/runtime/coordinator-source.ts",
-      "blobSha": "b6f5fa88b05df80fa21a7d588d1bd67d46602c79",
-      "size": 27732
+      "blobSha": "db7859728adba5129fab1d0572720390807dabad",
+      "size": 27917
     },
     {
       "path": "frontend/src/recovered/runtime/define-entrypoint.ts",

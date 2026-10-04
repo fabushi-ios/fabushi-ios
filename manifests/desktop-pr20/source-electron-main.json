@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
   "group": "source-electron-main",
   "fileCount": 195,
   "files": [
@@ -325,8 +325,8 @@
     },
     {
       "path": "source/electron-main/coordinator/rust-coordinator-carrier.ts",
-      "blobSha": "945a4186680da2508a8e533ac05316a2fed79c9c",
-      "size": 4867
+      "blobSha": "7cfffac65f4c5b9bfb330631bbd481d74f9e4456",
+      "size": 5454
     },
     {
       "path": "source/electron-main/deep-link/deep-link-controller.ts",
@@ -475,8 +475,8 @@
     },
     {
       "path": "source/electron-main/main-production-services.ts",
-      "blobSha": "88b1d48f5c646df54606b2d69135fbf253b26207",
-      "size": 66411
+      "blobSha": "0e4efa00de8cb34ce91aa14d2b94792c88c0a352",
+      "size": 66455
     },
     {
       "path": "source/electron-main/main.ts",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "8556281e5eb20aeb6dba781bd5ecf8c623206d6e",
+  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
   "group": "source-shared",
   "rowCount": 170,
   "rows": [
@@ -2091,7 +2091,7 @@
     },
     {
       "desktop_path": "source/shared/rpc/coordinator.ts",
-      "desktop_blob_sha": "ae98402e3b98843b00b51ee7da12f23befabbac6",
+      "desktop_blob_sha": "72b5adc91432fc208731cee9b11a2fe1e21ea10d",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "shared-contracts",
       "desktop_visible_effect": "pending-review",
@@ -2102,7 +2102,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline ea6da4779f508679549599d15121c74fe384ad96 -> 0d6e4095f18ec7662e169ecaec98d95e43bcdfec changed this Desktop blob; old blob-bound acceptance is historical. The changed delta adds interruptAgent to Desktop shared RPC. iOS has no Electron shared-RPC hop and uses the native feature.interrupt contract; the broader shared-contract row remains unreviewed pending full file review."
     },
     {
       "desktop_path": "source/shared/rpc/dev-controls.ts",

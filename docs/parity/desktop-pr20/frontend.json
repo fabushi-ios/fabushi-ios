@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
   "group": "frontend",
   "rowCount": 340,
   "rows": [
@@ -336,7 +336,7 @@
     },
     {
       "desktop_path": "frontend/src/production/ProductionRenderer.tsx",
-      "desktop_blob_sha": "56bcd9a62cb429d273c3003947e35f714d0b8927",
+      "desktop_blob_sha": "ee97740316fa1a9b48bfaa0bd2bc582cbed73c07",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "pending-review",
@@ -347,7 +347,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline ea6da4779f508679549599d15121c74fe384ad96 -> 0d6e4095f18ec7662e169ecaec98d95e43bcdfec changed this Desktop blob; old blob-bound acceptance is historical. The changed delta adds the shipping Stop control and post-interrupt settlement. iOS has mobile-bot-stop, but this large renderer row remains unreviewed as a whole; no whole-file promotion is inferred from one mapped responsibility."
     },
     {
       "desktop_path": "frontend/src/production/agent-name-editor-model.ts",
@@ -4776,7 +4776,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/coordinator-source.ts",
-      "desktop_blob_sha": "b6f5fa88b05df80fa21a7d588d1bd67d46602c79",
+      "desktop_blob_sha": "db7859728adba5129fab1d0572720390807dabad",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "pending-review",
@@ -4787,7 +4787,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline ea6da4779f508679549599d15121c74fe384ad96 -> 0d6e4095f18ec7662e169ecaec98d95e43bcdfec changed this Desktop blob; old blob-bound acceptance is historical. The changed delta admits interruptAgent through the closed Desktop Coordinator method table. iOS uses the native Rust app-host feature.interrupt request edge; this broader recovered Coordinator source row remains unreviewed as a whole."
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/define-entrypoint.ts",

@@ -211,8 +211,13 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             app.launchEnvironment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"] = session
         }
         if let apiBaseURL = environment["FABUSHI_API_BASE_URL"], !apiBaseURL.isEmpty {
+            guard apiBaseURL.lowercased().hasPrefix("https://") else {
+                XCTFail("Protected Fabushi API/model base must use HTTPS")
+                return
+            }
             app.launchEnvironment["FABUSHI_API_BASE_URL"] = apiBaseURL
             app.launchEnvironment["MAHAYANA_API_BASE_URL"] = apiBaseURL
+            app.launchEnvironment["FABUSHI_RESPONSES_URL"] = apiBaseURL
         }
         for key in [
             "GITHUB_ACTIONS", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_JOB",

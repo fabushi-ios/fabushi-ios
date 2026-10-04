@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
   "group": "source-shared",
   "fileCount": 170,
   "files": [
@@ -700,8 +700,8 @@
     },
     {
       "path": "source/shared/rpc/coordinator.ts",
-      "blobSha": "ae98402e3b98843b00b51ee7da12f23befabbac6",
-      "size": 9153
+      "blobSha": "72b5adc91432fc208731cee9b11a2fe1e21ea10d",
+      "size": 9218
     },
     {
       "path": "source/shared/rpc/dev-controls.ts",

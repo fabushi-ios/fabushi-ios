@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
   "group": "source-electron-main",
   "rowCount": 195,
   "rows": [
@@ -966,7 +966,7 @@
     },
     {
       "desktop_path": "source/electron-main/coordinator/rust-coordinator-carrier.ts",
-      "desktop_blob_sha": "945a4186680da2508a8e533ac05316a2fed79c9c",
+      "desktop_blob_sha": "7cfffac65f4c5b9bfb330631bbd481d74f9e4456",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "pending-review",
@@ -977,7 +977,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline ea6da4779f508679549599d15121c74fe384ad96 -> 0d6e4095f18ec7662e169ecaec98d95e43bcdfec changed this Desktop blob; old blob-bound acceptance is historical. The changed delta validates and forwards interruptAgent to canonical Runner cancellation. iOS uses FeatureHostController::interrupt/MahayanaHost::interrupt instead of an Electron carrier; the broader carrier row remains unreviewed pending full responsibility review."
     },
     {
       "desktop_path": "source/electron-main/deep-link/deep-link-controller.ts",
@@ -1416,7 +1416,7 @@
     },
     {
       "desktop_path": "source/electron-main/main-production-services.ts",
-      "desktop_blob_sha": "88b1d48f5c646df54606b2d69135fbf253b26207",
+      "desktop_blob_sha": "0e4efa00de8cb34ce91aa14d2b94792c88c0a352",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "pending-review",
@@ -1427,7 +1427,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline ea6da4779f508679549599d15121c74fe384ad96 -> 0d6e4095f18ec7662e169ecaec98d95e43bcdfec changed this Desktop blob; old blob-bound acceptance is historical. POWER-005 keeps the frozen global broadcaster exact and narrows renderer-only event delivery directly at production composition to the trusted main WebContents. iOS has no BrowserWindow fanout, but this large production-composition row remains unreviewed as a whole."
     },
     {
       "desktop_path": "source/electron-main/main.ts",
