@@ -107,7 +107,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
 
         let botChat = app.descendants(matching: .any)["mobile-bot-chat"]
         XCTAssertTrue(botChat.waitForExistence(timeout: 15))
-        let openApp = app.buttons["mobile-bot-open-app"]
+        let openApp = app.buttons["mobile-bot-open-miniapp"]
         XCTAssertTrue(openApp.waitForExistence(timeout: 8), "Global Dharma Bot must expose 打开应用")
         mark("botVisible", true)
         checkpoint("040-global-dharma-bot")
