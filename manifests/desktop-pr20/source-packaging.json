@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "7c00ea34fd64102cfe71266e646720369f2397e8",
+  "group": "source-packaging",
+  "fileCount": 1,
+  "files": [
+    {
+      "path": "source/packaging/offline-asr-engine.json",
+      "blobSha": "aca72ae2bd3753b7c95bc9f9f0dc8e22b91e544a",
+      "size": 407
+    }
+  ]
+}
