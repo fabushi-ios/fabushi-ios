@@ -6,6 +6,11 @@ private let webMcpOriginHost = "fabushi.ombhrum.com"
 private let localWebMcpOriginHost = "miniapp.local.fabushi.invalid"
 private let webMcpMessageHandler = "fabushiWebMcp"
 
+func isTrustedWebMcpBridgeHost(_ host: String?) -> Bool {
+    guard let host else { return false }
+    return host == webMcpOriginHost || host == localWebMcpOriginHost
+}
+
 struct MiniAppWebMcpBridgeSession: Equatable {
     let pluginInstanceId: String
     let nonce: String
@@ -172,7 +177,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         let key = "hosted:\(plugin.pluginId)"
         guard context.coordinator.loadedSourceKey != key else { return }
         context.coordinator.loadedSourceKey = key
-        context.coordinator.disposeLocalBridgeSession()
+        _ = context.coordinator.prepareLocalBridgeSession()
         var components = URLComponents()
         components.scheme = "https"
         components.host = webMcpOriginHost
@@ -229,6 +234,37 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+            let host = webView.url?.host
+            guard isTrustedWebMcpBridgeHost(host) else {
+                disposeLocalBridgeSession()
+                status = "WebMCP 页面已打开"
+                return
+            }
+
+            if host == webMcpOriginHost {
+                guard let session = activeBridgeSession else {
+                    status = "WebMCP 页面已打开"
+                    return
+                }
+                let bootstrap = webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: session)
+                webView.evaluateJavaScript(bootstrap) { [weak self, weak webView] _, error in
+                    guard let self, let webView else { return }
+                    guard error == nil,
+                          self.activeBridgeSession == session,
+                          webView.url?.host == webMcpOriginHost
+                    else {
+                        self.status = "WebMCP 页面已打开"
+                        return
+                    }
+                    self.probeBridge(in: webView, local: false)
+                }
+                return
+            }
+
+            probeBridge(in: webView, local: true)
+        }
+
+        private func probeBridge(in webView: WKWebView, local: Bool) {
             let probe = """
             (() => {
               const tools = window.__fabushiWebMcp?.list?.() || [];
@@ -238,50 +274,49 @@ private struct MiniAppWebView: UIViewRepresentable {
             webView.evaluateJavaScript(probe) { [weak self, weak webView] value, _ in
                 guard let self else { return }
                 let result = value as? String ?? ""
-                let local = webView?.url?.host == localWebMcpOriginHost
-                if result.contains("\"ready\":true") {
-                    self.status = local ? "本地 WebMCP 已连接" : "WebMCP 已连接"
-                    if self.plugin.pluginId == GlobalDharmaCommerceModel.miniAppId {
-                        let sharedRuntimeProbe = """
-                        (() => {
-                          const tools=window.__fabushiWebMcp?.list?.()||[];
-                          function marker(label,text,revision){
-                            let node=document.getElementById('fabushi-shared-runtime-sync');
-                            if(!node){
-                              node=document.createElement('div');
-                              node.id='fabushi-shared-runtime-sync';
-                              node.setAttribute('role','status');
-                              node.style.cssText='margin:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);border-radius:12px;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;';
-                              document.body.prepend(node);
-                            }
-                            node.setAttribute('aria-label',label);
-                            node.dataset.revision=revision===undefined?'':String(revision);
-                            node.textContent=text;
-                            return node;
-                          }
-                          if(!tools.some((tool)=>tool&&tool.name==='status')){
-                            marker('共享状态恢复失败','共享状态恢复失败 · WebMCP status 未暴露');
-                            return;
-                          }
-                          window.__fabushiWebMcp.call('status',{}).then((result)=>{
-                            const canonicalRuntime=result?.structuredContent?.runtime;
-                            const revision=Number(canonicalRuntime?.revision??-1);
-                            if(canonicalRuntime?.protocol!=='fabushi.miniapp.runtime.v1'||canonicalRuntime?.miniAppId!=='global-dharma'||!Number.isInteger(revision)||revision<0){
-                              marker('共享状态恢复失败','共享状态恢复失败 · canonical runtime 无效');
-                              return;
-                            }
-                            const label=`Bot / Web UI 同一共享状态 · revision ${revision}`;
-                            marker(label,label,revision);
-                            window.dispatchEvent(new CustomEvent('fabushi:shared-runtime-restored',{detail:canonicalRuntime}));
-                          }).catch((error)=>{
-                            marker('共享状态恢复失败',`共享状态恢复失败 · ${String(error?.message||error)}`);
-                          });
-                        })()
-                        """
-                        webView?.evaluateJavaScript(sharedRuntimeProbe)
-                    }
-                } else {
+                guard result.contains("\"ready\":true") else {
                     self.status = "WebMCP 页面已打开"
+                    return
+                }
+                self.status = local ? "本地 WebMCP 已连接" : "WebMCP 已连接"
+                if self.plugin.pluginId == GlobalDharmaCommerceModel.miniAppId {
+                    let sharedRuntimeProbe = """
+                    (() => {
+                      const tools=window.__fabushiWebMcp?.list?.()||[];
+                      function marker(label,text,revision){
+                        let node=document.getElementById('fabushi-shared-runtime-sync');
+                        if(!node){
+                          node=document.createElement('div');
+                          node.id='fabushi-shared-runtime-sync';
+                          node.setAttribute('role','status');
+                          node.style.cssText='margin:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);border-radius:12px;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;';
+                          document.body.prepend(node);
+                        }
+                        node.setAttribute('aria-label',label);
+                        node.dataset.revision=revision===undefined?'':String(revision);
+                        node.textContent=text;
+                        return node;
+                      }
+                      if(!tools.some((tool)=>tool&&tool.name==='status')){
+                        marker('共享状态恢复失败','共享状态恢复失败 · WebMCP status 未暴露');
+                        return;
+                      }
+                      window.__fabushiWebMcp.call('status',{}).then((result)=>{
+                        const canonicalRuntime=result?.structuredContent?.runtime;
+                        const revision=Number(canonicalRuntime?.revision??-1);
+                        if(canonicalRuntime?.protocol!=='fabushi.miniapp.runtime.v1'||canonicalRuntime?.miniAppId!=='global-dharma'||!Number.isInteger(revision)||revision<0){
+                          marker('共享状态恢复失败','共享状态恢复失败 · canonical runtime 无效');
+                          return;
+                        }
+                        const label=`Bot / Web UI 同一共享状态 · revision ${revision}`;
+                        marker(label,label,revision);
+                        window.dispatchEvent(new CustomEvent('fabushi:shared-runtime-restored',{detail:canonicalRuntime}));
+                      }).catch((error)=>{
+                        marker('共享状态恢复失败',`共享状态恢复失败 · ${String(error?.message||error)}`);
+                      });
+                    })()
+                    """
+                    webView?.evaluateJavaScript(sharedRuntimeProbe)
                 }
             }
         }
@@ -304,7 +339,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.name == webMcpMessageHandler,
                   let webView,
-                  webView.url?.host == localWebMcpOriginHost,
+                  isTrustedWebMcpBridgeHost(webView.url?.host),
                   let body = message.body as? [String: Any],
                   let pluginInstanceId = body["pluginInstanceId"] as? String,
                   let nonce = body["nonce"] as? String,
@@ -459,8 +494,7 @@ private func hardenGeneratedMiniAppDocument(_ html: String) -> String {
     return "<!doctype html><html><head>\(policy)</head><body>\(html)</body></html>"
 }
 
-private func injectLocalWebMcp(
-    _ html: String,
+private func webMcpBootstrapJavaScript(
     plugin: MarketplacePlugin,
     bridgeSession: MiniAppWebMcpBridgeSession
 ) -> String {
@@ -473,8 +507,7 @@ private func injectLocalWebMcp(
     }
     let data = (try? JSONSerialization.data(withJSONObject: definitions)) ?? Data("[]".utf8)
     let toolsJson = String(data: data, encoding: .utf8) ?? "[]"
-    let bootstrap = """
-    <script>
+    return """
     (function(){
       const definitions=\(toolsJson);
       const pluginInstanceId=\(jsonString(bridgeSession.pluginInstanceId));
@@ -491,8 +524,15 @@ private func injectLocalWebMcp(
       window.addEventListener('pagehide',()=>{if(disposed)return;disposed=true;for(const controller of controllers)controller.abort();window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({kind:'dispose',pluginInstanceId,nonce});rejectPending('MCP App bridge disposed');},{once:true});
       window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:\(jsonString(plugin.pluginId)),pluginInstanceId,grants:Array.from(grants),tools:Array.from(localTools.keys())}}));
     })();
-    </script>
     """
+}
+
+private func injectLocalWebMcp(
+    _ html: String,
+    plugin: MarketplacePlugin,
+    bridgeSession: MiniAppWebMcpBridgeSession
+) -> String {
+    let bootstrap = "<script>\(webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: bridgeSession))</script>"
     if let range = html.range(of: "</head>", options: .caseInsensitive) {
         var result = html
         result.insert(contentsOf: bootstrap, at: range.lowerBound)

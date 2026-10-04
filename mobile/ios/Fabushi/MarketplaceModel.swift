@@ -855,6 +855,12 @@ final class MarketplaceModel {
         )
     }
 
+    static let globalDharmaStatusFallbackTool = MiniAppToolContract(
+        name: "status",
+        description: "读取全球法布施 canonical shared runtime 状态",
+        approval: "none"
+    )
+
     static func activeLocalInstallSatisfies(
         plugin: MarketplacePlugin,
         pointer: [String: Any]?
@@ -1014,8 +1020,8 @@ final class MarketplaceModel {
             }
             return plugin.replacingTools(tools)
         } catch {
-            message = "Global Dharma WebMCP 工具合同不可用：\(error.localizedDescription)"
-            return plugin.replacingTools([])
+            message = "Global Dharma WebMCP 工具合同不可用，仅保留只读 status 恢复：\(error.localizedDescription)"
+            return plugin.replacingTools([Self.globalDharmaStatusFallbackTool])
         }
     }
 

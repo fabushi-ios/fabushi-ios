@@ -23,6 +23,20 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(bot.menuButtonText, "打开应用")
     }
 
+    func testWebMcpBridgeTrustIsBoundedToCanonicalLocalAndHostedOrigins() {
+        XCTAssertTrue(isTrustedWebMcpBridgeHost("miniapp.local.fabushi.invalid"))
+        XCTAssertTrue(isTrustedWebMcpBridgeHost("fabushi.ombhrum.com"))
+        XCTAssertFalse(isTrustedWebMcpBridgeHost("ombhrum.com"))
+        XCTAssertFalse(isTrustedWebMcpBridgeHost("fabushi.ombhrum.com.evil.invalid"))
+        XCTAssertFalse(isTrustedWebMcpBridgeHost(nil))
+    }
+
+    func testGlobalDharmaStatusFallbackIsReadOnlyAndNarrow() {
+        let tool = MarketplaceModel.globalDharmaStatusFallbackTool
+        XCTAssertEqual(tool.name, "status")
+        XCTAssertEqual(tool.approval, "none")
+    }
+
     func testMiniAppBridgeSessionRequiresExactInstanceNonceAndExplicitGrant() {
         let session = MiniAppWebMcpBridgeSession(
             pluginInstanceId: "global-dharma:instance-1",
