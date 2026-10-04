@@ -175,7 +175,22 @@ internal struct MobileBotChat: View {
         .onChange(of: bot.id) { _, _ in cancelVoiceInput() }
         .onDisappear { cancelVoiceInput() }
         .fullScreenCover(isPresented: $openedMiniApp) {
-            GlobalDharmaMiniAppView(model: model, bridge: bridge)
+            if let miniAppId = bot.miniAppId,
+               let plugin = model.plugins.first(where: { $0.pluginId == miniAppId }) {
+                MiniAppWebMcpSurface(plugin: plugin, model: model)
+            } else {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("正在加载应用…")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .task {
+                    if model.plugins.first(where: { $0.pluginId == bot.miniAppId }) == nil {
+                        await model.refresh()
+                    }
+                }
+            }
         }
     }
 
