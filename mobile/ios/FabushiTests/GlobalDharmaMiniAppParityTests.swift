@@ -68,6 +68,31 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(state["source"] as? String, "bot")
     }
 
+    func testGlobalDharmaStatusBridgePreservesRemoteStatusAndRestoresCanonicalRuntime() throws {
+        let execution = MarketplaceModel.nextGlobalDharmaExecution(
+            previous: nil,
+            tool: "status",
+            result: ["structuredContent": ["running": true]],
+            source: "bot"
+        )
+        let runtime = try XCTUnwrap(MarketplaceModel.globalDharmaRuntime(from: execution))
+        let bridged = MarketplaceModel.bridgeGlobalDharmaStatusResult(
+            [
+                "content": [["type": "text", "text": "running"]],
+                "structuredContent": ["running": true, "mode": "home"],
+            ],
+            runtime: runtime
+        )
+
+        let structured = try XCTUnwrap(bridged["structuredContent"] as? [String: Any])
+        XCTAssertEqual(structured["running"] as? Bool, true)
+        XCTAssertEqual(structured["mode"] as? String, "home")
+        let restored = try XCTUnwrap(structured["runtime"] as? [String: Any])
+        XCTAssertEqual(restored["protocol"] as? String, "fabushi.miniapp.runtime.v1")
+        XCTAssertEqual(restored["miniAppId"] as? String, "global-dharma")
+        XCTAssertEqual((restored["revision"] as? NSNumber)?.intValue, 1)
+    }
+
     func testMiniAppBridgeSessionRequiresExactInstanceNonceAndExplicitGrant() {
         let session = MiniAppWebMcpBridgeSession(
             pluginInstanceId: "global-dharma:instance-1",

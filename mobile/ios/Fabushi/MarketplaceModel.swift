@@ -227,6 +227,17 @@ final class MarketplaceModel {
         ]
     }
 
+    static func bridgeGlobalDharmaStatusResult(
+        _ result: [String: Any],
+        runtime: [String: Any]
+    ) -> [String: Any] {
+        var bridged = result
+        var structured = (result["structuredContent"] as? [String: Any]) ?? [:]
+        structured["runtime"] = runtime
+        bridged["structuredContent"] = structured
+        return bridged
+    }
+
     private static func globalDharmaScope(for user: [String: Any]) -> String? {
         guard let raw = ((user["id"] as? String)
             ?? (user["email"] as? String)
@@ -1208,11 +1219,14 @@ final class MarketplaceModel {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("Invalid WebMCP tool name")
         }
         if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
-            return try await globalDharmaBridge.callOfficialMcpTool(
+            let result = try await globalDharmaBridge.callOfficialMcpTool(
                 pluginId: pluginId,
                 name: name,
                 arguments: arguments
             )
+            guard name == "status" else { return result }
+            let runtime = try globalDharmaSharedRuntime()
+            return Self.bridgeGlobalDharmaStatusResult(result, runtime: runtime)
         }
         return try await callRuntimeTool(pluginId: pluginId, name: name, arguments: arguments)
     }
