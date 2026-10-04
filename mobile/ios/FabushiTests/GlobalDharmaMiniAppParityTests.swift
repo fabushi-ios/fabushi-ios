@@ -37,6 +37,37 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(tool.approval, "none")
     }
 
+    func testGlobalDharmaExecutionProjectionPreservesOneHostBoundaryRevision() throws {
+        let first = MarketplaceModel.nextGlobalDharmaExecution(
+            previous: nil,
+            tool: "status",
+            result: ["structuredContent": ["running": false]],
+            source: "bot"
+        )
+        XCTAssertEqual(first["protocol"] as? String, "fabushi.miniapp.execution.v1")
+        XCTAssertEqual(first["miniAppId"] as? String, "global-dharma")
+        XCTAssertEqual((first["revision"] as? NSNumber)?.intValue, 1)
+        XCTAssertEqual(first["source"] as? String, "bot")
+        XCTAssertEqual(first["phase"] as? String, "completed")
+        XCTAssertEqual(first["tool"] as? String, "status")
+
+        let second = MarketplaceModel.nextGlobalDharmaExecution(
+            previous: first,
+            tool: "start",
+            result: ["structuredContent": ["running": true]],
+            source: "web-ui"
+        )
+        XCTAssertEqual((second["revision"] as? NSNumber)?.intValue, 2)
+
+        let runtime = try XCTUnwrap(MarketplaceModel.globalDharmaRuntime(from: first))
+        XCTAssertEqual(runtime["protocol"] as? String, "fabushi.miniapp.runtime.v1")
+        XCTAssertEqual(runtime["miniAppId"] as? String, "global-dharma")
+        XCTAssertEqual((runtime["revision"] as? NSNumber)?.intValue, 1)
+        let state = try XCTUnwrap(runtime["state"] as? [String: Any])
+        XCTAssertEqual(state["tool"] as? String, "status")
+        XCTAssertEqual(state["source"] as? String, "bot")
+    }
+
     func testMiniAppBridgeSessionRequiresExactInstanceNonceAndExplicitGrant() {
         let session = MiniAppWebMcpBridgeSession(
             pluginInstanceId: "global-dharma:instance-1",

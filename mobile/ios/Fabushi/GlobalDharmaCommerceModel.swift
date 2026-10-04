@@ -247,21 +247,6 @@ final class GlobalDharmaCommerceModel {
         }
     }
 
-    func fetchCanonicalSharedRuntime() async throws -> [String: Any] {
-        let runtime = try await requestJSON(
-            baseURL: platformBaseURL,
-            path: "/v1/miniapps/\(Self.miniAppId)/runtime",
-            method: "GET"
-        )
-        guard runtime["protocol"] as? String == "fabushi.miniapp.runtime.v1",
-              runtime["miniAppId"] as? String == Self.miniAppId,
-              let revision = (runtime["revision"] as? NSNumber)?.int64Value,
-              revision >= 0,
-              runtime["state"] is [String: Any]
-        else { throw GlobalDharmaCommerceError.invalidResponse }
-        return runtime
-    }
-
     private func purchaseLifetimeThroughCanonicalLedger() async throws {
         message = "CI 测试模式：通过 canonical ledger 购买 ¥1080 买断权益（不真实扣款）…"
         let purchase = try await requestJSON(

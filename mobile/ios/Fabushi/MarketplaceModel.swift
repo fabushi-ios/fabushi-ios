@@ -182,6 +182,9 @@ final class MarketplaceModel {
     private let bridge: IOSPreloadBridge
     private let globalDharmaBridge: GlobalDharmaMiniAppBridge
     private let onboardingKey = "fabushi.mobile.onboarding-complete.v1"
+    @ObservationIgnored private var globalDharmaAccountScope: String?
+    @ObservationIgnored private var globalDharmaExecution: [String: Any]?
+    private static let globalDharmaExecutionKeyPrefix = "fabushi.ios.miniapp-execution.v1:"
     @ObservationIgnored private let browserAuthPresentationContext = BrowserAuthPresentationContext()
     @ObservationIgnored private var webAuthenticationSession: ASWebAuthenticationSession?
 
@@ -190,6 +193,94 @@ final class MarketplaceModel {
         globalDharmaBridge = GlobalDharmaMiniAppBridge(bridge: bridge)
         globalDharmaCommerce = GlobalDharmaCommerceModel(bridge: bridge)
         onboardingStep = UserDefaults.standard.bool(forKey: onboardingKey) ? 3 : 0
+    }
+
+    static func nextGlobalDharmaExecution(
+        previous: [String: Any]?,
+        tool: String,
+        result: Any,
+        source: String
+    ) -> [String: Any] {
+        let previousRevision = (previous?["revision"] as? NSNumber)?.intValue ?? 0
+        return [
+            "protocol": "fabushi.miniapp.execution.v1",
+            "miniAppId": GlobalDharmaMiniAppBridge.globalDharmaId,
+            "revision": previousRevision + 1,
+            "source": source,
+            "phase": "completed",
+            "tool": tool,
+            "result": result,
+        ]
+    }
+
+    static func globalDharmaRuntime(from execution: [String: Any]) -> [String: Any]? {
+        guard execution["protocol"] as? String == "fabushi.miniapp.execution.v1",
+              execution["miniAppId"] as? String == GlobalDharmaMiniAppBridge.globalDharmaId,
+              let revision = (execution["revision"] as? NSNumber)?.intValue,
+              revision > 0
+        else { return nil }
+        return [
+            "protocol": "fabushi.miniapp.runtime.v1",
+            "miniAppId": GlobalDharmaMiniAppBridge.globalDharmaId,
+            "revision": revision,
+            "state": execution,
+        ]
+    }
+
+    private static func globalDharmaScope(for user: [String: Any]) -> String? {
+        guard let raw = ((user["id"] as? String)
+            ?? (user["email"] as? String)
+            ?? (user["username"] as? String))?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !raw.isEmpty
+        else { return nil }
+        return Data(raw.lowercased().utf8)
+            .base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func globalDharmaExecutionKey(scope: String) -> String {
+        globalDharmaExecutionKeyPrefix + scope
+    }
+
+    private static func loadGlobalDharmaExecution(scope: String) -> [String: Any]? {
+        let key = globalDharmaExecutionKey(scope: scope)
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["protocol"] as? String == "fabushi.miniapp.execution.v1",
+              object["miniAppId"] as? String == GlobalDharmaMiniAppBridge.globalDharmaId,
+              ((object["revision"] as? NSNumber)?.intValue ?? 0) > 0
+        else { return nil }
+        return object
+    }
+
+    func recordGlobalDharmaExecution(tool: String, result: Any, source: String) {
+        guard loggedIn, let scope = globalDharmaAccountScope else { return }
+        let execution = Self.nextGlobalDharmaExecution(
+            previous: globalDharmaExecution,
+            tool: tool,
+            result: result,
+            source: source
+        )
+        guard JSONSerialization.isValidJSONObject(execution),
+              let data = try? JSONSerialization.data(withJSONObject: execution)
+        else { return }
+        globalDharmaExecution = execution
+        UserDefaults.standard.set(data, forKey: Self.globalDharmaExecutionKey(scope: scope))
+    }
+
+    func globalDharmaSharedRuntime() throws -> [String: Any] {
+        guard loggedIn,
+              let execution = globalDharmaExecution,
+              let runtime = Self.globalDharmaRuntime(from: execution)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Global Dharma has no completed account-scoped Bot execution to restore"
+            )
+        }
+        return runtime
     }
 
     func initializeApp() async {
@@ -213,11 +304,17 @@ final class MarketplaceModel {
         if !loggedIn {
             accountUsage = nil
             accountUsageError = nil
+            globalDharmaAccountScope = nil
+            globalDharmaExecution = nil
         }
         guard let user = object?["user"] as? [String: Any] else {
             accountName = "Fabushi"
             accountEmail = ""
             return
+        }
+        if loggedIn, let scope = Self.globalDharmaScope(for: user) {
+            globalDharmaAccountScope = scope
+            globalDharmaExecution = Self.loadGlobalDharmaExecution(scope: scope)
         }
         accountName = (user["nickname"] as? String)
             ?? (user["username"] as? String)
@@ -525,7 +622,13 @@ final class MarketplaceModel {
             _ = try? await bridge.request(method: "feature.interrupt", params: ["operationId": operationId])
         }
         do {
+            let scopeToClear = globalDharmaAccountScope
             let result = try await bridge.request(method: "feature.auth.logout")
+            if let scopeToClear {
+                UserDefaults.standard.removeObject(
+                    forKey: Self.globalDharmaExecutionKey(scope: scopeToClear)
+                )
+            }
             applyAuth(result.value as? [String: Any])
         } catch {
             message = "退出登录失败：\(error.localizedDescription)"

@@ -500,6 +500,9 @@ internal struct MobileBotChat: View {
             }
             let arguments = routed["arguments"] as? [String: Any] ?? [:]
             let result = try await bridge.callOfficialMcpTool(pluginId: pluginId, name: tool, arguments: arguments)
+            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
+                model.recordGlobalDharmaExecution(tool: tool, result: result, source: "bot")
+            }
             removeThinking(operationId)
             entries.append(MobileChatMessage(
                 id: "assistant:\(operationId)",

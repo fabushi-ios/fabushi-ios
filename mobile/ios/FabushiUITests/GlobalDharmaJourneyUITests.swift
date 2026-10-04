@@ -115,7 +115,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         let draft = app.textFields["mobile-bot-draft"]
         XCTAssertTrue(draft.waitForExistence(timeout: 8))
         draft.tap()
-        draft.typeText("请通过 WebMCP 启动本地转经轮，并把当前操作状态同步到小程序界面。")
+        draft.typeText("请通过 WebMCP 查看当前运行状态，并把当前操作状态同步到小程序界面。")
         let send = app.buttons["mobile-bot-send"]
         XCTAssertTrue(send.waitForExistence(timeout: 8))
         send.tap()

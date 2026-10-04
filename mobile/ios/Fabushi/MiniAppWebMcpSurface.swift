@@ -385,7 +385,7 @@ private struct MiniAppWebView: UIViewRepresentable {
 
                     let result: Any
                     if self.plugin.pluginId == GlobalDharmaCommerceModel.miniAppId && name == "status" {
-                        let runtime = try await self.model.globalDharmaCommerce.fetchCanonicalSharedRuntime()
+                        let runtime = try self.model.globalDharmaSharedRuntime()
                         result = [
                             "content": [["type": "text", "text": "已读取全球法布施状态。"]],
                             "structuredContent": ["runtime": runtime],
