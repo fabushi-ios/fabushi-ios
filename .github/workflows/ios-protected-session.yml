@@ -89,18 +89,6 @@ jobs:
           xcrun simctl io "$UDID" recordVideo --codec=h264 "$EVIDENCE_DIR/session.mp4" > "$EVIDENCE_DIR/video-recorder.log" 2>&1 &
           echo $! > "$EVIDENCE_DIR/video-recorder.pid"
 
-      - name: Prepare bounded refresh-token-free account session
-        shell: bash
-        env:
-          DEVICE_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}-ios-app
-          FABUSHI_CI_ACCOUNT_SESSION_FILE: ${{ runner.temp }}/fabushi-ci/account-session.json
-        run: |
-          set -euo pipefail
-          node .github/scripts/prepare-ios-ci-session.mjs
-          test -s "$FABUSHI_CI_ACCOUNT_SESSION_FILE"
-          test "$(stat -f '%Lp' "$FABUSHI_CI_ACCOUNT_SESSION_FILE")" = "600"
-          echo "HOST_CI_SESSION=$FABUSHI_CI_ACCOUNT_SESSION_FILE" >> "$GITHUB_ENV"
-
       - name: Build iOS-owned Rust runtime for simulator
         run: scripts/build-mahayana-ios.sh iphonesimulator arm64
 
@@ -118,6 +106,18 @@ jobs:
             -scheme Fabushi \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath "$RUNNER_TEMP/FabushiProtectedDerivedData"
+
+      - name: Prepare bounded refresh-token-free account session
+        shell: bash
+        env:
+          DEVICE_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}-ios-app
+          FABUSHI_CI_ACCOUNT_SESSION_FILE: ${{ runner.temp }}/fabushi-ci/account-session.json
+        run: |
+          set -euo pipefail
+          node .github/scripts/prepare-ios-ci-session.mjs
+          test -s "$FABUSHI_CI_ACCOUNT_SESSION_FILE"
+          test "$(stat -f '%Lp' "$FABUSHI_CI_ACCOUNT_SESSION_FILE")" = "600"
+          echo "HOST_CI_SESSION=$FABUSHI_CI_ACCOUNT_SESSION_FILE" >> "$GITHUB_ENV"
 
       - name: Inject bounded session into protected UI runner
         shell: bash
