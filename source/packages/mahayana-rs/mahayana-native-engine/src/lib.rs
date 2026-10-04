@@ -575,6 +575,8 @@ impl NativeEngine {
                 metadata: json!({"engine": "mahayana-native"}),
             })?;
 
+            let declared_tools =
+                tool_definitions(self.config.enable_process_tools, self.web_research.is_some());
             let collector = Arc::new(if visible_user_turn {
                 ModelCollector::buffered()
             } else {
@@ -590,10 +592,7 @@ impl NativeEngine {
                         input: Value::Array(session.history.clone()),
                         metadata: json!({
                             "instructions": self.config.system_instructions,
-                            "tools": tool_definitions(
-                                self.config.enable_process_tools,
-                                self.web_research.is_some(),
-                            ),
+                            "tools": declared_tools.clone(),
                             "tool_choice": "auto",
                             "parallel_tool_calls": false,
                         }),
@@ -626,8 +625,33 @@ impl NativeEngine {
             let payload = collector.output()?.ok_or_else(|| {
                 KernelError::Backend("model runtime completed without a payload".into())
             })?;
-            append_model_output(&mut session.history, &payload);
+            let step_text = collector.text()?;
             let mut calls = extract_function_calls(&payload)?;
+            let mut normalized_dsml = false;
+            if calls.is_empty() {
+                let payload_text = if step_text.trim().is_empty() {
+                    mahayana_model::responses::extract_output_text(&payload)
+                } else {
+                    None
+                };
+                let compatibility_text = if step_text.trim().is_empty() {
+                    payload_text.as_deref().unwrap_or_default()
+                } else {
+                    step_text.as_str()
+                };
+                if let Some(dsml_calls) =
+                    dsml_compat_function_calls(compatibility_text, &declared_tools, turn)
+                {
+                    session
+                        .history
+                        .extend(dsml_calls.iter().map(function_call_history_item));
+                    calls = dsml_calls;
+                    normalized_dsml = true;
+                }
+            }
+            if !normalized_dsml {
+                append_model_output(&mut session.history, &payload);
+            }
             if calls.is_empty()
                 && let Some(call) = explicit_tool_plan.first().cloned()
             {
@@ -643,7 +667,7 @@ impl NativeEngine {
             }
             if calls.is_empty() {
                 let text = mahayana_model::responses::extract_output_text(&payload)
-                    .or_else(|| collector.text().ok().filter(|text| !text.is_empty()))
+                    .or_else(|| (!step_text.is_empty()).then(|| step_text.clone()))
                     .ok_or_else(|| {
                         KernelError::Backend(
                             "model completed without assistant text or tool calls".into(),
@@ -2131,6 +2155,107 @@ fn explicit_workflow_tasks(prompt: &str) -> Vec<Value> {
         .collect()
 }
 
+fn parse_dsml_compat_calls(text: &str) -> Option<Vec<(String, Value)>> {
+    const CALLS_OPEN: &str = "<｜｜DSML｜｜ calls>";
+    const CALLS_CLOSE: &str = "</｜｜DSML｜｜ calls>";
+    const INVOKE_OPEN: &str = "<｜｜DSML｜｜ invoke name=\"";
+    const INVOKE_CLOSE: &str = "</｜｜DSML｜｜ invoke>";
+    const PARAM_OPEN: &str = "<｜｜DSML｜｜ parameter name=\"";
+    const PARAM_CLOSE: &str = "</｜｜DSML｜｜ parameter>";
+
+    let trimmed = text.trim();
+    let mut rest = trimmed
+        .strip_prefix(CALLS_OPEN)?
+        .strip_suffix(CALLS_CLOSE)?
+        .trim();
+    let mut calls = Vec::new();
+
+    while !rest.is_empty() {
+        let after_open = rest.strip_prefix(INVOKE_OPEN)?;
+        let name_end = after_open.find("\">")?;
+        let name = &after_open[..name_end];
+        if name.is_empty()
+            || !name
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
+        {
+            return None;
+        }
+
+        let body = &after_open[name_end + 2..];
+        let invoke_end = body.find(INVOKE_CLOSE)?;
+        let mut params = body[..invoke_end].trim();
+        let mut arguments = serde_json::Map::new();
+
+        while !params.is_empty() {
+            let after_param_open = params.strip_prefix(PARAM_OPEN)?;
+            let param_name_end = after_param_open.find('"')?;
+            let param_name = &after_param_open[..param_name_end];
+            if param_name.is_empty()
+                || !param_name
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
+                || arguments.contains_key(param_name)
+            {
+                return None;
+            }
+
+            let after_name = &after_param_open[param_name_end + 1..];
+            let tag_end = after_name.find('>')?;
+            let attributes = after_name[..tag_end].trim();
+            if !attributes.is_empty() && attributes != "string=\"true\"" {
+                return None;
+            }
+
+            let value_and_tail = &after_name[tag_end + 1..];
+            let value_end = value_and_tail.find(PARAM_CLOSE)?;
+            let value = &value_and_tail[..value_end];
+            arguments.insert(param_name.to_string(), Value::String(value.to_string()));
+            params = value_and_tail[value_end + PARAM_CLOSE.len()..].trim();
+        }
+
+        calls.push((name.to_string(), Value::Object(arguments)));
+        rest = body[invoke_end + INVOKE_CLOSE.len()..].trim();
+    }
+
+    (!calls.is_empty()).then_some(calls)
+}
+
+fn dsml_compat_function_calls(
+    text: &str,
+    tools: &[Value],
+    step: usize,
+) -> Option<Vec<FunctionCall>> {
+    let parsed = parse_dsml_compat_calls(text)?;
+    if parsed.iter().any(|(name, _)| {
+        !tools
+            .iter()
+            .any(|tool| tool.get("name").and_then(Value::as_str) == Some(name.as_str()))
+    }) {
+        return None;
+    }
+    Some(
+        parsed
+            .into_iter()
+            .enumerate()
+            .map(|(index, (name, arguments))| FunctionCall {
+                call_id: format!("dsml-step-{step}-call-{index}"),
+                name,
+                arguments,
+            })
+            .collect(),
+    )
+}
+
+fn function_call_history_item(call: &FunctionCall) -> Value {
+    json!({
+        "type": "function_call",
+        "name": call.name,
+        "call_id": call.call_id,
+        "arguments": serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".into()),
+    })
+}
+
 fn extract_function_calls(payload: &Value) -> Result<Vec<FunctionCall>, KernelError> {
     let mut calls = Vec::new();
     for item in payload
@@ -2817,6 +2942,7 @@ mod tests {
     use super::*;
     use mahayana_model::ModelProviderMode;
     use std::collections::VecDeque;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
     #[test]
     fn selected_images_project_into_the_current_user_turn() {
@@ -2877,6 +3003,47 @@ mod tests {
     }
 
     #[test]
+    fn strict_dsml_tool_calls_normalize_into_declared_native_tools() {
+        let tools = tool_definitions(false, false);
+        let dsml = concat!(
+            "<｜｜DSML｜｜ calls>\n",
+            "<｜｜DSML｜｜ invoke name=\"send_message\">\n",
+            "<｜｜DSML｜｜ parameter name=\"message\" string=\"true\">",
+            "FABUSHI-IOS-DSML-7421",
+            "</｜｜DSML｜｜ parameter>\n",
+            "</｜｜DSML｜｜ invoke>\n",
+            "</｜｜DSML｜｜ calls>"
+        );
+        let calls = dsml_compat_function_calls(dsml, &tools, 0)
+            .expect("strict declared DSML should normalize");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "send_message");
+        assert_eq!(calls[0].call_id, "dsml-step-0-call-0");
+        assert_eq!(
+            calls[0].arguments,
+            json!({"message":"FABUSHI-IOS-DSML-7421"})
+        );
+        let history = function_call_history_item(&calls[0]);
+        assert_eq!(history["type"], "function_call");
+        assert_eq!(history["name"], "send_message");
+        assert_eq!(history["call_id"], "dsml-step-0-call-0");
+    }
+
+    #[test]
+    fn dsml_compatibility_fails_closed_for_mixed_or_undeclared_text() {
+        let tools = tool_definitions(false, false);
+        for text in [
+            "prefix <｜｜DSML｜｜ calls><｜｜DSML｜｜ invoke name=\"send_message\"></｜｜DSML｜｜ invoke></｜｜DSML｜｜ calls>",
+            "<｜｜DSML｜｜ calls><｜｜DSML｜｜ invoke name=\"unknown_tool\"></｜｜DSML｜｜ invoke></｜｜DSML｜｜ calls>",
+        ] {
+            assert!(
+                dsml_compat_function_calls(text, &tools, 0).is_none(),
+                "mixed or undeclared DSML must remain ordinary model text"
+            );
+        }
+    }
+
+    #[test]
     fn local_docker_requires_an_immutable_image_digest() {
         assert!(!is_pinned_container_image("example.test/fabushi:latest"));
         assert!(is_pinned_container_image(&format!(
@@ -2917,6 +3084,51 @@ mod tests {
                 reasoning_output_tokens: 0,
             }))?;
             events.emit(ModelEvent::Completed { output })
+        }
+
+        fn provider_mode(&self) -> ModelProviderMode {
+            ModelProviderMode::LocalModel
+        }
+    }
+
+    struct DsmlStreamingModel {
+        inference_calls: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl ModelRuntime for DsmlStreamingModel {
+        async fn infer(
+            &self,
+            _request: ModelRequest,
+            events: SharedModelEventSink,
+        ) -> Result<(), ModelError> {
+            let call = self
+                .inference_calls
+                .fetch_add(1, AtomicOrdering::SeqCst);
+            if call == 0 {
+                let dsml = concat!(
+                    "<｜｜DSML｜｜ calls>\n",
+                    "<｜｜DSML｜｜ invoke name=\"send_message\">\n",
+                    "<｜｜DSML｜｜ parameter name=\"message\" string=\"true\">",
+                    "FABUSHI-IOS-STREAM-7421",
+                    "</｜｜DSML｜｜ parameter>\n",
+                    "</｜｜DSML｜｜ invoke>\n",
+                    "</｜｜DSML｜｜ calls>"
+                );
+                events.emit(ModelEvent::OutputTextDelta(dsml.to_string()))?;
+                return events.emit(ModelEvent::Completed {
+                    output: json!({"id":"resp-dsml-1","output":[]}),
+                });
+            }
+            events.emit(ModelEvent::Completed {
+                output: json!({
+                    "id":"resp-dsml-2",
+                    "output":[{
+                        "type":"message",
+                        "content":[{"type":"output_text","text":"internal-after-dsml"}]
+                    }]
+                }),
+            })
         }
 
         fn provider_mode(&self) -> ModelProviderMode {
@@ -3067,6 +3279,70 @@ mod tests {
         assert_eq!(metrics.operations_started, 1);
         assert_eq!(metrics.operations_completed, 1);
         assert_eq!(metrics.model_calls, 1);
+    }
+
+    #[tokio::test]
+    async fn strict_streamed_dsml_executes_declared_send_message_and_continues() {
+        let model = Arc::new(DsmlStreamingModel {
+            inference_calls: AtomicUsize::new(0),
+        });
+        let engine = NativeEngine::new(model.clone(), NativeEngineConfig::embedded("model"))
+            .expect("create engine");
+        let session = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                workspace_root: None,
+                model: None,
+                metadata: Value::Null,
+            })
+            .await
+            .expect("open session");
+        let events = Arc::new(Events::default());
+        engine
+            .run(
+                RunRequest {
+                    session_id: session,
+                    operation_id: OperationId::new(),
+                    input: "deliver the result".into(),
+                    policy: ExecutionPolicy::mobile_default(),
+                    required_capabilities: CapabilitySet::new([Capability::Model]),
+                    metadata: json!({"hidden": false}),
+                },
+                events.clone(),
+            )
+            .await
+            .expect("run DSML-compatible visible turn");
+
+        let events = events.0.lock().expect("events");
+        let delivered = events
+            .iter()
+            .find_map(|event| match event {
+                KernelEvent::ToolCompleted {
+                    tool,
+                    output,
+                    success: true,
+                    ..
+                } if tool == "send_message" => Some(output),
+                _ => None,
+            })
+            .expect("DSML send_message completion");
+        assert_eq!(
+            delivered["generatedMessage"],
+            "FABUSHI-IOS-STREAM-7421"
+        );
+        assert_eq!(
+            delivered["toolCallId"],
+            "dsml-step-0-call-0"
+        );
+        assert!(!events.iter().any(|event| matches!(
+            event,
+            KernelEvent::MessageDelta { delta, .. } if delta.contains("DSML")
+        )));
+        assert_eq!(
+            model.inference_calls.load(AtomicOrdering::SeqCst),
+            2,
+            "function_call_output must continue the model loop"
+        );
     }
 
     #[tokio::test]
