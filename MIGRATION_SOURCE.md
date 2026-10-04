@@ -5,7 +5,7 @@
 - Source repository: bhrumom/fabushi-desktop
 - Source pull request: #20
 - Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: 8556281e5eb20aeb6dba781bd5ecf8c623206d6e
+- Pinned source commit: ea6da4779f508679549599d15121c74fe384ad96
 - Target repository: bhrumom/fabushi-ios
 - Target pull request: #3
 - Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md
@@ -13,6 +13,8 @@
 Fabushi iOS is a standalone downstream port of Desktop PR #20. Source may be reused, ported, translated, or adapted into this repository, but the iOS product must not require another Fabushi source checkout or a new shared Desktop/iOS runtime repository.
 
 Grok Bot 0.18 is historical architecture/provenance context through Desktop PR #20. It is no longer the direct iOS migration authority.
+
+The current Desktop `frontend/** + source/**` inventory contains 7,943 source-bearing paths at the pinned exact HEAD. Chunk `sourceCommit` fields record the provenance SHA of each materialized snapshot; the top-level manifest/ledger authority and each changed blob identity are the exact-current acceptance boundary.
 
 ## Historical repository extraction provenance
 
