@@ -318,17 +318,35 @@ final class GlobalDharmaMiniAppBridge {
     }
 
     private func delegatedPluginToken(pluginId: String) async throws -> String {
-        let response = try await platform(
-            method: "POST",
-            path: "/v1/auth/plugin-token",
-            body: [
-                "pluginId": pluginId,
-                "deviceId": "fabushi-ios-miniapp-host",
-                "scopes": ["miniapp:\(pluginId)"],
-            ]
+        try Self.requirePluginId(pluginId)
+        // platform.request intentionally redacts bearer credentials. Ask the trusted
+        // native Host to consume the Rust-owned account session and mint the exact,
+        // five-minute Mini App credential without exposing the account token.
+        let result = try await bridge.request(
+            method: "feature.miniapp.delegatedToken",
+            params: ["pluginId": pluginId]
         )
-        guard let token = (response["accessToken"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), token.count >= 24 else {
-            throw MahayanaCoordinator.CoordinatorError.requestFailed("Fabushi did not issue a delegated Mini App token")
+        guard let response = result.value as? [String: Any] else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return try Self.delegatedPluginCredential(from: response)
+    }
+
+    nonisolated static func delegatedPluginCredential(from response: [String: Any]) throws -> String {
+        let token = (response["accessToken"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let tokenType = (response["tokenType"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let expiresIn = int64(response["expiresIn"])
+        guard let token,
+              token.count >= 24,
+              token != "[stored by Mahayana]",
+              tokenType == "Bearer",
+              (1...300).contains(expiresIn)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Fabushi did not issue a bounded delegated Mini App token"
+            )
         }
         return token
     }

@@ -207,6 +207,9 @@ impl AppHost {
                 .product
                 .device_agent_session()
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            // Trusted native Host only. Generic platform.request deliberately redacts
+            // bearer credentials before returning data to UI shells.
+            "feature.miniapp.delegatedToken" => self.feature_miniapp_delegated_token(params),
             "feature.auth.providers" => self
                 .feature
                 .auth_providers()
@@ -415,6 +418,14 @@ impl AppHost {
     fn feature_browser_login_poll(&self, params: Value) -> Result<Value, AppHostError> {
         self.feature
             .browser_login_poll(string_param(&params, "attemptId")?.to_string())
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_miniapp_delegated_token(&self, params: Value) -> Result<Value, AppHostError> {
+        let plugin_id = string_param(&params, "pluginId")?;
+        let device_id = format!("fabushi-{}-miniapp-host", host_platform());
+        self.product
+            .miniapp_delegated_token(plugin_id, &device_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 

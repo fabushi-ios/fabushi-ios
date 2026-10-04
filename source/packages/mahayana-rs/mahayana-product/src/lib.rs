@@ -1211,6 +1211,19 @@ impl MahayanaProductClient {
         self.post_json("/v1/auth/plugin-token", body, Some(&token))
     }
 
+    /// Issues the one bounded credential a trusted native Mini App host may use.
+    ///
+    /// The caller chooses only the plugin identity and Host-owned device identity.
+    /// Scope is derived here so native/UI callers cannot widen delegated authority.
+    pub fn miniapp_delegated_token(
+        &self,
+        plugin_id: &str,
+        device_id: &str,
+    ) -> Result<Value, ProductError> {
+        let request = miniapp_delegated_token_request(plugin_id, device_id)?;
+        self.delegated_plugin_token(&request)
+    }
+
     /// Returns the locally stored Fabushi/Alipay session token used by the
     /// first-party Responses provider. The value must stay in memory and must
     /// not be copied into Codex `auth.json` or logs.
@@ -3435,6 +3448,27 @@ fn terminal_session_error(error: &ProductError) -> bool {
     )
 }
 
+fn miniapp_delegated_token_request(
+    plugin_id: &str,
+    device_id: &str,
+) -> Result<DelegatedTokenRequest, ProductError> {
+    let plugin_id = safe_path_identifier(plugin_id, "pluginId")?;
+    let device_id = device_id.trim();
+    if device_id.is_empty()
+        || device_id.len() > 128
+        || !device_id.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-')
+        })
+    {
+        return Err(ProductError::InvalidParameter("deviceId"));
+    }
+    Ok(DelegatedTokenRequest {
+        plugin_id: plugin_id.to_string(),
+        device_id: device_id.to_string(),
+        scopes: vec![format!("miniapp:{plugin_id}")],
+    })
+}
+
 pub fn redact_secrets(value: &Value) -> Value {
     match value {
         Value::Object(object) => {
@@ -3473,6 +3507,27 @@ mod tests {
         assert_eq!(output["token"], "[stored by Mahayana]");
         assert_eq!(output["nested"]["accessToken"], "[stored by Mahayana]");
         assert_eq!(output["nested"]["name"], "kept");
+    }
+
+    #[test]
+    fn delegated_miniapp_token_request_is_exactly_scoped_and_host_bounded() {
+        let request = miniapp_delegated_token_request(
+            "global-dharma",
+            "fabushi-ios-miniapp-host",
+        )
+        .expect("bounded delegated request");
+        assert_eq!(request.plugin_id, "global-dharma");
+        assert_eq!(request.device_id, "fabushi-ios-miniapp-host");
+        assert_eq!(request.scopes, vec!["miniapp:global-dharma"]);
+
+        assert!(matches!(
+            miniapp_delegated_token_request("../admin", "fabushi-ios-miniapp-host"),
+            Err(ProductError::InvalidParameter("pluginId"))
+        ));
+        assert!(matches!(
+            miniapp_delegated_token_request("global-dharma", "bad device"),
+            Err(ProductError::InvalidParameter("deviceId"))
+        ));
     }
 
     #[test]

@@ -37,6 +37,33 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(tool.approval, "none")
     }
 
+    func testDelegatedMiniAppCredentialMustBeBoundedBearerAndNeverRedacted() throws {
+        let token = String(repeating: "a", count: 64)
+        XCTAssertEqual(
+            try GlobalDharmaMiniAppBridge.delegatedPluginCredential(from: [
+                "accessToken": token,
+                "tokenType": "Bearer",
+                "expiresIn": 300,
+            ]),
+            token
+        )
+
+        XCTAssertThrowsError(
+            try GlobalDharmaMiniAppBridge.delegatedPluginCredential(from: [
+                "accessToken": "[stored by Mahayana]",
+                "tokenType": "Bearer",
+                "expiresIn": 300,
+            ])
+        )
+        XCTAssertThrowsError(
+            try GlobalDharmaMiniAppBridge.delegatedPluginCredential(from: [
+                "accessToken": token,
+                "tokenType": "Bearer",
+                "expiresIn": 301,
+            ])
+        )
+    }
+
     func testGlobalDharmaExecutionProjectionPreservesOneHostBoundaryRevision() throws {
         let first = MarketplaceModel.nextGlobalDharmaExecution(
             previous: nil,
