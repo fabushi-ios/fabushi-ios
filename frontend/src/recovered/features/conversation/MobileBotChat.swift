@@ -169,6 +169,7 @@ internal struct MobileBotChat: View {
             .background(.ultraThinMaterial)
         }
         .background(Color(red: 0.985, green: 0.985, blue: 0.975))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mobile-bot-chat")
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
         .onChange(of: bot.id) { _, _ in cancelVoiceInput() }
