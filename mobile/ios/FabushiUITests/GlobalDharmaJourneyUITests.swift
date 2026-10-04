@@ -210,15 +210,18 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         if let session = environment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"], !session.isEmpty {
             app.launchEnvironment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"] = session
         }
-        if let apiBaseURL = environment["FABUSHI_API_BASE_URL"], !apiBaseURL.isEmpty {
-            guard apiBaseURL.lowercased().hasPrefix("https://") else {
-                XCTFail("Protected Fabushi API/model base must use HTTPS")
-                return
-            }
-            app.launchEnvironment["FABUSHI_API_BASE_URL"] = apiBaseURL
-            app.launchEnvironment["MAHAYANA_API_BASE_URL"] = apiBaseURL
-            app.launchEnvironment["FABUSHI_RESPONSES_URL"] = apiBaseURL
+        guard let rawAPIBaseURL = environment["FABUSHI_CI_API_BASE_URL"] else {
+            XCTFail("Protected Fabushi CI API/model base is missing")
+            return
         }
+        let apiBaseURL = rawAPIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !apiBaseURL.isEmpty, apiBaseURL.lowercased().hasPrefix("https://") else {
+            XCTFail("Protected Fabushi API/model base must use HTTPS")
+            return
+        }
+        app.launchEnvironment["FABUSHI_API_BASE_URL"] = apiBaseURL
+        app.launchEnvironment["MAHAYANA_API_BASE_URL"] = apiBaseURL
+        app.launchEnvironment["FABUSHI_RESPONSES_URL"] = apiBaseURL
         for key in [
             "GITHUB_ACTIONS", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_JOB",
             "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_OS", "RUNNER_ARCH",

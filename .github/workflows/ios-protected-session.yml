@@ -152,6 +152,7 @@ jobs:
 
           forwarded = {
               "FABUSHI_CI_ACCOUNT_SESSION_BASE64": encoded_session,
+              "FABUSHI_CI_API_BASE_URL": api_base,
               "FABUSHI_API_BASE_URL": api_base,
               "MAHAYANA_API_BASE_URL": api_base,
               "FABUSHI_RESPONSES_URL": api_base,
