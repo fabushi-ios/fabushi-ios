@@ -61,7 +61,7 @@ final class GlobalDharmaCommerceTests: XCTestCase {
         ]))
         XCTAssertTrue(GlobalDharmaCommerceModel.detectCanonicalLedgerTestMode(environment: [
             "GITHUB_ACTIONS": "true",
-            "GITHUB_REPOSITORY": "bhrumom/fabushi-ios",
+            "GITHUB_REPOSITORY": "fabushi-ios/fabushi-ios",
             "GITHUB_SHA": "8595a50196309c8ebb91c3f8077125d7dc9e3ffa",
             "FABUSHI_CI_ACCOUNT_SESSION_FILE": "/app/Documents/fabushi-ci-session.json",
         ]))
@@ -76,6 +76,22 @@ final class GlobalDharmaCommerceTests: XCTestCase {
             "GITHUB_SHA": "8595a50196309c8ebb91c3f8077125d7dc9e3ffa",
             "FABUSHI_CI_ACCOUNT_SESSION_FILE": "/app/Documents/fabushi-ci-session.json",
         ]))
+    }
+
+
+    func testPlatformBaseURLPrefersInjectedFabushiAPIBase() {
+        let url = GlobalDharmaCommerceModel.resolvePlatformBaseURL(environment: [
+            "FABUSHI_API_BASE_URL": "https://ci-api.example.test",
+            "MAHAYANA_API_BASE_URL": "https://secondary.example.test",
+        ])
+        XCTAssertEqual(url.absoluteString, "https://ci-api.example.test")
+    }
+
+    func testPlatformBaseURLFallsBackWhenInjectedBaseIsInvalid() {
+        let url = GlobalDharmaCommerceModel.resolvePlatformBaseURL(environment: [
+            "FABUSHI_API_BASE_URL": "http://insecure.example.test",
+        ])
+        XCTAssertEqual(url.absoluteString, "https://api.ombhrum.com")
     }
 
     func testAdvancedCommerceRequestDataUsesAppleSignatureInfoEnvelope() throws {
