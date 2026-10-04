@@ -19,7 +19,7 @@ final class CoordinatorInferenceRouter {
     private(set) var provider: IOSInferenceProvider
     private let sendPrompt: SendPrompt
 
-    init(provider: IOSInferenceProvider = .cursor, sendPrompt: @escaping SendPrompt) {
+    init(provider: IOSInferenceProvider = .codex, sendPrompt: @escaping SendPrompt) {
         self.provider = provider
         self.sendPrompt = sendPrompt
     }

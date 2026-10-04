@@ -143,7 +143,7 @@ final class SharedCursorInferenceParityTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = SandSettingsStore(settingsPath: root.appendingPathComponent("settings.json").path)
 
-        XCTAssertEqual(resolveSandPromptInferenceRoute(settings: store), .cursor)
+        XCTAssertEqual(resolveSandPromptInferenceRoute(settings: store), .provider(.codex))
         store.setInferenceProvider(.openrouter)
         XCTAssertEqual(resolveSandPromptInferenceRoute(settings: store), .provider(.openrouter))
 

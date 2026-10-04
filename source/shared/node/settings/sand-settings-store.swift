@@ -495,7 +495,7 @@ final class SandSettingsStore: @unchecked Sendable {
         resolveSandLocalToolPermission(getLocalToolPermission(), adminCeiling: getLocalToolPermissionCeiling())
     }
     func getInferenceProvider() -> SandInferenceProvider {
-        load().inferenceProvider ?? .cursor
+        load().inferenceProvider ?? .codex
     }
 
     func setInferenceProvider(_ provider: SandInferenceProvider) {
