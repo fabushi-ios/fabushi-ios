@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `ba58a474050e05943f6282d3e57aea45a75a237e`
+- pinned source commit for this baseline: `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,17 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `ba58a474050e05943f6282d3e57aea45a75a237e`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf`
+
+Desktop PR #20 is open and draft on `refactor/grok-018-architecture-rebuild`. Direct GitHub compare from the previously pinned `ba58a474050e05943f6282d3e57aea45a75a237e` baseline reports **2 commits and exactly 2 changed selected files**: `source/host/Cargo.toml` and `source/host/src/extensions/inference/provider_session.rs`. No selected path was added or removed, so the authoritative `frontend/** + source/**` inventory remains exactly **7,943** rows.
+
+The shipping change makes provider transport lifetime process-owned. Desktop enables Tokio `rt-multi-thread`, replaces per-call/current-thread provider runtimes with one `OnceLock` process-shared runtime, adds one process-shared Responses HTTP client with keep-alive/idle pooling, and makes OpenRouter borrow that same runtime. Focused contracts require repeated runtime/client lookups to return the same process-owned object. Credentials, cancellation, checkpoint, usage, tool execution and provider routing remain in their existing owners.
+
+This responsibility is applicable to iOS, but the platform mechanism differs. iOS already enables Tokio `rt-multi-thread` in the Mahayana workspace and its canonical provider-neutral `ResponsesModelRuntime` performs blocking HTTP inside the existing async model boundary. The native adaptation therefore does **not** introduce a second provider runtime. Instead, `mahayana-model` owns one process-shared `ureq::Agent` and every Responses/Chat-Completions/Anthropic request uses that same agent, preserving HTTP connection-pool lifetime across native turns while Host/Product continue to resolve account credentials and NativeEngine retains tool/checkpoint ownership. A focused Rust contract asserts the shared-agent identity.
+
+The two changed Desktop blob identities and the source-host snapshot provenance are rebound to `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf`. All ordinary/protected results bound to iOS `195c3dfbb1a1d08657412b5ea62e5c39230aae85` and Desktop `ba58a474050e05943f6282d3e57aea45a75a237e` are historical regression evidence only. The resulting iOS exact HEAD must obtain fresh ordinary and protected same-HEAD acceptance before any current-authority promotion. The previously observed Global Dharma protected failure remains useful diagnostic evidence, but it cannot by itself prove failure or success under this newer Desktop authority.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-05 / `ba58a474050e05943f6282d3e57aea45a75a237e`
 
 Desktop PR #20 remains open and draft on `refactor/grok-018-architecture-rebuild`. GitHub compare from `38be2a105ccf5dbd23f2c6e81886d10539ad018f` to this exact HEAD reports **1 commit and exactly 1 changed file**, `desktop/e2e/openbot-packaged-acceptance.spec.ts`, with no change under the authoritative selected `frontend/** + source/**` roots. The selected production inventory therefore remains exactly **7,943** paths and every selected per-path Desktop blob identity remains unchanged.
 

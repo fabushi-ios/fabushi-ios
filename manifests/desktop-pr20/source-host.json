@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "38be2a105ccf5dbd23f2c6e81886d10539ad018f",
+  "sourceCommit": "6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf",
   "group": "source-host",
   "fileCount": 967,
   "files": [
@@ -20,8 +20,8 @@
     },
     {
       "path": "source/host/Cargo.toml",
-      "blobSha": "65432b0e16a02e8ea912bc3d4918f7f583ef104e",
-      "size": 1086
+      "blobSha": "ef90c6e79d47be82321b743d885ac78fedfb569a",
+      "size": 1105
     },
     {
       "path": "source/host/local-exec/local-exec-daemon-protocol.ts",
@@ -1045,8 +1045,8 @@
     },
     {
       "path": "source/host/src/extensions/inference/provider_session.rs",
-      "blobSha": "3ed07b2526c68b6ac47001727a07e72a482d3fe7",
-      "size": 79458
+      "blobSha": "c7d8a515f193db7fdcc7d6d62dde8c737007ae1d",
+      "size": 81188
     },
     {
       "path": "source/host/src/extensions/inference/sand_labeling.rs",

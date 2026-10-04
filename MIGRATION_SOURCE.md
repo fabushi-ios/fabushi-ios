@@ -5,7 +5,7 @@
 - Source repository: bhrumom/fabushi-desktop
 - Source pull request: #20
 - Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: ba58a474050e05943f6282d3e57aea45a75a237e
+- Pinned source commit: 6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf
 - Target repository: fabushi-ios/fabushi-ios
 - Target pull request: #3
 - Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md
@@ -15,6 +15,9 @@ Fabushi iOS is a standalone downstream port of Desktop PR #20. Source may be reu
 Grok Bot 0.18 is historical architecture/provenance context through Desktop PR #20. It is no longer the direct iOS migration authority.
 
 The current Desktop `frontend/** + source/**` inventory contains 7,943 source-bearing paths at the pinned exact HEAD.
+
+
+The latest `ba58a474050e05943f6282d3e57aea45a75a237e -> 6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf` authority move is **2 commits across exactly 2 selected Host files**: `source/host/Cargo.toml` and `source/host/src/extensions/inference/provider_session.rs`. Desktop now keeps one process-shared Tokio provider I/O runtime and one shared Responses HTTP client/connection pool instead of recreating transport state per turn; OpenRouter also borrows that process-owned runtime. This responsibility is applicable to iOS. The native port keeps the existing `ResponsesModelRuntime`/Host/NativeEngine ownership boundaries and adapts the lifetime contract by reusing one process-owned `ureq::Agent` across Responses, Chat Completions, and Anthropic requests; the workspace already enables Tokio `rt-multi-thread`, so no parallel provider runtime is introduced. The two source-host blob identities and source-host chunk provenance are rebound to the new Desktop exact HEAD. All Actions evidence from iOS `195c3dfbb1a1d08657412b5ea62e5c39230aae85` is historical only and must not be promoted to current authority.
 
 The previous `88dcc3b0ac83d8c3aabff8050551eabdd1726455` baseline is historical after Desktop PR #20 advanced through `efd027139c8db7cc036cd3344579f047090b6c04` to `38be2a105ccf5dbd23f2c6e81886d10539ad018f`. Existing iOS HEAD `8ddac696bbdd5a0139112f90b87f0455c4323649` and Actions runs `37216783417` / `37216783543` remain regression evidence only; they cannot be promoted as current-authority acceptance.
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "38be2a105ccf5dbd23f2c6e81886d10539ad018f",
+  "sourceCommit": "6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf",
   "group": "source-host",
   "rowCount": 967,
   "rows": [
@@ -51,18 +51,18 @@
     },
     {
       "desktop_path": "source/host/Cargo.toml",
-      "desktop_blob_sha": "65432b0e16a02e8ea912bc3d4918f7f583ef104e",
-      "desktop_responsibility": "pending-review",
+      "desktop_blob_sha": "ef90c6e79d47be82321b743d885ac78fedfb569a",
+      "desktop_responsibility": "Enable the runtime capability required by the Host's process-shared provider I/O owner so provider transports do not create and tear down isolated per-turn runtime state.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "desktop_visible_effect": "Repeated provider turns reuse one process-owned async I/O lifetime instead of paying per-turn setup and losing transport keep-alive continuity.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/Cargo.toml",
+      "ios_language": "TOML",
+      "ios_platform_delta": "iOS already enables Tokio rt-multi-thread in the Mahayana workspace; the native Responses owner keeps the existing runtime composition and adds process-shared HTTP transport state instead of introducing a second provider runtime.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/Cargo.toml; source/packages/mahayana-rs/mahayana-model/src/responses.rs",
+      "test_evidence": "mahayana-model process-shared HTTP-agent contract; current iOS exact-HEAD GitHub Actions pending",
+      "notes": "Revalidated against Desktop PR #20 6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf. Desktop now enables rt-multi-thread because provider I/O is process-shared; iOS already carries that feature at workspace level."
     },
     {
       "desktop_path": "source/host/local-exec/local-exec-daemon-protocol.ts",
@@ -3126,18 +3126,18 @@
     },
     {
       "desktop_path": "source/host/src/extensions/inference/provider_session.rs",
-      "desktop_blob_sha": "3ed07b2526c68b6ac47001727a07e72a482d3fe7",
-      "desktop_responsibility": "Run Fabushi as a first-party Responses provider using the account-bound credential, official HTTPS Responses endpoint, product-specific model selection, and the existing provider session/checkpoint/usage/cancellation lifecycle.",
+      "desktop_blob_sha": "c7d8a515f193db7fdcc7d6d62dde8c737007ae1d",
+      "desktop_responsibility": "Run Fabushi provider inference through process-shared transport state: one long-lived provider I/O owner and one reusable Responses HTTP connection pool, while preserving account-bound credentials, cancellation, checkpoint and usage semantics.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "Signed-in Fabushi turns use the Fabushi Responses transport and model without leaking the bearer into presentation code or silently routing it through Cursor infrastructure.",
+      "desktop_visible_effect": "Consecutive Fabushi/provider turns reuse live HTTP transport capacity instead of rebuilding transport state for each turn, reducing avoidable reconnect/setup latency without moving credentials or inference ownership into presentation code.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-model/src/responses.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "iOS uses the native Rust AppHost/ResponsesModelRuntime instead of Desktop provider-session process wiring; the Product client remains the credential resolver and the native engine remains the checkpoint/usage owner.",
+      "ios_platform_delta": "iOS keeps its provider-neutral ResponsesModelRuntime and spawn_blocking boundary. One process-shared ureq::Agent is reused for Responses, Chat Completions and Anthropic requests so connection pooling survives across native turns; Host/Product still own credential resolution and NativeEngine still owns tool/checkpoint execution.",
       "implementation_status": "implemented",
-      "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs; source/host/MahayanaHostRuntime.swift",
-      "test_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs focused shipping inference tests; current iOS exact-HEAD GitHub Actions pending",
-      "notes": "Revalidated against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1. FABUSHI_RESPONSES_MODEL defaults to deepseek-chat; the default endpoint is https://api.ombhrum.com/v1/ai/responses and account credentials resolve inside Rust Product/Host ownership."
+      "production_evidence": "source/packages/mahayana-rs/mahayana-model/src/responses.rs; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-model/src/responses.rs::responses_http_agent_is_process_shared; current iOS exact-HEAD GitHub Actions pending",
+      "notes": "Revalidated against Desktop PR #20 6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf. The new Desktop delta makes provider I/O/Responses transport process-shared; iOS adapts the same lifetime/connection-reuse responsibility in the existing native model boundary."
     },
     {
       "desktop_path": "source/host/src/extensions/inference/sand_labeling.rs",

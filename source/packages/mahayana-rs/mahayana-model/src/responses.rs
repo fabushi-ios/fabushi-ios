@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use mahayana_core::ModelProviderMode;
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ResponsesWireApi {
@@ -64,6 +64,17 @@ pub struct ResponsesModelRuntime {
 /// after logout or account switching.
 pub type ModelCredentialResolver =
     Arc<dyn Fn() -> Result<Option<String>, ModelError> + Send + Sync>;
+
+static RESPONSES_HTTP_AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+
+fn responses_http_agent() -> &'static ureq::Agent {
+    RESPONSES_HTTP_AGENT.get_or_init(|| {
+        ureq::AgentBuilder::new()
+            .max_idle_connections(16)
+            .max_idle_connections_per_host(8)
+            .build()
+    })
+}
 
 impl ResponsesModelRuntime {
     pub fn new(config: ResponsesModelConfig) -> Result<Self, ModelError> {
@@ -216,7 +227,7 @@ fn request_response(
     } else {
         "application/json"
     };
-    let mut http = ureq::post(&endpoint).set("Accept", accept);
+    let mut http = responses_http_agent().post(&endpoint).set("Accept", accept);
     if let Some(token) = config.bearer_token.as_deref() {
         http = match config.wire_api {
             ResponsesWireApi::AnthropicMessages => http
@@ -773,6 +784,16 @@ fn usage_value(usage: &Value, keys: &[&str]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn responses_http_agent_is_process_shared() {
+        let first = responses_http_agent();
+        let second = responses_http_agent();
+        assert!(
+            std::ptr::eq(first, second),
+            "model turns must reuse one process-owned HTTP agent and connection pool"
+        );
+    }
 
     #[test]
     fn extracts_text_and_usage_from_responses_payload() {
