@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `da503ef7af80501b1c7bbf5dd22ee727155edf54`
+- pinned source commit for this baseline: `a71ac22020e969c6077ecd78a8a050078d7b134e`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,15 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-04 / `da503ef7af80501b1c7bbf5dd22ee727155edf54`
+### 1.0 Current exact-HEAD authority: 2026-10-04 / `a71ac22020e969c6077ecd78a8a050078d7b134e`
+
+Desktop PR #20 advanced exactly one commit from `da503ef7af80501b1c7bbf5dd22ee727155edf54` to `a71ac22020e969c6077ecd78a8a050078d7b134e` while remaining open and draft on `refactor/grok-018-architecture-rebuild`. A direct GitHub compare reports one changed file only: `desktop/e2e/openbot-packaged-acceptance.spec.ts`, with 14 additions and 10 deletions. No file under the authoritative iOS-selected `frontend/** + source/**` roots changed, was added, removed, or renamed. The selected production inventory therefore remains exactly **7,943** files and all selected per-path Desktop blob identities remain unchanged.
+
+The upstream commit, `test(packaging): reuse bootstrapped empty Agent in signed acceptance`, tightens the signed packaged acceptance semantics for canonical Agent creation. The signed product may already own one empty `New chat` Agent after first-run bootstrap; that row is the canonical first create target and is renamed in place. The acceptance harness invokes `New` only when the currently selected Agent is already durable/non-empty, and it verifies that the canonical conversation heading follows the renamed Agent. This is an acceptance-contract change outside the selected source inventory, not a new shipping production owner and not a reason to fabricate a new ledger row.
+
+For iOS the applicable invariant is behavioral: first-run bootstrap may surface an empty canonical Agent/conversation that must be reused rather than discarded to create a parallel owner; subsequent explicit creation occurs only after the current Agent is no longer the empty bootstrap target. Native iOS acceptance must prove this through its existing Coordinator/Host/Runtime-backed Agent roster and conversation projection, without introducing a test-only creation bypass. Existing production row dispositions/statuses are preserved because selected Desktop blobs are unchanged, but all older current-head Actions evidence is historical for promotion after this authority move. The resulting iOS exact HEAD must obtain fresh ordinary and protected same-HEAD evidence before promotion.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-04 / `da503ef7af80501b1c7bbf5dd22ee727155edf54`
 
 Desktop PR #20 advanced one commit from `0d6e4095f18ec7662e169ecaec98d95e43bcdfec` to `da503ef7af80501b1c7bbf5dd22ee727155edf54`. The exact compare is one commit ahead and changes only `desktop/e2e/openbot-packaged-acceptance.spec.ts`. No file under the selected `frontend/** + source/**` production inventory changed, so the authoritative production inventory remains exactly 7,943 paths and its existing per-path blob identities remain valid. The top-level manifest/ledger authority and strict checker are nevertheless rebound to the new PR HEAD so old-head acceptance cannot be mistaken for current-head parity.
 
