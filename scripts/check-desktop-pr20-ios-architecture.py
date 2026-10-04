@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_DESKTOP_REPOSITORY = "bhrumom/fabushi-desktop"
 EXPECTED_DESKTOP_PR = 20
 EXPECTED_DESKTOP_BRANCH = "refactor/grok-018-architecture-rebuild"
-EXPECTED_DESKTOP_COMMIT = "a667bdf5b3ad98ef2e69f2443a753233c0ad0667"
+EXPECTED_DESKTOP_COMMIT = "38be2a105ccf5dbd23f2c6e81886d10539ad018f"
 EXPECTED_FILES = 7943
 
 VALID_DISPOSITIONS = {
@@ -247,6 +247,32 @@ if app.is_file():
     for forbidden in ["MahayanaHost(", "MahayanaCoordinator("]:
         if forbidden in text:
             errors.append(f"FabushiApp.swift directly constructs runtime owner: {forbidden}")
+
+
+# Desktop packaged acceptance now reads the canonical agent-avatar shape contract.
+# iOS owns this natively: one reusable SwiftUI avatar shape must remain the source
+# for the canonical Bot chat surfaces rather than mirroring Electron DOM selectors.
+avatar_path = ROOT / "frontend/src/recovered/features/agent-info/ClothGhostAvatar.swift"
+bot_chat_path = ROOT / "frontend/src/recovered/features/conversation/MobileBotChat.swift"
+if not avatar_path.is_file():
+    errors.append("missing canonical native Bot avatar owner")
+else:
+    avatar_text = avatar_path.read_text(encoding="utf-8")
+    for token in [
+        "private struct ClothGhostShape: Shape",
+        'accessibilityIdentifier("cloth-ghost-avatar")',
+    ]:
+        if token not in avatar_text:
+            errors.append(f"canonical native Bot avatar contract drift: missing {token}")
+
+if not bot_chat_path.is_file():
+    errors.append("missing native Bot chat surface")
+else:
+    bot_chat_text = bot_chat_path.read_text(encoding="utf-8")
+    if bot_chat_text.count("ClothGhostAvatar(botId: bot.id") < 3:
+        errors.append(
+            "native Bot chat no longer reuses one canonical ClothGhostAvatar across visible agent surfaces"
+        )
 
 print(
     "Desktop PR #20 -> iOS authority: "

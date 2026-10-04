@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "a667bdf5b3ad98ef2e69f2443a753233c0ad0667",
+  "sourceCommit": "38be2a105ccf5dbd23f2c6e81886d10539ad018f",
   "group": "source-host",
   "rowCount": 967,
   "rows": [
@@ -6032,7 +6032,7 @@
       "implementation_status": "implemented",
       "production_evidence": "mahayana-native-engine/src/lib.rs: shipping run_prompt shapes reply and closing-send hidden nudge history from the original pending prompt plus the existing nudge instruction, while keeping send_message delivery truth, syntheticReplyNudge/syntheticClosingSendNudge marking, bounded retry, and operation-control/Box fences in the same NativeEngine owner.",
       "test_evidence": "Focused NativeEngine production-path tests assert reply and closing-send nudge history preserves FABUSHI-MARKER-7421 / CLOSING-MARKER-5937 and requested output detail between explicit pending-request boundaries; existing bounded empty-delivery, cancel fencing, synthetic identity, and request_box_help no-nudge contracts remain. Current exact-head GitHub Actions pending.",
-      "notes": "Exact-HEAD rebaseline 88dcc3b0ac83d8c3aabff8050551eabdd1726455 -> a667bdf5b3ad98ef2e69f2443a753233c0ad0667; the production responsibility entered at efd027139c8db7cc036cd3344579f047090b6c04. Later Desktop commits only strengthen packaged acceptance capture and do not alter this selected source blob. iOS implements the responsibility in the existing NativeEngine; status is implemented, not verified, until same-iOS-HEAD ordinary and protected Actions succeed."
+      "notes": "Exact-HEAD rebaseline 88dcc3b0ac83d8c3aabff8050551eabdd1726455 -> 38be2a105ccf5dbd23f2c6e81886d10539ad018f; the production responsibility entered at efd027139c8db7cc036cd3344579f047090b6c04. Later Desktop commits only strengthen packaged acceptance capture and do not alter this selected source blob. iOS implements the responsibility in the existing NativeEngine; status is implemented, not verified, until same-iOS-HEAD ordinary and protected Actions succeed."
     },
     {
       "desktop_path": "source/host/src/extensions/transcript/upgrade_recreate_resume.rs",
@@ -14162,7 +14162,7 @@
       "implementation_status": "implemented",
       "production_evidence": "The shipping iOS NativeEngine run_prompt is the single model/tool-loop owner and feeds the shaped hidden nudge history directly into the next ModelRequest.",
       "test_evidence": "NativeEngine focused tests preserve FABUSHI-MARKER-7421 and OUTPUT=full across bounded reply nudges, preserve CLOSING-MARKER-5937 and FORMAT=complete across the one-shot closing nudge, and retain cancellation and request_box_help suppression tests. Current exact-head GitHub Actions pending.",
-      "notes": "Rebound to Desktop PR #20 a667bdf5b3ad98ef2e69f2443a753233c0ad0667 blob 49778612dfe89fd6247d5461e2b8b5c944a4306a; prior exact-head CI is historical for promotion."
+      "notes": "Rebound to Desktop PR #20 38be2a105ccf5dbd23f2c6e81886d10539ad018f blob 49778612dfe89fd6247d5461e2b8b5c944a4306a; prior exact-head CI is historical for promotion."
     },
     {
       "desktop_path": "source/host/tests/turn_settle_checkpoint_contract.rs",
