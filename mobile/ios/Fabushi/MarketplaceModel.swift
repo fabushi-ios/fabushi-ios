@@ -118,6 +118,17 @@ struct MarketplacePlugin: Identifiable, Equatable, Sendable {
     }
 
     var id: String { pluginId }
+
+    func replacingTools(_ tools: [MiniAppToolContract]) -> MarketplacePlugin {
+        MarketplacePlugin(
+            pluginId: pluginId,
+            displayName: displayName,
+            description: description,
+            latestVersion: latestVersion,
+            sourceRef: sourceRef,
+            tools: tools
+        )
+    }
 }
 
 struct PluginPermissionRequest: Identifiable, Equatable {
@@ -169,12 +180,14 @@ final class MarketplaceModel {
     let globalDharmaCommerce: GlobalDharmaCommerceModel
 
     private let bridge: IOSPreloadBridge
+    private let globalDharmaBridge: GlobalDharmaMiniAppBridge
     private let onboardingKey = "fabushi.mobile.onboarding-complete.v1"
     @ObservationIgnored private let browserAuthPresentationContext = BrowserAuthPresentationContext()
     @ObservationIgnored private var webAuthenticationSession: ASWebAuthenticationSession?
 
     init(bridge: IOSPreloadBridge) {
         self.bridge = bridge
+        globalDharmaBridge = GlobalDharmaMiniAppBridge(bridge: bridge)
         globalDharmaCommerce = GlobalDharmaCommerceModel(bridge: bridge)
         onboardingStep = UserDefaults.standard.bool(forKey: onboardingKey) ? 3 : 0
     }
@@ -786,6 +799,75 @@ final class MarketplaceModel {
         }
     }
 
+    static func marketplacePlugin(from item: [String: Any]) -> MarketplacePlugin? {
+        guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
+        let source = item["source"] as? [String: Any]
+        let releaseManifest = item["releaseManifest"] as? [String: Any]
+        let install = item["install"] as? [String: Any]
+            ?? releaseManifest?["install"] as? [String: Any]
+        let commands = source?["commands"] as? [[String: Any]]
+            ?? item["commands"] as? [[String: Any]]
+            ?? releaseManifest?["commands"] as? [[String: Any]]
+            ?? []
+        let installSource = install?["source"] as? [String: Any]
+        let sourceRef = (installSource?["sourceRef"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let latestVersion = [
+            item["latestVersion"] as? String,
+            item["version"] as? String,
+            releaseManifest?["version"] as? String,
+            install?["version"] as? String,
+        ]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .first { !$0.isEmpty }
+
+        return MarketplacePlugin(
+            pluginId: id,
+            displayName: item["displayName"] as? String ?? item["title"] as? String ?? id,
+            description: item["description"] as? String ?? "无描述",
+            latestVersion: latestVersion,
+            sourceRef: sourceRef?.isEmpty == false ? sourceRef : nil,
+            tools: commands.compactMap(Self.toolContract(from:))
+        )
+    }
+
+    static func webMcpToolContract(from item: [String: Any]) -> MiniAppToolContract? {
+        guard let name = (item["name"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !name.isEmpty,
+            name.range(of: #"^[A-Za-z0-9_.-]{1,128}$"#, options: .regularExpression) != nil
+        else { return nil }
+        let annotations = item["annotations"] as? [String: Any]
+        let approval: String
+        if annotations?["readOnlyHint"] as? Bool == true {
+            approval = "none"
+        } else if annotations?["destructiveHint"] as? Bool == true {
+            approval = "destructive"
+        } else {
+            approval = "required"
+        }
+        let description = (item["description"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return MiniAppToolContract(
+            name: name,
+            description: description?.isEmpty == false ? description! : name,
+            approval: approval
+        )
+    }
+
+    static func activeLocalInstallSatisfies(
+        plugin: MarketplacePlugin,
+        pointer: [String: Any]?
+    ) -> Bool {
+        guard let pointer,
+              pointer["pluginId"] as? String == plugin.pluginId
+        else { return false }
+        guard let targetVersion = plugin.latestVersion, !targetVersion.isEmpty else {
+            return true
+        }
+        return pointer["version"] as? String == targetVersion
+    }
+
     func refresh() async {
         loading = true
         defer { loading = false }
@@ -796,25 +878,7 @@ final class MarketplaceModel {
             )
             let object = result.value as? [String: Any]
             let rows = object?["plugins"] as? [[String: Any]] ?? []
-            plugins = rows.compactMap { (item: [String: Any]) -> MarketplacePlugin? in
-                guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
-                let source = item["source"] as? [String: Any]
-                let commands = source?["commands"] as? [[String: Any]]
-                    ?? item["commands"] as? [[String: Any]]
-                    ?? []
-                let install = item["install"] as? [String: Any]
-                    ?? (item["releaseManifest"] as? [String: Any])?["install"] as? [String: Any]
-                let installSource = install?["source"] as? [String: Any]
-                let sourceRef = (installSource?["sourceRef"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                return MarketplacePlugin(
-                    pluginId: id,
-                    displayName: item["displayName"] as? String ?? id,
-                    description: item["description"] as? String ?? "无描述",
-                    latestVersion: item["latestVersion"] as? String,
-                    sourceRef: sourceRef?.isEmpty == false ? sourceRef : nil,
-                    tools: commands.compactMap(Self.toolContract(from:))
-                )
-            }
+            plugins = rows.compactMap(Self.marketplacePlugin(from:))
             message = "原生 iOS · Rust Host 已连接"
         } catch {
             message = "市场加载失败：\(error.localizedDescription)"
@@ -936,17 +1000,112 @@ final class MarketplaceModel {
         installingPluginId = nil
     }
 
-    func loadLocalMiniAppHtml(pluginId: String) async -> String? {
-        do {
-            let result = try await bridge.request(
-                method: "feature.plugin.uiDocument",
-                params: ["pluginId": pluginId]
-            )
-            let html = (result.value as? [String: Any])?["html"] as? String
-            return html?.isEmpty == false ? html : nil
-        } catch {
-            return nil
+    func webMcpPlugin(for plugin: MarketplacePlugin) async -> MarketplacePlugin {
+        guard plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId else {
+            return plugin
         }
+        do {
+            let advertised = try await globalDharmaBridge.listOfficialMcpTools(pluginId: plugin.pluginId)
+            let tools = advertised.compactMap(Self.webMcpToolContract(from:))
+            guard !tools.isEmpty else {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Global Dharma canonical MCP tools/list returned no usable tools"
+                )
+            }
+            return plugin.replacingTools(tools)
+        } catch {
+            message = "Global Dharma WebMCP 工具合同不可用：\(error.localizedDescription)"
+            return plugin.replacingTools([])
+        }
+    }
+
+    private func reconcileLocalMiniAppInstall(_ plugin: MarketplacePlugin) async throws {
+        let active = try await bridge.request(
+            method: "feature.plugin.active",
+            params: ["pluginId": plugin.pluginId]
+        )
+        if Self.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: active.value as? [String: Any]
+        ) {
+            return
+        }
+
+        guard let version = plugin.latestVersion, !version.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "\(plugin.pluginId) has no immutable Marketplace version for local reconciliation"
+            )
+        }
+        let metadata = try await bridge.request(
+            method: "feature.marketplace.release",
+            params: ["pluginId": plugin.pluginId, "version": version]
+        )
+        guard let metadataObject = metadata.value as? [String: Any],
+              let release = metadataObject["releaseManifest"] as? [String: Any]
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let install = metadataObject["install"] as? [String: Any]
+            ?? release["install"] as? [String: Any]
+        guard install?["protocol"] as? String == "fabushi.marketplace.install.v1",
+              install?["strategy"] as? String == "github-immutable",
+              let source = install?["source"] as? [String: Any],
+              let sourceRef = source["sourceRef"] as? String,
+              !sourceRef.isEmpty,
+              source["marketplaceHostsPackage"] as? Bool != true
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let installed = try await bridge.request(
+            method: "feature.plugin.install",
+            params: ["release": release, "platform": "ios"]
+        )
+        guard let pointer = installed.value as? [String: Any],
+              Self.activeLocalInstallSatisfies(plugin: plugin, pointer: pointer)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+    }
+
+    private func localMiniAppHtml(pluginId: String) async throws -> String {
+        let result = try await bridge.request(
+            method: "feature.plugin.uiDocument",
+            params: ["pluginId": pluginId]
+        )
+        guard let html = (result.value as? [String: Any])?["html"] as? String,
+              !html.isEmpty
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return html
+    }
+
+    func loadLocalMiniAppHtml(plugin: MarketplacePlugin) async -> String? {
+        do {
+            return try await localMiniAppHtml(pluginId: plugin.pluginId)
+        } catch {
+            do {
+                try await reconcileLocalMiniAppInstall(plugin)
+                return try await localMiniAppHtml(pluginId: plugin.pluginId)
+            } catch {
+                message = "本地 Mini App 包不可用，转 Hosted WebMCP：\(error.localizedDescription)"
+                return nil
+            }
+        }
+    }
+
+    func callWebMcpTool(pluginId: String, name: String, arguments: [String: Any]) async throws -> Any {
+        guard name.range(of: #"^[A-Za-z0-9_.-]{1,128}$"#, options: .regularExpression) != nil else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("Invalid WebMCP tool name")
+        }
+        if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
+            return try await globalDharmaBridge.callOfficialMcpTool(
+                pluginId: pluginId,
+                name: name,
+                arguments: arguments
+            )
+        }
+        return try await callRuntimeTool(pluginId: pluginId, name: name, arguments: arguments)
     }
 
     func callRuntimeTool(pluginId: String, name: String, arguments: [String: Any]) async throws -> Any {

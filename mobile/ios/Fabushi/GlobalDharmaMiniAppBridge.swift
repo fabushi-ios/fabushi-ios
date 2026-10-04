@@ -16,7 +16,6 @@ final class GlobalDharmaMiniAppBridge {
     static let prayerWheelLifetimeProductId = "prod.global-dharma.local-prayer-wheel.lifetime"
     static let prayerWheelLifetimeCNYMinor: Int64 = 108_000
 
-    private static let apiBase = URL(string: "https://api.ombhrum.com")!
     private static let mcpProtocol = "2025-06-18"
     private let bridge: IOSPreloadBridge
     private let session: URLSession
@@ -83,6 +82,66 @@ final class GlobalDharmaMiniAppBridge {
         )
     }
 
+    func listOfficialMcpTools(pluginId: String) async throws -> [[String: Any]] {
+        try Self.requirePluginId(pluginId)
+        let token = try await delegatedPluginToken(pluginId: pluginId)
+        let endpoint = GlobalDharmaCommerceModel.resolvePlatformBaseURL()
+            .appending(path: "/api/mcp/apps/\(pluginId)")
+        let initialize: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": [
+                "protocolVersion": Self.mcpProtocol,
+                "capabilities": [String: Any](),
+                "clientInfo": ["name": "fabushi-ios-miniapp-host", "version": "1.0.0"],
+            ],
+        ]
+        let initialized = try await mcpPost(
+            endpoint: endpoint,
+            token: token,
+            sessionId: nil,
+            payload: initialize,
+            expectJSON: true
+        )
+        guard let sessionId = initialized.sessionId, !sessionId.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Mini App MCP initialize did not return mcp-session-id"
+            )
+        }
+        try Self.ensureNoMcpError(initialized.body, phase: "initialize")
+        defer {
+            Task {
+                try? await self.mcpDelete(endpoint: endpoint, token: token, sessionId: sessionId)
+            }
+        }
+        _ = try await mcpPost(
+            endpoint: endpoint,
+            token: token,
+            sessionId: sessionId,
+            payload: [
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": [String: Any](),
+            ],
+            expectJSON: false
+        )
+        let listed = try await mcpPost(
+            endpoint: endpoint,
+            token: token,
+            sessionId: sessionId,
+            payload: [
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/list",
+                "params": [String: Any](),
+            ],
+            expectJSON: true
+        )
+        try Self.ensureNoMcpError(listed.body, phase: "tools/list")
+        return ((listed.body?["result"] as? [String: Any])?["tools"] as? [[String: Any]]) ?? []
+    }
+
     func callOfficialMcpTool(
         pluginId: String,
         name: String,
@@ -93,7 +152,8 @@ final class GlobalDharmaMiniAppBridge {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("Invalid Mini App MCP tool name")
         }
         let token = try await delegatedPluginToken(pluginId: pluginId)
-        let endpoint = Self.apiBase.appending(path: "/api/mcp/apps/\(pluginId)")
+        let endpoint = GlobalDharmaCommerceModel.resolvePlatformBaseURL()
+            .appending(path: "/api/mcp/apps/\(pluginId)")
         let initialize: [String: Any] = [
             "jsonrpc": "2.0",
             "id": 1,

@@ -52,6 +52,81 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         ))
     }
 
+    func testMarketplaceProjectionPreservesInstallableVersionAcrossCatalogShapes() throws {
+        let legacy = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "description": "test",
+            "version": "1.0.0",
+            "install": [
+                "version": "1.0.0",
+                "source": ["sourceRef": String(repeating: "a", count: 40)],
+            ],
+        ]))
+        XCTAssertEqual(legacy.latestVersion, "1.0.0")
+        XCTAssertEqual(legacy.sourceRef, String(repeating: "a", count: 40))
+
+        let releaseProjection = try XCTUnwrap(MarketplaceModel.marketplacePlugin(from: [
+            "pluginId": "global-dharma",
+            "displayName": "全球法布施",
+            "releaseManifest": [
+                "version": "1.0.1",
+                "install": [
+                    "version": "1.0.1",
+                    "source": ["sourceRef": String(repeating: "b", count: 40)],
+                ],
+            ],
+        ]))
+        XCTAssertEqual(releaseProjection.latestVersion, "1.0.1")
+        XCTAssertEqual(releaseProjection.sourceRef, String(repeating: "b", count: 40))
+    }
+
+    func testCanonicalMcpToolProjectionDerivesFailClosedApprovalFromAnnotations() throws {
+        let status = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "status",
+            "description": "读取状态",
+            "annotations": ["readOnlyHint": true],
+        ]))
+        XCTAssertEqual(status.approval, "none")
+
+        let stop = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "stop",
+            "description": "停止服务",
+            "annotations": ["destructiveHint": true],
+        ]))
+        XCTAssertEqual(stop.approval, "destructive")
+
+        let start = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "start",
+            "description": "启动服务",
+        ]))
+        XCTAssertEqual(start.approval, "required")
+        XCTAssertNil(MarketplaceModel.webMcpToolContract(from: ["name": "bad tool"]))
+    }
+
+    func testDeviceLocalInstallReconciliationRequiresMatchingPluginAndVersion() {
+        let plugin = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "test",
+            latestVersion: "1.0.0",
+            tools: []
+        )
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(plugin: plugin, pointer: nil))
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: ["pluginId": "global-dharma", "version": "0.9.9"]
+        ))
+        XCTAssertFalse(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: ["pluginId": "other", "version": "1.0.0"]
+        ))
+        XCTAssertTrue(MarketplaceModel.activeLocalInstallSatisfies(
+            plugin: plugin,
+            pointer: ["pluginId": "global-dharma", "version": "1.0.0"]
+        ))
+    }
+
     func testMiniAppBridgeFreshSessionUsesPerLoadIdentityAndBoundedExplicitGrants() {
         let plugin = MarketplacePlugin(
             pluginId: "bridge-session-test",

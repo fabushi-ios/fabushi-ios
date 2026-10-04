@@ -40,6 +40,7 @@ struct MiniAppWebMcpSurface: View {
     @Environment(\.dismiss) private var dismiss
     @State private var status = "正在解析本地 WebMCP…"
     @State private var localHtml: String?
+    @State private var webMcpPlugin: MarketplacePlugin?
     @State private var sourceResolved = false
 
     var body: some View {
@@ -94,13 +95,19 @@ struct MiniAppWebMcpSurface: View {
                 .padding(.bottom, 10)
             }
 
-            MiniAppWebView(
-                plugin: plugin,
-                model: model,
-                localHtml: localHtml,
-                sourceResolved: sourceResolved,
-                status: $status
-            )
+            if sourceResolved, let webMcpPlugin {
+                MiniAppWebView(
+                    plugin: webMcpPlugin,
+                    model: model,
+                    localHtml: localHtml,
+                    sourceResolved: true,
+                    status: $status
+                )
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityIdentifier("miniapp-webmcp-resolving")
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniapp-webmcp-surface")
@@ -108,10 +115,12 @@ struct MiniAppWebMcpSurface: View {
             if plugin.pluginId == GlobalDharmaCommerceModel.miniAppId {
                 await model.globalDharmaCommerce.refresh()
             }
+            let resolvedPlugin = await model.webMcpPlugin(for: plugin)
+            webMcpPlugin = resolvedPlugin
             if let localHtmlOverride {
                 localHtml = hardenGeneratedMiniAppDocument(localHtmlOverride)
             } else {
-                localHtml = await model.loadLocalMiniAppHtml(pluginId: plugin.pluginId)
+                localHtml = await model.loadLocalMiniAppHtml(plugin: resolvedPlugin)
             }
             sourceResolved = true
             status = localHtml == nil ? "正在加载 Hosted WebMCP…" : "正在加载本地 WebMCP…"
@@ -347,7 +356,7 @@ private struct MiniAppWebView: UIViewRepresentable {
                             "structuredContent": ["runtime": runtime],
                         ] as [String: Any]
                     } else {
-                        result = try await self.model.callRuntimeTool(
+                        result = try await self.model.callWebMcpTool(
                             pluginId: self.plugin.pluginId,
                             name: name,
                             arguments: input
