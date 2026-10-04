@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `7c00ea34fd64102cfe71266e646720369f2397e8`
+- pinned source commit for this baseline: `8556281e5eb20aeb6dba781bd5ecf8c623206d6e`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -1096,3 +1096,11 @@ The newly selected Desktop packaging manifest is not treated as desktop-only mer
 For the Agent/Bot composer, recording state remains ephemeral UI input state; canonical conversation/runtime state remains behind the existing iOS trusted bridge and Coordinator/Host/Runner chain. Stopping a voice-input recording transcribes the captured file and places the trimmed text into the composer draft for explicit user review/edit/send. Transcription never auto-sends a turn. Cancellation or account/Agent surface replacement must discard the in-flight recording/transcription result rather than applying stale text to a different composer.
 
 The iOS release contract must include the Speech authorization usage description and focused tests proving the no-network-fallback policy and composer wiring. The Desktop `source/packaging/offline-asr-engine.json` row may move from `unreviewed` to `implemented` only after this shipping path is present; it remains below `verified` until the resulting exact iOS HEAD passes architecture, Swift/unit/UI/lifecycle, archive, and applicable packaged/release acceptance.
+
+### Recovery rebaseline 2026-10-04: `8556281e`
+
+Desktop PR #20 advanced exactly one commit from `7c00ea34fd64102cfe71266e646720369f2397e8` to `8556281e5eb20aeb6dba781bd5ecf8c623206d6e` while remaining open and draft on `refactor/grok-018-architecture-rebuild`. A direct GitHub compare reports one changed file only: `desktop/e2e/openbot-packaged-acceptance.spec.ts`. No file under the authoritative iOS-selected `frontend/** + source/**` roots changed, was added, removed, or renamed. The selected inventory therefore remains exactly **7,938** files and every selected Desktop blob identity remains unchanged.
+
+The upstream change strengthens Desktop packaged acceptance so it follows the canonical ProductionRenderer workspace rather than stale shell/login selectors: acceptance observes the `messenger-workspace` production shell, real account status/onboarding phases, and a usable Mahayana Host/Coordinator `bot.list` path before declaring the signed candidate ready. This is an acceptance-contract change outside the selected source inventory, not a new iOS source responsibility. It therefore does not create a ledger row and does not automatically promote any existing iOS row or packaged/release acceptance status.
+
+All Desktop-bound manifest and ledger chunks, both indexes, `MIGRATION_SOURCE.md`, the active Spec authority, and the strict architecture checker are rebound to `8556281e5eb20aeb6dba781bd5ecf8c623206d6e`. Existing row dispositions/statuses are preserved because their selected Desktop blobs are unchanged. All CI, archive, protected-session, offline-ASR, and other acceptance evidence produced against the previous Desktop authority is historical for current-baseline completion; the resulting iOS exact HEAD must obtain its own same-HEAD GitHub Actions evidence before any current-baseline `verified` promotion. Desktop PR #26 remains observation-only because it is still unmerged into PR #20.
