@@ -102,6 +102,7 @@ struct MiniAppWebMcpSurface: View {
                 status: $status
             )
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniapp-webmcp-surface")
         .task(id: plugin.pluginId) {
             if plugin.pluginId == GlobalDharmaCommerceModel.miniAppId {
