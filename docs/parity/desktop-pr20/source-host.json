@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "82bdf3d38da2c423f44bc710fab2853a6c650e1c",
+  "sourceCommit": "d18de3f688859946ddf80526e366328fae2de718",
   "group": "source-host",
   "rowCount": 967,
   "rows": [
@@ -3456,18 +3456,18 @@
     },
     {
       "desktop_path": "source/host/src/extensions/managed_setup/team_rules.rs",
-      "desktop_blob_sha": "65e53a1718418ee4748960ee142c5facad18d6d9",
-      "desktop_responsibility": "pending-review",
+      "desktop_blob_sha": "16ead6a31a8b9f5dc7b5882f79b1026834c3d903",
+      "desktop_responsibility": "Resolve Cursor/Sand managed team rules from a cached snapshot or, only when Desktop HostAuth already has a cached Cursor renewal credential, refresh them. A missing Cursor renewal credential is an expected signed-product state and must not synchronously enter renewal on the ordinary-turn first-output critical path; Fabushi account credentials remain exclusive to first-party Fabushi/Responses transport.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Ordinary first-party Fabushi turns are not delayed by futile Cursor renewal when no Cursor credential exists; Cursor-authenticated Desktop installs still refresh managed team rules and preserve cached-snapshot fallback behavior.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "MobileEmbedded iOS does not instantiate Desktop HostAuthExtension or ProductionTeamRulesResolver, so there is no Cursor/Sand managed-team-rule renewal work on the ordinary-turn path. The shipping Host resolves FirstPartyDacheng model credentials from MahayanaProductClient.session_token(), while model_bearer_token is consulted only for an explicit UserConfiguredRemote provider. The Fabushi-account and Cursor-renewal credential domains therefore cannot collapse on iOS. Desktop's cached-Cursor-token refresh branch has no iOS shipping counterpart unless a future iOS managed-rules feature explicitly introduces one.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-host/src/lib.rs: shipping MobileEmbedded composition uses ModelCredentialResolver; FirstPartyDacheng resolves credential_client.session_token(), and configured model_bearer_token is returned only for ModelProviderMode::UserConfiguredRemote. The production owner contains neither HostAuthExtension nor ProductionTeamRulesResolver.",
+      "test_evidence": "scripts/check-desktop-pr20-ios-architecture.py pins the Desktop team_rules blob/disposition and verifies the iOS replacement owner keeps ModelCredentialResolver + credential_client.session_token() + UserConfiguredRemote separation while forbidding Desktop HostAuthExtension/ProductionTeamRulesResolver in the shipping iOS Host owner; exact-HEAD Actions are required after this rebaseline.",
+      "notes": "Applicability reviewed against Desktop PR #20 d18de3f688859946ddf80526e366328fae2de718. The 82bdf3d3 -> d18de3f6 delta changes only team_rules.rs: missing Cursor renewal auth must stay off first-output, while an already cached Cursor token may still refresh. iOS ships neither Desktop HostAuth renewal nor managed team-rule discovery, so the file-level mechanism is not applicable; its security/latency effect is preserved structurally by the native provider-specific credential owner."
     },
     {
       "desktop_path": "source/host/src/extensions/mcp/box_mcp_exec.rs",

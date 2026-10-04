@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `82bdf3d38da2c423f44bc710fab2853a6c650e1c`
+- pinned source commit for this baseline: `d18de3f688859946ddf80526e366328fae2de718`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,17 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `82bdf3d38da2c423f44bc710fab2853a6c650e1c`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `d18de3f688859946ddf80526e366328fae2de718`
+
+Desktop PR #20 is open, draft, based on `main`, and not merged. Relative to the previously pinned `82bdf3d38da2c423f44bc710fab2853a6c650e1c`, the current exact HEAD is one commit ahead and changes exactly one selected Host production file: `source/host/src/extensions/managed_setup/team_rules.rs`. No selected path is added or removed, so the authoritative `frontend/** + source/**` inventory remains **7,943** rows. The current `team_rules.rs` blob is `16ead6a31a8b9f5dc7b5882f79b1026834c3d903` (11,732 bytes).
+
+The new Desktop responsibility is a first-output/credential-domain invariant for managed team rules. A cached managed-rule snapshot still wins immediately. Without a snapshot, missing Cursor/Sand renewal auth is an expected signed-product state and must return without synchronous renewal; this prevents ordinary Fabushi turns from entering Cursor team-rule network/renewal work merely because no Cursor credential exists. If HostAuth already has a cached Cursor token, the established refresh path remains available. First-party Fabushi account/Responses credentials remain a separate credential domain and cannot substitute for Cursor renewal.
+
+For iOS, the Desktop file-level mechanism is **not applicable**, with a native replacement that already preserves the product effect. MobileEmbedded production does not instantiate Desktop `HostAuthExtension` or `ProductionTeamRulesResolver`, so no Cursor managed-rule renewal can block iOS first output. The iOS Rust Host resolves `FirstPartyDacheng` model credentials from `MahayanaProductClient.session_token()`; `model_bearer_token` is used only for explicit `UserConfiguredRemote`. The iOS ledger records `team_rules.rs` as `not-applicable-with-replacement`. Desktop's cached-Cursor-token refresh branch has no iOS shipping equivalent unless a future managed-rules feature explicitly introduces one.
+
+All acceptance bound to Desktop `82bdf3d38da2c423f44bc710fab2853a6c650e1c`, including iOS exact HEAD `5fb7c3e445e04823b82a09ec560cabbb3cd91553` and its Actions, is historical after this authority move. The resulting iOS exact HEAD must obtain fresh ordinary and protected exact-HEAD evidence before the 7,943-row audit can resume.
+
+### 1.0.1 Historical exact-HEAD authority: 2026-10-05 / `82bdf3d38da2c423f44bc710fab2853a6c650e1c`
 
 Desktop PR #20 is open, draft, based on `main`, and not merged. Relative to the previously pinned `f65d29682533f377f433cedac88aa67148008b3a`, the current exact HEAD is three commits ahead and changes exactly five selected Host files; no selected path is added or removed, so the authoritative inventory remains **7,943** rows. The current blob identities are: `main.rs@eedb687e...`, `production_runtime.rs@9e20bfed...`, `routed_provider_runtime.rs@485f92a...`, `send_message_tool.rs@facb03a7...`, and `runner_routed_provider_contract.rs@7c1a16b...`.
 

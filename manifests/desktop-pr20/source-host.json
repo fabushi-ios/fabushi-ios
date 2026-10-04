@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "82bdf3d38da2c423f44bc710fab2853a6c650e1c",
+  "sourceCommit": "d18de3f688859946ddf80526e366328fae2de718",
   "group": "source-host",
   "fileCount": 967,
   "files": [
@@ -1155,8 +1155,8 @@
     },
     {
       "path": "source/host/src/extensions/managed_setup/team_rules.rs",
-      "blobSha": "65e53a1718418ee4748960ee142c5facad18d6d9",
-      "size": 10948
+      "blobSha": "16ead6a31a8b9f5dc7b5882f79b1026834c3d903",
+      "size": 11732
     },
     {
       "path": "source/host/src/extensions/mcp/box_mcp_exec.rs",

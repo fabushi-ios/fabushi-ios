@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_DESKTOP_REPOSITORY = "bhrumom/fabushi-desktop"
 EXPECTED_DESKTOP_PR = 20
 EXPECTED_DESKTOP_BRANCH = "refactor/grok-018-architecture-rebuild"
-EXPECTED_DESKTOP_COMMIT = "82bdf3d38da2c423f44bc710fab2853a6c650e1c"
+EXPECTED_DESKTOP_COMMIT = "d18de3f688859946ddf80526e366328fae2de718"
 EXPECTED_FILES = 7943
 
 VALID_DISPOSITIONS = {
@@ -173,6 +173,37 @@ for path, row in ledger_by_path.items():
 
     if args.complete and status not in {"verified", "not-applicable"}:
         errors.append(f"{path}: completion gate still has status={status}")
+
+# Current Desktop authority changes managed team-rule auth/latency semantics.
+team_rules_path = "source/host/src/extensions/managed_setup/team_rules.rs"
+team_rules = ledger_by_path.get(team_rules_path)
+if team_rules is None:
+    errors.append(f"missing current Desktop applicability row: {team_rules_path}")
+else:
+    for key, expected in {
+        "desktop_blob_sha": "16ead6a31a8b9f5dc7b5882f79b1026834c3d903",
+        "ios_disposition": "not-applicable-with-replacement",
+        "ios_target_path": "source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+        "implementation_status": "not-applicable",
+    }.items():
+        if team_rules.get(key) != expected:
+            errors.append(f"{team_rules_path}: {key}={team_rules.get(key)!r}, expected {expected!r}")
+    audited_text = (team_rules.get("notes") or "") + " " + (team_rules.get("ios_platform_delta") or "")
+    for token in ["first-output", "cached Cursor", "Fabushi", "UserConfiguredRemote"]:
+        if token not in audited_text:
+            errors.append(f"{team_rules_path}: audited applicability is missing token {token!r}")
+
+mobile_host_path = ROOT / "source/packages/mahayana-rs/mahayana-host/src/lib.rs"
+if not mobile_host_path.is_file():
+    errors.append("missing iOS Rust Host credential owner")
+else:
+    mobile_host = mobile_host_path.read_text(encoding="utf-8")
+    for token in ["ModelCredentialResolver", "credential_client.session_token()", "ModelProviderMode::UserConfiguredRemote"]:
+        if token not in mobile_host:
+            errors.append(f"iOS Rust Host credential-separation contract drift: missing {token}")
+    for forbidden in ["HostAuthExtension", "ProductionTeamRulesResolver"]:
+        if forbidden in mobile_host:
+            errors.append(f"iOS Rust Host unexpectedly introduced Desktop Cursor managed-rule owner: {forbidden}")
 
 active_spec = active_spec_path.read_text(encoding="utf-8")
 for token in [

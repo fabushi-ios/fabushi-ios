@@ -5,7 +5,7 @@
 - Source repository: bhrumom/fabushi-desktop
 - Source pull request: #20
 - Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: 82bdf3d38da2c423f44bc710fab2853a6c650e1c
+- Pinned source commit: d18de3f688859946ddf80526e366328fae2de718
 - Target repository: fabushi-ios/fabushi-ios
 - Target pull request: #3
 - Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md
@@ -15,6 +15,10 @@ Fabushi iOS is a standalone downstream port of Desktop PR #20. Source may be reu
 Grok Bot 0.18 is historical architecture/provenance context through Desktop PR #20. It is no longer the direct iOS migration authority.
 
 The current Desktop `frontend/** + source/**` inventory contains 7,943 source-bearing paths at the pinned exact HEAD.
+
+The current `82bdf3d38da2c423f44bc710fab2853a6c650e1c -> d18de3f688859946ddf80526e366328fae2de718` authority move is **1 commit across exactly 1 selected Host production file**, `source/host/src/extensions/managed_setup/team_rules.rs`. Desktop now returns the cached managed-team-rule snapshot first; when there is no cached snapshot and no cached Cursor/Sand renewal credential, it returns without invoking synchronous HostAuth renewal, keeping missing Cursor credentials off the ordinary-turn first-output critical path. An already cached Cursor token still permits the established refresh path. Fabushi account credentials remain exclusive to first-party Fabushi/Responses transport.
+
+iOS applicability is **not-applicable-with-replacement** for this file-level mechanism. MobileEmbedded iOS ships no Desktop `HostAuthExtension` or `ProductionTeamRulesResolver`; its shipping Rust Host resolves FirstPartyDacheng credentials from `MahayanaProductClient.session_token()` and consults `model_bearer_token` only for explicit `UserConfiguredRemote`. Therefore there is no Cursor managed-rule renewal on the iOS first-output path and no route by which a Fabushi account credential can become a Cursor renewal credential. Desktop's cached-Cursor-token refresh branch has no iOS shipping counterpart unless such a managed-rules feature is introduced later. The selected inventory remains **7,943** paths because the authority delta modifies one existing file and adds/removes none. All acceptance tied to Desktop `82bdf3d38da2c423f44bc710fab2853a6c650e1c` is historical after this rebaseline.
 
 The current `f65d29682533f377f433cedac88aa67148008b3a -> 82bdf3d38da2c423f44bc710fab2853a6c650e1c` authority move is **3 commits across exactly 5 selected Host files**: `source/host/app/src/main.rs`, `source/host/src/extensions/transcript/production_runtime.rs`, `source/host/src/runner/routed_provider_runtime.rs`, `source/host/src/runner/tools/send_message_tool.rs`, and `source/host/tests/runner_routed_provider_contract.rs`. CHAT-013 no longer advertises a SendMessage-only schema for simple first-party conversation. It advertises **zero tools**, explicitly requests plain text, streams provider text through the Host into one canonical transcript entry, updates that entry in place, and records the delivery through the Host-delivery counter path rather than fabricating a SendMessage tool success. iOS adapts this in its existing `mahayana-native-engine` and `kernel_conversation` owners: visible FirstPartyDacheng simple turns use zero tools and native text streaming; RuntimeKernelEventBridge persists deltas into one stable canonical Message and finalizes the same MessageId. Action/resource/hidden/recovery/non-first-party turns retain the full tool path. Old `f65d29682533f377f433cedac88aa67148008b3a`, intermediate `a8d840c89fb3bb70e54ddcbcfe4fd1c723937f24`/`b4e11c9bcaa0c7efd6c4d9b29e1a5c56e7f3e6ab`, and Actions `37231366076`/`37231366048` are historical only and cannot be promoted as current-authority acceptance.
 
