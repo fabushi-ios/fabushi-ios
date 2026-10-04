@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "f65d29682533f377f433cedac88aa67148008b3a",
+  "sourceCommit": "b6d314bd7a8f7cbed011a3003a3902f254a16132",
   "group": "source-host",
   "fileCount": 967,
   "files": [
@@ -10,8 +10,8 @@
     },
     {
       "path": "source/host/app/src/main.rs",
-      "blobSha": "50eff8c892bcb62ed25146ea826c9f0cb5d9474d",
-      "size": 577817
+      "blobSha": "eedb687eb30c8158223ad6813b3df6af87a0c732",
+      "size": 581161
     },
     {
       "path": "source/host/build.rs",
@@ -1870,8 +1870,8 @@
     },
     {
       "path": "source/host/src/extensions/transcript/production_runtime.rs",
-      "blobSha": "43d3b141c0734a5487c9c0e0a9146f4650085294",
-      "size": 60814
+      "blobSha": "9e20bfedfc6186a78b4ea67b1cc25718f46fe567",
+      "size": 62096
     },
     {
       "path": "source/host/src/extensions/transcript/profile_watch.rs",
@@ -2445,8 +2445,8 @@
     },
     {
       "path": "source/host/src/runner/routed_provider_runtime.rs",
-      "blobSha": "3483d292213fcff507d48f63b4d6a17c6379cd47",
-      "size": 31421
+      "blobSha": "485f92a5c4e1412a404d032f51502f2d36d3af7d",
+      "size": 31727
     },
     {
       "path": "source/host/src/runner/runner_prompt_glue.rs",
@@ -2720,8 +2720,8 @@
     },
     {
       "path": "source/host/src/runner/tools/send_message_tool.rs",
-      "blobSha": "2ae0c6d1bac8f8cd93b9a4ed52f1f8da423c76de",
-      "size": 16077
+      "blobSha": "facb03a7c294c983e5691b3c5c2cb0e845f6272d",
+      "size": 16189
     },
     {
       "path": "source/host/src/runner/tools/tool_input_error.rs",
@@ -4275,8 +4275,8 @@
     },
     {
       "path": "source/host/tests/runner_routed_provider_contract.rs",
-      "blobSha": "2da31a1e284e5a6df0b1306216350d8dde8ed3eb",
-      "size": 16093
+      "blobSha": "7c1a16b88c5941675c27e86a66df3ad1587697b9",
+      "size": 16205
     },
     {
       "path": "source/host/tests/runner_small_modules_contract.rs",
