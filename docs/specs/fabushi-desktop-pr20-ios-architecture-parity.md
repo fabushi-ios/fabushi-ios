@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf`
+- pinned source commit for this baseline: `f65d29682533f377f433cedac88aa67148008b3a`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,17 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `f65d29682533f377f433cedac88aa67148008b3a`
+
+Desktop PR #20 remains open and draft on `refactor/grok-018-architecture-rebuild`. Direct GitHub compare from the previously pinned `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf` baseline reports **1 commit and exactly 2 changed selected Host files**: `source/host/src/runner/routed_provider_runtime.rs` and `source/host/tests/runner_routed_provider_contract.rs`. No selected path was added or removed, so the authoritative `frontend/** + source/**` inventory remains exactly **7,943** rows. The changed Desktop blob identities are `3483d292213fcff507d48f63b4d6a17c6379cd47` and `2da31a1e284e5a6df0b1306216350d8dde8ed3eb`.
+
+The production responsibility is CHAT-013's conservative Fabushi conversation fast lane. For a short, single-line, plain-text conversational user turn, Desktop may advertise only the canonical `SendMessage` tool to the first-party Fabushi routed provider. The classifier rejects empty or >280-character turns, newlines, code ticks, URLs, and English/Chinese action markers such as search/open/create/edit/delete/install/download/upload/run/execute/send/file/terminal/code/web. Ambiguous or action-oriented turns stay on the full tool path, non-Fabushi providers are unaffected, and a missing `SendMessage` definition fails closed to the full tool set. This is an optimization only and is never required for correctness.
+
+This responsibility is applicable to iOS. The native adaptation stays inside the existing Mahayana `NativeEngine` tool-routing owner: only `ModelProviderMode::FirstPartyDacheng` may take the fast lane, the latest user history item must be plain text and pass the same conservative classifier, and the reduced schema contains only iOS's canonical `send_message` tool. Mobile multimodal turns, user-configured/local providers, action/resource requests, or any missing `send_message` definition keep the complete native tool set. Canonical transcript delivery, authorization, explicit-tool planning, checkpoints, and provider/runtime ownership remain unchanged; no parallel Router or test-only path is introduced.
+
+The two changed Desktop blob identities and the `source-host` snapshot provenance are rebound to `f65d29682533f377f433cedac88aa67148008b3a`. The prior iOS exact HEAD `a51d92093c1d5741b61796b903c2289b6dd3a98a` and Actions runs `37228930933` / `37228930935` are historical regression evidence only because they were created under the superseded Desktop authority. The resulting iOS exact HEAD must obtain fresh ordinary and protected same-HEAD acceptance before any current-authority promotion.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-05 / `6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf`
 
 Desktop PR #20 is open and draft on `refactor/grok-018-architecture-rebuild`. Direct GitHub compare from the previously pinned `ba58a474050e05943f6282d3e57aea45a75a237e` baseline reports **2 commits and exactly 2 changed selected files**: `source/host/Cargo.toml` and `source/host/src/extensions/inference/provider_session.rs`. No selected path was added or removed, so the authoritative `frontend/** + source/**` inventory remains exactly **7,943** rows.
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf",
+  "sourceCommit": "f65d29682533f377f433cedac88aa67148008b3a",
   "group": "source-host",
   "rowCount": 967,
   "rows": [
@@ -7326,18 +7326,18 @@
     },
     {
       "desktop_path": "source/host/src/runner/routed_provider_runtime.rs",
-      "desktop_blob_sha": "b9d03063bf15a8182396d18036116ffa15484dc3",
-      "desktop_responsibility": "pending-review",
+      "desktop_blob_sha": "3483d292213fcff507d48f63b4d6a17c6379cd47",
+      "desktop_responsibility": "CHAT-013 conservative first-party Fabushi conversation fast lane: simple short plain-text conversational turns may advertise only canonical SendMessage, while ambiguous/action/resource turns and a missing SendMessage definition fail closed to the full routed tool set.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "desktop_visible_effect": "Simple conversational replies avoid the full tool-schema path without losing canonical user-visible SendMessage delivery; any turn that may require actions or external resources preserves the complete tool surface.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "iOS keeps classification inside the existing NativeEngine tool-routing owner, scopes it to ModelProviderMode::FirstPartyDacheng, uses the native lowercase send_message tool, rejects multimodal/non-plain user history, and otherwise preserves the full tool set.",
+      "implementation_status": "implemented",
+      "production_evidence": "NativeEngine selects per-turn tools from the existing tool_definitions owner. FirstPartyDacheng simple conversation history can reduce to send_message only; all other provider/turn classes and missing send_message fall back to the complete tool vector.",
+      "test_evidence": "Focused NativeEngine unit contracts for simple Chinese/English Q&A, action/resource rejection, SendMessage-only selection, provider scoping and fail-closed fallback are added in the same production crate; exact-head GitHub Actions are pending.",
+      "notes": "Desktop blob changed at 6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf -> f65d29682533f377f433cedac88aa67148008b3a. Prior unreviewed status and all older acceptance are historical. This row is implemented on the native iOS owner but remains below verified until the resulting exact iOS HEAD passes required Actions/acceptance."
     },
     {
       "desktop_path": "source/host/src/runner/runner_prompt_glue.rs",
@@ -12816,18 +12816,18 @@
     },
     {
       "desktop_path": "source/host/tests/runner_routed_provider_contract.rs",
-      "desktop_blob_sha": "f206a83c7a58bcfc6dd13359b749a4dd60f4d1dc",
-      "desktop_responsibility": "Focused shipping Runner-registry contract for exact current-stream identity plus dispatched/recovery-shaped pre-dispatch supersession rules and state cleanup.",
+      "desktop_blob_sha": "2da31a1e284e5a6df0b1306216350d8dde8ed3eb",
+      "desktop_responsibility": "Focused shipping routed-provider contract covering CHAT-013 simple-conversation classification and SendMessage-only fail-closed reduction, alongside the existing routed Runner identity/recovery-state regression contracts.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "Regression proof that an undispatched ordinary run survives unsafe supersession, an undispatched recovery-shaped run can be replaced only by recovery-carrying work, and dispatched current runs remain targetable without stale-stream cancellation.",
+      "desktop_visible_effect": "Regression proof that the fast lane accepts only simple conversation, rejects action/external-resource turns, keeps only SendMessage when safe, and falls back when SendMessage is absent, while existing routed-operation identity rules remain intact.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "iOS combines routed direct-operation identity and fence state inside KernelConversationProvider instead of a separate TranscriptRunnerRegistry; compare-and-clear protects a replacement from stale predecessor settlement.",
+      "ios_platform_delta": "The iOS native engine owns the analogous focused classifier/tool-reduction tests in-process; Desktop routed-process mechanics are not copied, and existing KernelConversation operation fencing remains the native replacement for the older Runner-registry portion.",
       "implementation_status": "implemented",
-      "production_evidence": "direct_operations is keyed by conversation and stores DirectOperationState; admission/preemption uses exact operation ids and compare-and-clear removes only the matching current operation.",
-      "test_evidence": "Focused htch-runtime Runtime tests executed 1 passed each for both-sided recovery gating, dispatch transition and stale settlement identity; exact-head GitHub Actions pending.",
-      "notes": "Pre-dispatch/current-operation responsibility is implemented. This test row does not by itself claim Desktop ack-interrupt telemetry parity."
+      "production_evidence": "The shipping NativeEngine owns both the canonical native tool declarations and the first-party per-turn reduction decision; it does not introduce a second Router or bypass transcript/tool execution ownership.",
+      "test_evidence": "NativeEngine unit contracts are added for the new CHAT-013 cases. Existing iOS direct-operation supersession contracts remain separate regression coverage. Current exact-head GitHub Actions are pending.",
+      "notes": "This Desktop test blob changed at 6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf -> f65d29682533f377f433cedac88aa67148008b3a. The newly added fast-lane contract is independently ported; no prior exact-head test result is promoted to current authority."
     },
     {
       "desktop_path": "source/host/tests/runner_small_modules_contract.rs",

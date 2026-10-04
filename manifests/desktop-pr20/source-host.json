@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "6e2cfc9aba647984ec4a35bb823142d7d2e9aeaf",
+  "sourceCommit": "f65d29682533f377f433cedac88aa67148008b3a",
   "group": "source-host",
   "fileCount": 967,
   "files": [
@@ -2445,8 +2445,8 @@
     },
     {
       "path": "source/host/src/runner/routed_provider_runtime.rs",
-      "blobSha": "b9d03063bf15a8182396d18036116ffa15484dc3",
-      "size": 28924
+      "blobSha": "3483d292213fcff507d48f63b4d6a17c6379cd47",
+      "size": 31421
     },
     {
       "path": "source/host/src/runner/runner_prompt_glue.rs",
@@ -4275,8 +4275,8 @@
     },
     {
       "path": "source/host/tests/runner_routed_provider_contract.rs",
-      "blobSha": "f206a83c7a58bcfc6dd13359b749a4dd60f4d1dc",
-      "size": 13670
+      "blobSha": "2da31a1e284e5a6df0b1306216350d8dde8ed3eb",
+      "size": 16093
     },
     {
       "path": "source/host/tests/runner_small_modules_contract.rs",

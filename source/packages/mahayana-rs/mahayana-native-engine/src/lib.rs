@@ -20,8 +20,8 @@ use mahayana_kernel::{
     SessionSnapshot as KernelSessionSnapshot, SharedKernelEventSink, SuspendOperationRequest,
 };
 use mahayana_model::{
-    ModelError, ModelEvent, ModelEventSink, ModelRequest, ModelRuntime, ModelUsage,
-    SharedModelEventSink,
+    ModelError, ModelEvent, ModelEventSink, ModelProviderMode, ModelRequest, ModelRuntime,
+    ModelUsage, SharedModelEventSink,
 };
 use mahayana_orchestrator::{
     HookEffect, HookPoint, HookRegistry, MemoryStore, PromptEntry, PromptPriority, PromptQueue,
@@ -46,6 +46,8 @@ mod web_research;
 use web_research::{WebResearchClient, WebResearchConfig};
 
 const MAIN_ASSISTANT_CONVERSATION_ID: &str = "mahayana-ai:agent:assistant";
+const CONVERSATION_FAST_LANE_MAX_CHARS: usize = 280;
+const SEND_MESSAGE_TOOL_NAME: &str = "send_message";
 const MAX_TOOL_OUTPUT_BYTES: usize = 64 * 1024;
 const DEFAULT_MAX_MODEL_TURNS: usize = 16;
 const MAX_REPLY_NUDGES: usize = 3;
@@ -575,8 +577,13 @@ impl NativeEngine {
                 metadata: json!({"engine": "mahayana-native"}),
             })?;
 
-            let declared_tools =
+            let full_declared_tools =
                 tool_definitions(self.config.enable_process_tools, self.web_research.is_some());
+            let declared_tools = model_turn_tools(
+                self.model.provider_mode(),
+                &session.history,
+                &full_declared_tools,
+            );
             let collector = Arc::new(if visible_user_turn {
                 ModelCollector::buffered()
             } else {
@@ -2814,6 +2821,116 @@ fn model_error(error: ModelError) -> KernelError {
     KernelError::Backend(error.to_string())
 }
 
+fn latest_plain_user_text(history: &[Value]) -> Option<&str> {
+    for item in history.iter().rev() {
+        if item.get("role").and_then(Value::as_str) == Some("user") {
+            return item.get("content").and_then(Value::as_str);
+        }
+    }
+    None
+}
+
+fn is_conversation_fast_lane(history: &[Value]) -> bool {
+    let Some(text) = latest_plain_user_text(history) else {
+        return false;
+    };
+    let text = text.trim();
+    if text.is_empty()
+        || text.chars().count() > CONVERSATION_FAST_LANE_MAX_CHARS
+        || text.contains('\n')
+        || text.contains('`')
+        || text.contains("http://")
+        || text.contains("https://")
+    {
+        return false;
+    }
+
+    let lower = text.to_lowercase();
+    const ACTION_MARKERS: &[&str] = &[
+        " search ",
+        " browse ",
+        " open ",
+        " create ",
+        " build ",
+        " edit ",
+        " modify ",
+        " delete ",
+        " remove ",
+        " install ",
+        " download ",
+        " upload ",
+        " run ",
+        " execute ",
+        " send ",
+        " email ",
+        " calendar ",
+        " github ",
+        " slack ",
+        " terminal ",
+        " shell ",
+        " file ",
+        " folder ",
+        " website ",
+        " webpage ",
+        " script ",
+        " code ",
+        "搜索",
+        "查找",
+        "浏览",
+        "打开",
+        "创建",
+        "新建",
+        "构建",
+        "编辑",
+        "修改",
+        "删除",
+        "安装",
+        "下载",
+        "上传",
+        "运行",
+        "执行",
+        "发送",
+        "邮件",
+        "日历",
+        "文件",
+        "文件夹",
+        "终端",
+        "脚本",
+        "代码",
+        "网站",
+        "网页",
+    ];
+    let padded = format!(" {lower} ");
+    !ACTION_MARKERS.iter().any(|marker| padded.contains(marker))
+}
+
+fn conversation_fast_lane_tools(history: &[Value], tools: &[Value]) -> Option<Vec<Value>> {
+    if !is_conversation_fast_lane(history) {
+        return None;
+    }
+    let send_message = tools
+        .iter()
+        .filter(|tool| {
+            tool.get("name").and_then(Value::as_str) == Some(SEND_MESSAGE_TOOL_NAME)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    (!send_message.is_empty()).then_some(send_message)
+}
+
+fn model_turn_tools(
+    provider_mode: ModelProviderMode,
+    history: &[Value],
+    tools: &[Value],
+) -> Vec<Value> {
+    if provider_mode == ModelProviderMode::FirstPartyDacheng {
+        if let Some(reduced) = conversation_fast_lane_tools(history, tools) {
+            return reduced;
+        }
+    }
+    tools.to_vec()
+}
+
 fn tool_definitions(enable_process_tools: bool, enable_web_research: bool) -> Vec<Value> {
     let mut tools = vec![
         function_tool(
@@ -2971,6 +3088,99 @@ mod tests {
         assert_eq!(parts[1]["type"], "input_image");
         assert_eq!(parts[1]["image_url"], "data:image/png;base64,AQID");
         assert_eq!(parts.len(), 2);
+    }
+
+    #[test]
+    fn conversation_fast_lane_accepts_simple_chinese_and_english_questions() {
+        for prompt in [
+            "用一句话解释为什么海水有咸味。",
+            "In one sentence, explain why the daytime sky appears blue.",
+            "用一句话说明声音为什么不能在真空中传播。",
+            "In one sentence, explain what HTTPS protects.",
+        ] {
+            let history = vec![json!({"role":"user","content":prompt})];
+            assert!(
+                is_conversation_fast_lane(&history),
+                "expected simple Q&A to use the conversation fast lane: {prompt}",
+            );
+        }
+    }
+
+    #[test]
+    fn conversation_fast_lane_rejects_action_or_external_resource_turns() {
+        for prompt in [
+            "Please search GitHub for the latest release.",
+            "Create a small app and write the files.",
+            "Open https://example.com and summarize it.",
+            "请搜索网页并下载文件。",
+            "修改这个代码文件并运行测试。",
+            "第一行\n第二行",
+        ] {
+            let history = vec![json!({"role":"user","content":prompt})];
+            assert!(
+                !is_conversation_fast_lane(&history),
+                "action-oriented turn must remain on the full tool path: {prompt}",
+            );
+        }
+
+        let multimodal = vec![json!({
+            "role":"user",
+            "content":[
+                {"type":"input_text","text":"what is in this image?"},
+                {"type":"input_image","image_url":"data:image/png;base64,AQID"}
+            ]
+        })];
+        assert!(
+            !is_conversation_fast_lane(&multimodal),
+            "non-plain/multimodal user content must keep the full tool path",
+        );
+    }
+
+    #[test]
+    fn conversation_fast_lane_keeps_only_send_message_and_fails_closed_without_it() {
+        let history = vec![json!({
+            "role":"user",
+            "content":"In one sentence, explain what a database index is for."
+        })];
+        let tools = vec![
+            function_tool(
+                "send_message",
+                "visible reply",
+                json!({"type":"object","properties":{}}),
+            ),
+            function_tool(
+                "workspace_read",
+                "read workspace",
+                json!({"type":"object","properties":{}}),
+            ),
+        ];
+        let reduced =
+            conversation_fast_lane_tools(&history, &tools).expect("simple turn fast lane");
+        assert_eq!(reduced.len(), 1);
+        assert_eq!(
+            reduced[0].get("name").and_then(Value::as_str),
+            Some("send_message")
+        );
+
+        let no_send = vec![function_tool(
+            "workspace_read",
+            "read workspace",
+            json!({"type":"object","properties":{}}),
+        )];
+        assert!(
+            conversation_fast_lane_tools(&history, &no_send).is_none(),
+            "missing send_message must fail closed to the full tool path",
+        );
+
+        assert_eq!(
+            model_turn_tools(ModelProviderMode::FirstPartyDacheng, &history, &tools).len(),
+            1
+        );
+        assert_eq!(
+            model_turn_tools(ModelProviderMode::UserConfiguredRemote, &history, &tools).len(),
+            2,
+            "non-first-party providers must keep the full tool schema",
+        );
     }
 
     #[test]
