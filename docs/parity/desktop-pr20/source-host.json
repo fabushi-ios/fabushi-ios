@@ -5080,13 +5080,13 @@
       "desktop_responsibility": "On Linux Desktop, start perf record and wait until its native perf.data artifact exists before publishing the pressure CPU profiler session as active.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Desktop Linux pressure captures cannot report an active profiler that is stopped before perf has produced its artifact.",
-      "ios_disposition": "not-applicable",
+      "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "The changed code is gated by cfg(target_os = \"linux\") and owns a Linux perf child process/artifact readiness contract. Native iOS/App Store execution has no perf child-process backend and cannot launch this Linux profiler.",
+      "ios_language": "iOS native platform",
+      "ios_platform_delta": "The changed code is gated by cfg(target_os = \"linux\") and owns a Linux perf child process/artifact readiness contract. Native iOS/App Store execution replaces that mechanism by having no perf child-process profiler owner; iOS pressure/runtime diagnostics remain platform-native and cannot launch this Linux backend.",
       "implementation_status": "not-applicable",
       "production_evidence": "Desktop source/host/src/extensions/telemetry/pressure_cpu_profiler.rs current Linux-only cfg branch; no corresponding iOS child-process profiler owner exists.",
-      "test_evidence": "Desktop commit f52d20c5a44e92ca985920c9e7f3208092c3c517 changes only the Linux perf startup branch; no iOS production code is mechanically copied.",
+      "test_evidence": "Desktop commit f52d20c5a44e92ca985920c9e7f3208092c3c517 changes only the Linux perf startup branch. The iOS replacement is the absence of that Linux child-process owner, so no Linux perf code is mechanically copied.",
       "notes": "Reviewed against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1; platform-specific Linux readiness behavior is intentionally not ported to iOS."
     },
     {
