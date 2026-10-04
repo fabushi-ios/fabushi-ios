@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "8556281e5eb20aeb6dba781bd5ecf8c623206d6e",
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
   "group": "source-host",
   "rowCount": 967,
   "rows": [
@@ -1191,7 +1191,7 @@
     },
     {
       "desktop_path": "source/host/src/extensions/auth/auth_service.rs",
-      "desktop_blob_sha": "d7add5621bba6d56ac775dd494a2ac046c6b8417",
+      "desktop_blob_sha": "3347723efb416f06fcf04e4158120db9a1f4f6f2",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -3111,7 +3111,7 @@
     },
     {
       "desktop_path": "source/host/src/extensions/inference/production.rs",
-      "desktop_blob_sha": "7b02110371bd452e23fd6ab28d0a92b075699402",
+      "desktop_blob_sha": "3d99cd67c3dad837a40b17f8db0c19d921cf3c5c",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
@@ -3126,7 +3126,7 @@
     },
     {
       "desktop_path": "source/host/src/extensions/inference/provider_session.rs",
-      "desktop_blob_sha": "73ae462c5e8241566afb408df6cb7440d1f3227c",
+      "desktop_blob_sha": "3d3d950eb7614e012b5ef74fe866b94eb4ba605d",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "host",
       "desktop_visible_effect": "pending-review",
