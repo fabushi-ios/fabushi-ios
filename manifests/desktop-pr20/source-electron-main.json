@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "8556281e5eb20aeb6dba781bd5ecf8c623206d6e",
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
   "group": "source-electron-main",
   "fileCount": 195,
   "files": [
@@ -410,8 +410,8 @@
     },
     {
       "path": "source/electron-main/entry.ts",
-      "blobSha": "7520849efc3251cc9dd0f431600f24e1c9f4c7f1",
-      "size": 4108
+      "blobSha": "63440a95726659b65b4cbfab227983b7b334821a",
+      "size": 4077
     },
     {
       "path": "source/electron-main/experiments/experiments-ipc.ts",
