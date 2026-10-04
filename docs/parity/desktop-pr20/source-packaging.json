@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "sourceCommit": "7c00ea34fd64102cfe71266e646720369f2397e8",
-  "group": "source-tsconfig.json",
+  "group": "source-packaging",
   "rowCount": 1,
   "rows": [
     {
-      "desktop_path": "source/tsconfig.json",
-      "desktop_blob_sha": "be1cd18a8f6f9c914bc9711f29c717e41c0dc125",
+      "desktop_path": "source/packaging/offline-asr-engine.json",
+      "desktop_blob_sha": "aca72ae2bd3753b7c95bc9f9f0dc8e22b91e544a",
       "desktop_responsibility": "pending-review",
-      "desktop_owner": "tsconfig.json",
+      "desktop_owner": "packaging",
       "desktop_visible_effect": "pending-review",
       "ios_disposition": "unreviewed",
       "ios_target_path": "",
@@ -17,7 +17,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "New Desktop PR #20 selected source at 7c00ea34; rebaseline only. Product responsibility and iOS disposition require explicit review before promotion."
     }
   ]
 }
