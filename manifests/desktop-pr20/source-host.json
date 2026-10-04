@@ -915,8 +915,8 @@
     },
     {
       "path": "source/host/src/extensions/experiments/extension.rs",
-      "blobSha": "b5c2bc88953a2416e048abe95af97605f84e5280",
-      "size": 48490
+      "blobSha": "3559c6a739dd6ebe97f06e71b805b09f6657389c",
+      "size": 48820
     },
     {
       "path": "source/host/src/extensions/experiments/mod.rs",
@@ -1040,13 +1040,13 @@
     },
     {
       "path": "source/host/src/extensions/inference/production.rs",
-      "blobSha": "3d99cd67c3dad837a40b17f8db0c19d921cf3c5c",
-      "size": 19532
+      "blobSha": "e3163bf2c88fe1a7c0c6c3f2ef65e449d5a67bef",
+      "size": 19534
     },
     {
       "path": "source/host/src/extensions/inference/provider_session.rs",
-      "blobSha": "3d3d950eb7614e012b5ef74fe866b94eb4ba605d",
-      "size": 75377
+      "blobSha": "3ed07b2526c68b6ac47001727a07e72a482d3fe7",
+      "size": 79458
     },
     {
       "path": "source/host/src/extensions/inference/sand_labeling.rs",
@@ -1470,8 +1470,8 @@
     },
     {
       "path": "source/host/src/extensions/settings/settings_service.rs",
-      "blobSha": "c7797d0c3631c21104f1dae8693fe79541c65d2a",
-      "size": 51223
+      "blobSha": "f34a4d90ac1bf5a3b8208cc4d573ea97c9f8da72",
+      "size": 51264
     },
     {
       "path": "source/host/src/extensions/source_map/extension.rs",
@@ -1695,8 +1695,8 @@
     },
     {
       "path": "source/host/src/extensions/telemetry/pressure_cpu_profiler.rs",
-      "blobSha": "b791db3f7447eb15aea78158f1f69e1cc32c9167",
-      "size": 27489
+      "blobSha": "c0d14984e12bd482f2a21eabb1131987a72c74c2",
+      "size": 28847
     },
     {
       "path": "source/host/src/extensions/telemetry/queue_telemetry_mappers.rs",
@@ -2765,8 +2765,8 @@
     },
     {
       "path": "source/host/src/runner/turn_shape.rs",
-      "blobSha": "0c2f2a423622983e8de38e65ad8e5fed203b46b6",
-      "size": 15908
+      "blobSha": "4bc362f27b2b2e846f570a20db7761586364533e",
+      "size": 18043
     },
     {
       "path": "source/host/src/runner/turn_tool_session_reminders.rs",

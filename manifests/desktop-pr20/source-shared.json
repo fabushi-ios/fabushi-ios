@@ -180,8 +180,8 @@
     },
     {
       "path": "source/shared/inference-router.ts",
-      "blobSha": "eb7fc2f2181f9326fb2add0abd91e9c49c00ca32",
-      "size": 1167
+      "blobSha": "2bc1550891cfc60a1f5b36ee35e39ac80f63e5bd",
+      "size": 1196
     },
     {
       "path": "source/shared/invariant.ts",

@@ -42,6 +42,24 @@ final class SharedExperimentServiceParityTests: XCTestCase {
         )
     }
 
+    func testFabushiProductGateDefaultIsFallbackBelowRemoteState() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let service = SandExperimentService(
+            getCacheDir: { root.path },
+            productFeatureGateDefaults: ["sand_agent_network": true]
+        )
+        XCTAssertTrue(service.checkFeatureGate("sand_agent_network"))
+
+        service.hydrate(
+            config: #"{"featureGates":{"sand_agent_network":{"value":false}}}"#,
+            fetchedAtMs: 1_000,
+            live: true
+        )
+        XCTAssertFalse(service.checkFeatureGate("sand_agent_network"))
+    }
+
     func testHydrationAppliesRemoteGatesExperimentsAndModelConfigs() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

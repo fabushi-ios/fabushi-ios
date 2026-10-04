@@ -495,7 +495,9 @@ final class SandSettingsStore: @unchecked Sendable {
         resolveSandLocalToolPermission(getLocalToolPermission(), adminCeiling: getLocalToolPermissionCeiling())
     }
     func getInferenceProvider() -> SandInferenceProvider {
-        load().inferenceProvider ?? .codex
+        // Fabushi product composition owns the fresh-profile default. Persisted
+        // explicit choices remain authoritative across launches and accounts.
+        load().inferenceProvider ?? .fabushi
     }
 
     func setInferenceProvider(_ provider: SandInferenceProvider) {

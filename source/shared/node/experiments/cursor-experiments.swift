@@ -124,6 +124,7 @@ final class SandExperimentService: @unchecked Sendable {
     private let getCacheDir: @Sendable () -> String
     private let env: [String: String]
     private let isDevBuild: Bool
+    private let productFeatureGateDefaults: [String: Bool]
 
     private var remoteGates: [String: Bool] = [:]
     private var experiments: [String: SandHydratedExperiment] = [:]
@@ -141,11 +142,13 @@ final class SandExperimentService: @unchecked Sendable {
     init(
         getCacheDir: @escaping @Sendable () -> String,
         isDevBuild: Bool = false,
-        env: [String: String] = ProcessInfo.processInfo.environment
+        env: [String: String] = ProcessInfo.processInfo.environment,
+        productFeatureGateDefaults: [String: Bool] = [:]
     ) {
         self.getCacheDir = getCacheDir
         self.isDevBuild = isDevBuild
         self.env = env
+        self.productFeatureGateDefaults = productFeatureGateDefaults
         overrideStore = SandFeatureFlagOverrideStore(getCacheDir: getCacheDir)
         if isDevBuild { overrideStore.hydrateFromDisk() }
     }
@@ -326,7 +329,10 @@ final class SandExperimentService: @unchecked Sendable {
         lock.lock()
         let remote = remoteGates[name]
         lock.unlock()
-        return remote ?? BUNDLED_FEATURE_FLAGS[name]?.defaultValue ?? false
+        return remote
+            ?? productFeatureGateDefaults[name]
+            ?? BUNDLED_FEATURE_FLAGS[name]?.defaultValue
+            ?? false
     }
 
     func getFeatureGateProperty(_ name: String) -> MutableGateProperty {

@@ -65,6 +65,19 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertEqual(store.load().updateTrackOverride, "stable")
     }
 
+    func testFabushiIsFreshInferenceDefaultAndExplicitProviderPersists() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("settings.json")
+        let store = SandSettingsStore(settingsPath: path.path)
+
+        XCTAssertEqual(store.getInferenceProvider(), .fabushi)
+        store.setInferenceProvider(.openrouter)
+
+        let restored = SandSettingsStore(settingsPath: path.path)
+        XCTAssertEqual(restored.getInferenceProvider(), .openrouter)
+    }
+
     func testAccountScopePreservesFirstOwnerThenClearsCrossAccountState() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

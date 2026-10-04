@@ -4,6 +4,7 @@ enum SandInferenceProvider: String, Codable, CaseIterable, Hashable, Sendable {
     case cursor
     case claudeCode = "claude-code"
     case codex
+    case fabushi
     case openrouter
 }
 

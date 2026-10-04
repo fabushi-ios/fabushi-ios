@@ -1081,12 +1081,14 @@ fn configured_fabushi_responses_url() -> String {
     normalize_fabushi_responses_url(&api_base)
 }
 
-fn configured_fabushi_model() -> String {
-    std::env::var("SAND_CODEX_MODEL")
-        .ok()
-        .map(|value| value.trim().to_string())
+fn resolve_fabushi_model(raw: Option<String>) -> String {
+    raw.map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "gpt-5.4".to_string())
+        .unwrap_or_else(|| "deepseek-chat".to_string())
+}
+
+fn configured_fabushi_model() -> String {
+    resolve_fabushi_model(std::env::var("FABUSHI_RESPONSES_MODEL").ok())
 }
 
 fn create_feature_host(
@@ -1278,6 +1280,15 @@ mod fabushi_shipping_inference_tests {
         assert_eq!(
             effective_inference_provider(AppHostFeatureMode::Test, "openrouter"),
             "openrouter"
+        );
+    }
+
+    #[test]
+    fn fabushi_model_uses_product_specific_default_and_override() {
+        assert_eq!(resolve_fabushi_model(None), "deepseek-chat");
+        assert_eq!(
+            resolve_fabushi_model(Some("  custom-fabushi-model  ".into())),
+            "custom-fabushi-model"
         );
     }
 

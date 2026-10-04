@@ -21,18 +21,18 @@
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-adapters.ts",
-      "desktop_blob_sha": "cf305c8a2316d53e0ffb1c63ecfa8cee3c4a63a6",
-      "desktop_responsibility": "Bind the shipping Fabushi account owner into production startup, install the first-party Responses endpoint/product mode and private Host credential path, settle account state before Coordinator/Host startup, and prevent a parallel Cursor account owner.",
+      "desktop_blob_sha": "1f0f847f690090c32c004f2ddcfaa294d6e91aa8",
+      "desktop_responsibility": "Bind the shipping Fabushi account owner into startup, install the first-party Responses endpoint/product policy and private Host credential path, set Fabushi as the fresh-profile inference default, preserve explicit provider selection, and supply product feature-gate fallbacks.",
       "desktop_owner": "product/fabushi/account",
-      "desktop_visible_effect": "A signed-in Fabushi account is the credential source used by the shipping Host/Responses inference chain from startup, while refresh credentials remain outside presentation code and no independent Cursor credential is seeded.",
+      "desktop_visible_effect": "A fresh signed-in Fabushi profile uses first-party Responses with the account credential and sand_agent_network fallback, while stored provider choice remains persisted for settings semantics, the shipping Fabushi product Host route remains first-party Fabushi; live remote gate state remains authoritative over fallback.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "The iOS native Host has no Electron environment adapter; AppHost directly configures the first-party Responses owner and composes the Rust Product client before runtime construction.",
+      "ios_platform_delta": "iOS has no Electron environment adapter. SandSettingsStore and MahayanaCoordinator own provider/product-gate policy, while Swift projects the selected provider through native FFI and Rust Product/AppHost owns endpoint and account credential resolution.",
       "implementation_status": "implemented",
-      "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs",
-      "test_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; exact-HEAD GitHub Actions pending",
-      "notes": "Production mode forces Fabushi inference ownership and derives model credentials from the Rust-owned product session. Revalidated against Desktop PR #20 ea6da477."
+      "production_evidence": "source/shared/node/settings/sand-settings-store.swift; source/shared/node/experiments/cursor-experiments.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/host/MahayanaHostRuntime.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift; mobile/ios/FabushiTests/SharedExperimentServiceParityTests.swift; Rust app-host shipping inference tests; current exact-HEAD GitHub Actions pending",
+      "notes": "Revalidated against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1. Fresh default is Fabushi, explicit persisted provider is not overwritten, and account bearer resolution remains Rust-owned."
     },
     {
       "desktop_path": "source/product/fabushi/fabushi-account-policy.ts",

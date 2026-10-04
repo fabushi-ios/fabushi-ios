@@ -91,7 +91,8 @@ final class MahayanaCoordinator {
             .appendingPathComponent("experiments", isDirectory: true)
         let experimentService = SandExperimentService(
             getCacheDir: { experimentCacheDirectory.path },
-            isDevBuild: featureHostTest
+            isDevBuild: featureHostTest,
+            productFeatureGateDefaults: ["sand_agent_network": true]
         )
         experimentService.startFromCache()
         return MahayanaCoordinator(

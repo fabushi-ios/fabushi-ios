@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `266ca48a220edae3ce12820fb951c731723810d6`
+- pinned source commit for this baseline: `a3d9a509144f0997df10cdc85a50cc27507f5aa1`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,18 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-04 / `266ca48a220edae3ce12820fb951c731723810d6`
+### 1.0 Current exact-HEAD authority: 2026-10-04 / `a3d9a509144f0997df10cdc85a50cc27507f5aa1`
+
+Desktop PR #20 is open and draft on `refactor/grok-018-architecture-rebuild`. From the previously pinned `266ca48a220edae3ce12820fb951c731723810d6` baseline to this exact HEAD, GitHub compare reports **5 commits and 9 changed files**. The authoritative `frontend/** + source/**` inventory remains exactly **7,943** paths. The selected changes are `source/host/src/extensions/experiments/extension.rs`, `source/host/src/extensions/inference/provider_session.rs`, `source/host/src/extensions/inference/production.rs`, `source/host/src/extensions/settings/settings_service.rs`, `source/host/src/extensions/telemetry/pressure_cpu_profiler.rs`, `source/host/src/runner/turn_shape.rs`, `source/product/fabushi/fabushi-account-adapters.ts`, and `source/shared/inference-router.ts`; `projects/grok-fabu-parity/architecture-semantic-adaptations.json` supplies the matching architecture adaptation outside the selected inventory roots.
+
+The first-party Fabushi changes are applicable iOS product responsibilities. Fresh profiles must expose a first-class `fabushi` provider identity and persist settings without aliasing it to Codex; in shipping Fabushi product mode the canonical Host inference owner routes production turns to Fabushi regardless of a persisted alternate selection. First-party inference must use the Fabushi Responses endpoint and account-bound Rust-owned credential with the product-specific model default, `sand_agent_network=true` is only a product fallback below live remote gate state, and Fabushi participates in the existing provider-neutral checkpoint/usage/cancellation lifecycle rather than creating a second owner. iOS implements these responsibilities through `SandSettingsStore`, `SandExperimentService`, `MahayanaCoordinator`, native Host FFI, Rust AppHost/Product/Host, and NativeEngine. These rows are **implemented, not verified**, until the resulting iOS exact HEAD completes required same-HEAD Actions.
+
+The final Desktop commit in this delta, `fix: wait for Linux perf profiler readiness`, changes only the `#[cfg(target_os = "linux")]` `perf record` backend so it waits for `perf.data` before reporting an active session. That child-process/artifact contract is not an iOS production responsibility and is reviewed `not-applicable`; native iOS must not mechanically copy Linux `perf` process management.
+
+All acceptance attached to the old `266ca48a...` baseline, including Actions runs `37206582726` and `37206582744`, is historical only and cannot be promoted for this authority. Any new iOS commit must obtain its own automatically triggered ordinary and protected workflows before current-head verification.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-04 / `266ca48a220edae3ce12820fb951c731723810d6`
+
 
 Desktop PR #20 advanced exactly one commit from `a71ac22020e969c6077ecd78a8a050078d7b134e` to `266ca48a220edae3ce12820fb951c731723810d6` while remaining open and draft on `refactor/grok-018-architecture-rebuild`. A direct GitHub compare reports one changed file only: `source/host/tests/agent_to_agent_messaging_contract.rs`, with 4 additions and 1 deletion. The authoritative `frontend/** + source/**` inventory therefore remains exactly **7,943** paths, but this selected test file has a new Desktop blob identity (`7292a8b53882c5533db97da7e3c87626df963c57`).
 
