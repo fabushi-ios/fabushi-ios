@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: Fabushi iOS  
-Last updated: 2026-10-04
+Last updated: 2026-10-05
 Related PR: `bhrumom/fabushi-ios#3`
 
 ## 1. Decision and authority
@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `88dcc3b0ac83d8c3aabff8050551eabdd1726455`
+- pinned source commit for this baseline: `a667bdf5b3ad98ef2e69f2443a753233c0ad0667`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,19 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-04 / `88dcc3b0ac83d8c3aabff8050551eabdd1726455`
+### 1.0 Current exact-HEAD authority: 2026-10-05 / `a667bdf5b3ad98ef2e69f2443a753233c0ad0667`
+
+Desktop PR #20 remains open and draft on `refactor/grok-018-architecture-rebuild`. GitHub compare from the previous pinned `88dcc3b0ac83d8c3aabff8050551eabdd1726455` baseline to this exact HEAD reports **4 commits and exactly 3 changed files**: `desktop/e2e/openbot-packaged-acceptance.spec.ts`, `source/host/src/extensions/transcript/turn_runtime.rs`, and `source/host/tests/turn_runtime_recovery_contract.rs`. No selected `frontend/** + source/**` path was added or removed, so the authoritative selected inventory remains exactly **7,943** paths. The two changed selected Host blobs are `50272d988ed531632d970cf2904138f92f392172` and `49778612dfe89fd6247d5461e2b8b5c944a4306a`.
+
+At intermediate Desktop HEAD `efd027139c8db7cc036cd3344579f047090b6c04`, the shipping Host closed a recovery-content loss bug without moving ownership. Hidden reply nudges and closing-send nudges still use the canonical routed-turn owner, the same epoch/cancellation/WaitingUser/delivery guards, and the same synthetic message/reply/fork/attachment identity cleanup, but their inference input also reproduces the same turn's latest non-empty pending user request between explicit boundaries. This prevents a retry from forgetting user markers, constraints, or requested output details merely because the synthetic nudge prompt became the newest user-shaped input.
+
+This responsibility is applicable to iOS and is implemented in the existing native owner rather than by introducing a parallel TurnRuntime. `MahayanaRuntime` continues to route a visible turn into the `MobileEmbedded` `NativeEngine`. `NativeEngine::run_prompt` still owns bounded reply/closing-send recovery, successful `send_message` delivery truth, synthetic reply/closing-send markers, interruption/suspension fencing, and the `request_box_help` WaitingUser exit. The adaptation shapes both hidden nudge inputs from the original function-local pending request and the existing nudge instruction, so the subsequent model call sees the exact pending marker/constraint/output detail while all identity-cleanup and safety semantics remain on the same owner. Focused Rust contracts exercise both reply and closing-send paths with `FABUSHI-MARKER-7421`, `CLOSING-MARKER-5937`, explicit output details, boundary markers, bounded retries, cancellation fencing, and Box-handoff suppression.
+
+The packaged E2E delta is outside the selected production inventory. It first recognizes the SendMessage text-card as a legitimate assistant completion and, in the final `efd027139c8db7cc036cd3344579f047090b6c04 -> a667bdf5b3ad98ef2e69f2443a753233c0ad0667` acceptance-only commits, makes lifecycle capture read assistant identity plus busy/failed state from either the outer transcript article or its nested assistant surface. iOS does not copy those Electron DOM selectors. Native iOS uses one event protocol instead: successful `send_message` becomes the canonical Runtime message; `FeatureHostController` projects it as same-operation `HostEvent::ChatMessage`; `MobileBotChat` accepts a non-user `chat.message` only when it contains text or an attachment; `chat.delta` remains streaming; and `operation.completed`, `operation.interrupted`, and `operation.failed` retain lifecycle settlement. The focused Swift contract covers text, attachment-only, user, streaming-delta, stale-operation, and empty shapes, so no renderer-owned completion oracle is introduced.
+
+The pre-existing iOS exact HEAD `8ddac696bbdd5a0139112f90b87f0455c4323649` and Actions runs `37216783417` / `37216783543` are historical regression evidence only and cannot prove `a667bdf5b3ad98ef2e69f2443a753233c0ad0667` parity. Current changed rows remain `implemented`, not `verified`, until one resulting iOS exact HEAD passes both required ordinary and protected GitHub Actions and preserves exact-head artifacts/evidence.
+
+### 1.0 Historical exact-HEAD authority: 2026-10-04 / `88dcc3b0ac83d8c3aabff8050551eabdd1726455`
 
 Desktop PR #20 is open and draft on `refactor/grok-018-architecture-rebuild`. From the previously pinned `c64035cca2bdb301e948036250ed6ffcc6ea7e42` baseline to this exact HEAD, GitHub compare reports **1 commit and 2 changed files**: `source/host/src/extensions/inference/codex_direct_responses.rs` and `source/host/tests/inference_codex_direct_contract.rs`. The authoritative `frontend/** + source/**` inventory remains exactly **7,943** paths. The material production change is a strict DSML compatibility boundary in the first-party Fabushi direct Responses path: when a model step contains only canonical DSML calls, every tool name is currently declared, parameters satisfy the strict grammar, and no duplicate parameter exists, Desktop converts that text into structured function calls and preserves normal function-call/output continuation. Mixed prose, malformed DSML, or undeclared tools remain ordinary text and are never executed.
 

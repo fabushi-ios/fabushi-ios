@@ -1,5 +1,17 @@
 import SwiftUI
 
+internal func isMobileBotVisibleAssistantCompletion(
+    _ event: [String: Any],
+    operationId: String
+) -> Bool {
+    guard event["type"] as? String == "chat.message" else { return false }
+    let eventOperationId = event["operationId"] as? String ?? operationId
+    guard eventOperationId == operationId, event["role"] as? String != "user" else { return false }
+    let text = event["text"] as? String ?? ""
+    let attachment = event["attachment"] as? [String: Any]
+    return !text.isEmpty || attachment != nil
+}
+
 internal struct MobileBotChat: View {
     let bot: MobileBotSummary
     let bridge: IOSPreloadBridge
@@ -594,7 +606,7 @@ internal struct MobileBotChat: View {
                         entries[index].actionStatus = event["resolution"] as? String ?? "completed"
                     }
                 case "chat.message":
-                    guard (event["role"] as? String) != "user" else { continue }
+                    guard isMobileBotVisibleAssistantCompletion(event, operationId: operationId) else { continue }
                     removeThinking(operationId)
                     let eventText = event["text"] as? String ?? ""
                     let generatedAttachment = event["attachment"] as? [String: Any]

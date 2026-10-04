@@ -23,6 +23,50 @@ private final class HostRecoveryStub: MahayanaHostRequesting {
 }
 
 final class LocalHostRecoveryTests: XCTestCase {
+    func testCanonicalSendMessageCompletionProjectsAsSettledVisibleAssistantMessage() {
+        let operationId = "operation-send-message"
+
+        XCTAssertTrue(isMobileBotVisibleAssistantCompletion([
+            "type": "chat.message",
+            "operationId": operationId,
+            "role": "assistant",
+            "text": "final delivered result",
+        ], operationId: operationId))
+
+        XCTAssertTrue(isMobileBotVisibleAssistantCompletion([
+            "type": "chat.message",
+            "operationId": operationId,
+            "role": "assistant",
+            "text": "",
+            "attachment": ["url": "https://example.test/result.png"],
+        ], operationId: operationId))
+
+        XCTAssertFalse(isMobileBotVisibleAssistantCompletion([
+            "type": "chat.message",
+            "operationId": operationId,
+            "role": "user",
+            "text": "not an assistant completion",
+        ], operationId: operationId))
+        XCTAssertFalse(isMobileBotVisibleAssistantCompletion([
+            "type": "chat.delta",
+            "operationId": operationId,
+            "role": "assistant",
+            "text": "still streaming",
+        ], operationId: operationId))
+        XCTAssertFalse(isMobileBotVisibleAssistantCompletion([
+            "type": "chat.message",
+            "operationId": "newer-operation",
+            "role": "assistant",
+            "text": "stale completion",
+        ], operationId: operationId))
+        XCTAssertFalse(isMobileBotVisibleAssistantCompletion([
+            "type": "chat.message",
+            "operationId": operationId,
+            "role": "assistant",
+            "text": "",
+        ], operationId: operationId))
+    }
+
     @MainActor
     func testRecoverableHostFailureSettlesRequestThenServesNextGeneration() async throws {
         let failed = HostRecoveryStub(

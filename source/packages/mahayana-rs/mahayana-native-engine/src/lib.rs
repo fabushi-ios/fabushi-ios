@@ -680,7 +680,7 @@ impl NativeEngine {
                     reply_nudge_attempts = reply_nudge_attempts.saturating_add(1);
                     session.history.push(json!({
                         "role": "user",
-                        "content": REPLY_NUDGE_PROMPT,
+                        "content": shape_hidden_nudge_content(REPLY_NUDGE_PROMPT, &prompt),
                         "source": "mahayana_reply_nudge",
                     }));
                     continue;
@@ -697,7 +697,7 @@ impl NativeEngine {
                     self.telemetry.closing_send_nudge();
                     session.history.push(json!({
                         "role": "user",
-                        "content": CLOSING_SEND_NUDGE_PROMPT,
+                        "content": shape_hidden_nudge_content(CLOSING_SEND_NUDGE_PROMPT, &prompt),
                         "source": "mahayana_closing_send_nudge",
                         "operationId": operation_id.as_str(),
                     }));
@@ -2747,6 +2747,16 @@ fn permission_memory_from_metadata(
     }
 }
 
+fn shape_hidden_nudge_content(nudge_prompt: &str, pending_user_request: &str) -> String {
+    let pending_user_request = pending_user_request.trim();
+    if pending_user_request.is_empty() {
+        return nudge_prompt.to_string();
+    }
+    format!(
+        "{nudge_prompt}\n\nThe user request still pending from this same turn is reproduced verbatim below. Answer this exact request when you invoke send_message; preserve every explicit marker, constraint, and requested output detail.\n\n--- BEGIN PENDING USER REQUEST ---\n{pending_user_request}\n--- END PENDING USER REQUEST ---"
+    )
+}
+
 fn has_closing_send_nudge_for_operation(
     history: &[Value],
     operation_id: &OperationId,
@@ -3384,9 +3394,9 @@ mod tests {
         engine
             .run(
                 RunRequest {
-                    session_id: session,
+                    session_id: session.clone(),
                     operation_id: OperationId::new(),
-                    input: "finish the task".into(),
+                    input: "finish the task exactly; preserve marker FABUSHI-MARKER-7421 and output detail OUTPUT=full".into(),
                     policy: ExecutionPolicy::mobile_default(),
                     required_capabilities: CapabilitySet::new([Capability::Model]),
                     metadata: json!({"hidden": false}),
@@ -3414,6 +3424,30 @@ mod tests {
             KernelEvent::MessageDelta { .. } | KernelEvent::MessageCompleted { .. }
         )));
         assert_eq!(model.outputs.lock().expect("outputs").len(), 0);
+
+        drop(events);
+        let session_state = engine.session(&session).expect("session state");
+        let session_state = session_state.lock().await;
+        let reply_nudges = session_state
+            .history
+            .iter()
+            .filter(|item| {
+                item.get("source").and_then(Value::as_str) == Some("mahayana_reply_nudge")
+            })
+            .map(|item| {
+                item.get("content")
+                    .and_then(Value::as_str)
+                    .expect("reply nudge content")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(reply_nudges.len(), 3);
+        for nudge in reply_nudges {
+            assert!(nudge.starts_with(REPLY_NUDGE_PROMPT));
+            assert!(nudge.contains("--- BEGIN PENDING USER REQUEST ---"));
+            assert!(nudge.contains("FABUSHI-MARKER-7421"));
+            assert!(nudge.contains("OUTPUT=full"));
+            assert!(nudge.contains("--- END PENDING USER REQUEST ---"));
+        }
     }
 
     #[tokio::test]
@@ -3460,7 +3494,7 @@ mod tests {
                 RunRequest {
                     session_id: session.clone(),
                     operation_id: operation_id.clone(),
-                    input: "check memory and report back".into(),
+                    input: "check memory and report back; preserve marker CLOSING-MARKER-5937 and output detail FORMAT=complete".into(),
                     policy: ExecutionPolicy::mobile_default(),
                     required_capabilities: CapabilitySet::new([Capability::Model]),
                     metadata: json!({"hidden": false}),
@@ -3500,6 +3534,23 @@ mod tests {
             })
             .count();
         assert_eq!(markers, 1);
+        let closing_nudge = session_state
+            .history
+            .iter()
+            .find(|item| {
+                item.get("source").and_then(Value::as_str)
+                    == Some("mahayana_closing_send_nudge")
+                    && item.get("operationId").and_then(Value::as_str)
+                        == Some(operation_id.as_str())
+            })
+            .and_then(|item| item.get("content"))
+            .and_then(Value::as_str)
+            .expect("closing nudge content");
+        assert!(closing_nudge.starts_with(CLOSING_SEND_NUDGE_PROMPT));
+        assert!(closing_nudge.contains("--- BEGIN PENDING USER REQUEST ---"));
+        assert!(closing_nudge.contains("CLOSING-MARKER-5937"));
+        assert!(closing_nudge.contains("FORMAT=complete"));
+        assert!(closing_nudge.contains("--- END PENDING USER REQUEST ---"));
         drop(session_state);
         let metrics = engine.metrics_snapshot();
         assert_eq!(metrics.closing_send_nudges, 1);

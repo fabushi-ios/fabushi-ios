@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
+  "sourceCommit": "a667bdf5b3ad98ef2e69f2443a753233c0ad0667",
   "group": "source-host",
   "fileCount": 967,
   "files": [
@@ -2010,8 +2010,8 @@
     },
     {
       "path": "source/host/src/extensions/transcript/turn_runtime.rs",
-      "blobSha": "c8b0c7bf734f3b82981da22f4c8c55878e756cca",
-      "size": 11014
+      "blobSha": "50272d988ed531632d970cf2904138f92f392172",
+      "size": 11915
     },
     {
       "path": "source/host/src/extensions/transcript/upgrade_recreate_resume.rs",
@@ -4720,8 +4720,8 @@
     },
     {
       "path": "source/host/tests/turn_runtime_recovery_contract.rs",
-      "blobSha": "494cdc3f83721417255b914ebe40b886a334271d",
-      "size": 10887
+      "blobSha": "49778612dfe89fd6247d5461e2b8b5c944a4306a",
+      "size": 11320
     },
     {
       "path": "source/host/tests/turn_settle_checkpoint_contract.rs",

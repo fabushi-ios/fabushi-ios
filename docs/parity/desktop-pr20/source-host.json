@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "0d6e4095f18ec7662e169ecaec98d95e43bcdfec",
+  "sourceCommit": "a667bdf5b3ad98ef2e69f2443a753233c0ad0667",
   "group": "source-host",
   "rowCount": 967,
   "rows": [
@@ -6021,18 +6021,18 @@
     },
     {
       "desktop_path": "source/host/src/extensions/transcript/turn_runtime.rs",
-      "desktop_blob_sha": "c8b0c7bf734f3b82981da22f4c8c55878e756cca",
-      "desktop_responsibility": "Canonical turn policy for reply/closing hidden nudges, delivery debt, terminal projection, and construction of ordinary empty-delivery reports only for successful uncancelled non-WaitingUser same-epoch turns that still owe delivery.",
-      "desktop_owner": "Host transcript turn runtime, consumed by the shipping routed-provider turn worker; delivery counters remain producer-owned inputs and the renderer owns no retry policy.",
-      "desktop_visible_effect": "Recovery prompts preserve original request boundaries and telemetry is suppressed for delivered, reaction, WaitingUser, cancelled, failed, or superseded turns.",
-      "ios_disposition": "unreviewed",
+      "desktop_blob_sha": "50272d988ed531632d970cf2904138f92f392172",
+      "desktop_responsibility": "Canonical Host turn-delivery recovery shaping: hidden reply and closing-send nudges retain the same turn's still-pending user request while preserving bounded delivery recovery, epoch/cancel/WaitingUser fences, and synthetic checkpoint identity isolation.",
+      "desktop_owner": "Host transcript turn runtime; the canonical routed-turn owner shapes retry input without adding another Runner or transcript owner.",
+      "desktop_visible_effect": "Recovery retries preserve every explicit marker, constraint, and requested output detail from the pending request and cannot bypass existing stale-turn, cancellation, WaitingUser, or delivery-settlement safety.",
+      "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "Mobile shipping uses Runtime operation identity/supersede interruption as the stale-generation fence instead of Desktop turn_epoch. NativeEngine owns tool-only visible delivery, bounded reply nudges, and waiting-user suppression; Swift remains projection-only.",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Re-audited at Desktop PR #20 c316a1ccac2d93810224dcfdd1085997a5dab452: visible user turns that succeed without a delivered SendMessage or reaction now receive at most three hidden reply-nudge reruns. The shipping guard is fenced by the original turn epoch, current epoch, cancellation, WaitingUser state, provider success, and delivery counters; hidden/background/resume turns are excluded and nudge text deltas are suppressed. iOS must independently prove the same product effect at its canonical Runtime/Host boundary; this rebaseline does not promote status. Revalidated through Desktop PR #20 827f22da7c527ab22df0700303f356d589c2a0f4. The 4060b1f5 shaping rule requires synthetic nudges to drop inherited visible-turn message/reply/fork/attachment checkpoint identity; iOS now marks synthetic reply-nudge sends and clears only inherited projection identity while preserving an explicit valid tool-selected reply target. iOS uses the existing NativeEngine/NativeSession owner rather than copying Desktop checkpoint wrappers. The separate ed06 production-wiring row remains mapped until reaction-as-delivery is audited in the iOS shipping reaction owner. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=ios-adapted and status=implemented, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "ios_platform_delta": "Use the existing MobileEmbedded NativeEngine delivery-recovery owner. Reply and closing-send hidden nudges append the original function-local pending request with explicit boundaries; synthetic delivery metadata, bounded retry, interruption/suspension, Runtime supersession, and request_box_help WaitingUser semantics remain on their existing owners.",
+      "implementation_status": "implemented",
+      "production_evidence": "mahayana-native-engine/src/lib.rs: shipping run_prompt shapes reply and closing-send hidden nudge history from the original pending prompt plus the existing nudge instruction, while keeping send_message delivery truth, syntheticReplyNudge/syntheticClosingSendNudge marking, bounded retry, and operation-control/Box fences in the same NativeEngine owner.",
+      "test_evidence": "Focused NativeEngine production-path tests assert reply and closing-send nudge history preserves FABUSHI-MARKER-7421 / CLOSING-MARKER-5937 and requested output detail between explicit pending-request boundaries; existing bounded empty-delivery, cancel fencing, synthetic identity, and request_box_help no-nudge contracts remain. Current exact-head GitHub Actions pending.",
+      "notes": "Exact-HEAD rebaseline 88dcc3b0ac83d8c3aabff8050551eabdd1726455 -> a667bdf5b3ad98ef2e69f2443a753233c0ad0667; the production responsibility entered at efd027139c8db7cc036cd3344579f047090b6c04. Later Desktop commits only strengthen packaged acceptance capture and do not alter this selected source blob. iOS implements the responsibility in the existing NativeEngine; status is implemented, not verified, until same-iOS-HEAD ordinary and protected Actions succeed."
     },
     {
       "desktop_path": "source/host/src/extensions/transcript/upgrade_recreate_resume.rs",
@@ -14151,18 +14151,18 @@
     },
     {
       "desktop_path": "source/host/tests/turn_runtime_recovery_contract.rs",
-      "desktop_blob_sha": "494cdc3f83721417255b914ebe40b886a334271d",
-      "desktop_responsibility": "Focused contracts for closing-send hidden-input identity isolation and ordinary empty-delivery reporting only for settled same-epoch delivery debt.",
-      "desktop_owner": "Host transcript turn-runtime contract; it proves the shipping pure decision logic used by the routed-provider worker rather than a second implementation.",
-      "desktop_visible_effect": "Recovery does not impersonate a new user request, and invalid terminal states cannot be reported as empty delivery.",
-      "ios_disposition": "unreviewed",
+      "desktop_blob_sha": "49778612dfe89fd6247d5461e2b8b5c944a4306a",
+      "desktop_responsibility": "Focused recovery contracts proving hidden reply and closing-send nudge input contains the exact pending user request markers/details while preserving canonical synthetic identity and delivery-recovery guards.",
+      "desktop_owner": "Host transcript turn-runtime contract; it exercises the shipping recovery shaper rather than a second implementation.",
+      "desktop_visible_effect": "Regression evidence prevents hidden retries from silently dropping the user's still-pending requirements.",
+      "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "Desktop pure turn_epoch guard maps to NativeEngine delivery/nudge focused contracts plus Runtime operation supersession/cancellation fencing.",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Re-audited at Desktop PR #20 c316a1ccac2d93810224dcfdd1085997a5dab452: visible user turns that succeed without a delivered SendMessage or reaction now receive at most three hidden reply-nudge reruns. The shipping guard is fenced by the original turn epoch, current epoch, cancellation, WaitingUser state, provider success, and delivery counters; hidden/background/resume turns are excluded and nudge text deltas are suppressed. iOS must independently prove the same product effect at its canonical Runtime/Host boundary; this rebaseline does not promote status. Revalidated through Desktop PR #20 827f22da7c527ab22df0700303f356d589c2a0f4; current iOS focused coverage additionally proves synthetic nudge sends do not inherit reply/fork/attachment checkpoint identity. iOS uses the existing NativeEngine/NativeSession owner rather than copying Desktop checkpoint wrappers. The separate ed06 production-wiring row remains mapped until reaction-as-delivery is audited in the iOS shipping reaction owner. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=ios-adapted and status=implemented, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "ios_platform_delta": "Map the Desktop contract to NativeEngine production-path tests over canonical session history and existing operation/Box guards; do not copy the Desktop wrapper or create a parallel TurnRuntime.",
+      "implementation_status": "implemented",
+      "production_evidence": "The shipping iOS NativeEngine run_prompt is the single model/tool-loop owner and feeds the shaped hidden nudge history directly into the next ModelRequest.",
+      "test_evidence": "NativeEngine focused tests preserve FABUSHI-MARKER-7421 and OUTPUT=full across bounded reply nudges, preserve CLOSING-MARKER-5937 and FORMAT=complete across the one-shot closing nudge, and retain cancellation and request_box_help suppression tests. Current exact-head GitHub Actions pending.",
+      "notes": "Rebound to Desktop PR #20 a667bdf5b3ad98ef2e69f2443a753233c0ad0667 blob 49778612dfe89fd6247d5461e2b8b5c944a4306a; prior exact-head CI is historical for promotion."
     },
     {
       "desktop_path": "source/host/tests/turn_settle_checkpoint_contract.rs",

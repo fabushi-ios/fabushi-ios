@@ -4,8 +4,8 @@
     "repository": "bhrumom/fabushi-desktop",
     "pullRequest": 20,
     "branch": "refactor/grok-018-architecture-rebuild",
-    "commit": "88dcc3b0ac83d8c3aabff8050551eabdd1726455",
-    "generatedAt": "2026-10-04"
+    "commit": "a667bdf5b3ad98ef2e69f2443a753233c0ad0667",
+    "generatedAt": "2026-10-05"
   },
   "roots": [
     "frontend/**",
