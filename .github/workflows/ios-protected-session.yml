@@ -119,7 +119,7 @@ jobs:
           test "$(stat -f '%Lp' "$FABUSHI_CI_ACCOUNT_SESSION_FILE")" = "600"
           echo "HOST_CI_SESSION=$FABUSHI_CI_ACCOUNT_SESSION_FILE" >> "$GITHUB_ENV"
 
-      - name: Inject bounded session into protected UI runner
+      - name: Resolve protected UI runner configuration
         shell: bash
         env:
           UDID: ${{ steps.sim.outputs.udid }}
@@ -130,81 +130,21 @@ jobs:
           xctestrun="$(find "$RUNNER_TEMP/FabushiProtectedDerivedData/Build/Products" -name '*.xctestrun' -type f -print -quit)"
           test -n "$xctestrun"
           test -f "$xctestrun"
-          python3 - "$xctestrun" "$HOST_CI_SESSION" <<'PY'
-          import base64
+
+          api_base="$(python3 - <<'PY'
           import os
-          import plistlib
-          import sys
-
-          path = sys.argv[1]
-          session_path = sys.argv[2]
-          session = open(session_path, "rb").read()
-          if not session or len(session) > 64 * 1024:
-              raise SystemExit("Protected Fabushi CI session has an invalid size")
-          encoded_session = base64.b64encode(session).decode("ascii")
-
-          with open(path, "rb") as handle:
-              payload = plistlib.load(handle)
-
-          api_base = os.environ["FABUSHI_API_BASE_URL"].strip()
-          if not api_base.startswith("https://"):
-              raise SystemExit("Protected Fabushi API/model base must use HTTPS")
-
-          forwarded = {
-              "FABUSHI_CI_ACCOUNT_SESSION_BASE64": encoded_session,
-              "FABUSHI_CI_API_BASE_URL": api_base,
-              "FABUSHI_API_BASE_URL": api_base,
-              "MAHAYANA_API_BASE_URL": api_base,
-              "FABUSHI_RESPONSES_URL": api_base,
-              "FABUSHI_E2E_SOURCE_SHA": os.environ["SOURCE_SHA"],
-              "FABUSHI_DEVICE_NAME": "Fabushi Protected iOS Simulator",
-          }
-          for key in (
-              "GITHUB_ACTIONS",
-              "GITHUB_REPOSITORY",
-              "GITHUB_WORKFLOW",
-              "GITHUB_JOB",
-              "GITHUB_RUN_ID",
-              "GITHUB_RUN_ATTEMPT",
-              "RUNNER_NAME",
-              "RUNNER_OS",
-              "RUNNER_ARCH",
-          ):
-              value = os.environ.get(key)
-              if value:
-                  forwarded[key] = value
-
-          patched = 0
-
-          def visit(value):
-              global patched
-              if isinstance(value, dict):
-                  marker = " ".join(
-                      str(value.get(key, ""))
-                      for key in ("BlueprintName", "TestBundlePath", "TestHostBundleIdentifier")
-                  )
-                  if "FabushiUITests" in marker:
-                      environment = value.setdefault("EnvironmentVariables", {})
-                      environment.update(forwarded)
-                      testing_environment = value.setdefault("TestingEnvironmentVariables", {})
-                      testing_environment.update(forwarded)
-                      patched += 1
-                  for child in value.values():
-                      visit(child)
-              elif isinstance(value, list):
-                  for child in value:
-                      visit(child)
-
-          visit(payload)
-          if patched == 0:
-              raise SystemExit("FabushiUITests xctestrun target was not found")
-
-          with open(path, "wb") as handle:
-              plistlib.dump(payload, handle)
-          print(f"Injected protected-session runner context into {patched} xctestrun target(s).")
+          print(os.environ["FABUSHI_API_BASE_URL"].strip(), end="")
           PY
-          echo "PROTECTED_XCTESTRUN=$xctestrun" >> "$GITHUB_ENV"
+          )"
+          case "$api_base" in
+            https://*) ;;
+            *)
+              echo "Protected Fabushi API/model base must use HTTPS" >&2
+              exit 2
+              ;;
+          esac
 
+          echo "PROTECTED_XCTESTRUN=$xctestrun" >> "$GITHUB_ENV"
           xcrun simctl io "$UDID" screenshot "$EVIDENCE_DIR/screenshots/010-session-ready.png"
 
       - name: Run real protected-session Global Dharma journey
@@ -218,6 +158,51 @@ jobs:
           rm -rf "$EVIDENCE_DIR/FabushiProtectedSession.xcresult"
           set -o pipefail
           test -f "$PROTECTED_XCTESTRUN"
+          test -s "$HOST_CI_SESSION"
+
+          api_base="$(python3 - <<'PY'
+          import os
+          print(os.environ["FABUSHI_API_BASE_URL"].strip(), end="")
+          PY
+          )"
+          case "$api_base" in
+            https://*) ;;
+            *)
+              echo "Protected Fabushi API/model base must use HTTPS" >&2
+              exit 2
+              ;;
+          esac
+
+          session_b64="$(python3 - "$HOST_CI_SESSION" <<'PY'
+          import base64
+          import pathlib
+          import sys
+
+          payload = pathlib.Path(sys.argv[1]).read_bytes()
+          if not payload or len(payload) > 64 * 1024:
+              raise SystemExit("Protected Fabushi CI session has an invalid size")
+          sys.stdout.write(base64.b64encode(payload).decode("ascii"))
+          PY
+          )"
+
+          # xcodebuild only forwards custom process environment into its test
+          # runner when the variables use the TEST_RUNNER_ prefix. XCTest sees
+          # these under their original names, keeping the protected endpoint and
+          # bounded session out of app defaults and source.
+          export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
+          export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$api_base"
+          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="$FABUSHI_E2E_SOURCE_SHA"
+          export TEST_RUNNER_FABUSHI_DEVICE_NAME="$FABUSHI_DEVICE_NAME"
+          for key in \
+            GITHUB_ACTIONS GITHUB_REPOSITORY GITHUB_WORKFLOW GITHUB_JOB \
+            GITHUB_RUN_ID GITHUB_RUN_ATTEMPT RUNNER_NAME RUNNER_OS RUNNER_ARCH
+          do
+            value="${!key:-}"
+            if [ -n "$value" ]; then
+              export "TEST_RUNNER_${key}=$value"
+            fi
+          done
+
           xcodebuild test-without-building \
             -xctestrun "$PROTECTED_XCTESTRUN" \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
