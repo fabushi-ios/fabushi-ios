@@ -14,7 +14,7 @@ The direct migration source and product/architecture authority for this work is:
 - source repository: `bhrumom/fabushi-desktop`
 - source pull request: `#20`
 - source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `0d6e4095f18ec7662e169ecaec98d95e43bcdfec`
+- pinned source commit for this baseline: `da503ef7af80501b1c7bbf5dd22ee727155edf54`
 - source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
 
 The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
@@ -35,7 +35,15 @@ Fabushi iOS PR #3
 
 If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
 
-### 1.0 Current exact-HEAD authority: 2026-10-04 / `0d6e4095f18ec7662e169ecaec98d95e43bcdfec`
+### 1.0 Current exact-HEAD authority: 2026-10-04 / `da503ef7af80501b1c7bbf5dd22ee727155edf54`
+
+Desktop PR #20 advanced one commit from `0d6e4095f18ec7662e169ecaec98d95e43bcdfec` to `da503ef7af80501b1c7bbf5dd22ee727155edf54`. The exact compare is one commit ahead and changes only `desktop/e2e/openbot-packaged-acceptance.spec.ts`. No file under the selected `frontend/** + source/**` production inventory changed, so the authoritative production inventory remains exactly 7,943 paths and its existing per-path blob identities remain valid. The top-level manifest/ledger authority and strict checker are nevertheless rebound to the new PR HEAD so old-head acceptance cannot be mistaken for current-head parity.
+
+The upstream delta changes the signed packaged acceptance surface rather than shipping production ownership. Desktop acceptance now drives the canonical Grok-shaped renderer through visible Agent roster, Prompt/Send controls, Coordinator-backed Agent creation/rename, canonical conversation transcript entries with `data-entry-id`, visible accepted/output/text/completed/failed lifecycle projection, and the read-only Agent network reference. The old acceptance harness paths that directly invoked the Mahayana bridge for bot creation/list, direct handoff/broadcast, background-event capture, or legacy `data-testid` transcript semantics are no longer authoritative acceptance behavior.
+
+For iOS this is an acceptance-semantics responsibility, not an Electron-selector port. Native iOS must continue to prove that user-visible Agent roster, conversation isolation, running/terminal lifecycle, cancellation/recovery, and product journeys are projected from the canonical Coordinator/Host/Runtime ownership chain rather than a test-only bypass. Because this Desktop commit changes no production source under the selected inventory, it does not by itself promote or demote any production ledger row. Existing iOS implementation statuses remain subject to fresh same-iOS-HEAD ordinary and protected Actions under this new Desktop authority.
+
+### 1.0a Historical exact-HEAD authority: 2026-10-04 / `0d6e4095f18ec7662e169ecaec98d95e43bcdfec`
 
 Desktop PR #20 advanced six commits from `ea6da4779f508679549599d15121c74fe384ad96` to `0d6e4095f18ec7662e169ecaec98d95e43bcdfec`. The selected `frontend/** + source/**` inventory remains exactly 7,943 paths; six existing source-bearing blobs changed, so acceptance bound to their older blob identities is historical only.
 
@@ -45,7 +53,7 @@ Desktop POWER-005 also narrows renderer-scoped event delivery at the shipping pr
 
 The current protected iOS journey independently exposed a startup failure where the shipping Rust Host correctly rejected a non-HTTPS remote model endpoint. Acceptance wiring now derives `FABUSHI_RESPONSES_URL`, `FABUSHI_API_BASE_URL`, and `MAHAYANA_API_BASE_URL` from the same validated HTTPS first-party API base before XCTest launches the app. The Rust HTTPS guard remains unchanged and fail-closed.
 
-### 1.0a Historical exact-HEAD rebaseline: 2026-10-04 / `ea6da4779f508679549599d15121c74fe384ad96`
+### 1.0b Historical exact-HEAD rebaseline: 2026-10-04 / `ea6da4779f508679549599d15121c74fe384ad96`
 
 At that historical rebaseline, the live Desktop PR #20 authority was `ea6da4779f508679549599d15121c74fe384ad96`. Relative to the previously machine-pinned `8556281e5eb20aeb6dba781bd5ecf8c623206d6e`, Desktop advanced 26 commits. The selected `frontend/** + source/**` inventory grows from 7,938 to 7,943 paths because five shipping Fabushi product-account sources were added under `source/product/fabushi/**`; all other selected changes are modifications of existing rows.
 
