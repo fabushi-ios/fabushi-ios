@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "8556281e5eb20aeb6dba781bd5ecf8c623206d6e",
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
   "group": "source-electron-main",
   "rowCount": 195,
   "rows": [
@@ -1221,7 +1221,7 @@
     },
     {
       "desktop_path": "source/electron-main/entry.ts",
-      "desktop_blob_sha": "7520849efc3251cc9dd0f431600f24e1c9f4c7f1",
+      "desktop_blob_sha": "63440a95726659b65b4cbfab227983b7b334821a",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "pending-review",
