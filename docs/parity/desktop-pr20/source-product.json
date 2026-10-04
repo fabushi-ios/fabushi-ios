@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "group": "source-product",
+  "rowCount": 5,
+  "rows": [
+    {
+      "desktop_path": "source/product/fabushi/entry.ts",
+      "desktop_blob_sha": "62ec343f968963c111cff33a209774567b40a0e2",
+      "desktop_responsibility": "Expose the Fabushi product compatibility entry while preserving the canonical product-specific account and inference composition as the shipping owner rather than creating a parallel runtime.",
+      "desktop_owner": "product/fabushi",
+      "desktop_visible_effect": "Fabushi shipping surfaces resolve through the canonical product account/runtime composition without a second product-specific runtime owner.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "Electron product-entry composition is adapted to the native iOS AppHost composition; product-specific policy remains inside the canonical Rust Host/Product owners.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "test_evidence": "exact-HEAD GitHub Actions pending",
+      "notes": "Revalidated against Desktop PR #20 ea6da477. No status is promoted to verified until the rebased iOS exact HEAD passes required CI."
+    },
+    {
+      "desktop_path": "source/product/fabushi/fabushi-account-adapters.ts",
+      "desktop_blob_sha": "cf305c8a2316d53e0ffb1c63ecfa8cee3c4a63a6",
+      "desktop_responsibility": "Bind the shipping Fabushi account owner into production startup, install the first-party Responses endpoint/product mode and private Host credential path, settle account state before Coordinator/Host startup, and prevent a parallel Cursor account owner.",
+      "desktop_owner": "product/fabushi/account",
+      "desktop_visible_effect": "A signed-in Fabushi account is the credential source used by the shipping Host/Responses inference chain from startup, while refresh credentials remain outside presentation code and no independent Cursor credential is seeded.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "The iOS native Host has no Electron environment adapter; AppHost directly configures the first-party Responses owner and composes the Rust Product client before runtime construction.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; exact-HEAD GitHub Actions pending",
+      "notes": "Production mode forces Fabushi inference ownership and derives model credentials from the Rust-owned product session. Revalidated against Desktop PR #20 ea6da477."
+    },
+    {
+      "desktop_path": "source/product/fabushi/fabushi-account-policy.ts",
+      "desktop_blob_sha": "75dc77e1aa1d6bd6729cd69a985fe428c6195dff",
+      "desktop_responsibility": "Validate Fabushi durable account sessions, bounded refresh-token-free GitHub Actions sessions, expiration/identity fields, and HTTPS-first API origin policy without credential/query smuggling.",
+      "desktop_owner": "product/fabushi/account-policy",
+      "desktop_visible_effect": "Only structurally valid account sessions are accepted; protected CI can use a bounded refreshless session, while durable user sessions require refresh credentials and first-party API origins fail closed.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "The TypeScript policy boundary is implemented inside the native Rust Product client and CI-session loader, preserving the same account/session trust boundary.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "test_evidence": ".github/scripts/prepare-ios-ci-session.test.mjs; exact-HEAD GitHub Actions pending",
+      "notes": "The Rust owner validates bounded CI session transport and keeps refresh credentials in Rust-owned storage. Revalidated against Desktop PR #20 ea6da477."
+    },
+    {
+      "desktop_path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
+      "desktop_blob_sha": "5024a86e37aef45c355196847024db6b58f0ed85",
+      "desktop_responsibility": "Contract-test bounded refresh-token-free CI session acceptance, durable refresh-token requirements, and trusted Fabushi API origin validation.",
+      "desktop_owner": "product/fabushi/account-contract",
+      "desktop_visible_effect": "Shipping account policy regressions that would admit unbounded CI credentials, refreshless durable sessions, or unsafe API origins are rejected by focused contracts.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "The corresponding iOS contract is split between Rust Product tests and the protected-session preparation self-tests used by GitHub Actions.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs; .github/scripts/prepare-ios-ci-session.mjs",
+      "test_evidence": ".github/scripts/prepare-ios-ci-session.test.mjs; exact-HEAD GitHub Actions pending",
+      "notes": "Mapped as a contract responsibility, not production UI. Revalidated against Desktop PR #20 ea6da477."
+    },
+    {
+      "desktop_path": "source/product/fabushi/fabushi-account-service.ts",
+      "desktop_blob_sha": "1b3b65e4c28b7156b11819c5e6a01b43c5aa714a",
+      "desktop_responsibility": "Own shipping Fabushi browser login, encrypted durable session persistence, identity verification, access-token refresh, logout/revocation, bounded CI session admission, and private Host access credential projection without exposing refresh credentials.",
+      "desktop_owner": "product/fabushi/account-service",
+      "desktop_visible_effect": "Users sign in through Fabushi, long-lived sessions refresh with stable identity, logout/account changes revoke stale model credentials, and model inference receives only the current account access credential.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-product/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "The native iOS product client owns browser/account session lifecycle and encrypted secrets; Host model inference resolves the current Rust-owned session token at request time instead of consuming an Electron credential file.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs; source/packages/mahayana-rs/mahayana-model/src/responses.rs",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-product/src/lib.rs; source/packages/mahayana-rs/mahayana-model/src/responses.rs; exact-HEAD GitHub Actions pending",
+      "notes": "Current inference credential resolver rereads the Product session for each inference so logout/account switching cannot retain a stale bearer. Revalidated against Desktop PR #20 ea6da477."
+    }
+  ]
+}
