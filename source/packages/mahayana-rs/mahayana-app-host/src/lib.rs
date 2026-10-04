@@ -1041,6 +1041,54 @@ fn feature_host_root(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join("feature-host")
 }
 
+fn effective_inference_provider(
+    feature_mode: AppHostFeatureMode,
+    configured_provider: &str,
+) -> String {
+    if feature_mode == AppHostFeatureMode::Production {
+        "fabushi".to_string()
+    } else {
+        configured_provider.to_string()
+    }
+}
+
+fn normalize_fabushi_responses_url(raw: &str) -> String {
+    let base = raw.trim().trim_end_matches('/');
+    if base.ends_with("/v1/ai/responses") {
+        base.to_string()
+    } else if base.ends_with("/v1/ai") {
+        format!("{base}/responses")
+    } else {
+        format!("{base}/v1/ai/responses")
+    }
+}
+
+fn configured_fabushi_responses_url() -> String {
+    if let Ok(value) = std::env::var("FABUSHI_RESPONSES_URL")
+        && !value.trim().is_empty()
+    {
+        return normalize_fabushi_responses_url(&value);
+    }
+    let api_base = std::env::var("FABUSHI_API_BASE_URL")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| {
+            std::env::var("MAHAYANA_API_BASE_URL")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+        })
+        .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+    normalize_fabushi_responses_url(&api_base)
+}
+
+fn configured_fabushi_model() -> String {
+    std::env::var("SAND_CODEX_MODEL")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "gpt-5.4".to_string())
+}
+
 fn create_feature_host(
     app_data_dir: &Path,
     feature_mode: AppHostFeatureMode,
@@ -1048,13 +1096,19 @@ fn create_feature_host(
 ) -> Result<FeatureHostController, AppHostError> {
     let root = feature_host_root(app_data_dir);
     std::fs::create_dir_all(&root).map_err(|error| AppHostError::Operation(error.to_string()))?;
-    let provider =
+    let configured_provider =
         std::env::var("MAHAYANA_INFERENCE_PROVIDER").unwrap_or_else(|_| "fabushi".into());
+    let provider = effective_inference_provider(feature_mode, &configured_provider);
     let mut runtime = RuntimeConfig {
         data_dir: Some(root.join("runtime")),
         ..RuntimeConfig::default()
     };
-    if provider == "openrouter" {
+    if provider == "fabushi" {
+        runtime.model.provider = ModelProviderMode::FirstPartyDacheng;
+        runtime.model.base_url = Some(configured_fabushi_responses_url());
+        runtime.model.model = configured_fabushi_model();
+        runtime.model.credential_key = Some("mahayana.account.session".into());
+    } else if provider == "openrouter" {
         runtime.model.provider = ModelProviderMode::UserConfiguredRemote;
         runtime.model.base_url = Some("https://openrouter.ai/api/v1".into());
         runtime.model.model =
@@ -1200,4 +1254,46 @@ pub fn dispatch_json(host: &AppHost, input: &str) -> String {
     serde_json::to_string(&response).unwrap_or_else(|error| {
         format!("{{\"ok\":false,\"error\":\"serialization failed: {error}\"}}")
     })
+}
+
+
+#[cfg(test)]
+mod fabushi_shipping_inference_tests {
+    use super::*;
+
+    #[test]
+    fn production_feature_host_forces_fabushi_inference_owner() {
+        assert_eq!(
+            effective_inference_provider(AppHostFeatureMode::Production, "openrouter"),
+            "fabushi"
+        );
+        assert_eq!(
+            effective_inference_provider(AppHostFeatureMode::Production, "claude-code"),
+            "fabushi"
+        );
+    }
+
+    #[test]
+    fn test_feature_host_keeps_explicit_provider_for_contract_coverage() {
+        assert_eq!(
+            effective_inference_provider(AppHostFeatureMode::Test, "openrouter"),
+            "openrouter"
+        );
+    }
+
+    #[test]
+    fn fabushi_responses_url_matches_desktop_shipping_contract() {
+        assert_eq!(
+            normalize_fabushi_responses_url("https://api.ombhrum.com"),
+            "https://api.ombhrum.com/v1/ai/responses"
+        );
+        assert_eq!(
+            normalize_fabushi_responses_url("https://api.ombhrum.com/v1/ai"),
+            "https://api.ombhrum.com/v1/ai/responses"
+        );
+        assert_eq!(
+            normalize_fabushi_responses_url("https://api.ombhrum.com/v1/ai/responses"),
+            "https://api.ombhrum.com/v1/ai/responses"
+        );
+    }
 }
