@@ -5,8 +5,10 @@ internal struct GrokMobileShell: View {
     @Bindable var messaging: MessagingModel
     let bridge: IOSPreloadBridge
     let appAgentSurface: FabushiAppAgentSurface
+    @Environment(\.openURL) var openExternalURL
 
     @State var query = ""
+    @State var paletteTab: MobileCommandPaletteTab = .all
     @State var searchOpen = false
     @State var composeOpen = false
     @State var createBotOpen = false
@@ -24,6 +26,7 @@ internal struct GrokMobileShell: View {
     @State var botDrafts: [String: String] = [:]
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
+    @State var legacyConversationID: String?
 
     @ViewBuilder
     var body: some View {
@@ -71,7 +74,10 @@ internal struct GrokMobileShell: View {
     private var legacyContent: some View {
         VStack(spacing: 0) {
             HStack {
-                Button { legacyOpen = false } label: {
+                Button {
+                    legacyConversationID = nil
+                    legacyOpen = false
+                } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 15, weight: .bold))
                         .frame(width: 36, height: 36)
@@ -84,7 +90,14 @@ internal struct GrokMobileShell: View {
             .padding(.vertical, 8)
             .background(.ultraThinMaterial)
 
-            ContentView(model: model, messaging: messaging, appAgentSurface: appAgentSurface)
+            ContentView(
+                model: model,
+                messaging: messaging,
+                appAgentSurface: appAgentSurface,
+                initialConversation: legacyConversationID.flatMap { id in
+                    messaging.conversations.first(where: { $0.id == id })
+                }
+            )
         }
     }
 
@@ -99,6 +112,8 @@ internal struct GrokMobileShell: View {
         var components: [String] = []
         components.append(query)
         components.append(String(searchOpen))
+        components.append(paletteTab.rawValue)
+        components.append(commandPaletteFingerprint)
         components.append(String(composeOpen))
         components.append(String(createBotOpen))
         components.append(botName)

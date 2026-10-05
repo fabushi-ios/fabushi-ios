@@ -77,12 +77,14 @@ struct ContentView: View {
         model: MarketplaceModel,
         messaging: MessagingModel,
         appAgentSurface: FabushiAppAgentSurface,
+        initialConversation: ConversationSummary? = nil,
         onShellBack: (() -> Void)? = nil
     ) {
         self.model = model
         self.messaging = messaging
         self.appAgentSurface = appAgentSurface
         self.onShellBack = onShellBack
+        _selectedConversation = State(initialValue: initialConversation)
     }
 
     @State var openedMiniApp: MarketplacePlugin?

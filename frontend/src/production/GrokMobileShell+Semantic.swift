@@ -111,11 +111,52 @@ extension GrokMobileShell {
             return
         }
 
+        if searchOpen {
+            add("grok-command-palette", role: "dialog", name: "Search")
+            add(
+                "grok-mobile-search-field",
+                role: "textbox",
+                name: "Search",
+                action: .init(allowed: ["setValue"]) { value in query = value ?? "" }
+            )
+            for tab in MobileCommandPaletteTab.allCases {
+                add(
+                    "grok-palette-tab-\(tab.rawValue)",
+                    role: "tab",
+                    name: tab.title,
+                    action: .init(allowed: ["invoke"]) { _ in paletteTab = tab }
+                )
+            }
+            if paletteTab == .routines {
+                add(
+                    "grok-palette-routines-unavailable",
+                    role: "status",
+                    name: "Routines unavailable until the canonical Host automation roster is exposed to iOS",
+                    enabled: false
+                )
+            }
+            for entry in commandPaletteEntries.prefix(100) {
+                add(
+                    "grok-palette-result-\(entry.accessibilityKey)",
+                    role: "button",
+                    name: entry.label,
+                    action: .init(allowed: ["invoke"]) { _ in activateCommandPaletteEntry(entry) }
+                )
+            }
+            add(
+                "grok-palette-close",
+                role: "button",
+                name: "Close search",
+                action: .init(allowed: ["invoke"]) { _ in closeCommandPalette() }
+            )
+            try? appAgentSurface.publish(screen: "grok-command-palette", elements: elements, actions: actions)
+            return
+        }
+
         add("grok-mobile-home", role: "application", name: "Fabushi")
         add("grok-mobile-legacy", role: "button", name: "打开完整消息工作台", action: .init(allowed: ["invoke"]) { _ in legacyOpen = true })
-        add("grok-mobile-search", role: "button", name: searchOpen ? "关闭搜索" : "打开搜索", action: .init(allowed: ["invoke"]) { _ in
-            searchOpen.toggle()
-            if !searchOpen { query = "" }
+        add("grok-mobile-search", role: "button", name: "打开搜索", action: .init(allowed: ["invoke"]) { _ in
+            toggleCommandPalette()
         })
         add("grok-mobile-search-field", role: "textbox", name: "搜索", action: .init(allowed: ["setValue"]) { value in
             searchOpen = true
@@ -154,7 +195,7 @@ extension GrokMobileShell {
                 "grok-conversation-\(conversation.id)",
                 role: "button",
                 name: conversation.title,
-                action: .init(allowed: ["invoke"]) { _ in legacyOpen = true }
+                action: .init(allowed: ["invoke"]) { _ in openLegacyConversation(conversation.id) }
             )
         }
         try? appAgentSurface.publish(screen: "grok-home", elements: elements, actions: actions)

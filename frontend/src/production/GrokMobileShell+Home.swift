@@ -17,10 +17,7 @@ extension GrokMobileShell {
                         }
                         .accessibilityIdentifier("grok-mobile-legacy")
                         Spacer()
-                        Button {
-                            searchOpen.toggle()
-                            if !searchOpen { query = "" }
-                        } label: { Image(systemName: "magnifyingglass") }
+                        Button { toggleCommandPalette() } label: { Image(systemName: "magnifyingglass") }
                             .accessibilityIdentifier("grok-mobile-search")
                         Button { composeOpen = true } label: { Image(systemName: "plus") }
                             .accessibilityIdentifier("grok-mobile-add")
@@ -41,10 +38,7 @@ extension GrokMobileShell {
                     .frame(maxWidth: .infinity).padding(.top, 38).padding(.bottom, 34)
 
                     if searchOpen {
-                        TextField("Search", text: $query)
-                            .textFieldStyle(.plain).padding(12).background(.white, in: RoundedRectangle(cornerRadius: 14))
-                            .padding(.horizontal, 16).padding(.bottom, 14)
-                            .accessibilityIdentifier("grok-mobile-search-field")
+                        commandPaletteContent
                     }
 
                     if let botActionError {
@@ -56,23 +50,25 @@ extension GrokMobileShell {
                             .accessibilityIdentifier("grok-mobile-bot-action-error")
                     }
 
-                    sectionTitle("Board")
-                    botRow(MobileBotSummary(id: "mahayana-assistant", name: "Mahayana", description: "Ready to help"), subtitle: "that's the only new one.", badge: "Board")
+                    if !searchOpen {
+                        sectionTitle("Board")
+                        botRow(MobileBotSummary(id: "mahayana-assistant", name: "Mahayana", description: "Ready to help"), subtitle: "that's the only new one.", badge: "Board")
 
-                    if !bots.isEmpty {
-                        sectionTitle("Bots  \(bots.count)")
-                        ForEach(filteredBots) { bot in botRow(bot, subtitle: bot.description.isEmpty ? "Ready" : bot.description, badge: bot.miniAppId == nil ? "Bot" : "Mini App Bot") }
-                    }
+                        if !bots.isEmpty {
+                            sectionTitle("Bots  \(bots.count)")
+                            ForEach(filteredBots) { bot in botRow(bot, subtitle: bot.description.isEmpty ? "Ready" : bot.description, badge: bot.miniAppId == nil ? "Bot" : "Mini App Bot") }
+                        }
 
-                    let projects = filteredConversations.filter { $0.kind == .group || $0.kind == .direct }
-                    if !projects.isEmpty {
-                        sectionTitle("Projects  \(projects.count)")
-                        ForEach(projects.prefix(8)) { conversation in conversationRow(conversation) }
-                    }
-                    let channels = filteredConversations.filter { $0.kind == .channel }
-                    if !channels.isEmpty {
-                        sectionTitle("Channels  \(channels.count)")
-                        ForEach(channels.prefix(8)) { conversation in conversationRow(conversation) }
+                        let projects = filteredConversations.filter { $0.kind == .group || $0.kind == .direct }
+                        if !projects.isEmpty {
+                            sectionTitle("Projects  \(projects.count)")
+                            ForEach(projects.prefix(8)) { conversation in conversationRow(conversation) }
+                        }
+                        let channels = filteredConversations.filter { $0.kind == .channel }
+                        if !channels.isEmpty {
+                            sectionTitle("Channels  \(channels.count)")
+                            ForEach(channels.prefix(8)) { conversation in conversationRow(conversation) }
+                        }
                     }
                     Spacer(minLength: 40)
                 }
@@ -168,7 +164,7 @@ extension GrokMobileShell {
     }
 
     func conversationRow(_ conversation: ConversationSummary) -> some View {
-        Button { legacyOpen = true } label: {
+        Button { openLegacyConversation(conversation.id) } label: {
             HStack(spacing: 12) {
                 ClothGhostAvatar(botId: "conversation:\(conversation.id)", size: 45, badge: conversation.unreadCount > 0 ? .blue : nil)
                 VStack(alignment: .leading, spacing: 3) {
