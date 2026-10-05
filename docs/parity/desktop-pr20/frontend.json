@@ -86,13 +86,13 @@
       "desktop_owner": "renderer / MCP App contract types",
       "desktop_visible_effect": "Bridge and WebMCP callers share one validated contract vocabulary for tool metadata, request identity, structured content, errors, and read-only/destructive hints.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
+      "ios_target_path": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Swift value types/dictionaries and MiniAppToolContract replace TypeScript structural types. Canonical MCP tools are projected fail-closed from annotations into none/required/destructive approval semantics.",
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "The native contract preserves the product semantics without copying TypeScript compile-time types."
+      "notes": "The native contract preserves the product semantics without copying TypeScript compile-time types. MiniAppWebMcpSurface.swift is the single canonical ledger target; MarketplaceModel.swift remains supporting production evidence."
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/webmcp.ts",
