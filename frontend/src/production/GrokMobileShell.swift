@@ -25,49 +25,74 @@ internal struct GrokMobileShell: View {
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
 
+    @ViewBuilder
     var body: some View {
         if model.onboardingStep < 3 || !model.authResolved || !model.loggedIn {
-            ContentView(model: model, messaging: messaging, appAgentSurface: appAgentSurface)
+            unauthenticatedContent
         } else if let selectedBot {
-            MobileBotChat(
-                bot: selectedBot,
-                bridge: bridge,
-                model: model,
-                appAgentSurface: appAgentSurface,
-                onClose: { self.selectedBot = nil },
-                draft: Binding(
-                    get: { botDrafts[selectedBot.id] ?? "" },
-                    set: { botDrafts[selectedBot.id] = $0 }
-                ),
-                entries: Binding(
-                    get: { botTranscripts[selectedBot.id] ?? [] },
-                    set: { botTranscripts[selectedBot.id] = $0 }
-                )
-            )
+            selectedBotContent(selectedBot)
         } else if legacyOpen {
-            VStack(spacing: 0) {
-                HStack {
-                    Button { legacyOpen = false } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 15, weight: .bold))
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .accessibilityIdentifier("grok-mobile-back")
-                    Spacer()
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-
-                ContentView(model: model, messaging: messaging, appAgentSurface: appAgentSurface)
-            }
+            legacyContent
         } else {
-            home
-                .task { await loadBots() }
-                .task { await messaging.refresh() }
-                .task(id: appAgentSurfaceFingerprint) { publishAppAgentSurface() }
+            homeContent
         }
+    }
+
+    private var unauthenticatedContent: some View {
+        ContentView(model: model, messaging: messaging, appAgentSurface: appAgentSurface)
+    }
+
+    private func selectedBotContent(_ bot: MobileBotSummary) -> some View {
+        MobileBotChat(
+            bot: bot,
+            bridge: bridge,
+            model: model,
+            appAgentSurface: appAgentSurface,
+            onClose: { self.selectedBot = nil },
+            draft: botDraftBinding(for: bot.id),
+            entries: botTranscriptBinding(for: bot.id)
+        )
+    }
+
+    private func botDraftBinding(for botID: String) -> Binding<String> {
+        Binding(
+            get: { botDrafts[botID] ?? "" },
+            set: { botDrafts[botID] = $0 }
+        )
+    }
+
+    private func botTranscriptBinding(for botID: String) -> Binding<[MobileChatMessage]> {
+        Binding(
+            get: { botTranscripts[botID] ?? [] },
+            set: { botTranscripts[botID] = $0 }
+        )
+    }
+
+    private var legacyContent: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button { legacyOpen = false } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 15, weight: .bold))
+                        .frame(width: 36, height: 36)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityIdentifier("grok-mobile-back")
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+
+            ContentView(model: model, messaging: messaging, appAgentSurface: appAgentSurface)
+        }
+    }
+
+    private var homeContent: some View {
+        home
+            .task { await loadBots() }
+            .task { await messaging.refresh() }
+            .task(id: appAgentSurfaceFingerprint) { publishAppAgentSurface() }
     }
 
     var appAgentSurfaceFingerprint: String {
