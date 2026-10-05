@@ -238,14 +238,44 @@ final class MarketplaceModel {
         return bridged
     }
 
-    private static func globalDharmaScope(for user: [String: Any]) -> String? {
-        guard let raw = ((user["id"] as? String)
-            ?? (user["email"] as? String)
-            ?? (user["username"] as? String))?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-            !raw.isEmpty
-        else { return nil }
-        return Data(raw.lowercased().utf8)
+    private static let canonicalAccountIdentityKeys = [
+        "principalId",
+        "principal_id",
+        "id",
+        "userId",
+        "user_id",
+        "userNo",
+        "user_no",
+        "username",
+    ]
+
+    private static func stableGlobalDharmaAccountIdentity(in auth: [String: Any]) -> String? {
+        if let user = auth["user"] as? [String: Any],
+           let identity = stableGlobalDharmaIdentityComponent(in: user) {
+            return identity
+        }
+        return stableGlobalDharmaIdentityComponent(in: auth)
+    }
+
+    private static func stableGlobalDharmaIdentityComponent(in object: [String: Any]) -> String? {
+        for key in canonicalAccountIdentityKeys {
+            guard let raw = object[key] else { continue }
+            if let value = raw as? String {
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return trimmed }
+                continue
+            }
+            if let number = raw as? NSNumber,
+               CFGetTypeID(number) != CFBooleanGetTypeID() {
+                return number.stringValue
+            }
+        }
+        return nil
+    }
+
+    private static func globalDharmaScope(for auth: [String: Any]) -> String? {
+        guard let raw = stableGlobalDharmaAccountIdentity(in: auth) else { return nil }
+        return Data(raw.utf8)
             .base64EncodedString()
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "+", with: "-")
@@ -311,21 +341,28 @@ final class MarketplaceModel {
     }
 
     private func applyAuth(_ object: [String: Any]?, defaultLoggedIn: Bool = false) {
-        loggedIn = object?["loggedIn"] as? Bool ?? defaultLoggedIn
+        let auth = (object?["auth"] as? [String: Any]) ?? object
+        loggedIn = auth?["loggedIn"] as? Bool ?? defaultLoggedIn
         if !loggedIn {
             accountUsage = nil
             accountUsageError = nil
+        }
+
+        if loggedIn, let auth, let scope = Self.globalDharmaScope(for: auth) {
+            globalDharmaAccountScope = scope
+            globalDharmaExecution = Self.loadGlobalDharmaExecution(scope: scope)
+        } else {
+            // Account-scoped Mini App state must fail closed whenever the Host
+            // cannot supply the same stable account identity used by the
+            // Coordinator. Never retain a previous account's runtime.
             globalDharmaAccountScope = nil
             globalDharmaExecution = nil
         }
-        guard let user = object?["user"] as? [String: Any] else {
+
+        guard let user = auth?["user"] as? [String: Any] else {
             accountName = "Fabushi"
             accountEmail = ""
             return
-        }
-        if loggedIn, let scope = Self.globalDharmaScope(for: user) {
-            globalDharmaAccountScope = scope
-            globalDharmaExecution = Self.loadGlobalDharmaExecution(scope: scope)
         }
         accountName = (user["nickname"] as? String)
             ?? (user["username"] as? String)
