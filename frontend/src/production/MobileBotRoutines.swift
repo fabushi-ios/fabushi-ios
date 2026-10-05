@@ -545,20 +545,8 @@ internal struct MobileBotRoutineCustomScheduleBlurResult: Equatable {
 }
 
 internal enum MobileBotRoutineSchedule {
-    private static let aliases: [String: String] = [
-        "@hourly": "0 * * * *",
-        "@daily": "0 0 * * *",
-        "@midnight": "0 0 * * *",
-        "@weekly": "0 0 * * 0",
-        "@monthly": "0 0 1 * *",
-        "@yearly": "0 0 1 1 *",
-        "@annually": "0 0 1 1 *",
-    ]
-
     static func normalize(_ value: String) -> String {
-        value
-            .split(whereSeparator: { $0.isWhitespace })
-            .joined(separator: " ")
+        normalizeSchedule(value)
     }
 
     static func pickerOptions(days: String = "*") -> [MobileBotRoutineSchedulePickerOption] {
@@ -575,7 +563,7 @@ internal enum MobileBotRoutineSchedule {
     }
 
     static func resolveCustomBlur(_ value: String) -> MobileBotRoutineCustomScheduleBlurResult {
-        let schedule = normalize(value)
+        let schedule = normalizeSchedule(value)
         if schedule.isEmpty {
             return .init(schedule: schedule, isInvalid: false, shouldCommit: false)
         }
@@ -586,73 +574,12 @@ internal enum MobileBotRoutineSchedule {
     }
 
     static func isValid(_ value: String) -> Bool {
-        let normalized = normalize(value)
+        let normalized = normalizeSchedule(value)
         guard !normalized.isEmpty else { return false }
-
-        if normalized.lowercased().hasPrefix("@every ") {
-            let pieces = normalized.split(separator: " ")
-            guard pieces.count == 2 else { return false }
-            let token = String(pieces[1])
-            guard let suffix = token.last, ["s", "m", "h", "d"].contains(String(suffix).lowercased()) else {
-                return false
-            }
-            return Int(token.dropLast()).map { $0 > 0 } ?? false
+        if normalized.lowercased().hasPrefix("@every") {
+            return parseEveryIntervalMs(normalized) != nil
         }
-
-        var cron = normalized
-        if cron.hasPrefix("CRON_TZ=") || cron.hasPrefix("TZ=") {
-            guard let space = cron.firstIndex(of: " ") else { return false }
-            let prefix = String(cron[..<space])
-            guard let equal = prefix.firstIndex(of: "=") else { return false }
-            let zone = String(prefix[prefix.index(after: equal)...])
-            guard !zone.isEmpty, TimeZone(identifier: zone) != nil else { return false }
-            cron = String(cron[cron.index(after: space)...])
-        }
-
-        cron = aliases[cron.lowercased()] ?? cron
-        let fields = cron.split(separator: " ", omittingEmptySubsequences: true)
-        guard fields.count == 5 else { return false }
-
-        return expandField(String(fields[0]), minimum: 0, maximum: 59) != nil
-            && expandField(String(fields[1]), minimum: 0, maximum: 23) != nil
-            && expandField(String(fields[2]), minimum: 1, maximum: 31) != nil
-            && expandField(String(fields[3]), minimum: 1, maximum: 12) != nil
-            && expandField(String(fields[4]), minimum: 0, maximum: 7) != nil
-    }
-
-    private static func expandField(_ value: String, minimum: Int, maximum: Int) -> Set<Int>? {
-        var result = Set<Int>()
-        for segment in value.split(separator: ",", omittingEmptySubsequences: false) {
-            let parts = segment.split(separator: "/", omittingEmptySubsequences: false)
-            guard parts.count <= 2 else { return nil }
-            let base = String(parts[0])
-            let step = parts.count == 2 ? Int(parts[1]) : 1
-            guard let step, step > 0 else { return nil }
-
-            let start: Int
-            let end: Int
-            if base == "*" || base.isEmpty {
-                start = minimum
-                end = maximum
-            } else if base.contains("-") {
-                let range = base.split(separator: "-", omittingEmptySubsequences: false)
-                guard range.count == 2, let first = Int(range[0]), let last = Int(range[1]) else {
-                    return nil
-                }
-                start = first
-                end = last
-            } else {
-                guard let first = Int(base) else { return nil }
-                start = first
-                end = parts.count == 2 ? maximum : first
-            }
-
-            guard start >= minimum, end <= maximum, start <= end else { return nil }
-            for item in stride(from: start, through: end, by: step) {
-                result.insert(item)
-            }
-        }
-        return result.isEmpty ? nil : result
+        return compileCronMatcher(normalized) != nil
     }
 }
 
