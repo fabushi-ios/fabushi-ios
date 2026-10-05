@@ -1,5 +1,10 @@
 import SwiftUI
 
+internal func committedMobileBotName(initialValue: String, draftValue: String) -> String? {
+    let trimmed = draftValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty || trimmed == initialValue ? nil : trimmed
+}
+
 extension GrokMobileShell {
     @MainActor
     func loadBots() async {
@@ -27,6 +32,91 @@ extension GrokMobileShell {
             await messaging.refresh()
         } catch {
             botError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func beginBotRename(_ bot: MobileBotSummary) {
+        guard bot.miniAppId == nil, !botActionBusy else { return }
+        botActionError = nil
+        botRenameDraft = bot.name
+        botRenameTarget = bot
+    }
+
+    @MainActor
+    func commitBotRename() async {
+        guard let bot = botRenameTarget,
+              let name = committedMobileBotName(
+                initialValue: bot.name,
+                draftValue: botRenameDraft
+              ),
+              !botActionBusy
+        else {
+            if botRenameTarget != nil,
+               committedMobileBotName(
+                   initialValue: botRenameTarget?.name ?? "",
+                   draftValue: botRenameDraft
+               ) == nil
+            {
+                botRenameTarget = nil
+                botRenameDraft = ""
+                botActionError = nil
+            }
+            return
+        }
+
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+
+        do {
+            bots = try await GrokMobileBotService(bridge: bridge).renameBot(
+                id: bot.id,
+                name: name
+            )
+            botRenameTarget = nil
+            botRenameDraft = ""
+            await messaging.refresh()
+        } catch {
+            botActionError = "重命名 Bot 失败：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    func duplicateBot(_ bot: MobileBotSummary) async {
+        guard bot.miniAppId == nil, !botActionBusy else { return }
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+
+        do {
+            bots = try await GrokMobileBotService(bridge: bridge).duplicateBot(id: bot.id)
+            await messaging.refresh()
+        } catch {
+            botActionError = "复制 Bot 失败：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    func requestBotDelete(_ bot: MobileBotSummary) {
+        guard bot.miniAppId == nil, !botActionBusy else { return }
+        botActionError = nil
+        botDeleteTarget = bot
+    }
+
+    @MainActor
+    func deleteBot(_ bot: MobileBotSummary) async {
+        guard bot.miniAppId == nil, !botActionBusy else { return }
+        botDeleteTarget = nil
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+
+        do {
+            bots = try await GrokMobileBotService(bridge: bridge).deleteBot(id: bot.id)
+            await messaging.refresh()
+        } catch {
+            botActionError = "删除 Bot 失败：\(error.localizedDescription)"
         }
     }
 }
