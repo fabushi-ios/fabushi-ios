@@ -529,6 +529,133 @@ internal struct MobileBotRoutine: Identifiable, Equatable {
     let nextRunAtMs: Int64?
 }
 
+internal let mobileBotRoutineScheduleIntervalMinutes = 15
+
+internal struct MobileBotRoutineSchedulePickerOption: Identifiable, Equatable {
+    let label: String
+    let schedule: String
+
+    var id: String { schedule }
+}
+
+internal struct MobileBotRoutineCustomScheduleBlurResult: Equatable {
+    let schedule: String
+    let isInvalid: Bool
+    let shouldCommit: Bool
+}
+
+internal enum MobileBotRoutineSchedule {
+    private static let aliases: [String: String] = [
+        "@hourly": "0 * * * *",
+        "@daily": "0 0 * * *",
+        "@midnight": "0 0 * * *",
+        "@weekly": "0 0 * * 0",
+        "@monthly": "0 0 1 * *",
+        "@yearly": "0 0 1 1 *",
+        "@annually": "0 0 1 1 *",
+    ]
+
+    static func normalize(_ value: String) -> String {
+        value
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+    }
+
+    static func pickerOptions(days: String = "*") -> [MobileBotRoutineSchedulePickerOption] {
+        stride(from: 0, to: 24 * 60, by: mobileBotRoutineScheduleIntervalMinutes).map { totalMinutes in
+            let hour = totalMinutes / 60
+            let minute = totalMinutes % 60
+            let hour12 = hour % 12 == 0 ? 12 : hour % 12
+            let suffix = hour < 12 ? "AM" : "PM"
+            return MobileBotRoutineSchedulePickerOption(
+                label: String(format: "%d:%02d %@", hour12, minute, suffix),
+                schedule: "\(minute) \(hour) * * \(days)"
+            )
+        }
+    }
+
+    static func resolveCustomBlur(_ value: String) -> MobileBotRoutineCustomScheduleBlurResult {
+        let schedule = normalize(value)
+        if schedule.isEmpty {
+            return .init(schedule: schedule, isInvalid: false, shouldCommit: false)
+        }
+        guard isValid(schedule) else {
+            return .init(schedule: schedule, isInvalid: true, shouldCommit: false)
+        }
+        return .init(schedule: schedule, isInvalid: false, shouldCommit: true)
+    }
+
+    static func isValid(_ value: String) -> Bool {
+        let normalized = normalize(value)
+        guard !normalized.isEmpty else { return false }
+
+        if normalized.lowercased().hasPrefix("@every ") {
+            let pieces = normalized.split(separator: " ")
+            guard pieces.count == 2 else { return false }
+            let token = String(pieces[1])
+            guard let suffix = token.last, ["s", "m", "h", "d"].contains(String(suffix).lowercased()) else {
+                return false
+            }
+            return Int(token.dropLast()).map { $0 > 0 } ?? false
+        }
+
+        var cron = normalized
+        if cron.hasPrefix("CRON_TZ=") || cron.hasPrefix("TZ=") {
+            guard let space = cron.firstIndex(of: " ") else { return false }
+            let prefix = String(cron[..<space])
+            guard let equal = prefix.firstIndex(of: "=") else { return false }
+            let zone = String(prefix[prefix.index(after: equal)...])
+            guard !zone.isEmpty, TimeZone(identifier: zone) != nil else { return false }
+            cron = String(cron[cron.index(after: space)...])
+        }
+
+        cron = aliases[cron.lowercased()] ?? cron
+        let fields = cron.split(separator: " ", omittingEmptySubsequences: true)
+        guard fields.count == 5 else { return false }
+
+        return expandField(String(fields[0]), minimum: 0, maximum: 59) != nil
+            && expandField(String(fields[1]), minimum: 0, maximum: 23) != nil
+            && expandField(String(fields[2]), minimum: 1, maximum: 31) != nil
+            && expandField(String(fields[3]), minimum: 1, maximum: 12) != nil
+            && expandField(String(fields[4]), minimum: 0, maximum: 7) != nil
+    }
+
+    private static func expandField(_ value: String, minimum: Int, maximum: Int) -> Set<Int>? {
+        var result = Set<Int>()
+        for segment in value.split(separator: ",", omittingEmptySubsequences: false) {
+            let parts = segment.split(separator: "/", omittingEmptySubsequences: false)
+            guard parts.count <= 2 else { return nil }
+            let base = String(parts[0])
+            let step = parts.count == 2 ? Int(parts[1]) : 1
+            guard let step, step > 0 else { return nil }
+
+            let start: Int
+            let end: Int
+            if base == "*" || base.isEmpty {
+                start = minimum
+                end = maximum
+            } else if base.contains("-") {
+                let range = base.split(separator: "-", omittingEmptySubsequences: false)
+                guard range.count == 2, let first = Int(range[0]), let last = Int(range[1]) else {
+                    return nil
+                }
+                start = first
+                end = last
+            } else {
+                guard let first = Int(base) else { return nil }
+                start = first
+                end = parts.count == 2 ? maximum : first
+            }
+
+            guard start >= minimum, end <= maximum, start <= end else { return nil }
+            for item in stride(from: start, through: end, by: step) {
+                result.insert(item)
+            }
+        }
+        return result.isEmpty ? nil : result
+    }
+}
+
 internal struct MobileBotRoutineSpec: Equatable {
     let name: String
     let prompt: String
