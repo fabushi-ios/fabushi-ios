@@ -22,6 +22,67 @@ extension GrokMobileShell {
             if let action { actions[normalizedId] = action }
         }
 
+        if let bot = botRenameTarget {
+            add("grok-rename-bot", role: "dialog", name: "重命名 \(bot.name)")
+            add(
+                "rename-bot-name",
+                role: "textbox",
+                name: "Bot 名称",
+                action: .init(allowed: ["setValue"]) { value in botRenameDraft = value ?? "" }
+            )
+            add(
+                "rename-bot-submit",
+                role: "button",
+                name: botActionBusy ? "正在保存 Bot 名称" : "保存 Bot 名称",
+                enabled: !botActionBusy
+                    && committedMobileBotName(
+                        initialValue: bot.name,
+                        draftValue: botRenameDraft
+                    ) != nil,
+                action: .init(allowed: ["invoke"]) { _ in
+                    Task { await commitBotRename() }
+                }
+            )
+            add(
+                "rename-bot-cancel",
+                role: "button",
+                name: "取消重命名 Bot",
+                enabled: !botActionBusy,
+                action: .init(allowed: ["invoke"]) { _ in
+                    botRenameTarget = nil
+                    botRenameDraft = ""
+                    botActionError = nil
+                }
+            )
+            if botActionError != nil {
+                add("rename-bot-error", role: "status", name: "Bot 重命名失败")
+            }
+            try? appAgentSurface.publish(screen: "grok-rename-bot", elements: elements, actions: actions)
+            return
+        }
+
+        if let bot = botDeleteTarget {
+            add("grok-delete-bot", role: "alertdialog", name: "删除 \(bot.name)")
+            add(
+                "delete-bot-cancel",
+                role: "button",
+                name: "取消删除 Bot",
+                enabled: !botActionBusy,
+                action: .init(allowed: ["invoke"]) { _ in botDeleteTarget = nil }
+            )
+            add(
+                "delete-bot-confirm",
+                role: "button",
+                name: "永久删除 \(bot.name)",
+                enabled: !botActionBusy,
+                action: .init(allowed: ["invoke"]) { _ in
+                    Task { await deleteBot(bot) }
+                }
+            )
+            try? appAgentSurface.publish(screen: "grok-delete-bot", elements: elements, actions: actions)
+            return
+        }
+
         if createBotOpen {
             add("grok-create-bot", role: "dialog", name: "新建 Bot")
             add("new-bot-name", role: "textbox", name: "Bot 名称", action: .init(allowed: ["setValue"]) { value in botName = value ?? "" })
@@ -64,6 +125,29 @@ extension GrokMobileShell {
         add("grok-bot-mahayana-assistant", role: "button", name: "Mahayana", action: .init(allowed: ["invoke"]) { _ in selectedBot = MobileBotSummary(id: "mahayana-assistant", name: "Mahayana", description: "Ready to help") })
         for bot in filteredBots.prefix(100) {
             add("grok-bot-\(bot.id)", role: "button", name: bot.name, action: .init(allowed: ["invoke"]) { _ in selectedBot = bot })
+            if bot.miniAppId == nil {
+                add(
+                    "grok-bot-rename-\(bot.id)",
+                    role: "button",
+                    name: "重命名 \(bot.name)",
+                    enabled: !botActionBusy,
+                    action: .init(allowed: ["invoke"]) { _ in beginBotRename(bot) }
+                )
+                add(
+                    "grok-bot-duplicate-\(bot.id)",
+                    role: "button",
+                    name: "复制 \(bot.name)",
+                    enabled: !botActionBusy,
+                    action: .init(allowed: ["invoke"]) { _ in Task { await duplicateBot(bot) } }
+                )
+                add(
+                    "grok-bot-delete-\(bot.id)",
+                    role: "button",
+                    name: "删除 \(bot.name)",
+                    enabled: !botActionBusy,
+                    action: .init(allowed: ["invoke"]) { _ in requestBotDelete(bot) }
+                )
+            }
         }
         for conversation in filteredConversations.prefix(100) {
             add(
