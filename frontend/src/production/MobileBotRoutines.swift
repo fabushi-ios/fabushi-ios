@@ -1270,6 +1270,8 @@ internal struct MobileBotRoutinesSection: View {
     let accountScopeKey: String
 
     @StateObject private var controller: MobileBotRoutinesController
+    @State private var showingEditor = false
+    @State private var editingRoutine: MobileBotRoutine?
 
     init(
         agentId: String,
@@ -1312,6 +1314,39 @@ internal struct MobileBotRoutinesSection: View {
                 }
             case .ready(let value):
                 routines(value)
+            }
+
+            Button("添加自动化") {
+                editingRoutine = nil
+                showingEditor = true
+            }
+            .disabled(controller.createPending)
+
+            if let error = controller.mutationError(for: "create") {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .sheet(isPresented: $showingEditor) {
+            MobileBotRoutineEditorSheet(initial: editingRoutine) { spec in
+                Task {
+                    do {
+                        if let editingRoutine {
+                            try await controller.update(
+                                agentId: agentId,
+                                automationId: editingRoutine.id,
+                                spec: spec
+                            )
+                        } else {
+                            _ = try await controller.create(agentId: agentId, spec: spec)
+                        }
+                        showingEditor = false
+                        self.editingRoutine = nil
+                    } catch {
+                        // Controller retains the scoped mutation error for the shipping section.
+                    }
+                }
             }
         }
         .task(id: "\(accountScopeKey)|\(agentId)") {
@@ -1377,6 +1412,12 @@ internal struct MobileBotRoutinesSection: View {
                     }
                     .disabled(controller.runPending.contains(routine.id))
 
+                    Button("编辑") {
+                        editingRoutine = routine
+                        showingEditor = true
+                    }
+                    .disabled(controller.pending.contains(routine.id))
+
                     Button("删除", role: .destructive) {
                         Task {
                             try? await controller.remove(
@@ -1398,3 +1439,101 @@ internal struct MobileBotRoutinesSection: View {
         }
     }
 }
+
+@MainActor
+internal struct MobileBotRoutineEditorSheet: View {
+    let initial: MobileBotRoutine?
+    let onSave: (MobileBotRoutineSpec) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var prompt: String
+    @State private var schedule: String
+    @State private var isEnabled: Bool
+    @State private var scheduleInvalid = false
+
+    init(
+        initial: MobileBotRoutine?,
+        onSave: @escaping (MobileBotRoutineSpec) -> Void
+    ) {
+        self.initial = initial
+        self.onSave = onSave
+        _name = State(initialValue: initial?.name ?? "")
+        _prompt = State(initialValue: initial?.prompt ?? "")
+        _schedule = State(initialValue: initial?.schedule ?? "0 * * * *")
+        _isEnabled = State(initialValue: initial?.isEnabled ?? true)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("自动化") {
+                    TextField("名称", text: $name)
+                    TextField("提示词", text: $prompt, axis: .vertical)
+                        .lineLimit(3...8)
+                    Toggle("启用", isOn: $isEnabled)
+                }
+
+                Section("触发时间") {
+                    Picker("时间", selection: $schedule) {
+                        ForEach(MobileBotRoutineSchedule.pickerOptions()) { option in
+                            Text(option.label).tag(option.schedule)
+                        }
+                    }
+
+                    TextField("Schedule", text: $schedule)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit {
+                            validateSchedule()
+                        }
+                        .accessibilityValue(scheduleInvalid ? "invalid" : "valid")
+
+                    if scheduleInvalid {
+                        Text("请输入有效的 cron、@every 或带时区的 cron 表达式")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle(initial == nil ? "添加自动化" : "编辑自动化")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        save()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func validateSchedule() {
+        let result = MobileBotRoutineSchedule.resolveCustomBlur(schedule)
+        schedule = result.schedule
+        scheduleInvalid = result.isInvalid || !result.shouldCommit
+    }
+
+    private func save() {
+        let result = MobileBotRoutineSchedule.resolveCustomBlur(schedule)
+        schedule = result.schedule
+        scheduleInvalid = result.isInvalid || !result.shouldCommit
+        guard result.shouldCommit else { return }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        onSave(
+            MobileBotRoutineSpec(
+                name: trimmedName,
+                prompt: prompt,
+                schedule: result.schedule,
+                isEnabled: isEnabled
+            )
+        )
+    }
+}
+
