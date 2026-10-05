@@ -14,7 +14,7 @@ final class GrokMobileCommandPaletteTests: XCTestCase {
         XCTAssertNotNil(
             GrokMobileCommandPaletteModel.fuzzyScore(
                 value: "open full messaging",
-                query: "ofm"
+                query: "of"
             )
         )
         XCTAssertNil(
