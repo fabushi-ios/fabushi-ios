@@ -143,23 +143,36 @@ extension GrokMobileShell {
             }
             .buttonStyle(.plain)
 
-            if bot.miniAppId == nil && !bot.isGroup {
+            if bot.miniAppId == nil {
                 Menu {
                     Button {
-                        beginBotRename(bot)
+                        botSettingsTarget = bot
                     } label: {
-                        Label("重命名", systemImage: "pencil")
+                        Label("设置", systemImage: "gearshape")
                     }
-                    Button {
-                        Task { await duplicateBot(bot) }
-                    } label: {
-                        Label("复制", systemImage: "doc.on.doc")
-                    }
-                    Divider()
-                    Button(role: .destructive) {
-                        requestBotDelete(bot)
-                    } label: {
-                        Label("删除", systemImage: "trash")
+                    if bot.isGroup {
+                        Button {
+                            groupMembersTarget = bot
+                        } label: {
+                            Label("成员", systemImage: "person.2")
+                        }
+                    } else {
+                        Button {
+                            beginBotRename(bot)
+                        } label: {
+                            Label("重命名", systemImage: "pencil")
+                        }
+                        Button {
+                            Task { await duplicateBot(bot) }
+                        } label: {
+                            Label("复制", systemImage: "doc.on.doc")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            requestBotDelete(bot)
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis")

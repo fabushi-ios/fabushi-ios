@@ -70,6 +70,41 @@ final class FabushiUITests: XCTestCase {
         submit.tap()
     }
 
+
+    @MainActor
+    func testNativeAgentSettingsIsReachableFromShippingBotSurface() throws {
+        let app = launchAuthenticatedApp()
+
+        let shellBack = app.buttons["grok-mobile-back"]
+        XCTAssertTrue(shellBack.waitForExistence(timeout: 5))
+        shellBack.tap()
+
+        let grokHome = app.descendants(matching: .any)["grok-mobile-home"]
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 10))
+
+        let researchBot = app.staticTexts["Research Bot"]
+        XCTAssertTrue(
+            researchBot.waitForExistence(timeout: 10),
+            "Expected canonical Host bot roster on the shipping Grok home"
+        )
+        researchBot.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["mobile-bot-chat"].waitForExistence(timeout: 10)
+        )
+        let settings = app.buttons["mobile-bot-settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+
+        let settingsSurface = app.descendants(matching: .any)["mobile-agent-settings"]
+        XCTAssertTrue(settingsSurface.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["mobile-agent-settings-name"].exists)
+        XCTAssertTrue(app.textFields["mobile-agent-settings-title"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["mobile-agent-settings-description"].exists)
+        XCTAssertTrue(app.switches["mobile-agent-settings-notifications"].exists)
+        XCTAssertTrue(app.buttons["mobile-agent-settings-save"].exists)
+    }
+
     @MainActor
     func testMiniAppOpensAndClosesDedicatedWebMcpSurface() throws {
         let app = launchAuthenticatedApp()

@@ -24,6 +24,7 @@ internal struct GrokMobileShell: View {
     @State var bots: [MobileBotSummary] = []
     @State var selectedBot: MobileBotSummary?
     @State var groupMembersTarget: MobileBotSummary?
+    @State var botSettingsTarget: MobileBotSummary?
     @State var botDrafts: [String: String] = [:]
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
@@ -37,31 +38,62 @@ internal struct GrokMobileShell: View {
 
     @ViewBuilder
     var body: some View {
-        if model.onboardingStep < 3 || !model.authResolved || !model.loggedIn {
-            unauthenticatedContent
-        } else if let selectedBot {
-            selectedBotContent(selectedBot)
-        } else if legacyOpen {
-            legacyContent
-        } else {
-            homeContent
-                .sheet(item: $groupMembersTarget) { group in
-                    MobileBotGroupMembersSheet(
-                        group: bots.first(where: { $0.id == group.id }) ?? group,
-                        roster: bots,
-                        bridge: bridge,
-                        accountScopeKey: [
-                            String(model.loggedIn),
-                            model.accountEmail,
-                            model.accountName,
-                        ].joined(separator: ":"),
-                        onRosterChanged: { updated in
-                            bots = updated
-                            groupMembersTarget = updated.first(where: { $0.id == group.id })
-                        },
-                        onClose: { groupMembersTarget = nil }
-                    )
-                }
+        Group {
+            if model.onboardingStep < 3 || !model.authResolved || !model.loggedIn {
+                unauthenticatedContent
+            } else if let selectedBot {
+                selectedBotContent(selectedBot)
+            } else if legacyOpen {
+                legacyContent
+            } else {
+                homeContent
+            }
+        }
+        .sheet(item: $groupMembersTarget) { group in
+            MobileBotGroupMembersSheet(
+                group: bots.first(where: { $0.id == group.id }) ?? group,
+                roster: bots,
+                bridge: bridge,
+                accountScopeKey: mobileAccountScopeKey,
+                onRosterChanged: { updated in
+                    applyBotRosterUpdate(updated)
+                    groupMembersTarget = updated.first(where: { $0.id == group.id })
+                },
+                onClose: { groupMembersTarget = nil }
+            )
+        }
+        .sheet(item: $botSettingsTarget) { agent in
+            MobileBotAgentSettingsSheet(
+                agent: bots.first(where: { $0.id == agent.id }) ?? agent,
+                bridge: bridge,
+                accountScopeKey: mobileAccountScopeKey,
+                onRosterChanged: { updated in
+                    applyBotRosterUpdate(updated)
+                    botSettingsTarget = updated.first(where: { $0.id == agent.id })
+                },
+                onClose: { botSettingsTarget = nil }
+            )
+        }
+    }
+
+    var mobileAccountScopeKey: String {
+        [
+            String(model.loggedIn),
+            model.accountEmail,
+            model.accountName,
+        ].joined(separator: ":")
+    }
+
+    @MainActor
+    func applyBotRosterUpdate(_ updated: [MobileBotSummary]) {
+        bots = updated
+        if let selectedBot,
+           let refreshed = updated.first(where: { $0.id == selectedBot.id }) {
+            self.selectedBot = refreshed
+        }
+        if let groupMembersTarget,
+           let refreshed = updated.first(where: { $0.id == groupMembersTarget.id }) {
+            self.groupMembersTarget = refreshed
         }
     }
 
@@ -76,6 +108,9 @@ internal struct GrokMobileShell: View {
             model: model,
             appAgentSurface: appAgentSurface,
             onClose: { self.selectedBot = nil },
+            onOpenSettings: {
+                self.botSettingsTarget = self.bots.first(where: { $0.id == bot.id }) ?? bot
+            },
             draft: botDraftBinding(for: bot.id),
             entries: botTranscriptBinding(for: bot.id)
         )
@@ -164,6 +199,9 @@ internal struct GrokMobileShell: View {
                 [
                     bot.id,
                     bot.name,
+                    bot.description,
+                    bot.title ?? "",
+                    String(bot.notifyOnUpdatesEnabled),
                     bot.miniAppId ?? "",
                     String(bot.isGroup),
                     bot.memberIds.joined(separator: "+"),

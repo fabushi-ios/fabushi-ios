@@ -81,6 +81,61 @@ struct GrokMobileBotService {
         )
     }
 
+    func updateAgentProfile(
+        id: String,
+        isGroup: Bool,
+        name: String,
+        title: String?,
+        description: String
+    ) async throws -> [MobileBotSummary] {
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.agentProfileUpdateCommand(
+                    id: id,
+                    isGroup: isGroup,
+                    name: name,
+                    title: title,
+                    description: description,
+                    requestId: "ios-mobile-agent-settings-profile-\(UUID().uuidString.lowercased())"
+                ),
+            ]
+        )
+        try Task.checkCancellation()
+        let updated = await loadBots()
+        guard updated.contains(where: { $0.id == id }) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "更新后无法从 Host roster 重新读取该 Agent"]
+            )
+        }
+        return updated
+    }
+
+    func setAgentNotifyOnUpdates(id: String, isEnabled: Bool) async throws -> [MobileBotSummary] {
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.agentNotificationUpdateCommand(
+                    id: id,
+                    isEnabled: isEnabled,
+                    requestId: "ios-mobile-agent-settings-notify-\(UUID().uuidString.lowercased())"
+                ),
+            ]
+        )
+        try Task.checkCancellation()
+        let updated = await loadBots()
+        guard updated.contains(where: { $0.id == id }) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "更新通知设置后无法从 Host roster 重新读取该 Agent"]
+            )
+        }
+        return updated
+    }
+
     func updateGroupMembers(groupId: String, memberIds: [String]) async throws -> [MobileBotSummary] {
         let normalized = memberIds.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard normalized.count == memberIds.count,
@@ -106,6 +161,40 @@ struct GrokMobileBotService {
         )
         try Task.checkCancellation()
         return await loadBots()
+    }
+
+    static func agentProfileUpdateCommand(
+        id: String,
+        isGroup: Bool,
+        name: String,
+        title: String?,
+        description: String,
+        requestId: String
+    ) -> [String: Any] {
+        var command: [String: Any] = [
+            "type": isGroup ? "group.update" : "bot.update",
+            "requestId": requestId,
+            "id": id,
+            "name": name,
+            "description": description,
+        ]
+        if !isGroup, let title {
+            command["title"] = title
+        }
+        return command
+    }
+
+    static func agentNotificationUpdateCommand(
+        id: String,
+        isEnabled: Bool,
+        requestId: String
+    ) -> [String: Any] {
+        [
+            "type": "bot.update",
+            "requestId": requestId,
+            "id": id,
+            "notifyOnUpdates": isEnabled,
+        ]
     }
 
     static func renameCommand(id: String, name: String, requestId: String) -> [String: Any] {
@@ -202,7 +291,24 @@ struct GrokMobileBotService {
     static func mergeBots(_ installed: [MobileBotSummary], _ surface: [MobileBotSummary]) -> [MobileBotSummary] {
         var byId: [String: MobileBotSummary] = [:]
         for bot in surface { byId[bot.id] = bot }
-        for bot in installed { byId[bot.id] = bot }
+        for installedBot in installed {
+            if let canonical = byId[installedBot.id] {
+                byId[installedBot.id] = MobileBotSummary(
+                    id: installedBot.id,
+                    name: installedBot.name,
+                    description: installedBot.description,
+                    title: canonical.title,
+                    notifyOnUpdatesEnabled: canonical.notifyOnUpdatesEnabled,
+                    miniAppId: installedBot.miniAppId ?? canonical.miniAppId,
+                    menuButtonText: installedBot.menuButtonText ?? canonical.menuButtonText,
+                    isGroup: canonical.isGroup,
+                    memberIds: canonical.memberIds,
+                    isSharedRoom: canonical.isSharedRoom
+                )
+            } else {
+                byId[installedBot.id] = installedBot
+            }
+        }
         return byId.values.sorted {
             if ($0.miniAppId != nil) != ($1.miniAppId != nil) {
                 return $0.miniAppId != nil
@@ -227,6 +333,8 @@ struct GrokMobileBotService {
             id: id,
             name: (row["name"] as? String) ?? (row["displayName"] as? String) ?? id,
             description: row["description"] as? String ?? "",
+            title: row["title"] as? String,
+            notifyOnUpdatesEnabled: row["notifyOnUpdates"] as? Bool ?? false,
             miniAppId: miniAppId,
             menuButtonText: menuText?.isEmpty == false ? menuText : (miniAppId == nil ? nil : "打开应用")
         )

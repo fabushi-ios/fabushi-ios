@@ -135,4 +135,74 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertEqual(command["memberIds"] as? [String], ["bot-a", "bot-b"])
     }
 
+    @MainActor
+    func testSettingsProjectionAndCommandsUseCanonicalHostFields() throws {
+        let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-1",
+            "name": "Research",
+            "description": "Verify sources",
+            "title": "Research assistant",
+            "notifyOnUpdates": false,
+        ]))
+        XCTAssertEqual(bot.title, "Research assistant")
+        XCTAssertFalse(bot.notifyOnUpdatesEnabled)
+
+        let individual = GrokMobileBotService.agentProfileUpdateCommand(
+            id: "agent-1",
+            isGroup: false,
+            name: "Renamed",
+            title: "New title",
+            description: "New description",
+            requestId: "profile-1"
+        )
+        XCTAssertEqual(individual["type"] as? String, "bot.update")
+        XCTAssertEqual(individual["name"] as? String, "Renamed")
+        XCTAssertEqual(individual["title"] as? String, "New title")
+        XCTAssertEqual(individual["description"] as? String, "New description")
+
+        let group = GrokMobileBotService.agentProfileUpdateCommand(
+            id: "group-1",
+            isGroup: true,
+            name: "Room",
+            title: "Must not cross the group boundary",
+            description: "Coordination",
+            requestId: "profile-2"
+        )
+        XCTAssertEqual(group["type"] as? String, "group.update")
+        XCTAssertNil(group["title"])
+
+        let notifications = GrokMobileBotService.agentNotificationUpdateCommand(
+            id: "agent-1",
+            isEnabled: true,
+            requestId: "notify-1"
+        )
+        XCTAssertEqual(notifications["type"] as? String, "bot.update")
+        XCTAssertEqual(notifications["notifyOnUpdates"] as? Bool, true)
+    }
+
+    @MainActor
+    func testInstalledMiniAppMergePreservesCanonicalSettingsProjection() throws {
+        let surface = MobileBotSummary(
+            id: "global-dharma-bot",
+            name: "Host name",
+            description: "Host description",
+            title: "Canonical title",
+            notifyOnUpdatesEnabled: false
+        )
+        let installed = MobileBotSummary(
+            id: "global-dharma-bot",
+            name: "全球法布施",
+            description: "Installed metadata",
+            miniAppId: GlobalDharmaMiniAppBridge.globalDharmaId,
+            menuButtonText: "打开应用"
+        )
+
+        let merged = try XCTUnwrap(GrokMobileBotService.mergeBots([installed], [surface]).first)
+        XCTAssertEqual(merged.name, "全球法布施")
+        XCTAssertEqual(merged.title, "Canonical title")
+        XCTAssertFalse(merged.notifyOnUpdatesEnabled)
+        XCTAssertEqual(merged.miniAppId, GlobalDharmaMiniAppBridge.globalDharmaId)
+    }
+
+
 }

@@ -404,10 +404,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Swift structured-concurrency cancellation replaces the Desktop provider request-id lifecycle; canonical HTTP(S) links are projected from MessagingModel and enriched through trusted getLinkMetadata.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; source/ios-preload/main-rpc-runtime.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Baseline iOS HEAD de93e639670d3417731bc3cfdf6b4018ae695228 passed ordinary 37326225567 and protected 37326225582; this production tranche requires its own exact-head CI before verified."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/production/command-palette-message-provider.ts",
@@ -419,10 +419,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "The native palette searches the canonical hydrated MessagingModel transcript directly and navigates by exact conversation/message identity instead of owning a second search cache.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Baseline iOS HEAD de93e639670d3417731bc3cfdf6b4018ae695228 passed ordinary 37326225567 and protected 37326225582; this production tranche requires its own exact-head CI before verified."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/production/command-palette-model.ts",
@@ -434,10 +434,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native Swift value types preserve normalization/fuzzy search/tab semantics; individual Bots stay in Agents and Host-owned Bot groups project into Groups.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Baseline iOS HEAD de93e639670d3417731bc3cfdf6b4018ae695228 passed ordinary 37326225567 and protected 37326225582; this production tranche requires its own exact-head CI before verified."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/production/command-palette-provider.ts",
@@ -449,10 +449,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "listAllAutomations remains the canonical owner; Swift Task cancellation replaces AbortController provider lifecycle.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/production/GrokMobileCommandPaletteModel.swift; source/ios-preload/main-rpc-runtime.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Baseline iOS HEAD de93e639670d3417731bc3cfdf6b4018ae695228 passed ordinary 37326225567 and protected 37326225582; this production tranche requires its own exact-head CI before verified."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/production/command-palette-root-commands.ts",
@@ -464,10 +464,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS maps root actions to native shell routes; a selected non-shared Bot group opens the native Members owner without creating alternate membership state.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/production/MobileBotGroupMembers.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Baseline iOS HEAD de93e639670d3417731bc3cfdf6b4018ae695228 passed ordinary 37326225567 and protected 37326225582; this production tranche requires its own exact-head CI before verified."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/production/command-palette-search-provider.ts",
@@ -479,10 +479,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS derives searchable files from canonical local message media fields instead of maintaining a second searchMedia cache.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Baseline iOS HEAD de93e639670d3417731bc3cfdf6b4018ae695228 passed ordinary 37326225567 and protected 37326225582; this production tranche requires its own exact-head CI before verified."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/production/command-palette-update-command.ts",
@@ -539,10 +539,10 @@
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "SwiftUI composition projects the canonical Host roster and owns only native interaction state.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/production/local-tool-permission-scope.ts",
@@ -1169,10 +1169,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileBotService.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "IOSPreloadBridge sends canonical group.list/group.update commands; Task cancellation and a view lifecycle generation fence discard stale mutation completions.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/model.ts",
@@ -1184,10 +1184,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileGroupMembersModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native model preserves isGroup/memberIds/isSharedRoom projection, individual-only candidates, max-six/min-one, shared-room fail-closed behavior, and pending mutation guards.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/recovered/features/agent-info/MobileBotSummary.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/route.ts",
@@ -1214,10 +1214,10 @@
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native SwiftUI List/Section/Button presentation replaces CSS while preserving disabled/pending/destructive interaction semantics.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/view.tsx",
@@ -1229,55 +1229,55 @@
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native sheet exposes members, individual-only add candidates, destructive remove confirmation, cap/minimum guidance, retryable failure state, pending guards, and lifecycle cancellation.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/settings/model.ts",
       "desktop_blob_sha": "5d641cd3c8da63aab780e9bf1b56dae71a59ede4",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Own editable Agent profile and update-notification settings over the canonical Agent roster, serialize mutations, and reject stale selection/disposal completions.",
+      "desktop_owner": "renderer settings controller over Coordinator Agent source",
+      "desktop_visible_effect": "The selected Agent keeps authoritative name/title/description and update-notification state; groups omit individual-only controls, while stale or failed mutations cannot overwrite a new selection.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/GrokMobileAgentSettingsModel.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Swift structured concurrency replaces the React subscription/dispose lifecycle. The native settings owner reuses the existing account-scoped Rust Host bot.update/group.update store, with account/Agent/generation fencing, cancellation, one pending mutation, and canonical roster reload after success.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/GrokMobileAgentSettingsModel.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileAgentSettingsModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. This settings production tranche requires its own exact-head ordinary/protected acceptance before verified."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/settings/view.css",
       "desktop_blob_sha": "42dba2c3eb9e5ef3a1ad37434307b64cd69e1a88",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Define the Agent Settings field, card, row, focus, and notification-switch presentation.",
+      "desktop_owner": "renderer Agent settings presentation",
+      "desktop_visible_effect": "Settings fields and the notification control are legible, focusable, grouped, and visibly disabled while a mutation is pending.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotAgentSettings.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Native SwiftUI Form/TextField/Toggle semantics replace CSS, browser focus-visible styling, and manual switch visuals while preserving focus/accessibility and pending-disabled behavior.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileAgentSettingsModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; mobile/ios/FabushiUITests/FabushiUITests.swift",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Native SwiftUI is the platform presentation replacement; exact-head acceptance for this tranche is pending."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/settings/view.tsx",
       "desktop_blob_sha": "c1cb6bb94d6d0557ed6f6d8a653e04b8f5771b64",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Compose the Agent Settings surface, commit normalized profile edits, expose individual-only update notifications, and surface pending/error state.",
+      "desktop_owner": "renderer Agent-info settings view over its settings controller",
+      "desktop_visible_effect": "Users can edit Agent name/title/description and toggle update notifications; groups expose name/description only, invalid/no-op edits stay inert, and mutation errors remain visible.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotAgentSettings.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "A native SwiftUI sheet replaces the React view. It is reachable from shipping Bot/Agent surfaces, keeps local drafts separate from authoritative Host state, disables concurrent edits, and fences account/Agent/lifecycle drift.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/GrokMobileBotService.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileAgentSettingsModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; mobile/ios/FabushiUITests/FabushiUITests.swift",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Shipping composition and focused tests are implemented; current production HEAD still requires exact-head CI/acceptance before verified."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/bridge.ts",

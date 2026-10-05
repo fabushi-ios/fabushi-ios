@@ -18,6 +18,7 @@ internal struct MobileBotChat: View {
     let model: MarketplaceModel
     let appAgentSurface: FabushiAppAgentSurface
     let onClose: () -> Void
+    let onOpenSettings: () -> Void
 
     @Binding var draft: String
     @Binding var entries: [MobileChatMessage]
@@ -43,13 +44,18 @@ internal struct MobileBotChat: View {
                         .background(Color.black.opacity(0.045), in: Circle())
                 }
                 Spacer()
-                HStack(spacing: 8) {
-                    ClothGhostAvatar(botId: bot.id, size: 28, active: busy)
-                    Text(bot.name).font(.system(size: 17, weight: .semibold))
+                Button(action: onOpenSettings) {
+                    HStack(spacing: 8) {
+                        ClothGhostAvatar(botId: bot.id, size: 28, active: busy)
+                        Text(bot.name).font(.system(size: 17, weight: .semibold))
+                    }
+                    .padding(.horizontal, 13).padding(.vertical, 7)
+                    .background(.white, in: Capsule())
+                    .shadow(color: .black.opacity(0.08), radius: 12, y: 3)
                 }
-                .padding(.horizontal, 13).padding(.vertical, 7)
-                .background(.white, in: Capsule())
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 3)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Bot settings")
+                .accessibilityIdentifier("mobile-bot-settings")
                 Spacer()
                 Image(systemName: "desktopcomputer")
                     .font(.system(size: 16, weight: .medium))
@@ -209,6 +215,10 @@ internal struct MobileBotChat: View {
     private var semanticFingerprint: String {
         [
             bot.id,
+            bot.name,
+            bot.description,
+            bot.title ?? "",
+            String(bot.notifyOnUpdatesEnabled),
             bot.miniAppId ?? "",
             bot.menuButtonText ?? "",
             draft,
@@ -225,6 +235,7 @@ internal struct MobileBotChat: View {
         var elements: [FabushiAppAgentSurface.Element] = [
             .init(agentId: "mobile-bot-chat", role: "application", name: "Bot \(String(bot.name.prefix(160)))"),
             .init(agentId: "mobile-bot-close", role: "button", name: "关闭 Bot 对话"),
+            .init(agentId: "mobile-bot-settings", role: "button", name: "Bot 设置"),
             .init(agentId: "mobile-bot-draft", role: "textbox", name: "Bot 消息"),
         ]
         let sendId = busy ? "mobile-bot-stop" : "mobile-bot-send"
@@ -258,6 +269,7 @@ internal struct MobileBotChat: View {
         }
         var actions: [String: FabushiAppAgentSurface.Action] = [
             "mobile-bot-close": .init(allowed: ["invoke"]) { _ in onClose() },
+            "mobile-bot-settings": .init(allowed: ["invoke"]) { _ in onOpenSettings() },
             "mobile-bot-draft": .init(allowed: ["setValue"]) { value in draft = value ?? "" },
         ]
         actions[sendId] = .init(allowed: ["invoke"]) { _ in
