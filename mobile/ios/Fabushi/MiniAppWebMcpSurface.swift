@@ -857,6 +857,11 @@ private struct MiniAppWebView: UIViewRepresentable {
                   session.nonce == nonce
             else { return }
 
+            if body["kind"] as? String == "ready" {
+                probeBridge(in: webView, local: webView.url?.host == localWebMcpOriginHost)
+                return
+            }
+
             if body["kind"] as? String == "dispose" {
                 disposeLocalBridgeSession()
                 return
@@ -1039,6 +1044,7 @@ private func webMcpBootstrapJavaScript(
       function register(item){if(!grants.has(item.name))return;const tool={name:item.name,title:item.title||item.name,description:item.description||item.name,inputSchema:item.inputSchema||{type:'object',properties:{}},annotations:{readOnlyHint:item.readOnlyHint===true},execute:(input)=>callNative(item.name,input)};localTools.set(tool.name,tool);if(document.modelContext&&typeof document.modelContext.registerTool==='function'){const controller=new AbortController();controllers.push(controller);Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}}
       for(const item of definitions)register(item);
       Object.defineProperty(window,'__fabushiWebMcp',{configurable:true,value:{version:1,list:()=>Array.from(localTools.values()).map(publicTool),call:async(name,input={})=>{const tool=localTools.get(name);if(!tool)throw new Error('Unknown WebMCP tool: '+name);return tool.execute(input);}}});
+      window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({kind:'ready',pluginInstanceId,nonce});
       window.addEventListener('pagehide',()=>{if(disposed)return;disposed=true;for(const controller of controllers)controller.abort();window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({kind:'dispose',pluginInstanceId,nonce});rejectPending('MCP App bridge disposed');},{once:true});
       window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:\(jsonString(plugin.pluginId)),pluginInstanceId,grants:Array.from(grants),tools:Array.from(localTools.keys())}}));
     })();

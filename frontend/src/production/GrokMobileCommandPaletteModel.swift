@@ -365,7 +365,11 @@ internal enum GrokMobileCommandPaletteModel {
         case .conversation(let conversation):
             return [conversation.description, conversation.preview, conversation.kind.rawValue]
         case .message(let message):
-            return [message.conversationTitle, message.snippet]
+            // Desktop message search receives focused backend snippets. The iOS
+            // adapter projects the canonical local transcript directly, so add
+            // lexical candidates to prevent an earlier URL character from
+            // consuming the bounded fuzzy match for a later exact word.
+            return [message.conversationTitle, message.snippet] + searchTokens(message.snippet)
         case .file(let file):
             return [file.conversationTitle, file.kind, (file.fileName as NSString).pathExtension]
         case .link(let link):
