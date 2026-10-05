@@ -1,5 +1,48 @@
 import SwiftUI
 
+internal enum MobileBotSharedRoomPendingPolicy {
+    static func canBegin(_ key: String, pending: Set<String>) -> Bool {
+        !pending.contains(key)
+    }
+
+    static func adding(_ key: String, to pending: Set<String>) -> Set<String> {
+        var next = pending
+        next.insert(key)
+        return next
+    }
+
+    static func removing(_ key: String, from pending: Set<String>) -> Set<String> {
+        var next = pending
+        next.remove(key)
+        return next
+    }
+}
+
+internal enum MobileBotSharedRoomActionPolicy {
+    static func people(
+        in room: GrokMobileSharedRoomModel.Room
+    ) -> [GrokMobileSharedRoomModel.Member] {
+        room.members.filter { $0.kind == .human }
+    }
+
+    static func canRemoveHuman(
+        _ member: GrokMobileSharedRoomModel.Member,
+        room: GrokMobileSharedRoomModel.Room,
+        isHost: Bool
+    ) -> Bool {
+        isHost
+            && member.kind == .human
+            && member.authId != room.hostAuthId
+    }
+
+    static func canRemoveOwnAgent(
+        _ agentId: String,
+        selfAgentIds: [String]
+    ) -> Bool {
+        selfAgentIds.contains(agentId)
+    }
+}
+
 internal struct MobileBotSharedRoomTrigger: View {
     let agent: MobileBotSummary
     let roster: [MobileBotSummary]
@@ -118,10 +161,10 @@ internal struct MobileBotSharedRoomSheet: View {
 
     @State private var state: GrokMobileSharedRoomModel.SharingState?
     @State private var invite: GrokMobileSharedRoomModel.InviteResult?
-    @State private var pendingKey: String?
+    @State private var pendingKeys: Set<String> = []
     @State private var failure: String?
     @State private var generation = 0
-    @State private var operationTask: Task<Void, Never>?
+    @State private var operationTasks: [String: Task<Void, Never>] = [:]
 
     init(
         agent: MobileBotSummary,
@@ -156,10 +199,15 @@ internal struct MobileBotSharedRoomSheet: View {
                         LabeledContent("名称", value: room.name)
                         LabeledContent("成员", value: "\(room.members.count)")
                         if snapshot.isHost {
-                            Button(pendingKey == "invite" ? "正在创建…" : "创建邀请链接") {
+                            let inviteKey = "invite"
+                            Button(
+                                pendingKeys.contains(inviteKey)
+                                    ? "正在创建…"
+                                    : "创建邀请链接"
+                            ) {
                                 beginInvite(roomId: room.roomId)
                             }
-                            .disabled(pendingKey != nil)
+                            .disabled(pendingKeys.contains(inviteKey))
                             .accessibilityIdentifier("mobile-shared-room-invite")
                         }
                     }
@@ -192,20 +240,29 @@ internal struct MobileBotSharedRoomSheet: View {
                     if snapshot.isHost, !snapshot.requests.isEmpty {
                         Section("加入请求") {
                             ForEach(snapshot.requests) { request in
+                                let requestKey = "request:\(request.requestId)"
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(request.requesterName)
                                     HStack {
                                         Button("批准") {
-                                            beginRespond(requestId: request.requestId, approved: true)
+                                            beginRespond(
+                                                requestId: request.requestId,
+                                                approved: true
+                                            )
                                         }
-                                        .disabled(pendingKey != nil)
+                                        .disabled(pendingKeys.contains(requestKey))
                                         Button("拒绝", role: .destructive) {
-                                            beginRespond(requestId: request.requestId, approved: false)
+                                            beginRespond(
+                                                requestId: request.requestId,
+                                                approved: false
+                                            )
                                         }
-                                        .disabled(pendingKey != nil)
+                                        .disabled(pendingKeys.contains(requestKey))
                                     }
                                 }
-                                .accessibilityIdentifier("mobile-shared-room-request-\(request.requestId)")
+                                .accessibilityIdentifier(
+                                    "mobile-shared-room-request-\(request.requestId)"
+                                )
                             }
                         }
                     }
@@ -214,14 +271,24 @@ internal struct MobileBotSharedRoomSheet: View {
                         Section("我的 Agent") {
                             ForEach(snapshot.selfAgentIds, id: \.self) { agentId in
                                 let name = roster.first(where: { $0.id == agentId })?.name ?? agentId
+                                let agentKey = "agent:\(agentId)"
                                 HStack {
                                     Text(name)
                                     Spacer()
-                                    if snapshot.isHost && snapshot.selfAgentIds.count > 1 {
+                                    if MobileBotSharedRoomActionPolicy.canRemoveOwnAgent(
+                                        agentId,
+                                        selfAgentIds: snapshot.selfAgentIds
+                                    ) {
                                         Button("移除", role: .destructive) {
-                                            beginRemoveAgent(roomId: room.roomId, agentId: agentId)
+                                            beginRemoveAgent(
+                                                roomId: room.roomId,
+                                                agentId: agentId
+                                            )
                                         }
-                                        .disabled(pendingKey != nil)
+                                        .disabled(pendingKeys.contains(agentKey))
+                                        .accessibilityIdentifier(
+                                            "mobile-shared-room-remove-agent-\(agentId)"
+                                        )
                                     }
                                 }
                             }
@@ -231,6 +298,7 @@ internal struct MobileBotSharedRoomSheet: View {
                     if snapshot.isHost, !snapshot.candidates.isEmpty {
                         Section("添加 Agent") {
                             ForEach(snapshot.candidates) { candidate in
+                                let agentKey = "agent:\(candidate.id)"
                                 Button {
                                     beginAddAgent(
                                         roomId: room.roomId,
@@ -240,25 +308,43 @@ internal struct MobileBotSharedRoomSheet: View {
                                 } label: {
                                     Label(candidate.name, systemImage: "plus.circle")
                                 }
-                                .disabled(pendingKey != nil)
+                                .disabled(pendingKeys.contains(agentKey))
                             }
                         }
                     }
 
-                    let removableHumans = room.members.filter {
-                        $0.kind == .human && $0.authId != room.hostAuthId
-                    }
-                    if snapshot.isHost, !removableHumans.isEmpty {
-                        Section("其他成员") {
-                            ForEach(removableHumans) { member in
+                    let people = MobileBotSharedRoomActionPolicy.people(in: room)
+                    if !people.isEmpty {
+                        Section("成员") {
+                            ForEach(people) { member in
+                                let memberKey = "member:\(member.authId)"
                                 HStack {
                                     Text(member.displayName)
                                     Spacer()
-                                    Button("移除", role: .destructive) {
-                                        beginLeave(roomId: room.roomId, targetAuthId: member.authId)
+                                    if member.authId == room.hostAuthId {
+                                        Text("Host")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    } else if MobileBotSharedRoomActionPolicy.canRemoveHuman(
+                                        member,
+                                        room: room,
+                                        isHost: snapshot.isHost
+                                    ) {
+                                        Button("移除", role: .destructive) {
+                                            beginLeave(
+                                                roomId: room.roomId,
+                                                targetAuthId: member.authId
+                                            )
+                                        }
+                                        .disabled(pendingKeys.contains(memberKey))
+                                        .accessibilityIdentifier(
+                                            "mobile-shared-room-remove-person-\(member.authId)"
+                                        )
                                     }
-                                    .disabled(pendingKey != nil)
                                 }
+                                .accessibilityIdentifier(
+                                    "mobile-shared-room-person-\(member.authId)"
+                                )
                             }
                         }
                     }
@@ -267,7 +353,7 @@ internal struct MobileBotSharedRoomSheet: View {
                         Button("离开共享房间", role: .destructive) {
                             beginLeave(roomId: room.roomId, targetAuthId: nil)
                         }
-                        .disabled(pendingKey != nil)
+                        .disabled(pendingKeys.contains("leave"))
                         .accessibilityIdentifier("mobile-shared-room-leave")
                     }
                 } else if state == nil {
@@ -293,7 +379,6 @@ internal struct MobileBotSharedRoomSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("完成", action: onClose)
-                        .disabled(pendingKey != nil)
                 }
             }
         }
@@ -313,14 +398,16 @@ internal struct MobileBotSharedRoomSheet: View {
 
     @MainActor
     private func beginInvite(roomId: String) {
-        guard pendingKey == nil else { return }
+        let key = "invite"
+        guard MobileBotSharedRoomPendingPolicy.canBegin(key, pending: pendingKeys) else {
+            return
+        }
         let fence = makeFence()
-        pendingKey = "invite"
+        pendingKeys = MobileBotSharedRoomPendingPolicy.adding(key, to: pendingKeys)
         failure = nil
         invite = nil
-        operationTask?.cancel()
-        operationTask = Task { @MainActor in
-            defer { finish(fence) }
+        operationTasks[key] = Task { @MainActor in
+            defer { finish(key: key, fence: fence) }
             do {
                 let result = try await bridge.request(
                     method: "sharing.createRoomInvite",
@@ -389,13 +476,14 @@ internal struct MobileBotSharedRoomSheet: View {
         method: String,
         params: [String: Any]
     ) {
-        guard pendingKey == nil || key == "refresh" else { return }
+        guard MobileBotSharedRoomPendingPolicy.canBegin(key, pending: pendingKeys) else {
+            return
+        }
         let fence = makeFence()
-        pendingKey = key
+        pendingKeys = MobileBotSharedRoomPendingPolicy.adding(key, to: pendingKeys)
         failure = nil
-        operationTask?.cancel()
-        operationTask = Task { @MainActor in
-            defer { finish(fence) }
+        operationTasks[key] = Task { @MainActor in
+            defer { finish(key: key, fence: fence) }
             do {
                 let result = try await bridge.request(method: method, params: params)
                 try Task.checkCancellation()
@@ -438,18 +526,24 @@ internal struct MobileBotSharedRoomSheet: View {
     }
 
     @MainActor
-    private func finish(_ fence: GrokMobileSharedRoomModel.LifecycleFence) {
+    private func finish(
+        key: String,
+        fence: GrokMobileSharedRoomModel.LifecycleFence
+    ) {
         guard accepts(fence) else { return }
-        pendingKey = nil
-        operationTask = nil
+        pendingKeys = MobileBotSharedRoomPendingPolicy.removing(key, from: pendingKeys)
+        operationTasks[key] = nil
     }
 
     @MainActor
     private func invalidate() {
         generation += 1
-        operationTask?.cancel()
-        operationTask = nil
-        pendingKey = nil
+        for task in operationTasks.values {
+            task.cancel()
+        }
+        operationTasks.removeAll()
+        pendingKeys.removeAll()
         failure = nil
     }
+
 }

@@ -134,4 +134,126 @@ final class GrokMobileSharedRoomModelTests: XCTestCase {
             )
         )
     }
+
+    func testRejectsMissingOrWrongTopLevelSharingFields() {
+        let valid: [String: Any] = [
+            "isEnabled": true,
+            "selfAuthId": "auth-self",
+            "pendingJoinRequests": [],
+            "rooms": [],
+            "typingUsers": [],
+        ]
+
+        var missingEnabled = valid
+        missingEnabled.removeValue(forKey: "isEnabled")
+        XCTAssertNil(GrokMobileSharedRoomModel.projectSharingState(missingEnabled))
+
+        var wrongRequests = valid
+        wrongRequests["pendingJoinRequests"] = ["not": "an array"]
+        XCTAssertNil(GrokMobileSharedRoomModel.projectSharingState(wrongRequests))
+
+        var wrongRooms = valid
+        wrongRooms["rooms"] = "rooms"
+        XCTAssertNil(GrokMobileSharedRoomModel.projectSharingState(wrongRooms))
+
+        var wrongTyping = valid
+        wrongTyping["typingUsers"] = NSNull()
+        XCTAssertNil(GrokMobileSharedRoomModel.projectSharingState(wrongTyping))
+    }
+
+    func testControllerPendingPolicyDeduplicatesOnlyMatchingKeys() {
+        var pending = Set(["agent:agent-1"])
+
+        XCTAssertFalse(
+            MobileBotSharedRoomPendingPolicy.canBegin(
+                "agent:agent-1",
+                pending: pending
+            )
+        )
+        XCTAssertTrue(
+            MobileBotSharedRoomPendingPolicy.canBegin(
+                "request:request-1",
+                pending: pending
+            )
+        )
+
+        pending = MobileBotSharedRoomPendingPolicy.adding(
+            "request:request-1",
+            to: pending
+        )
+        XCTAssertEqual(
+            pending,
+            Set(["agent:agent-1", "request:request-1"])
+        )
+
+        pending = MobileBotSharedRoomPendingPolicy.removing(
+            "agent:agent-1",
+            from: pending
+        )
+        XCTAssertEqual(pending, Set(["request:request-1"]))
+    }
+
+    func testUIActionPolicyShowsPeopleToEveryoneAndKeepsDesktopRemovalRules() {
+        let host = GrokMobileSharedRoomModel.Member(
+            kind: .human,
+            authId: "auth-host",
+            agentId: nil,
+            displayName: "Host",
+            avatarURL: nil
+        )
+        let guest = GrokMobileSharedRoomModel.Member(
+            kind: .human,
+            authId: "auth-guest",
+            agentId: nil,
+            displayName: "Guest",
+            avatarURL: nil
+        )
+        let selfAgent = GrokMobileSharedRoomModel.Member(
+            kind: .agent,
+            authId: "auth-guest",
+            agentId: "agent-1",
+            displayName: "Agent",
+            avatarURL: nil
+        )
+        let room = GrokMobileSharedRoomModel.Room(
+            roomId: "room-1",
+            name: "Shared room",
+            hostAuthId: "auth-host",
+            members: [host, guest, selfAgent],
+            avatarDataURL: nil
+        )
+
+        XCTAssertEqual(
+            MobileBotSharedRoomActionPolicy.people(in: room).map(\.authId),
+            ["auth-host", "auth-guest"]
+        )
+        XCTAssertFalse(
+            MobileBotSharedRoomActionPolicy.canRemoveHuman(
+                guest,
+                room: room,
+                isHost: false
+            )
+        )
+        XCTAssertTrue(
+            MobileBotSharedRoomActionPolicy.canRemoveHuman(
+                guest,
+                room: room,
+                isHost: true
+            )
+        )
+        XCTAssertFalse(
+            MobileBotSharedRoomActionPolicy.canRemoveHuman(
+                host,
+                room: room,
+                isHost: true
+            )
+        )
+        XCTAssertTrue(
+            MobileBotSharedRoomActionPolicy.canRemoveOwnAgent(
+                "agent-1",
+                selfAgentIds: ["agent-1"]
+            )
+        )
+    }
+
 }

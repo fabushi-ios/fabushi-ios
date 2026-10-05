@@ -687,7 +687,7 @@ impl MahayanaProductClient {
     pub fn sharing_state(&self) -> Result<Value, ProductError> {
         let token = self.authorization_token(&Value::Null)?;
         let raw = self.post_json("/sand/share-state", json!({}), Some(&token))?;
-        Ok(project_sharing_state(raw, jwt_subject_from_access_token(&token)))
+        project_sharing_state(raw, jwt_subject_from_access_token(&token))
     }
 
     pub fn sharing_create_room_invite(&self, room_id: &str) -> Result<Value, ProductError> {
@@ -3436,31 +3436,131 @@ fn safe_platform_path(value: &str) -> Result<&str, ProductError> {
         .ok_or(ProductError::InvalidParameter("path"))
 }
 
-fn project_sharing_state(raw: Value, self_auth_id: Option<String>) -> Value {
-    let pending_join_requests = raw
+fn sharing_non_empty_string(row: &Map<String, Value>, name: &str) -> bool {
+    row.get(name)
+        .and_then(Value::as_str)
+        .map(|value| !value.is_empty())
+        .unwrap_or(false)
+}
+
+fn sharing_optional_string(row: &Map<String, Value>, name: &str) -> bool {
+    match row.get(name) {
+        None => true,
+        Some(Value::String(_)) => true,
+        Some(_) => false,
+    }
+}
+
+fn valid_sharing_member(value: &Value) -> bool {
+    let Some(row) = value.as_object() else {
+        return false;
+    };
+    let Some(kind) = row.get("kind").and_then(Value::as_str) else {
+        return false;
+    };
+    if !matches!(kind, "human" | "agent") || !sharing_non_empty_string(row, "authId") {
+        return false;
+    }
+    if row.contains_key("agentId") && !sharing_non_empty_string(row, "agentId") {
+        return false;
+    }
+    let display_name = row
+        .get("displayName")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if kind == "human" && display_name.is_empty() {
+        return false;
+    }
+    sharing_optional_string(row, "avatarDataUrl")
+}
+
+fn valid_sharing_room(value: &Value) -> bool {
+    let Some(row) = value.as_object() else {
+        return false;
+    };
+    if !sharing_non_empty_string(row, "roomId")
+        || !sharing_non_empty_string(row, "name")
+        || !sharing_non_empty_string(row, "hostAuthId")
+    {
+        return false;
+    }
+    row.get("members")
+        .and_then(Value::as_array)
+        .map(|members| members.iter().all(valid_sharing_member))
+        .unwrap_or(false)
+}
+
+fn valid_sharing_join_request(value: &Value) -> bool {
+    let Some(row) = value.as_object() else {
+        return false;
+    };
+    sharing_non_empty_string(row, "requestId")
+        && sharing_non_empty_string(row, "roomId")
+        && sharing_non_empty_string(row, "requesterAuthId")
+        && sharing_non_empty_string(row, "requesterName")
+        && sharing_optional_string(row, "requesterAvatarUrl")
+}
+
+fn valid_sharing_typing_user(value: &Value) -> bool {
+    let Some(row) = value.as_object() else {
+        return false;
+    };
+    sharing_non_empty_string(row, "roomId")
+        && sharing_non_empty_string(row, "authId")
+        && sharing_non_empty_string(row, "name")
+        && row
+            .get("expiresAtMs")
+            .and_then(Value::as_f64)
+            .map(f64::is_finite)
+            .unwrap_or(false)
+}
+
+fn malformed_sharing_state(field: &str) -> ProductError {
+    ProductError::Response(format!("malformed shared-room state: {field}"))
+}
+
+fn project_sharing_state(
+    raw: Value,
+    self_auth_id: Option<String>,
+) -> Result<Value, ProductError> {
+    let row = raw
+        .as_object()
+        .ok_or_else(|| malformed_sharing_state("root"))?;
+    let is_enabled = row
+        .get("isEnabled")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| malformed_sharing_state("isEnabled"))?;
+    let pending_join_requests = row
         .get("pendingJoinRequests")
-        .cloned()
-        .filter(Value::is_array)
-        .unwrap_or_else(|| Value::Array(Vec::new()));
-    let rooms = raw
+        .and_then(Value::as_array)
+        .ok_or_else(|| malformed_sharing_state("pendingJoinRequests"))?;
+    let rooms = row
         .get("rooms")
-        .cloned()
-        .filter(Value::is_array)
-        .unwrap_or_else(|| Value::Array(Vec::new()));
-    let typing_users = raw
+        .and_then(Value::as_array)
+        .ok_or_else(|| malformed_sharing_state("rooms"))?;
+    let typing_users = row
         .get("typingUsers")
-        .cloned()
-        .filter(Value::is_array)
-        .unwrap_or_else(|| Value::Array(Vec::new()));
-    json!({
-        "isEnabled": raw.get("isEnabled").and_then(Value::as_bool).unwrap_or(true),
+        .and_then(Value::as_array)
+        .ok_or_else(|| malformed_sharing_state("typingUsers"))?;
+
+    if !pending_join_requests.iter().all(valid_sharing_join_request) {
+        return Err(malformed_sharing_state("pendingJoinRequests"));
+    }
+    if !rooms.iter().all(valid_sharing_room) {
+        return Err(malformed_sharing_state("rooms"));
+    }
+    if !typing_users.iter().all(valid_sharing_typing_user) {
+        return Err(malformed_sharing_state("typingUsers"));
+    }
+
+    Ok(json!({
+        "isEnabled": is_enabled,
         "selfAuthId": self_auth_id,
         "pendingJoinRequests": pending_join_requests,
         "rooms": rooms,
         "typingUsers": typing_users,
-    })
+    }))
 }
-
 fn project_room_invite_result(result: &Value) -> Value {
     let room_id = result
         .get("room")
@@ -3722,6 +3822,7 @@ mod tests {
         let token = format!("header.{token_payload}.signature");
         let projected = project_sharing_state(
             json!({
+                "isEnabled": true,
                 "pendingJoinRequests": [{
                     "requestId": "request-1",
                     "roomId": "room-1",
@@ -3732,16 +3833,107 @@ mod tests {
                     "roomId": "room-1",
                     "name": "Shared room",
                     "hostAuthId": "auth-user",
-                    "members": []
+                    "members": [{
+                        "kind": "agent",
+                        "authId": "auth-user",
+                        "agentId": "agent-1",
+                        "displayName": ""
+                    }]
+                }],
+                "typingUsers": [{
+                    "roomId": "room-1",
+                    "authId": "guest-1",
+                    "name": "Guest",
+                    "expiresAtMs": 123.0
                 }]
             }),
             jwt_subject_from_access_token(&token),
-        );
+        )
+        .expect("valid Desktop sharing payload");
         assert_eq!(projected["isEnabled"], true);
         assert_eq!(projected["selfAuthId"], "auth-user");
         assert_eq!(projected["rooms"][0]["roomId"], "room-1");
         assert_eq!(projected["pendingJoinRequests"][0]["requestId"], "request-1");
-        assert_eq!(projected["typingUsers"], json!([]));
+        assert_eq!(projected["typingUsers"][0]["authId"], "guest-1");
+    }
+
+    #[test]
+    fn shared_room_projection_rejects_malformed_state_as_a_whole() {
+        let valid = json!({
+            "isEnabled": true,
+            "pendingJoinRequests": [{
+                "requestId": "request-1",
+                "roomId": "room-1",
+                "requesterAuthId": "guest-1",
+                "requesterName": "Guest"
+            }],
+            "rooms": [{
+                "roomId": "room-1",
+                "name": "Shared room",
+                "hostAuthId": "auth-user",
+                "members": [{
+                    "kind": "human",
+                    "authId": "guest-1",
+                    "displayName": "Guest"
+                }]
+            }],
+            "typingUsers": [{
+                "roomId": "room-1",
+                "authId": "guest-1",
+                "name": "Guest",
+                "expiresAtMs": 123.0
+            }]
+        });
+
+        let mut cases = Vec::new();
+
+        let mut missing_is_enabled = valid.clone();
+        missing_is_enabled
+            .as_object_mut()
+            .expect("object")
+            .remove("isEnabled");
+        cases.push(missing_is_enabled);
+
+        let mut wrong_is_enabled = valid.clone();
+        wrong_is_enabled["isEnabled"] = json!("true");
+        cases.push(wrong_is_enabled);
+
+        let mut wrong_requests = valid.clone();
+        wrong_requests["pendingJoinRequests"] = json!({});
+        cases.push(wrong_requests);
+
+        let mut wrong_rooms = valid.clone();
+        wrong_rooms["rooms"] = json!("rooms");
+        cases.push(wrong_rooms);
+
+        let mut wrong_typing = valid.clone();
+        wrong_typing["typingUsers"] = Value::Null;
+        cases.push(wrong_typing);
+
+        let mut malformed_request = valid.clone();
+        malformed_request["pendingJoinRequests"][0]
+            .as_object_mut()
+            .expect("request object")
+            .remove("requesterName");
+        cases.push(malformed_request);
+
+        let mut malformed_member = valid.clone();
+        malformed_member["rooms"][0]["members"][0] = json!({
+            "kind": "human",
+            "authId": "guest-1"
+        });
+        cases.push(malformed_member);
+
+        let mut malformed_typing = valid.clone();
+        malformed_typing["typingUsers"][0]["expiresAtMs"] = json!("soon");
+        cases.push(malformed_typing);
+
+        for malformed in cases {
+            assert!(matches!(
+                project_sharing_state(malformed, Some("auth-user".into())),
+                Err(ProductError::Response(_))
+            ));
+        }
     }
 
     #[test]
