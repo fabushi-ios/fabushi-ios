@@ -46,6 +46,26 @@ const TEST_MARKETPLACE_PLUGINS: &[(&str, &str, &str)] = &[
 const TEST_MARKETPLACE_REPOSITORY: &str = "https://github.com/bhrumom/fabushi";
 const TEST_MARKETPLACE_SOURCE_REF: &str = "7b02d8d00e0646e9bf4e90a129cbf203fcff015d";
 
+const SHARING_RPC_METHODS: [&str; 6] = [
+    "sharing.state",
+    "sharing.createRoomInvite",
+    "sharing.respondToRoomJoinRequest",
+    "sharing.addOwnAgent",
+    "sharing.removeOwnAgent",
+    "sharing.leaveRoom",
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SharingRpc {
+    State,
+    CreateRoomInvite,
+    RespondToRoomJoinRequest,
+    AddOwnAgent,
+    RemoveOwnAgent,
+    LeaveRoom,
+}
+
+
 impl From<AppHostFeatureMode> for HostMode {
     fn from(value: AppHostFeatureMode) -> Self {
         match value {
@@ -172,52 +192,7 @@ impl AppHost {
                 .product
                 .execute("mahayana.platform.request", &params)
                 .map_err(|error| AppHostError::Operation(error.to_string())),
-            "sharing.state" => self
-                .product
-                .sharing_state()
-                .map_err(|error| AppHostError::Operation(error.to_string())),
-            "sharing.createRoomInvite" => self
-                .product
-                .sharing_create_room_invite(string_param(&params, "roomId")?)
-                .map_err(|error| AppHostError::Operation(error.to_string())),
-            "sharing.respondToRoomJoinRequest" => {
-                let approved = params
-                    .get("isApproved")
-                    .and_then(Value::as_bool)
-                    .ok_or_else(|| AppHostError::InvalidRequest("isApproved is required".into()))?;
-                self.product
-                    .sharing_respond_to_join_request(
-                        string_param(&params, "requestId")?,
-                        approved,
-                    )
-                    .map_err(|error| AppHostError::Operation(error.to_string()))
-            }
-            "sharing.addOwnAgent" => self
-                .product
-                .sharing_add_own_agent(
-                    string_param(&params, "roomId")?,
-                    string_param(&params, "agentId")?,
-                    string_param(&params, "agentName")?,
-                )
-                .map_err(|error| AppHostError::Operation(error.to_string())),
-            "sharing.removeOwnAgent" => self
-                .product
-                .sharing_remove_own_agent(
-                    string_param(&params, "roomId")?,
-                    string_param(&params, "agentId")?,
-                )
-                .map_err(|error| AppHostError::Operation(error.to_string())),
-            "sharing.leaveRoom" => self
-                .product
-                .sharing_leave_room(
-                    string_param(&params, "roomId")?,
-                    params
-                        .get("targetAuthId")
-                        .and_then(Value::as_str)
-                        .map(str::trim)
-                        .filter(|value| !value.is_empty()),
-                )
-                .map_err(|error| AppHostError::Operation(error.to_string())),
+            method if method.starts_with("sharing.") => self.handle_sharing(method, params),
             "getLinkMetadata" => self.get_link_metadata(params),
             "listAllAutomations" => self.list_all_automations(),
             "plugin.permissions" => self.plugin_permissions(params),
@@ -234,6 +209,54 @@ impl AppHost {
         }
     }
 
+
+    fn handle_sharing(&self, method: &str, params: Value) -> Result<Value, AppHostError> {
+        let rpc = sharing_rpc(method)?;
+        validate_sharing_params(rpc, &params)?;
+        match rpc {
+            SharingRpc::State => self
+                .product
+                .sharing_state()
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            SharingRpc::CreateRoomInvite => self
+                .product
+                .sharing_create_room_invite(string_param(&params, "roomId")?)
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            SharingRpc::RespondToRoomJoinRequest => self
+                .product
+                .sharing_respond_to_join_request(
+                    string_param(&params, "requestId")?,
+                    bool_param(&params, "isApproved")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            SharingRpc::AddOwnAgent => self
+                .product
+                .sharing_add_own_agent(
+                    string_param(&params, "roomId")?,
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "agentName")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            SharingRpc::RemoveOwnAgent => self
+                .product
+                .sharing_remove_own_agent(
+                    string_param(&params, "roomId")?,
+                    string_param(&params, "agentId")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            SharingRpc::LeaveRoom => self
+                .product
+                .sharing_leave_room(
+                    string_param(&params, "roomId")?,
+                    params
+                        .get("targetAuthId")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty()),
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+        }
+    }
 
     fn list_all_automations(&self) -> Result<Value, AppHostError> {
         let rows = self
@@ -1513,6 +1536,59 @@ fn string_param<'a>(params: &'a Value, name: &str) -> Result<&'a str, AppHostErr
         .ok_or_else(|| AppHostError::InvalidRequest(format!("{name} is required")))
 }
 
+fn bool_param(params: &Value, name: &str) -> Result<bool, AppHostError> {
+    params
+        .get(name)
+        .and_then(Value::as_bool)
+        .ok_or_else(|| {
+            AppHostError::InvalidRequest(format!("{name} is required and must be boolean"))
+        })
+}
+
+fn sharing_rpc(method: &str) -> Result<SharingRpc, AppHostError> {
+    match method {
+        "sharing.state" => Ok(SharingRpc::State),
+        "sharing.createRoomInvite" => Ok(SharingRpc::CreateRoomInvite),
+        "sharing.respondToRoomJoinRequest" => Ok(SharingRpc::RespondToRoomJoinRequest),
+        "sharing.addOwnAgent" => Ok(SharingRpc::AddOwnAgent),
+        "sharing.removeOwnAgent" => Ok(SharingRpc::RemoveOwnAgent),
+        "sharing.leaveRoom" => Ok(SharingRpc::LeaveRoom),
+        other => Err(AppHostError::InvalidRequest(format!(
+            "unknown sharing method {other}"
+        ))),
+    }
+}
+
+fn validate_sharing_params(rpc: SharingRpc, params: &Value) -> Result<(), AppHostError> {
+    match rpc {
+        SharingRpc::State => Ok(()),
+        SharingRpc::CreateRoomInvite => {
+            string_param(params, "roomId")?;
+            Ok(())
+        }
+        SharingRpc::RespondToRoomJoinRequest => {
+            string_param(params, "requestId")?;
+            bool_param(params, "isApproved")?;
+            Ok(())
+        }
+        SharingRpc::AddOwnAgent => {
+            string_param(params, "roomId")?;
+            string_param(params, "agentId")?;
+            string_param(params, "agentName")?;
+            Ok(())
+        }
+        SharingRpc::RemoveOwnAgent => {
+            string_param(params, "roomId")?;
+            string_param(params, "agentId")?;
+            Ok(())
+        }
+        SharingRpc::LeaveRoom => {
+            string_param(params, "roomId")?;
+            Ok(())
+        }
+    }
+}
+
 fn surface_platform() -> SurfacePlatform {
     if cfg!(target_os = "ios") {
         SurfacePlatform::Ios
@@ -1644,4 +1720,98 @@ mod fabushi_shipping_inference_tests {
             "https://api.ombhrum.com/codex-deepseek/v1/responses"
         );
     }
+
+    fn assert_required_string_rejected(rpc: SharingRpc, base: Value, field: &str) {
+        let mut missing = base.clone();
+        missing
+            .as_object_mut()
+            .expect("sharing test params must be an object")
+            .remove(field);
+        assert!(validate_sharing_params(rpc, &missing).is_err());
+
+        for invalid in [Value::Null, json!(7), json!("   ")] {
+            let mut params = base.clone();
+            params
+                .as_object_mut()
+                .expect("sharing test params must be an object")
+                .insert(field.to_string(), invalid);
+            assert!(validate_sharing_params(rpc, &params).is_err());
+        }
+    }
+
+    #[test]
+    fn shared_room_rpc_surface_is_closed_to_six_shipping_methods() {
+        assert_eq!(
+            SHARING_RPC_METHODS,
+            [
+                "sharing.state",
+                "sharing.createRoomInvite",
+                "sharing.respondToRoomJoinRequest",
+                "sharing.addOwnAgent",
+                "sharing.removeOwnAgent",
+                "sharing.leaveRoom",
+            ]
+        );
+        for method in SHARING_RPC_METHODS {
+            assert!(sharing_rpc(method).is_ok(), "{method} must remain routable");
+        }
+        for method in [
+            "sharing.getSharingState",
+            "sharing.addOwnAgentToSharedRoom",
+            "sharing.removeOwnAgentFromSharedRoom",
+            "sharing.leaveSharedRoom",
+            "sharing.deleteRoom",
+        ] {
+            assert!(sharing_rpc(method).is_err(), "{method} must fail closed");
+        }
+    }
+
+    #[test]
+    fn shared_room_required_identities_and_reply_fail_closed() {
+        assert_required_string_rejected(
+            SharingRpc::CreateRoomInvite,
+            json!({"roomId": "room-1"}),
+            "roomId",
+        );
+        assert_required_string_rejected(
+            SharingRpc::RespondToRoomJoinRequest,
+            json!({"requestId": "req-1", "isApproved": true}),
+            "requestId",
+        );
+        for field in ["roomId", "agentId", "agentName"] {
+            assert_required_string_rejected(
+                SharingRpc::AddOwnAgent,
+                json!({"roomId": "room-1", "agentId": "agent-1", "agentName": "Agent"}),
+                field,
+            );
+        }
+        assert_required_string_rejected(
+            SharingRpc::RemoveOwnAgent,
+            json!({"roomId": "room-1", "agentId": "agent-1"}),
+            "agentId",
+        );
+        assert_required_string_rejected(
+            SharingRpc::LeaveRoom,
+            json!({"roomId": "room-1"}),
+            "roomId",
+        );
+
+        for params in [
+            json!({"requestId": "req-1"}),
+            json!({"requestId": "req-1", "isApproved": "true"}),
+            json!({"requestId": "req-1", "isApproved": null}),
+        ] {
+            assert!(validate_sharing_params(
+                SharingRpc::RespondToRoomJoinRequest,
+                &params
+            )
+            .is_err());
+        }
+        assert!(validate_sharing_params(
+            SharingRpc::RespondToRoomJoinRequest,
+            &json!({"requestId": "req-1", "isApproved": false})
+        )
+        .is_ok());
+    }
+
 }
