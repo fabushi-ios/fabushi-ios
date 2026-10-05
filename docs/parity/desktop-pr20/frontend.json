@@ -58,11 +58,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "The schema-governed tool invocation responsibility is applicable, but iOS currently exposes Mini App tools through WebMCP/native approval flow without an equivalent native slash-command/form parser. Do not claim the existing bridge as feature parity.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
+      "ios_platform_delta": "iOS preserves the canonical MCP inputSchema in MiniAppToolContract, injects that same schema into WebMCP registration, and ships a native /tool command bar matching Desktop zero-field and single-string direct calls plus schema-backed form defaults, enum/type/required validation, and approval-gated execution through the existing canonical MarketplaceModel runtime owner.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Reviewed gap: tool execution/approval exists; the Desktop command/form UX responsibility still needs an explicit iOS-native product decision or implementation."
+      "notes": "Implemented against Desktop final HEAD 798cf51d. Existing WebMCP/runtime ownership is reused rather than bypassed. Keep below verified until the new exact iOS HEAD passes architecture, unit/UI, device-archive and protected-session acceptance."
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/index.ts",

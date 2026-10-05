@@ -31,6 +31,147 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertFalse(isTrustedWebMcpBridgeHost(nil))
     }
 
+    func testWebMcpToolContractPreservesCanonicalInputSchemaForNativeAndInjectedUX() throws {
+        let tool = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "configure",
+            "title": "配置",
+            "description": "配置测试 Tool",
+            "inputSchema": [
+                "type": "object",
+                "required": ["count"],
+                "properties": [
+                    "count": ["type": "integer"],
+                    "enabled": ["type": "boolean"],
+                ],
+            ],
+            "annotations": ["readOnlyHint": true],
+        ]))
+        XCTAssertEqual(tool.title, "配置")
+        XCTAssertEqual(tool.inputSchemaObject?["type"] as? String, "object")
+        let properties = try XCTUnwrap(tool.inputSchemaObject?["properties"] as? [String: Any])
+        XCTAssertEqual((properties["count"] as? [String: Any])?["type"] as? String, "integer")
+
+        let plugin = MarketplacePlugin(
+            pluginId: "schema-test",
+            displayName: "Schema Test",
+            description: "test",
+            latestVersion: nil,
+            tools: [tool]
+        )
+        let definition = try XCTUnwrap(webMcpToolDefinitions(plugin: plugin).first)
+        let injectedSchema = try XCTUnwrap(definition["inputSchema"] as? [String: Any])
+        XCTAssertEqual(injectedSchema["type"] as? String, "object")
+        XCTAssertNotNil((injectedSchema["properties"] as? [String: Any])?["enabled"])
+    }
+
+    func testToolCommandParserMatchesDesktopSlashAndDefaultSemantics() throws {
+        let status = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "status",
+            "inputSchema": ["type": "object", "properties": [String: Any]()],
+            "annotations": ["readOnlyHint": true],
+        ]))
+        let echo = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "echo",
+            "inputSchema": [
+                "type": "object",
+                "properties": ["message": ["type": "string"]],
+            ],
+            "annotations": ["readOnlyHint": true],
+        ]))
+        let configure = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "configure",
+            "inputSchema": [
+                "type": "object",
+                "required": ["count", "mode"],
+                "properties": [
+                    "region": ["type": "string", "default": "cn"],
+                    "enabled": ["type": "boolean"],
+                    "tags": ["type": "array", "items": ["type": "string"]],
+                    "count": ["type": "integer"],
+                    "mode": ["type": "string", "enum": ["safe", "fast"]],
+                ],
+            ],
+            "annotations": ["readOnlyHint": true],
+        ]))
+        let tools = [status, echo, configure]
+
+        XCTAssertEqual(try parseMiniAppToolCommand("hello", tools: tools), .text("hello"))
+
+        switch try parseMiniAppToolCommand("/status", tools: tools) {
+        case .call(let tool, let arguments):
+            XCTAssertEqual(tool.name, "status")
+            XCTAssertTrue(arguments.isEmpty)
+        default:
+            XCTFail("zero-field tool should call immediately")
+        }
+
+        switch try parseMiniAppToolCommand("/echo hello world", tools: tools) {
+        case .call(let tool, let arguments):
+            XCTAssertEqual(tool.name, "echo")
+            XCTAssertEqual(arguments["message"], .string("hello world"))
+        default:
+            XCTFail("single-string tool should receive the remainder directly")
+        }
+
+        switch try parseMiniAppToolCommand("/configure", tools: tools) {
+        case .form(let tool, let initial):
+            XCTAssertEqual(tool.name, "configure")
+            XCTAssertEqual(initial["region"], .string("cn"))
+            XCTAssertEqual(initial["enabled"], .boolean(false))
+            XCTAssertEqual(initial["tags"], .array([]))
+            XCTAssertNil(initial["count"])
+            XCTAssertNil(initial["mode"])
+        default:
+            XCTFail("structured tool should open a schema form")
+        }
+
+        XCTAssertThrowsError(try parseMiniAppToolCommand("/missing", tools: tools)) { error in
+            XCTAssertEqual(error.localizedDescription, "当前插件没有 /missing Tool")
+        }
+    }
+
+    func testToolCommandSchemaValidationFailsBeforeExecutionAndAcceptsValidForm() throws {
+        let tool = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
+            "name": "configure",
+            "inputSchema": [
+                "type": "object",
+                "required": ["count", "mode"],
+                "properties": [
+                    "count": ["type": "integer"],
+                    "mode": ["type": "string", "enum": ["safe", "fast"]],
+                    "options": [
+                        "type": "object",
+                        "properties": [
+                            "dryRun": ["type": "boolean"],
+                        ],
+                    ],
+                ],
+            ],
+            "annotations": ["readOnlyHint": true],
+        ]))
+        let schema = try XCTUnwrap(tool.inputSchemaObject)
+
+        let missing = validateMiniAppSchemaValue(schema, value: .object([:]))
+        XCTAssertTrue(missing.contains("$.count 是必填项"))
+        XCTAssertTrue(missing.contains("$.mode 是必填项"))
+
+        let wrongTypes = validateMiniAppSchemaValue(schema, value: .object([
+            "count": .string("two"),
+            "mode": .string("unsafe"),
+            "options": .array([]),
+        ]))
+        XCTAssertTrue(wrongTypes.contains("$.count 必须是整数"))
+        XCTAssertTrue(wrongTypes.contains("$.mode 必须是枚举中的一个值"))
+        XCTAssertTrue(wrongTypes.contains("$.options 必须是对象"))
+
+        let valid = validateMiniAppSchemaValue(schema, value: .object([
+            "count": .integer(2),
+            "mode": .string("safe"),
+            "options": .object(["dryRun": .boolean(false)]),
+        ]))
+        XCTAssertEqual(valid, [])
+    }
+
     func testGlobalDharmaStatusFallbackIsReadOnlyAndNarrow() {
         let tool = MarketplaceModel.globalDharmaStatusFallbackTool
         XCTAssertEqual(tool.name, "status")

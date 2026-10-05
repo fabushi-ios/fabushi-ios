@@ -91,6 +91,31 @@ struct MiniAppToolContract: Equatable, Sendable {
     let name: String
     let description: String
     let approval: String
+    let title: String?
+    let inputSchemaJSON: String?
+
+    init(
+        name: String,
+        description: String,
+        approval: String,
+        title: String? = nil,
+        inputSchemaJSON: String? = nil
+    ) {
+        self.name = name
+        self.description = description
+        self.approval = approval
+        self.title = title
+        self.inputSchemaJSON = inputSchemaJSON
+    }
+
+    var inputSchemaObject: [String: Any]? {
+        guard let inputSchemaJSON,
+              let data = inputSchemaJSON.data(using: .utf8),
+              let raw = try? JSONSerialization.jsonObject(with: data),
+              let object = raw as? [String: Any]
+        else { return nil }
+        return object
+    }
 }
 
 struct MarketplacePlugin: Identifiable, Equatable, Sendable {
@@ -950,6 +975,14 @@ final class MarketplaceModel {
         }
     }
 
+    private static func canonicalInputSchemaJSON(_ value: Any?) -> String? {
+        guard let object = value as? [String: Any],
+              JSONSerialization.isValidJSONObject(object),
+              let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
     static func marketplacePlugin(from item: [String: Any]) -> MarketplacePlugin? {
         guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
         let source = item["source"] as? [String: Any]
@@ -999,10 +1032,14 @@ final class MarketplaceModel {
         }
         let description = (item["description"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = (item["title"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         return MiniAppToolContract(
             name: name,
             description: description?.isEmpty == false ? description! : name,
-            approval: approval
+            approval: approval,
+            title: title?.isEmpty == false ? title : nil,
+            inputSchemaJSON: canonicalInputSchemaJSON(item["inputSchema"])
         )
     }
 
@@ -1291,10 +1328,14 @@ final class MarketplaceModel {
         else { return nil }
         let description = ((command["description"] as? String) ?? name)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = (command["title"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         return MiniAppToolContract(
             name: name,
             description: description.isEmpty ? name : description,
-            approval: (command["approval"] as? String) ?? "none"
+            approval: (command["approval"] as? String) ?? "none",
+            title: title?.isEmpty == false ? title : nil,
+            inputSchemaJSON: canonicalInputSchemaJSON(command["inputSchema"] ?? command["schema"])
         )
     }
 }
