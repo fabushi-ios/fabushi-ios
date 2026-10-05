@@ -2,6 +2,7 @@ import SwiftUI
 
 internal struct MobileBotAgentSettingsSheet: View {
     let agent: MobileBotSummary
+    let roster: [MobileBotSummary]
     let bridge: IOSPreloadBridge
     let accountScopeKey: String
     let onRosterChanged: ([MobileBotSummary]) -> Void
@@ -18,12 +19,14 @@ internal struct MobileBotAgentSettingsSheet: View {
 
     init(
         agent: MobileBotSummary,
+        roster: [MobileBotSummary],
         bridge: IOSPreloadBridge,
         accountScopeKey: String,
         onRosterChanged: @escaping ([MobileBotSummary]) -> Void,
         onClose: @escaping () -> Void
     ) {
         self.agent = agent
+        self.roster = roster
         self.bridge = bridge
         self.accountScopeKey = accountScopeKey
         self.onRosterChanged = onRosterChanged
@@ -95,6 +98,13 @@ internal struct MobileBotAgentSettingsSheet: View {
                         Text("当这个 Agent 完成任务或需要输入时通知我。")
                     }
                 }
+
+                MobileBotSharedRoomTrigger(
+                    agent: currentAgent,
+                    roster: roster,
+                    bridge: bridge,
+                    accountScopeKey: accountScopeKey
+                )
 
                 if let failure {
                     Section {
