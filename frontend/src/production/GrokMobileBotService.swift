@@ -63,6 +63,75 @@ struct GrokMobileBotService {
         return await loadBots()
     }
 
+    func renameBot(id: String, name: String) async throws -> [MobileBotSummary] {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Bot 名称不能为空"]
+            )
+        }
+        return try await executeBotMutation(
+            Self.renameCommand(
+                id: id,
+                name: trimmed,
+                requestId: "ios-mobile-bot-rename-\(UUID().uuidString.lowercased())"
+            )
+        )
+    }
+
+    func duplicateBot(id: String) async throws -> [MobileBotSummary] {
+        try await executeBotMutation(
+            Self.duplicateCommand(
+                id: id,
+                requestId: "ios-mobile-bot-clone-\(UUID().uuidString.lowercased())"
+            )
+        )
+    }
+
+    func deleteBot(id: String) async throws -> [MobileBotSummary] {
+        try await executeBotMutation(
+            Self.deleteCommand(
+                id: id,
+                requestId: "ios-mobile-bot-delete-\(UUID().uuidString.lowercased())"
+            )
+        )
+    }
+
+    static func renameCommand(id: String, name: String, requestId: String) -> [String: Any] {
+        [
+            "type": "bot.update",
+            "requestId": requestId,
+            "id": id,
+            "name": String(name.prefix(72)),
+        ]
+    }
+
+    static func duplicateCommand(id: String, requestId: String) -> [String: Any] {
+        [
+            "type": "bot.clone",
+            "requestId": requestId,
+            "id": id,
+        ]
+    }
+
+    static func deleteCommand(id: String, requestId: String) -> [String: Any] {
+        [
+            "type": "bot.delete",
+            "requestId": requestId,
+            "id": id,
+        ]
+    }
+
+    private func executeBotMutation(_ command: [String: Any]) async throws -> [MobileBotSummary] {
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: ["command": command]
+        )
+        return await loadBots()
+    }
+
     static func mergeBots(
         _ installed: [MobileBotSummary],
         _ surface: [MobileBotSummary]
