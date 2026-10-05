@@ -681,6 +681,96 @@ impl MahayanaProductClient {
         &self.api_base_url
     }
 
+    /// Host-owned cross-user sharing state. The native/UI shell never receives
+    /// the account bearer token, and generic platform.request intentionally
+    /// continues to reject /sand paths.
+    pub fn sharing_state(&self) -> Result<Value, ProductError> {
+        let token = self.authorization_token(&Value::Null)?;
+        let raw = self.post_json("/sand/share-state", json!({}), Some(&token))?;
+        Ok(project_sharing_state(raw, jwt_subject_from_access_token(&token)))
+    }
+
+    pub fn sharing_create_room_invite(&self, room_id: &str) -> Result<Value, ProductError> {
+        let room_id = non_empty(room_id, "roomId")?;
+        let token = self.authorization_token(&Value::Null)?;
+        match self.post_json(
+            "/sand/share-rooms/invite-links",
+            json!({"roomId": room_id}),
+            Some(&token),
+        ) {
+            Ok(result) => Ok(project_room_invite_result(&result)),
+            Err(error) => Ok(json!({"status": "error", "message": error.to_string()})),
+        }
+    }
+
+    pub fn sharing_respond_to_join_request(
+        &self,
+        request_id: &str,
+        is_approved: bool,
+    ) -> Result<Value, ProductError> {
+        let request_id = non_empty(request_id, "requestId")?;
+        let token = self.authorization_token(&Value::Null)?;
+        self.post_json(
+            "/sand/share-rooms/join/respond",
+            json!({"requestId": request_id, "isApproved": is_approved}),
+            Some(&token),
+        )?;
+        self.sharing_state()
+    }
+
+    pub fn sharing_add_own_agent(
+        &self,
+        room_id: &str,
+        agent_id: &str,
+        agent_name: &str,
+    ) -> Result<Value, ProductError> {
+        let room_id = non_empty(room_id, "roomId")?;
+        let agent_id = non_empty(agent_id, "agentId")?;
+        let agent_name = non_empty(agent_name, "agentName")?;
+        let token = self.authorization_token(&Value::Null)?;
+        self.post_json(
+            "/sand/share-rooms/agents/add",
+            json!({"roomId": room_id, "agentId": agent_id, "agentName": agent_name}),
+            Some(&token),
+        )?;
+        self.sharing_state()
+    }
+
+    pub fn sharing_remove_own_agent(
+        &self,
+        room_id: &str,
+        agent_id: &str,
+    ) -> Result<Value, ProductError> {
+        let room_id = non_empty(room_id, "roomId")?;
+        let agent_id = non_empty(agent_id, "agentId")?;
+        let token = self.authorization_token(&Value::Null)?;
+        self.post_json(
+            "/sand/share-rooms/agents/remove",
+            json!({"roomId": room_id, "agentId": agent_id}),
+            Some(&token),
+        )?;
+        self.sharing_state()
+    }
+
+    pub fn sharing_leave_room(
+        &self,
+        room_id: &str,
+        target_auth_id: Option<&str>,
+    ) -> Result<Value, ProductError> {
+        let room_id = non_empty(room_id, "roomId")?;
+        let target_auth_id = target_auth_id
+            .map(|value| non_empty(value, "targetAuthId"))
+            .transpose()?;
+        let token = self.authorization_token(&Value::Null)?;
+        let mut body = json!({"roomId": room_id});
+        if let Some(target_auth_id) = target_auth_id {
+            body["targetAuthId"] = Value::String(target_auth_id.to_string());
+        }
+        self.post_json("/sand/share-rooms/leave", body, Some(&token))?;
+        self.sharing_state()
+    }
+
+
     /// Returns a previously stored first-party requested secret without ever
     /// serializing it through the renderer/product command response. Callers
     /// must already know the opaque request id that created the secret.
@@ -3344,6 +3434,66 @@ fn safe_platform_path(value: &str) -> Result<&str, ProductError> {
         && !value.contains('#');
     safe.then_some(value)
         .ok_or(ProductError::InvalidParameter("path"))
+}
+
+fn project_sharing_state(raw: Value, self_auth_id: Option<String>) -> Value {
+    let pending_join_requests = raw
+        .get("pendingJoinRequests")
+        .cloned()
+        .filter(Value::is_array)
+        .unwrap_or_else(|| Value::Array(Vec::new()));
+    let rooms = raw
+        .get("rooms")
+        .cloned()
+        .filter(Value::is_array)
+        .unwrap_or_else(|| Value::Array(Vec::new()));
+    let typing_users = raw
+        .get("typingUsers")
+        .cloned()
+        .filter(Value::is_array)
+        .unwrap_or_else(|| Value::Array(Vec::new()));
+    json!({
+        "isEnabled": raw.get("isEnabled").and_then(Value::as_bool).unwrap_or(true),
+        "selfAuthId": self_auth_id,
+        "pendingJoinRequests": pending_join_requests,
+        "rooms": rooms,
+        "typingUsers": typing_users,
+    })
+}
+
+fn project_room_invite_result(result: &Value) -> Value {
+    let room_id = result
+        .get("room")
+        .and_then(Value::as_object)
+        .and_then(|room| room.get("roomId"))
+        .and_then(Value::as_str);
+    let share_url = result.get("shareUrl").and_then(Value::as_str);
+    let expires_at_ms = result.get("expiresAtMs").and_then(Value::as_f64);
+    match (room_id, share_url, expires_at_ms) {
+        (Some(room_id), Some(share_url), Some(expires_at_ms)) if expires_at_ms.is_finite() => json!({
+            "status": "ok",
+            "shareUrl": share_url,
+            "expiresAtMs": expires_at_ms,
+            "roomId": room_id,
+        }),
+        _ => json!({"status": "error", "message": "The invite link could not be created."}),
+    }
+}
+
+fn jwt_subject_from_access_token(token: &str) -> Option<String> {
+    use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
+    let encoded = token.split('.').nth(1)?;
+    let payload = URL_SAFE_NO_PAD
+        .decode(encoded)
+        .or_else(|_| URL_SAFE.decode(encoded))
+        .ok()?;
+    serde_json::from_slice::<Value>(&payload)
+        .ok()?
+        .get("sub")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn decode_value<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T, ProductError> {
