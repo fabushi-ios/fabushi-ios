@@ -172,6 +172,52 @@ impl AppHost {
                 .product
                 .execute("mahayana.platform.request", &params)
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "sharing.state" => self
+                .product
+                .sharing_state()
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "sharing.createRoomInvite" => self
+                .product
+                .sharing_create_room_invite(string_param(&params, "roomId")?)
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "sharing.respondToRoomJoinRequest" => {
+                let approved = params
+                    .get("isApproved")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| AppHostError::InvalidRequest("isApproved is required".into()))?;
+                self.product
+                    .sharing_respond_to_join_request(
+                        string_param(&params, "requestId")?,
+                        approved,
+                    )
+                    .map_err(|error| AppHostError::Operation(error.to_string()))
+            }
+            "sharing.addOwnAgent" => self
+                .product
+                .sharing_add_own_agent(
+                    string_param(&params, "roomId")?,
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "agentName")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "sharing.removeOwnAgent" => self
+                .product
+                .sharing_remove_own_agent(
+                    string_param(&params, "roomId")?,
+                    string_param(&params, "agentId")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "sharing.leaveRoom" => self
+                .product
+                .sharing_leave_room(
+                    string_param(&params, "roomId")?,
+                    params
+                        .get("targetAuthId")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty()),
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "getLinkMetadata" => self.get_link_metadata(params),
             "listAllAutomations" => self.list_all_automations(),
             "plugin.permissions" => self.plugin_permissions(params),
