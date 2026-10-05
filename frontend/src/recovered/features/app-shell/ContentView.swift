@@ -78,6 +78,8 @@ struct ContentView: View {
         messaging: MessagingModel,
         appAgentSurface: FabushiAppAgentSurface,
         initialConversation: ConversationSummary? = nil,
+        initialMessageID: String? = nil,
+        initialSection: MobileSection? = nil,
         onShellBack: (() -> Void)? = nil
     ) {
         self.model = model
@@ -85,6 +87,8 @@ struct ContentView: View {
         self.appAgentSurface = appAgentSurface
         self.onShellBack = onShellBack
         _selectedConversation = State(initialValue: initialConversation)
+        _pendingInitialMessageID = State(initialValue: initialMessageID)
+        _activeSection = State(initialValue: initialSection)
     }
 
     @State var openedMiniApp: MarketplacePlugin?
@@ -93,6 +97,7 @@ struct ContentView: View {
     @State var isSearching = false
     @State var homeQuery = ""
     @State var selectedConversation: ConversationSummary?
+    @State var pendingInitialMessageID: String?
     @State var messageDraft = ""
     @State var draftSyncTask: Task<Void, Never>?
     @State var replyTarget: ChatMessage?

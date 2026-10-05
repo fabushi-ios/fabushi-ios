@@ -26,9 +26,39 @@ internal enum MobileCommandPaletteTab: String, CaseIterable, Identifiable {
     }
 }
 
+internal enum MobileCommandPaletteProviderStatus: Equatable {
+    case idle
+    case loading
+    case ready
+    case empty
+    case failed(String)
+    case unavailable
+    case cancelled
+}
+
+internal struct MobileCommandPaletteLinkMetadata: Equatable {
+    let title: String?
+    let description: String?
+    let hostname: String?
+}
+
+internal struct MobileCommandPaletteRoutine: Identifiable, Equatable {
+    let agentId: String
+    let automationId: String
+    let name: String
+    let triggerDescription: String
+    let createdAt: Double
+    let lastRunAt: Double?
+
+    var id: String { "routine:\(agentId):\(automationId)" }
+}
+
 internal enum MobileCommandPaletteActionKind: String {
     case createBot
     case openWorkspace
+    case openContacts
+    case openChannels
+    case openSettings
 }
 
 internal struct MobileCommandPaletteAction: Identifiable {
@@ -64,6 +94,8 @@ internal struct MobileCommandPaletteLink: Identifiable {
     let messageId: String
     let conversationTitle: String
     let url: String
+    var metadataTitle: String? = nil
+    var metadataDescription: String? = nil
 
     var id: String { "link:\(conversationId):\(messageId):\(url)" }
 
@@ -80,6 +112,7 @@ internal enum MobileCommandPaletteEntry: Identifiable {
     case message(MobileCommandPaletteMessage)
     case file(MobileCommandPaletteFile)
     case link(MobileCommandPaletteLink)
+    case routine(MobileCommandPaletteRoutine)
     case action(MobileCommandPaletteAction)
 
     var id: String {
@@ -89,6 +122,7 @@ internal enum MobileCommandPaletteEntry: Identifiable {
         case .message(let message): message.id
         case .file(let file): file.id
         case .link(let link): link.id
+        case .routine(let routine): routine.id
         case .action(let action): "action:\(action.id)"
         }
     }
@@ -105,7 +139,8 @@ internal enum MobileCommandPaletteEntry: Identifiable {
         case .conversation(let conversation): conversation.title
         case .message(let message): message.snippet
         case .file(let file): file.fileName
-        case .link(let link): link.displayURL
+        case .link(let link): link.metadataTitle ?? link.displayURL
+        case .routine(let routine): routine.name
         case .action(let action): action.label
         }
     }
@@ -121,7 +156,9 @@ internal enum MobileCommandPaletteEntry: Identifiable {
         case .file(let file):
             return "\(file.conversationTitle) · \(file.kind.capitalized)"
         case .link(let link):
-            return link.conversationTitle
+            return link.metadataDescription ?? link.conversationTitle
+        case .routine(let routine):
+            return routine.triggerDescription.isEmpty ? "Routine" : routine.triggerDescription
         case .action(let action):
             return action.detail
         }
@@ -135,8 +172,15 @@ internal enum MobileCommandPaletteEntry: Identifiable {
         case .message: return "quote.bubble"
         case .file: return "doc"
         case .link: return "link"
+        case .routine: return "clock.arrow.circlepath"
         case .action(let action):
-            return action.kind == .createBot ? "plus.circle" : "rectangle.grid.1x2"
+            switch action.kind {
+            case .createBot: return "plus.circle"
+            case .openWorkspace: return "rectangle.grid.1x2"
+            case .openContacts: return "person.2"
+            case .openChannels: return "megaphone"
+            case .openSettings: return "gearshape"
+            }
         }
     }
 }
@@ -265,6 +309,8 @@ internal enum GrokMobileCommandPaletteModel {
         conversations: [ConversationSummary],
         messagesByConversation: [String: [ChatMessage]],
         actions: [MobileCommandPaletteAction],
+        routines: [MobileCommandPaletteRoutine] = [],
+        linkMetadata: [String: MobileCommandPaletteLinkMetadata] = [:],
         query: String,
         tab: MobileCommandPaletteTab
     ) -> [MobileCommandPaletteEntry] {
@@ -279,9 +325,15 @@ internal enum GrokMobileCommandPaletteModel {
         let fileEntries = files(conversations: conversations, messagesByConversation: messagesByConversation)
             .map(MobileCommandPaletteEntry.file)
         let linkEntries = links(conversations: conversations, messagesByConversation: messagesByConversation)
-            .map(MobileCommandPaletteEntry.link)
+            .map { link -> MobileCommandPaletteEntry in
+                var enriched = link
+                enriched.metadataTitle = linkMetadata[link.url]?.title
+                enriched.metadataDescription = linkMetadata[link.url]?.description
+                return .link(enriched)
+            }
+        let routineEntries = routines.map(MobileCommandPaletteEntry.routine)
 
-        let base = (botEntries + conversationEntries + fileEntries + linkEntries + messageEntries + actionEntries)
+        let base = (botEntries + conversationEntries + fileEntries + linkEntries + routineEntries + messageEntries + actionEntries)
             .filter { matches(tab: tab, entry: $0) }
         let tokens = searchTokens(query)
         if tokens.isEmpty {
@@ -300,6 +352,49 @@ internal enum GrokMobileCommandPaletteModel {
             if $0.1 == $1.1 { return $0.0 < $1.0 }
             return $0.1 > $1.1
         }.prefix(100).map { $0.2 }
+    }
+
+
+    static func linkMetadata(from value: Any) -> MobileCommandPaletteLinkMetadata? {
+        guard let row = value as? [String: Any] else { return nil }
+        func clean(_ key: String) -> String? {
+            guard let raw = row[key] as? String else { return nil }
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }
+        let metadata = MobileCommandPaletteLinkMetadata(
+            title: clean("title"),
+            description: clean("description"),
+            hostname: clean("hostname")
+        )
+        return metadata.title == nil && metadata.description == nil && metadata.hostname == nil ? nil : metadata
+    }
+
+    static func routines(from value: Any) -> [MobileCommandPaletteRoutine] {
+        guard let rows = value as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
+        return rows.compactMap { row in
+            guard let agentId = row["agentId"] as? String,
+                  !agentId.isEmpty,
+                  let automation = row["automation"] as? [String: Any],
+                  let automationId = automation["id"] as? String,
+                  !automationId.isEmpty,
+                  let name = automation["name"] as? String,
+                  let triggerDescription = automation["triggerDescription"] as? String,
+                  let created = automation["createdAt"] as? NSNumber
+            else { return nil }
+            let identity = "\(agentId):\(automationId)"
+            guard seen.insert(identity).inserted else { return nil }
+            let lastRunAt = (automation["lastRunAt"] as? NSNumber)?.doubleValue
+            return MobileCommandPaletteRoutine(
+                agentId: agentId,
+                automationId: automationId,
+                name: name,
+                triggerDescription: triggerDescription,
+                createdAt: created.doubleValue,
+                lastRunAt: lastRunAt
+            )
+        }
     }
 
     private static func deduplicatedBots(_ bots: [MobileBotSummary]) -> [MobileBotSummary] {
@@ -331,6 +426,7 @@ internal enum GrokMobileCommandPaletteModel {
             if case .link = entry { return true }
             return false
         case .routines:
+            if case .routine = entry { return true }
             return false
         case .actions:
             if case .action = entry { return true }
@@ -373,7 +469,9 @@ internal enum GrokMobileCommandPaletteModel {
         case .file(let file):
             return [file.conversationTitle, file.kind, (file.fileName as NSString).pathExtension]
         case .link(let link):
-            return [link.conversationTitle, link.url]
+            return [link.conversationTitle, link.url, link.metadataTitle ?? "", link.metadataDescription ?? ""]
+        case .routine(let routine):
+            return [routine.agentId, routine.triggerDescription, "routine", "automation"]
         case .action(let action):
             return action.keywords
         }

@@ -36,6 +36,14 @@ final class IOSPreloadBridge {
         return JSONResult(value: result.foundationValue)
     }
 
+    func getLinkMetadata(url: String) async throws -> JSONResult {
+        try await request(method: "getLinkMetadata", params: ["url": url])
+    }
+
+    func listAllAutomations() async throws -> JSONResult {
+        try await request(method: "listAllAutomations")
+    }
+
     func shutdown() {
         client.shutdown()
     }

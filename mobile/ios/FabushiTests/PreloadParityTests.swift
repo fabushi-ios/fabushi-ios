@@ -67,6 +67,10 @@ final class PreloadParityTests: XCTestCase {
     func testPinnedMainRPCSurfaceAndEdgeChannelNames() {
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("openExternal"))
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("authenticateMcpServer"))
+        XCTAssertTrue(IOSMainRPCRuntime.isMethod("getLinkMetadata"))
+        XCTAssertEqual(IOSMainRPCRuntime.methodTable["getLinkMetadata"], .object)
+        XCTAssertTrue(IOSMainRPCRuntime.isMethod("listAllAutomations"))
+        XCTAssertEqual(IOSMainRPCRuntime.methodTable["listAllAutomations"], .none)
         XCTAssertFalse(IOSMainRPCRuntime.isMethod("totallyUnknownMethod"))
         XCTAssertEqual(
             IOSRPCEdgeRuntime.methodChannel(edge: "main", method: "openExternal"),

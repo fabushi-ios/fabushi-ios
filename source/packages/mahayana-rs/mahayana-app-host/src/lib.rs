@@ -3,7 +3,8 @@ use mahayana_core::{ModelProviderMode, RuntimeConfig};
 use mahayana_feature_host::FeatureHostController;
 use mahayana_host::HostCreateConfig;
 use mahayana_host_protocol::{
-    ApprovalResolution, FeatureCommand, HostConfig, HostMode, SurfacePlatform,
+    ApprovalResolution, AutomationSummary, AutomationTrigger, FeatureCommand, HostConfig, HostMode,
+    SurfacePlatform,
 };
 use mahayana_js_runtime::{DeepSeekJsHost, scan_package_compatibility};
 use mahayana_native_engine::ProcessExecution;
@@ -14,6 +15,8 @@ use mahayana_plugin_runtime::{
 use mahayana_product::MahayanaProductClient;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::io::Read as _;
+use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -169,6 +172,8 @@ impl AppHost {
                 .product
                 .execute("mahayana.platform.request", &params)
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "getLinkMetadata" => self.get_link_metadata(params),
+            "listAllAutomations" => self.list_all_automations(),
             "plugin.permissions" => self.plugin_permissions(params),
             "plugin.permission.grant" => self.set_permission(params, true),
             "plugin.permission.revoke" => self.set_permission(params, false),
@@ -181,6 +186,94 @@ impl AppHost {
                 "unknown method {other}"
             ))),
         }
+    }
+
+
+    fn list_all_automations(&self) -> Result<Value, AppHostError> {
+        let rows = self
+            .feature
+            .list_all_automations()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?
+            .into_iter()
+            .filter_map(|automation| routine_projection(automation))
+            .collect::<Vec<_>>();
+        Ok(Value::Array(rows))
+    }
+
+    fn get_link_metadata(&self, params: Value) -> Result<Value, AppHostError> {
+        let requested = string_param(&params, "url")?;
+        let parsed = validate_public_link_url(requested)?;
+        let hostname = parsed
+            .host_str()
+            .ok_or_else(|| AppHostError::InvalidRequest("link URL hostname is required".into()))?
+            .to_string();
+
+        let agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(8))
+            .redirects(0)
+            .build();
+        let mut current = parsed;
+        for _ in 0..=3 {
+            let response = match agent
+                .get(current.as_str())
+                .set("User-Agent", "Fabushi-iOS-LinkMetadata/1.0")
+                .set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1")
+                .call()
+            {
+                Ok(response) => response,
+                Err(ureq::Error::Status(status, response)) if (300..400).contains(&status) => {
+                    let location = response.header("Location").ok_or_else(|| {
+                        AppHostError::Operation("link metadata redirect omitted Location".into())
+                    })?;
+                    let next = current.join(location).map_err(|error| {
+                        AppHostError::InvalidRequest(format!("invalid link metadata redirect: {error}"))
+                    })?;
+                    current = validate_public_link_url(next.as_str())?;
+                    continue;
+                }
+                Err(error) => {
+                    return Err(AppHostError::Operation(format!(
+                        "link metadata request failed: {error}"
+                    )));
+                }
+            };
+
+            let content_type = response
+                .header("Content-Type")
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            if !content_type.is_empty()
+                && !content_type.contains("text/html")
+                && !content_type.contains("application/xhtml+xml")
+            {
+                return Ok(json!({
+                    "hostname": hostname,
+                    "title": hostname,
+                }));
+            }
+
+            let mut html = String::new();
+            response
+                .into_reader()
+                .take(1_048_576)
+                .read_to_string(&mut html)
+                .map_err(|error| AppHostError::Operation(format!("read link metadata: {error}")))?;
+            let title = html_tag_text(&html, "title");
+            let description = html_meta_content(&html, "description")
+                .or_else(|| html_meta_property_content(&html, "og:description"));
+            let image = html_meta_property_content(&html, "og:image");
+            return Ok(json!({
+                "hostname": hostname,
+                "title": title.unwrap_or_else(|| hostname.clone()),
+                "description": description,
+                "imageDataUrl": Value::Null,
+                "faviconDataUrl": Value::Null,
+                "imageUrl": image,
+            }));
+        }
+        Err(AppHostError::Operation(
+            "link metadata exceeded redirect limit".into(),
+        ))
     }
 
     fn handle_feature(&self, method: &str, params: Value) -> Result<Value, AppHostError> {
@@ -1207,6 +1300,164 @@ fn discover_js_entry(entry: &Option<String>, root: &Path) -> Result<PathBuf, App
     ))
 }
 
+
+fn routine_projection(automation: AutomationSummary) -> Option<Value> {
+    let agent_id = automation.agent_id.as_deref()?.trim();
+    if agent_id.is_empty() {
+        return None;
+    }
+    let trigger_description = match automation.trigger.as_ref() {
+        Some(AutomationTrigger::Schedule { schedule }) => schedule.clone(),
+        Some(AutomationTrigger::Event { source, event, filter }) => {
+            let source = serde_json::to_value(source)
+                .ok()
+                .and_then(|value| value.as_str().map(str::to_string))
+                .unwrap_or_else(|| "event".into());
+            match filter.as_deref().filter(|value| !value.trim().is_empty()) {
+                Some(filter) => format!("{source} · {event} · {filter}"),
+                None => format!("{source} · {event}"),
+            }
+        }
+        None => automation.schedule.clone(),
+    };
+    Some(json!({
+        "agentId": agent_id,
+        "automation": {
+            "id": automation.id,
+            "name": automation.name,
+            "triggerDescription": trigger_description,
+            "createdAt": automation.created_at_ms,
+            "lastRunAt": automation.last_run_at_ms,
+        }
+    }))
+}
+
+fn validate_public_link_url(raw: &str) -> Result<url::Url, AppHostError> {
+    let parsed = url::Url::parse(raw)
+        .map_err(|error| AppHostError::InvalidRequest(format!("invalid link URL: {error}")))?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err(AppHostError::InvalidRequest(
+            "link metadata only supports HTTP(S) URLs".into(),
+        ));
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(AppHostError::InvalidRequest(
+            "link metadata URL must not contain credentials".into(),
+        ));
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| AppHostError::InvalidRequest("link URL hostname is required".into()))?;
+    if host.eq_ignore_ascii_case("localhost") || host.ends_with(".localhost") {
+        return Err(AppHostError::InvalidRequest(
+            "link metadata rejects local network destinations".into(),
+        ));
+    }
+    let port = parsed.port_or_known_default().ok_or_else(|| {
+        AppHostError::InvalidRequest("link URL has no usable port".into())
+    })?;
+    let addresses = (host, port)
+        .to_socket_addrs()
+        .map_err(|error| AppHostError::Operation(format!("resolve link URL: {error}")))?
+        .collect::<Vec<_>>();
+    if addresses.is_empty() || addresses.iter().any(|address| !is_public_ip(address.ip())) {
+        return Err(AppHostError::InvalidRequest(
+            "link metadata rejects local or private network destinations".into(),
+        ));
+    }
+    Ok(parsed)
+}
+
+fn is_public_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => {
+            !ip.is_private()
+                && !ip.is_loopback()
+                && !ip.is_link_local()
+                && !ip.is_unspecified()
+                && !ip.is_multicast()
+                && ip.octets()[0] != 0
+        }
+        IpAddr::V6(ip) => {
+            !ip.is_loopback()
+                && !ip.is_unspecified()
+                && !ip.is_unique_local()
+                && !ip.is_unicast_link_local()
+                && !ip.is_multicast()
+        }
+    }
+}
+
+fn html_tag_text(html: &str, tag: &str) -> Option<String> {
+    let lowercase = html.to_ascii_lowercase();
+    let open = format!("<{tag}");
+    let start = lowercase.find(&open)?;
+    let content_start = lowercase[start..].find('>')? + start + 1;
+    let close = format!("</{tag}>");
+    let end = lowercase[content_start..].find(&close)? + content_start;
+    clean_html_text(&html[content_start..end])
+}
+
+fn html_meta_content(html: &str, name: &str) -> Option<String> {
+    html_meta_value(html, "name", name)
+}
+
+fn html_meta_property_content(html: &str, property: &str) -> Option<String> {
+    html_meta_value(html, "property", property)
+}
+
+fn html_meta_value(html: &str, attribute: &str, expected: &str) -> Option<String> {
+    let lowercase = html.to_ascii_lowercase();
+    let expected_a = format!("{attribute}=\"{}\"", expected.to_ascii_lowercase());
+    let expected_b = format!("{attribute}='{}'", expected.to_ascii_lowercase());
+    let mut cursor = 0;
+    while let Some(relative) = lowercase[cursor..].find("<meta") {
+        let start = cursor + relative;
+        let end = lowercase[start..].find('>')? + start + 1;
+        let lower_tag = &lowercase[start..end];
+        if lower_tag.contains(&expected_a) || lower_tag.contains(&expected_b) {
+            return html_attribute(&html[start..end], "content");
+        }
+        cursor = end;
+    }
+    None
+}
+
+fn html_attribute(tag: &str, attribute: &str) -> Option<String> {
+    let lower = tag.to_ascii_lowercase();
+    let needle = format!("{attribute}=");
+    let index = lower.find(&needle)? + needle.len();
+    let bytes = tag.as_bytes();
+    let quote = *bytes.get(index)?;
+    if quote == b'"' || quote == b'\'' {
+        let rest = &tag[index + 1..];
+        let end = rest.find(quote as char)?;
+        clean_html_text(&rest[..end])
+    } else {
+        let rest = &tag[index..];
+        let end = rest.find(|ch: char| ch.is_whitespace() || ch == '>').unwrap_or(rest.len());
+        clean_html_text(&rest[..end])
+    }
+}
+
+fn clean_html_text(value: &str) -> Option<String> {
+    let collapsed = value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">");
+    let trimmed = collapsed.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.chars().take(512).collect())
+    }
+}
+
 fn string_param<'a>(params: &'a Value, name: &str) -> Result<&'a str, AppHostError> {
     params
         .get(name)
@@ -1301,6 +1552,35 @@ mod fabushi_shipping_inference_tests {
             resolve_fabushi_model(Some("  custom-fabushi-model  ".into())),
             "custom-fabushi-model"
         );
+    }
+
+    #[test]
+    fn routine_projection_uses_host_owned_agent_scope_and_desktop_shape() {
+        let row = routine_projection(AutomationSummary {
+            id: "daily".into(),
+            agent_id: Some("research".into()),
+            name: "Daily research".into(),
+            prompt: "Summarize".into(),
+            schedule: "@daily".into(),
+            trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
+            enabled: true,
+            created_at_ms: 10,
+            last_run_at_ms: Some(20),
+            next_run_at_ms: Some(30),
+        })
+        .expect("agent-scoped automation should project");
+        assert_eq!(row["agentId"], "research");
+        assert_eq!(row["automation"]["id"], "daily");
+        assert_eq!(row["automation"]["triggerDescription"], "@daily");
+        assert_eq!(row["automation"]["createdAt"], 10);
+        assert_eq!(row["automation"]["lastRunAt"], 20);
+    }
+
+    #[test]
+    fn link_metadata_html_parser_extracts_title_and_description() {
+        let html = r#"<html><head><title> Example &amp; Docs </title><meta name="description" content="A useful page"></head></html>"#;
+        assert_eq!(html_tag_text(html, "title").as_deref(), Some("Example & Docs"));
+        assert_eq!(html_meta_content(html, "description").as_deref(), Some("A useful page"));
     }
 
     #[test]

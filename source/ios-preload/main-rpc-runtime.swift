@@ -111,6 +111,7 @@ enum IOSMainRPCRuntime {
         "reportClientFailure": .object,
         "openCloudAgent": .object,
         "getLinkMetadata": .object,
+        "listAllAutomations": .none,
         "listSecrets": .none,
         "revealSecret": .object,
         "upsertSecrets": .object,

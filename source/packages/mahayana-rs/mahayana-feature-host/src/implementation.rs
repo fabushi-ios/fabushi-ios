@@ -728,6 +728,20 @@ impl FeatureHostController {
         self.info.clone()
     }
 
+    /// Returns the canonical Host-owned automation roster without creating a
+    /// second renderer-side store. Command-palette consumers receive a snapshot
+    /// of the same durable automation state used by automation commands.
+    pub fn list_all_automations(&self) -> Result<Vec<AutomationSummary>, FeatureHostError> {
+        let state = self.state()?;
+        let mut automations = state.automations.values().cloned().collect::<Vec<_>>();
+        automations.sort_by(|left, right| {
+            left.created_at_ms
+                .cmp(&right.created_at_ms)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        Ok(automations)
+    }
+
     pub fn set_scene_active(&self, active: bool) -> Result<Value, FeatureHostError> {
         let now_ms = now_millis();
         let mut state = self.state()?;

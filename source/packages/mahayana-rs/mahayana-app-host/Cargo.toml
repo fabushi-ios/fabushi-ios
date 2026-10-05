@@ -20,6 +20,8 @@ mahayana-product.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+ureq.workspace = true
+url.workspace = true
 
 [target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
 mahayana-feature-host = { workspace = true, features = ["mobile-embedded"] }

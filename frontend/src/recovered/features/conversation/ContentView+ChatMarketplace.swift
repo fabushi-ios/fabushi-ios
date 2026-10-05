@@ -147,8 +147,22 @@ extension ContentView {
                                 }
                             }.padding(.vertical, 12)
                         }
+                        .onAppear {
+                            guard let target = pendingInitialMessageID,
+                                  messaging.messagesByConversation[conversation.id]?.contains(where: { $0.id == target }) == true
+                            else { return }
+                            pendingInitialMessageID = nil
+                            DispatchQueue.main.async { withAnimation { proxy.scrollTo(target, anchor: .center) } }
+                        }
                         .onChange(of: messaging.messagesByConversation[conversation.id]?.count ?? 0) { _, _ in
-                            if let id = messaging.messagesByConversation[conversation.id]?.last?.id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
+                            if let target = pendingInitialMessageID,
+                               messaging.messagesByConversation[conversation.id]?.contains(where: { $0.id == target }) == true {
+                                pendingInitialMessageID = nil
+                                withAnimation { proxy.scrollTo(target, anchor: .center) }
+                            } else if pendingInitialMessageID == nil,
+                                      let id = messaging.messagesByConversation[conversation.id]?.last?.id {
+                                withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+                            }
                         }
                     }
                     if let editingMessage {

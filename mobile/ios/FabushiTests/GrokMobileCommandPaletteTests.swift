@@ -116,6 +116,66 @@ final class GrokMobileCommandPaletteTests: XCTestCase {
         XCTAssertEqual(link.conversationId, conversation.id)
     }
 
+
+    func testRoutineRosterProjectionAndSearchUsesCanonicalHostShape() {
+        let raw: [[String: Any]] = [[
+            "agentId": "research-bot",
+            "automation": [
+                "id": "daily",
+                "name": "Daily research",
+                "triggerDescription": "@daily",
+                "createdAt": NSNumber(value: 10),
+                "lastRunAt": NSNumber(value: 20),
+            ],
+        ]]
+        let routines = GrokMobileCommandPaletteModel.routines(from: raw)
+        XCTAssertEqual(routines.count, 1)
+        XCTAssertEqual(routines[0].agentId, "research-bot")
+        XCTAssertEqual(routines[0].automationId, "daily")
+        XCTAssertEqual(routines[0].triggerDescription, "@daily")
+
+        let rows = GrokMobileCommandPaletteModel.entries(
+            bots: [],
+            conversations: [],
+            messagesByConversation: [:],
+            actions: [],
+            routines: routines,
+            query: "daily",
+            tab: .routines
+        )
+        XCTAssertEqual(rows.map(\.id), ["routine:research-bot:daily"])
+    }
+
+    func testLinkMetadataEnrichesCanonicalLinkWithoutOwningLinkStorage() {
+        let conversation = conversation(id: "chat-1", title: "Release", kind: .direct)
+        let textMessage = message(
+            id: "message-1",
+            conversationId: conversation.id,
+            text: "Review https://example.com/docs before launch"
+        )
+        let rows = GrokMobileCommandPaletteModel.entries(
+            bots: [],
+            conversations: [conversation],
+            messagesByConversation: [conversation.id: [textMessage]],
+            actions: [],
+            linkMetadata: [
+                "https://example.com/docs": .init(
+                    title: "Example Docs",
+                    description: "Release guide",
+                    hostname: "example.com"
+                )
+            ],
+            query: "release guide",
+            tab: .links
+        )
+        XCTAssertEqual(rows.count, 1)
+        guard case .link(let link) = rows[0] else {
+            return XCTFail("Expected an enriched link")
+        }
+        XCTAssertEqual(link.metadataTitle, "Example Docs")
+        XCTAssertEqual(link.metadataDescription, "Release guide")
+    }
+
     func testRoutinesRemainFailClosedWithoutCanonicalHostRoster() {
         let rows = GrokMobileCommandPaletteModel.entries(
             bots: [MobileBotSummary(id: "bot-1", name: "Research", description: "")],

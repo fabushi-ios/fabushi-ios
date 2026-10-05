@@ -27,6 +27,12 @@ internal struct GrokMobileShell: View {
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
     @State var legacyConversationID: String?
+    @State var legacyMessageID: String?
+    @State var legacySection: MobileSection?
+    @State var commandPaletteRoutines: [MobileCommandPaletteRoutine] = []
+    @State var commandPaletteRoutineStatus: MobileCommandPaletteProviderStatus = .idle
+    @State var commandPaletteLinkMetadata: [String: MobileCommandPaletteLinkMetadata] = [:]
+    @State var commandPaletteLinkStatus: MobileCommandPaletteProviderStatus = .idle
 
     @ViewBuilder
     var body: some View {
@@ -76,6 +82,8 @@ internal struct GrokMobileShell: View {
             HStack {
                 Button {
                     legacyConversationID = nil
+                    legacyMessageID = nil
+                    legacySection = nil
                     legacyOpen = false
                 } label: {
                     Image(systemName: "chevron.left")
@@ -96,7 +104,9 @@ internal struct GrokMobileShell: View {
                 appAgentSurface: appAgentSurface,
                 initialConversation: legacyConversationID.flatMap { id in
                     messaging.conversations.first(where: { $0.id == id })
-                }
+                },
+                initialMessageID: legacyMessageID,
+                initialSection: legacySection
             )
         }
     }
