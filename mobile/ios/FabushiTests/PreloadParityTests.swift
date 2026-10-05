@@ -70,7 +70,7 @@ final class PreloadParityTests: XCTestCase {
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("getLinkMetadata"))
         XCTAssertEqual(IOSMainRPCRuntime.methodTable["getLinkMetadata"], .object)
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("listAllAutomations"))
-        XCTAssertEqual(IOSMainRPCRuntime.methodTable["listAllAutomations"], .none)
+        XCTAssertEqual(IOSMainRPCRuntime.methodTable["listAllAutomations"], IOSRPCArgumentShape.none)
         XCTAssertFalse(IOSMainRPCRuntime.isMethod("totallyUnknownMethod"))
         XCTAssertEqual(
             IOSRPCEdgeRuntime.methodChannel(edge: "main", method: "openExternal"),
