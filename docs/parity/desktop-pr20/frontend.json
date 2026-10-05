@@ -1396,8 +1396,8 @@
       "ios_platform_delta": "MobileBotRoutineRunHistoryProvider composes the existing native Routines controller and the single shared clock; it has no history RPC or storage. Scope changes use account/Agent/routine identities, account changes reset the controller, refresh/reconnect share one path, Run Now delegates to the controller, and source subscriptions are lazy and disposed with the last listener.",
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotRoutines.swift (MobileBotRoutineRunHistoryProvider) over the canonical Rust AutomationSummary.runs data source and MobileBotRoutineRunHistoryClock.",
-      "test_evidence": "GrokMobileRoutinesControllerTests.swift covers strict embedded run parsing and the shared clock/presentation dependencies; exact-HEAD CI and additional provider lifecycle evidence are required before verified.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob dd9a99fcceddd36400b1fbf02149601bf087c6df. Implemented without a second RPC/store/timer; keep implemented until exact-HEAD CI and scoped lifecycle acceptance are green."
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift now has focused provider lifecycle coverage for lazy source/clock subscription, last-listener teardown, ready/pending projection, account-scope reset, refresh/reconnect delegation, exact Run Now delegation, missing-routine fail-closed behavior, and dispose notification fencing. Fresh exact-HEAD ordinary/protected CI is required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob dd9a99fcceddd36400b1fbf02149601bf087c6df. Implemented without a second RPC/store/timer and now has focused scoped-lifecycle tests; keep implemented until the new exact HEAD completes ordinary plus protected acceptance and same-HEAD artifacts/provenance are checked."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/run-history.ts",

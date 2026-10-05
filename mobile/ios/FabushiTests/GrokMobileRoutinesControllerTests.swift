@@ -333,4 +333,232 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertEqual(cancellations, 1)
     }
 
+    @MainActor
+    private final class FakeRoutinesController: MobileBotRoutinesControlling {
+        var snapshot: MobileBotRoutinesSnapshot
+        var runPending: Set<String> = []
+        var resetCalls = 0
+        var refreshAgentIds: [String] = []
+        var runCalls: [(agentId: String, automationId: String)] = []
+        var subscriptions = 0
+        var unsubscriptions = 0
+        private var listeners: [UUID: () -> Void] = [:]
+
+        init(snapshot: MobileBotRoutinesSnapshot) {
+            self.snapshot = snapshot
+        }
+
+        @discardableResult
+        func subscribe(_ listener: @escaping () -> Void) -> () -> Void {
+            subscriptions += 1
+            let id = UUID()
+            listeners[id] = listener
+            return { [weak self] in
+                guard let self else { return }
+                if self.listeners.removeValue(forKey: id) != nil {
+                    self.unsubscriptions += 1
+                }
+            }
+        }
+
+        func refresh(agentId: String) async {
+            refreshAgentIds.append(agentId)
+            emit()
+        }
+
+        func runNow(agentId: String, automationId: String) async throws {
+            runCalls.append((agentId, automationId))
+            emit()
+        }
+
+        func reset() {
+            resetCalls += 1
+            snapshot = .loading(previous: [])
+            runPending.removeAll()
+            emit()
+        }
+
+        func emit() {
+            for listener in Array(listeners.values) {
+                listener()
+            }
+        }
+    }
+
+    @MainActor
+    private func providerRoutine() -> MobileBotRoutine {
+        MobileBotRoutine(
+            id: "routine-1",
+            agentId: "agent-1",
+            name: "Daily research",
+            prompt: "Summarize sources",
+            schedule: "@daily",
+            isEnabled: true,
+            createdAtMs: 10,
+            runs: [
+                MobileBotRoutineRun(
+                    id: "run-1",
+                    status: .ok,
+                    startedAt: 20,
+                    detail: "Completed",
+                    event: nil
+                ),
+            ],
+            lastRunAtMs: 20,
+            nextRunAtMs: 30
+        )
+    }
+
+    @MainActor
+    func testRunHistoryProviderLazilySubscribesAndStopsWithLastListener() {
+        let fake = FakeRoutinesController(snapshot: .ready([providerRoutine()]))
+        var clockStarts = 0
+        var clockStops = 0
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "UTC",
+                overrideTimeZone: nil
+            ),
+            now: { Date(timeIntervalSince1970: 1) },
+            scheduler: { _, _, _ in
+                clockStarts += 1
+                return { clockStops += 1 }
+            }
+        )
+        let provider = MobileBotRoutineRunHistoryProvider(
+            controller: fake,
+            clock: clock,
+            initialScope: MobileBotRoutineRunHistoryScope(
+                accountKey: "account-a",
+                agentId: "agent-1",
+                automationId: "routine-1"
+            )
+        )
+
+        XCTAssertEqual(fake.subscriptions, 0)
+        XCTAssertEqual(clockStarts, 0)
+
+        let stopFirst = provider.subscribe {}
+        XCTAssertEqual(fake.subscriptions, 1)
+        XCTAssertEqual(clockStarts, 1)
+
+        let stopSecond = provider.subscribe {}
+        XCTAssertEqual(fake.subscriptions, 1)
+        XCTAssertEqual(clockStarts, 1)
+
+        stopFirst()
+        XCTAssertEqual(fake.unsubscriptions, 0)
+        XCTAssertEqual(clockStops, 0)
+
+        stopSecond()
+        XCTAssertEqual(fake.unsubscriptions, 1)
+        XCTAssertEqual(clockStops, 1)
+    }
+
+    @MainActor
+    func testRunHistoryProviderScopesRefreshReconnectAndRunNow() async throws {
+        let fake = FakeRoutinesController(snapshot: .ready([providerRoutine()]))
+        fake.runPending = ["routine-1"]
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "UTC",
+                overrideTimeZone: nil
+            ),
+            now: { Date(timeIntervalSince1970: 0.020) },
+            scheduler: { _, _, _ in { } }
+        )
+        let provider = MobileBotRoutineRunHistoryProvider(
+            controller: fake,
+            clock: clock,
+            initialScope: MobileBotRoutineRunHistoryScope(
+                accountKey: "account-a",
+                agentId: "agent-1",
+                automationId: "routine-1"
+            )
+        )
+
+        switch provider.snapshot() {
+        case .ready(let scope, let rows, let pending):
+            XCTAssertEqual(scope.accountKey, "account-a")
+            XCTAssertEqual(scope.agentId, "agent-1")
+            XCTAssertEqual(scope.automationId, "routine-1")
+            XCTAssertEqual(rows.map(\.id), ["run-1"])
+            XCTAssertEqual(rows.first?.title, "Completed")
+            XCTAssertEqual(rows.first?.timestampLabel, "Just now")
+            XCTAssertTrue(pending)
+        default:
+            XCTFail("expected ready run-history snapshot")
+        }
+
+        _ = await provider.refresh()
+        _ = await provider.refreshOnReconnect()
+        XCTAssertEqual(fake.refreshAgentIds, ["agent-1", "agent-1"])
+
+        let didRun = try await provider.runNow()
+        XCTAssertTrue(didRun)
+        XCTAssertEqual(fake.runCalls.count, 1)
+        XCTAssertEqual(fake.runCalls.first?.agentId, "agent-1")
+        XCTAssertEqual(fake.runCalls.first?.automationId, "routine-1")
+
+        fake.snapshot = .empty
+        let missingDidRun = try await provider.runNow()
+        XCTAssertFalse(missingDidRun)
+        XCTAssertEqual(fake.runCalls.count, 1)
+
+        provider.setScope(
+            MobileBotRoutineRunHistoryScope(
+                accountKey: "account-b",
+                agentId: "agent-1",
+                automationId: "routine-1"
+            )
+        )
+        XCTAssertEqual(fake.resetCalls, 1)
+        if case .loading(let scope, _, _) = provider.snapshot() {
+            XCTAssertEqual(scope.accountKey, "account-b")
+        } else {
+            XCTFail("account scope reset must return loading")
+        }
+    }
+
+    @MainActor
+    func testRunHistoryProviderDisposeUnsubscribesAndFencesNotifications() {
+        let fake = FakeRoutinesController(snapshot: .ready([providerRoutine()]))
+        var tick: (() -> Void)?
+        var clockStops = 0
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "UTC",
+                overrideTimeZone: nil
+            ),
+            scheduler: { _, _, callback in
+                tick = callback
+                return { clockStops += 1 }
+            }
+        )
+        let provider = MobileBotRoutineRunHistoryProvider(
+            controller: fake,
+            clock: clock,
+            initialScope: MobileBotRoutineRunHistoryScope(
+                accountKey: "account-a",
+                agentId: "agent-1",
+                automationId: "routine-1"
+            )
+        )
+
+        var notifications = 0
+        _ = provider.subscribe { notifications += 1 }
+        fake.emit()
+        tick?()
+        XCTAssertEqual(notifications, 2)
+
+        provider.dispose()
+        XCTAssertEqual(fake.unsubscriptions, 1)
+        XCTAssertEqual(clockStops, 1)
+        XCTAssertEqual(provider.snapshot(), .unavailable)
+
+        fake.emit()
+        tick?()
+        XCTAssertEqual(notifications, 2)
+    }
+
 }
