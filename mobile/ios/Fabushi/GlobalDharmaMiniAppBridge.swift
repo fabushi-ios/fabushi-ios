@@ -249,14 +249,39 @@ final class GlobalDharmaMiniAppBridge {
         guard (12...160).contains(cleanKey.count), !cleanKey.contains(where: \.isWhitespace) else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("Invalid purchase idempotency key")
         }
-        return try await platform(
+        let intent = try await platform(
             method: "POST",
-            path: "/v1/plugins/\(Self.globalDharmaId)/commerce/purchase",
+            path: "/v1/miniapps/\(Self.globalDharmaId)/pay/intents",
             body: [
                 "sku": Self.prayerWheelLifetimeSku,
+                "rail": "web_provider",
                 "idempotencyKey": cleanKey,
             ]
         )
+        guard let paymentId = intent["paymentId"] as? String,
+              UUID(uuidString: paymentId) != nil,
+              intent["sku"] as? String == Self.prayerWheelLifetimeSku,
+              Self.int64(intent["amount"]) == Self.prayerWheelLifetimeCNYMinor,
+              intent["currency"] as? String == "CNY"
+        else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Canonical CI payment intent drifted from the governed lifetime contract"
+            )
+        }
+        let checkout = try await platform(
+            method: "POST",
+            path: "/v1/pay/intents/\(paymentId)/checkout",
+            body: [String: Any]()
+        )
+        guard let payment = checkout["payment"] as? [String: Any],
+              payment["paymentId"] as? String == paymentId,
+              payment["status"] as? String == "succeeded"
+        else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Canonical CI checkout did not settle the payment"
+            )
+        }
+        return checkout
     }
 
     func restorePurchases() async throws -> [String: Any] {
