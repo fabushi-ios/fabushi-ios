@@ -14,6 +14,11 @@ internal struct GrokMobileShell: View {
     @State var botDescription = ""
     @State var botBusy = false
     @State var botError: String?
+    @State var botRenameTarget: MobileBotSummary?
+    @State var botRenameDraft = ""
+    @State var botDeleteTarget: MobileBotSummary?
+    @State var botActionBusy = false
+    @State var botActionError: String?
     @State var bots: [MobileBotSummary] = []
     @State var selectedBot: MobileBotSummary?
     @State var botDrafts: [String: String] = [:]
@@ -75,6 +80,11 @@ internal struct GrokMobileShell: View {
             botDescription,
             String(botBusy),
             botError ?? "",
+            botRenameTarget?.id ?? "",
+            botRenameDraft,
+            botDeleteTarget?.id ?? "",
+            String(botActionBusy),
+            botActionError ?? "",
             bots.map { "\($0.id):\($0.name):\($0.miniAppId ?? "")" }.joined(separator: ","),
             messaging.conversations.map { "\($0.id):\($0.unreadCount):\($0.isArchived)" }.joined(separator: ","),
         ].joined(separator: "|")
