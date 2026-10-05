@@ -278,21 +278,43 @@ internal struct MobileBotChat: View {
     }
 
     private var semanticFingerprint: String {
-        [
-            bot.id,
-            bot.name,
-            bot.description,
-            bot.title ?? "",
-            String(bot.notifyOnUpdatesEnabled),
-            bot.miniAppId ?? "",
-            bot.menuButtonText ?? "",
-            draft,
-            String(busy),
-            String(openedMiniApp),
-            activeOperationId ?? "",
-            errorText ?? "",
-            entries.map { "\($0.id):\($0.kind.rawValue):\($0.role.rawValue)" }.joined(separator: ","),
-        ].joined(separator: "|")
+        let botIdFingerprint: String = bot.id
+        let botNameFingerprint: String = bot.name
+        let botDescriptionFingerprint: String = bot.description
+        let botTitleFingerprint: String = bot.title ?? ""
+        let notifyOnUpdatesFingerprint: String = String(bot.notifyOnUpdatesEnabled)
+        let miniAppIdFingerprint: String = bot.miniAppId ?? ""
+        let menuButtonTextFingerprint: String = bot.menuButtonText ?? ""
+        let draftFingerprint: String = draft
+        let busyFingerprint: String = String(busy)
+        let openedMiniAppFingerprint: String = String(openedMiniApp)
+        let activeOperationFingerprint: String = activeOperationId ?? ""
+        let errorFingerprint: String = errorText ?? ""
+
+        let entryFingerprints: [String] = entries.map { entry -> String in
+            let entryId: String = "\(entry.id)"
+            let entryKind: String = "\(entry.kind.rawValue)"
+            let entryRole: String = "\(entry.role.rawValue)"
+            return "\(entryId):\(entryKind):\(entryRole)"
+        }
+        let entriesFingerprint: String = entryFingerprints.joined(separator: ",")
+
+        let fields: [String] = [
+            botIdFingerprint,
+            botNameFingerprint,
+            botDescriptionFingerprint,
+            botTitleFingerprint,
+            notifyOnUpdatesFingerprint,
+            miniAppIdFingerprint,
+            menuButtonTextFingerprint,
+            draftFingerprint,
+            busyFingerprint,
+            openedMiniAppFingerprint,
+            activeOperationFingerprint,
+            errorFingerprint,
+            entriesFingerprint,
+        ]
+        return fields.joined(separator: "|")
     }
 
     @MainActor
