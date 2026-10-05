@@ -129,6 +129,393 @@ internal final class MobileBotRoutineRunHistoryClock {
     }
 }
 
+internal enum MobileBotRoutineRunStatus: String, Equatable {
+    case running
+    case ok
+    case error
+}
+
+internal struct MobileBotRoutineRun: Identifiable, Equatable {
+    let id: String
+    let status: MobileBotRoutineRunStatus
+    let startedAt: Int64
+    let detail: String?
+    let event: String?
+}
+
+internal struct MobileBotRoutineRunPresentation: Identifiable, Equatable {
+    let id: String
+    let title: String?
+    let timestampLabel: String
+    let status: MobileBotRoutineRunStatus
+    let accessibilityLabel: String
+    let iconName: String
+    let statusRole: Bool
+}
+
+internal struct MobileBotRoutineRunHistoryPresentation: Equatable {
+    let empty: Bool
+    let rows: [MobileBotRoutineRunPresentation]
+}
+
+internal enum MobileBotRoutineRunHistoryModel {
+    private static let months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+    private static let weekdays = [
+        "Sunday", "Monday", "Tuesday", "Wednesday",
+        "Thursday", "Friday", "Saturday",
+    ]
+
+    static func formatTimestamp(
+        startedAt: Int64,
+        now: Int64,
+        timeZoneIdentifier: String?
+    ) -> String {
+        let delta = startedAt - now
+        if delta > 0, delta < 3_600_000 {
+            let minutes = Int(ceil(Double(delta) / 60_000))
+            return "In \(minutes) min"
+        }
+        if delta <= 0, -delta < 60_000 {
+            return "Just now"
+        }
+        if delta <= 0, -delta < 3_600_000 {
+            return "\(Int((-delta) / 60_000)) min ago"
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZoneIdentifier
+            .flatMap(TimeZone.init(identifier:))
+            ?? TimeZone(secondsFromGMT: 0)!
+        let currentDate = Date(timeIntervalSince1970: Double(now) / 1_000)
+        let startedDate = Date(timeIntervalSince1970: Double(startedAt) / 1_000)
+        let current = calendar.dateComponents(
+            [.year, .month, .day, .weekday, .hour, .minute],
+            from: currentDate
+        )
+        let started = calendar.dateComponents(
+            [.year, .month, .day, .weekday, .hour, .minute],
+            from: startedDate
+        )
+        let currentStart = calendar.startOfDay(for: currentDate)
+        let startedStart = calendar.startOfDay(for: startedDate)
+        let dayDelta = calendar.dateComponents(
+            [.day],
+            from: currentStart,
+            to: startedStart
+        ).day ?? 0
+        let hour24 = started.hour ?? 0
+        let hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12
+        let minute = started.minute ?? 0
+        let clock = String(
+            format: "%d:%02d %@",
+            hour12,
+            minute,
+            hour24 < 12 ? "AM" : "PM"
+        )
+
+        switch dayDelta {
+        case 0:
+            return "Today at \(clock)"
+        case 1:
+            return "Tomorrow at \(clock)"
+        case -1:
+            return "Yesterday at \(clock)"
+        case 2...6:
+            let weekday = weekdays[max(0, min(6, (started.weekday ?? 1) - 1))]
+            return "\(weekday) at \(clock)"
+        case -6 ... -2:
+            let weekday = weekdays[max(0, min(6, (started.weekday ?? 1) - 1))]
+            return "Last \(weekday) at \(clock)"
+        default:
+            let monthIndex = max(0, min(11, (started.month ?? 1) - 1))
+            let date = "\(months[monthIndex]) \(started.day ?? 1)"
+            if started.year == current.year {
+                return "\(date) at \(clock)"
+            }
+            return "\(date), \(started.year ?? 0) at \(clock)"
+        }
+    }
+
+    static func present(
+        _ run: MobileBotRoutineRun,
+        now: Int64,
+        timeZoneIdentifier: String?
+    ) -> MobileBotRoutineRunPresentation {
+        let title = run.detail ?? run.event
+        switch run.status {
+        case .running:
+            return MobileBotRoutineRunPresentation(
+                id: run.id,
+                title: title,
+                timestampLabel: formatTimestamp(
+                    startedAt: run.startedAt,
+                    now: now,
+                    timeZoneIdentifier: timeZoneIdentifier
+                ),
+                status: .running,
+                accessibilityLabel: "Running",
+                iconName: "loading",
+                statusRole: true
+            )
+        case .ok:
+            return MobileBotRoutineRunPresentation(
+                id: run.id,
+                title: title,
+                timestampLabel: formatTimestamp(
+                    startedAt: run.startedAt,
+                    now: now,
+                    timeZoneIdentifier: timeZoneIdentifier
+                ),
+                status: .ok,
+                accessibilityLabel: "Succeeded",
+                iconName: "check",
+                statusRole: false
+            )
+        case .error:
+            return MobileBotRoutineRunPresentation(
+                id: run.id,
+                title: title,
+                timestampLabel: formatTimestamp(
+                    startedAt: run.startedAt,
+                    now: now,
+                    timeZoneIdentifier: timeZoneIdentifier
+                ),
+                status: .error,
+                accessibilityLabel: "Failed",
+                iconName: "close",
+                statusRole: false
+            )
+        }
+    }
+
+    static func presentHistory(
+        _ runs: [MobileBotRoutineRun],
+        now: Int64,
+        timeZoneIdentifier: String?
+    ) -> MobileBotRoutineRunHistoryPresentation {
+        MobileBotRoutineRunHistoryPresentation(
+            empty: runs.isEmpty,
+            rows: runs.map {
+                present(
+                    $0,
+                    now: now,
+                    timeZoneIdentifier: timeZoneIdentifier
+                )
+            }
+        )
+    }
+}
+
+internal struct MobileBotRoutineRunHistoryScope: Equatable {
+    let accountKey: String?
+    let agentId: String
+    let automationId: String
+}
+
+internal enum MobileBotRoutineRunHistorySnapshot: Equatable {
+    case unavailable
+    case loading(
+        scope: MobileBotRoutineRunHistoryScope,
+        rows: [MobileBotRoutineRunPresentation],
+        pending: Bool
+    )
+    case empty(
+        scope: MobileBotRoutineRunHistoryScope,
+        pending: Bool
+    )
+    case ready(
+        scope: MobileBotRoutineRunHistoryScope,
+        rows: [MobileBotRoutineRunPresentation],
+        pending: Bool
+    )
+    case failed(
+        scope: MobileBotRoutineRunHistoryScope,
+        rows: [MobileBotRoutineRunPresentation],
+        pending: Bool,
+        message: String
+    )
+}
+
+@MainActor
+internal protocol MobileBotRoutinesControlling: AnyObject {
+    var snapshot: MobileBotRoutinesSnapshot { get }
+    var runPending: Set<String> { get }
+    @discardableResult
+    func subscribe(_ listener: @escaping () -> Void) -> () -> Void
+    func refresh(agentId: String) async
+    func runNow(agentId: String, automationId: String) async throws
+    func reset()
+}
+
+@MainActor
+internal final class MobileBotRoutineRunHistoryProvider {
+    private let controller: MobileBotRoutinesControlling
+    private let clock: MobileBotRoutineRunHistoryClock
+    private var scope: MobileBotRoutineRunHistoryScope?
+    private var listeners: [UUID: () -> Void] = [:]
+    private var stopController: (() -> Void)?
+    private var stopClock: (() -> Void)?
+    private var generation = 0
+    private var request = 0
+    private var refreshing = false
+    private var disposed = false
+
+    init(
+        controller: MobileBotRoutinesControlling,
+        clock: MobileBotRoutineRunHistoryClock,
+        initialScope: MobileBotRoutineRunHistoryScope? = nil
+    ) {
+        self.controller = controller
+        self.clock = clock
+        self.scope = initialScope
+    }
+
+    @discardableResult
+    func subscribe(_ listener: @escaping () -> Void) -> () -> Void {
+        guard !disposed else { return { } }
+        if listeners.isEmpty {
+            startSources()
+        }
+        let id = UUID()
+        listeners[id] = listener
+        return { [weak self] in
+            self?.unsubscribe(id)
+        }
+    }
+
+    func snapshot() -> MobileBotRoutineRunHistorySnapshot {
+        guard !disposed, let scope else {
+            return .unavailable
+        }
+        let routineSnapshot = controller.snapshot
+        let routine = routineSnapshot.value.first {
+            $0.id == scope.automationId
+        }
+        let history = MobileBotRoutineRunHistoryModel.presentHistory(
+            routine?.runs ?? [],
+            now: clock.nowMilliseconds,
+            timeZoneIdentifier: clock.timeZoneIdentifier
+        )
+        let pending = controller.runPending.contains(scope.automationId)
+        if refreshing {
+            return .loading(scope: scope, rows: history.rows, pending: pending)
+        }
+        switch routineSnapshot {
+        case .loading:
+            return .loading(scope: scope, rows: history.rows, pending: pending)
+        case .failed(_, _, let message):
+            return .failed(
+                scope: scope,
+                rows: history.rows,
+                pending: pending,
+                message: message
+            )
+        case .empty, .ready, .unavailable:
+            if routine == nil || history.empty {
+                return .empty(scope: scope, pending: pending)
+            }
+            return .ready(scope: scope, rows: history.rows, pending: pending)
+        }
+    }
+
+    func setScope(_ next: MobileBotRoutineRunHistoryScope?) {
+        guard !disposed, scope != next else { return }
+        let accountChanged = scope?.accountKey != next?.accountKey
+        scope = next
+        generation += 1
+        request += 1
+        refreshing = false
+        if accountChanged {
+            controller.reset()
+        }
+        notify()
+    }
+
+    func refresh() async -> MobileBotRoutineRunHistorySnapshot {
+        guard !disposed, let scope else {
+            return snapshot()
+        }
+        let operationGeneration = generation
+        request += 1
+        let operationRequest = request
+        refreshing = true
+        notify()
+        await controller.refresh(agentId: scope.agentId)
+        guard !disposed,
+              operationGeneration == generation,
+              operationRequest == request
+        else {
+            return snapshot()
+        }
+        refreshing = false
+        notify()
+        return snapshot()
+    }
+
+    func refreshOnReconnect() async -> MobileBotRoutineRunHistorySnapshot {
+        await refresh()
+    }
+
+    func runNow() async throws -> Bool {
+        guard !disposed, let scope else { return false }
+        let operationGeneration = generation
+        guard controller.snapshot.value.contains(where: {
+            $0.id == scope.automationId
+        }) else {
+            return false
+        }
+        try await controller.runNow(
+            agentId: scope.agentId,
+            automationId: scope.automationId
+        )
+        return !disposed && operationGeneration == generation
+    }
+
+    func dispose() {
+        guard !disposed else { return }
+        disposed = true
+        generation += 1
+        request += 1
+        refreshing = false
+        stopSources()
+        listeners.removeAll()
+    }
+
+    private func startSources() {
+        stopController = controller.subscribe { [weak self] in
+            self?.notify()
+        }
+        stopClock = clock.subscribe { [weak self] in
+            self?.notify()
+        }
+    }
+
+    private func stopSources() {
+        stopController?()
+        stopController = nil
+        stopClock?()
+        stopClock = nil
+    }
+
+    private func unsubscribe(_ id: UUID) {
+        guard !disposed else { return }
+        listeners.removeValue(forKey: id)
+        if listeners.isEmpty {
+            stopSources()
+        }
+    }
+
+    private func notify() {
+        guard !disposed else { return }
+        for listener in Array(listeners.values) {
+            listener()
+        }
+    }
+}
+
 internal struct MobileBotRoutine: Identifiable, Equatable {
     let id: String
     let agentId: String
@@ -137,6 +524,7 @@ internal struct MobileBotRoutine: Identifiable, Equatable {
     let schedule: String
     let isEnabled: Bool
     let createdAtMs: Int64
+    let runs: [MobileBotRoutineRun]
     let lastRunAtMs: Int64?
     let nextRunAtMs: Int64?
 }
@@ -177,12 +565,15 @@ internal enum MobileBotRoutinesModel {
               let prompt = row["prompt"] as? String,
               let schedule = row["schedule"] as? String,
               let isEnabled = row["enabled"] as? Bool,
-              let createdAtMs = integer(row["createdAtMs"])
+              let createdAtMs = integer(row["createdAtMs"]),
+              let rawRuns = row["runs"] as? [[String: Any]]
         else {
             return nil
         }
 
-        guard optionalInteger(row["lastRunAtMs"]) != .invalid,
+        let parsedRuns = rawRuns.map(parseRun)
+        guard parsedRuns.allSatisfy({ $0 != nil }),
+              optionalInteger(row["lastRunAtMs"]) != .invalid,
               optionalInteger(row["nextRunAtMs"]) != .invalid
         else {
             return nil
@@ -196,8 +587,45 @@ internal enum MobileBotRoutinesModel {
             schedule: schedule,
             isEnabled: isEnabled,
             createdAtMs: createdAtMs,
+            runs: parsedRuns.compactMap { $0 },
             lastRunAtMs: optionalInteger(row["lastRunAtMs"]).value,
             nextRunAtMs: optionalInteger(row["nextRunAtMs"]).value
+        )
+    }
+
+    static func parseRun(_ row: [String: Any]) -> MobileBotRoutineRun? {
+        guard let id = row["id"] as? String,
+              let statusRaw = row["status"] as? String,
+              let status = MobileBotRoutineRunStatus(rawValue: statusRaw),
+              let startedAt = integer(row["startedAt"])
+        else {
+            return nil
+        }
+
+        let detail: String?
+        if row["detail"] == nil || row["detail"] is NSNull {
+            detail = nil
+        } else if let value = row["detail"] as? String {
+            detail = value
+        } else {
+            return nil
+        }
+
+        let event: String?
+        if row["event"] == nil || row["event"] is NSNull {
+            event = nil
+        } else if let value = row["event"] as? String {
+            event = value
+        } else {
+            return nil
+        }
+
+        return MobileBotRoutineRun(
+            id: id,
+            status: status,
+            startedAt: startedAt,
+            detail: detail,
+            event: event
         )
     }
 
@@ -479,9 +907,20 @@ internal final class MobileBotRoutinesController: ObservableObject {
     private var refreshRequest = 0
     private var generation = 0
     private var disposed = false
+    private var listeners: [UUID: () -> Void] = [:]
 
     init(source: MobileBotRoutinesSource) {
         self.source = source
+    }
+
+    @discardableResult
+    func subscribe(_ listener: @escaping () -> Void) -> () -> Void {
+        guard !disposed else { return { } }
+        let id = UUID()
+        listeners[id] = listener
+        return { [weak self] in
+            self?.listeners.removeValue(forKey: id)
+        }
     }
 
     func mutationError(for automationId: String) -> String? {
@@ -603,9 +1042,11 @@ internal final class MobileBotRoutinesController: ObservableObject {
         }
         let operationGeneration = generation
         runPending.insert(automationId)
+        notify()
         defer {
             if generation == operationGeneration {
                 runPending.remove(automationId)
+                notify()
             }
         }
         try await source.runNow(agentId: agentId, automationId: automationId)
@@ -629,6 +1070,7 @@ internal final class MobileBotRoutinesController: ObservableObject {
         guard !disposed else { return }
         reset()
         disposed = true
+        listeners.removeAll()
     }
 
     private func withPending(
@@ -676,12 +1118,22 @@ internal final class MobileBotRoutinesController: ObservableObject {
             refreshing: refreshing,
             capabilityUnavailable: capabilityUnavailable
         )
+        notify()
+    }
+
+    private func notify() {
+        guard !disposed else { return }
+        for listener in Array(listeners.values) {
+            listener()
+        }
     }
 
     private static func isCapabilityUnavailable(_ error: Error) -> Bool {
         error.localizedDescription.contains("source/capability-unavailable")
     }
 }
+
+extension MobileBotRoutinesController: MobileBotRoutinesControlling {}
 
 @MainActor
 internal struct MobileBotRoutinesSection: View {

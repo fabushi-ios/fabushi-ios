@@ -1365,8 +1365,8 @@
       "ios_language": "Swift",
       "ios_platform_delta": "A native @MainActor ObservableObject replaces the TypeScript subscription controller. It calls the existing canonical Rust Host automation.list/upsert/setEnabled/delete/run commands through IOSPreloadBridge, keeps per-routine mutation/run dedupe and refresh fencing in Swift presentation state, and never creates a second automation store. The section is shipping-composed in Agent Settings; run-history detail remains a separate ledger responsibility.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/production/MobileBotRoutines.swift (native lifecycle controller, canonical Host command adapter, and Agent Settings routines section); frontend/src/production/MobileBotAgentSettings.swift (shipping composition); source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs (canonical persisted automation owner). Canonical Rust AutomationSummary now persists Desktop-shaped runs[] and FeatureHost settles production operation IDs back into those runs; Swift does not own a duplicate history store.",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers strict projection, agent scoping, Desktop snapshot semantics, per-routine pending dedupe, and canonical Host command shapes. Existing Rust FeatureHost automation tests remain the persistence/command authority. Exact-HEAD ordinary/protected Actions required before verified. Rust protocol/store/run-lifecycle tests cover runs[] serialization, persistence, and deterministic completion; fresh exact-HEAD CI is still required.",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift (native lifecycle controller, canonical Host command adapter, and Agent Settings routines section); frontend/src/production/MobileBotAgentSettings.swift (shipping composition); source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs (canonical persisted automation owner). Canonical Rust AutomationSummary now persists Desktop-shaped runs[] and FeatureHost settles production operation IDs back into those runs; Swift does not own a duplicate history store. MobileBotRoutinesModel now strictly projects canonical embedded runs[] into the native routine model for the run-history consumers.",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers strict projection, agent scoping, Desktop snapshot semantics, per-routine pending dedupe, and canonical Host command shapes. Existing Rust FeatureHost automation tests remain the persistence/command authority. Exact-HEAD ordinary/protected Actions required before verified. Rust protocol/store/run-lifecycle tests cover runs[] serialization, persistence, and deterministic completion; fresh exact-HEAD CI is still required. Swift projection tests now reject missing/malformed runs[] and validate valid run projection.",
       "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob 1cbd18feb408b51589b271e5044f63ac9e9e879f. The previous missing runs[] production-data gap is now implemented in the canonical Rust Host. Keep this controller row implemented until exact Desktop trigger/triggerDescription/run projection semantics and fresh exact-HEAD evidence are fully closed."
     },
     {
@@ -1393,26 +1393,26 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
       "ios_language": "Swift + Rust",
-      "ios_platform_delta": "The iOS provider will compose MobileBotRoutinesController with MobileBotRoutineRunHistoryClock. Canonical Rust AutomationSummary now persists Desktop-shaped runs[], so no invented history RPC or Swift-side persistence is allowed.",
-      "implementation_status": "unreviewed",
-      "production_evidence": "source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs and mahayana-feature-host/src/implementation.rs now provide the required canonical persisted runs[] data source; the Swift scoped provider itself remains to be implemented.",
-      "test_evidence": "Rust tests cover run serialization/persistence/settlement; provider lifecycle/scope/snapshot tests remain pending.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob dd9a99fcceddd36400b1fbf02149601bf087c6df. Keep this row unreviewed until the Swift scoped adapter is implemented; Host data support alone is not provider completion."
+      "ios_platform_delta": "MobileBotRoutineRunHistoryProvider composes the existing native Routines controller and the single shared clock; it has no history RPC or storage. Scope changes use account/Agent/routine identities, account changes reset the controller, refresh/reconnect share one path, Run Now delegates to the controller, and source subscriptions are lazy and disposed with the last listener.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift (MobileBotRoutineRunHistoryProvider) over the canonical Rust AutomationSummary.runs data source and MobileBotRoutineRunHistoryClock.",
+      "test_evidence": "GrokMobileRoutinesControllerTests.swift covers strict embedded run parsing and the shared clock/presentation dependencies; exact-HEAD CI and additional provider lifecycle evidence are required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob dd9a99fcceddd36400b1fbf02149601bf087c6df. Implemented without a second RPC/store/timer; keep implemented until exact-HEAD CI and scoped lifecycle acceptance are green."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/run-history.ts",
       "desktop_blob_sha": "7ce0c54345516524f669b61845c72acb8d08ac7d",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Pure routine-run presentation: format relative/date timestamps in the supplied time zone, prefer detail over event for row titles, map running/ok/error to accessibility labels/icons/status role, preserve input order, and expose empty-vs-rows without owning timers or data.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Run history shows Desktop-equivalent labels such as Just now, N min ago, Today/Tomorrow/Yesterday, weekday/date labels, plus Running/Succeeded/Failed semantics and detail/event titles.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Foundation Calendar/TimeZone replace browser Intl.DateTimeFormat. The presentation layer remains pure and consumes the time and time-zone supplied by the shared run-history clock.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift (MobileBotRoutineRunHistoryModel and presentation structs).",
+      "test_evidence": "GrokMobileRoutinesControllerTests.swift covers Just now, minute-ago, future-minute formatting, title precedence, and running/ok/error accessibility/icon/status semantics. Fresh exact-HEAD CI is required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob 7ce0c54345516524f669b61845c72acb8d08ac7d. Pure presentation only; shared clock remains the sole timer owner."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/schedule-editor.tsx",

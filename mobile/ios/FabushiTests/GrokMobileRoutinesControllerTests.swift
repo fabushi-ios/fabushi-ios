@@ -10,6 +10,14 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         "schedule": "@daily",
         "enabled": true,
         "createdAtMs": 10,
+        "runs": [
+            [
+                "id": "run-1",
+                "status": "ok",
+                "startedAt": 20,
+                "detail": "Completed",
+            ],
+        ],
         "lastRunAtMs": 20,
         "nextRunAtMs": 30,
     ]
@@ -23,6 +31,10 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertEqual(projected?.schedule, "@daily")
         XCTAssertEqual(projected?.isEnabled, true)
         XCTAssertEqual(projected?.createdAtMs, 10)
+        XCTAssertEqual(projected?.runs.count, 1)
+        XCTAssertEqual(projected?.runs.first?.status, .ok)
+        XCTAssertEqual(projected?.runs.first?.startedAt, 20)
+        XCTAssertEqual(projected?.runs.first?.detail, "Completed")
         XCTAssertEqual(projected?.lastRunAtMs, 20)
         XCTAssertEqual(projected?.nextRunAtMs, 30)
     }
@@ -165,6 +177,69 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         )
         XCTAssertEqual(run["type"] as? String, "automation.run")
     }
+    func testRoutineProjectionFailsClosedOnMalformedRunHistory() {
+        var missingRuns = valid
+        missingRuns.removeValue(forKey: "runs")
+        XCTAssertNil(MobileBotRoutinesModel.parseAutomation(missingRuns))
+
+        for mutation in [
+            { (row: inout [String: Any]) in row["status"] = "done" },
+            { (row: inout [String: Any]) in row["startedAt"] = "later" },
+            { (row: inout [String: Any]) in row["detail"] = 42 },
+            { (row: inout [String: Any]) in row["event"] = false },
+        ] {
+            var row = (valid["runs"] as! [[String: Any]])[0]
+            mutation(&row)
+            var automation = valid
+            automation["runs"] = [row]
+            XCTAssertNil(MobileBotRoutinesModel.parseAutomation(automation))
+        }
+    }
+
+    func testRunHistoryPresentationMatchesDesktopRelativeAndStatusContract() {
+        let now: Int64 = 1_700_000_000_000
+        let running = MobileBotRoutineRun(
+            id: "running",
+            status: .running,
+            startedAt: now - 30_000,
+            detail: nil,
+            event: "message.created"
+        )
+        let ok = MobileBotRoutineRun(
+            id: "ok",
+            status: .ok,
+            startedAt: now - 120_000,
+            detail: "Completed",
+            event: nil
+        )
+        let failed = MobileBotRoutineRun(
+            id: "failed",
+            status: .error,
+            startedAt: now + 120_000,
+            detail: "Network",
+            event: nil
+        )
+
+        let history = MobileBotRoutineRunHistoryModel.presentHistory(
+            [running, ok, failed],
+            now: now,
+            timeZoneIdentifier: "UTC"
+        )
+        XCTAssertFalse(history.empty)
+        XCTAssertEqual(history.rows[0].timestampLabel, "Just now")
+        XCTAssertEqual(history.rows[0].accessibilityLabel, "Running")
+        XCTAssertEqual(history.rows[0].iconName, "loading")
+        XCTAssertTrue(history.rows[0].statusRole)
+        XCTAssertEqual(history.rows[0].title, "message.created")
+        XCTAssertEqual(history.rows[1].timestampLabel, "2 min ago")
+        XCTAssertEqual(history.rows[1].accessibilityLabel, "Succeeded")
+        XCTAssertEqual(history.rows[1].iconName, "check")
+        XCTAssertEqual(history.rows[1].title, "Completed")
+        XCTAssertEqual(history.rows[2].timestampLabel, "In 2 min")
+        XCTAssertEqual(history.rows[2].accessibilityLabel, "Failed")
+        XCTAssertEqual(history.rows[2].iconName, "close")
+    }
+
     func testRunHistoryClockLazilyTicksAndPublishesTimeZoneChanges() {
         var scheduledName: String?
         var scheduledInterval: Int?
