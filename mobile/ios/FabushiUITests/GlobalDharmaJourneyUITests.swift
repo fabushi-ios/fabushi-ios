@@ -157,8 +157,12 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             sharedRuntime.waitForExistence(timeout: 30),
             "Opening the Global Dharma Web UI must restore the canonical account-scoped runtime and complete the read-only WebMCP status bridge"
         )
-        let revisionText = String(sharedRuntime.label.dropFirst(sharedRuntimePrefix.count))
-        guard let revision = Int(revisionText), revision > 0 else {
+        let revisionSuffix = sharedRuntime.label.dropFirst(sharedRuntimePrefix.count)
+        let revisionDigits = revisionSuffix.prefix(while: { $0.isNumber })
+        guard !revisionDigits.isEmpty,
+              let revision = Int(revisionDigits),
+              revision > 0
+        else {
             XCTFail("Bot/Web UI synchronization must expose a positive canonical runtime revision, got: \(sharedRuntime.label)")
             return
         }
