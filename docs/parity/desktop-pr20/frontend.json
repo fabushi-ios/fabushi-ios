@@ -1289,10 +1289,10 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "iOS adapts the Electron/Coordinator bridge to dedicated AppHost RPC backed by Rust-owned MahayanaProductClient; generic platform.request remains unable to access /sand.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs (closed Host-owned sharing RPC surface and request validation); source/packages/mahayana-rs/mahayana-product/src/lib.rs (Host-owned bearer path plus strict fail-closed /sand share-state projection).",
-      "test_evidence": "Focused Rust shared-room projection contract tests in source/packages/mahayana-rs/mahayana-product/src/lib.rs; exact-HEAD ordinary/protected Actions still required before verified.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated."
+      "test_evidence": "Focused Rust shared-room projection contract tests in source/packages/mahayana-rs/mahayana-product/src/lib.rs; exact-HEAD ordinary/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
+      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/controller.ts",
@@ -1304,10 +1304,10 @@
       "ios_target_path": "frontend/src/production/MobileBotSharedRoom.swift",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "SwiftUI Task cancellation plus account/agent/generation fences replace React provider subscriptions while preserving Host-as-authority mutation semantics.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotSharedRoom.swift (account/agent/generation fences plus per-key pending mutation set; distinct keys no longer globally cancel/block each other); frontend/src/production/GrokMobileSharedRoomModel.swift (strict native shared-room state/lifecycle projection used by the shipping view).",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift covers lifecycle fencing and per-key duplicate/concurrency policy; exact-HEAD ordinary/protected Actions still required before verified.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated."
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift covers lifecycle fencing and per-key duplicate/concurrency policy; exact-HEAD ordinary/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
+      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/model.ts",
@@ -1319,10 +1319,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileSharedRoomModel.swift",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "Native Swift value types replace TypeScript projections while retaining strict all-or-nothing member/room/request validation.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileSharedRoomModel.swift plus source/packages/mahayana-rs/mahayana-product/src/lib.rs; both boundaries fail closed on malformed shared-room state.",
-      "test_evidence": "Focused Swift malformed top-level/nested projection tests and Rust all-or-nothing shared-room contract tests; exact-HEAD ordinary/protected Actions still required before verified.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated."
+      "test_evidence": "Focused Swift malformed top-level/nested projection tests and Rust all-or-nothing shared-room contract tests; exact-HEAD ordinary/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
+      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/trigger.tsx",
@@ -1334,10 +1334,10 @@
       "ios_target_path": "frontend/src/production/MobileBotSharedRoom.swift",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "SwiftUI conditional Section/sheet replaces the React header button; no local room is synthesized when Host state has no roomId.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotSharedRoom.swift (shipping shared-room sheet/entry composition); frontend/src/production/MobileBotAgentSettings.swift (Agent Settings trigger conditioned on Host-projected sharing enabled plus a real room).",
-      "test_evidence": "GrokMobileSharedRoomModelTests cover deterministic room/snapshot projection; exact-HEAD shipping UI/protected Actions still required before verified.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated."
+      "test_evidence": "GrokMobileSharedRoomModelTests cover deterministic room/snapshot projection; exact-HEAD shipping UI/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
+      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/view.tsx",
@@ -1349,10 +1349,10 @@
       "ios_target_path": "frontend/src/production/MobileBotSharedRoom.swift",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "Native Form/ShareLink UI replaces React view while every mutation returns to Host canonical sharing state.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotSharedRoom.swift renders People to all room members, Host-only removal of other humans, unconditional Remove for each owned self Agent, and per-key pending UI state.",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift includes UI action/presentation policy coverage; exact-HEAD ordinary UI + protected Actions still required before verified.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated."
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift includes UI action/presentation policy coverage; exact-HEAD ordinary UI + protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
+      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/controller.ts",
@@ -4439,10 +4439,10 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Rust + Swift",
       "ios_platform_delta": "iOS maps the Desktop renderer bridge to a closed native AppHost sharing.* RPC surface. AppHost rejects malformed required parameters before product/network execution, while existing Rust and Swift projections preserve all-or-nothing shared-room state validation.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs (six-method closed sharing RPC dispatcher and fail-closed request validation); source/packages/mahayana-rs/mahayana-product/src/lib.rs (strict all-or-nothing /sand share-state projection); frontend/src/production/GrokMobileSharedRoomModel.swift (strict native projection).",
-      "test_evidence": "Focused AppHost sharing RPC contract tests lock the exact six shipping methods and reject missing/non-string/blank roomId/requestId/agentId/agentName plus missing/non-bool isApproved; existing mahayana-product strict shared-room projection tests and mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift cover state projection. Exact-HEAD ordinary/protected Actions remain required before verified.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and Desktop blob c9e6241a48ff2f8ab71496c6fdc11122801c088f. Responsibility is implemented but must remain unverified until the new exact HEAD passes ordinary and protected production evidence gates."
+      "test_evidence": "Focused AppHost sharing RPC contract tests lock the exact six shipping methods and reject missing/non-string/blank roomId/requestId/agentId/agentName plus missing/non-bool isApproved; existing mahayana-product strict shared-room projection tests and mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift cover state projection. Exact-HEAD ordinary/protected Actions remain required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and Desktop blob c9e6241a48ff2f8ab71496c6fdc11122801c088f. Responsibility is implemented but must remain unverified until the new exact HEAD passes ordinary and protected production evidence gates. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
     },
     {
       "desktop_path": "frontend/src/recovered/features/terminal/output/model.ts",
