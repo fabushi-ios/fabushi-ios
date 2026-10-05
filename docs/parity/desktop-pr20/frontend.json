@@ -11,13 +11,13 @@
       "desktop_owner": "renderer / Fabushi App semantic surface",
       "desktop_visible_effect": "An agent can discover and invoke structured Fabushi-app status/snapshot/find/action/wait/assert operations instead of relying on image recognition.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/NativeAppSemanticSurface.swift",
+      "ios_target_path": "mobile/ios/Fabushi/FabushiAppAgentSurface.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Applicable product effect, but the browser WebMCP registration mechanism is not copied. iOS needs one native semantic-surface owner over SwiftUI/UIKit accessibility state and Host-authorized operations; the existing Mini App WebMCP bridge is a different boundary and is not accepted as this implementation.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d. Mapping is intentionally below implemented: no shipping NativeAppSemanticSurface owner exists yet."
+      "ios_platform_delta": "iOS publishes the same six fabushi.app.* semantic tools through the account-scoped official Fabushi device WebSocket gateway instead of browser WebMCP registration. FabushiRuntime constructs one native semantic-surface owner and shares that exact instance with renderer publishers and the gateway; no Mini App bridge is substituted for this boundary.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/FabushiAppAgentSurface.swift; mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/GrokMobileShell+Semantic.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "test_evidence": "mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift; mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift",
+      "notes": "Reviewed against Desktop final HEAD 798cf51d. The native owner is shipping-composed; exact-head CI/acceptance for this audit commit is still required before current-head promotion."
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/app-surface.ts",
@@ -26,13 +26,13 @@
       "desktop_owner": "renderer / Fabushi App semantic surface",
       "desktop_visible_effect": "Automation receives a structured, redacted, generation-aware view of the active Fabushi UI and can perform allowlisted stale-reference-safe actions.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/NativeAppSemanticSurface.swift",
+      "ios_target_path": "mobile/ios/Fabushi/FabushiAppAgentSurface.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS must expose the same responsibility through native accessibility/semantic state rather than DOM/ARIA. Password/credential mutation must remain impossible and action references must fail closed when stale.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d. Existing accessibility identifiers are supporting primitives, not a complete semantic-surface owner."
+      "ios_platform_delta": "SwiftUI/UIKit semantic publishers replace DOM/ARIA traversal while preserving versioned status/snapshot/find/action/wait/assert, bounded snapshots, generation fencing, allowlisted actions, sensitive-input fail-closed behavior, and redacted value metadata. The same owner is exposed only through FabushiRemoteDeviceGateway.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/FabushiAppAgentSurface.swift; mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/GrokMobileShell+Semantic.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "test_evidence": "mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift; mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift",
+      "notes": "Existing accessibility identifiers are supporting UI identity; canonical automation truth is the single FabushiAppAgentSurface instance owned by FabushiRuntime."
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/bridge.ts",
