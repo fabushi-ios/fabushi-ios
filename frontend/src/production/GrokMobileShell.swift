@@ -65,6 +65,7 @@ internal struct GrokMobileShell: View {
         .sheet(item: $botSettingsTarget) { agent in
             MobileBotAgentSettingsSheet(
                 agent: bots.first(where: { $0.id == agent.id }) ?? agent,
+                roster: bots,
                 bridge: bridge,
                 accountScopeKey: mobileAccountScopeKey,
                 onRosterChanged: { updated in
