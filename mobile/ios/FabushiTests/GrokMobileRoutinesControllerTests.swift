@@ -561,4 +561,85 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertEqual(notifications, 2)
     }
 
+
+    func testSchedulePickerMatchesDesktopQuarterHourContract() {
+        let options = MobileBotRoutineSchedule.pickerOptions()
+        XCTAssertEqual(mobileBotRoutineScheduleIntervalMinutes, 15)
+        XCTAssertEqual(options.count, 96)
+        XCTAssertEqual(options.first?.label, "12:00 AM")
+        XCTAssertEqual(options.first?.schedule, "0 0 * * *")
+        XCTAssertEqual(options[1].label, "12:15 AM")
+        XCTAssertEqual(options[1].schedule, "15 0 * * *")
+        XCTAssertEqual(options.last?.label, "11:45 PM")
+        XCTAssertEqual(options.last?.schedule, "45 23 * * *")
+    }
+
+    func testCustomScheduleBlurNormalizesValidatesAndFailsClosed() {
+        XCTAssertEqual(
+            MobileBotRoutineSchedule.resolveCustomBlur("  15   9  * * 1-5  "),
+            MobileBotRoutineCustomScheduleBlurResult(
+                schedule: "15 9 * * 1-5",
+                isInvalid: false,
+                shouldCommit: true
+            )
+        )
+        XCTAssertEqual(
+            MobileBotRoutineSchedule.resolveCustomBlur("   "),
+            MobileBotRoutineCustomScheduleBlurResult(
+                schedule: "",
+                isInvalid: false,
+                shouldCommit: false
+            )
+        )
+        XCTAssertEqual(
+            MobileBotRoutineSchedule.resolveCustomBlur("61 25 * * *"),
+            MobileBotRoutineCustomScheduleBlurResult(
+                schedule: "61 25 * * *",
+                isInvalid: true,
+                shouldCommit: false
+            )
+        )
+    }
+
+    func testScheduleValidationAcceptsDesktopAliasesIntervalsAndTimeZones() {
+        for schedule in [
+            "@hourly",
+            "@daily",
+            "@weekly",
+            "@monthly",
+            "@every 15m",
+            "@every 2h",
+            "0 9 * * 1-5",
+            "*/15 8-18 * * 1-5",
+            "CRON_TZ=America/Phoenix 0 9 * * *",
+            "TZ=UTC 0 0 * * *",
+        ] {
+            XCTAssertTrue(
+                MobileBotRoutineSchedule.isValid(schedule),
+                "expected valid schedule: \(schedule)"
+            )
+        }
+    }
+
+    func testScheduleValidationRejectsMalformedOrOutOfRangeForms() {
+        for schedule in [
+            "",
+            "@every 0m",
+            "@every nope",
+            "0 0 * *",
+            "60 0 * * *",
+            "0 24 * * *",
+            "0 0 0 * *",
+            "0 0 * 13 *",
+            "0 0 * * 8",
+            "*/0 * * * *",
+            "CRON_TZ=Not/AZone 0 9 * * *",
+        ] {
+            XCTAssertFalse(
+                MobileBotRoutineSchedule.isValid(schedule),
+                "expected invalid schedule: \(schedule)"
+            )
+        }
+    }
+
 }
