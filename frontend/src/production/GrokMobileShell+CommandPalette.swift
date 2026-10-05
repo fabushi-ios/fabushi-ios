@@ -192,7 +192,11 @@ extension GrokMobileShell {
     func activateCommandPaletteEntry(_ entry: MobileCommandPaletteEntry) {
         switch entry {
         case .bot(let bot):
-            selectedBot = bot
+            if bot.isGroup && !bot.isSharedRoom {
+                groupMembersTarget = bot
+            } else {
+                selectedBot = bot
+            }
             closeCommandPalette()
         case .conversation(let conversation):
             openLegacyConversation(conversation.id)

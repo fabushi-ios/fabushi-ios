@@ -56,7 +56,13 @@ extension GrokMobileShell {
 
                         if !bots.isEmpty {
                             sectionTitle("Bots  \(bots.count)")
-                            ForEach(filteredBots) { bot in botRow(bot, subtitle: bot.description.isEmpty ? "Ready" : bot.description, badge: bot.miniAppId == nil ? "Bot" : "Mini App Bot") }
+                            ForEach(filteredBots) { bot in
+                                botRow(
+                                    bot,
+                                    subtitle: bot.description.isEmpty ? "Ready" : bot.description,
+                                    badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
+                                )
+                            }
                         }
 
                         let projects = filteredConversations.filter { $0.kind == .group || $0.kind == .direct }
@@ -113,7 +119,13 @@ extension GrokMobileShell {
 
     func botRow(_ bot: MobileBotSummary, subtitle: String, badge: String) -> some View {
         HStack(spacing: 0) {
-            Button { selectedBot = bot } label: {
+            Button {
+                if bot.isGroup && !bot.isSharedRoom {
+                    groupMembersTarget = bot
+                } else {
+                    selectedBot = bot
+                }
+            } label: {
                 HStack(spacing: 12) {
                     ClothGhostAvatar(botId: bot.id, size: 47, badge: .green)
                     VStack(alignment: .leading, spacing: 3) {
@@ -131,7 +143,7 @@ extension GrokMobileShell {
             }
             .buttonStyle(.plain)
 
-            if bot.miniAppId == nil {
+            if bot.miniAppId == nil && !bot.isGroup {
                 Menu {
                     Button {
                         beginBotRename(bot)

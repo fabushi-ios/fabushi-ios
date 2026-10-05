@@ -91,4 +91,48 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertEqual(delete["id"] as? String, "agent-1")
     }
 
+    @MainActor
+    func testParseGroupProjectsCanonicalMembershipFields() throws {
+        let group = try XCTUnwrap(GrokMobileBotService.parseGroup([
+            "id": "group-1",
+            "name": "Research Room",
+            "description": "Cross-check",
+            "memberIds": ["bot-a", "bot-b"],
+        ]))
+        XCTAssertTrue(group.isGroup)
+        XCTAssertFalse(group.isSharedRoom)
+        XCTAssertEqual(group.memberIds, ["bot-a", "bot-b"])
+        XCTAssertNil(group.miniAppId)
+    }
+
+    @MainActor
+    func testParseGroupFailsClosedForInvalidMembership() {
+        XCTAssertNil(GrokMobileBotService.parseGroup([
+            "id": "group-empty", "name": "Empty", "memberIds": [],
+        ]))
+        XCTAssertNil(GrokMobileBotService.parseGroup([
+            "id": "group-too-large",
+            "name": "Too large",
+            "memberIds": (0...6).map { "bot-\($0)" },
+        ]))
+        XCTAssertNil(GrokMobileBotService.parseGroup([
+            "id": "group-duplicate",
+            "name": "Duplicate",
+            "memberIds": ["bot-a", "bot-a"],
+        ]))
+    }
+
+    @MainActor
+    func testGroupUpdateCommandUsesCanonicalHostContract() {
+        let command = GrokMobileBotService.groupUpdateCommand(
+            id: "group-1",
+            memberIds: ["bot-a", "bot-b"],
+            requestId: "group-update-1"
+        )
+        XCTAssertEqual(command["type"] as? String, "group.update")
+        XCTAssertEqual(command["id"] as? String, "group-1")
+        XCTAssertEqual(command["requestId"] as? String, "group-update-1")
+        XCTAssertEqual(command["memberIds"] as? [String], ["bot-a", "bot-b"])
+    }
+
 }

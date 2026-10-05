@@ -63,6 +63,37 @@ final class GrokMobileCommandPaletteTests: XCTestCase {
         XCTAssertEqual(groups.map(\.id), ["conversation:group-1"])
     }
 
+    func testBotGroupsRouteToGroupsTabAndNotIndividualAgentsTab() {
+        let individual = MobileBotSummary(id: "bot-1", name: "Research", description: "")
+        let group = MobileBotSummary(
+            id: "group-1",
+            name: "Research Room",
+            description: "",
+            isGroup: true,
+            memberIds: ["bot-1"]
+        )
+
+        let agents = GrokMobileCommandPaletteModel.entries(
+            bots: [individual, group],
+            conversations: [],
+            messagesByConversation: [:],
+            actions: [],
+            query: "",
+            tab: .agents
+        )
+        XCTAssertEqual(agents.map(\.id), ["bot:bot-1"])
+
+        let groups = GrokMobileCommandPaletteModel.entries(
+            bots: [individual, group],
+            conversations: [],
+            messagesByConversation: [:],
+            actions: [],
+            query: "",
+            tab: .groups
+        )
+        XCTAssertEqual(groups.map(\.id), ["bot:group-1"])
+    }
+
     func testCanonicalMessagingProjectionFeedsMessagesFilesAndLinks() {
         let conversation = conversation(id: "chat-1", title: "Release", kind: .direct)
         let textMessage = message(

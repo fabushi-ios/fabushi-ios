@@ -409,12 +409,13 @@ internal enum GrokMobileCommandPaletteModel {
             if case .message = entry { return true }
             return false
         case .agents:
-            if case .bot = entry { return true }
+            if case .bot(let bot) = entry { return !bot.isGroup }
             if case .conversation(let conversation) = entry {
                 return conversation.kind == .direct || conversation.kind == .savedMessages || conversation.kind == .secret
             }
             return false
         case .groups:
+            if case .bot(let bot) = entry { return bot.isGroup && !bot.isSharedRoom }
             if case .conversation(let conversation) = entry {
                 return conversation.kind == .group || conversation.kind == .channel
             }

@@ -23,6 +23,7 @@ internal struct GrokMobileShell: View {
     @State var botActionError: String?
     @State var bots: [MobileBotSummary] = []
     @State var selectedBot: MobileBotSummary?
+    @State var groupMembersTarget: MobileBotSummary?
     @State var botDrafts: [String: String] = [:]
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
@@ -44,6 +45,18 @@ internal struct GrokMobileShell: View {
             legacyContent
         } else {
             homeContent
+                .sheet(item: $groupMembersTarget) { group in
+                    MobileBotGroupMembersSheet(
+                        group: bots.first(where: { $0.id == group.id }) ?? group,
+                        roster: bots,
+                        bridge: bridge,
+                        onRosterChanged: { updated in
+                            bots = updated
+                            groupMembersTarget = updated.first(where: { $0.id == group.id })
+                        },
+                        onClose: { groupMembersTarget = nil }
+                    )
+                }
         }
     }
 
@@ -143,7 +156,14 @@ internal struct GrokMobileShell: View {
     private var botRosterFingerprint: String {
         bots
             .map { bot in
-                [bot.id, bot.name, bot.miniAppId ?? ""].joined(separator: ":")
+                [
+                    bot.id,
+                    bot.name,
+                    bot.miniAppId ?? "",
+                    String(bot.isGroup),
+                    bot.memberIds.joined(separator: "+"),
+                    String(bot.isSharedRoom),
+                ].joined(separator: ":")
             }
             .joined(separator: ",")
     }

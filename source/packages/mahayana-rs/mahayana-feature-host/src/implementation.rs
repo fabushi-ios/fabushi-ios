@@ -171,6 +171,7 @@ struct PendingApproval {
 const GROUP_MAX_MEMBER_TURNS: usize = 10;
 const GROUP_MAX_ROUNDS: usize = 3;
 const GROUP_PROMPT_HISTORY_LIMIT: usize = 24;
+const GROUP_MAX_MEMBERS: usize = 6;
 const REMOTE_DEVICE_SECRET_MAX_ENTRIES: usize = 256;
 const REMOTE_DEVICE_SECRET_MAX_BYTES: u64 = 256 * 1024;
 
@@ -11838,6 +11839,11 @@ fn validate_group_members(
             "group chat must contain at least one agent".into(),
         ));
     }
+    if members.len() > GROUP_MAX_MEMBERS {
+        return Err(FeatureHostError::Contract(format!(
+            "group chat can contain at most {GROUP_MAX_MEMBERS} agents"
+        )));
+    }
     Ok(members)
 }
 
@@ -12598,7 +12604,11 @@ fn load_groups(path: &Path) -> BTreeMap<String, GroupSummary> {
             group
                 .member_ids
                 .retain(|id| !id.trim().is_empty() && seen.insert(id.clone()));
-            if group.id.trim().is_empty() || group.name.is_empty() || group.member_ids.is_empty() {
+            if group.id.trim().is_empty()
+                || group.name.is_empty()
+                || group.member_ids.is_empty()
+                || group.member_ids.len() > GROUP_MAX_MEMBERS
+            {
                 return None;
             }
             Some((group.id.clone(), group))
@@ -13397,6 +13407,29 @@ mod tests {
             member_ids: vec![group.id.clone()],
         });
         assert!(nested.is_err());
+
+        {
+            let mut state = controller.state().expect("state");
+            let template = state.bots.values().next().expect("default bot").clone();
+            for index in 0..7 {
+                let id = format!("capacity-bot-{index}");
+                let mut bot = template.clone();
+                bot.id = id.clone();
+                bot.name = format!("Capacity {index}");
+                state.bots.insert(id, bot);
+            }
+        }
+        let over_capacity = controller.execute(FeatureCommand::GroupCreate {
+            request_id: "over-capacity-group".into(),
+            name: "Too many".into(),
+            description: String::new(),
+            member_ids: (0..7).map(|index| format!("capacity-bot-{index}")).collect(),
+        });
+        assert!(matches!(
+            over_capacity,
+            Err(FeatureHostError::Contract(message)) if message.contains("at most 6")
+        ));
+
         controller
             .execute(FeatureCommand::GroupDelete {
                 request_id: "group-delete".into(),
