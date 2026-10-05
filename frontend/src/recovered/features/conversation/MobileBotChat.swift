@@ -35,156 +35,12 @@ internal struct MobileBotChat: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button(action: onClose) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .frame(width: 38, height: 38)
-                        .background(Color.black.opacity(0.045), in: Circle())
-                }
-                Spacer()
-                Button(action: onOpenSettings) {
-                    HStack(spacing: 8) {
-                        ClothGhostAvatar(botId: bot.id, size: 28, active: busy)
-                        Text(bot.name).font(.system(size: 17, weight: .semibold))
-                    }
-                    .padding(.horizontal, 13).padding(.vertical, 7)
-                    .background(.white, in: Capsule())
-                    .shadow(color: .black.opacity(0.08), radius: 12, y: 3)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Bot settings")
-                .accessibilityIdentifier("mobile-bot-settings")
-                Spacer()
-                Image(systemName: "desktopcomputer")
-                    .font(.system(size: 16, weight: .medium))
-                    .frame(width: 38, height: 38)
-                    .background(Color.black.opacity(0.045), in: Circle())
-            }
-            .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(Color.white.opacity(0.97))
-
+            chatHeader
             Divider().opacity(0.35)
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 7) {
-                        if entries.isEmpty {
-                            VStack(spacing: 13) {
-                                ClothGhostAvatar(botId: bot.id, size: 82)
-                                Text(bot.name).font(.title2.bold())
-                                if !bot.description.isEmpty {
-                                    Text(bot.description).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                                }
-                            }
-                            .frame(maxWidth: .infinity).padding(.top, 96).padding(.horizontal, 30)
-                        }
-
-                        ForEach(entries) { entry in
-                            transcript(entry)
-                                .id(entry.id)
-                        }
-                        if let errorText {
-                            Text(errorText).font(.caption).foregroundStyle(.red).padding(.top, 4)
-                                .accessibilityIdentifier("mobile-bot-error")
-                        }
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 18)
-                }
-                .background(Color(red: 0.985, green: 0.985, blue: 0.975))
-                .onChange(of: entries.count) { _, _ in
-                    if let last = entries.last { withAnimation(.easeOut(duration: 0.16)) { proxy.scrollTo(last.id, anchor: .bottom) } }
-                }
-            }
-
-            if let replyTargetId {
-                HStack(spacing: 8) {
-                    Image(systemName: replyIsFork ? "arrow.triangle.branch" : "arrowshape.turn.up.left")
-                    Text(replyIsFork ? "Fork reply · \(replyTargetId)" : "Replying · \(replyTargetId)")
-                        .font(.caption)
-                        .lineLimit(1)
-                    Spacer()
-                    Button { self.replyTargetId = nil; replyIsFork = false } label: { Image(systemName: "xmark.circle.fill") }
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16).padding(.top, 7)
-            }
-
-            if voiceRecorder.isRecording || transcribingVoice {
-                HStack(spacing: 9) {
-                    if transcribingVoice {
-                        ProgressView().controlSize(.small)
-                        Text("正在离线转写…").font(.caption.weight(.semibold))
-                    } else {
-                        Circle().fill(Color.red).frame(width: 8, height: 8)
-                        Text("正在录音 \(voiceRecorder.elapsedSeconds / 60):\(String(format: "%02d", voiceRecorder.elapsedSeconds % 60))")
-                            .font(.caption.weight(.semibold))
-                    }
-                    Spacer()
-                    Button("取消") { cancelVoiceInput() }
-                        .font(.caption.weight(.semibold))
-                        .disabled(transcribingVoice)
-                }
-                .padding(.horizontal, 16).padding(.top, 7)
-            }
-
-            HStack(alignment: .bottom, spacing: 8) {
-                TextField("Message", text: $draft, axis: .vertical)
-                    .lineLimit(1...5)
-                    .padding(.horizontal, 14).padding(.vertical, 11)
-                    .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .onSubmit { if !busy { Task { await send() } } }
-                    .accessibilityIdentifier("mobile-bot-draft")
-
-                if bot.miniAppId == GlobalDharmaMiniAppBridge.globalDharmaId {
-                    Button {
-                        openedMiniApp = true
-                    } label: {
-                        Text(bot.menuButtonText ?? "打开应用")
-                            .font(.caption.bold())
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .frame(height: 39)
-                            .background(Color.black.opacity(0.075), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(bot.menuButtonText ?? "打开应用")
-                    .accessibilityIdentifier("mobile-bot-open-miniapp")
-                }
-
-                if !busy && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Button {
-                        if voiceRecorder.isRecording {
-                            Task { await finishVoiceInput() }
-                        } else {
-                            Task { await startVoiceInput() }
-                        }
-                    } label: {
-                        Image(systemName: voiceRecorder.isRecording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 39, height: 39)
-                            .background(voiceRecorder.isRecording ? Color.red : Color.black, in: Circle())
-                    }
-                    .disabled(transcribingVoice)
-                    .accessibilityIdentifier(voiceRecorder.isRecording ? "mobile-bot-voice-stop" : "mobile-bot-voice-start")
-                }
-
-                Button {
-                    if busy { Task { await stop() } } else { Task { await send() } }
-                } label: {
-                    Image(systemName: busy ? "stop.fill" : "arrow.up")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 39, height: 39)
-                        .background(busy ? Color.red : Color.black, in: Circle())
-                }
-                .disabled(!busy && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .accessibilityIdentifier(busy ? "mobile-bot-stop" : "mobile-bot-send")
-            }
-            .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 10)
-            .background(.ultraThinMaterial)
+            transcriptList
+            replyBanner
+            voiceStatusBanner
+            composer
         }
         .background(Color(red: 0.985, green: 0.985, blue: 0.975))
         .accessibilityElement(children: .contain)
@@ -193,20 +49,229 @@ internal struct MobileBotChat: View {
         .onChange(of: bot.id) { _, _ in cancelVoiceInput() }
         .onDisappear { cancelVoiceInput() }
         .fullScreenCover(isPresented: $openedMiniApp) {
-            if let miniAppId = bot.miniAppId,
-               let plugin = model.plugins.first(where: { $0.pluginId == miniAppId }) {
-                MiniAppWebMcpSurface(plugin: plugin, model: model)
-            } else {
-                VStack(spacing: 12) {
-                    ProgressView()
-                    Text("正在加载应用…")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+            miniAppCover
+        }
+    }
+
+    private var chatHeader: some View {
+        HStack(spacing: 12) {
+            Button(action: onClose) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .frame(width: 38, height: 38)
+                    .background(Color.black.opacity(0.045), in: Circle())
+            }
+            Spacer()
+            Button(action: onOpenSettings) {
+                HStack(spacing: 8) {
+                    ClothGhostAvatar(botId: bot.id, size: 28, active: busy)
+                    Text(bot.name).font(.system(size: 17, weight: .semibold))
                 }
-                .task {
-                    if model.plugins.first(where: { $0.pluginId == bot.miniAppId }) == nil {
-                        await model.refresh()
+                .padding(.horizontal, 13).padding(.vertical, 7)
+                .background(.white, in: Capsule())
+                .shadow(color: .black.opacity(0.08), radius: 12, y: 3)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Bot settings")
+            .accessibilityIdentifier("mobile-bot-settings")
+            Spacer()
+            Image(systemName: "desktopcomputer")
+                .font(.system(size: 16, weight: .medium))
+                .frame(width: 38, height: 38)
+                .background(Color.black.opacity(0.045), in: Circle())
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .background(Color.white.opacity(0.97))
+    }
+
+    private var transcriptList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 7) {
+                    if entries.isEmpty {
+                        VStack(spacing: 13) {
+                            ClothGhostAvatar(botId: bot.id, size: 82)
+                            Text(bot.name).font(.title2.bold())
+                            if !bot.description.isEmpty {
+                                Text(bot.description)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 96)
+                        .padding(.horizontal, 30)
                     }
+
+                    ForEach(entries) { entry in
+                        transcript(entry)
+                            .id(entry.id)
+                    }
+                    if let errorText {
+                        Text(errorText)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .padding(.top, 4)
+                            .accessibilityIdentifier("mobile-bot-error")
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 18)
+            }
+            .background(Color(red: 0.985, green: 0.985, blue: 0.975))
+            .onChange(of: entries.count) { _, _ in
+                if let last = entries.last {
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var replyBanner: some View {
+        if let replyTargetId {
+            HStack(spacing: 8) {
+                Image(systemName: replyIsFork ? "arrow.triangle.branch" : "arrowshape.turn.up.left")
+                Text(replyIsFork ? "Fork reply · \(replyTargetId)" : "Replying · \(replyTargetId)")
+                    .font(.caption)
+                    .lineLimit(1)
+                Spacer()
+                Button {
+                    self.replyTargetId = nil
+                    replyIsFork = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+            .padding(.top, 7)
+        }
+    }
+
+    @ViewBuilder
+    private var voiceStatusBanner: some View {
+        if voiceRecorder.isRecording || transcribingVoice {
+            HStack(spacing: 9) {
+                if transcribingVoice {
+                    ProgressView().controlSize(.small)
+                    Text("正在离线转写…").font(.caption.weight(.semibold))
+                } else {
+                    Circle().fill(Color.red).frame(width: 8, height: 8)
+                    Text("正在录音 \(voiceRecorder.elapsedSeconds / 60):\(String(format: "%02d", voiceRecorder.elapsedSeconds % 60))")
+                        .font(.caption.weight(.semibold))
+                }
+                Spacer()
+                Button("取消") { cancelVoiceInput() }
+                    .font(.caption.weight(.semibold))
+                    .disabled(transcribingVoice)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 7)
+        }
+    }
+
+    private var composer: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Message", text: $draft, axis: .vertical)
+                .lineLimit(1...5)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .onSubmit {
+                    if !busy {
+                        Task { await send() }
+                    }
+                }
+                .accessibilityIdentifier("mobile-bot-draft")
+
+            miniAppButton
+            voiceInputButton
+            sendButton
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(.ultraThinMaterial)
+    }
+
+    @ViewBuilder
+    private var miniAppButton: some View {
+        if bot.miniAppId == GlobalDharmaMiniAppBridge.globalDharmaId {
+            Button {
+                openedMiniApp = true
+            } label: {
+                Text(bot.menuButtonText ?? "打开应用")
+                    .font(.caption.bold())
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .frame(height: 39)
+                    .background(Color.black.opacity(0.075), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(bot.menuButtonText ?? "打开应用")
+            .accessibilityIdentifier("mobile-bot-open-miniapp")
+        }
+    }
+
+    @ViewBuilder
+    private var voiceInputButton: some View {
+        if !busy && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Button {
+                if voiceRecorder.isRecording {
+                    Task { await finishVoiceInput() }
+                } else {
+                    Task { await startVoiceInput() }
+                }
+            } label: {
+                Image(systemName: voiceRecorder.isRecording ? "stop.fill" : "mic.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 39, height: 39)
+                    .background(voiceRecorder.isRecording ? Color.red : Color.black, in: Circle())
+            }
+            .disabled(transcribingVoice)
+            .accessibilityIdentifier(voiceRecorder.isRecording ? "mobile-bot-voice-stop" : "mobile-bot-voice-start")
+        }
+    }
+
+    private var sendButton: some View {
+        Button {
+            if busy {
+                Task { await stop() }
+            } else {
+                Task { await send() }
+            }
+        } label: {
+            Image(systemName: busy ? "stop.fill" : "arrow.up")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 39, height: 39)
+                .background(busy ? Color.red : Color.black, in: Circle())
+        }
+        .disabled(!busy && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .accessibilityIdentifier(busy ? "mobile-bot-stop" : "mobile-bot-send")
+    }
+
+    @ViewBuilder
+    private var miniAppCover: some View {
+        if let miniAppId = bot.miniAppId,
+           let plugin = model.plugins.first(where: { $0.pluginId == miniAppId }) {
+            MiniAppWebMcpSurface(plugin: plugin, model: model)
+        } else {
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("正在加载应用…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .task {
+                if model.plugins.first(where: { $0.pluginId == bot.miniAppId }) == nil {
+                    await model.refresh()
                 }
             }
         }
