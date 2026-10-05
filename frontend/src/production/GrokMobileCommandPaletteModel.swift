@@ -129,12 +129,12 @@ internal enum MobileCommandPaletteEntry: Identifiable {
 
     var systemImage: String {
         switch self {
-        case .bot: "sparkles"
+        case .bot: return "sparkles"
         case .conversation(let conversation):
             return conversation.kind == .channel ? "megaphone" : conversation.kind == .group ? "person.3" : "bubble.left.and.bubble.right"
-        case .message: "quote.bubble"
-        case .file: "doc"
-        case .link: "link"
+        case .message: return "quote.bubble"
+        case .file: return "doc"
+        case .link: return "link"
         case .action(let action):
             return action.kind == .createBot ? "plus.circle" : "rectangle.grid.1x2"
         }
