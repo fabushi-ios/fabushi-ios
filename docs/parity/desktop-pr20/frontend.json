@@ -1244,10 +1244,10 @@
       "ios_target_path": "frontend/src/production/GrokMobileAgentSettingsModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Swift structured concurrency replaces the React subscription/dispose lifecycle. The native settings owner reuses the existing account-scoped Rust Host bot.update/group.update store, with account/Agent/generation fencing, cancellation, one pending mutation, and canonical roster reload after success.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/GrokMobileAgentSettingsModel.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileAgentSettingsModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. This settings production tranche requires its own exact-head ordinary/protected acceptance before verified."
+      "notes": "Verified against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701 with iOS production HEAD 1af147e416381d6ae135335adbfdc640af9d83fa. Ordinary acceptance 37356458540 completed/success (architecture, rust-host, simulator Unit/UI, physical-device archive/package/upload); device artifact 11365592567 fabushi-ios-device-archive-1af147e416381d6ae135335adbfdc640af9d83fa digest sha256:3b25dbe08d67a23896165a1698267d32a5810447bebae73cfaa56ef277ef01b9. Protected acceptance 37356458467 completed/success (protected build, bounded refresh-token-free session, real Global Dharma journey, complete-state, evidence cleanup/upload, Simulator erase); protected artifact 11366331343 fabushi-ios-protected-session-1af147e416381d6ae135335adbfdc640af9d83fa-37356458467-1 digest sha256:3b06d97015c5520709fcbffb561ee88c58c652ac0fd02cc38181f808882761c9."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/settings/view.css",
@@ -1259,10 +1259,10 @@
       "ios_target_path": "frontend/src/production/MobileBotAgentSettings.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native SwiftUI Form/TextField/Toggle semantics replace CSS, browser focus-visible styling, and manual switch visuals while preserving focus/accessibility and pending-disabled behavior.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileAgentSettingsModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; mobile/ios/FabushiUITests/FabushiUITests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Native SwiftUI is the platform presentation replacement; exact-head acceptance for this tranche is pending."
+      "notes": "Verified against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701 with iOS production HEAD 1af147e416381d6ae135335adbfdc640af9d83fa. Ordinary acceptance 37356458540 completed/success (architecture, rust-host, simulator Unit/UI, physical-device archive/package/upload); device artifact 11365592567 fabushi-ios-device-archive-1af147e416381d6ae135335adbfdc640af9d83fa digest sha256:3b25dbe08d67a23896165a1698267d32a5810447bebae73cfaa56ef277ef01b9. Protected acceptance 37356458467 completed/success (protected build, bounded refresh-token-free session, real Global Dharma journey, complete-state, evidence cleanup/upload, Simulator erase); protected artifact 11366331343 fabushi-ios-protected-session-1af147e416381d6ae135335adbfdc640af9d83fa-37356458467-1 digest sha256:3b06d97015c5520709fcbffb561ee88c58c652ac0fd02cc38181f808882761c9."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/settings/view.tsx",
@@ -1274,10 +1274,10 @@
       "ios_target_path": "frontend/src/production/MobileBotAgentSettings.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "A native SwiftUI sheet replaces the React view. It is reachable from shipping Bot/Agent surfaces, keeps local drafts separate from authoritative Host state, disables concurrent edits, and fences account/Agent/lifecycle drift.",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "production_evidence": "frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/GrokMobileBotService.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileAgentSettingsModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; mobile/ios/FabushiUITests/FabushiUITests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Shipping composition and focused tests are implemented; current production HEAD still requires exact-head CI/acceptance before verified."
+      "notes": "Verified against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701 with iOS production HEAD 1af147e416381d6ae135335adbfdc640af9d83fa. Ordinary acceptance 37356458540 completed/success (architecture, rust-host, simulator Unit/UI, physical-device archive/package/upload); device artifact 11365592567 fabushi-ios-device-archive-1af147e416381d6ae135335adbfdc640af9d83fa digest sha256:3b25dbe08d67a23896165a1698267d32a5810447bebae73cfaa56ef277ef01b9. Protected acceptance 37356458467 completed/success (protected build, bounded refresh-token-free session, real Global Dharma journey, complete-state, evidence cleanup/upload, Simulator erase); protected artifact 11366331343 fabushi-ios-protected-session-1af147e416381d6ae135335adbfdc640af9d83fa-37356458467-1 digest sha256:3b06d97015c5520709fcbffb561ee88c58c652ac0fd02cc38181f808882761c9."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/bridge.ts",
