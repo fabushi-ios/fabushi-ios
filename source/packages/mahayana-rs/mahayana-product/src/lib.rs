@@ -3716,6 +3716,56 @@ mod tests {
     }
 
     #[test]
+    fn shared_room_projection_matches_renderer_contract() {
+        let token_payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(br#"{"sub":"auth-user"}"#);
+        let token = format!("header.{token_payload}.signature");
+        let projected = project_sharing_state(
+            json!({
+                "pendingJoinRequests": [{
+                    "requestId": "request-1",
+                    "roomId": "room-1",
+                    "requesterAuthId": "guest-1",
+                    "requesterName": "Guest"
+                }],
+                "rooms": [{
+                    "roomId": "room-1",
+                    "name": "Shared room",
+                    "hostAuthId": "auth-user",
+                    "members": []
+                }]
+            }),
+            jwt_subject_from_access_token(&token),
+        );
+        assert_eq!(projected["isEnabled"], true);
+        assert_eq!(projected["selfAuthId"], "auth-user");
+        assert_eq!(projected["rooms"][0]["roomId"], "room-1");
+        assert_eq!(projected["pendingJoinRequests"][0]["requestId"], "request-1");
+        assert_eq!(projected["typingUsers"], json!([]));
+    }
+
+    #[test]
+    fn shared_room_invite_projection_is_strict_and_stable() {
+        assert_eq!(
+            project_room_invite_result(&json!({
+                "room": {"roomId": "room-1"},
+                "shareUrl": "https://example.test/share/invite",
+                "expiresAtMs": 42.0
+            })),
+            json!({
+                "status": "ok",
+                "shareUrl": "https://example.test/share/invite",
+                "expiresAtMs": 42.0,
+                "roomId": "room-1"
+            })
+        );
+        assert_eq!(
+            project_room_invite_result(&json!({"shareUrl": "https://example.test/share/invite"}))["status"],
+            "error"
+        );
+    }
+
+    #[test]
     fn path_identifiers_allow_product_ids_but_reject_traversal() {
         assert_eq!(
             safe_path_identifier("sandbox.test-1", "miniAppId").as_deref(),
