@@ -273,7 +273,7 @@ final class MarketplaceModel {
         return nil
     }
 
-    private static func globalDharmaScope(for auth: [String: Any]) -> String? {
+    static func globalDharmaScope(for auth: [String: Any]) -> String? {
         guard let raw = stableGlobalDharmaAccountIdentity(in: auth) else { return nil }
         return Data(raw.utf8)
             .base64EncodedString()

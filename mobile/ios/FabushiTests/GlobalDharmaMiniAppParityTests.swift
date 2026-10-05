@@ -120,6 +120,46 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual((restored["revision"] as? NSNumber)?.intValue, 1)
     }
 
+
+    func testGlobalDharmaAccountScopeUsesCanonicalStableIdentityAndFailsClosed() {
+        XCTAssertEqual(
+            MarketplaceModel.globalDharmaScope(for: [
+                "loggedIn": true,
+                "user": ["principalId": "account-alpha", "email": "ignored@example.invalid"],
+            ]),
+            "YWNjb3VudC1hbHBoYQ"
+        )
+        XCTAssertEqual(
+            MarketplaceModel.globalDharmaScope(for: [
+                "loggedIn": true,
+                "user": ["principal_id": "account-alpha"],
+            ]),
+            "YWNjb3VudC1hbHBoYQ"
+        )
+        XCTAssertEqual(
+            MarketplaceModel.globalDharmaScope(for: [
+                "loggedIn": true,
+                "user": ["userId": NSNumber(value: 42)],
+            ]),
+            "NDI"
+        )
+        XCTAssertEqual(
+            MarketplaceModel.globalDharmaScope(for: [
+                "loggedIn": true,
+                "userNo": NSNumber(value: 73),
+            ]),
+            "NzM"
+        )
+        XCTAssertNil(MarketplaceModel.globalDharmaScope(for: [
+            "loggedIn": true,
+            "user": ["email": "legacy-email-is-not-a-stable-runtime-identity@example.invalid"],
+        ]))
+        XCTAssertNil(MarketplaceModel.globalDharmaScope(for: [
+            "loggedIn": true,
+            "user": ["userId": true],
+        ]))
+    }
+
     func testMiniAppBridgeSessionRequiresExactInstanceNonceAndExplicitGrant() {
         let session = MiniAppWebMcpBridgeSession(
             pluginInstanceId: "global-dharma:instance-1",
