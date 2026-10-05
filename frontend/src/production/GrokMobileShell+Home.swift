@@ -47,6 +47,15 @@ extension GrokMobileShell {
                             .accessibilityIdentifier("grok-mobile-search-field")
                     }
 
+                    if let botActionError {
+                        Text(botActionError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 8)
+                            .accessibilityIdentifier("grok-mobile-bot-action-error")
+                    }
+
                     sectionTitle("Board")
                     botRow(MobileBotSummary(id: "mahayana-assistant", name: "Mahayana", description: "Ready to help"), subtitle: "that's the only new one.", badge: "Board")
 
@@ -77,6 +86,17 @@ extension GrokMobileShell {
             Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $createBotOpen) { createBotSheet }
+        .sheet(item: $botRenameTarget) { bot in renameBotSheet(bot) }
+        .alert(item: $botDeleteTarget) { bot in
+            Alert(
+                title: Text("删除“\(bot.name)”？"),
+                message: Text("这会永久删除该 Bot 及其聊天记录，且无法撤销。"),
+                primaryButton: .destructive(Text("删除")) {
+                    Task { await deleteBot(bot) }
+                },
+                secondaryButton: .cancel(Text("取消"))
+            )
+        }
         .accessibilityIdentifier("grok-mobile-home")
     }
 
@@ -96,23 +116,55 @@ extension GrokMobileShell {
     }
 
     func botRow(_ bot: MobileBotSummary, subtitle: String, badge: String) -> some View {
-        Button { selectedBot = bot } label: {
-            HStack(spacing: 12) {
-                ClothGhostAvatar(botId: bot.id, size: 47, badge: .green)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 7) {
-                        Text(bot.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(.black)
-                        Text(badge).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 7).padding(.vertical, 3).background(Color.black.opacity(0.045), in: Capsule())
+        HStack(spacing: 0) {
+            Button { selectedBot = bot } label: {
+                HStack(spacing: 12) {
+                    ClothGhostAvatar(botId: bot.id, size: 47, badge: .green)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 7) {
+                            Text(bot.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(.black)
+                            Text(badge).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 7).padding(.vertical, 3).background(Color.black.opacity(0.045), in: Capsule())
+                        }
+                        Text(subtitle).font(.system(size: 14)).foregroundStyle(.secondary).lineLimit(1)
                     }
-                    Text(subtitle).font(.system(size: 14)).foregroundStyle(.secondary).lineLimit(1)
+                    Spacer()
+                    Text("now").font(.caption).foregroundStyle(.secondary)
                 }
-                Spacer()
-                Text("now").font(.caption).foregroundStyle(.secondary)
+                .padding(.leading, 18).padding(.vertical, 9)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 18).padding(.vertical, 9)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            if bot.miniAppId == nil {
+                Menu {
+                    Button {
+                        beginBotRename(bot)
+                    } label: {
+                        Label("重命名", systemImage: "pencil")
+                    }
+                    Button {
+                        Task { await duplicateBot(bot) }
+                    } label: {
+                        Label("复制", systemImage: "doc.on.doc")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        requestBotDelete(bot)
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(botActionBusy)
+                .accessibilityIdentifier("grok-bot-actions-\(bot.id)")
+                .padding(.trailing, 6)
+            }
         }
-        .buttonStyle(.plain)
     }
 
     func conversationRow(_ conversation: ConversationSummary) -> some View {
@@ -131,6 +183,52 @@ extension GrokMobileShell {
             }
             .padding(.horizontal, 18).padding(.vertical, 9)
         }.buttonStyle(.plain)
+    }
+
+    func renameBotSheet(_ bot: MobileBotSummary) -> some View {
+        NavigationStack {
+            Form {
+                Section("名称") {
+                    TextField("Bot 名称", text: $botRenameDraft)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("rename-bot-name")
+                }
+                if let botActionError {
+                    Section {
+                        Text(botActionError)
+                            .foregroundStyle(.red)
+                            .font(.footnote)
+                            .accessibilityIdentifier("rename-bot-error")
+                    }
+                }
+            }
+            .navigationTitle("重命名 Bot")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        botRenameTarget = nil
+                        botRenameDraft = ""
+                        botActionError = nil
+                    }
+                    .disabled(botActionBusy)
+                    .accessibilityIdentifier("rename-bot-cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(botActionBusy ? "保存中…" : "保存") {
+                        Task { await commitBotRename() }
+                    }
+                    .disabled(
+                        botActionBusy
+                            || committedMobileBotName(
+                                initialValue: bot.name,
+                                draftValue: botRenameDraft
+                            ) == nil
+                    )
+                    .accessibilityIdentifier("rename-bot-submit")
+                }
+            }
+        }
     }
 
     var createBotSheet: some View {
