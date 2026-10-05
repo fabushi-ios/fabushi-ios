@@ -35,8 +35,13 @@ final class FabushiUITests: XCTestCase {
         let newMessage = app.buttons["新消息"]
         XCTAssertTrue(newMessage.waitForExistence(timeout: 5))
         newMessage.tap()
-        XCTAssertTrue(app.navigationBars["联系人"].waitForExistence(timeout: 5))
+        let contactsNavigation = app.navigationBars["联系人"]
+        XCTAssertTrue(contactsNavigation.waitForExistence(timeout: 5))
         app.buttons["完成"].tap()
+        XCTAssertTrue(
+            contactsNavigation.waitForNonExistence(timeout: 10),
+            "Expected the contacts sheet to finish dismissing before interacting with the Home toolbar"
+        )
 
         openRemoteComputer(in: app)
         let remoteComputer = app.descendants(matching: .any)["remote-computer-surface"]
