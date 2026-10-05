@@ -50,7 +50,11 @@ internal struct GrokMobileShell: View {
                         group: bots.first(where: { $0.id == group.id }) ?? group,
                         roster: bots,
                         bridge: bridge,
-                        accountScopeKey: String(model.loggedIn) + ":" + model.accountEmail,
+                        accountScopeKey: [
+                            String(model.loggedIn),
+                            model.accountEmail,
+                            model.accountName,
+                        ].joined(separator: ":"),
                         onRosterChanged: { updated in
                             bots = updated
                             groupMembersTarget = updated.first(where: { $0.id == group.id })
