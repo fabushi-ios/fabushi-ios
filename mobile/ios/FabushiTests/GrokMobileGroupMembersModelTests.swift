@@ -2,6 +2,28 @@ import XCTest
 @testable import Fabushi
 
 final class GrokMobileGroupMembersModelTests: XCTestCase {
+    func testMutationFenceRejectsAccountOrGenerationDrift() {
+        let fence = GrokMobileGroupMembersModel.MutationFence(
+            accountScopeKey: "account-a",
+            generation: 3
+        )
+        XCTAssertTrue(GrokMobileGroupMembersModel.accepts(
+            fence,
+            accountScopeKey: "account-a",
+            generation: 3
+        ))
+        XCTAssertFalse(GrokMobileGroupMembersModel.accepts(
+            fence,
+            accountScopeKey: "account-b",
+            generation: 3
+        ))
+        XCTAssertFalse(GrokMobileGroupMembersModel.accepts(
+            fence,
+            accountScopeKey: "account-a",
+            generation: 4
+        ))
+    }
+
     func testCandidatesAreIndividualOnlyAndExcludeExistingMembers() {
         let group = MobileBotSummary(
             id: "group-1",

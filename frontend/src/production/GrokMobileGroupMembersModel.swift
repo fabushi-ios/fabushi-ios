@@ -1,7 +1,20 @@
 import Foundation
 
 internal enum GrokMobileGroupMembersModel {
+    struct MutationFence: Equatable {
+        let accountScopeKey: String
+        let generation: Int
+    }
+
     static let maximumMembers = 6
+
+    static func accepts(
+        _ fence: MutationFence,
+        accountScopeKey: String,
+        generation: Int
+    ) -> Bool {
+        fence.accountScopeKey == accountScopeKey && fence.generation == generation
+    }
 
     static func group(id: String, fallback: MobileBotSummary, roster: [MobileBotSummary]) -> MobileBotSummary? {
         let candidate = roster.first(where: { $0.id == id }) ?? fallback

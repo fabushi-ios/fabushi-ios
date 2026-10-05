@@ -397,9 +397,9 @@
     {
       "desktop_path": "frontend/src/production/command-palette-link-provider.ts",
       "desktop_blob_sha": "94a341a4dfd6fc999850d551430dff3083317eba",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Search-result link metadata lifecycle",
+      "desktop_owner": "renderer provider",
+      "desktop_visible_effect": "Links in palette have normalized URLs and trusted metadata previews.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; source/ios-preload/main-rpc-runtime.swift",
       "ios_language": "Swift",
@@ -412,9 +412,9 @@
     {
       "desktop_path": "frontend/src/production/command-palette-message-provider.ts",
       "desktop_blob_sha": "888e5d683d941018856291197662033c44edc506",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Search canonical Agent conversation messages with debounce/cancellation",
+      "desktop_owner": "renderer provider over Coordinator",
+      "desktop_visible_effect": "Palette message search returns exact Agent/message identities and supports cancellation/unavailable states.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
@@ -427,9 +427,9 @@
     {
       "desktop_path": "frontend/src/production/command-palette-model.ts",
       "desktop_blob_sha": "da324cd2b271ed32173ee0452c1ae6747a8ba30d",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Normalize, fuzzy-rank, filter, and virtualize command-palette entries",
+      "desktop_owner": "renderer pure model",
+      "desktop_visible_effect": "Users can filter Agents, groups, messages, files, links, routines, and actions with stable ranking.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
@@ -442,9 +442,9 @@
     {
       "desktop_path": "frontend/src/production/command-palette-provider.ts",
       "desktop_blob_sha": "e96c3b5cec57fc141ec30fc46b0c475ea16aaf21",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Load searchable routine/automation entries from canonical Coordinator ownership",
+      "desktop_owner": "renderer provider over Coordinator",
+      "desktop_visible_effect": "Routine results expose canonical automation name/trigger/recency and open their owning Agent.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/production/GrokMobileCommandPaletteModel.swift; source/ios-preload/main-rpc-runtime.swift",
       "ios_language": "Swift",
@@ -457,9 +457,9 @@
     {
       "desktop_path": "frontend/src/production/command-palette-root-commands.ts",
       "desktop_blob_sha": "de08d622484b60f3a793fd237571dde583ca106f",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Project current-chat root actions without owning Agent/navigation state",
+      "desktop_owner": "renderer command projection",
+      "desktop_visible_effect": "Current group can open Members; current chat exposes Channels/Settings and applicable computer update action.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/production/MobileBotGroupMembers.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "ios_language": "Swift",
@@ -472,9 +472,9 @@
     {
       "desktop_path": "frontend/src/production/command-palette-search-provider.ts",
       "desktop_blob_sha": "9c1d24f19e5dfcb13462ab5feec1152505d2feff",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Search canonical media/file entries with cancellation and result caps",
+      "desktop_owner": "renderer provider over Coordinator",
+      "desktop_visible_effect": "Files tab returns typed media/file results tied to exact Agent/message entries.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
@@ -487,9 +487,9 @@
     {
       "desktop_path": "frontend/src/production/command-palette-update-command.ts",
       "desktop_blob_sha": "264116e83248f48d35a7482bdaaf665e4ffa7512",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Project packaged Desktop update state into a command-palette action",
+      "desktop_owner": "renderer over Desktop updater owner",
+      "desktop_visible_effect": "Users can check/download/restart-install the Desktop app update from the palette.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "source/ios-main/update/update-wiring.swift; source/ios-main/update/sand-update-service.swift",
       "ios_language": "Swift",
@@ -532,9 +532,9 @@
     {
       "desktop_path": "frontend/src/production/group-members-root.ts",
       "desktop_blob_sha": "02910ea0377b4782620e0154bb45405df479e3ba",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Compose the Agent/Bot group-members feature into the production renderer",
+      "desktop_owner": "renderer composition over Coordinator group owner",
+      "desktop_visible_effect": "A non-shared Agent group exposes native member management.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift; frontend/src/production/GrokMobileBotService.swift",
       "ios_language": "Swift",
@@ -542,7 +542,7 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
     },
     {
       "desktop_path": "frontend/src/production/local-tool-permission-scope.ts",
@@ -1162,9 +1162,9 @@
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/bridge.ts",
       "desktop_blob_sha": "b100644c8a181222bddd83369bf755cc5139880e",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Bridge group membership mutations to canonical Coordinator ownership with stale-request fencing",
+      "desktop_owner": "renderer bridge over Coordinator",
+      "desktop_visible_effect": "Add/remove member mutations call canonical group membership update and ignore stale account/context completions.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
@@ -1172,14 +1172,14 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/model.ts",
       "desktop_blob_sha": "5f72bbc2c3ac035b9a6e28091ce8e8bd34a63c55",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Own group-members presentation state and membership invariants",
+      "desktop_owner": "renderer model",
+      "desktop_visible_effect": "Only individual Agents are candidates; group size stays 1-6; pending/stale actions are rejected.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/recovered/features/agent-info/MobileBotSummary.swift",
       "ios_language": "Swift",
@@ -1187,14 +1187,14 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/recovered/features/agent-info/MobileBotSummary.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/route.ts",
       "desktop_blob_sha": "da39e969a1c3c98cf0c94a7b6a7c203e70dfeb86",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Declare group-members route/module boundary",
+      "desktop_owner": "renderer route declaration",
+      "desktop_visible_effect": "The production Agent-info surface can compose the members feature at its route boundary.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
@@ -1202,14 +1202,14 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/view.css",
       "desktop_blob_sha": "fd5517e3f08ec4091f59071520525f6516b46815",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Style the group-members production surface",
+      "desktop_owner": "renderer presentation",
+      "desktop_visible_effect": "Members, candidates, pending/error/limit affordances render with the shipping layout.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
@@ -1217,14 +1217,14 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/view.tsx",
       "desktop_blob_sha": "8f2416ffdc140869ec1ab8d6645ee745b79e3d04",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Render and drive group member add/remove interactions",
+      "desktop_owner": "renderer view over group-members provider",
+      "desktop_visible_effect": "Users see current members, add individual candidates, confirm destructive removal, and recover from failures.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
@@ -1232,7 +1232,7 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending."
+      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Exact-head CI for this tranche is pending. Mutation completion is fenced by both iOS account scope and local lifecycle generation."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/settings/model.ts",

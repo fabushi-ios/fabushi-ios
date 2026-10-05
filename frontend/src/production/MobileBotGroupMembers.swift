@@ -4,6 +4,7 @@ internal struct MobileBotGroupMembersSheet: View {
     let group: MobileBotSummary
     let roster: [MobileBotSummary]
     let bridge: IOSPreloadBridge
+    let accountScopeKey: String
     let onRosterChanged: ([MobileBotSummary]) -> Void
     let onClose: () -> Void
 
@@ -119,6 +120,7 @@ internal struct MobileBotGroupMembersSheet: View {
         }
         .accessibilityIdentifier("mobile-group-members")
         .onChange(of: group.id) { _, _ in invalidatePending() }
+        .onChange(of: accountScopeKey) { _, _ in invalidatePending() }
         .onDisappear { invalidatePending() }
         .alert(item: $removalTarget) { member in
             Alert(
@@ -160,13 +162,20 @@ internal struct MobileBotGroupMembersSheet: View {
     @MainActor
     private func beginMutation(agentId: String, memberIds: [String]) {
         guard pendingAgentId == nil else { return }
-        let actionGeneration = generation
+        let fence = GrokMobileGroupMembersModel.MutationFence(
+            accountScopeKey: accountScopeKey,
+            generation: generation
+        )
         pendingAgentId = agentId
         failure = nil
         mutationTask?.cancel()
         mutationTask = Task { @MainActor in
             defer {
-                if generation == actionGeneration {
+                if GrokMobileGroupMembersModel.accepts(
+                    fence,
+                    accountScopeKey: accountScopeKey,
+                    generation: generation
+                ) {
                     pendingAgentId = nil
                     mutationTask = nil
                 }
@@ -177,12 +186,20 @@ internal struct MobileBotGroupMembersSheet: View {
                     memberIds: memberIds
                 )
                 try Task.checkCancellation()
-                guard generation == actionGeneration else { return }
+                guard GrokMobileGroupMembersModel.accepts(
+                    fence,
+                    accountScopeKey: accountScopeKey,
+                    generation: generation
+                ) else { return }
                 onRosterChanged(updated)
             } catch is CancellationError {
                 return
             } catch {
-                guard generation == actionGeneration else { return }
+                guard GrokMobileGroupMembersModel.accepts(
+                    fence,
+                    accountScopeKey: accountScopeKey,
+                    generation: generation
+                ) else { return }
                 failure = "更新群组成员失败：\(error.localizedDescription)"
             }
         }
