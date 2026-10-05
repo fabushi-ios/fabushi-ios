@@ -572,9 +572,11 @@ internal enum MobileBotRoutinesModel {
         }
 
         let parsedRuns = rawRuns.map(parseRun)
+        let lastRunAt = optionalInteger(row["lastRunAtMs"])
+        let nextRunAt = optionalInteger(row["nextRunAtMs"])
         guard parsedRuns.allSatisfy({ $0 != nil }),
-              optionalInteger(row["lastRunAtMs"]) != .invalid,
-              optionalInteger(row["nextRunAtMs"]) != .invalid
+              case .value(let lastRunAtMs) = lastRunAt,
+              case .value(let nextRunAtMs) = nextRunAt
         else {
             return nil
         }
@@ -588,8 +590,8 @@ internal enum MobileBotRoutinesModel {
             isEnabled: isEnabled,
             createdAtMs: createdAtMs,
             runs: parsedRuns.compactMap { $0 },
-            lastRunAtMs: optionalInteger(row["lastRunAtMs"]).value,
-            nextRunAtMs: optionalInteger(row["nextRunAtMs"]).value
+            lastRunAtMs: lastRunAtMs,
+            nextRunAtMs: nextRunAtMs
         )
     }
 
