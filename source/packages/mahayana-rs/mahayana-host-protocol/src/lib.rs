@@ -2132,6 +2132,26 @@ pub struct CapabilitySummary {
     pub unavailable_reason: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AutomationRunStatus {
+    Running,
+    Ok,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunSummary {
+    pub id: String,
+    pub status: AutomationRunStatus,
+    pub started_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSummary {
@@ -2145,6 +2165,8 @@ pub struct AutomationSummary {
     pub trigger: Option<AutomationTrigger>,
     pub enabled: bool,
     pub created_at_ms: i64,
+    #[serde(default)]
+    pub runs: Vec<AutomationRunSummary>,
     pub last_run_at_ms: Option<i64>,
     pub next_run_at_ms: Option<i64>,
 }
@@ -3227,6 +3249,13 @@ mod tests {
                 }),
                 enabled: true,
                 created_at_ms: 1,
+                runs: vec![AutomationRunSummary {
+                    id: "run-1".into(),
+                    status: AutomationRunStatus::Ok,
+                    started_at: 1,
+                    detail: Some("Completed".into()),
+                    event: None,
+                }],
                 last_run_at_ms: None,
                 next_run_at_ms: Some(2),
             }],
@@ -3235,6 +3264,9 @@ mod tests {
         assert_eq!(value["type"], "automation.listed");
         assert_eq!(value["automations"][0]["nextRunAtMs"], 2);
         assert_eq!(value["automations"][0]["trigger"]["kind"], "schedule");
+        assert_eq!(value["automations"][0]["runs"][0]["id"], "run-1");
+        assert_eq!(value["automations"][0]["runs"][0]["status"], "ok");
+        assert_eq!(value["automations"][0]["runs"][0]["startedAt"], 1);
     }
 
     #[test]
