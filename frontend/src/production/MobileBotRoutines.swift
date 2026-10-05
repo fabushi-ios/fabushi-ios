@@ -2,6 +2,133 @@ import Combine
 import Foundation
 import SwiftUI
 
+internal let mobileBotRoutineRunHistoryClockName = "agents-now-tick"
+internal let mobileBotRoutineRunHistoryClockIntervalMilliseconds = 30_000
+
+internal struct MobileBotRoutineTimeZoneState: Equatable {
+    let detectedTimeZone: String?
+    let overrideTimeZone: String?
+}
+
+internal final class MobileBotRoutineRunHistoryClock {
+    internal typealias Cancellation = () -> Void
+    internal typealias Scheduler = (
+        _ name: String,
+        _ intervalMilliseconds: Int,
+        _ callback: @escaping () -> Void
+    ) -> Cancellation
+
+    private let nowProvider: () -> Date
+    private let scheduler: Scheduler
+    private var listeners: [UUID: () -> Void] = [:]
+    private var cancelTimer: Cancellation?
+    private var timeZone: String
+    private var disposed = false
+
+    init(
+        initialTimeZone: MobileBotRoutineTimeZoneState,
+        now: @escaping () -> Date = { Date() },
+        scheduler: Scheduler? = nil
+    ) {
+        self.nowProvider = now
+        self.scheduler = scheduler ?? Self.liveScheduler
+        self.timeZone = Self.effectiveTimeZone(initialTimeZone)
+    }
+
+    static func detectTimeZone() -> MobileBotRoutineTimeZoneState {
+        MobileBotRoutineTimeZoneState(
+            detectedTimeZone: TimeZone.autoupdatingCurrent.identifier,
+            overrideTimeZone: nil
+        )
+    }
+
+    var nowMilliseconds: Int64 {
+        Int64((nowProvider().timeIntervalSince1970 * 1_000).rounded(.towardZero))
+    }
+
+    var timeZoneIdentifier: String {
+        timeZone
+    }
+
+    @discardableResult
+    func subscribe(_ listener: @escaping () -> Void) -> Cancellation {
+        guard !disposed else { return { } }
+        let id = UUID()
+        listeners[id] = listener
+        ensureTimer()
+        return { [weak self] in
+            self?.unsubscribe(id)
+        }
+    }
+
+    func ingestTimeZone(_ state: MobileBotRoutineTimeZoneState) {
+        guard !disposed else { return }
+        let next = Self.effectiveTimeZone(state)
+        guard next != timeZone else { return }
+        timeZone = next
+        notify()
+    }
+
+    func dispose() {
+        guard !disposed else { return }
+        disposed = true
+        stopTimer()
+        listeners.removeAll()
+    }
+
+    private func unsubscribe(_ id: UUID) {
+        guard !disposed else { return }
+        listeners.removeValue(forKey: id)
+        if listeners.isEmpty {
+            stopTimer()
+        }
+    }
+
+    private func ensureTimer() {
+        guard !disposed, cancelTimer == nil, !listeners.isEmpty else { return }
+        cancelTimer = scheduler(
+            mobileBotRoutineRunHistoryClockName,
+            mobileBotRoutineRunHistoryClockIntervalMilliseconds
+        ) { [weak self] in
+            self?.notify()
+        }
+    }
+
+    private func stopTimer() {
+        cancelTimer?()
+        cancelTimer = nil
+    }
+
+    private func notify() {
+        guard !disposed else { return }
+        for listener in Array(listeners.values) {
+            listener()
+        }
+    }
+
+    private static func effectiveTimeZone(_ state: MobileBotRoutineTimeZoneState) -> String {
+        state.overrideTimeZone ?? state.detectedTimeZone ?? "UTC"
+    }
+
+    private static func liveScheduler(
+        _ name: String,
+        _ intervalMilliseconds: Int,
+        _ callback: @escaping () -> Void
+    ) -> Cancellation {
+        _ = name
+        let timer = Timer(
+            timeInterval: TimeInterval(intervalMilliseconds) / 1_000,
+            repeats: true
+        ) { _ in
+            callback()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        return {
+            timer.invalidate()
+        }
+    }
+}
+
 internal struct MobileBotRoutine: Identifiable, Equatable {
     let id: String
     let agentId: String

@@ -165,4 +165,97 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         )
         XCTAssertEqual(run["type"] as? String, "automation.run")
     }
+    func testRunHistoryClockLazilyTicksAndPublishesTimeZoneChanges() {
+        var scheduledName: String?
+        var scheduledInterval: Int?
+        var tick: (() -> Void)?
+        var cancellations = 0
+
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "America/Phoenix",
+                overrideTimeZone: nil
+            ),
+            now: { Date(timeIntervalSince1970: 123) },
+            scheduler: { name, interval, callback in
+                scheduledName = name
+                scheduledInterval = interval
+                tick = callback
+                return {
+                    cancellations += 1
+                }
+            }
+        )
+
+        XCTAssertEqual(clock.nowMilliseconds, 123_000)
+        XCTAssertEqual(clock.timeZoneIdentifier, "America/Phoenix")
+        XCTAssertNil(scheduledName)
+
+        var notifications = 0
+        let stop = clock.subscribe {
+            notifications += 1
+        }
+
+        XCTAssertEqual(scheduledName, "agents-now-tick")
+        XCTAssertEqual(scheduledInterval, 30_000)
+
+        tick?()
+        XCTAssertEqual(notifications, 1)
+
+        clock.ingestTimeZone(
+            MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "America/Phoenix",
+                overrideTimeZone: "Asia/Tokyo"
+            )
+        )
+        XCTAssertEqual(clock.timeZoneIdentifier, "Asia/Tokyo")
+        XCTAssertEqual(notifications, 2)
+
+        clock.ingestTimeZone(
+            MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "America/Phoenix",
+                overrideTimeZone: "Asia/Tokyo"
+            )
+        )
+        XCTAssertEqual(notifications, 2)
+
+        stop()
+        XCTAssertEqual(cancellations, 1)
+    }
+
+    func testRunHistoryClockFallsBackToUTCAndDisposeStopsNotifications() {
+        var tick: (() -> Void)?
+        var cancellations = 0
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: nil,
+                overrideTimeZone: nil
+            ),
+            scheduler: { _, _, callback in
+                tick = callback
+                return {
+                    cancellations += 1
+                }
+            }
+        )
+
+        XCTAssertEqual(clock.timeZoneIdentifier, "UTC")
+        var notifications = 0
+        _ = clock.subscribe {
+            notifications += 1
+        }
+
+        clock.dispose()
+        XCTAssertEqual(cancellations, 1)
+        tick?()
+        XCTAssertEqual(notifications, 0)
+
+        let stopAfterDispose = clock.subscribe {
+            notifications += 1
+        }
+        stopAfterDispose()
+        XCTAssertEqual(notifications, 0)
+        XCTAssertEqual(cancellations, 1)
+    }
+
 }

@@ -1367,22 +1367,22 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotRoutines.swift (native lifecycle controller, canonical Host command adapter, and Agent Settings routines section); frontend/src/production/MobileBotAgentSettings.swift (shipping composition); source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs (canonical persisted automation owner).",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers strict projection, agent scoping, Desktop snapshot semantics, per-routine pending dedupe, and canonical Host command shapes. Existing Rust FeatureHost automation tests remain the persistence/command authority. Exact-HEAD ordinary/protected Actions required before verified.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob 1cbd18feb408b51589b271e5044f63ac9e9e879f. This closes the controller responsibility only; adjacent run-history/editor/view rows remain independently unreviewed."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob 1cbd18feb408b51589b271e5044f63ac9e9e879f. This closes the controller responsibility only; adjacent run-history/editor/view rows remain independently unreviewed. Exact-behavior promotion remains blocked on the adjacent run-history contract: Desktop RoutineAutomation carries trigger/triggerDescription/runs[], while the current iOS Host AutomationSummary exposes trigger plus schedule/lastRunAtMs/nextRunAtMs but no embedded run list. CI success alone must not promote this controller row until the run-history provider/history rows close that production-data responsibility."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/run-history-clock.ts",
       "desktop_blob_sha": "2610a12d81968aa75da57e78e87d6039f9407f67",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Own the single run-history presentation clock: current time, effective time zone, a lazy 30-second named tick, subscriber notification, time-zone ingestion, and deterministic timer/listener disposal.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Routine run-history relative timestamps refresh on one shared cadence without per-view timers; time-zone changes re-render labels, and no timer remains active when there are no subscribers or after disposal.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Foundation Date/TimeZone/RunLoop Timer replace browser Intl/window.setInterval. The native owner keeps the Desktop agents-now-tick 30-second cadence, override > detected > UTC time-zone precedence, lazy first-subscriber start, last-subscriber stop, change notifications, and idempotent disposal; it owns presentation time only and no automation persistence.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift (MobileBotRoutineRunHistoryClock and MobileBotRoutineTimeZoneState implement the single lazy 30-second presentation-clock owner).",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers the exact agents-now-tick/30000ms contract, lazy scheduling, tick notification, time-zone override notification/deduplication, UTC fallback, unsubscribe stop, and dispose fencing. Exact-HEAD ordinary/protected Actions are required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob 2610a12d81968aa75da57e78e87d6039f9407f67. This row owns only the shared presentation clock; provider/history rows must compose it before the run-history product surface is complete."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/run-history-provider.ts",
