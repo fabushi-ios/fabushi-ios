@@ -96,22 +96,42 @@ internal struct GrokMobileShell: View {
     }
 
     var appAgentSurfaceFingerprint: String {
-        [
-            query,
-            String(searchOpen),
-            String(composeOpen),
-            String(createBotOpen),
-            botName,
-            botDescription,
-            String(botBusy),
-            botError ?? "",
-            botRenameTarget?.id ?? "",
-            botRenameDraft,
-            botDeleteTarget?.id ?? "",
-            String(botActionBusy),
-            botActionError ?? "",
-            bots.map { "\($0.id):\($0.name):\($0.miniAppId ?? "")" }.joined(separator: ","),
-            messaging.conversations.map { "\($0.id):\($0.unreadCount):\($0.isArchived)" }.joined(separator: ","),
-        ].joined(separator: "|")
+        var components: [String] = []
+        components.append(query)
+        components.append(String(searchOpen))
+        components.append(String(composeOpen))
+        components.append(String(createBotOpen))
+        components.append(botName)
+        components.append(botDescription)
+        components.append(String(botBusy))
+        components.append(botError ?? "")
+        components.append(botRenameTarget?.id ?? "")
+        components.append(botRenameDraft)
+        components.append(botDeleteTarget?.id ?? "")
+        components.append(String(botActionBusy))
+        components.append(botActionError ?? "")
+        components.append(botRosterFingerprint)
+        components.append(conversationFingerprint)
+        return components.joined(separator: "|")
+    }
+
+    private var botRosterFingerprint: String {
+        bots
+            .map { bot in
+                [bot.id, bot.name, bot.miniAppId ?? ""].joined(separator: ":")
+            }
+            .joined(separator: ",")
+    }
+
+    private var conversationFingerprint: String {
+        messaging.conversations
+            .map { conversation in
+                [
+                    conversation.id,
+                    String(conversation.unreadCount),
+                    String(conversation.isArchived),
+                ].joined(separator: ":")
+            }
+            .joined(separator: ",")
     }
 }
