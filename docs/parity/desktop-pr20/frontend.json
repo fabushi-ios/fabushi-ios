@@ -1357,17 +1357,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/controller.ts",
       "desktop_blob_sha": "1cbd18feb408b51589b271e5044f63ac9e9e879f",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Owns per-Agent Routines renderer lifecycle: strict routine projection, loading/empty/ready/failed/unavailable snapshots, stale refresh fencing, create/mutation/run pending state, refresh-after-mutation, event ingestion, reset, and disposal.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Agent automation state remains coherent while refreshing and mutating: malformed lists fail closed, previous data survives recoverable refresh failures, duplicate per-routine mutations/runs are suppressed, and stale lifecycle results cannot overwrite the current Agent.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "A native @MainActor ObservableObject replaces the TypeScript subscription controller. It calls the existing canonical Rust Host automation.list/upsert/setEnabled/delete/run commands through IOSPreloadBridge, keeps per-routine mutation/run dedupe and refresh fencing in Swift presentation state, and never creates a second automation store. The section is shipping-composed in Agent Settings; run-history detail remains a separate ledger responsibility.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift (native lifecycle controller, canonical Host command adapter, and Agent Settings routines section); frontend/src/production/MobileBotAgentSettings.swift (shipping composition); source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs (canonical persisted automation owner).",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers strict projection, agent scoping, Desktop snapshot semantics, per-routine pending dedupe, and canonical Host command shapes. Existing Rust FeatureHost automation tests remain the persistence/command authority. Exact-HEAD ordinary/protected Actions required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and blob 1cbd18feb408b51589b271e5044f63ac9e9e879f. This closes the controller responsibility only; adjacent run-history/editor/view rows remain independently unreviewed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/run-history-clock.ts",

@@ -106,6 +106,14 @@ internal struct MobileBotAgentSettingsSheet: View {
                     accountScopeKey: accountScopeKey
                 )
 
+                if !currentAgent.isGroup {
+                    MobileBotRoutinesSection(
+                        agentId: currentAgent.id,
+                        bridge: bridge,
+                        accountScopeKey: accountScopeKey
+                    )
+                }
+
                 if let failure {
                     Section {
                         Text(failure)
