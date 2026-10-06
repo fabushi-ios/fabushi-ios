@@ -2007,11 +2007,28 @@ impl AgentBackend for CodexAgentBackend {
             })
             .await
             .map_err(|error| AgentError::Backend(error.to_string()))?;
+        let configured_servers = self.inner.config.mcp_servers.get();
         response
             .data
             .into_iter()
             .map(|status| {
-                serde_json::to_value(status).map_err(|error| AgentError::Backend(error.to_string()))
+                let mut value = serde_json::to_value(status)
+                    .map_err(|error| AgentError::Backend(error.to_string()))?;
+                let server_name = value
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                if let Some(config) = server_name
+                    .as_deref()
+                    .and_then(|name| configured_servers.get(name))
+                {
+                    let config_value = serde_json::to_value(config)
+                        .map_err(|error| AgentError::Backend(error.to_string()))?;
+                    if let Value::Object(object) = &mut value {
+                        object.insert("fabushiConfig".into(), config_value);
+                    }
+                }
+                Ok(value)
             })
             .collect()
     }

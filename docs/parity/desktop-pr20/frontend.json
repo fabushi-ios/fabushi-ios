@@ -3778,11 +3778,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "SwiftUI + Swift",
-      "ios_platform_delta": "iOS already ships Marketplace search, immutable install/update, requested-permission approval, Mini App opening and WebMCP tool use. Desktop account management, generic MCP server tool enable/disable, private-skill publish/sync/edit/delete and the full two-axis Marketplace/Yours filtering remain unclosed and must not be inferred from the existing Mini App flow.",
+      "ios_platform_delta": "iOS ships Marketplace search/install/permission/Mini App flows and now generic MCP server tool listing plus enable/disable with account/stale/failure fencing. MCP account management, private-skill lifecycle, authenticated/private GitHub repair, and full Marketplace/Yours filtering remain unclosed.",
       "implementation_status": "mapped",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Generic MCP server tool management is implemented; keep this composite row mapped until the remaining account/private-skill/source-auth/filtering responsibilities close."
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop-preview.tsx",
@@ -3808,7 +3808,7 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "SwiftUI + Swift",
-      "ios_platform_delta": "iOS shipping composition already binds MarketplaceModel directly into the SwiftUI Marketplace screen and now surfaces requested plugin permissions, but the full Desktop server-account/private-skill/GitHub-auth composition is not yet present.",
+      "ios_platform_delta": "iOS shipping composition binds MarketplaceModel into SwiftUI and now composes the single CoordinatorMcpSurface/SandMcpManager owner for generic MCP server tools. MCP account management, private-skill lifecycle, GitHub-source repair, and full Yours filtering remain missing.",
       "implementation_status": "mapped",
       "production_evidence": "source/ios-main/FabushiRuntime.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
@@ -3823,7 +3823,7 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "MarketplaceModel already routes browse/release/install/account synchronization, permission grants, runtime start and Mini App reconciliation through IOSPreloadBridge. Generic removal/setup editing, MCP account lifecycle/tool toggles and private-skill lifecycle remain to be migrated.",
+      "ios_platform_delta": "MarketplaceModel routes browse/release/install/account synchronization, permissions/runtime/Mini App reconciliation and generic MCP server tool enable/disable through IOSPreloadBridge and authoritative Coordinator owners. MCP account lifecycle, private-skill lifecycle and authenticated/private GitHub repair remain to be migrated.",
       "implementation_status": "mapped",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
@@ -3883,7 +3883,7 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "MarketplacePlugin and MiniAppToolContract cover installable plugins and governed tools on iOS, but Desktop account/private-skill/team-policy projections are not fully represented.",
+      "ios_platform_delta": "MarketplaceModel represents installable plugins, governed Mini App tools, generic MCP server summaries and per-server disabled tool state. Desktop MCP account projections, private-skill/team-policy projections and complete Yours filtering remain incomplete.",
       "implementation_status": "mapped",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
@@ -3913,11 +3913,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS can discover and call governed Mini App/WebMCP tools, but it does not yet expose the Desktop generic MCP server tool-management surface or enable/disable mutation lifecycle.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "ios_platform_delta": "iOS exposes generic account-scoped MCP server tools through the shipping SwiftUI Marketplace. Requests flow IOSPreloadBridge → CoordinatorMcpSurface → the existing SandMcpManager/tools-discovery owner → direct authenticated Rust Host MCP management methods. Tool changes are Host-confirmed rather than optimistic and are fenced across logout/account replacement.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/shared/node/mcp/mcp-manager.swift; mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
+      "notes": "Implemented against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. This implementation still requires its own ordinary + protected exact-HEAD Actions evidence before promotion to verified."
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/view.tsx",

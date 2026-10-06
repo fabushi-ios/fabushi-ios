@@ -4459,6 +4459,91 @@ impl FeatureHostController {
         })
     }
 
+
+    /// Native settings surfaces use a direct MCP snapshot so they never drain
+    /// the renderer's shared HostEvent queue while waiting for settings data.
+    pub fn mcp_servers_snapshot(&self) -> Result<Vec<Value>, FeatureHostError> {
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+        }
+        if self.config.mode == HostMode::Production {
+            #[cfg(feature = "production")]
+            {
+                self.require_authenticated_account()?;
+                return match self.runtime()?.execute(RuntimeCommand::McpServers)? {
+                    RuntimeResponse::McpServers { data } => Ok(data),
+                    other => Err(unexpected_response("mcp.serversSnapshot", other)),
+                };
+            }
+            #[cfg(not(feature = "production"))]
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        Ok(Vec::new())
+    }
+
+    pub fn set_mcp_tool_disabled_direct(
+        &self,
+        server: String,
+        tool: String,
+        disabled: bool,
+    ) -> Result<Vec<String>, FeatureHostError> {
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+        }
+        let server = required(server, "MCP server")?;
+        let tool = required(tool, "MCP tool")?;
+        if self.config.mode == HostMode::Production {
+            #[cfg(feature = "production")]
+            {
+                self.require_authenticated_account()?;
+                return match self.runtime()?.execute(RuntimeCommand::McpSetToolDisabled {
+                    server,
+                    tool,
+                    disabled,
+                })? {
+                    RuntimeResponse::McpToolDisabledUpdated { disabled_tools, .. } => Ok(disabled_tools),
+                    other => Err(unexpected_response("mcp.setToolDisabledDirect", other)),
+                };
+            }
+            #[cfg(not(feature = "production"))]
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        Ok(if disabled { vec![tool] } else { Vec::new() })
+    }
+
+    pub fn call_mcp_tool_direct(
+        &self,
+        server: String,
+        tool: String,
+        arguments: Value,
+    ) -> Result<Value, FeatureHostError> {
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+        }
+        let server = required(server, "MCP server")?;
+        let tool = required(tool, "MCP tool")?;
+        if self.config.mode == HostMode::Production {
+            #[cfg(feature = "production")]
+            {
+                self.require_authenticated_account()?;
+                return match self.runtime()?.execute(RuntimeCommand::McpToolCall {
+                    server,
+                    tool,
+                    arguments,
+                })? {
+                    RuntimeResponse::McpToolResult { result, .. } => Ok(result),
+                    other => Err(unexpected_response("mcp.toolCallDirect", other)),
+                };
+            }
+            #[cfg(not(feature = "production"))]
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        Ok(json!({"ok": true, "mock": true}))
+    }
+
     fn execute_mcp(&self, command: FeatureCommand) -> Result<CommandAccepted, FeatureHostError> {
         let request_id = command.request_id().to_string();
         {

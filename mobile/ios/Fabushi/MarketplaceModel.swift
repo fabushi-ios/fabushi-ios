@@ -696,6 +696,25 @@ struct PluginPermissionRequest: Identifiable, Equatable {
     var id: String { pluginId }
 }
 
+struct MarketplaceMcpServer: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let serverIdentifier: String
+    let transport: String
+    let status: String
+    let statusDetail: String?
+    let toolCount: Int
+    let disabledToolCount: Int
+}
+
+struct MarketplaceMcpTool: Identifiable, Equatable, Sendable {
+    let name: String
+    let title: String?
+    let description: String?
+    let isDisabled: Bool
+    var id: String { name }
+}
+
 private final class BrowserAuthPresentationContext: NSObject, ASWebAuthenticationPresentationContextProviding {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
@@ -718,6 +737,12 @@ final class MarketplaceModel {
     var installingPluginId: String?
     var plugins: [MarketplacePlugin] = []
     var permissionRequest: PluginPermissionRequest?
+    var mcpServers: [MarketplaceMcpServer] = []
+    var mcpToolsByServerId: [String: [MarketplaceMcpTool]] = [:]
+    var mcpLoading = false
+    var mcpLoadingServerId: String?
+    var mcpMutatingToolKey: String?
+    var mcpError: String?
     var featureHostSmokeStatus: String?
     var authResolved = false
     var loggedIn = false
@@ -747,6 +772,10 @@ final class MarketplaceModel {
     @ObservationIgnored private var webAuthenticationSession: ASWebAuthenticationSession?
     @ObservationIgnored private var linkMetadataCache: [String: MobileLinkMetadata] = [:]
     @ObservationIgnored private var linkMetadataTasks: [String: Task<MobileLinkMetadata, Error>] = [:]
+    @ObservationIgnored private var mcpAccountEpoch = 0
+    @ObservationIgnored private var mcpServerRequestSerial = 0
+    @ObservationIgnored private var mcpToolRequestSerial: [String: Int] = [:]
+    @ObservationIgnored private var mcpMutationSerial: [String: Int] = [:]
 
     init(bridge: IOSPreloadBridge) {
         self.bridge = bridge
@@ -977,6 +1006,19 @@ final class MarketplaceModel {
         return runtime
     }
 
+    private func resetMcpState() {
+        mcpAccountEpoch = mcpAccountEpoch == Int.max ? 1 : mcpAccountEpoch + 1
+        mcpServerRequestSerial = mcpServerRequestSerial == Int.max ? 1 : mcpServerRequestSerial + 1
+        mcpToolRequestSerial.removeAll()
+        mcpMutationSerial.removeAll()
+        mcpServers = []
+        mcpToolsByServerId = [:]
+        mcpLoading = false
+        mcpLoadingServerId = nil
+        mcpMutatingToolKey = nil
+        mcpError = nil
+    }
+
     func initializeApp() async {
         authResolved = false
         do {
@@ -986,6 +1028,7 @@ final class MarketplaceModel {
             if loggedIn {
                 await refreshAccountUsage()
                 await refresh()
+                await refreshMcpServers()
             }
         } catch {
             authResolved = true
@@ -994,6 +1037,7 @@ final class MarketplaceModel {
     }
 
     private func applyAuth(_ object: [String: Any]?, defaultLoggedIn: Bool = false) {
+        let previousMcpScope = globalDharmaAccountScope
         let auth = (object?["auth"] as? [String: Any]) ?? object
         loggedIn = auth?["loggedIn"] as? Bool ?? defaultLoggedIn
         if !loggedIn {
@@ -1010,6 +1054,10 @@ final class MarketplaceModel {
             // Coordinator. Never retain a previous account's runtime.
             globalDharmaAccountScope = nil
             globalDharmaExecution = nil
+        }
+
+        if previousMcpScope != globalDharmaAccountScope || !loggedIn {
+            resetMcpState()
         }
 
         guard let user = auth?["user"] as? [String: Any] else {
@@ -1308,6 +1356,7 @@ final class MarketplaceModel {
                 loginError = nil
                 await refreshAccountUsage()
                 await refresh()
+                await refreshMcpServers()
                 message = "登录成功，账号状态已同步"
             case "cancelled":
                 message = "登录授权已取消"
@@ -1730,6 +1779,150 @@ final class MarketplaceModel {
             return true
         }
         return pointer["version"] as? String == targetVersion
+    }
+
+    private static func mcpServer(from row: [String: Any]) -> MarketplaceMcpServer? {
+        guard let id = row["id"] as? String,
+              !id.isEmpty,
+              let name = row["name"] as? String,
+              let identifier = row["serverIdentifier"] as? String,
+              let transport = row["transport"] as? String,
+              let status = row["status"] as? String
+        else { return nil }
+        return .init(
+            id: id,
+            name: name,
+            serverIdentifier: identifier,
+            transport: transport,
+            status: status,
+            statusDetail: row["statusDetail"] as? String,
+            toolCount: (row["toolCount"] as? NSNumber)?.intValue ?? 0,
+            disabledToolCount: (row["disabledToolCount"] as? NSNumber)?.intValue ?? 0
+        )
+    }
+
+    private static func mcpTool(from row: [String: Any]) -> MarketplaceMcpTool? {
+        guard let name = row["name"] as? String, !name.isEmpty,
+              let isDisabled = row["isDisabled"] as? Bool
+        else { return nil }
+        return .init(
+            name: name,
+            title: row["title"] as? String,
+            description: row["description"] as? String,
+            isDisabled: isDisabled
+        )
+    }
+
+    func refreshMcpServers() async {
+        guard loggedIn else {
+            resetMcpState()
+            return
+        }
+        let epoch = mcpAccountEpoch
+        mcpServerRequestSerial = mcpServerRequestSerial == Int.max ? 1 : mcpServerRequestSerial + 1
+        let serial = mcpServerRequestSerial
+        mcpLoading = true
+        mcpError = nil
+        defer {
+            if epoch == mcpAccountEpoch, serial == mcpServerRequestSerial {
+                mcpLoading = false
+            }
+        }
+        do {
+            let response = try await bridge.request(method: "coordinator.mcp.servers")
+            guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return }
+            guard let object = response.value as? [String: Any],
+                  let rows = object["servers"] as? [[String: Any]]
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            let next = rows.compactMap(Self.mcpServer(from:))
+            mcpServers = next
+            let validIds = Set(next.map(\.id))
+            mcpToolsByServerId = mcpToolsByServerId.filter { validIds.contains($0.key) }
+        } catch {
+            guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return }
+            mcpError = error.localizedDescription
+        }
+    }
+
+    func loadMcpTools(serverId: String) async {
+        guard loggedIn else { return }
+        let epoch = mcpAccountEpoch
+        let previous = mcpToolRequestSerial[serverId] ?? 0
+        let serial = previous == Int.max ? 1 : previous + 1
+        mcpToolRequestSerial[serverId] = serial
+        mcpLoadingServerId = serverId
+        mcpError = nil
+        defer {
+            if epoch == mcpAccountEpoch,
+               mcpToolRequestSerial[serverId] == serial,
+               mcpLoadingServerId == serverId {
+                mcpLoadingServerId = nil
+            }
+        }
+        do {
+            let response = try await bridge.request(
+                method: "coordinator.mcp.tools",
+                params: ["serverId": serverId]
+            )
+            guard epoch == mcpAccountEpoch,
+                  mcpToolRequestSerial[serverId] == serial
+            else { return }
+            guard let object = response.value as? [String: Any],
+                  let rows = object["tools"] as? [[String: Any]]
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            mcpToolsByServerId[serverId] = rows.compactMap(Self.mcpTool(from:))
+        } catch {
+            guard epoch == mcpAccountEpoch,
+                  mcpToolRequestSerial[serverId] == serial
+            else { return }
+            mcpError = error.localizedDescription
+        }
+    }
+
+    func setMcpToolEnabled(
+        serverId: String,
+        toolName: String,
+        enabled: Bool
+    ) async {
+        guard loggedIn else { return }
+        let epoch = mcpAccountEpoch
+        let key = "\(serverId):\(toolName)"
+        let previous = mcpMutationSerial[key] ?? 0
+        let serial = previous == Int.max ? 1 : previous + 1
+        mcpMutationSerial[key] = serial
+        mcpMutatingToolKey = key
+        mcpError = nil
+        do {
+            let response = try await bridge.request(
+                method: "coordinator.mcp.setToolDisabled",
+                params: [
+                    "serverId": serverId,
+                    "tool": toolName,
+                    "disabled": !enabled,
+                ]
+            )
+            guard epoch == mcpAccountEpoch,
+                  mcpMutationSerial[key] == serial
+            else { return }
+            guard let object = response.value as? [String: Any],
+                  let rows = object["tools"] as? [[String: Any]]
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            mcpToolsByServerId[serverId] = rows.compactMap(Self.mcpTool(from:))
+            if mcpMutatingToolKey == key { mcpMutatingToolKey = nil }
+            await refreshMcpServers()
+        } catch {
+            guard epoch == mcpAccountEpoch,
+                  mcpMutationSerial[key] == serial
+            else { return }
+            if mcpMutatingToolKey == key { mcpMutatingToolKey = nil }
+            mcpError = error.localizedDescription
+        }
     }
 
     func refresh() async {

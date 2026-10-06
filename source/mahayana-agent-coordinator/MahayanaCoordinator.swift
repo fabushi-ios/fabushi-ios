@@ -50,6 +50,7 @@ final class MahayanaCoordinator {
 
     private let hostSupervisor: MahayanaLocalHostSupervisor
     private let settingsStore: SandSettingsStore?
+    private let mcpSurface: CoordinatorMcpSurface?
     private let experimentService: SandExperimentService?
     private let webAuthnSigner: CoordinatorWebAuthnSigner?
     private let devControlAdapter: (any CoordinatorDevControlAdapting)?
@@ -63,10 +64,21 @@ final class MahayanaCoordinator {
         passkeyProvider: (any PasskeyProviding)? = nil,
         settingsStore: SandSettingsStore? = nil,
         experimentService: SandExperimentService? = nil,
-        devControlAdapter: (any CoordinatorDevControlAdapting)? = nil
+        devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
+        mcpSurface: CoordinatorMcpSurface? = nil
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
+        if let mcpSurface {
+            self.mcpSurface = mcpSurface
+        } else if let settingsStore {
+            self.mcpSurface = CoordinatorMcpSurface.make(
+                hostSupervisor: hostSupervisor,
+                settingsStore: settingsStore
+            )
+        } else {
+            self.mcpSurface = nil
+        }
         self.experimentService = experimentService
         self.devControlAdapter = devControlAdapter
         webAuthnSigner = passkeyProvider.map {
@@ -154,6 +166,7 @@ final class MahayanaCoordinator {
         } else {
             settingsStore?.clearAccountScope()
         }
+        mcpSurface?.updateAccountScope(accountScope)
     }
 
     func signPasskey(_ challenge: PasskeyChallenge) async throws -> CoordinatorPayload {
@@ -175,6 +188,15 @@ final class MahayanaCoordinator {
                 lifecycleState = .ready
             } catch {
                 throw CoordinatorError.unavailable
+            }
+        }
+
+        if let mcpSurface {
+            switch try await mcpSurface.route(method: method, params: params) {
+            case .handled(let value):
+                return JSONResult(value: value)
+            case .notHandled:
+                break
             }
         }
 

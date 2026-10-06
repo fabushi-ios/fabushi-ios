@@ -98,7 +98,8 @@ private struct ManagerFixture {
 
 private func makeManagerFixture(
     provider: ManagerDisplayProvider,
-    client: ManagerDashboardClient
+    client: ManagerDashboardClient,
+    setToolDisabled: (@Sendable (String, String, Bool) async throws -> Void)? = nil
 ) -> ManagerFixture {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("fabushi-mcp-manager-\(UUID().uuidString)")
@@ -136,14 +137,16 @@ private func makeManagerFixture(
             )
         }
     ))
-    let manager = SandMcpManager(deps: .init(
+    var dependencies = SandMcpManagerDependencies(
         settingsStore: settings,
         backendMcpExec: backend,
         definitionSource: definitionSource,
         toolsDiscovery: discovery,
         accountDisplayConfigProvider: { _ in await provider.get() },
         autoPollEnabled: false
-    ))
+    )
+    dependencies.setToolDisabled = setToolDisabled
+    let manager = SandMcpManager(deps: dependencies)
     return .init(
         manager: manager,
         settings: settings,
@@ -320,4 +323,94 @@ final class SharedMcpManagerParityTests: XCTestCase {
             XCTAssertTrue(error.message.contains("unavailable"))
         }
     }
+
+    func testLogoutScopeClearsAccountScopedStateAndCachedDisplay() async throws {
+        let provider = ManagerDisplayProvider(.init(
+            servers: [
+                .init(
+                    id: "1",
+                    name: "Remote",
+                    serverIdentifier: "remote",
+                    config: .http(url: "https://mcp.example.test"),
+                    isTeamServer: false
+                ),
+            ],
+            cacheScope: "account-a"
+        ))
+        let client = ManagerDashboardClient()
+        let fixture = makeManagerFixture(provider: provider, client: client)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        _ = try await fixture.manager.listServers()
+        fixture.settings.setMcpCustomInstructionsByServerId(["1": "private"])
+        fixture.settings.setMcpDisabledToolsByServerId(["1": ["search"]])
+
+        await provider.set(.init(servers: [], cacheScope: nil))
+        let loggedOut = try await fixture.manager.listServers()
+
+        XCTAssertTrue(loggedOut.servers.isEmpty)
+        XCTAssertTrue(fixture.settings.getMcpCustomInstructionsByServerId().isEmpty)
+        XCTAssertTrue(fixture.settings.getMcpDisabledToolsByServerId().isEmpty)
+        let lastDisplay = await fixture.manager.lastAccountDisplayConfigView()
+        XCTAssertNil(lastDisplay?.cacheScope)
+        XCTAssertTrue(lastDisplay?.servers.isEmpty == true)
+    }
+
+    func testRemoteToolToggleFailureLeavesLocalDisabledStateUnchanged() async throws {
+        let provider = ManagerDisplayProvider(.init(
+            servers: [
+                .init(
+                    id: "1",
+                    name: "Remote",
+                    serverIdentifier: "remote",
+                    config: .http(url: "https://mcp.example.test"),
+                    isTeamServer: false
+                ),
+            ],
+            cacheScope: "account-a"
+        ))
+        let client = ManagerDashboardClient()
+        client.listToolsResponse = [
+            .init(
+                serverIdentifier: "remote",
+                status: "connected",
+                tools: [
+                    .init(
+                        name: "remote.search",
+                        providerIdentifier: "remote",
+                        toolName: "search",
+                        description: "Search",
+                        inputSchema: nil
+                    ),
+                ],
+                accountLabel: "default",
+                rowServerIdentifier: "remote"
+            ),
+        ]
+        let fixture = makeManagerFixture(
+            provider: provider,
+            client: client,
+            setToolDisabled: { _, _, _ in
+                throw SandMcpConfigError("remote mutation failed")
+            }
+        )
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        _ = try await fixture.manager.listServers()
+        XCTAssertTrue(fixture.settings.getMcpDisabledToolsByServerId().isEmpty)
+
+        do {
+            _ = try await fixture.manager.setMcpToolDisabled(
+                serverId: "1",
+                toolName: "search",
+                disabled: true
+            )
+            XCTFail("remote mutation failure must be surfaced")
+        } catch let error as SandMcpConfigError {
+            XCTAssertTrue(error.message.contains("remote mutation failed"))
+        }
+
+        XCTAssertTrue(fixture.settings.getMcpDisabledToolsByServerId().isEmpty)
+    }
+
 }

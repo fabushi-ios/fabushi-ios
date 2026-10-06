@@ -475,6 +475,101 @@ extension ContentView {
                     }
                 }
 
+                Section("MCP 连接器") {
+                    if !model.loggedIn {
+                        Text("登录 Fabushi 后可管理当前账号的 MCP 连接器与工具。")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        HStack {
+                            Text("服务器与工具状态由 Coordinator / Rust Host 管理。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            if model.mcpLoading { ProgressView() }
+                            Button("刷新") {
+                                Task { await model.refreshMcpServers() }
+                            }
+                            .disabled(model.mcpLoading)
+                            .accessibilityIdentifier("mcp-refresh")
+                        }
+
+                        if let error = model.mcpError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .accessibilityIdentifier("mcp-error")
+                        }
+
+                        if model.mcpServers.isEmpty && !model.mcpLoading {
+                            Text("当前账号没有可管理的 MCP 服务器。")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        ForEach(model.mcpServers) { server in
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(server.name).font(.headline)
+                                        Text("\(server.transport.uppercased()) · \(server.status) · \(server.toolCount) 个启用工具")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        if let detail = server.statusDetail, !detail.isEmpty {
+                                            Text(detail).font(.caption2).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    Button(model.mcpLoadingServerId == server.id ? "读取中…" : "工具") {
+                                        Task { await model.loadMcpTools(serverId: server.id) }
+                                    }
+                                    .disabled(model.mcpLoadingServerId == server.id)
+                                }
+                                .accessibilityElement(children: .contain)
+                                .accessibilityIdentifier("mcp-server-\(server.id)")
+
+                                if let tools = model.mcpToolsByServerId[server.id] {
+                                    if tools.isEmpty {
+                                        Text("此服务器没有报告可管理工具。")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    ForEach(tools) { tool in
+                                        HStack(alignment: .top, spacing: 10) {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(tool.title ?? tool.name)
+                                                    .font(.subheadline.weight(.medium))
+                                                if let description = tool.description, !description.isEmpty {
+                                                    Text(description)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            Spacer()
+                                            Toggle(
+                                                "启用",
+                                                isOn: Binding(
+                                                    get: { !tool.isDisabled },
+                                                    set: { enabled in
+                                                        Task {
+                                                            await model.setMcpToolEnabled(
+                                                                serverId: server.id,
+                                                                toolName: tool.name,
+                                                                enabled: enabled
+                                                            )
+                                                        }
+                                                    }
+                                                )
+                                            )
+                                            .labelsHidden()
+                                            .disabled(model.mcpMutatingToolKey == "\(server.id):\(tool.name)")
+                                            .accessibilityIdentifier("mcp-tool-\(server.id)-\(tool.name)")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Section("插件") {
                     if model.plugins.isEmpty && !model.loading {
                         Text("没有匹配的 iOS 插件。")
@@ -515,10 +610,18 @@ extension ContentView {
                     Button("消息") { destination = .home }
                 }
             }
-            .refreshable { await model.refresh() }
+            .refreshable {
+                await model.refresh()
+                if model.loggedIn {
+                    await model.refreshMcpServers()
+                }
+            }
             .task {
                 if model.plugins.isEmpty {
                     await model.refresh()
+                }
+                if model.loggedIn && model.mcpServers.isEmpty {
+                    await model.refreshMcpServers()
                 }
             }
         }

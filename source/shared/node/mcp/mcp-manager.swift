@@ -12,6 +12,7 @@ struct SandMcpManagerDependencies: @unchecked Sendable {
     var parseServerConfig: (@Sendable (Any) throws -> McpServerConfig)? = nil
     var onConnectorAuth: (@Sendable (McpConnectorAuthEvent) -> Void)? = nil
     var onAccountScopeApplied: (@Sendable () -> Void)? = nil
+    var setToolDisabled: (@Sendable (_ serverIdentifier: String, _ toolName: String, _ disabled: Bool) async throws -> Void)? = nil
     var authWatchPollIntervalMs: Int = AUTH_WATCH_POLL_INTERVAL_MS
     var authWatchTimeoutMs: Int = AUTH_WATCH_TIMEOUT_MS
     var autoPollEnabled: Bool = true
@@ -191,8 +192,8 @@ actor SandMcpManager {
         let sameScope = display.cacheScope != nil && display.cacheScope == lastScope
         display = mergeAccountDisplay(display, cached: sameScope ? lastDisplay : nil)
 
-        if let scope = display.cacheScope, scope != lastScope {
-            if lastScope != nil {
+        if display.cacheScope != lastScope {
+            if lastScope != nil || lastDisplay != nil {
                 lastDisplay = nil
                 lastState = nil
                 lastBackendTools = []
@@ -203,8 +204,12 @@ actor SandMcpManager {
                 await deps.toolsDiscovery.resetPushState()
                 await deps.definitionSource.clearLastKnownAccountConfig()
             }
-            deps.settingsStore.scopeToAccount(scope)
-            lastScope = scope
+            if let scope = display.cacheScope {
+                deps.settingsStore.scopeToAccount(scope)
+            } else {
+                deps.settingsStore.clearAccountScope()
+            }
+            lastScope = display.cacheScope
             deps.onAccountScopeApplied?()
         }
 
@@ -497,24 +502,63 @@ actor SandMcpManager {
         }
     }
 
+    func setMcpToolDisabled(
+        serverId rawId: String,
+        toolName: String,
+        disabled: Bool
+    ) async throws -> [McpToolListing] {
+        let serverId = try validateMcpServerId(rawId)
+        let toolName = toolName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !toolName.isEmpty else {
+            throw SandMcpConfigError("MCP tool name is required.")
+        }
+        guard let server = try await resolveDisplayServer(
+            serverId,
+            requireFreshRead: deps.setToolDisabled != nil
+        ) else {
+            throw SandMcpConfigError("MCP server not found.")
+        }
+
+        if let setToolDisabled = deps.setToolDisabled,
+           let serverIdentifier = server.serverIdentifier {
+            let expectedScope = lastScope
+            try await setToolDisabled(serverIdentifier, toolName, disabled)
+            _ = try await loadDisplay(requireFreshRead: true)
+            guard lastScope == expectedScope else {
+                throw SandMcpConfigError(
+                    "MCP tool update became stale because the account changed."
+                )
+            }
+            await deps.toolsDiscovery.invalidateToolsCache()
+            return try await listServerTools(serverId)
+        }
+
+        var all = deps.settingsStore.getMcpDisabledToolsByServerId()
+        var current = all[serverId] ?? []
+        if disabled {
+            if !current.contains(toolName) { current.append(toolName) }
+        } else {
+            current.removeAll { $0 == toolName }
+        }
+        current.sort()
+        all[serverId] = current
+        deps.settingsStore.setMcpDisabledToolsByServerId(all)
+        return try await listServerTools(serverId)
+    }
+
     func toggleMcpToolDisabled(
         serverId rawId: String,
         toolName: String
     ) async throws -> [McpToolListing] {
-        let serverId = try validateMcpServerId(rawId)
-        guard !toolName.isEmpty else {
-            throw SandMcpConfigError("MCP tool name is required.")
+        let current = try await listServerTools(rawId)
+        guard let tool = current.first(where: { $0.name == toolName }) else {
+            throw SandMcpConfigError("MCP tool not found.")
         }
-        guard try await resolveDisplayServer(serverId) != nil else {
-            throw SandMcpConfigError("MCP server not found.")
-        }
-        var all = deps.settingsStore.getMcpDisabledToolsByServerId()
-        let current = all[serverId] ?? []
-        all[serverId] = current.contains(toolName)
-            ? current.filter { $0 != toolName }
-            : current + [toolName]
-        deps.settingsStore.setMcpDisabledToolsByServerId(all)
-        return try await listServerTools(serverId)
+        return try await setMcpToolDisabled(
+            serverId: rawId,
+            toolName: toolName,
+            disabled: !tool.isDisabled
+        )
     }
 
     func getMcpCustomInstructions() -> [String: String] {

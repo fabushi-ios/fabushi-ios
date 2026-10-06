@@ -421,6 +421,34 @@ impl AppHost {
                 .feature
                 .usage_status()
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.mcp.servers" => self
+                .feature
+                .mcp_servers_snapshot()
+                .map(|servers| json!({"servers": servers}))
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.mcp.setToolDisabled" => {
+                let server = string_param(&params, "server")?.to_string();
+                let tool = string_param(&params, "tool")?.to_string();
+                let disabled = params
+                    .get("disabled")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| AppHostError::InvalidRequest("disabled is required".into()))?;
+                self.feature
+                    .set_mcp_tool_disabled_direct(server.clone(), tool, disabled)
+                    .map(|disabled_tools| json!({
+                        "server": server,
+                        "disabledTools": disabled_tools,
+                    }))
+                    .map_err(|error| AppHostError::Operation(error.to_string()))
+            }
+            "feature.mcp.toolCall" => {
+                let server = string_param(&params, "server")?.to_string();
+                let tool = string_param(&params, "tool")?.to_string();
+                let arguments = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
+                self.feature
+                    .call_mcp_tool_direct(server, tool, arguments)
+                    .map_err(|error| AppHostError::Operation(error.to_string()))
+            }
             "feature.marketplace.browse" => self.marketplace_browse(params),
             "feature.marketplace.release" => self.marketplace_release(params),
             "feature.marketplace.add" => self.marketplace_add(params),
