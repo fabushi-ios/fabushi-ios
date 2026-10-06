@@ -1667,27 +1667,8 @@ impl FeatureHostController {
                 let trigger = trigger.unwrap_or_else(|| AutomationTrigger::Schedule {
                     schedule: schedule.clone(),
                 });
-                let (schedule, trigger) = match trigger {
-                    AutomationTrigger::Schedule { schedule } => {
-                        let schedule = normalize_automation_schedule(&schedule)?;
-                        (schedule.clone(), AutomationTrigger::Schedule { schedule })
-                    }
-                    AutomationTrigger::Event {
-                        source,
-                        event,
-                        filter,
-                    } => {
-                        let event = required(event, "automation event")?;
-                        (
-                            format!("event:{}:{event}", listener_platform_slug(source)),
-                            AutomationTrigger::Event {
-                                source,
-                                event,
-                                filter: filter.filter(|value| !value.trim().is_empty()),
-                            },
-                        )
-                    }
-                };
+                let trigger = normalize_automation_trigger(trigger)?;
+                let schedule = automation_trigger_legacy_schedule(&trigger);
                 let now = now_millis();
                 let mut state = self.state()?;
                 let id = id
@@ -1831,10 +1812,7 @@ impl FeatureHostController {
                         status: AutomationRunStatus::Running,
                         started_at: now,
                         detail: None,
-                        event: match &trigger {
-                            AutomationTrigger::Event { event, .. } => Some(event.clone()),
-                            AutomationTrigger::Schedule { .. } => None,
-                        },
+                        event: automation_trigger_event_label(&trigger),
                     });
                     let automation = automation.clone();
                     self.persist_automations(&state.automations)?;
@@ -1845,33 +1823,37 @@ impl FeatureHostController {
                     });
                     (automation, run_id)
                 };
-                if let Some(AutomationTrigger::Event { source, event, filter }) = automation.trigger.as_ref() {
-                    self.state()?.events.push_back(HostEvent::TranscriptCard {
-                        timestamp: timestamp(),
-                        entry_id: format!("event-{}-{}", automation.id, now_millis()),
-                        operation_id: None,
-                        card: TranscriptCard::Event {
-                            event: EventCard {
-                                source: *source,
-                                event: event.clone(),
-                                title: format!("{} event", listener_platform_display(*source)),
-                                summary: format!("{} woke routine “{}”.", event, automation.name),
-                                url: None,
-                                actor: None,
-                                fields: filter.as_ref().map(|filter| vec![EventField {
-                                    label: "Filter".into(), value: filter.clone(),
-                                }]),
-                                occurred_at_ms: Some(now_millis()),
+                if let Some(trigger) = automation.trigger.as_ref() {
+                    if let Some((source, event, filter)) = automation_trigger_first_event(trigger) {
+                        self.state()?.events.push_back(HostEvent::TranscriptCard {
+                            timestamp: timestamp(),
+                            entry_id: format!("event-{}-{}", automation.id, now_millis()),
+                            operation_id: None,
+                            card: TranscriptCard::Event {
+                                event: EventCard {
+                                    source,
+                                    event: event.clone(),
+                                    title: format!("{} event", listener_platform_display(source)),
+                                    summary: format!("{} woke routine “{}”.", event, automation.name),
+                                    url: None,
+                                    actor: None,
+                                    fields: filter.map(|filter| vec![EventField {
+                                        label: "Filter".into(), value: filter,
+                                    }]),
+                                    occurred_at_ms: Some(now_millis()),
+                                },
                             },
-                        },
-                    });
+                        });
+                    }
                 }
-                let trigger_context = match automation.trigger.as_ref() {
-                    Some(AutomationTrigger::Event { source, event, .. }) => format!(
-                        "\n触发事件：{} / {}", listener_platform_display(*source), event
-                    ),
-                    _ => String::new(),
-                };
+                let trigger_context = automation
+                    .trigger
+                    .as_ref()
+                    .and_then(automation_trigger_first_event)
+                    .map(|(source, event, _)| {
+                        format!("\n触发事件：{} / {}", listener_platform_display(source), event)
+                    })
+                    .unwrap_or_default();
                 let text = format!(
                     "[自动化例程：{}]{}\n这是用户保存的 standing instruction。请立即执行并报告结果。\n\n{}",
                     automation.name, trigger_context, automation.prompt
@@ -6256,21 +6238,10 @@ impl FeatureHostController {
                     if !automation.enabled {
                         return false;
                     }
-                    let Some(AutomationTrigger::Event {
-                        source,
-                        event: expected_event,
-                        filter,
-                    }) = automation.trigger.as_ref()
-                    else {
-                        return false;
-                    };
-                    *source == event.source
-                        && (expected_event == "*" || expected_event == &event.event)
-                        && filter.as_ref().is_none_or(|filter| {
-                            serialized
-                                .to_ascii_lowercase()
-                                .contains(&filter.to_ascii_lowercase())
-                        })
+                    automation
+                        .trigger
+                        .as_ref()
+                        .is_some_and(|trigger| automation_trigger_matches_event(trigger, &event, &serialized))
                 })
                 .map(|automation| automation.id.clone())
                 .collect::<Vec<_>>()
@@ -9549,16 +9520,222 @@ fn listener_platform_display(platform: ListenerPlatform) -> &'static str {
     }
 }
 
+fn normalize_automation_trigger(
+    trigger: AutomationTrigger,
+) -> Result<AutomationTrigger, FeatureHostError> {
+    match trigger {
+        AutomationTrigger::Schedule { schedule } => {
+            let schedule = normalize_automation_schedule(&schedule)?;
+            Ok(AutomationTrigger::Schedule { schedule })
+        }
+        AutomationTrigger::Event {
+            source,
+            event,
+            filter,
+            filters,
+        } => Ok(AutomationTrigger::Event {
+            source,
+            event: required(event, "automation event")?,
+            filter: filter.filter(|value| !value.trim().is_empty()),
+            filters: filters.filter(|value| !value.is_empty()),
+        }),
+        AutomationTrigger::Group { listeners } => {
+            if listeners.len() < 2 || listeners.len() > 8 {
+                return Err(FeatureHostError::Contract(
+                    "automation trigger group must contain 2 to 8 listeners".into(),
+                ));
+            }
+            let mut normalized = Vec::with_capacity(listeners.len());
+            for listener in listeners {
+                if matches!(listener, AutomationTrigger::Group { .. }) {
+                    return Err(FeatureHostError::Contract(
+                        "nested automation trigger groups are not supported".into(),
+                    ));
+                }
+                normalized.push(normalize_automation_trigger(listener)?);
+            }
+            Ok(AutomationTrigger::Group {
+                listeners: normalized,
+            })
+        }
+    }
+}
+
+fn automation_trigger_legacy_schedule(trigger: &AutomationTrigger) -> String {
+    match trigger {
+        AutomationTrigger::Schedule { schedule } => schedule.clone(),
+        AutomationTrigger::Event { source, event, .. } => {
+            format!("event:{}:{event}", listener_platform_slug(*source))
+        }
+        AutomationTrigger::Group { listeners } => listeners
+            .iter()
+            .find_map(|listener| match listener {
+                AutomationTrigger::Schedule { schedule } => Some(schedule.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| "event:group".into()),
+    }
+}
+
+fn automation_trigger_event_label(trigger: &AutomationTrigger) -> Option<String> {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => None,
+        AutomationTrigger::Event { event, .. } => Some(event.clone()),
+        AutomationTrigger::Group { listeners } => listeners
+            .iter()
+            .find_map(automation_trigger_event_label)
+            .or_else(|| Some("group".into())),
+    }
+}
+
+fn automation_trigger_first_event(
+    trigger: &AutomationTrigger,
+) -> Option<(ListenerPlatform, String, Option<String>)> {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => None,
+        AutomationTrigger::Event {
+            source,
+            event,
+            filter,
+            ..
+        } => Some((*source, event.clone(), filter.clone())),
+        AutomationTrigger::Group { listeners } => {
+            listeners.iter().find_map(automation_trigger_first_event)
+        }
+    }
+}
+
+fn normalized_event_key(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn event_value_for_filter(event: &EventCard, key: &str) -> Option<String> {
+    let normalized = normalized_event_key(key);
+    match normalized.as_str() {
+        "event" => return Some(event.event.clone()),
+        "actor" | "user" | "username" => return event.actor.clone(),
+        "url" => return event.url.clone(),
+        "title" => return Some(event.title.clone()),
+        "summary" | "message" | "messagecontains" => return Some(event.summary.clone()),
+        _ => {}
+    }
+    let aliases: &[&str] = match normalized.as_str() {
+        "repo" => &["repo", "repository"],
+        "channel" => &["channel", "channelid"],
+        "tenantid" => &["tenant", "tenantid"],
+        "teamid" | "teamids" => &["team", "teamid", "teamids"],
+        "channelid" | "channelids" => &["channel", "channelid", "channelids"],
+        "projectid" | "projectids" => &["project", "projectid", "projectids"],
+        "serviceid" | "serviceids" => &["service", "serviceid", "serviceids"],
+        "statusid" | "statusids" => &["status", "statusid", "statusids"],
+        "cycleid" | "cycleids" => &["cycle", "cycleid", "cycleids"],
+        "emoji" => &["emoji", "reaction"],
+        _ => &[normalized.as_str()],
+    };
+    event.fields.as_ref()?.iter().find_map(|field| {
+        let label = normalized_event_key(&field.label);
+        aliases.contains(&label.as_str()).then(|| field.value.clone())
+    })
+}
+
+fn structured_event_filters_match(
+    filters: &BTreeMap<String, Value>,
+    event: &EventCard,
+) -> bool {
+    filters.iter().all(|(key, expected)| {
+        if key == "events" {
+            return expected.as_array().is_some_and(|values| {
+                values.iter().any(|value| {
+                    value
+                        .as_str()
+                        .is_some_and(|value| value.eq_ignore_ascii_case(&event.event))
+                })
+            });
+        }
+        if key == "actorAllowlist" || key == "userAllowlist" {
+            let Some(actor) = event.actor.as_deref() else { return false; };
+            return expected.as_array().is_some_and(|values| {
+                values.iter().any(|value| {
+                    value
+                        .as_str()
+                        .is_some_and(|value| value.trim_start_matches('@').eq_ignore_ascii_case(actor.trim_start_matches('@')))
+                })
+            });
+        }
+        let Some(actual) = event_value_for_filter(event, key) else {
+            return false;
+        };
+        match expected {
+            Value::String(value) => {
+                if key == "messageContains" {
+                    actual.to_ascii_lowercase().contains(&value.to_ascii_lowercase())
+                } else {
+                    actual.eq_ignore_ascii_case(value)
+                }
+            }
+            Value::Bool(value) => actual.parse::<bool>().ok() == Some(*value),
+            Value::Array(values) => values.iter().any(|value| {
+                value.as_str().is_some_and(|value| {
+                    actual
+                        .split(|ch: char| ch.is_whitespace() || ch == ',')
+                        .any(|item| item.eq_ignore_ascii_case(value))
+                })
+            }),
+            _ => false,
+        }
+    })
+}
+
+fn automation_trigger_matches_event(
+    trigger: &AutomationTrigger,
+    event: &EventCard,
+    serialized: &str,
+) -> bool {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => false,
+        AutomationTrigger::Event {
+            source,
+            event: expected_event,
+            filter,
+            filters,
+        } => {
+            *source == event.source
+                && (expected_event == "*" || expected_event == &event.event)
+                && filter.as_ref().is_none_or(|filter| {
+                    serialized
+                        .to_ascii_lowercase()
+                        .contains(&filter.to_ascii_lowercase())
+                })
+                && filters
+                    .as_ref()
+                    .is_none_or(|filters| structured_event_filters_match(filters, event))
+        }
+        AutomationTrigger::Group { listeners } => listeners
+            .iter()
+            .any(|listener| automation_trigger_matches_event(listener, event, serialized)),
+    }
+}
+
 fn automation_next_run(
     trigger: &AutomationTrigger,
     schedule: &str,
     enabled: bool,
     after_ms: i64,
 ) -> Option<i64> {
-    if !enabled || matches!(trigger, AutomationTrigger::Event { .. }) {
-        None
-    } else {
-        next_automation_run(schedule, after_ms)
+    if !enabled {
+        return None;
+    }
+    match trigger {
+        AutomationTrigger::Schedule { schedule } => next_automation_run(schedule, after_ms),
+        AutomationTrigger::Event { .. } => None,
+        AutomationTrigger::Group { listeners } => listeners
+            .iter()
+            .filter_map(|listener| automation_next_run(listener, schedule, true, after_ms))
+            .min(),
     }
 }
 
@@ -13825,6 +14002,7 @@ mod tests {
                     source: ListenerPlatform::Slack,
                     event: "message".into(),
                     filter: None,
+                    filters: None,
                 }),
                 enabled: true,
             })
@@ -13861,6 +14039,7 @@ mod tests {
                     source: ListenerPlatform::Slack,
                     event: "message".into(),
                     filter: None,
+                    filters: None,
                 }),
                 enabled: true,
             })
@@ -13930,6 +14109,7 @@ mod tests {
                     source: ListenerPlatform::Slack,
                     event: "message".into(),
                     filter: None,
+                    filters: None,
                 }),
                 enabled: true,
             })
@@ -14265,6 +14445,7 @@ mod tests {
                     source: ListenerPlatform::Sentry,
                     event: "issue.regressed".into(),
                     filter: Some("web".into()),
+                    filters: None,
                 }),
                 enabled: true,
             })
