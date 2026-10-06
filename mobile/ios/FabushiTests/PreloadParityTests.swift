@@ -68,24 +68,26 @@ final class PreloadParityTests: XCTestCase {
     @MainActor
     func testFeatureEventBrokerBuffersUnmatchedEventsWithoutDroppingThem() async throws {
         var receiveCount = 0
-        var events: [[String: Any]] = [
-            ["type": "group.listed", "groups": []],
-            ["type": "bot.listed", "bots": []],
+        var events: [CoordinatorPayload] = [
+            .object(["type": .string("group.listed"), "groups": .array([])]),
+            .object(["type": .string("bot.listed"), "bots": .array([])]),
         ]
         let broker = IOSFeatureEventBroker { _ in
             receiveCount += 1
             return events.isEmpty ? nil : events.removeFirst()
         }
 
-        let bot = try await broker.next(deadlineMilliseconds: 1_000) {
+        let botPayload = try await broker.next(deadlineMilliseconds: 1_000) {
             $0["type"] as? String == "bot.listed"
         }
+        let bot = try XCTUnwrap(botPayload.foundationValue as? [String: Any])
         XCTAssertEqual(bot["type"] as? String, "bot.listed")
         XCTAssertEqual(receiveCount, 2)
 
-        let group = try await broker.next(deadlineMilliseconds: 1_000) {
+        let groupPayload = try await broker.next(deadlineMilliseconds: 1_000) {
             $0["type"] as? String == "group.listed"
         }
+        let group = try XCTUnwrap(groupPayload.foundationValue as? [String: Any])
         XCTAssertEqual(group["type"] as? String, "group.listed")
         XCTAssertEqual(receiveCount, 2, "buffered events must not trigger a second receive")
         broker.dispose()

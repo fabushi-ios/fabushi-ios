@@ -19,14 +19,14 @@ enum IOSFeatureEventBrokerError: LocalizedError, Equatable {
 
 @MainActor
 final class IOSFeatureEventBroker {
-    typealias Receiver = @MainActor (_ timeoutMilliseconds: Int) async throws -> [String: Any]?
+    typealias Receiver = @MainActor (_ timeoutMilliseconds: Int) async throws -> CoordinatorPayload?
     typealias Predicate = ([String: Any]) -> Bool
 
     private struct Waiter {
         let id: UUID
         let expiresAt: Date
         let predicate: Predicate
-        let continuation: CheckedContinuation<[String: Any], Error>
+        let continuation: CheckedContinuation<CoordinatorPayload, Error>
     }
 
     private let receive: Receiver
@@ -34,7 +34,7 @@ final class IOSFeatureEventBroker {
     private let bufferLimit: Int
     private var waiters: [UUID: Waiter] = [:]
     private var waiterOrder: [UUID] = []
-    private var buffered: [[String: Any]] = []
+    private var buffered: [CoordinatorPayload] = []
     private var pumpTask: Task<Void, Never>?
     private var disposed = false
 
@@ -51,7 +51,7 @@ final class IOSFeatureEventBroker {
     func next(
         deadlineMilliseconds: Int,
         matching predicate: @escaping Predicate
-    ) async throws -> [String: Any] {
+    ) async throws -> CoordinatorPayload {
         guard !disposed else { throw CancellationError() }
         guard deadlineMilliseconds > 0 else {
             throw IOSFeatureEventBrokerError.timedOut
@@ -126,10 +126,11 @@ final class IOSFeatureEventBroker {
         }
     }
 
-    private func route(_ event: [String: Any]) {
+    private func route(_ event: CoordinatorPayload) {
         expireWaiters()
+        guard let foundationEvent = event.foundationValue as? [String: Any] else { return }
         for id in waiterOrder {
-            guard let waiter = waiters[id], waiter.predicate(event) else { continue }
+            guard let waiter = waiters[id], waiter.predicate(foundationEvent) else { continue }
             removeWaiter(id)
             waiter.continuation.resume(returning: event)
             return
@@ -141,8 +142,11 @@ final class IOSFeatureEventBroker {
         }
     }
 
-    private func takeBuffered(matching predicate: Predicate) -> [String: Any]? {
-        guard let index = buffered.firstIndex(where: predicate) else { return nil }
+    private func takeBuffered(matching predicate: Predicate) -> CoordinatorPayload? {
+        guard let index = buffered.firstIndex(where: { event in
+            guard let foundationEvent = event.foundationValue as? [String: Any] else { return false }
+            return predicate(foundationEvent)
+        }) else { return nil }
         return buffered.remove(at: index)
     }
 
@@ -205,17 +209,25 @@ final class IOSPreloadBridge {
         client = IOSCoordinatorPortClient(port: pair.client)
         featureEventBroker = IOSFeatureEventBroker { [weak self] timeoutMilliseconds in
             guard let self else { throw CancellationError() }
-            let result = try await self.request(
+            let result = try await self.requestPayload(
                 method: "feature.receive",
                 params: ["timeoutMs": timeoutMilliseconds]
             )
-            return result.value as? [String: Any]
+            guard case .object = result else { return nil }
+            return result
         }
     }
 
-    func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
+    private func requestPayload(
+        method: String,
+        params: [String: Any] = [:]
+    ) async throws -> CoordinatorPayload {
         let payload = try CoordinatorPayload.fromFoundation(params)
-        let result = try await client.request(method: method, args: payload)
+        return try await client.request(method: method, args: payload)
+    }
+
+    func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
+        let result = try await requestPayload(method: method, params: params)
         return JSONResult(value: result.foundationValue)
     }
 
@@ -232,12 +244,11 @@ final class IOSPreloadBridge {
         matching predicate: @escaping IOSFeatureEventBroker.Predicate
     ) async throws -> JSONResult {
         guard let featureEventBroker else { throw CancellationError() }
-        return JSONResult(
-            value: try await featureEventBroker.next(
-                deadlineMilliseconds: deadlineMilliseconds,
-                matching: predicate
-            )
+        let event = try await featureEventBroker.next(
+            deadlineMilliseconds: deadlineMilliseconds,
+            matching: predicate
         )
+        return JSONResult(value: event.foundationValue)
     }
 
     func shutdown() {
