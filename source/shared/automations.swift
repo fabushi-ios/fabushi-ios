@@ -528,3 +528,127 @@ func routineTriggerWireValue(_ trigger: AutomationTrigger) -> [String: Any] {
     }
 }
 
+private func routineWireStringArray(_ value: Any?) -> [String]? {
+    if let values = value as? [String] { return values }
+    guard let values = value as? [Any] else { return nil }
+    var result: [String] = []
+    for value in values {
+        guard let value = value as? String else { return nil }
+        result.append(value)
+    }
+    return result
+}
+
+private func routineTriggerMemberFromWireValue(_ value: Any) -> AutomationTriggerMember? {
+    guard let row = value as? [String: Any],
+          let kind = row["kind"] as? String
+    else { return nil }
+
+    if kind == "schedule" {
+        guard let schedule = row["schedule"] as? String else { return nil }
+        let form = RoutineTriggerForm.schedule(schedule)
+        return routineTriggerFormToMember(form)
+    }
+
+    guard kind == "event",
+          let source = row["source"] as? String,
+          let event = row["event"] as? String
+    else { return nil }
+
+    let filters = row["filters"] as? [String: Any] ?? [:]
+    switch source.lowercased() {
+    case "slack":
+        guard let channel = filters["channel"] as? String else { return nil }
+        switch event {
+        case "mention":
+            return .slack(.init(channel: channel, match: .mention))
+        case "message":
+            if let keyword = filters["messageContains"] as? String {
+                return .slack(.init(channel: channel, match: .keyword(keyword)))
+            }
+            return .slack(.init(channel: channel, match: .message))
+        case "reaction":
+            let emoji = routineWireStringArray(filters["emoji"]) ?? []
+            return .slack(.init(
+                channel: channel,
+                match: .reaction(emoji: emoji, bySelf: filters["bySelf"] as? Bool)
+            ))
+        default:
+            return nil
+        }
+
+    case "github":
+        guard let repo = filters["repo"] as? String else { return nil }
+        let events = routineWireStringArray(filters["events"])
+            ?? (event == "*" ? [] : [event])
+        guard !events.isEmpty else { return nil }
+        return .github(.init(
+            repo: repo,
+            events: events,
+            ciBranch: filters["ciBranch"] as? String,
+            userAllowlist: routineWireStringArray(
+                filters["actorAllowlist"] ?? filters["userAllowlist"]
+            )
+        ))
+
+    case "teams":
+        guard let tenantId = filters["tenantId"] as? String else { return nil }
+        let teamIds = routineWireStringArray(filters["teamIds"]) ?? []
+        return .microsoftTeams(.init(
+            tenantId: tenantId,
+            teamId: teamIds.first ?? "",
+            teamIds: teamIds,
+            channelIds: routineWireStringArray(filters["channelIds"]) ?? [],
+            messageContains: filters["messageContains"] as? String ?? "",
+            messageContainsIsRegex: filters["messageContainsIsRegex"] as? Bool ?? false,
+            blockUnauthenticatedTeamsUsers: filters["blockUnauthenticatedTeamsUsers"] as? Bool ?? false
+        ))
+
+    case "linear":
+        return .integration(.init(
+            platform: .linear,
+            eventCase: event,
+            projectIds: routineWireStringArray(filters["projectIds"]) ?? [],
+            teamIds: routineWireStringArray(filters["teamIds"]) ?? [],
+            statusIds: routineWireStringArray(filters["statusIds"]) ?? [],
+            cycleIds: routineWireStringArray(filters["cycleIds"]) ?? []
+        ))
+
+    case "sentry":
+        return .integration(.init(
+            platform: .sentry,
+            eventCase: event,
+            projectIds: routineWireStringArray(filters["projectIds"]) ?? []
+        ))
+
+    case "pagerduty":
+        return .integration(.init(
+            platform: .pagerduty,
+            eventCase: event,
+            serviceIds: routineWireStringArray(filters["serviceIds"]) ?? []
+        ))
+
+    default:
+        return nil
+    }
+}
+
+func routineTriggerFromWireValue(_ value: Any) -> AutomationTrigger? {
+    guard let row = value as? [String: Any],
+          let kind = row["kind"] as? String
+    else { return nil }
+
+    if kind == "group" {
+        guard let rawListeners = row["listeners"] as? [Any],
+              rawListeners.count >= 2,
+              rawListeners.count <= TRIGGER_MAX_GROUP_LISTENERS
+        else { return nil }
+        let listeners = rawListeners.compactMap(routineTriggerMemberFromWireValue)
+        guard listeners.count == rawListeners.count else { return nil }
+        return .group(listeners)
+    }
+
+    guard let member = routineTriggerMemberFromWireValue(row) else { return nil }
+    return .member(member)
+}
+
