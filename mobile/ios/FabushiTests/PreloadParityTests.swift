@@ -64,6 +64,34 @@ final class PreloadParityTests: XCTestCase {
         )
     }
 
+
+    @MainActor
+    func testFeatureEventBrokerBuffersUnmatchedEventsWithoutDroppingThem() async throws {
+        var receiveCount = 0
+        var events: [[String: Any]] = [
+            ["type": "group.listed", "groups": []],
+            ["type": "bot.listed", "bots": []],
+        ]
+        let broker = IOSFeatureEventBroker { _ in
+            receiveCount += 1
+            return events.isEmpty ? nil : events.removeFirst()
+        }
+
+        let bot = try await broker.next(deadlineMilliseconds: 1_000) {
+            $0["type"] as? String == "bot.listed"
+        }
+        XCTAssertEqual(bot["type"] as? String, "bot.listed")
+        XCTAssertEqual(receiveCount, 2)
+
+        let group = try await broker.next(deadlineMilliseconds: 1_000) {
+            $0["type"] as? String == "group.listed"
+        }
+        XCTAssertEqual(group["type"] as? String, "group.listed")
+        XCTAssertEqual(receiveCount, 2, "buffered events must not trigger a second receive")
+        broker.dispose()
+    }
+
+
     func testPinnedMainRPCSurfaceAndEdgeChannelNames() {
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("openExternal"))
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("authenticateMcpServer"))
