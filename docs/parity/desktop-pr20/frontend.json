@@ -2152,17 +2152,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/send-message-text.ts",
       "desktop_blob_sha": "4093777fd3d2be9ea5d897533ff755a33061aee0",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Owns strict send-message:text projection: entry/message/image/channel/streaming/timestamp validation, adjacency projection, trusted-source marking, and the exact non-streaming image-free single-bare-link branch that hands presentation to the URL-card consumer.",
+      "desktop_owner": "renderer / transcript-card send-message text projector",
+      "desktop_visible_effect": "Persisted send-message:text cards render trusted text and optional images/streaming state correctly; a single bare HTTP(S) link becomes link-card presentation only when it is non-streaming and image-free, while malformed card shapes fail closed.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Native MobileSendMessageTextProjection replaces the TypeScript projector. MobileBotChat consumes the same projection in the shipping SwiftUI transcript, using a native Link for the URL-card handoff and AsyncImage for HTTP(S) image entries; richer URL metadata remains a separate url-card responsibility.",
+      "implementation_status": "implemented",
+      "production_evidence": "MarketplaceModel.swift now dispatches send-message by message.type before attachment projection, validates text/images/channel/streaming/timestamp, preserves the exact bare-link gate, and stores a typed projection on MobileChatMessage. MobileBotChat.swift consumes it for live text/stream cursor, native link presentation, and attached images.",
+      "test_evidence": "SharedWorkflowTranscriptParityTests.swift covers valid text metadata, streaming guard, Markdown bare-link normalization, image suppression of URL-card presentation, malformed images/streaming/channel rejection, and transcript-card dispatch before attachment projection. Fresh exact-HEAD ordinary/protected Actions remain required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and canonical desktop blob 4093777fd3d2be9ea5d897533ff755a33061aee0. Implemented in the shipping transcript path; verification is pending current exact-HEAD CI."
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/thread-affordance.tsx",
