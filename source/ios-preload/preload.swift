@@ -19,7 +19,7 @@ enum IOSFeatureEventBrokerError: LocalizedError, Equatable {
 
 @MainActor
 final class IOSFeatureEventBroker {
-    typealias Receiver = (_ timeoutMilliseconds: Int) async throws -> [String: Any]?
+    typealias Receiver = @MainActor (_ timeoutMilliseconds: Int) async throws -> [String: Any]?
     typealias Predicate = ([String: Any]) -> Bool
 
     private struct Waiter {
