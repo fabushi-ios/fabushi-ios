@@ -604,30 +604,32 @@ extension ContentView {
                                     }
                                     .buttonStyle(.borderless)
 
-                                    HStack(spacing: 8) {
-                                        TextField(
-                                            "重命名账号",
-                                            text: Binding(
-                                                get: {
-                                                    model.mcpRenameDraftByIdentity[server.id]
-                                                        ?? server.accountKey
-                                                },
-                                                set: {
-                                                    model.mcpRenameDraftByIdentity[server.id] = $0
-                                                }
-                                            )
-                                        )
-                                        .textInputAutocapitalization(.never)
-                                        .autocorrectionDisabled()
-                                        Button("重命名") {
-                                            let next = model.mcpRenameDraftByIdentity[server.id]
-                                                ?? server.accountKey
-                                            Task {
-                                                await model.renameMcpAccount(
-                                                    serverId: server.serverId,
-                                                    accountKey: server.accountKey,
-                                                    newAccountKey: next
+                                    if server.accountKey != DEFAULT_MCP_ACCOUNT_KEY {
+                                        HStack(spacing: 8) {
+                                            TextField(
+                                                "重命名账号",
+                                                text: Binding(
+                                                    get: {
+                                                        model.mcpRenameDraftByIdentity[server.id]
+                                                            ?? server.accountKey
+                                                    },
+                                                    set: {
+                                                        model.mcpRenameDraftByIdentity[server.id] = $0
+                                                    }
                                                 )
+                                            )
+                                            .textInputAutocapitalization(.never)
+                                            .autocorrectionDisabled()
+                                            Button("重命名") {
+                                                let next = model.mcpRenameDraftByIdentity[server.id]
+                                                    ?? server.accountKey
+                                                Task {
+                                                    await model.renameMcpAccount(
+                                                        serverId: server.serverId,
+                                                        accountKey: server.accountKey,
+                                                        newAccountKey: next
+                                                    )
+                                                }
                                             }
                                         }
                                     }

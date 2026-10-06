@@ -15,6 +15,9 @@ extension ContentView {
                 authenticatedContent
             }
         }
+        .onOpenURL { url in
+            model.handleDeepLink(url)
+        }
     }
 
     var authenticatedContent: some View {

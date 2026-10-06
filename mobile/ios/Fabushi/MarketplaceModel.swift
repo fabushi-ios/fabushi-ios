@@ -1321,6 +1321,24 @@ final class MarketplaceModel {
     }
 
     func handleDeepLink(_ url: URL) {
+        if isMcpOAuthIOSCallback(url) {
+            Task { @MainActor in
+                do {
+                    let result = try await bridge.request(
+                        method: "coordinator.mcp.oauthCallback",
+                        params: ["url": url.absoluteString]
+                    )
+                    let outcome = (result.value as? [String: Any])?["outcome"] as? String
+                    if outcome != "success", outcome != "notFound" {
+                        mcpError = outcome ?? "MCP OAuth callback failed."
+                    }
+                    await refreshMcpServers()
+                } catch {
+                    mcpError = error.localizedDescription
+                }
+            }
+            return
+        }
         guard url.scheme?.lowercased() == "fabushi",
               url.user == nil,
               url.password == nil,
