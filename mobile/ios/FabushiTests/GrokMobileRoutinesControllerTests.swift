@@ -39,6 +39,49 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertEqual(projected?.nextRunAtMs, 30)
     }
 
+    func testRoutineProjectionRestoresCanonicalGroupedTrigger() {
+        var row = valid
+        row["trigger"] = [
+            "kind": "group",
+            "listeners": [
+                [
+                    "kind": "schedule",
+                    "schedule": "@daily",
+                ],
+                [
+                    "kind": "event",
+                    "source": "github",
+                    "event": "*",
+                    "filters": [
+                        "repo": "owner/repo",
+                        "events": ["pr-opened", "ci-failed"],
+                        "ciBranch": "main",
+                        "actorAllowlist": ["Alice", "Bob"],
+                    ],
+                ],
+            ],
+        ]
+
+        guard let projected = MobileBotRoutinesModel.parseAutomation(row) else {
+            return XCTFail("expected grouped trigger projection")
+        }
+        guard let forms = routineTriggerForms(from: projected.trigger) else {
+            return XCTFail("expected trigger forms")
+        }
+        XCTAssertEqual(forms.count, 2)
+        guard case .schedule(let schedule) = forms[0] else {
+            return XCTFail("expected schedule")
+        }
+        XCTAssertEqual(schedule, "@daily")
+        guard case .github(let repo, let events, let users, let branch) = forms[1] else {
+            return XCTFail("expected GitHub form")
+        }
+        XCTAssertEqual(repo, "owner/repo")
+        XCTAssertEqual(events, ["pr-opened", "ci-failed"])
+        XCTAssertEqual(users, "Alice, Bob")
+        XCTAssertEqual(branch, "main")
+    }
+
     func testRoutineProjectionFailsClosedOnMalformedRows() {
         for field in ["id", "agentId", "name", "prompt", "schedule", "enabled", "createdAtMs"] {
             var row = valid
