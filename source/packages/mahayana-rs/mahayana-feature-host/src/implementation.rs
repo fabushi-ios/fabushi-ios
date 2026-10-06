@@ -14513,6 +14513,120 @@ mod tests {
     }
 
     #[test]
+    fn grouped_automation_triggers_validate_schedule_and_match_structured_events() {
+        assert!(normalize_automation_trigger(AutomationTrigger::Group {
+            listeners: vec![AutomationTrigger::Schedule {
+                schedule: "@daily".into(),
+            }],
+        })
+        .is_err());
+
+        let trigger = normalize_automation_trigger(AutomationTrigger::Group {
+            listeners: vec![
+                AutomationTrigger::Schedule {
+                    schedule: "*/15 9-17 * * 1-5".into(),
+                },
+                AutomationTrigger::Event {
+                    source: ListenerPlatform::Sentry,
+                    event: "issue.regressed".into(),
+                    filter: None,
+                    filters: Some(BTreeMap::from([(
+                        "projectIds".into(),
+                        json!(["web", "api"]),
+                    )])),
+                },
+            ],
+        })
+        .expect("normalize grouped trigger");
+
+        assert!(automation_next_run(&trigger, "unused", true, 1_750_000_000_000).is_some());
+
+        let event = EventCard {
+            source: ListenerPlatform::Sentry,
+            event: "issue.regressed".into(),
+            title: "Checkout regression".into(),
+            summary: "Regression detected".into(),
+            url: None,
+            actor: None,
+            fields: Some(vec![EventField {
+                label: "Project".into(),
+                value: "web".into(),
+            }]),
+            occurred_at_ms: Some(1),
+        };
+        let serialized = serde_json::to_string(&event).expect("serialize event");
+        assert!(automation_trigger_matches_event(&trigger, &event, &serialized));
+
+        let nonmatching = EventCard {
+            fields: Some(vec![EventField {
+                label: "Project".into(),
+                value: "mobile".into(),
+            }]),
+            ..event
+        };
+        let serialized = serde_json::to_string(&nonmatching).expect("serialize nonmatching event");
+        assert!(!automation_trigger_matches_event(
+            &trigger,
+            &nonmatching,
+            &serialized
+        ));
+    }
+
+    #[test]
+    fn event_group_automation_store_survives_reload() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-event-group-store-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        let path = root.join("automations.json");
+        let trigger = AutomationTrigger::Group {
+            listeners: vec![
+                AutomationTrigger::Event {
+                    source: ListenerPlatform::Github,
+                    event: "*".into(),
+                    filter: None,
+                    filters: Some(BTreeMap::from([
+                        ("repo".into(), json!("owner/repo")),
+                        ("events".into(), json!(["pr-opened", "ci-failed"])),
+                    ])),
+                },
+                AutomationTrigger::Event {
+                    source: ListenerPlatform::Slack,
+                    event: "mention".into(),
+                    filter: None,
+                    filters: Some(BTreeMap::from([(
+                        "channel".into(),
+                        json!("alerts"),
+                    )])),
+                },
+            ],
+        };
+        let automation = AutomationSummary {
+            id: "event-group".into(),
+            agent_id: Some("research-bot".into()),
+            name: "Event group".into(),
+            prompt: "Handle matching events.".into(),
+            schedule: "event:group".into(),
+            trigger: Some(trigger),
+            enabled: true,
+            created_at_ms: 1,
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        };
+        persist_automations(
+            &path,
+            &BTreeMap::from([("event-group".into(), automation.clone())]),
+        )
+        .expect("persist event group");
+
+        let loaded = load_automations(&path);
+        assert_eq!(loaded.get("event-group"), Some(&automation));
+        std::fs::remove_dir_all(&root).expect("remove isolated automation store");
+    }
+
+    #[test]
     fn automation_store_round_trips_atomically() {
         let root = std::env::temp_dir().join(format!(
             "fabushi-automation-store-{}-{}",
