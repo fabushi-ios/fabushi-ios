@@ -1825,14 +1825,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Native typed MobileAttachmentCardProjection replaces the Desktop TypeScript adapter while preserving box/legacy-link/media/file classification, normalized HTTP links, strict malformed-metadata fail-closed behavior, user-attachment batch/reply/clientNonce metadata and basename fallback. The existing MobileChatMessage owner carries the projection; MobileBotChat renders that same projection for both user and assistant transcript rows without creating a second attachment store.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift defines classifyMobileAttachmentURL/projectMobileAttachmentCard/projectMobileChatMessageAttachment and wires live chat.message plus transcript.card attachment events into one typed MobileChatMessage projection. frontend/src/recovered/features/conversation/MobileBotChat.swift consumes that projection on the shipping transcript for box/link/media/file presentation, including user attachments.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers Desktop attachment kind classification, box metadata, normalized legacy links, media/file classification, user-attachment metadata/basename projection, malformed metadata rejection, and shared transcript/live-chat typed projection. Fresh exact-HEAD ordinary/protected Actions required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and attachment-data.ts blob 9f51c3e56a5eaf984a4bb36e86d694981bdb4af6. Implemented on current branch; do not promote to verified until current exact-HEAD CI and artifact provenance are terminal-success."
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/auto-review-actions.ts",
