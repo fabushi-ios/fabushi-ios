@@ -7,6 +7,21 @@ private let remoteComputerOriginHost = "fabushi.ombhrum.com"
 private let remoteComputerURL = URL(string: "https://fabushi.ombhrum.com/remote-computer")!
 private let remoteComputerForeverBoxID = "forever-box"
 
+struct RemoteComputerScope: Equatable, Sendable {
+    let accountScopeKey: String
+    let agentID: String?
+    let agentName: String?
+
+    var scopeKey: String {
+        [accountScopeKey, agentID ?? "account"].joined(separator: ":")
+    }
+
+    var displayTitle: String {
+        guard let agentName, !agentName.isEmpty else { return "我的电脑" }
+        return "(agentName) 的电脑"
+    }
+}
+
 enum RemoteComputerRebuildKind: String, Equatable, Sendable {
     case update
     case reset
@@ -1108,6 +1123,7 @@ final class RemoteComputerRebuildOwner: ObservableObject {
 /// session, and the WebKit navigation lifecycle is the platform transport/box
 /// signal instead of a second reachability watcher.
 struct RemoteComputerSurface: View {
+    let scope: RemoteComputerScope?
     let reconnectGeneration: Int
     let onClose: () -> Void
 
@@ -1119,9 +1135,11 @@ struct RemoteComputerSurface: View {
 
     init(
         bridge: IOSPreloadBridge? = nil,
+        scope: RemoteComputerScope? = nil,
         reconnectGeneration: Int = 0,
         onClose: @escaping () -> Void
     ) {
+        self.scope = scope
         self.reconnectGeneration = reconnectGeneration
         self.onClose = onClose
         _rebuildOwner = StateObject(
@@ -1138,8 +1156,9 @@ struct RemoteComputerSurface: View {
                     .accessibilityIdentifier("remote-computer-close")
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("我的电脑")
+                    Text(scope?.displayTitle ?? "我的电脑")
                         .font(.headline)
+                        .accessibilityIdentifier("remote-computer-scope-title")
                     Text(status)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1244,6 +1263,7 @@ struct RemoteComputerSurface: View {
         .background(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("remote-computer-surface")
+        .id(scope?.scopeKey ?? "account")
         .task {
             await rebuildOwner.connect()
         }

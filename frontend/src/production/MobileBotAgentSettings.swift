@@ -7,6 +7,7 @@ internal struct MobileBotAgentSettingsSheet: View {
     let accountScopeKey: String
     let reconnectGeneration: Int
     let onRosterChanged: ([MobileBotSummary]) -> Void
+    let onOpenComputer: (MobileBotSummary) -> Void
     let onClose: () -> Void
 
     @State private var currentAgent: MobileBotSummary
@@ -25,6 +26,7 @@ internal struct MobileBotAgentSettingsSheet: View {
         accountScopeKey: String,
         reconnectGeneration: Int = 0,
         onRosterChanged: @escaping ([MobileBotSummary]) -> Void,
+        onOpenComputer: @escaping (MobileBotSummary) -> Void,
         onClose: @escaping () -> Void
     ) {
         self.agent = agent
@@ -33,6 +35,7 @@ internal struct MobileBotAgentSettingsSheet: View {
         self.accountScopeKey = accountScopeKey
         self.reconnectGeneration = reconnectGeneration
         self.onRosterChanged = onRosterChanged
+        self.onOpenComputer = onOpenComputer
         self.onClose = onClose
         _currentAgent = State(initialValue: agent)
         _nameDraft = State(initialValue: agent.name)
@@ -116,6 +119,19 @@ internal struct MobileBotAgentSettingsSheet: View {
                         accountScopeKey: accountScopeKey,
                         reconnectGeneration: reconnectGeneration
                     )
+
+                    Section("电脑") {
+                        Button {
+                            invalidatePending()
+                            onOpenComputer(currentAgent)
+                        } label: {
+                            Label("打开此 Agent 的电脑", systemImage: "desktopcomputer")
+                        }
+                        .disabled(pending != nil)
+                        .accessibilityIdentifier("mobile-agent-settings-open-computer")
+                    } footer: {
+                        Text("从 Agent 设置打开时会显式绑定当前账号与 Agent 作用域。")
+                    }
                 }
 
                 if let failure {

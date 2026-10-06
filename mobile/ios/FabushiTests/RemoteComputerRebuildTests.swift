@@ -37,6 +37,25 @@ final class RemoteComputerRebuildTests: XCTestCase {
 
     }
 
+    func testAgentComputerScopeIsExplicitAndStable() {
+        let scoped = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: "agent-7",
+            agentName: "Research"
+        )
+        XCTAssertEqual(scoped.scopeKey, "account-a:agent-7")
+        XCTAssertEqual(scoped.displayTitle, "Research 的电脑")
+
+        let accountOnly = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: nil,
+            agentName: nil
+        )
+        XCTAssertEqual(accountOnly.scopeKey, "account-a:account")
+        XCTAssertEqual(accountOnly.displayTitle, "我的电脑")
+        XCTAssertNotEqual(scoped.scopeKey, accountOnly.scopeKey)
+    }
+
     func testOperationIDFencesStaleTerminalMigrationAndDoneSettles() {
         let operationA = RemoteComputerRebuildOperationID(value: "op-a")
         let operationB = RemoteComputerRebuildOperationID(value: "op-b")

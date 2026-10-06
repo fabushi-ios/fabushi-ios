@@ -26,6 +26,7 @@ internal struct GrokMobileShell: View {
     @State var selectedBot: MobileBotSummary?
     @State var groupMembersTarget: MobileBotSummary?
     @State var botSettingsTarget: MobileBotSummary?
+    @State var remoteComputerAgentTarget: MobileBotSummary?
     @State var botDrafts: [String: String] = [:]
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
@@ -74,8 +75,26 @@ internal struct GrokMobileShell: View {
                     applyBotRosterUpdate(updated)
                     botSettingsTarget = updated.first(where: { $0.id == agent.id })
                 },
+                onOpenComputer: { scopedAgent in
+                    botSettingsTarget = nil
+                    remoteComputerAgentTarget =
+                        bots.first(where: { $0.id == scopedAgent.id }) ?? scopedAgent
+                },
                 onClose: { botSettingsTarget = nil }
             )
+        }
+        .fullScreenCover(item: $remoteComputerAgentTarget) { agent in
+            RemoteComputerSurface(
+                bridge: bridge,
+                scope: .init(
+                    accountScopeKey: mobileAccountScopeKey,
+                    agentID: agent.id,
+                    agentName: agent.name
+                ),
+                reconnectGeneration: reconnectGeneration
+            ) {
+                remoteComputerAgentTarget = nil
+            }
         }
     }
 
@@ -97,6 +116,10 @@ internal struct GrokMobileShell: View {
         if let groupMembersTarget,
            let refreshed = updated.first(where: { $0.id == groupMembersTarget.id }) {
             self.groupMembersTarget = refreshed
+        }
+        if let remoteComputerAgentTarget,
+           let refreshed = updated.first(where: { $0.id == remoteComputerAgentTarget.id }) {
+            self.remoteComputerAgentTarget = refreshed
         }
     }
 
