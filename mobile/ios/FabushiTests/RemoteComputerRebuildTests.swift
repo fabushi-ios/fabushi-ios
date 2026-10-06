@@ -109,7 +109,7 @@ final class RemoteComputerRebuildTests: XCTestCase {
         ]))
     }
 
-    func testComputerShellModelPreservesVNCAndCursorSemantics() {
+    func testComputerShellModelPreservesVNCAndCursorSemantics() throws {
         let special = "https://vnc.example/sand-special-treatment-v1/vnc.html?path=websockify%3Ftoken%3Ddisplay-7"
         let dimensions = RemoteComputerShellModel.vncDimensions(special)
         XCTAssertEqual(dimensions.width, 2048)
