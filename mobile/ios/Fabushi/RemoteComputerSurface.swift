@@ -1344,6 +1344,7 @@ struct RemoteComputerSurface: View {
     @State private var vncIdentity = RemoteComputerShellVNCIdentity(host: nil, display: nil)
     @State private var trustedCursor: IOSVNCCursorTelemetry?
     @State private var lastLivenessReport: IOSVNCLivenessReport?
+    @State private var selectedMonitorID: String?
 
     init(
         bridge: IOSPreloadBridge? = nil,
@@ -1514,6 +1515,10 @@ struct RemoteComputerSurface: View {
                 await rebuildOwner.connect()
             }
             await activityOwner.refresh(agentID: scope?.agentID)
+            await refreshShippingMonitors()
+        }
+        .onChange(of: activityOwner.snapshot) { _, _ in
+            Task { await refreshShippingMonitors() }
         }
         .onChange(of: reconnectGeneration) { _, _ in
             Task {
@@ -1525,6 +1530,7 @@ struct RemoteComputerSurface: View {
                     await rebuildOwner.noteReconnect()
                 }
                 await activityOwner.refresh(agentID: scope?.agentID)
+                await refreshShippingMonitors()
             }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -1534,6 +1540,7 @@ struct RemoteComputerSurface: View {
             }
             Task {
                 await activityOwner.refresh(agentID: scope?.agentID)
+                await refreshShippingMonitors()
             }
         }
         .onDisappear {
@@ -1576,65 +1583,167 @@ struct RemoteComputerSurface: View {
         }
     }
 
+    private var shippingMonitors: [RemoteComputerShellMonitor] {
+        activityOwner.snapshot.runningComputerSubagentIDs.compactMap { subagentID in
+            guard let status = agentBoxOwner.status(for: subagentID),
+                  status.isReadyForVNC,
+                  let url = status.vncURL
+            else { return nil }
+            return .init(
+                subagentID: subagentID,
+                title: "Computer \(subagentID)",
+                vncURL: url.absoluteString,
+                handoff: nil
+            )
+        }
+    }
+
+    private var selectedAgentVNCURL: URL? {
+        if let selectedMonitorID,
+           let monitor = shippingMonitors.first(where: { $0.subagentID == selectedMonitorID })
+        {
+            return URL(string: monitor.vncURL)
+        }
+        return agentBoxOwner.vncURL
+    }
+
+    private var shippingMonitorPicker: some View {
+        HStack(spacing: 8) {
+            Button {
+                selectAdjacentMonitor(delta: -1)
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .accessibilityLabel("上一个电脑画面")
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(shippingMonitors, id: \.subagentID) { monitor in
+                        Button {
+                            selectedMonitorID = monitor.subagentID
+                            trustedCursor = nil
+                        } label: {
+                            Text(monitor.title)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .accessibilityIdentifier(
+                            "remote-computer-monitor-\(monitor.subagentID)"
+                        )
+                    }
+                }
+            }
+
+            Button {
+                selectAdjacentMonitor(delta: 1)
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .accessibilityLabel("下一个电脑画面")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial)
+        .accessibilityIdentifier("remote-computer-monitor-picker")
+    }
+
+    private func selectAdjacentMonitor(delta: Int) {
+        let monitors = shippingMonitors
+        guard !monitors.isEmpty else { return }
+        selectedMonitorID = RemoteComputerShellModel.stepSelectedMonitor(
+            monitors,
+            current: selectedMonitorID,
+            delta: delta
+        ) ?? RemoteComputerShellModel.firstSelectedMonitor(
+            monitors,
+            requested: selectedMonitorID
+        )
+        trustedCursor = nil
+    }
+
+    private func refreshShippingMonitors() async {
+        guard scope?.isAgentScope == true else {
+            selectedMonitorID = nil
+            return
+        }
+        for subagentID in activityOwner.snapshot.runningComputerSubagentIDs {
+            await agentBoxOwner.refresh(agentID: subagentID)
+        }
+        selectedMonitorID = RemoteComputerShellModel.firstSelectedMonitor(
+            shippingMonitors,
+            requested: selectedMonitorID
+        )
+    }
+
     @ViewBuilder
     private var remoteComputerViewer: some View {
         if scope?.isAgentScope == true {
-            if let vncURL = agentBoxOwner.vncURL {
-                RemoteComputerWebView(
-                    targetURL: vncURL,
-                    reloadToken: agentBoxOwner.reloadRevision,
-                    status: $status,
-                    errorMessage: $errorMessage,
-                    onNavigationStarted: {},
-                    onNavigationFinished: {},
-                    onNavigationFailed: {},
-                    onVNCSession: { session, identity in
-                        vncIdentity = identity
-                        agentBoxOwner.ingestComputerAction(
-                            .init(
-                                agentID: scope?.agentID,
-                                kind: session.phase.rawValue,
-                                x: nil,
-                                y: nil
-                            )
-                        )
-                        switch session.phase {
-                        case .connect:
-                            status = "已安全连接"
-                        case .reconnect:
-                            status = "已重新连接"
-                        case .disconnect:
-                            agentBoxOwner.ingestVncUserPresence(isPresent: false)
-                            status = "连接已中断"
-                        }
-                    },
-                    onVNCLiveness: { report, identity in
-                        vncIdentity = identity
-                        lastLivenessReport = report
-                        agentBoxOwner.ingestVncUserPresence(isPresent: true)
-                        agentBoxOwner.ingestComputerAction(
-                            .init(
-                                agentID: scope?.agentID,
-                                kind: "liveness-stall",
-                                x: nil,
-                                y: nil
-                            )
-                        )
-                    },
-                    onVNCCursor: { cursor in
-                        trustedCursor = cursor
-                        agentBoxOwner.ingestVncUserPresence(isPresent: true)
-                        agentBoxOwner.ingestComputerAction(
-                            .init(
-                                agentID: scope?.agentID,
-                                kind: cursor.kind.rawValue,
-                                x: cursor.x,
-                                y: cursor.y
-                            )
-                        )
+            if let vncURL = selectedAgentVNCURL {
+                VStack(spacing: 0) {
+                    if shippingMonitors.count > 1 {
+                        shippingMonitorPicker
                     }
-                )
-                .accessibilityIdentifier("remote-computer-agent-vnc")
+                    ZStack {
+                        RemoteComputerWebView(
+                            targetURL: vncURL,
+                            reloadToken: agentBoxOwner.reloadRevision,
+                            status: $status,
+                            errorMessage: $errorMessage,
+                            onNavigationStarted: {},
+                            onNavigationFinished: {},
+                            onNavigationFailed: {},
+                            onVNCSession: { session, identity in
+                                vncIdentity = identity
+                                agentBoxOwner.ingestComputerAction(
+                                    .init(
+                                        agentID: selectedMonitorID ?? scope?.agentID,
+                                        kind: session.phase.rawValue,
+                                        x: nil,
+                                        y: nil
+                                    )
+                                )
+                                switch session.phase {
+                                case .connect:
+                                    status = "已安全连接"
+                                case .reconnect:
+                                    status = "已重新连接"
+                                case .disconnect:
+                                    agentBoxOwner.ingestVncUserPresence(isPresent: false)
+                                    status = "连接已中断"
+                                }
+                            },
+                            onVNCLiveness: { report, identity in
+                                vncIdentity = identity
+                                lastLivenessReport = report
+                                agentBoxOwner.ingestVncUserPresence(isPresent: true)
+                                agentBoxOwner.ingestComputerAction(
+                                    .init(
+                                        agentID: selectedMonitorID ?? scope?.agentID,
+                                        kind: "liveness-stall",
+                                        x: nil,
+                                        y: nil
+                                    )
+                                )
+                            },
+                            onVNCCursor: { cursor in
+                                trustedCursor = cursor
+                                agentBoxOwner.ingestVncUserPresence(isPresent: true)
+                                agentBoxOwner.ingestComputerAction(
+                                    .init(
+                                        agentID: selectedMonitorID ?? scope?.agentID,
+                                        kind: cursor.kind.rawValue,
+                                        x: cursor.x,
+                                        y: cursor.y
+                                    )
+                                )
+                            }
+                        )
+                        .accessibilityIdentifier("remote-computer-agent-vnc")
+
+                        RemoteComputerTrustedCursorOverlay(cursor: trustedCursor)
+                    }
+                }
             } else {
                 VStack(spacing: 12) {
                     if agentBoxOwner.isLoading {
@@ -1700,6 +1809,35 @@ struct RemoteComputerSurface: View {
                 }
             )
         }
+    }
+}
+
+private struct RemoteComputerTrustedCursorOverlay: View {
+    let cursor: IOSVNCCursorTelemetry?
+
+    var body: some View {
+        GeometryReader { proxy in
+            if let cursor {
+                let x = min(max(cursor.x, 0), proxy.size.width)
+                let y = min(max(cursor.y, 0), proxy.size.height)
+                ZStack {
+                    if cursor.kind == .click {
+                        Circle()
+                            .stroke(.primary, lineWidth: 2)
+                            .frame(width: 28, height: 28)
+                    }
+                    Image(systemName: "cursorarrow")
+                        .font(.system(size: 22, weight: .semibold))
+                        .shadow(radius: 1)
+                }
+                .position(x: x, y: y)
+                .animation(.easeOut(duration: 0.12), value: x)
+                .animation(.easeOut(duration: 0.12), value: y)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .accessibilityIdentifier("remote-computer-trusted-cursor-overlay")
     }
 }
 
