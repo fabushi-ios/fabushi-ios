@@ -177,7 +177,8 @@ private final class CoordinatorMcpHostPort {
             let authStatus = row["authStatus"] as? String
             let status = authStatus == "notLoggedIn" ? "needsAuth" : "connected"
             let toolObject = row["tools"] as? [String: Any] ?? [:]
-            let tools = toolObject.keys.sorted().compactMap { toolName -> BackendToolWire? in
+            let toolNames = Set(toolObject.keys).union(disabled)
+            let tools = toolNames.sorted().compactMap { toolName -> BackendToolWire? in
                 let detail = toolObject[toolName] as? [String: Any]
                 let canonical = (detail?["name"] as? String)?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
