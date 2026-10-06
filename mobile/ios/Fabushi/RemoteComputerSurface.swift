@@ -2439,6 +2439,7 @@ struct RemoteComputerWebProcessCrashPolicy: Equatable, Sendable {
 private struct RemoteComputerWebView: UIViewRepresentable {
     let targetURL: URL
     let reloadToken: Int
+    let teachCapture: RemoteComputerTeachCaptureController?
     @Binding var status: String
     @Binding var errorMessage: String?
     let onNavigationStarted: @MainActor () -> Void
@@ -2451,6 +2452,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator(
             targetURL: targetURL,
+            teachCapture: teachCapture,
             status: $status,
             errorMessage: $errorMessage,
             onNavigationStarted: onNavigationStarted,
@@ -2490,6 +2492,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         webView.allowsBackForwardNavigationGestures = true
         webView.isInspectable = false
         context.coordinator.webView = webView
+        context.coordinator.teachCapture?.attach(webView)
         context.coordinator.updateViewerVisibility(true)
         return webView
     }
@@ -2513,6 +2516,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
         coordinator.updateViewerVisibility(false)
+        coordinator.teachCapture?.detach(webView)
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(
@@ -2526,6 +2530,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         @Binding private var status: String
         @Binding private var errorMessage: String?
         private var targetURL: URL
+        let teachCapture: RemoteComputerTeachCaptureController?
         private let onNavigationStarted: @MainActor () -> Void
         private let onNavigationFinished: @MainActor () -> Void
         private let onNavigationFailed: @MainActor () -> Void
@@ -2540,6 +2545,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
         init(
             targetURL: URL,
+            teachCapture: RemoteComputerTeachCaptureController?,
             status: Binding<String>,
             errorMessage: Binding<String?>,
             onNavigationStarted: @escaping @MainActor () -> Void,
@@ -2550,6 +2556,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             onVNCCursor: @escaping @MainActor (IOSVNCCursorTelemetry) -> Void
         ) {
             self.targetURL = targetURL
+            self.teachCapture = teachCapture
             _status = status
             _errorMessage = errorMessage
             self.onNavigationStarted = onNavigationStarted
