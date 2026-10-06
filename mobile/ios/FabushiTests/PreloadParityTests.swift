@@ -92,6 +92,61 @@ final class PreloadParityTests: XCTestCase {
     }
 
 
+
+    func testAppSurfacesDoNotBypassCanonicalFeatureEventBroker() throws {
+        let file = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = file
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let roots = [
+            repositoryRoot.appendingPathComponent("frontend"),
+            repositoryRoot.appendingPathComponent("mobile/ios/Fabushi"),
+        ]
+        let manager = FileManager.default
+        var bypasses: [String] = []
+
+        for root in roots {
+            guard let enumerator = manager.enumerator(
+                at: root,
+                includingPropertiesForKeys: nil
+            ) else { continue }
+            for case let url as URL in enumerator {
+                guard url.pathExtension == "swift",
+                      !url.path.contains("/FabushiTests/")
+                else { continue }
+                let source = try String(contentsOf: url, encoding: .utf8)
+                if source.contains("method: \"feature.receive\"") {
+                    bypasses.append(
+                        url.path.replacingOccurrences(
+                            of: repositoryRoot.path + "/",
+                            with: ""
+                        )
+                    )
+                }
+            }
+        }
+
+        XCTAssertEqual(
+            bypasses,
+            [],
+            "FeatureHost receive must stay behind IOSFeatureEventBroker: \(bypasses)"
+        )
+
+        let preload = try String(
+            contentsOf: repositoryRoot
+                .appendingPathComponent("source/ios-preload/preload.swift"),
+            encoding: .utf8
+        )
+        XCTAssertEqual(
+            preload.components(separatedBy: "method: \"feature.receive\"").count - 1,
+            1,
+            "IOSPreloadBridge must remain the single raw FeatureHost receive owner"
+        )
+    }
+
+
     func testPinnedMainRPCSurfaceAndEdgeChannelNames() {
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("openExternal"))
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("authenticateMcpServer"))
