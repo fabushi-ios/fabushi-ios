@@ -1495,128 +1495,7 @@ struct RemoteComputerSurface: View {
                 .accessibilityIdentifier("remote-computer-error")
             }
 
-            if scope?.isAgentScope == true {
-                if let vncURL = agentBoxOwner.vncURL {
-                    RemoteComputerWebView(
-                        targetURL: vncURL,
-                        reloadToken: agentBoxOwner.reloadRevision,
-                        status: $status,
-                        errorMessage: $errorMessage,
-                        onNavigationStarted: {},
-                        onNavigationFinished: {},
-                        onNavigationFailed: {},
-                        onVNCSession: { session, identity in
-                            vncIdentity = identity
-                            agentBoxOwner.ingestComputerAction(
-                                .init(
-                                    agentID: scope?.agentID,
-                                    kind: session.phase.rawValue,
-                                    x: nil,
-                                    y: nil
-                                )
-                            )
-                            switch session.phase {
-                            case .connect:
-                                status = "已安全连接"
-                            case .reconnect:
-                                status = "已重新连接"
-                            case .disconnect:
-                                agentBoxOwner.ingestVncUserPresence(isPresent: false)
-                                status = "连接已中断"
-                            }
-                        },
-                        onVNCLiveness: { report, identity in
-                            vncIdentity = identity
-                            lastLivenessReport = report
-                            agentBoxOwner.ingestVncUserPresence(isPresent: true)
-                            agentBoxOwner.ingestComputerAction(
-                                .init(
-                                    agentID: scope?.agentID,
-                                    kind: "liveness-stall",
-                                    x: nil,
-                                    y: nil
-                                )
-                            )
-                        },
-                        onVNCCursor: { cursor in
-                            trustedCursor = cursor
-                            agentBoxOwner.ingestVncUserPresence(isPresent: true)
-                            agentBoxOwner.ingestComputerAction(
-                                .init(
-                                    agentID: scope?.agentID,
-                                    kind: cursor.kind.rawValue,
-                                    x: cursor.x,
-                                    y: cursor.y
-                                )
-                            )
-                        }
-                    )
-                    .accessibilityIdentifier("remote-computer-agent-vnc")
-                } else {
-                    VStack(spacing: 12) {
-                        if agentBoxOwner.isLoading {
-                            ProgressView()
-                                .controlSize(.regular)
-                        } else {
-                            Image(systemName: "desktopcomputer.trianglebadge.exclamationmark")
-                                .font(.system(size: 34))
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(agentBoxOwner.isLoading ? "正在启动 Agent 电脑…" : "Agent 电脑不可用")
-                            .font(.headline)
-                        Text(
-                            agentBoxOwner.errorMessage
-                                ?? "iOS 只接受当前 Fabushi 账号下、由 Host 鉴权的 Agent ForeverBox。没有可验证的 HTTPS VNC 会话时会保持关闭，不会回退到配对电脑。"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 420)
-
-                        if !agentBoxOwner.isLoading {
-                            Button("重新连接") {
-                                errorMessage = nil
-                                status = "正在重新连接 Agent 电脑…"
-                                Task { await agentBoxOwner.noteReconnect() }
-                            }
-                            .accessibilityIdentifier("remote-computer-agent-reconnect")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(24)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("remote-computer-agent-unavailable")
-                }
-            } else {
-                RemoteComputerWebView(
-                    targetURL: remoteComputerURL,
-                    reloadToken: rebuildOwner.reloadRevision,
-                    status: $status,
-                    errorMessage: $errorMessage,
-                    onNavigationStarted: { rebuildOwner.noteNavigationStarted() },
-                    onNavigationFinished: { rebuildOwner.noteNavigationFinished() },
-                    onNavigationFailed: { rebuildOwner.noteNavigationFailed() },
-                    onVNCSession: { session, identity in
-                        vncIdentity = identity
-                        rebuildOwner.noteVNCSession(session)
-                        switch session.phase {
-                        case .connect:
-                            status = "已安全连接"
-                        case .reconnect:
-                            status = "已重新连接"
-                        case .disconnect:
-                            status = "连接已中断"
-                        }
-                    },
-                    onVNCLiveness: { report, identity in
-                        vncIdentity = identity
-                        lastLivenessReport = report
-                    },
-                    onVNCCursor: { cursor in
-                        trustedCursor = cursor
-                    }
-                )
-            }
+            remoteComputerViewer
         }
         .background(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
@@ -1694,6 +1573,132 @@ struct RemoteComputerSurface: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text("恢复会重新创建当前远程电脑。")
+        }
+    }
+
+    @ViewBuilder
+    private var remoteComputerViewer: some View {
+        if scope?.isAgentScope == true {
+            if let vncURL = agentBoxOwner.vncURL {
+                RemoteComputerWebView(
+                    targetURL: vncURL,
+                    reloadToken: agentBoxOwner.reloadRevision,
+                    status: $status,
+                    errorMessage: $errorMessage,
+                    onNavigationStarted: {},
+                    onNavigationFinished: {},
+                    onNavigationFailed: {},
+                    onVNCSession: { session, identity in
+                        vncIdentity = identity
+                        agentBoxOwner.ingestComputerAction(
+                            .init(
+                                agentID: scope?.agentID,
+                                kind: session.phase.rawValue,
+                                x: nil,
+                                y: nil
+                            )
+                        )
+                        switch session.phase {
+                        case .connect:
+                            status = "已安全连接"
+                        case .reconnect:
+                            status = "已重新连接"
+                        case .disconnect:
+                            agentBoxOwner.ingestVncUserPresence(isPresent: false)
+                            status = "连接已中断"
+                        }
+                    },
+                    onVNCLiveness: { report, identity in
+                        vncIdentity = identity
+                        lastLivenessReport = report
+                        agentBoxOwner.ingestVncUserPresence(isPresent: true)
+                        agentBoxOwner.ingestComputerAction(
+                            .init(
+                                agentID: scope?.agentID,
+                                kind: "liveness-stall",
+                                x: nil,
+                                y: nil
+                            )
+                        )
+                    },
+                    onVNCCursor: { cursor in
+                        trustedCursor = cursor
+                        agentBoxOwner.ingestVncUserPresence(isPresent: true)
+                        agentBoxOwner.ingestComputerAction(
+                            .init(
+                                agentID: scope?.agentID,
+                                kind: cursor.kind.rawValue,
+                                x: cursor.x,
+                                y: cursor.y
+                            )
+                        )
+                    }
+                )
+                .accessibilityIdentifier("remote-computer-agent-vnc")
+            } else {
+                VStack(spacing: 12) {
+                    if agentBoxOwner.isLoading {
+                        ProgressView()
+                            .controlSize(.regular)
+                    } else {
+                        Image(systemName: "desktopcomputer.trianglebadge.exclamationmark")
+                            .font(.system(size: 34))
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(agentBoxOwner.isLoading ? "正在启动 Agent 电脑…" : "Agent 电脑不可用")
+                        .font(.headline)
+                    Text(
+                        agentBoxOwner.errorMessage
+                            ?? "iOS 只接受当前 Fabushi 账号下、由 Host 鉴权的 Agent ForeverBox。没有可验证的 HTTPS VNC 会话时会保持关闭，不会回退到配对电脑。"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+
+                    if !agentBoxOwner.isLoading {
+                        Button("重新连接") {
+                            errorMessage = nil
+                            status = "正在重新连接 Agent 电脑…"
+                            Task { await agentBoxOwner.noteReconnect() }
+                        }
+                        .accessibilityIdentifier("remote-computer-agent-reconnect")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(24)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("remote-computer-agent-unavailable")
+            }
+        } else {
+            RemoteComputerWebView(
+                targetURL: remoteComputerURL,
+                reloadToken: rebuildOwner.reloadRevision,
+                status: $status,
+                errorMessage: $errorMessage,
+                onNavigationStarted: { rebuildOwner.noteNavigationStarted() },
+                onNavigationFinished: { rebuildOwner.noteNavigationFinished() },
+                onNavigationFailed: { rebuildOwner.noteNavigationFailed() },
+                onVNCSession: { session, identity in
+                    vncIdentity = identity
+                    rebuildOwner.noteVNCSession(session)
+                    switch session.phase {
+                    case .connect:
+                        status = "已安全连接"
+                    case .reconnect:
+                        status = "已重新连接"
+                    case .disconnect:
+                        status = "连接已中断"
+                    }
+                },
+                onVNCLiveness: { report, identity in
+                    vncIdentity = identity
+                    lastLivenessReport = report
+                },
+                onVNCCursor: { cursor in
+                    trustedCursor = cursor
+                }
+            )
         }
     }
 }
