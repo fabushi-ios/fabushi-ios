@@ -18,7 +18,7 @@ struct RemoteComputerScope: Equatable, Sendable {
 
     var displayTitle: String {
         guard let agentName, !agentName.isEmpty else { return "我的电脑" }
-        return "(agentName) 的电脑"
+        return "\(agentName) 的电脑"
     }
 }
 
