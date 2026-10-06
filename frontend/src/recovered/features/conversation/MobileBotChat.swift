@@ -12,6 +12,78 @@ internal func isMobileBotVisibleAssistantCompletion(
     return !text.isEmpty || attachment != nil
 }
 
+private struct MobileLinkMetadataCard: View {
+    let url: String
+    let model: MarketplaceModel
+    var isGroupStart = false
+
+    @State private var metadata: MobileLinkMetadata?
+    @State private var loading = false
+
+    var body: some View {
+        Link(destination: URL(string: url)!) {
+            VStack(alignment: .leading, spacing: 5) {
+                if let imageURL = metadata?.imageURL,
+                   let image = URL(string: imageURL)
+                {
+                    AsyncImage(url: image) { phase in
+                        switch phase {
+                        case .success(let imageView):
+                            imageView
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 96)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        case .empty:
+                            ProgressView().controlSize(.small)
+                        case .failure:
+                            EmptyView()
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                }
+                Text(metadata?.displayTitle ?? url)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if let description = metadata?.description {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                if let hostname = metadata?.hostname {
+                    Text(hostname)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else if loading {
+                    ProgressView().controlSize(.mini)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(
+                Color.black.opacity(0.045),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(metadata?.displayTitle ?? url)
+        .accessibilityIdentifier("mobile-bot-link-card")
+        .task(id: url) {
+            metadata = nil
+            loading = true
+            defer { loading = false }
+            metadata = try? await model.linkMetadata(for: url)
+        }
+    }
+}
+
 internal struct MobileBotChat: View {
     let bot: MobileBotSummary
     let bridge: IOSPreloadBridge
@@ -526,17 +598,9 @@ internal struct MobileBotChat: View {
         if let projection = entry.sendMessageTextProjection {
             switch projection.presentation {
             case .urlCard(let rawURL):
-                if let url = URL(string: rawURL) {
-                    Link(destination: url) {
-                        HStack(spacing: 7) {
-                            Image(systemName: "link")
-                            Text(rawURL)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                        }
-                        .font(.system(size: 15, weight: .medium))
-                    }
-                    .accessibilityIdentifier(Self.semanticId("mobile-bot-url-card-\(projection.id)"))
+                if URL(string: rawURL) != nil {
+                    MobileLinkMetadataCard(url: rawURL, model: model)
+                        .accessibilityIdentifier(Self.semanticId("mobile-bot-url-card-\(projection.id)"))
                 } else if !projection.content.isEmpty {
                     Text(projection.content)
                         .font(.system(size: 16))
@@ -611,15 +675,14 @@ internal struct MobileBotChat: View {
                     }
                 }
                 .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-box-\(attachment.id)"))
-            case .legacyLink, .media, .file:
+            case .legacyLink:
+                MobileLinkMetadataCard(url: attachment.url, model: model)
+                    .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
+            case .media, .file:
                 let label = attachment.name
                     ?? attachment.alt
-                    ?? (attachment.kind == .legacyLink
-                        ? "Open link"
-                        : attachment.kind == .media ? "Open media" : "Open attachment")
-                let icon = attachment.kind == .media
-                    ? "photo"
-                    : attachment.kind == .legacyLink ? "link" : "paperclip"
+                    ?? (attachment.kind == .media ? "Open media" : "Open attachment")
+                let icon = attachment.kind == .media ? "photo" : "paperclip"
                 if let destination = attachmentDestinationURL(attachment.url) {
                     Link(destination: destination) {
                         Label(label, systemImage: icon)
