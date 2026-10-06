@@ -677,12 +677,35 @@ internal struct MobileBotChat: View {
         for _ in 0..<1800 {
             if Task.isCancelled { return }
             do {
-                let result = try await bridge.request(method: "feature.receive", params: ["timeoutMs": 250])
-                guard let event = result.value as? [String: Any], let type = event["type"] as? String else {
-                    try? await Task.sleep(for: .milliseconds(60)); continue
+                let ownedHandoffRequestIDs = Set(
+                    entries.compactMap(\.handoffRequestId)
+                )
+                let result = try await bridge.receiveFeatureEvent(
+                    deadlineMilliseconds: 450_000
+                ) { event in
+                    guard let type = event["type"] as? String else { return false }
+                    if type == "box.handoff.resolved" {
+                        guard let requestID = event["requestId"] as? String else { return false }
+                        return ownedHandoffRequestIDs.contains(requestID)
+                    }
+                    let acceptedTypes: Set<String> = [
+                        "box.handoff.requested",
+                        "chat.message",
+                        "chat.delta",
+                        "agent.step",
+                        "operation.started",
+                        "operation.completed",
+                        "operation.interrupted",
+                        "operation.failed",
+                        "model.routed",
+                    ]
+                    guard acceptedTypes.contains(type) else { return false }
+                    return (event["operationId"] as? String ?? operationId) == operationId
                 }
+                guard let event = result.value as? [String: Any],
+                      let type = event["type"] as? String
+                else { continue }
                 let eventOperationId = event["operationId"] as? String ?? operationId
-                if ["chat.message", "chat.delta", "agent.step", "operation.started", "operation.completed", "operation.interrupted", "operation.failed", "model.routed"].contains(type), eventOperationId != operationId { continue }
                 switch type {
                 case "box.handoff.requested":
                     guard eventOperationId == operationId,
