@@ -137,11 +137,9 @@ final class IOSCursorAuthService {
     }
 
     func status() async -> IOSCursorAuthStatus {
-        guard let access = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
-              let token = access,
+        guard let token = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
               !token.isEmpty,
-              let refresh = try? await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
-              let refreshToken = refresh,
+              let refreshToken = try? await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
               !refreshToken.isEmpty
         else {
             return .init(loggedIn: false)
