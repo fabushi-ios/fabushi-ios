@@ -2678,6 +2678,9 @@ private struct RemoteComputerWebView: UIViewRepresentable {
                     .init(phase: phase, clean: signal.clean),
                     identity
                 )
+                if phase != .disconnect {
+                    scheduleInteractiveFocus()
+                }
                 return
             }
 
@@ -2736,6 +2739,17 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         func prepareExplicitReload() {
             crashPolicy.resetForExplicitReload()
             vncRuntime.resetSession()
+        }
+
+        private func scheduleInteractiveFocus() {
+            let delay = Double(RemoteComputerShellModel.focusDelayMilliseconds) / 1_000
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let webView = self?.webView,
+                      self?.vncRuntime.viewerIsVisible == true,
+                      webView.window != nil
+                else { return }
+                _ = webView.becomeFirstResponder()
+            }
         }
 
         func updateViewerVisibility(_ visible: Bool) {
