@@ -6,6 +6,9 @@
 //! feature-by-feature and must never silently fall back to test behavior.
 
 use base64::Engine as _;
+use flate2::Compression;
+use flate2::write::GzEncoder;
+use tar::{Builder as TarBuilder, HeaderMode};
 use chrono::Datelike;
 use chrono::NaiveDate;
 use chrono::TimeZone;
@@ -746,6 +749,54 @@ impl FeatureHostController {
                 .then_with(|| left.id.cmp(&right.id))
         });
         Ok(automations)
+    }
+
+    /// Export one private workflow as the Desktop-compatible plugin-shaped
+    /// tar.gz payload. Authentication and network mutation remain Coordinator-owned.
+    pub fn export_workflow_publish_package(
+        &self,
+        agent_id: &str,
+        workflow_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        if !is_safe_memory_agent_id(agent_id) || !is_safe_memory_agent_id(workflow_id) {
+            return Err(FeatureHostError::Contract(
+                "unsafe workflow publish identity".into(),
+            ));
+        }
+        let workflow_root = self
+            .workflow_root_path
+            .as_deref()
+            .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("agent storage is unavailable".into()))?;
+        if !self.state()?.bots.contains_key(agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unknown workflow owner: {agent_id}"
+            )));
+        }
+        let summary = load_workflow_summary(workflow_root, &agent_root, agent_id, workflow_id)
+            .ok_or_else(|| FeatureHostError::Contract(format!(
+                "unknown private workflow: {workflow_id}"
+            )))?;
+        if summary.description.trim().is_empty() {
+            return Err(FeatureHostError::Contract(
+                "A description is required before publishing a skill.".into(),
+            ));
+        }
+        let workflow_dir = workflow_root.join(workflow_id);
+        let bytes = pack_workflow_plugin_artifact(
+            &workflow_dir,
+            workflow_id,
+            &summary.name,
+        )?;
+        Ok(json!({
+            "workflowId": summary.id,
+            "name": normalize_marketplace_plugin_name(workflow_id),
+            "displayName": summary.name,
+            "description": summary.description,
+            "pluginTarGzBase64": base64::engine::general_purpose::STANDARD.encode(bytes),
+        }))
     }
 
     pub fn set_scene_active(&self, active: bool) -> Result<Value, FeatureHostError> {
@@ -11846,6 +11897,127 @@ fn write_workflow(
         .map_err(|error| FeatureHostError::Contract(format!("commit workflow: {error}")))?;
     load_workflow_summary(workflow_root, agent_root, agent_id, &id)
         .ok_or_else(|| FeatureHostError::Contract("workflow could not be reloaded".into()))
+}
+
+fn normalize_marketplace_plugin_name(value: &str) -> String {
+    let normalized = value
+        .trim()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                character.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    let mut compact = String::new();
+    for character in normalized.chars() {
+        if character == '-' && compact.ends_with('-') {
+            continue;
+        }
+        compact.push(character);
+    }
+    compact.trim_matches('-').to_string()
+}
+
+fn append_workflow_publish_tree(
+    builder: &mut TarBuilder<GzEncoder<Vec<u8>>>,
+    workflow_dir: &Path,
+    current: &Path,
+    archive_root: &Path,
+) -> Result<(), FeatureHostError> {
+    let mut entries = std::fs::read_dir(current)
+        .map_err(|error| FeatureHostError::Contract(format!(
+            "read workflow publish directory: {error}"
+        )))?
+        .filter_map(Result::ok)
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path();
+        let relative = path.strip_prefix(workflow_dir).map_err(|error| {
+            FeatureHostError::Contract(format!("resolve workflow publish path: {error}"))
+        })?;
+        if relative.components().count() == 1 {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name == LEGACY_WORKFLOW_FILENAME || name == "runs.json" {
+                continue;
+            }
+        }
+        let archive_path = archive_root.join(relative);
+        let file_type = entry.file_type().map_err(|error| {
+            FeatureHostError::Contract(format!("inspect workflow publish entry: {error}"))
+        })?;
+        if file_type.is_symlink() {
+            return Err(FeatureHostError::Contract(
+                "workflow publish package must not contain symlinks".into(),
+            ));
+        }
+        if file_type.is_dir() {
+            builder.append_dir(&archive_path, &path).map_err(|error| {
+                FeatureHostError::Contract(format!("append workflow publish directory: {error}"))
+            })?;
+            append_workflow_publish_tree(builder, workflow_dir, &path, &archive_path)?;
+        } else if file_type.is_file() {
+            builder.append_path_with_name(&path, &archive_path).map_err(|error| {
+                FeatureHostError::Contract(format!("append workflow publish file: {error}"))
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn pack_workflow_plugin_artifact(
+    workflow_dir: &Path,
+    workflow_id: &str,
+    display_name: &str,
+) -> Result<Vec<u8>, FeatureHostError> {
+    let plugin_name = normalize_marketplace_plugin_name(workflow_id);
+    if plugin_name.is_empty() {
+        return Err(FeatureHostError::Contract(
+            "workflow id has no usable marketplace plugin name".into(),
+        ));
+    }
+    let encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut builder = TarBuilder::new(encoder);
+    builder.mode(HeaderMode::Deterministic);
+    builder.follow_symlinks(false);
+
+    let manifest = serde_json::to_vec_pretty(&json!({
+        "name": plugin_name,
+        "displayName": display_name,
+        "skills": [format!("skills/{workflow_id}")],
+    }))
+    .map_err(|error| FeatureHostError::Contract(format!(
+        "serialize workflow plugin manifest: {error}"
+    )))?;
+    let mut header = tar::Header::new_gnu();
+    header.set_size(manifest.len() as u64);
+    header.set_mode(0o644);
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_mtime(0);
+    header.set_cksum();
+    builder
+        .append_data(&mut header, "plugin.json", manifest.as_slice())
+        .map_err(|error| FeatureHostError::Contract(format!(
+            "append workflow plugin manifest: {error}"
+        )))?;
+
+    append_workflow_publish_tree(
+        &mut builder,
+        workflow_dir,
+        workflow_dir,
+        &PathBuf::from("skills").join(workflow_id),
+    )?;
+    let encoder = builder.into_inner().map_err(|error| {
+        FeatureHostError::Contract(format!("finish workflow publish tar: {error}"))
+    })?;
+    encoder.finish().map_err(|error| {
+        FeatureHostError::Contract(format!("finish workflow publish gzip: {error}"))
+    })
 }
 
 fn workflow_from_automation(automation: &AutomationSummary) -> WorkflowSummary {

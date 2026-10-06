@@ -421,6 +421,13 @@ impl AppHost {
                 .feature
                 .usage_status()
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.publishPackage" => self
+                .feature
+                .export_workflow_publish_package(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "workflowId")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "feature.mcp.servers" => self
                 .feature
                 .mcp_servers_snapshot()
