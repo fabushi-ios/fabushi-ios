@@ -417,6 +417,18 @@ extension ContentView {
                     .accessibilityElement(children: .contain)
                 }
 
+
+                Section {
+                    Picker("插件视图", selection: $model.pluginBrowserTab) {
+                        ForEach(MarketplaceBrowserTab.allCases) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("plugin-browser-tabs")
+                }
+
+                if model.pluginBrowserTab == .marketplace {
                 Section("本地插件市场") {
                     Text("iOS 主壳使用 SwiftUI；MiniApp 使用受控 WebMCP Surface；代码从 GitHub 固定版本拉取并由共享 Mahayana Rust Host 校验、安装、更新。")
                     TextField("搜索插件", text: $model.query)
@@ -428,6 +440,7 @@ extension ContentView {
                     }
                     .disabled(model.loading)
                     .accessibilityIdentifier("marketplace-search-submit")
+                }
                 }
 
                 Section("Host 状态") {
@@ -444,7 +457,7 @@ extension ContentView {
                     }
                 }
 
-                if let permission = model.permissionRequest {
+                if model.pluginBrowserTab == .marketplace, let permission = model.permissionRequest {
                     Section("插件权限") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(permission.pluginId)
@@ -474,6 +487,135 @@ extension ContentView {
                         .accessibilityIdentifier("plugin-permission-request-\(permission.pluginId)")
                     }
                 }
+
+
+                if model.pluginBrowserTab == .yours {
+                    Section("我的 Skills") {
+                        HStack(spacing: 8) {
+                            TextField("搜索 Yours", text: $model.privateSkillQuery)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .accessibilityIdentifier("plugin-yours-search")
+                            Button("刷新") {
+                                Task { await model.refreshPrivateSkills() }
+                            }
+                            .disabled(model.privateSkillsLoading)
+                            .accessibilityIdentifier("plugin-yours-refresh")
+                        }
+
+                        Picker("来源", selection: $model.privateSkillOwnershipFilter) {
+                            ForEach(MarketplaceSkillOwnershipFilter.allCases) { filter in
+                                Text(filter.rawValue).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("plugin-yours-ownership-filter")
+
+                        if model.privateSkillsLoading {
+                            ProgressView("正在读取 authoritative workflow state…")
+                        }
+                        if let error = model.privateSkillError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .accessibilityIdentifier("plugin-yours-error")
+                        }
+                        if model.visiblePrivateSkills.isEmpty && !model.privateSkillsLoading {
+                            Text("当前没有匹配的 Skills。")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        ForEach(model.visiblePrivateSkills) { skill in
+                            DisclosureGroup {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    TextField(
+                                        "名称",
+                                        text: Binding(
+                                            get: { model.privateSkillNameDrafts[skill.id] ?? skill.name },
+                                            set: { model.privateSkillNameDrafts[skill.id] = $0 }
+                                        )
+                                    )
+                                    .disabled(!skill.canEdit)
+
+                                    TextField(
+                                        "Description / Use when",
+                                        text: Binding(
+                                            get: { model.privateSkillDescriptionDrafts[skill.id] ?? skill.description },
+                                            set: { model.privateSkillDescriptionDrafts[skill.id] = $0 }
+                                        ),
+                                        axis: .vertical
+                                    )
+                                    .disabled(!skill.canEdit)
+
+                                    TextEditor(
+                                        text: Binding(
+                                            get: { model.privateSkillBodyDrafts[skill.id] ?? skill.body },
+                                            set: { model.privateSkillBodyDrafts[skill.id] = $0 }
+                                        )
+                                    )
+                                    .frame(minHeight: 88)
+                                    .disabled(!skill.canEdit)
+                                    .accessibilityIdentifier("plugin-skill-body-\(skill.id)")
+
+                                    if skill.canEdit {
+                                        HStack(spacing: 8) {
+                                            Button("保存") {
+                                                Task { await model.savePrivateSkill(skill) }
+                                            }
+                                            .disabled(model.privateSkillMutatingId != nil)
+                                            .accessibilityIdentifier("plugin-skill-save-\(skill.id)")
+
+                                            Button("删除", role: .destructive) {
+                                                Task { await model.deletePrivateSkill(skill) }
+                                            }
+                                            .disabled(model.privateSkillMutatingId != nil)
+                                            .accessibilityIdentifier("plugin-skill-delete-\(skill.id)")
+                                        }
+                                    }
+
+                                    if skill.source == "plugin", let pluginId = skill.pluginId {
+                                        Text("Plugin: \(pluginId)")
+                                            .font(.caption2.monospaced())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if skill.publishedByCurrentUser {
+                                        Text("由当前账号发布")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(skill.name).font(.headline)
+                                        Text(skill.sourceLabel)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if skill.canToggle {
+                                        Toggle(
+                                            "启用",
+                                            isOn: Binding(
+                                                get: { skill.isEnabledForAgent },
+                                                set: { enabled in
+                                                    Task { await model.setPrivateSkillEnabled(skill, enabled: enabled) }
+                                                }
+                                            )
+                                        )
+                                        .labelsHidden()
+                                        .disabled(model.privateSkillMutatingId != nil)
+                                        .accessibilityIdentifier("plugin-skill-enabled-\(skill.id)")
+                                    }
+                                }
+                            }
+                            .accessibilityIdentifier("plugin-skill-\(skill.id)")
+                        }
+
+                        Text("Publish / Sync / Unpublish 仍需接入 Desktop 等价的团队发布 owner；在该 production contract 闭合前不会把这部分标记为完成。")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
 
                 Section("MCP 连接器") {
                     if !model.loggedIn {
@@ -710,7 +852,9 @@ extension ContentView {
                         }
                     }
                 }
+                }
 
+                if model.pluginBrowserTab == .marketplace {
                 Section("插件") {
                     if model.plugins.isEmpty && !model.loading {
                         Text("没有匹配的 iOS 插件。")
@@ -744,6 +888,7 @@ extension ContentView {
                         }
                     }
                 }
+                }
             }
             .navigationTitle("法布施")
             .toolbar {
@@ -752,17 +897,39 @@ extension ContentView {
                 }
             }
             .refreshable {
-                await model.refresh()
-                if model.loggedIn {
-                    await model.refreshMcpServers()
+                if model.pluginBrowserTab == .marketplace {
+                    await model.refresh()
+                } else {
+                    await model.refreshPrivateSkills()
+                    if model.loggedIn {
+                        await model.refreshMcpServers()
+                    }
                 }
             }
             .task {
-                if model.plugins.isEmpty {
-                    await model.refresh()
+                if model.pluginBrowserTab == .marketplace {
+                    if model.plugins.isEmpty {
+                        await model.refresh()
+                    }
+                } else {
+                    if model.privateSkills.isEmpty {
+                        await model.refreshPrivateSkills()
+                    }
+                    if model.loggedIn && model.mcpServers.isEmpty {
+                        await model.refreshMcpServers()
+                    }
                 }
-                if model.loggedIn && model.mcpServers.isEmpty {
-                    await model.refreshMcpServers()
+            }
+            .onChange(of: model.pluginBrowserTab) { _, tab in
+                Task {
+                    if tab == .marketplace {
+                        if model.plugins.isEmpty { await model.refresh() }
+                    } else {
+                        await model.refreshPrivateSkills()
+                        if model.loggedIn && model.mcpServers.isEmpty {
+                            await model.refreshMcpServers()
+                        }
+                    }
                 }
             }
         }

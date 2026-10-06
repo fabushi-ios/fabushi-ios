@@ -689,6 +689,44 @@ struct MarketplacePlugin: Identifiable, Equatable, Sendable {
     }
 }
 
+
+enum MarketplaceBrowserTab: String, CaseIterable, Identifiable, Sendable {
+    case marketplace = "Marketplace"
+    case yours = "Yours"
+    var id: String { rawValue }
+}
+
+enum MarketplaceSkillOwnershipFilter: String, CaseIterable, Identifiable, Sendable {
+    case all = "全部"
+    case team = "团队"
+    case publicItems = "公开"
+    var id: String { rawValue }
+}
+
+struct MarketplacePrivateSkill: Identifiable {
+    let id: String
+    let name: String
+    let description: String
+    let body: String
+    let source: String
+    let sourceRef: String?
+    let pluginId: String?
+    let publishedByCurrentUser: Bool
+    let isEnabledForAgent: Bool
+    let triggerSchedule: String?
+    let triggerEnabled: Bool?
+
+    var canEdit: Bool { source == "workflow" }
+    var canToggle: Bool { source == "workflow" }
+    var sourceLabel: String {
+        switch source {
+        case "managed": return "Managed by Cursor"
+        case "plugin": return "Shared with your team"
+        default: return "Private skill"
+        }
+    }
+}
+
 struct PluginPermissionRequest: Identifiable, Equatable {
     let pluginId: String
     let runtime: String
@@ -739,6 +777,16 @@ final class MarketplaceModel {
     var loading = false
     var installingPluginId: String?
     var plugins: [MarketplacePlugin] = []
+    var pluginBrowserTab: MarketplaceBrowserTab = .marketplace
+    var privateSkillOwnershipFilter: MarketplaceSkillOwnershipFilter = .all
+    var privateSkillQuery = ""
+    var privateSkills: [MarketplacePrivateSkill] = []
+    var privateSkillsLoading = false
+    var privateSkillMutatingId: String?
+    var privateSkillError: String?
+    var privateSkillNameDrafts: [String: String] = [:]
+    var privateSkillDescriptionDrafts: [String: String] = [:]
+    var privateSkillBodyDrafts: [String: String] = [:]
     var permissionRequest: PluginPermissionRequest?
     var mcpServers: [MarketplaceMcpServer] = []
     var mcpToolsByServerId: [String: [MarketplaceMcpTool]] = [:]
@@ -786,6 +834,8 @@ final class MarketplaceModel {
     @ObservationIgnored private var mcpServerRequestSerial = 0
     @ObservationIgnored private var mcpToolRequestSerial: [String: Int] = [:]
     @ObservationIgnored private var mcpMutationSerial: [String: Int] = [:]
+    @ObservationIgnored private var privateSkillRequestSerial = 0
+    private static let marketplaceAgentId = "mahayana-assistant"
 
     init(bridge: IOSPreloadBridge) {
         self.bridge = bridge
@@ -1812,6 +1862,62 @@ final class MarketplaceModel {
         return pointer["version"] as? String == targetVersion
     }
 
+
+    static func marketplacePrivateSkill(from row: [String: Any]) -> MarketplacePrivateSkill? {
+        guard let id = (row["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !id.isEmpty,
+              let name = row["name"] as? String,
+              let source = row["source"] as? String,
+              ["workflow", "managed", "plugin"].contains(source)
+        else { return nil }
+        let trigger = row["trigger"] as? [String: Any]
+        return MarketplacePrivateSkill(
+            id: id,
+            name: name,
+            description: row["description"] as? String ?? "",
+            body: row["body"] as? String ?? "",
+            source: source,
+            sourceRef: row["sourceRef"] as? String,
+            pluginId: row["pluginId"] as? String,
+            publishedByCurrentUser: row["publishedByCurrentUser"] as? Bool ?? false,
+            isEnabledForAgent: row["isEnabledForAgent"] as? Bool ?? true,
+            triggerSchedule: trigger?["schedule"] as? String,
+            triggerEnabled: trigger?["isEnabled"] as? Bool
+        )
+    }
+
+    nonisolated static func filterPrivateSkills(
+        _ skills: [MarketplacePrivateSkill],
+        query: String,
+        ownership: MarketplaceSkillOwnershipFilter
+    ) -> [MarketplacePrivateSkill] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return skills.filter { skill in
+            let ownershipMatches: Bool
+            switch ownership {
+            case .all:
+                ownershipMatches = true
+            case .team:
+                ownershipMatches = skill.source == "plugin"
+            case .publicItems:
+                ownershipMatches = skill.source != "plugin"
+            }
+            guard ownershipMatches else { return false }
+            guard !needle.isEmpty else { return true }
+            return skill.name.localizedCaseInsensitiveContains(needle)
+                || skill.description.localizedCaseInsensitiveContains(needle)
+                || skill.body.localizedCaseInsensitiveContains(needle)
+        }
+    }
+
+    var visiblePrivateSkills: [MarketplacePrivateSkill] {
+        Self.filterPrivateSkills(
+            privateSkills,
+            query: privateSkillQuery,
+            ownership: privateSkillOwnershipFilter
+        )
+    }
+
     private static func mcpServer(from row: [String: Any]) -> MarketplaceMcpServer? {
         guard let id = row["id"] as? String,
               !id.isEmpty,
@@ -2161,6 +2267,156 @@ final class MarketplaceModel {
             else { return }
             if mcpMutatingToolKey == key { mcpMutatingToolKey = nil }
             mcpError = error.localizedDescription
+        }
+    }
+
+
+    func refreshPrivateSkills() async {
+        guard !privateSkillsLoading else { return }
+        privateSkillsLoading = true
+        privateSkillError = nil
+        privateSkillRequestSerial += 1
+        let serial = privateSkillRequestSerial
+        let agentId = Self.marketplaceAgentId
+        do {
+            _ = try await executeFeatureCommand(
+                type: "workflow.list",
+                requestId: "ios-plugin-skills-list-\(UUID().uuidString.lowercased())",
+                fields: ["agentId": agentId]
+            )
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 5_120
+            ) { event in
+                event["type"] as? String == "workflow.listed"
+                    && event["agentId"] as? String == agentId
+            }
+            guard serial == privateSkillRequestSerial,
+                  let event = result.value as? [String: Any],
+                  let rows = event["workflows"] as? [[String: Any]]
+            else {
+                if serial == privateSkillRequestSerial {
+                    throw MahayanaCoordinator.CoordinatorError.invalidResponse
+                }
+                return
+            }
+            let projected = rows.compactMap(Self.marketplacePrivateSkill(from:))
+                .sorted { lhs, rhs in
+                    if lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedSame {
+                        return lhs.id < rhs.id
+                    }
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+            privateSkills = projected
+            privateSkillNameDrafts = Dictionary(uniqueKeysWithValues: projected.map { ($0.id, $0.name) })
+            privateSkillDescriptionDrafts = Dictionary(uniqueKeysWithValues: projected.map { ($0.id, $0.description) })
+            privateSkillBodyDrafts = Dictionary(uniqueKeysWithValues: projected.map { ($0.id, $0.body) })
+        } catch {
+            guard serial == privateSkillRequestSerial else { return }
+            privateSkillError = error.localizedDescription
+        }
+        if serial == privateSkillRequestSerial {
+            privateSkillsLoading = false
+        }
+    }
+
+    func savePrivateSkill(_ skill: MarketplacePrivateSkill) async {
+        guard skill.canEdit, privateSkillMutatingId == nil else { return }
+        let name = (privateSkillNameDrafts[skill.id] ?? skill.name)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let description = (privateSkillDescriptionDrafts[skill.id] ?? skill.description)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = privateSkillBodyDrafts[skill.id] ?? skill.body
+        guard !name.isEmpty, !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            privateSkillError = "Skill 名称和 Instructions 不能为空。"
+            return
+        }
+        var fields: [String: Any] = [
+            "agentId": Self.marketplaceAgentId,
+            "id": skill.id,
+            "name": name,
+            "description": description,
+            "body": body,
+        ]
+        if let sourceRef = skill.sourceRef, !sourceRef.isEmpty {
+            fields["sourceRef"] = sourceRef
+        }
+        if let schedule = skill.triggerSchedule, !schedule.isEmpty {
+            fields["trigger"] = [
+                "schedule": schedule,
+                "isEnabled": skill.triggerEnabled ?? true,
+            ]
+        }
+        await mutatePrivateSkill(
+            skillId: skill.id,
+            type: "workflow.upsert",
+            action: "saved",
+            fields: fields
+        )
+    }
+
+    func setPrivateSkillEnabled(_ skill: MarketplacePrivateSkill, enabled: Bool) async {
+        guard skill.canToggle, privateSkillMutatingId == nil else { return }
+        await mutatePrivateSkill(
+            skillId: skill.id,
+            type: "workflow.setEnabled",
+            action: "enabled",
+            fields: [
+                "agentId": Self.marketplaceAgentId,
+                "id": skill.id,
+                "enabled": enabled,
+            ]
+        )
+    }
+
+    func deletePrivateSkill(_ skill: MarketplacePrivateSkill) async {
+        guard skill.source == "workflow", privateSkillMutatingId == nil else { return }
+        await mutatePrivateSkill(
+            skillId: skill.id,
+            type: "workflow.delete",
+            action: "deleted",
+            fields: [
+                "agentId": Self.marketplaceAgentId,
+                "id": skill.id,
+            ]
+        )
+    }
+
+    private func mutatePrivateSkill(
+        skillId: String,
+        type: String,
+        action: String,
+        fields: [String: Any]
+    ) async {
+        privateSkillMutatingId = skillId
+        privateSkillError = nil
+        defer {
+            if privateSkillMutatingId == skillId {
+                privateSkillMutatingId = nil
+            }
+        }
+        let agentId = Self.marketplaceAgentId
+        do {
+            _ = try await executeFeatureCommand(
+                type: type,
+                requestId: "ios-plugin-skill-mutation-\(UUID().uuidString.lowercased())",
+                fields: fields
+            )
+            _ = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 5_120
+            ) { event in
+                guard event["type"] as? String == "workflow.changed",
+                      event["agentId"] as? String == agentId,
+                      event["action"] as? String == action
+                else { return false }
+                if event["id"] as? String == skillId { return true }
+                return (event["workflow"] as? [String: Any])?["id"] as? String == skillId
+            }
+            // Never trust the mutation echo as the long-lived UI owner. Read the
+            // authoritative workflow directory + enablement state back through
+            // the same Host before updating the visible Yours surface.
+            await refreshPrivateSkills()
+        } catch {
+            privateSkillError = error.localizedDescription
         }
     }
 

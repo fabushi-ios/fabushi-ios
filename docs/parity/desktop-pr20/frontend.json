@@ -3781,8 +3781,8 @@
       "ios_platform_delta": "iOS ships Marketplace search/install/permission/Mini App flows and now generic MCP server tool listing plus enable/disable with account/stale/failure fencing. MCP account management, private-skill lifecycle, authenticated/private GitHub repair, and full Marketplace/Yours filtering remain unclosed.",
       "implementation_status": "mapped",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Generic MCP server tool management is implemented; keep this composite row mapped until the remaining account/private-skill/source-auth/filtering responsibilities close."
+      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
+      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS now ships Marketplace/Yours tabs plus authoritative workflow-backed private-skill list/edit/enable-disable/delete and re-reads Host state after every mutation. Keep this composite row mapped: team publish/resync/unpublish, complete team policy projections and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop-preview.tsx",
@@ -3811,8 +3811,8 @@
       "ios_platform_delta": "iOS shipping composition binds MarketplaceModel into SwiftUI and now composes the single CoordinatorMcpSurface/SandMcpManager owner for generic MCP server tools. MCP account management, private-skill lifecycle, GitHub-source repair, and full Yours filtering remain missing.",
       "implementation_status": "mapped",
       "production_evidence": "source/ios-main/FabushiRuntime.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
+      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS now ships Marketplace/Yours tabs plus authoritative workflow-backed private-skill list/edit/enable-disable/delete and re-reads Host state after every mutation. Keep this composite row mapped: team publish/resync/unpublish, complete team policy projections and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",
@@ -3825,9 +3825,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "MarketplaceModel routes browse/release/install/account synchronization, permissions/runtime/Mini App reconciliation and generic MCP server tool enable/disable through IOSPreloadBridge and authoritative Coordinator owners. MCP account lifecycle, private-skill lifecycle and authenticated/private GitHub repair remain to be migrated.",
       "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
+      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS now ships Marketplace/Yours tabs plus authoritative workflow-backed private-skill list/edit/enable-disable/delete and re-reads Host state after every mutation. Keep this composite row mapped: team publish/resync/unpublish, complete team policy projections and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/entrypoint.ts",
@@ -3885,9 +3885,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "MarketplaceModel represents installable plugins, governed Mini App tools, generic MCP server summaries and per-server disabled tool state. Desktop MCP account projections, private-skill/team-policy projections and complete Yours filtering remain incomplete.",
       "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
+      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS now ships Marketplace/Yours tabs plus authoritative workflow-backed private-skill list/edit/enable-disable/delete and re-reads Host state after every mutation. Keep this composite row mapped: team publish/resync/unpublish, complete team policy projections and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/production-adapter.ts",

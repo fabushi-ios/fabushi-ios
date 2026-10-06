@@ -63,4 +63,84 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(github.actionDetail, "GitHub 已连接。")
     }
 
+
+    func testPrivateSkillProjectionUsesWorkflowOwnerAndRejectsAutomationRows() throws {
+        let skill = try XCTUnwrap(MarketplaceModel.marketplacePrivateSkill(from: [
+            "id": "review-release",
+            "name": "Review release",
+            "description": "Use before publishing.",
+            "body": "Inspect the diff and verify evidence.",
+            "source": "workflow",
+            "sourceRef": "local://review-release",
+            "pluginId": NSNull(),
+            "publishedByCurrentUser": false,
+            "isEnabledForAgent": true,
+        ]))
+        XCTAssertEqual(skill.id, "review-release")
+        XCTAssertEqual(skill.sourceLabel, "Private skill")
+        XCTAssertTrue(skill.canEdit)
+        XCTAssertTrue(skill.canToggle)
+        XCTAssertTrue(skill.isEnabledForAgent)
+
+        XCTAssertNil(MarketplaceModel.marketplacePrivateSkill(from: [
+            "id": "nightly",
+            "name": "Nightly",
+            "body": "Run nightly.",
+            "source": "automation",
+        ]))
+    }
+
+    func testPrivateSkillOwnershipAndSearchFilteringMatchDesktopYoursSemantics() {
+        let privateSkill = MarketplacePrivateSkill(
+            id: "private",
+            name: "Release check",
+            description: "Verify a release",
+            body: "Inspect diffs",
+            source: "workflow",
+            sourceRef: nil,
+            pluginId: nil,
+            publishedByCurrentUser: false,
+            isEnabledForAgent: true,
+            triggerSchedule: nil,
+            triggerEnabled: nil
+        )
+        let teamSkill = MarketplacePrivateSkill(
+            id: "team",
+            name: "Team triage",
+            description: "Shared workflow",
+            body: "Triage failures",
+            source: "plugin",
+            sourceRef: nil,
+            pluginId: "team-plugin",
+            publishedByCurrentUser: true,
+            isEnabledForAgent: true,
+            triggerSchedule: nil,
+            triggerEnabled: nil
+        )
+        XCTAssertEqual(
+            MarketplaceModel.filterPrivateSkills(
+                [privateSkill, teamSkill],
+                query: "",
+                ownership: .team
+            ).map(\.id),
+            ["team"]
+        )
+        XCTAssertEqual(
+            MarketplaceModel.filterPrivateSkills(
+                [privateSkill, teamSkill],
+                query: "release",
+                ownership: .all
+            ).map(\.id),
+            ["private"]
+        )
+        XCTAssertEqual(
+            MarketplaceModel.filterPrivateSkills(
+                [privateSkill, teamSkill],
+                query: "",
+                ownership: .publicItems
+            ).map(\.id),
+            ["private"]
+        )
+    }
+
 }
