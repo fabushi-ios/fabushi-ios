@@ -156,8 +156,19 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
 
 
     @MainActor
-    func testPrivateSkillScopeFailsClosedAndCanBeExplicitlyBoundToAgent() {
-        let bridge = IOSPreloadBridge(coordinator: MahayanaCoordinator())
+    func testPrivateSkillScopeFailsClosedAndCanBeExplicitlyBoundToAgent() throws {
+        let appDataDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-private-skill-scope-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: appDataDirectory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: appDataDirectory) }
+        let main = try IOSMainRuntime(
+            appDataDirectory: appDataDirectory,
+            featureHostTest: true
+        )
+        let bridge = IOSPreloadBridge(main: main)
         let model = MarketplaceModel(bridge: bridge)
         XCTAssertFalse(model.hasPrivateSkillAgentScope)
         XCTAssertNil(model.privateSkillAgentId)
