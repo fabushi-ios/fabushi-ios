@@ -1231,18 +1231,29 @@ struct IOSRemoteComputerHostActivitySource {
 
 @MainActor
 final class RemoteComputerHostActivityOwner: ObservableObject {
+    static let activeHoldNanoseconds: UInt64 = 2_500_000_000
+
     typealias Loader = @MainActor (String) async throws -> RemoteComputerHostActivitySnapshot
+    typealias Sleeper = @MainActor (UInt64) async throws -> Void
 
     @Published private(set) var snapshot = RemoteComputerHostActivitySnapshot.empty
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
 
     private let loader: Loader
+    private let sleeper: Sleeper
     private var generation = 0
     private var disposed = false
+    private var activeHoldTask: Task<Void, Never>?
 
-    init(loader: @escaping Loader) {
+    init(
+        loader: @escaping Loader,
+        sleeper: @escaping Sleeper = { nanoseconds in
+            try await Task.sleep(nanoseconds: nanoseconds)
+        }
+    ) {
         self.loader = loader
+        self.sleeper = sleeper
     }
 
     func refresh(agentID: String?) async {
@@ -1251,6 +1262,8 @@ final class RemoteComputerHostActivityOwner: ObservableObject {
         guard !disposed else { return }
 
         guard let agentID, !agentID.isEmpty else {
+            activeHoldTask?.cancel()
+            activeHoldTask = nil
             snapshot = .empty
             isRefreshing = false
             lastError = nil
@@ -1262,7 +1275,17 @@ final class RemoteComputerHostActivityOwner: ObservableObject {
         do {
             let next = try await loader(agentID)
             guard !disposed, generation == requestGeneration else { return }
-            snapshot = next
+            if next.isActive {
+                activeHoldTask?.cancel()
+                activeHoldTask = nil
+                snapshot = next
+            } else if snapshot.agentID == agentID, snapshot.isActive {
+                scheduleActiveRelease(next, generation: requestGeneration)
+            } else {
+                activeHoldTask?.cancel()
+                activeHoldTask = nil
+                snapshot = next
+            }
             isRefreshing = false
         } catch is CancellationError {
             guard !disposed, generation == requestGeneration else { return }
@@ -1279,10 +1302,30 @@ final class RemoteComputerHostActivityOwner: ObservableObject {
         }
     }
 
+    private func scheduleActiveRelease(
+        _ next: RemoteComputerHostActivitySnapshot,
+        generation expectedGeneration: Int
+    ) {
+        guard activeHoldTask == nil else { return }
+        activeHoldTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await sleeper(Self.activeHoldNanoseconds)
+            } catch {
+                return
+            }
+            guard !disposed, generation == expectedGeneration else { return }
+            snapshot = next
+            activeHoldTask = nil
+        }
+    }
+
     func dispose() {
         guard !disposed else { return }
         disposed = true
         generation &+= 1
+        activeHoldTask?.cancel()
+        activeHoldTask = nil
         isRefreshing = false
     }
 }
