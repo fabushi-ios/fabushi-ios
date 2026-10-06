@@ -1337,6 +1337,8 @@ struct RemoteComputerSurface: View {
     @StateObject private var rebuildOwner: RemoteComputerRebuildOwner
     @StateObject private var agentBoxOwner: RemoteComputerAgentBoxOwner
     @StateObject private var activityOwner: RemoteComputerHostActivityOwner
+    @StateObject private var teachCaptureOwner: RemoteComputerTeachCaptureController
+    @StateObject private var teachRecordingOwner: RemoteComputerTeachRecordingOwner
     @State private var status = "正在连接我的电脑…"
     @State private var errorMessage: String?
     @State private var resetConfirmationPresented = false
@@ -1370,6 +1372,14 @@ struct RemoteComputerSurface: View {
             wrappedValue: RemoteComputerHostActivityOwner { agentID in
                 try await activitySource.load(agentID: agentID)
             }
+        )
+        let teachCapture = RemoteComputerTeachCaptureController()
+        _teachCaptureOwner = StateObject(wrappedValue: teachCapture)
+        _teachRecordingOwner = StateObject(
+            wrappedValue: RemoteComputerTeachRecordingOwner(
+                source: IOSRemoteComputerTeachRecordingSource(bridge: bridge),
+                capture: teachCapture
+            )
         )
     }
 
@@ -1510,7 +1520,9 @@ struct RemoteComputerSurface: View {
                 status = agentBoxOwner.vncURL == nil
                     ? "Agent 电脑不可用"
                     : "正在安全连接…"
+                await teachRecordingOwner.connect()
             } else {
+                teachRecordingOwner.reset()
                 await agentBoxOwner.disconnect(trigger: "scope-account")
                 await rebuildOwner.connect()
             }
@@ -1526,6 +1538,7 @@ struct RemoteComputerSurface: View {
                     errorMessage = nil
                     status = "正在重新连接 Agent 电脑…"
                     await agentBoxOwner.noteReconnect()
+                    await teachRecordingOwner.noteReconnect()
                 } else {
                     await rebuildOwner.noteReconnect()
                 }
@@ -1546,6 +1559,7 @@ struct RemoteComputerSurface: View {
         .onDisappear {
             rebuildOwner.dispose()
             activityOwner.dispose()
+            teachRecordingOwner.dispose()
             if scope?.isAgentScope == true {
                 Task {
                     await agentBoxOwner.disconnect(trigger: "surface-disappear")
@@ -1605,6 +1619,124 @@ struct RemoteComputerSurface: View {
             return URL(string: monitor.vncURL)
         }
         return agentBoxOwner.vncURL
+    }
+
+    private var selectedAgentBoxSnapshot: RemoteComputerAgentBoxSnapshot? {
+        if let selectedMonitorID {
+            return agentBoxOwner.status(for: selectedMonitorID)
+        }
+        return agentBoxOwner.snapshot
+    }
+
+    private var isTeachTaskAvailable: Bool {
+        scope?.isAgentScope == true
+            && selectedAgentVNCURL != nil
+            && selectedAgentBoxSnapshot?.hasHandoff != true
+    }
+
+    @ViewBuilder
+    private var teachRecordingBar: some View {
+        if scope?.isAgentScope == true, let agentID = scope?.agentID {
+            if teachRecordingOwner.status.state == .recording {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 8, height: 8)
+                    Text(
+                        teachRecordingOwner.status.agentId == agentID
+                            ? "\(scope?.agentName ?? "Agent") 正在观察并学习"
+                            : "正在录制另一个 Agent 的电脑"
+                    )
+                    .font(.caption)
+                    Spacer()
+                    Text(Self.formatTeachDuration(teachRecordingOwner.elapsedMilliseconds))
+                        .font(.caption.monospacedDigit())
+                    Button("停止并保存") {
+                        Task { await teachRecordingOwner.stop(save: true) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("remote-computer-teach-save")
+                    Button {
+                        Task { await teachRecordingOwner.stop(save: false) }
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("丢弃录制")
+                    .accessibilityIdentifier("remote-computer-teach-discard")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.thinMaterial)
+                .accessibilityIdentifier("remote-computer-teach-recording")
+            } else if let armed = teachRecordingOwner.armed,
+                      armed.agentID == agentID,
+                      isTeachTaskAvailable
+            {
+                HStack(spacing: 10) {
+                    Text("录制你完成任务的过程，\(scope?.agentName ?? "Agent") 会学习这些步骤。")
+                        .font(.caption)
+                    Spacer()
+                    Button("开始录制") {
+                        Task {
+                            await teachRecordingOwner.start(
+                                agentID: agentID,
+                                entryPoint: armed.entryPoint
+                            )
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("remote-computer-teach-start")
+                    Button {
+                        teachRecordingOwner.dismissArm()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("关闭 Teach Recording")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.thinMaterial)
+                .accessibilityIdentifier("remote-computer-teach-armed")
+            } else if isTeachTaskAvailable {
+                HStack {
+                    Spacer()
+                    Button {
+                        teachRecordingOwner.arm(
+                            agentID: agentID,
+                            entryPoint: "fullscreen_title_bar"
+                        )
+                    } label: {
+                        Label("教会任务", systemImage: "record.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("remote-computer-teach-arm")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            }
+
+            if let teachError = teachRecordingOwner.errorMessage {
+                Text(teachError)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+                    .accessibilityIdentifier("remote-computer-teach-error")
+            }
+        }
+    }
+
+    private static func formatTeachDuration(_ milliseconds: Int) -> String {
+        let seconds = max(0, milliseconds / 1_000)
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
     private var shippingMonitorPicker: some View {
@@ -1681,6 +1813,7 @@ struct RemoteComputerSurface: View {
         if scope?.isAgentScope == true {
             if let vncURL = selectedAgentVNCURL {
                 VStack(spacing: 0) {
+                    teachRecordingBar
                     if shippingMonitors.count > 1 {
                         shippingMonitorPicker
                     }
@@ -1688,6 +1821,7 @@ struct RemoteComputerSurface: View {
                         RemoteComputerWebView(
                             targetURL: vncURL,
                             reloadToken: agentBoxOwner.reloadRevision,
+                            teachCapture: teachCaptureOwner,
                             status: $status,
                             errorMessage: $errorMessage,
                             onNavigationStarted: {},
@@ -1783,6 +1917,7 @@ struct RemoteComputerSurface: View {
             RemoteComputerWebView(
                 targetURL: remoteComputerURL,
                 reloadToken: rebuildOwner.reloadRevision,
+                teachCapture: nil,
                 status: $status,
                 errorMessage: $errorMessage,
                 onNavigationStarted: { rebuildOwner.noteNavigationStarted() },
