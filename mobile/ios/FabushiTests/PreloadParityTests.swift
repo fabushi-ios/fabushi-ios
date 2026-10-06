@@ -113,6 +113,29 @@ final class PreloadParityTests: XCTestCase {
             "y": 2,
             "type": "move",
         ]))
+
+        XCTAssertEqual(
+            IOSVNCPreloadRuntime.hostKey(from: [
+                "kind": "host_key",
+                "key": "ArrowRight",
+            ]),
+            .arrowRight
+        )
+        XCTAssertEqual(
+            IOSVNCPreloadRuntime.hostKey(from: [
+                "kind": "host_key",
+                "key": "ArrowUp",
+            ]),
+            .arrowUp
+        )
+        XCTAssertNil(IOSVNCPreloadRuntime.hostKey(from: [
+            "kind": "host_key",
+            "key": "Escape",
+        ]))
+        XCTAssertNil(IOSVNCPreloadRuntime.hostKey(from: [
+            "kind": "cursor",
+            "key": "ArrowLeft",
+        ]))
     }
 
     @MainActor
@@ -125,6 +148,16 @@ final class PreloadParityTests: XCTestCase {
         XCTAssertTrue(script.contains("core/display.js"))
         XCTAssertTrue(script.contains("core/websock.js"))
         XCTAssertTrue(script.contains("fabushiVNC"))
+        XCTAssertTrue(script.contains("sandInteractive"))
+        XCTAssertTrue(script.contains("host_key"))
+        XCTAssertTrue(script.contains("ArrowUp"))
+        XCTAssertTrue(script.contains("ArrowDown"))
+        XCTAssertTrue(script.contains("ArrowLeft"))
+        XCTAssertTrue(script.contains("ArrowRight"))
+        XCTAssertFalse(
+            script.contains("preventDefault"),
+            "Trusted host-key forwarding must not steal arrows from noVNC"
+        )
         XCTAssertFalse(
             script.contains("didFinish"),
             "RFB connectivity must never be inferred from WebKit navigation completion"
