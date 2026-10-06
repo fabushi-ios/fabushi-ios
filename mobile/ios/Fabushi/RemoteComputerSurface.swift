@@ -1384,216 +1384,256 @@ struct RemoteComputerSurface: View {
     }
 
     var body: some View {
+        confirmationSurface
+    }
+
+    private var baseSurface: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button("返回", action: onClose)
-                    .accessibilityIdentifier("remote-computer-close")
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(scope?.displayTitle ?? "我的电脑")
-                        .font(.headline)
-                        .accessibilityIdentifier("remote-computer-scope-title")
-                    Text(status)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("remote-computer-status")
-                    if activityOwner.snapshot.isActive {
-                        Text(activityOwner.snapshot.runningComputerSubagentIDs.isEmpty
-                            ? "Computer Use 任务活动中"
-                            : "Computer Use 活动中 · \(activityOwner.snapshot.runningComputerSubagentIDs.count) 个子任务")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("remote-computer-agent-activity")
-                    }
-                }
-
-                Spacer()
-
-                if (scope?.isAgentScope == true && agentBoxOwner.isLoading)
-                    || (
-                        scope?.isAgentScope != true
-                        && errorMessage == nil
-                        && status != "已安全连接"
-                    )
-                {
-                    ProgressView()
-                        .controlSize(.small)
-                        .accessibilityIdentifier("remote-computer-loading")
-                }
-
-                if scope?.isAgentScope != true {
-                    Menu {
-                        if rebuildOwner.managedLifecycleAvailable {
-                            Button("更新电脑") {
-                                Task { await rebuildOwner.requestUpdate() }
-                            }
-                        }
-                        Button("重新连接") {
-                            errorMessage = nil
-                            status = "正在重新连接…"
-                            Task { await rebuildOwner.requestReconnect() }
-                        }
-                        if rebuildOwner.managedLifecycleAvailable {
-                            Button("重置电脑", role: .destructive) {
-                                resetConfirmationPresented = true
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .disabled(rebuildOwner.state.isPending || rebuildOwner.state.kind != nil)
-                    .accessibilityIdentifier("remote-computer-actions")
-                }
-            }
-            .padding(12)
-
-            if let presentation = RemoteComputerRebuildPresentation.project(
-                state: rebuildOwner.state,
-                migration: rebuildOwner.migrationSnapshot
-            ) {
-                RemoteComputerRebuildBanner(
-                    presentation: presentation,
-                    detail: rebuildOwner.migrationSnapshot.detail,
-                    isHydrating: rebuildOwner.isHydrating
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-            }
-
-            if let requestError = rebuildOwner.requestError {
-                Text(requestError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
-                    .accessibilityIdentifier("remote-computer-rebuild-error")
-            }
-
-            if let errorMessage {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("无法打开远程电脑")
-                        .font(.headline)
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Button("重新连接") {
-                            self.errorMessage = nil
-                            if scope?.isAgentScope == true {
-                                status = "正在重新连接 Agent 电脑…"
-                                Task { await agentBoxOwner.noteReconnect() }
-                            } else {
-                                status = "正在重新连接…"
-                                Task { await rebuildOwner.requestReconnect() }
-                            }
-                        }
-                        .accessibilityIdentifier("remote-computer-reload")
-
-                        if scope?.isAgentScope != true && rebuildOwner.managedLifecycleAvailable {
-                            Button("恢复电脑") {
-                                recoverConfirmationPresented = true
-                            }
-                            .accessibilityIdentifier("remote-computer-recover")
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-                .accessibilityIdentifier("remote-computer-error")
-            }
-
+            computerHeader
+            rebuildStatusContent
             remoteComputerViewer
         }
         .background(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("remote-computer-surface")
         .id(scope?.scopeKey ?? "account")
-        .task(id: scope?.scopeKey ?? "account") {
-            errorMessage = nil
-            if let scope, scope.isAgentScope {
-                status = "正在启动 Agent 电脑…"
-                await agentBoxOwner.connect(scope: scope)
-                status = agentBoxOwner.vncURL == nil
-                    ? "Agent 电脑不可用"
-                    : "正在安全连接…"
-                await teachRecordingOwner.connect()
-            } else {
-                teachRecordingOwner.reset()
-                await agentBoxOwner.disconnect(trigger: "scope-account")
-                await rebuildOwner.connect()
+    }
+
+    private var lifecycleSurface: some View {
+        baseSurface
+            .task(id: scope?.scopeKey ?? "account") {
+                await activateSurfaceScope()
             }
-            await activityOwner.refresh(agentID: scope?.agentID)
-            await refreshShippingMonitors()
-        }
-        .onChange(of: activityOwner.snapshot) { _, _ in
-            Task { await refreshShippingMonitors() }
-        }
-        .onChange(of: reconnectGeneration) { _, _ in
-            Task {
+            .onChange(of: activityOwner.snapshot) { _, _ in
+                Task { await refreshShippingMonitors() }
+            }
+            .onChange(of: reconnectGeneration) { _, _ in
+                Task { await handleReconnectGeneration() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
                 if scope?.isAgentScope == true {
-                    errorMessage = nil
-                    status = "正在重新连接 Agent 电脑…"
-                    await agentBoxOwner.noteReconnect()
-                    await teachRecordingOwner.noteReconnect()
-                } else {
-                    await rebuildOwner.noteReconnect()
+                    agentBoxOwner.noteWindowFocus()
                 }
-                await activityOwner.refresh(agentID: scope?.agentID)
-                await refreshShippingMonitors()
-            }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            if scope?.isAgentScope == true {
-                agentBoxOwner.noteWindowFocus()
-            }
-            Task {
-                await activityOwner.refresh(agentID: scope?.agentID)
-                await refreshShippingMonitors()
-            }
-        }
-        .onDisappear {
-            rebuildOwner.dispose()
-            activityOwner.dispose()
-            teachRecordingOwner.dispose()
-            if scope?.isAgentScope == true {
                 Task {
-                    await agentBoxOwner.disconnect(trigger: "surface-disappear")
-                    agentBoxOwner.dispose()
+                    await activityOwner.refresh(agentID: scope?.agentID)
+                    await refreshShippingMonitors()
                 }
-            } else {
+            }
+            .onDisappear {
+                deactivateSurface()
+            }
+    }
+
+    private var confirmationSurface: some View {
+        lifecycleSurface
+            .confirmationDialog(
+                "重置我的电脑？",
+                isPresented: $resetConfirmationPresented,
+                titleVisibility: .visible
+            ) {
+                Button("重置电脑", role: .destructive) {
+                    Task { await rebuildOwner.requestReset() }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("重置会重新创建远程电脑。")
+            }
+            .confirmationDialog(
+                "恢复我的电脑？",
+                isPresented: $recoverConfirmationPresented,
+                titleVisibility: .visible
+            ) {
+                Button("恢复电脑", role: .destructive) {
+                    errorMessage = nil
+                    status = "正在恢复我的电脑…"
+                    Task { await rebuildOwner.requestRecover() }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("恢复会重新创建当前远程电脑。")
+            }
+    }
+
+    private var computerHeader: some View {
+        HStack(spacing: 12) {
+            Button("返回", action: onClose)
+                .accessibilityIdentifier("remote-computer-close")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(scope?.displayTitle ?? "我的电脑")
+                    .font(.headline)
+                    .accessibilityIdentifier("remote-computer-scope-title")
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("remote-computer-status")
+                if activityOwner.snapshot.isActive {
+                    Text(activityOwner.snapshot.runningComputerSubagentIDs.isEmpty
+                        ? "Computer Use 任务活动中"
+                        : "Computer Use 活动中 · \(activityOwner.snapshot.runningComputerSubagentIDs.count) 个子任务")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("remote-computer-agent-activity")
+                }
+            }
+
+            Spacer()
+
+            if showsHeaderLoadingIndicator {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityIdentifier("remote-computer-loading")
+            }
+
+            if scope?.isAgentScope != true {
+                accountActionsMenu
+            }
+        }
+        .padding(12)
+    }
+
+    private var showsHeaderLoadingIndicator: Bool {
+        if scope?.isAgentScope == true {
+            return agentBoxOwner.isLoading
+        }
+        return errorMessage == nil && status != "已安全连接"
+    }
+
+    private var accountActionsMenu: some View {
+        Menu {
+            if rebuildOwner.managedLifecycleAvailable {
+                Button("更新电脑") {
+                    Task { await rebuildOwner.requestUpdate() }
+                }
+            }
+            Button("重新连接") {
+                errorMessage = nil
+                status = "正在重新连接…"
+                Task { await rebuildOwner.requestReconnect() }
+            }
+            if rebuildOwner.managedLifecycleAvailable {
+                Button("重置电脑", role: .destructive) {
+                    resetConfirmationPresented = true
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .disabled(rebuildOwner.state.isPending || rebuildOwner.state.kind != nil)
+        .accessibilityIdentifier("remote-computer-actions")
+    }
+
+    @ViewBuilder
+    private var rebuildStatusContent: some View {
+        if let presentation = RemoteComputerRebuildPresentation.project(
+            state: rebuildOwner.state,
+            migration: rebuildOwner.migrationSnapshot
+        ) {
+            RemoteComputerRebuildBanner(
+                presentation: presentation,
+                detail: rebuildOwner.migrationSnapshot.detail,
+                isHydrating: rebuildOwner.isHydrating
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+        }
+
+        if let requestError = rebuildOwner.requestError {
+            Text(requestError)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .accessibilityIdentifier("remote-computer-rebuild-error")
+        }
+
+        if let errorMessage {
+            remoteComputerErrorCard(errorMessage)
+        }
+    }
+
+    private func remoteComputerErrorCard(_ errorMessage: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("无法打开远程电脑")
+                .font(.headline)
+            Text(errorMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("重新连接") {
+                    self.errorMessage = nil
+                    if scope?.isAgentScope == true {
+                        status = "正在重新连接 Agent 电脑…"
+                        Task { await agentBoxOwner.noteReconnect() }
+                    } else {
+                        status = "正在重新连接…"
+                        Task { await rebuildOwner.requestReconnect() }
+                    }
+                }
+                .accessibilityIdentifier("remote-computer-reload")
+
+                if scope?.isAgentScope != true && rebuildOwner.managedLifecycleAvailable {
+                    Button("恢复电脑") {
+                        recoverConfirmationPresented = true
+                    }
+                    .accessibilityIdentifier("remote-computer-recover")
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .accessibilityIdentifier("remote-computer-error")
+    }
+
+    @MainActor
+    private func activateSurfaceScope() async {
+        errorMessage = nil
+        if let scope, scope.isAgentScope {
+            status = "正在启动 Agent 电脑…"
+            await agentBoxOwner.connect(scope: scope)
+            status = agentBoxOwner.vncURL == nil
+                ? "Agent 电脑不可用"
+                : "正在安全连接…"
+            await teachRecordingOwner.connect()
+        } else {
+            teachRecordingOwner.reset()
+            await agentBoxOwner.disconnect(trigger: "scope-account")
+            await rebuildOwner.connect()
+        }
+        await activityOwner.refresh(agentID: scope?.agentID)
+        await refreshShippingMonitors()
+    }
+
+    @MainActor
+    private func handleReconnectGeneration() async {
+        if scope?.isAgentScope == true {
+            errorMessage = nil
+            status = "正在重新连接 Agent 电脑…"
+            await agentBoxOwner.noteReconnect()
+            await teachRecordingOwner.noteReconnect()
+        } else {
+            await rebuildOwner.noteReconnect()
+        }
+        await activityOwner.refresh(agentID: scope?.agentID)
+        await refreshShippingMonitors()
+    }
+
+    private func deactivateSurface() {
+        rebuildOwner.dispose()
+        activityOwner.dispose()
+        teachRecordingOwner.dispose()
+        if scope?.isAgentScope == true {
+            Task {
+                await agentBoxOwner.disconnect(trigger: "surface-disappear")
                 agentBoxOwner.dispose()
             }
-        }
-        .confirmationDialog(
-            "重置我的电脑？",
-            isPresented: $resetConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("重置电脑", role: .destructive) {
-                Task { await rebuildOwner.requestReset() }
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("重置会重新创建远程电脑。")
-        }
-        .confirmationDialog(
-            "恢复我的电脑？",
-            isPresented: $recoverConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("恢复电脑", role: .destructive) {
-                errorMessage = nil
-                status = "正在恢复我的电脑…"
-                Task { await rebuildOwner.requestRecover() }
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("恢复会重新创建当前远程电脑。")
+        } else {
+            agentBoxOwner.dispose()
         }
     }
 

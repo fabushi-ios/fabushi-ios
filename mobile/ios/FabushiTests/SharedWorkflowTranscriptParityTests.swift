@@ -96,4 +96,71 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertTrue(isSandUpdateTrack("stable"))
         XCTAssertFalse(isSandUpdateTrack("beta"))
     }
+    func testNativeTranscriptCardsProjectRecoveredNoticePermissionAndTimelineSemantics() throws {
+        let notice = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "notice-1",
+                "timestampMs": 1_000,
+                "card": ["kind": "notice", "text": "Workspace updated"],
+            ],
+            operationId: "op-1"
+        ))
+        XCTAssertEqual(notice.kind, .notice)
+        XCTAssertEqual(notice.text, "Workspace updated")
+        XCTAssertEqual(notice.createdAt.timeIntervalSince1970, 1, accuracy: 0.001)
+
+        let permission = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "permission-1",
+                "card": [
+                    "kind": "permission-request",
+                    "permission": ["title": "Camera"],
+                ],
+            ],
+            operationId: nil
+        ))
+        XCTAssertEqual(permission.kind, .permissionRequest)
+        XCTAssertEqual(permission.text, "Camera")
+
+        let renamed = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "event-1",
+                "card": [
+                    "kind": "timeline-event",
+                    "event": ["type": "name-changed", "to": "Research"],
+                ],
+            ],
+            operationId: nil
+        ))
+        XCTAssertEqual(renamed.kind, .timelineEvent)
+        XCTAssertEqual(renamed.text, "Renamed to Research")
+        XCTAssertNil(renamed.timelineAutomationId)
+
+        let automation = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "event-2",
+                "card": [
+                    "kind": "timelineEvent",
+                    "event": [
+                        "type": "automation-changed",
+                        "automationId": "routine-7",
+                        "action": "enabled",
+                        "automationName": "Morning brief",
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+        XCTAssertEqual(automation.kind, .timelineEvent)
+        XCTAssertEqual(automation.text, "Enabled automation \"Morning brief\"")
+        XCTAssertEqual(automation.timelineAutomationId, "routine-7")
+    }
+
+    func testNativeTranscriptCardsRejectMalformedOrUnknownRecoveredCards() {
+        XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "notice"]], operationId: nil))
+        XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "permission-request", "permission": [:]]], operationId: nil))
+        XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "timeline-event", "event": ["type": "automation-changed", "automationName": "Missing id"]]], operationId: nil))
+        XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "unknown"]], operationId: nil))
+    }
+
 }

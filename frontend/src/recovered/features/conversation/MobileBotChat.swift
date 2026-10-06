@@ -345,7 +345,14 @@ internal struct MobileBotChat: View {
         }
         for entry in entries.suffix(50) {
             let id = Self.semanticId("mobile-bot-entry-\(entry.id)")
-            let roleName = entry.role == .user ? "用户消息" : entry.kind == .handoff ? "等待用户接管" : entry.kind == .action ? "Bot 动作" : entry.kind == .thinking ? "Bot 思考" : "Bot 消息"
+            let roleName = entry.role == .user ? "用户消息"
+                : entry.kind == .handoff ? "等待用户接管"
+                : entry.kind == .action ? "Bot 动作"
+                : entry.kind == .thinking ? "Bot 思考"
+                : entry.kind == .notice ? "通知"
+                : entry.kind == .permissionRequest ? "权限请求记录"
+                : entry.kind == .timelineEvent ? "时间线事件"
+                : "Bot 消息"
             elements.append(.init(agentId: id, role: "log", name: roleName))
         }
         for entry in entries where entry.kind == .handoff && entry.actionStatus == "pending" {
@@ -416,6 +423,47 @@ internal struct MobileBotChat: View {
             }
             .padding(12)
             .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        } else if entry.kind == .notice {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(.secondary)
+                Text(entry.text)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Text(entry.createdAt, style: .time)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 4)
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-notice-\(entry.id)"))
+        } else if entry.kind == .permissionRequest {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "lock.shield")
+                    .foregroundStyle(.secondary)
+                Text(entry.text)
+                    .font(.caption)
+                Spacer(minLength: 8)
+                Text(entry.createdAt, style: .time)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 4)
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-permission-request-\(entry.id)"))
+        } else if entry.kind == .timelineEvent {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: entry.timelineAutomationId == nil ? "clock" : "calendar")
+                    .foregroundStyle(.secondary)
+                Text(entry.text)
+                    .font(.caption)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(entry.createdAt, style: .time)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 4)
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-timeline-event-\(entry.id)"))
         } else if entry.kind == .action {
             HStack(spacing: 7) {
                 Circle().fill(entry.actionStatus == "failed" ? Color.red : Color.orange).frame(width: 7, height: 7)
@@ -693,6 +741,7 @@ internal struct MobileBotChat: View {
                         "chat.message",
                         "chat.delta",
                         "agent.step",
+                        "transcript.card",
                         "operation.started",
                         "operation.completed",
                         "operation.interrupted",
@@ -764,6 +813,9 @@ internal struct MobileBotChat: View {
                     let model = event["model"] as? String ?? ""
                     let row = MobileChatMessage(id: id, role: .assistant, text: "", kind: .action, operationId: operationId, actionTitle: "Model", actionDetail: [provider, model].filter { !$0.isEmpty }.joined(separator: " · "), actionStatus: "completed")
                     if let index = entries.firstIndex(where: { $0.id == id }) { entries[index] = row } else { entries.append(row) }
+                case "transcript.card":
+                    guard let row = projectMobileTranscriptCard(event: event, operationId: eventOperationId) else { continue }
+                    if let index = entries.firstIndex(where: { $0.id == row.id }) { entries[index] = row } else { entries.append(row) }
                 case "operation.completed", "operation.interrupted":
                     removeThinking(operationId)
                     finishAssistant(operationId)

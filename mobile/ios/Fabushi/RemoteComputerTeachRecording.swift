@@ -585,7 +585,7 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
         guard !disposed else { return }
         generation &+= 1
         let expectedGeneration = generation
-        _ = awaitHeal(expectedGeneration: expectedGeneration)
+        _ = await awaitHeal(expectedGeneration: expectedGeneration)
     }
 
     @discardableResult

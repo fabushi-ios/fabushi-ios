@@ -13,6 +13,9 @@ enum MobileChatEntryKind: String, Equatable {
     case action
     case thinking
     case handoff
+    case notice
+    case permissionRequest
+    case timelineEvent
 }
 
 enum MahayanaChatPumpOutcome: Equatable {
@@ -39,9 +42,96 @@ struct MobileChatMessage: Identifiable, Equatable {
     var attachmentURL: String?
     var attachmentFileName: String?
     var attachmentAlt: String?
+    var timelineEvent: SandTimelineEvent?
+    var timelineAutomationId: String?
     var branched = false
     var streaming = false
     var createdAt = Date()
+}
+
+private func mobileTranscriptCardDate(_ value: Any?) -> Date {
+    if let milliseconds = value as? NSNumber {
+        return Date(timeIntervalSince1970: milliseconds.doubleValue / 1_000)
+    }
+    return Date()
+}
+
+private func projectMobileTimelineEvent(
+    _ raw: [String: Any]
+) -> (event: SandTimelineEvent, automationId: String?)? {
+    guard let type = raw["type"] as? String else { return nil }
+    switch type {
+    case "name-changed":
+        guard let to = raw["to"] as? String else { return nil }
+        return (.nameChanged(to: to), nil)
+    case "channel-connected":
+        guard let label = raw["label"] as? String else { return nil }
+        return (.channelConnected(label: label), nil)
+    case "channel-disconnected":
+        guard let label = raw["label"] as? String else { return nil }
+        return (.channelDisconnected(label: label), nil)
+    case "automation-changed":
+        guard let automationId = raw["automationId"] as? String, !automationId.isEmpty,
+              let action = raw["action"] as? String, !action.isEmpty,
+              let automationName = raw["automationName"] as? String, !automationName.isEmpty
+        else { return nil }
+        return (.automationChanged(action: action, automationName: automationName), automationId)
+    default:
+        return nil
+    }
+}
+
+/// Native projection for the recovered Desktop transcript-card family.
+/// Unknown/malformed cards fail closed rather than becoming generic messages.
+func projectMobileTranscriptCard(
+    event: [String: Any],
+    operationId: String?
+) -> MobileChatMessage? {
+    guard let card = event["card"] as? [String: Any],
+          let kind = card["kind"] as? String
+    else { return nil }
+
+    if kind == "listenerConnect" {
+        return projectListenerConnectTranscriptCard(event: event, operationId: operationId)
+    }
+
+    let entryId = (event["entryId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        ?? (card["id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        ?? "transcript-card:\(UUID().uuidString.lowercased())"
+    let createdAt = mobileTranscriptCardDate(event["timestampMs"] ?? card["timestampMs"])
+
+    switch kind {
+    case "notice":
+        guard let text = card["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return MobileChatMessage(
+            id: entryId, role: .assistant, text: text, kind: .notice,
+            operationId: operationId, createdAt: createdAt
+        )
+
+    case "permissionRequest", "permission-request":
+        let nestedTitle = (card["permission"] as? [String: Any])?["title"] as? String
+        guard let title = (nestedTitle ?? card["title"] as? String),
+              !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return MobileChatMessage(
+            id: entryId, role: .assistant, text: title, kind: .permissionRequest,
+            operationId: operationId, createdAt: createdAt
+        )
+
+    case "timelineEvent", "timeline-event", "event":
+        guard let rawEvent = card["event"] as? [String: Any],
+              let projection = projectMobileTimelineEvent(rawEvent)
+        else { return nil }
+        return MobileChatMessage(
+            id: entryId, role: .assistant, text: describeTimelineEvent(projection.event),
+            kind: .timelineEvent, operationId: operationId,
+            timelineEvent: projection.event, timelineAutomationId: projection.automationId,
+            createdAt: createdAt
+        )
+
+    default:
+        return nil
+    }
 }
 
 func projectListenerConnectTranscriptCard(
@@ -911,7 +1001,7 @@ final class MarketplaceModel {
                     let stepId = event["stepId"] as? String ?? "step-\(UUID().uuidString)"
                     upsertAction(operationId: operationId, stepId: stepId, title: title, detail: event["detail"] as? String, status: event["status"] as? String ?? "completed")
                 case "transcript.card":
-                    guard let row = projectListenerConnectTranscriptCard(
+                    guard let row = projectMobileTranscriptCard(
                         event: event,
                         operationId: event["operationId"] as? String ?? operationId
                     ) else { continue }
