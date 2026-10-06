@@ -1447,17 +1447,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/trigger-draft-controller.ts",
       "desktop_blob_sha": "4a85d3604cceb81b48d5ada26a1903cf02decfd0",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Owns the persistence-injected routine trigger draft state machine: up to eight editable rows, last-valid snapshot, menu/editor/hover/focus-return state, custom schedule invalid state, valid-only commit/revert callbacks, pending/error handling, stale mutation fencing, reset, and disposal.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Users can add, edit and remove trigger rows without invalid drafts leaking into persistence; duplicate mutations are suppressed, failed commits retain recoverable state, closing returns focus predictably, single-row removal can revert safely, and stale/disposed async results cannot overwrite the current draft.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "A @MainActor ObservableObject replaces the TypeScript closure controller while retaining persistence injection and keeping Host/bridge knowledge out of this state machine. It reuses native RoutineTriggerForm/AutomationTrigger validation, preserves the Desktop eight-row bound and last-valid semantics, and exposes SwiftUI-ready menu/editor/focus/pending/error state.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift contains MobileBotRoutineTriggerDraftController with bounded rows, raw draft change callbacks, valid-only commit/revert persistence injection, menu/editor/focus-return state, custom schedule validation, pending/error state, generation fencing, reset and disposal.",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers valid grouped commits, the eight-row cap, invalid custom schedule fail-closed behavior with last-valid close-time revert, focus return, single-row removal semantics, and disposal fencing of an in-flight persistence callback. Fresh exact-HEAD ordinary/protected Actions are required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This row owns draft lifecycle only; rich-trigger durable Host encoding and the shipping multi-trigger editor remain separate composition gates and are not implied by this implemented status."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/trigger-schema.ts",
