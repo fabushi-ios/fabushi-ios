@@ -110,6 +110,26 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         }
     }
 
+    func testIOSLocalExecRoutesOnlyAllowlistedDeviceCapabilitiesLocally() async {
+        let supervisor = IOSLocalExecSupervisor()
+
+        let clipboard = await supervisor.route(capabilityName: "clipboardRead")
+        let openURL = await supervisor.route(capabilityName: "openExternalURL")
+        let share = await supervisor.route(capabilityName: "shareItem")
+        let shell = await supervisor.route(capabilityName: "shell.exec")
+        let process = await supervisor.route(capabilityName: "process.spawn")
+        let box = await supervisor.route(capabilityName: "box.read")
+        let arbitrary = await supervisor.route(capabilityName: "spawnArbitraryProcess")
+
+        XCTAssertEqual(clipboard, .local(.clipboardRead))
+        XCTAssertEqual(openURL, .local(.openExternalURL))
+        XCTAssertEqual(share, .unavailable("shareItem"))
+        XCTAssertEqual(shell, .remote)
+        XCTAssertEqual(process, .remote)
+        XCTAssertEqual(box, .remote)
+        XCTAssertEqual(arbitrary, .unavailable("spawnArbitraryProcess"))
+    }
+
     func testMcpCustomInstructionSelectionIsBoundedDeduplicatedAndStable() {
         XCTAssertEqual(clampMcpCustomInstruction(String(repeating: "x", count: 700)).count, 500)
         XCTAssertFalse(getDefaultMcpCustomInstruction(" Hex ").isEmpty)
