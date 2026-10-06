@@ -3291,6 +3291,29 @@ mod tests {
             }
         ));
 
+        let grouped: FeatureCommand = serde_json::from_str(
+            r#"{"type":"automation.upsert","requestId":"group-1","name":"Grouped","prompt":"Handle either trigger","schedule":"@daily","trigger":{"kind":"group","listeners":[{"kind":"schedule","schedule":"@daily"},{"kind":"event","source":"github","event":"*","filters":{"repo":"owner/repo","events":["pr-opened","ci-failed"]}}]}}"#,
+        )
+        .expect("decode grouped automation");
+        match grouped {
+            FeatureCommand::AutomationUpsert {
+                trigger: Some(AutomationTrigger::Group { listeners }),
+                ..
+            } => {
+                assert_eq!(listeners.len(), 2);
+                assert!(matches!(listeners[0], AutomationTrigger::Schedule { .. }));
+                assert!(matches!(
+                    &listeners[1],
+                    AutomationTrigger::Event {
+                        source: ListenerPlatform::Github,
+                        filters: Some(filters),
+                        ..
+                    } if filters.get("repo").and_then(Value::as_str) == Some("owner/repo")
+                ));
+            }
+            other => panic!("unexpected grouped automation command: {other:?}"),
+        }
+
         let connector: FeatureCommand = serde_json::from_str(
             r#"{"type":"connector.setToolEnabled","requestId":"connector-1","connectorId":"github","toolId":"create_issue","enabled":false}"#,
         )
