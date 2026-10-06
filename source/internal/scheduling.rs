@@ -33,11 +33,17 @@ impl DeadlinePolicy {
     where
         F: Future<Output = T>,
     {
-        tokio::time::timeout(self.timeout, work)
-            .await
-            .map_err(|_| DeadlineExceededError {
+        let deadline = tokio::time::sleep(self.timeout);
+        tokio::pin!(deadline);
+        tokio::pin!(work);
+
+        tokio::select! {
+            biased;
+            _ = &mut deadline => Err(DeadlineExceededError {
                 policy_name: self.name.clone(),
-            })
+            }),
+            value = &mut work => Ok(value),
+        }
     }
 }
 
@@ -194,6 +200,18 @@ mod tests {
             })
             .await;
         assert!(matches!(result, Err(DeadlineExceededError { .. })));
+    }
+
+    #[tokio::test]
+    async fn zero_deadline_fails_closed_even_when_work_is_already_ready() {
+        let policy = DeadlinePolicy::new("ready-work", Duration::ZERO).unwrap();
+        let result = policy.run(async { 7 }).await;
+        assert_eq!(
+            result,
+            Err(DeadlineExceededError {
+                policy_name: "ready-work".into(),
+            })
+        );
     }
 
     #[test]
