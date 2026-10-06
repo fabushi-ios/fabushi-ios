@@ -56,6 +56,38 @@ final class RemoteComputerRebuildTests: XCTestCase {
         XCTAssertNotEqual(scoped.scopeKey, accountOnly.scopeKey)
     }
 
+
+    func testWebProcessCrashPolicyReloadsThreeTimesThenFailsClosed() {
+        var policy = RemoteComputerWebProcessCrashPolicy()
+
+        XCTAssertEqual(policy.recordCrash(atMilliseconds: 1_000), .reload)
+        XCTAssertEqual(policy.recordCrash(atMilliseconds: 2_000), .reload)
+        XCTAssertEqual(policy.recordCrash(atMilliseconds: 3_000), .reload)
+        XCTAssertEqual(policy.recordCrash(atMilliseconds: 4_000), .failClosed)
+        XCTAssertEqual(policy.crashCount, 4)
+        XCTAssertTrue(policy.failedClosed)
+    }
+
+    func testWebProcessCrashPolicyStartsNewEpisodeAfterWindowOrExplicitReload() {
+        var policy = RemoteComputerWebProcessCrashPolicy()
+
+        XCTAssertEqual(policy.recordCrash(atMilliseconds: 1_000), .reload)
+        XCTAssertEqual(
+            policy.recordCrash(
+                atMilliseconds: 1_000 + RemoteComputerWebProcessCrashPolicy.crashWindowMilliseconds
+            ),
+            .reload
+        )
+        XCTAssertEqual(policy.crashCount, 1)
+
+        _ = policy.recordCrash(atMilliseconds: 62_000)
+        policy.resetForExplicitReload()
+        XCTAssertEqual(policy.crashCount, 0)
+        XCTAssertNil(policy.lastCrashAtMilliseconds)
+        XCTAssertFalse(policy.failedClosed)
+        XCTAssertEqual(policy.recordCrash(atMilliseconds: 62_100), .reload)
+    }
+
     func testOperationIDFencesStaleTerminalMigrationAndDoneSettles() {
         let operationA = RemoteComputerRebuildOperationID(value: "op-a")
         let operationB = RemoteComputerRebuildOperationID(value: "op-b")
