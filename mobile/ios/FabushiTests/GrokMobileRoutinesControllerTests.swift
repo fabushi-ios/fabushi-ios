@@ -857,4 +857,55 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertEqual(controller.lastValidRows, [.schedule("@daily")])
     }
 
+
+    func testRoutineUpsertCommandCarriesCanonicalGroupedTriggerWireShape() {
+        let trigger = routineTriggerFromForms([
+            .schedule("@daily"),
+            .github(
+                repo: "owner/repo",
+                events: ["pr-opened", "ci-failed"],
+                userAllowlist: "@Alice Bob",
+                ciBranch: "main"
+            ),
+        ])
+        XCTAssertNotNil(trigger)
+
+        let spec = MobileBotRoutineSpec(
+            name: "Review",
+            prompt: "Summarize matching events.",
+            schedule: "@daily",
+            isEnabled: true,
+            trigger: trigger
+        )
+        let command = MobileBotRoutinesModel.commandUpsert(
+            agentId: "agent-1",
+            id: "routine-1",
+            spec: spec,
+            requestId: "request-1"
+        )
+
+        XCTAssertEqual(command["type"] as? String, "automation.upsert")
+        XCTAssertEqual(command["schedule"] as? String, "@daily")
+        guard let wire = command["trigger"] as? [String: Any] else {
+            return XCTFail("missing trigger wire")
+        }
+        XCTAssertEqual(wire["kind"] as? String, "group")
+        guard let listeners = wire["listeners"] as? [[String: Any]] else {
+            return XCTFail("missing group listeners")
+        }
+        XCTAssertEqual(listeners.count, 2)
+        XCTAssertEqual(listeners[0]["kind"] as? String, "schedule")
+        XCTAssertEqual(listeners[0]["schedule"] as? String, "@daily")
+        XCTAssertEqual(listeners[1]["kind"] as? String, "event")
+        XCTAssertEqual(listeners[1]["source"] as? String, "github")
+        XCTAssertEqual(listeners[1]["event"] as? String, "*")
+        guard let filters = listeners[1]["filters"] as? [String: Any] else {
+            return XCTFail("missing structured filters")
+        }
+        XCTAssertEqual(filters["repo"] as? String, "owner/repo")
+        XCTAssertEqual(filters["events"] as? [String], ["pr-opened", "ci-failed"])
+        XCTAssertEqual(filters["ciBranch"] as? String, "main")
+        XCTAssertEqual(filters["actorAllowlist"] as? [String], ["Alice", "Bob"])
+    }
+
 }
