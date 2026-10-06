@@ -127,7 +127,11 @@ private func normalizeMobileLinkURL(_ value: Any?) -> String? {
           let host = url.host,
           !host.isEmpty
     else { return nil }
-    return url.absoluteString
+    var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+    if components?.path.isEmpty == true {
+        components?.path = "/"
+    }
+    return components?.url?.absoluteString ?? url.absoluteString
 }
 
 private func extractMobileBareLink(_ content: String) -> String? {
