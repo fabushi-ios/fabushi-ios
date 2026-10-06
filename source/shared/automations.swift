@@ -426,3 +426,105 @@ private extension Array {
     var nilIfEmpty: Self? { isEmpty ? nil : self }
 }
 
+private func routineEventWire(
+    source: String,
+    event: String,
+    filters: [String: Any]
+) -> [String: Any] {
+    var value: [String: Any] = [
+        "kind": "event",
+        "source": source,
+        "event": event,
+    ]
+    if !filters.isEmpty {
+        value["filters"] = filters
+    }
+    return value
+}
+
+func routineTriggerMemberWireValue(_ member: AutomationTriggerMember) -> [String: Any] {
+    switch member {
+    case .cron(let cron):
+        return [
+            "kind": "schedule",
+            "schedule": cron.schedule,
+        ]
+
+    case .slack(let slack):
+        var filters: [String: Any] = ["channel": slack.channel]
+        let event: String
+        switch slack.match {
+        case .mention:
+            event = "mention"
+        case .message:
+            event = "message"
+        case .keyword(let keyword):
+            event = "message"
+            filters["messageContains"] = keyword
+        case .reaction(let emoji, let bySelf):
+            event = "reaction"
+            if !emoji.isEmpty {
+                filters["emoji"] = emoji
+            }
+            if let bySelf {
+                filters["bySelf"] = bySelf
+            }
+        }
+        return routineEventWire(source: "slack", event: event, filters: filters)
+
+    case .github(let github):
+        var filters: [String: Any] = [
+            "repo": github.repo,
+            "events": github.events,
+        ]
+        if let branch = github.ciBranch, !branch.isEmpty {
+            filters["ciBranch"] = branch
+        }
+        if let users = github.userAllowlist, !users.isEmpty {
+            filters["actorAllowlist"] = users
+        }
+        return routineEventWire(source: "github", event: "*", filters: filters)
+
+    case .microsoftTeams(let teams):
+        var filters: [String: Any] = [
+            "tenantId": teams.tenantId,
+            "teamIds": teams.teamIds.isEmpty ? [teams.teamId] : teams.teamIds,
+            "channelIds": teams.channelIds,
+            "messageContains": teams.messageContains,
+            "messageContainsIsRegex": teams.messageContainsIsRegex,
+            "blockUnauthenticatedTeamsUsers": teams.blockUnauthenticatedTeamsUsers,
+        ]
+        filters = filters.filter { _, value in
+            if let string = value as? String { return !string.isEmpty }
+            if let array = value as? [String] { return !array.isEmpty }
+            return true
+        }
+        return routineEventWire(source: "teams", event: "message", filters: filters)
+
+    case .integration(let integration):
+        var filters: [String: Any] = [:]
+        if !integration.projectIds.isEmpty { filters["projectIds"] = integration.projectIds }
+        if !integration.teamIds.isEmpty { filters["teamIds"] = integration.teamIds }
+        if !integration.serviceIds.isEmpty { filters["serviceIds"] = integration.serviceIds }
+        if !integration.statusIds.isEmpty { filters["statusIds"] = integration.statusIds }
+        if !integration.cycleIds.isEmpty { filters["cycleIds"] = integration.cycleIds }
+        return routineEventWire(
+            source: integration.platform.rawValue,
+            event: integration.eventCase,
+            filters: filters
+        )
+    }
+}
+
+func routineTriggerWireValue(_ trigger: AutomationTrigger) -> [String: Any] {
+    switch trigger {
+    case .member(let member):
+        return routineTriggerMemberWireValue(member)
+    case .group(let listeners):
+        return [
+            "kind": "group",
+            "listeners": listeners.map(routineTriggerMemberWireValue),
+        ]
+    }
+}
+
