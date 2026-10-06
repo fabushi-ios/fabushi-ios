@@ -1870,6 +1870,10 @@ final class MarketplaceModel {
               let source = row["source"] as? String,
               ["workflow", "managed", "plugin"].contains(source)
         else { return nil }
+        let publishedByCurrentUser = row["publishedByCurrentUser"] as? Bool ?? false
+        if source == "plugin" && !publishedByCurrentUser {
+            return nil
+        }
         let trigger = row["trigger"] as? [String: Any]
         return MarketplacePrivateSkill(
             id: id,
@@ -1879,7 +1883,7 @@ final class MarketplaceModel {
             source: source,
             sourceRef: row["sourceRef"] as? String,
             pluginId: row["pluginId"] as? String,
-            publishedByCurrentUser: row["publishedByCurrentUser"] as? Bool ?? false,
+            publishedByCurrentUser: publishedByCurrentUser,
             isEnabledForAgent: row["isEnabledForAgent"] as? Bool ?? true,
             triggerSchedule: trigger?["schedule"] as? String,
             triggerEnabled: trigger?["isEnabled"] as? Bool
@@ -1906,7 +1910,6 @@ final class MarketplaceModel {
             guard !needle.isEmpty else { return true }
             return skill.name.localizedCaseInsensitiveContains(needle)
                 || skill.description.localizedCaseInsensitiveContains(needle)
-                || skill.body.localizedCaseInsensitiveContains(needle)
         }
     }
 

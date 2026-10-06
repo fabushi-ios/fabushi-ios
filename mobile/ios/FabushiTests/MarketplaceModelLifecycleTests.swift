@@ -83,6 +83,17 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertTrue(skill.isEnabledForAgent)
 
         XCTAssertNil(MarketplaceModel.marketplacePrivateSkill(from: [
+            "id": "other-team-skill",
+            "name": "Other member skill",
+            "description": "Must not leak into Yours.",
+            "body": "Shared body",
+            "source": "plugin",
+            "pluginId": "team-plugin",
+            "publishedByCurrentUser": false,
+            "isEnabledForAgent": true,
+        ]))
+
+        XCTAssertNil(MarketplaceModel.marketplacePrivateSkill(from: [
             "id": "nightly",
             "name": "Nightly",
             "body": "Run nightly.",
