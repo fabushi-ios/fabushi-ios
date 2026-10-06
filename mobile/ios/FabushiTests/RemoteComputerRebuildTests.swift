@@ -243,6 +243,85 @@ final class RemoteComputerRebuildTests: XCTestCase {
     }
 
 
+
+    func testHostActivityProjectionKeepsOnlyRunningComputerUseState() {
+        let snapshot = IOSRemoteComputerHostActivitySource.project(
+            agentID: "agent-a",
+            subagentEvent: [
+                "subagents": [
+                    [
+                        "id": "computer-1",
+                        "status": "running",
+                        "subagentType": "computerUse",
+                    ],
+                    [
+                        "id": "research-1",
+                        "status": "running",
+                        "subagentType": "research",
+                    ],
+                    [
+                        "id": "computer-done",
+                        "status": "done",
+                        "subagentType": "computerUse",
+                    ],
+                ],
+            ],
+            taskEvent: [
+                "tasks": [
+                    [
+                        "id": "task-1",
+                        "status": "running",
+                        "subagentType": "computerUse",
+                    ],
+                ],
+            ]
+        )
+
+        XCTAssertEqual(snapshot.agentID, "agent-a")
+        XCTAssertEqual(snapshot.runningComputerSubagentIDs, ["computer-1"])
+        XCTAssertTrue(snapshot.isComputerUseTaskActive)
+        XCTAssertTrue(snapshot.isActive)
+    }
+
+    @MainActor
+    func testHostActivityOwnerFencesStaleAgentRefresh() async throws {
+        var continuations: [
+            String: CheckedContinuation<RemoteComputerHostActivitySnapshot, Error>
+        ] = [:]
+        let owner = RemoteComputerHostActivityOwner { agentID in
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<RemoteComputerHostActivitySnapshot, Error>) in
+                continuations[agentID] = continuation
+            }
+        }
+
+        let first = Task { await owner.refresh(agentID: "agent-a") }
+        await Task.yield()
+        let second = Task { await owner.refresh(agentID: "agent-b") }
+        await Task.yield()
+
+        let secondContinuation = try XCTUnwrap(continuations["agent-b"])
+        secondContinuation.resume(returning: .init(
+            agentID: "agent-b",
+            runningComputerSubagentIDs: ["computer-b"],
+            isComputerUseTaskActive: true
+        ))
+        await second.value
+
+        let firstContinuation = try XCTUnwrap(continuations["agent-a"])
+        firstContinuation.resume(returning: .init(
+            agentID: "agent-a",
+            runningComputerSubagentIDs: ["computer-a"],
+            isComputerUseTaskActive: true
+        ))
+        await first.value
+
+        XCTAssertEqual(owner.snapshot.agentID, "agent-b")
+        XCTAssertEqual(owner.snapshot.runningComputerSubagentIDs, ["computer-b"])
+        XCTAssertFalse(owner.isRefreshing)
+    }
+
+
     func testRemoteComputerScopeUsesAgentNameInVisibleTitle() {
         let account = RemoteComputerScope(
             accountScopeKey: "account-a",
