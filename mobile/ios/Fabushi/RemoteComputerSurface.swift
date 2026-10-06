@@ -1117,6 +1117,172 @@ final class RemoteComputerRebuildOwner: ObservableObject {
     }
 }
 
+struct RemoteComputerHostActivitySnapshot: Equatable, Sendable {
+    let agentID: String?
+    let runningComputerSubagentIDs: [String]
+    let isComputerUseTaskActive: Bool
+
+    static let empty = Self(
+        agentID: nil,
+        runningComputerSubagentIDs: [],
+        isComputerUseTaskActive: false
+    )
+
+    var isActive: Bool {
+        !runningComputerSubagentIDs.isEmpty || isComputerUseTaskActive
+    }
+}
+
+struct IOSRemoteComputerHostActivitySource {
+    let bridge: IOSPreloadBridge?
+
+    @MainActor
+    func load(agentID: String) async throws -> RemoteComputerHostActivitySnapshot {
+        guard let bridge else {
+            throw NSError(
+                domain: "Fabushi.RemoteComputerActivity",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Host bridge is unavailable"]
+            )
+        }
+
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": [
+                    "type": "subagent.list",
+                    "requestId": requestID("subagents"),
+                    "agentId": agentID,
+                ],
+            ]
+        )
+        let subagentResult = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 5_120
+        ) { event in
+            event["type"] as? String == "subagent.listed"
+                && event["agentId"] as? String == agentID
+        }
+        guard let subagentEvent = subagentResult.value as? [String: Any] else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": [
+                    "type": "asyncTask.list",
+                    "requestId": requestID("tasks"),
+                    "agentId": agentID,
+                ],
+            ]
+        )
+        let taskResult = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 5_120
+        ) { event in
+            event["type"] as? String == "asyncTask.listed"
+                && event["agentId"] as? String == agentID
+        }
+        guard let taskEvent = taskResult.value as? [String: Any] else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+
+        return Self.project(
+            agentID: agentID,
+            subagentEvent: subagentEvent,
+            taskEvent: taskEvent
+        )
+    }
+
+    static func project(
+        agentID: String,
+        subagentEvent: [String: Any],
+        taskEvent: [String: Any]
+    ) -> RemoteComputerHostActivitySnapshot {
+        let subagents = subagentEvent["subagents"] as? [[String: Any]] ?? []
+        let runningComputerSubagentIDs = subagents.compactMap { row -> String? in
+            guard row["status"] as? String == "running",
+                  row["subagentType"] as? String == "computerUse",
+                  let id = row["id"] as? String,
+                  !id.isEmpty
+            else { return nil }
+            return id
+        }
+
+        let tasks = taskEvent["tasks"] as? [[String: Any]] ?? []
+        let hasComputerTask = tasks.contains { row in
+            row["status"] as? String == "running"
+                && row["subagentType"] as? String == "computerUse"
+        }
+        return .init(
+            agentID: agentID,
+            runningComputerSubagentIDs: runningComputerSubagentIDs,
+            isComputerUseTaskActive: hasComputerTask
+        )
+    }
+
+    private func requestID(_ suffix: String) -> String {
+        "ios-computer-\(suffix)-\(UUID().uuidString.lowercased())"
+    }
+}
+
+@MainActor
+final class RemoteComputerHostActivityOwner: ObservableObject {
+    typealias Loader = @MainActor (String) async throws -> RemoteComputerHostActivitySnapshot
+
+    @Published private(set) var snapshot = RemoteComputerHostActivitySnapshot.empty
+    @Published private(set) var isRefreshing = false
+    @Published private(set) var lastError: String?
+
+    private let loader: Loader
+    private var generation = 0
+    private var disposed = false
+
+    init(loader: @escaping Loader) {
+        self.loader = loader
+    }
+
+    func refresh(agentID: String?) async {
+        generation &+= 1
+        let requestGeneration = generation
+        guard !disposed else { return }
+
+        guard let agentID, !agentID.isEmpty else {
+            snapshot = .empty
+            isRefreshing = false
+            lastError = nil
+            return
+        }
+
+        isRefreshing = true
+        lastError = nil
+        do {
+            let next = try await loader(agentID)
+            guard !disposed, generation == requestGeneration else { return }
+            snapshot = next
+            isRefreshing = false
+        } catch is CancellationError {
+            guard !disposed, generation == requestGeneration else { return }
+            isRefreshing = false
+        } catch {
+            guard !disposed, generation == requestGeneration else { return }
+            snapshot = .init(
+                agentID: agentID,
+                runningComputerSubagentIDs: [],
+                isComputerUseTaskActive: false
+            )
+            isRefreshing = false
+            lastError = error.localizedDescription
+        }
+    }
+
+    func dispose() {
+        guard !disposed else { return }
+        disposed = true
+        generation &+= 1
+        isRefreshing = false
+    }
+}
+
 /// The existing shipping remote-computer surface remains the sole native
 /// Computer UI owner. Desktop's empty lazy overlay is intentionally not copied:
 /// native iOS renders the rebuild/reconnect state directly above this WebKit
@@ -1128,6 +1294,7 @@ struct RemoteComputerSurface: View {
     let onClose: () -> Void
 
     @StateObject private var rebuildOwner: RemoteComputerRebuildOwner
+    @StateObject private var activityOwner: RemoteComputerHostActivityOwner
     @State private var status = "正在连接我的电脑…"
     @State private var errorMessage: String?
     @State private var resetConfirmationPresented = false
@@ -1147,6 +1314,12 @@ struct RemoteComputerSurface: View {
                 source: IOSRemoteComputerRebuildSource(bridge: bridge)
             )
         )
+        let activitySource = IOSRemoteComputerHostActivitySource(bridge: bridge)
+        _activityOwner = StateObject(
+            wrappedValue: RemoteComputerHostActivityOwner { agentID in
+                try await activitySource.load(agentID: agentID)
+            }
+        )
     }
 
     var body: some View {
@@ -1163,6 +1336,14 @@ struct RemoteComputerSurface: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("remote-computer-status")
+                    if activityOwner.snapshot.isActive {
+                        Text(activityOwner.snapshot.runningComputerSubagentIDs.isEmpty
+                            ? "Computer Use 任务活动中"
+                            : "Computer Use 活动中 · \(activityOwner.snapshot.runningComputerSubagentIDs.count) 个子任务")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("remote-computer-agent-activity")
+                    }
                 }
 
                 Spacer()
@@ -1264,14 +1445,19 @@ struct RemoteComputerSurface: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("remote-computer-surface")
         .id(scope?.scopeKey ?? "account")
-        .task {
+        .task(id: scope?.scopeKey ?? "account") {
             await rebuildOwner.connect()
+            await activityOwner.refresh(agentID: scope?.agentID)
         }
         .onChange(of: reconnectGeneration) { _, _ in
-            Task { await rebuildOwner.noteReconnect() }
+            Task {
+                await rebuildOwner.noteReconnect()
+                await activityOwner.refresh(agentID: scope?.agentID)
+            }
         }
         .onDisappear {
             rebuildOwner.dispose()
+            activityOwner.dispose()
         }
         .confirmationDialog(
             "重置我的电脑？",
