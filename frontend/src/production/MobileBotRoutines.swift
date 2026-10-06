@@ -583,6 +583,228 @@ internal enum MobileBotRoutineSchedule {
     }
 }
 
+@MainActor
+internal final class MobileBotRoutineTriggerDraftController: ObservableObject {
+    internal typealias Persist = @MainActor ([RoutineTriggerForm]) async throws -> Void
+    internal static let maximumRows = TRIGGER_MAX_GROUP_LISTENERS
+
+    @Published private(set) var rows: [RoutineTriggerForm]
+    @Published private(set) var lastValidRows: [RoutineTriggerForm]
+    @Published private(set) var menuOpen = false
+    @Published private(set) var editingRow: Int?
+    @Published private(set) var customInvalid = false
+    @Published private(set) var hoveredRow: Int?
+    @Published private(set) var focusReturnRow: Int?
+    @Published private(set) var pending = false
+    @Published private(set) var error: String?
+
+    private let onDraftChange: @MainActor ([RoutineTriggerForm]) -> Void
+    private let onDraftCommit: Persist
+    private let onCommitOrRevert: Persist
+    private var generation = 0
+    private var disposed = false
+    private var menuMutation = false
+    private var skipNextMenuCommit = false
+
+    init(
+        initialRows: [RoutineTriggerForm],
+        onDraftChange: @escaping @MainActor ([RoutineTriggerForm]) -> Void = { _ in },
+        onDraftCommit: @escaping Persist = { _ in },
+        onCommitOrRevert: @escaping Persist = { _ in }
+    ) {
+        self.rows = initialRows
+        self.lastValidRows = initialRows
+        self.onDraftChange = onDraftChange
+        self.onDraftCommit = onDraftCommit
+        self.onCommitOrRevert = onCommitOrRevert
+    }
+
+    var isValid: Bool {
+        routineTriggerFromForms(rows) != nil
+    }
+
+    func openMenu() {
+        guard !disposed else { return }
+        menuOpen = true
+        error = nil
+    }
+
+    func setHoveredRow(_ row: Int?) {
+        guard !disposed else { return }
+        hoveredRow = row
+    }
+
+    func openEditor(_ row: Int) {
+        guard !disposed, rows.indices.contains(row) else { return }
+        menuOpen = false
+        customInvalid = false
+        editingRow = row
+        focusReturnRow = nil
+        error = nil
+    }
+
+    func setMenuOpen(_ open: Bool) async -> Bool {
+        guard !disposed else { return false }
+        if open {
+            openMenu()
+            return false
+        }
+        menuOpen = false
+        if menuMutation {
+            menuMutation = false
+            return false
+        }
+        if skipNextMenuCommit {
+            skipNextMenuCommit = false
+            return false
+        }
+        return await persist(lastValidRows, using: onCommitOrRevert)
+    }
+
+    func handleMenuEscape() async -> Bool {
+        await setMenuOpen(false)
+    }
+
+    func closeEditor() async -> Bool {
+        guard !disposed, let row = editingRow else { return false }
+        editingRow = nil
+        customInvalid = false
+        let didPersist = await persist(lastValidRows, using: onCommitOrRevert)
+        if !disposed {
+            focusReturnRow = row
+        }
+        return didPersist
+    }
+
+    func replaceDraft(_ next: [RoutineTriggerForm]) {
+        rawChange(next)
+    }
+
+    func updateRow(_ row: Int, value: RoutineTriggerForm, commit: Bool = false) async -> Bool {
+        guard !disposed, rows.indices.contains(row) else { return false }
+        var next = rows
+        next[row] = value
+        customInvalid = false
+        rawChange(next)
+        return commit ? await commitCurrent() : false
+    }
+
+    func updateCustomSchedule(_ row: Int, value: String) {
+        guard rows.indices.contains(row) else { return }
+        Task { _ = await updateRow(row, value: .schedule(value), commit: false) }
+    }
+
+    func blurCustomSchedule(_ row: Int, value: String) async -> Bool {
+        guard !disposed, rows.indices.contains(row) else { return false }
+        let schedule = normalizeSchedule(value)
+        customInvalid = !schedule.isEmpty
+            && !(parseEveryIntervalMs(schedule) != nil || compileCronMatcher(schedule) != nil)
+        var next = rows
+        next[row] = .schedule(schedule)
+        rawChange(next)
+        return customInvalid ? false : await commitCurrent()
+    }
+
+    func addRow(_ value: RoutineTriggerForm, openEditor: Bool = false) async -> Bool {
+        guard !disposed, !pending, rows.count < Self.maximumRows else { return false }
+        menuMutation = true
+        skipNextMenuCommit = false
+        let next = rows + [value]
+        rawChange(next)
+        if openEditor {
+            editingRow = next.count - 1
+            menuOpen = false
+            focusReturnRow = nil
+            return await commitCurrent()
+        }
+        return false
+    }
+
+    func addRowAndCommit(_ value: RoutineTriggerForm) async -> Bool {
+        guard !disposed, !pending, rows.count < Self.maximumRows else { return false }
+        menuMutation = true
+        skipNextMenuCommit = false
+        rawChange(rows + [value])
+        return await commitCurrent()
+    }
+
+    func removeRow(_ row: Int) async -> Bool {
+        guard !disposed, rows.indices.contains(row) else { return false }
+        menuOpen = false
+        editingRow = nil
+        customInvalid = false
+        if rows.count <= 1 {
+            skipNextMenuCommit = true
+            rawChange([])
+            return false
+        }
+        var next = rows
+        next.remove(at: row)
+        rawChange(next)
+        return await commitCurrent()
+    }
+
+    func clearFocusReturnRow() {
+        focusReturnRow = nil
+    }
+
+    func reset(_ next: [RoutineTriggerForm]? = nil) {
+        guard !disposed else { return }
+        generation += 1
+        let value = next ?? lastValidRows
+        rows = value
+        lastValidRows = value
+        menuOpen = false
+        editingRow = nil
+        customInvalid = false
+        hoveredRow = nil
+        focusReturnRow = nil
+        pending = false
+        error = nil
+        menuMutation = false
+        skipNextMenuCommit = false
+        onDraftChange(rows)
+    }
+
+    func dispose() {
+        guard !disposed else { return }
+        generation += 1
+        disposed = true
+        pending = false
+    }
+
+    private func rawChange(_ next: [RoutineTriggerForm]) {
+        guard !disposed else { return }
+        rows = next
+        onDraftChange(next)
+    }
+
+    private func commitCurrent() async -> Bool {
+        guard routineTriggerFromForms(rows) != nil else { return false }
+        return await persist(rows, using: onDraftCommit)
+    }
+
+    private func persist(_ next: [RoutineTriggerForm], using callback: Persist) async -> Bool {
+        guard !disposed, !pending, routineTriggerFromForms(next) != nil else { return false }
+        generation += 1
+        let token = generation
+        pending = true
+        error = nil
+        do {
+            try await callback(next)
+            guard !disposed, generation == token else { return false }
+            lastValidRows = next
+            pending = false
+            return true
+        } catch {
+            guard !disposed, generation == token else { return false }
+            self.error = error.localizedDescription
+            pending = false
+            return false
+        }
+    }
+}
+
 internal struct MobileBotRoutineSpec: Equatable {
     let name: String
     let prompt: String
