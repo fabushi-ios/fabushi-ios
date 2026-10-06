@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import Foundation
 import UIKit
 import WebKit
@@ -96,7 +97,7 @@ final class IOSRemoteComputerTeachRecordingSource: RemoteComputerTeachRecordingS
         _ = try await bridge.request(
             method: "feature.execute",
             params: ["command": command]
-        ).value
+        )
 
         let result = try await bridge.receiveFeatureEvent(
             deadlineMilliseconds: 15_000
@@ -534,7 +535,7 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
             publish(remote)
         } catch {
             guard !disposed, generation == expectedGeneration else { return }
-            if !awaitHeal(expectedGeneration: expectedGeneration) {
+            if !(await awaitHeal(expectedGeneration: expectedGeneration)) {
                 publish(previous)
             }
             errorMessage = String(error.localizedDescription.prefix(240))
