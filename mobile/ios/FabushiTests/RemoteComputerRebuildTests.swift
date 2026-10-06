@@ -946,9 +946,16 @@ final class RemoteComputerRebuildTests: XCTestCase {
         XCTAssertEqual(owner.migrationSnapshot.phases, [.backingUp])
 
         owner.noteNavigationFinished()
+        XCTAssertFalse(
+            owner.state.isConnected,
+            "viewer navigation completion must not masquerade as an RFB connection"
+        )
+        owner.noteVNCSession(.init(phase: .connect, clean: true))
+        XCTAssertEqual(owner.state.boxPhase, "running")
+        XCTAssertTrue(owner.state.isConnected)
+
         await owner.noteReconnect()
         XCTAssertEqual(source.migrationReads, 2)
-        XCTAssertEqual(owner.state.boxPhase, "running")
         XCTAssertTrue(owner.state.isConnected)
 
         await owner.requestReset()
@@ -960,6 +967,32 @@ final class RemoteComputerRebuildTests: XCTestCase {
         XCTAssertEqual(owner.migrationSnapshot.operationID?.value, "reset-op")
         XCTAssertEqual(owner.migrationSnapshot.phase, .done)
 
+        owner.dispose()
+    }
+
+    func testNavigationFinishWaitsForRealRFBSessionSignal() async {
+        let source = FakeSource()
+        let owner = RemoteComputerRebuildOwner(
+            source: source,
+            now: { 150 }
+        )
+
+        await owner.connect()
+        owner.noteNavigationStarted()
+        owner.noteNavigationFinished()
+
+        XCTAssertFalse(owner.state.isConnected)
+        XCTAssertNotEqual(owner.state.boxPhase, "running")
+
+        owner.noteVNCSession(.init(phase: .connect, clean: true))
+        XCTAssertTrue(owner.state.isConnected)
+        XCTAssertEqual(owner.state.boxPhase, "running")
+
+        owner.noteVNCSession(.init(phase: .disconnect, clean: false))
+        XCTAssertFalse(owner.state.isConnected)
+
+        owner.noteVNCSession(.init(phase: .reconnect, clean: true))
+        XCTAssertTrue(owner.state.isConnected)
         owner.dispose()
     }
 
