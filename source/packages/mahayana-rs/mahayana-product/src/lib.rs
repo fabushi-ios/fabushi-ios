@@ -53,6 +53,8 @@ use std::time::UNIX_EPOCH;
 const DEFAULT_API_BASE_URL: &str = "https://api.ombhrum.com";
 const DEFAULT_PLATFORM_CONTROL_PLANE_API_BASE_URL: &str =
     "https://mahayana-platform.bhrumom.workers.dev";
+pub const AGENT_BOX_ENSURE_PATH: &str = "/v1/agent-boxes/ensure";
+pub const AGENT_BOX_RELEASE_PATH: &str = "/v1/agent-boxes/release";
 const LEGACY_API_BACKEND_ONLY_RESPONSE: &str = "This Cloudflare Worker is an API backend only.";
 const MAHAYANA_ACCOUNT_SESSION_SECRET: &str = "MAHAYANA_ACCOUNT_SESSION";
 const MAHAYANA_TEST_ACCOUNT_TOKEN_ENV: &str = "MAHAYANA_TEST_ACCOUNT_TOKEN";
@@ -1319,6 +1321,36 @@ impl MahayanaProductClient {
     /// not be copied into Codex `auth.json` or logs.
     pub fn session_token(&self) -> Result<String, ProductError> {
         self.authorization_token(&Value::Null)
+    }
+
+    /// Host-owned authenticated Agent ForeverBox lifecycle edge.
+    ///
+    /// Native/UI surfaces can choose only the Agent identity and lifecycle trigger.
+    /// The Rust product client owns the bearer credential and the canonical
+    /// control-plane path so callers cannot synthesize arbitrary platform routes.
+    pub fn ensure_agent_box(&self, agent_id: &str) -> Result<Value, ProductError> {
+        let agent_id = validate_agent_box_identity(agent_id, "agentId")?;
+        self.platform_request(&json!({
+            "method": "POST",
+            "path": AGENT_BOX_ENSURE_PATH,
+            "authenticated": true,
+            "body": {"agentId": agent_id},
+        }))
+    }
+
+    pub fn release_agent_box(
+        &self,
+        agent_id: &str,
+        trigger: &str,
+    ) -> Result<Value, ProductError> {
+        let agent_id = validate_agent_box_identity(agent_id, "agentId")?;
+        let trigger = validate_agent_box_identity(trigger, "trigger")?;
+        self.platform_request(&json!({
+            "method": "POST",
+            "path": AGENT_BOX_RELEASE_PATH,
+            "authenticated": true,
+            "body": {"agentId": agent_id, "trigger": trigger},
+        }))
     }
 
     fn load_surface_state(&self) -> Result<ProductSurfaceState, ProductError> {
@@ -3401,6 +3433,19 @@ fn non_empty<'a>(value: &'a str, name: &'static str) -> Result<&'a str, ProductE
         .ok_or(ProductError::InvalidParameter(name))
 }
 
+fn validate_agent_box_identity<'a>(
+    value: &'a str,
+    name: &'static str,
+) -> Result<&'a str, ProductError> {
+    let value = non_empty(value, name)?;
+    let safe = value.len() <= 200
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b':')
+        });
+    safe.then_some(value)
+        .ok_or(ProductError::InvalidParameter(name))
+}
+
 fn safe_path_identifier<'a>(value: &'a str, name: &'static str) -> Result<&'a str, ProductError> {
     let value = non_empty(value, name)?;
     value
@@ -3982,6 +4027,24 @@ mod tests {
         assert_eq!(
             safe_platform_path("/api/../admin"),
             Err(ProductError::InvalidParameter("path"))
+        );
+    }
+
+    #[test]
+    fn agent_box_contract_is_host_owned_and_identity_scoped() {
+        assert_eq!(AGENT_BOX_ENSURE_PATH, "/v1/agent-boxes/ensure");
+        assert_eq!(AGENT_BOX_RELEASE_PATH, "/v1/agent-boxes/release");
+        assert_eq!(
+            validate_agent_box_identity("agent:research-1", "agentId"),
+            Ok("agent:research-1")
+        );
+        assert_eq!(
+            validate_agent_box_identity("../agent", "agentId"),
+            Err(ProductError::InvalidParameter("agentId"))
+        );
+        assert_eq!(
+            validate_agent_box_identity("scope changed", "trigger"),
+            Err(ProductError::InvalidParameter("trigger"))
         );
     }
 
