@@ -2007,7 +2007,11 @@ impl AgentBackend for CodexAgentBackend {
             })
             .await
             .map_err(|error| AgentError::Backend(error.to_string()))?;
-        let configured_servers = self.inner.config.mcp_servers.get();
+        let configured_servers = load_global_mcp_servers(&self.inner.config.codex_home)
+            .await
+            .map_err(|error| AgentError::Backend(format!(
+                "failed to load MCP servers for status snapshot: {error}"
+            )))?;
         response
             .data
             .into_iter()
