@@ -371,7 +371,7 @@ struct RemoteComputerRebuildState: Equatable, Sendable {
             teardownObserved: .none,
             reconnectedSinceLeft: false,
             readySince: nil,
-            isConnected: true,
+            isConnected: false,
             connectedSince: nil,
             resetOperationID: nil,
             hasTerminalMigration: false,
@@ -1151,19 +1151,31 @@ final class RemoteComputerRebuildOwner: ObservableObject {
     }
 
     func noteNavigationFinished() {
+        // WKNavigationDelegate.didFinish means only that the noVNC viewer
+        // document loaded. Desktop deliberately keeps viewer readiness
+        // separate from the RFB transport. Do not synthesize "connected" here.
+    }
+
+    func noteVNCSession(_ session: RemoteComputerShellVNCSession) {
         guard !disposed else { return }
         let at = now()
-        webSessionHealthy = true
-        hasObservedHealthyWebSession = true
-        ingest(.box(
-            boxID: remoteComputerForeverBoxID,
-            phase: "running",
-            at: at
-        ))
-        ingest(.connection(isConnected: true, at: at))
+        switch session.phase {
+        case .connect, .reconnect:
+            webSessionHealthy = true
+            hasObservedHealthyWebSession = true
+            ingest(.box(
+                boxID: remoteComputerForeverBoxID,
+                phase: "running",
+                at: at
+            ))
+            ingest(.connection(isConnected: true, at: at))
+            if state.hasTerminalMigration || state.kind == .reconnecting {
+                ingest(.deactivate(at: at))
+            }
 
-        if state.hasTerminalMigration || state.kind == .reconnecting {
-            ingest(.deactivate(at: at))
+        case .disconnect:
+            webSessionHealthy = false
+            ingest(.connection(isConnected: false, at: at))
         }
     }
 
@@ -1602,6 +1614,9 @@ struct RemoteComputerSurface: View {
     @State private var errorMessage: String?
     @State private var resetConfirmationPresented = false
     @State private var recoverConfirmationPresented = false
+    @State private var vncIdentity = RemoteComputerShellVNCIdentity(host: nil, display: nil)
+    @State private var trustedCursor: IOSVNCCursorTelemetry?
+    @State private var lastLivenessReport: IOSVNCLivenessReport?
 
     init(
         bridge: IOSPreloadBridge? = nil,
@@ -1762,7 +1777,25 @@ struct RemoteComputerSurface: View {
                         errorMessage: $errorMessage,
                         onNavigationStarted: {},
                         onNavigationFinished: {},
-                        onNavigationFailed: {}
+                        onNavigationFailed: {},
+                        onVNCSession: { session, identity in
+                            vncIdentity = identity
+                            switch session.phase {
+                            case .connect:
+                                status = "已安全连接"
+                            case .reconnect:
+                                status = "已重新连接"
+                            case .disconnect:
+                                status = "连接已中断"
+                            }
+                        },
+                        onVNCLiveness: { report, identity in
+                            vncIdentity = identity
+                            lastLivenessReport = report
+                        },
+                        onVNCCursor: { cursor in
+                            trustedCursor = cursor
+                        }
                     )
                     .accessibilityIdentifier("remote-computer-agent-vnc")
                 } else {
@@ -1808,7 +1841,26 @@ struct RemoteComputerSurface: View {
                     errorMessage: $errorMessage,
                     onNavigationStarted: { rebuildOwner.noteNavigationStarted() },
                     onNavigationFinished: { rebuildOwner.noteNavigationFinished() },
-                    onNavigationFailed: { rebuildOwner.noteNavigationFailed() }
+                    onNavigationFailed: { rebuildOwner.noteNavigationFailed() },
+                    onVNCSession: { session, identity in
+                        vncIdentity = identity
+                        rebuildOwner.noteVNCSession(session)
+                        switch session.phase {
+                        case .connect:
+                            status = "已安全连接"
+                        case .reconnect:
+                            status = "已重新连接"
+                        case .disconnect:
+                            status = "连接已中断"
+                        }
+                    },
+                    onVNCLiveness: { report, identity in
+                        vncIdentity = identity
+                        lastLivenessReport = report
+                    },
+                    onVNCCursor: { cursor in
+                        trustedCursor = cursor
+                    }
                 )
             }
         }
@@ -2351,6 +2403,9 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     let onNavigationStarted: @MainActor () -> Void
     let onNavigationFinished: @MainActor () -> Void
     let onNavigationFailed: @MainActor () -> Void
+    let onVNCSession: @MainActor (RemoteComputerShellVNCSession, RemoteComputerShellVNCIdentity) -> Void
+    let onVNCLiveness: @MainActor (IOSVNCLivenessReport, RemoteComputerShellVNCIdentity) -> Void
+    let onVNCCursor: @MainActor (IOSVNCCursorTelemetry) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -2359,7 +2414,10 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             errorMessage: $errorMessage,
             onNavigationStarted: onNavigationStarted,
             onNavigationFinished: onNavigationFinished,
-            onNavigationFailed: onNavigationFailed
+            onNavigationFailed: onNavigationFailed,
+            onVNCSession: onVNCSession,
+            onVNCLiveness: onVNCLiveness,
+            onVNCCursor: onVNCCursor
         )
     }
 
@@ -2370,9 +2428,21 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
 
-        // This restricted surface deliberately has no native script handler or
-        // injected WebMCP bridge. Computer lifecycle state uses the app's
-        // Coordinator RPC plus this exact WebKit navigation lifecycle.
+        // The native bridge is scoped to this one restricted VNC WebView. It
+        // observes the noVNC RFB state and trusted noVNC counters; it does not
+        // expose an application RPC surface to page JavaScript.
+        configuration.userContentController.add(
+            context.coordinator,
+            name: IOSVNCPreloadRuntime.messageHandlerName
+        )
+        configuration.userContentController.addUserScript(
+            WKUserScript(
+                source: IOSVNCPreloadRuntime.bootstrapScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.accessibilityIdentifier = "remote-computer-webview"
         webView.navigationDelegate = context.coordinator
@@ -2404,22 +2474,28 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         coordinator.updateViewerVisibility(false)
         webView.stopLoading()
         webView.navigationDelegate = nil
+        webView.configuration.userContentController.removeScriptMessageHandler(
+            forName: IOSVNCPreloadRuntime.messageHandlerName
+        )
         coordinator.webView = nil
     }
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         @Binding private var status: String
         @Binding private var errorMessage: String?
         private var targetURL: URL
         private let onNavigationStarted: @MainActor () -> Void
         private let onNavigationFinished: @MainActor () -> Void
         private let onNavigationFailed: @MainActor () -> Void
+        private let onVNCSession: @MainActor (RemoteComputerShellVNCSession, RemoteComputerShellVNCIdentity) -> Void
+        private let onVNCLiveness: @MainActor (IOSVNCLivenessReport, RemoteComputerShellVNCIdentity) -> Void
+        private let onVNCCursor: @MainActor (IOSVNCCursorTelemetry) -> Void
         weak var webView: WKWebView?
         var loadedReloadToken: Int?
         var loadedTargetURL: URL?
         private var crashPolicy = RemoteComputerWebProcessCrashPolicy()
-        private let vncRuntime = IOSVNCPreloadRuntime()
+        private let vncRuntime = IOSVNCPreloadEntrypoint.install()
 
         init(
             targetURL: URL,
@@ -2427,7 +2503,10 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             errorMessage: Binding<String?>,
             onNavigationStarted: @escaping @MainActor () -> Void,
             onNavigationFinished: @escaping @MainActor () -> Void,
-            onNavigationFailed: @escaping @MainActor () -> Void
+            onNavigationFailed: @escaping @MainActor () -> Void,
+            onVNCSession: @escaping @MainActor (RemoteComputerShellVNCSession, RemoteComputerShellVNCIdentity) -> Void,
+            onVNCLiveness: @escaping @MainActor (IOSVNCLivenessReport, RemoteComputerShellVNCIdentity) -> Void,
+            onVNCCursor: @escaping @MainActor (IOSVNCCursorTelemetry) -> Void
         ) {
             self.targetURL = targetURL
             _status = status
@@ -2435,6 +2514,9 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             self.onNavigationStarted = onNavigationStarted
             self.onNavigationFinished = onNavigationFinished
             self.onNavigationFailed = onNavigationFailed
+            self.onVNCSession = onVNCSession
+            self.onVNCLiveness = onVNCLiveness
+            self.onVNCCursor = onVNCCursor
         }
 
         func webView(
@@ -2442,7 +2524,8 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             didStartProvisionalNavigation navigation: WKNavigation?
         ) {
             errorMessage = nil
-            status = "正在安全连接…"
+            status = "正在加载远程电脑…"
+            vncRuntime.resetSession()
             onNavigationStarted()
         }
 
@@ -2451,9 +2534,48 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             didFinish navigation: WKNavigation?
         ) {
             if errorMessage == nil {
-                status = "已安全连接"
+                status = "远程电脑已载入，正在建立安全会话…"
             }
             onNavigationFinished()
+        }
+
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == IOSVNCPreloadRuntime.messageHandlerName else { return }
+            let identity = RemoteComputerShellModel.vncIdentity(targetURL.absoluteString)
+
+            if let state = IOSVNCPreloadRuntime.rfbState(from: message.body),
+               let signal = vncRuntime.ingestRFBState(state)
+            {
+                let phase: RemoteComputerShellVNCSession.Phase
+                switch signal.phase {
+                case .connect: phase = .connect
+                case .reconnect: phase = .reconnect
+                case .disconnect: phase = .disconnect
+                }
+                onVNCSession(
+                    .init(phase: phase, clean: signal.clean),
+                    identity
+                )
+                return
+            }
+
+            if let counters = IOSVNCPreloadRuntime.livenessCounters(from: message.body) {
+                let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+                if let report = vncRuntime.sampleLiveness(
+                    nowMilliseconds: now,
+                    counters: counters
+                ) {
+                    onVNCLiveness(report, identity)
+                }
+                return
+            }
+
+            if let cursor = IOSVNCPreloadRuntime.cursorTelemetry(from: message.body) {
+                onVNCCursor(cursor)
+            }
         }
 
         func webView(
@@ -2474,6 +2596,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             onNavigationFailed()
+            vncRuntime.resetSession()
             let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
             switch crashPolicy.recordCrash(atMilliseconds: now) {
             case .reload:
@@ -2488,7 +2611,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
         func prepareExplicitReload() {
             crashPolicy.resetForExplicitReload()
-            vncRuntime.resetLiveness()
+            vncRuntime.resetSession()
         }
 
         func updateViewerVisibility(_ visible: Bool) {
@@ -2529,6 +2652,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         private func handleNavigationError(_ error: Error) {
             let nsError = error as NSError
             guard nsError.code != NSURLErrorCancelled else { return }
+            vncRuntime.resetSession()
             status = "连接失败"
             errorMessage = nsError.localizedDescription
             onNavigationFailed()
