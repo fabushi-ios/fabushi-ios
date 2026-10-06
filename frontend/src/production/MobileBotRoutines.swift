@@ -43,7 +43,7 @@ internal final class MobileBotRoutineRunHistoryClock {
     }
 
     var nowMilliseconds: Int64 {
-        Int64((nowProvider().timeIntervalSince1970 * 1_000).rounded(.towardZero))
+        Int64((nowProvider().timeIntervalSince1970 * 1_000).rounded())
     }
 
     var timeZoneIdentifier: String {

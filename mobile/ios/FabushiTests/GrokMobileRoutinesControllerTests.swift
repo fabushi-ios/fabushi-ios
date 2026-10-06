@@ -376,6 +376,19 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertEqual(cancellations, 1)
     }
 
+    func testRunHistoryClockRoundsDateToNearestMillisecond() {
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "UTC",
+                overrideTimeZone: nil
+            ),
+            now: { Date(timeIntervalSince1970: 0.020) },
+            scheduler: { _, _, _ in { } }
+        )
+
+        XCTAssertEqual(clock.nowMilliseconds, 20)
+    }
+
     @MainActor
     private final class FakeRoutinesController: MobileBotRoutinesControlling {
         var snapshot: MobileBotRoutinesSnapshot
