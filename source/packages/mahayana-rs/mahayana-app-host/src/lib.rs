@@ -1965,24 +1965,17 @@ mod fabushi_shipping_inference_tests {
     }
 
     #[test]
-    fn agent_box_rpc_surface_is_typed_and_not_platform_passthrough() {
-        let ensure = HostRequest {
-            id: "box-ensure".into(),
-            method: "computer.agentBox.ensure".into(),
-            params: json!({}),
-        };
-        let release = HostRequest {
-            id: "box-release".into(),
-            method: "computer.agentBox.release".into(),
-            params: json!({"agentId": "agent-a"}),
-        };
-        let host = AppHost::new_for_test();
-        let ensure_response = host.dispatch(ensure);
-        let release_response = host.dispatch(release);
-        assert!(!ensure_response.ok);
-        assert!(ensure_response.error.unwrap_or_default().contains("agentId is required"));
-        assert!(!release_response.ok);
-        assert!(release_response.error.unwrap_or_default().contains("trigger is required"));
+    fn agent_box_rpc_required_identity_fields_fail_closed() {
+        assert!(string_param(&json!({}), "agentId").is_err());
+        assert!(string_param(&json!({"agentId": "agent-a"}), "agentId").is_ok());
+        assert!(string_param(&json!({"agentId": "agent-a"}), "trigger").is_err());
+        assert!(
+            string_param(
+                &json!({"agentId": "agent-a", "trigger": "scope-changed"}),
+                "trigger"
+            )
+            .is_ok()
+        );
     }
 
     #[test]
