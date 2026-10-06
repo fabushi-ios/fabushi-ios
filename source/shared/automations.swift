@@ -205,3 +205,224 @@ func describeListener(_ listener: AutomationTriggerMember) -> String {
         return "When \(CASE_PHRASES[integration.platform]?[integration.eventCase] ?? integration.eventCase)"
     }
 }
+
+enum RoutineTriggerForm: Equatable, Sendable {
+    case schedule(String)
+    case slack(channel: String, match: SlackMatch)
+    case github(repo: String, events: [String], userAllowlist: String, ciBranch: String)
+    case microsoftTeams(
+        tenantId: String,
+        teamIds: String,
+        channelIds: String,
+        messageContains: String,
+        messageContainsIsRegex: Bool,
+        blockUnauthenticatedTeamsUsers: Bool
+    )
+    case linear(
+        eventCase: String,
+        statusIds: String,
+        cycleIds: String,
+        projectIds: String,
+        teamIds: String
+    )
+    case sentry(eventCase: String, projectIds: String)
+    case pagerduty(eventCase: String, serviceIds: String)
+}
+
+private func routineTokens(_ value: String) -> [String] {
+    value
+        .split(whereSeparator: { $0.isWhitespace || $0 == "," })
+        .map(String.init)
+        .filter { !$0.isEmpty }
+}
+
+private func normalizedRoutineAllowlist(_ value: String) -> [String] {
+    var result: [String] = []
+    for token in routineTokens(value) {
+        let item = token.drop(while: { $0 == "@" })
+        guard !item.isEmpty else { continue }
+        let normalized = String(item)
+        if !result.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
+            result.append(normalized)
+        }
+    }
+    return result
+}
+
+private func normalizedRoutineEmoji(_ values: [String]) -> [String] {
+    var result: [String] = []
+    for raw in values {
+        let normalized = normalizeReactionEmoji(raw)
+        guard isValidReactionEmoji(normalized), !result.contains(normalized) else { continue }
+        result.append(normalized)
+        if result.count == TRIGGER_MAX_REACTION_EMOJI { break }
+    }
+    return result
+}
+
+func routineTriggerFormToMember(_ form: RoutineTriggerForm) -> AutomationTriggerMember? {
+    switch form {
+    case .schedule(let raw):
+        let schedule = normalizeSchedule(raw)
+        guard !schedule.isEmpty,
+              parseEveryIntervalMs(schedule) != nil || compileCronMatcher(schedule) != nil
+        else { return nil }
+        return .cron(.init(schedule: schedule))
+
+    case .slack(let channelRaw, let match):
+        let channel = channelRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !channel.isEmpty else { return nil }
+        switch match {
+        case .keyword(let raw):
+            let keyword = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return keyword.isEmpty ? nil : .slack(.init(channel: channel, match: .keyword(keyword)))
+        case .reaction(let emoji, let bySelf):
+            return .slack(.init(
+                channel: channel,
+                match: .reaction(emoji: normalizedRoutineEmoji(emoji), bySelf: bySelf)
+            ))
+        case .mention:
+            return .slack(.init(channel: channel, match: .mention))
+        case .message:
+            return .slack(.init(channel: channel, match: .message))
+        }
+
+    case .github(let repoRaw, let events, let allowlistRaw, let branchRaw):
+        let repo = repoRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let branch = branchRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isValidGithubRepo(repo),
+              !events.isEmpty,
+              events.allSatisfy({ GITHUB_EVENT_KINDS.contains($0) })
+        else { return nil }
+        let needsBranch = events.contains(where: isGithubCiEventKind)
+        guard !needsBranch || isValidGitBranch(branch) else { return nil }
+        return .github(.init(
+            repo: repo,
+            events: events,
+            ciBranch: needsBranch ? branch : nil,
+            userAllowlist: normalizedRoutineAllowlist(allowlistRaw).nilIfEmpty
+        ))
+
+    case .microsoftTeams(
+        let tenantRaw,
+        let teamIdsRaw,
+        let channelIdsRaw,
+        let messageRaw,
+        let isRegex,
+        let blockUnauthenticated
+    ):
+        let tenant = tenantRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let teamIds = routineTokens(teamIdsRaw)
+        guard !tenant.isEmpty, !teamIds.isEmpty else { return nil }
+        return .microsoftTeams(.init(
+            tenantId: tenant,
+            teamId: "",
+            teamIds: teamIds,
+            channelIds: routineTokens(channelIdsRaw),
+            messageContains: messageRaw.trimmingCharacters(in: .whitespacesAndNewlines),
+            messageContainsIsRegex: isRegex,
+            blockUnauthenticatedTeamsUsers: blockUnauthenticated
+        ))
+
+    case .linear(let eventCase, let statusIds, let cycleIds, let projectIds, let teamIds):
+        guard LINEAR_EVENT_CASES.contains(eventCase) else { return nil }
+        return .integration(.init(
+            platform: .linear,
+            eventCase: eventCase,
+            projectIds: routineTokens(projectIds),
+            teamIds: routineTokens(teamIds),
+            statusIds: eventCase == "statusChanged" ? routineTokens(statusIds) : [],
+            cycleIds: eventCase == "endOfCycle" ? routineTokens(cycleIds) : []
+        ))
+
+    case .sentry(let eventCase, let projectIds):
+        guard SENTRY_EVENT_CASES.contains(eventCase) else { return nil }
+        return .integration(.init(
+            platform: .sentry,
+            eventCase: eventCase,
+            projectIds: routineTokens(projectIds)
+        ))
+
+    case .pagerduty(let eventCase, let serviceIds):
+        guard PAGERDUTY_EVENT_CASES.contains(eventCase) else { return nil }
+        return .integration(.init(
+            platform: .pagerduty,
+            eventCase: eventCase,
+            serviceIds: routineTokens(serviceIds)
+        ))
+    }
+}
+
+func routineTriggerFormIsValid(_ form: RoutineTriggerForm) -> Bool {
+    routineTriggerFormToMember(form) != nil
+}
+
+func routineTriggerFromForms(_ forms: [RoutineTriggerForm]) -> AutomationTrigger? {
+    guard !forms.isEmpty, forms.count <= TRIGGER_MAX_GROUP_LISTENERS else { return nil }
+    var members: [AutomationTriggerMember] = []
+    for form in forms {
+        guard let member = routineTriggerFormToMember(form) else { return nil }
+        members.append(member)
+    }
+    return triggerFromList(members)
+}
+
+func routineTriggerForm(from member: AutomationTriggerMember) -> RoutineTriggerForm {
+    switch member {
+    case .cron(let cron):
+        return .schedule(cron.schedule)
+    case .slack(let slack):
+        return .slack(channel: slack.channel, match: slack.match)
+    case .github(let github):
+        return .github(
+            repo: github.repo,
+            events: github.events,
+            userAllowlist: (github.userAllowlist ?? []).joined(separator: ", "),
+            ciBranch: github.ciBranch ?? ""
+        )
+    case .microsoftTeams(let teams):
+        return .microsoftTeams(
+            tenantId: teams.tenantId,
+            teamIds: (teams.teamIds.isEmpty ? [teams.teamId] : teams.teamIds)
+                .filter { !$0.isEmpty }
+                .joined(separator: ", "),
+            channelIds: teams.channelIds.joined(separator: ", "),
+            messageContains: teams.messageContains,
+            messageContainsIsRegex: teams.messageContainsIsRegex,
+            blockUnauthenticatedTeamsUsers: teams.blockUnauthenticatedTeamsUsers
+        )
+    case .integration(let integration):
+        switch integration.platform {
+        case .linear:
+            return .linear(
+                eventCase: integration.eventCase,
+                statusIds: integration.statusIds.joined(separator: ", "),
+                cycleIds: integration.cycleIds.joined(separator: ", "),
+                projectIds: integration.projectIds.joined(separator: ", "),
+                teamIds: integration.teamIds.joined(separator: ", ")
+            )
+        case .sentry:
+            return .sentry(
+                eventCase: integration.eventCase,
+                projectIds: integration.projectIds.joined(separator: ", ")
+            )
+        case .pagerduty:
+            return .pagerduty(
+                eventCase: integration.eventCase,
+                serviceIds: integration.serviceIds.joined(separator: ", ")
+            )
+        }
+    }
+}
+
+func routineTriggerForms(from trigger: AutomationTrigger) -> [RoutineTriggerForm]? {
+    let members = triggerList(trigger)
+    guard !members.isEmpty, members.count <= TRIGGER_MAX_GROUP_LISTENERS else { return nil }
+    let forms = members.map(routineTriggerForm(from:))
+    return forms.allSatisfy(routineTriggerFormIsValid) ? forms : nil
+}
+
+private extension Array {
+    var nilIfEmpty: Self? { isEmpty ? nil : self }
+}
+
