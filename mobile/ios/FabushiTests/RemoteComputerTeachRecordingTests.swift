@@ -193,6 +193,8 @@ final class RemoteComputerTeachRecordingTests: XCTestCase {
             expectedAgentID: "agent-a"
         )
         XCTAssertTrue(snapshot.hasHandoff)
+        XCTAssertEqual(snapshot.handoff?.requestID, "handoff-1")
+        XCTAssertEqual(snapshot.handoff?.instruction, "Complete sign in")
 
         let clear = try IOSRemoteComputerAgentBoxSource.projectStatus(
             [
