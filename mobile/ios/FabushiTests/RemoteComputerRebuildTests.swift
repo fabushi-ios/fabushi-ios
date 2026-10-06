@@ -4,17 +4,16 @@ import XCTest
 @MainActor
 final class RemoteComputerRebuildTests: XCTestCase {
     private final class FakeSource: RemoteComputerRebuildSource {
+        var supportsManagedLifecycle = true
         var migrationValue: Any = NSNull()
         var migrationReads = 0
         var updateForces: [Bool] = []
         var recreateCalls = 0
-        var reconnectCalls = 0
         var nextUpdateValue: Any = ["status": "started"]
         var nextRecreateValue: Any = [
             "status": "started",
             "operationId": "reset-op",
         ]
-        var nextReconnectValue: Any = ["status": "started"]
 
         func getMigrationStatus() async throws -> Any {
             migrationReads += 1
@@ -36,10 +35,6 @@ final class RemoteComputerRebuildTests: XCTestCase {
             return nextRecreateValue
         }
 
-        func reconnect() async throws -> Any {
-            reconnectCalls += 1
-            return nextReconnectValue
-        }
     }
 
     func testOperationIDFencesStaleTerminalMigrationAndDoneSettles() {
@@ -372,9 +367,34 @@ final class RemoteComputerRebuildTests: XCTestCase {
         XCTAssertEqual(source.updateForces, [true])
 
         await owner.requestReconnect()
-        XCTAssertEqual(source.reconnectCalls, 1)
         XCTAssertEqual(owner.reloadRevision, 1)
+        XCTAssertEqual(source.updateForces, [true])
         XCTAssertTrue(owner.state.isPending == false)
+
+        owner.dispose()
+    }
+
+    func testUnavailableManagedLifecycleFailsClosedWithoutCallingBackend() async {
+        let source = FakeSource()
+        source.supportsManagedLifecycle = false
+        let owner = RemoteComputerRebuildOwner(
+            source: source,
+            now: { 300 }
+        )
+
+        await owner.connect()
+        XCTAssertFalse(owner.managedLifecycleAvailable)
+        XCTAssertEqual(source.migrationReads, 0)
+
+        await owner.requestUpdate()
+        await owner.requestReset()
+        await owner.requestRecover()
+        XCTAssertTrue(source.updateForces.isEmpty)
+        XCTAssertEqual(source.recreateCalls, 0)
+        XCTAssertNotNil(owner.requestError)
+
+        await owner.requestReconnect()
+        XCTAssertEqual(owner.reloadRevision, 1)
 
         owner.dispose()
     }

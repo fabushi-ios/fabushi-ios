@@ -716,10 +716,14 @@ struct RemoteComputerRebuildPresentation: Equatable, Sendable {
 
 @MainActor
 protocol RemoteComputerRebuildSource: AnyObject {
+    /// True only when the current iOS production graph has a real lifecycle
+    /// service behind the Desktop-derived migration/update/recreate contract.
+    /// The Main RPC method table alone is not evidence of a serving route.
+    var supportsManagedLifecycle: Bool { get }
+
     func getMigrationStatus() async throws -> Any
     func update(force: Bool) async throws -> Any
     func recreate() async throws -> Any
-    func reconnect() async throws -> Any
 }
 
 @MainActor
@@ -733,6 +737,12 @@ final class IOSRemoteComputerRebuildSource: RemoteComputerRebuildSource {
     }
 
     private let bridge: IOSPreloadBridge?
+
+    /// The current Rust Product/Host graph does not yet serve the Desktop
+    /// Cursor-box lifecycle methods. Keep the UI fail-closed until that owner is
+    /// ported; otherwise every visible update/reset action deterministically
+    /// falls through to "unknown method".
+    let supportsManagedLifecycle = false
 
     init(bridge: IOSPreloadBridge?) {
         self.bridge = bridge
@@ -759,10 +769,6 @@ final class IOSRemoteComputerRebuildSource: RemoteComputerRebuildSource {
         return try await bridge.request(method: "forceRecreateComputer").value
     }
 
-    func reconnect() async throws -> Any {
-        guard let bridge else { throw SourceError.bridgeUnavailable }
-        return try await bridge.request(method: "forceReconnectGateway").value
-    }
 }
 
 @MainActor
@@ -793,15 +799,23 @@ final class RemoteComputerRebuildOwner: ObservableObject {
         self.now = now
     }
 
+    var managedLifecycleAvailable: Bool {
+        source.supportsManagedLifecycle
+    }
+
     func connect() async {
         guard !disposed else { return }
         connected = true
-        await hydrateMigration()
+        if source.supportsManagedLifecycle {
+            await hydrateMigration()
+        }
     }
 
     func noteReconnect() async {
         guard !disposed, connected else { return }
-        await hydrateMigration()
+        if source.supportsManagedLifecycle {
+            await hydrateMigration()
+        }
         if webSessionHealthy {
             ingest(.box(
                 boxID: remoteComputerForeverBoxID,
@@ -825,7 +839,19 @@ final class RemoteComputerRebuildOwner: ObservableObject {
     }
 
     func requestReconnect() async {
-        await performRequest(kind: .reconnecting, force: false)
+        guard !disposed else { return }
+        requestGeneration &+= 1
+        requestError = nil
+        reloadRevision &+= 1
+        ingest(.request(
+            kind: .reconnecting,
+            operationID: nil,
+            source: nil,
+            at: now()
+        ))
+        // On iOS, the existing restricted WKWebView is the transport owner.
+        // Changing reloadRevision performs the real reconnect; its navigation
+        // callbacks drive connection/box teardown and recovery below.
     }
 
     func noteNavigationStarted() {
@@ -896,6 +922,10 @@ final class RemoteComputerRebuildOwner: ObservableObject {
         force: Bool
     ) async {
         guard !disposed, !state.isPending else { return }
+        guard kind == .reconnecting || source.supportsManagedLifecycle else {
+            requestError = "当前 iOS 版本尚未接入远程电脑的更新/重建服务。"
+            return
+        }
 
         hydrationGeneration &+= 1
         requestGeneration &+= 1
@@ -922,7 +952,9 @@ final class RemoteComputerRebuildOwner: ObservableObject {
             case .reset, .recover:
                 response = try await source.recreate()
             case .reconnecting:
-                response = try await source.reconnect()
+                // requestReconnect is a native WebKit transport operation and
+                // never enters this backend path.
+                return
             }
 
             guard !disposed, attempt == requestGeneration else { return }
@@ -1123,21 +1155,25 @@ struct RemoteComputerSurface: View {
                 }
 
                 Menu {
-                    Button("更新电脑") {
-                        Task { await rebuildOwner.requestUpdate() }
+                    if rebuildOwner.managedLifecycleAvailable {
+                        Button("更新电脑") {
+                            Task { await rebuildOwner.requestUpdate() }
+                        }
                     }
                     Button("重新连接") {
                         errorMessage = nil
                         status = "正在重新连接…"
                         Task { await rebuildOwner.requestReconnect() }
                     }
-                    Button("重置电脑", role: .destructive) {
-                        resetConfirmationPresented = true
+                    if rebuildOwner.managedLifecycleAvailable {
+                        Button("重置电脑", role: .destructive) {
+                            resetConfirmationPresented = true
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
-                .disabled(rebuildOwner.state.isPending)
+                .disabled(rebuildOwner.state.isPending || rebuildOwner.state.kind != nil)
                 .accessibilityIdentifier("remote-computer-actions")
             }
             .padding(12)
@@ -1180,10 +1216,12 @@ struct RemoteComputerSurface: View {
                         }
                         .accessibilityIdentifier("remote-computer-reload")
 
-                        Button("恢复电脑") {
-                            recoverConfirmationPresented = true
+                        if rebuildOwner.managedLifecycleAvailable {
+                            Button("恢复电脑") {
+                                recoverConfirmationPresented = true
+                            }
+                            .accessibilityIdentifier("remote-computer-recover")
                         }
-                        .accessibilityIdentifier("remote-computer-recover")
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

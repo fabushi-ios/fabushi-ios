@@ -827,7 +827,7 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerForeverBoxProjection plus WebKit navigation→box lifecycle ingestion).",
       "test_evidence": "RemoteComputerRebuildTests covers pulling/running/local/starting/sleeping/off projection and shipping-owner navigation hydration.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. Keep implemented (not verified) until a fresh exact HEAD passes ordinary+protected+artifact provenance and the existing Computer main-RPC declarations are independently proven to have a real iOS production service route."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-migration-store.ts",
@@ -842,7 +842,7 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerMigrationAccumulator and RemoteComputerRebuildOwner hydrateMigration).",
       "test_evidence": "RemoteComputerRebuildTests covers operation-scoped phase-history reset and owner launch/reconnect hydration.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. Keep implemented (not verified) until a fresh exact HEAD passes ordinary+protected+artifact provenance and the existing Computer main-RPC declarations are independently proven to have a real iOS production service route."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-model.ts",
@@ -857,7 +857,7 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildState/Event/Reducer and shipping RemoteComputerRebuildOwner).",
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift covers stale operation-id terminal fencing, matching done→settled, failed and deactivate→cancelled, and healthy→disconnect→reconnect transport tracking.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. Keep implemented (not verified) until a fresh exact HEAD passes ordinary+protected+artifact provenance and the existing Computer main-RPC declarations are independently proven to have a real iOS production service route."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-transport-store.ts",
@@ -872,7 +872,7 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift plus frontend/src/recovered/features/app-shell/ContentView.swift, ContentView+Root.swift and frontend/src/production/GrokMobileShell.swift carry the existing bridge/reconnect generation into the single Computer owner.",
       "test_evidence": "RemoteComputerRebuildTests covers healthy→disconnect→reconnect and owner reconnect hydration over one injected source.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. Keep implemented (not verified) until a fresh exact HEAD passes ordinary+protected+artifact provenance and the existing Computer main-RPC declarations are independently proven to have a real iOS production service route."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/first-box-gate.ts",
@@ -1547,7 +1547,7 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildPresentation and RemoteComputerRebuildBanner composed above the existing WebView).",
       "test_evidence": "RemoteComputerRebuildTests covers update/reset/recover presentation and reconnect checking/network/restarting projection.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. Keep implemented (not verified) until a fresh exact HEAD passes ordinary+protected+artifact provenance and the existing Computer main-RPC declarations are independently proven to have a real iOS production service route."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/controller.ts",
