@@ -43,6 +43,93 @@ final class PreloadParityTests: XCTestCase {
         XCTAssertEqual(report?.stallMilliseconds, 7_000)
     }
 
+    @MainActor
+    func testVNCRuntimeTracksRealRFBSessionTransitions() {
+        let runtime = IOSVNCPreloadRuntime()
+
+        XCTAssertNil(runtime.ingestRFBState(.disconnected))
+        XCTAssertNil(runtime.ingestRFBState(.connecting))
+
+        let connected = runtime.ingestRFBState(.connected)
+        XCTAssertEqual(connected?.phase, .connect)
+        XCTAssertEqual(connected?.clean, true)
+        XCTAssertNil(runtime.ingestRFBState(.connected))
+
+        let dropped = runtime.ingestRFBState(.reconnecting)
+        XCTAssertEqual(dropped?.phase, .disconnect)
+        XCTAssertEqual(dropped?.clean, false)
+
+        XCTAssertNil(runtime.ingestRFBState(.connecting))
+        let reconnected = runtime.ingestRFBState(.connected)
+        XCTAssertEqual(reconnected?.phase, .reconnect)
+        XCTAssertEqual(reconnected?.clean, true)
+
+        let cleanDisconnect = runtime.ingestRFBState(.disconnecting)
+        XCTAssertEqual(cleanDisconnect?.phase, .disconnect)
+        XCTAssertEqual(cleanDisconnect?.clean, true)
+    }
+
+    @MainActor
+    func testVNCRuntimeParsesTrustedNativeBridgeMessages() {
+        XCTAssertEqual(
+            IOSVNCPreloadRuntime.rfbState(from: [
+                "kind": "rfb_state",
+                "state": "connected",
+            ]),
+            .connected
+        )
+        XCTAssertNil(IOSVNCPreloadRuntime.rfbState(from: [
+            "kind": "rfb_state",
+            "state": "unknown",
+        ]))
+
+        let counters = IOSVNCPreloadRuntime.livenessCounters(from: [
+            "kind": "liveness",
+            "counters": [
+                "keys": 3,
+                "clicks": 2,
+                "moves": 9,
+                "drawOps": 7,
+                "inBytes": 1024,
+            ],
+        ])
+        XCTAssertEqual(
+            counters,
+            .init(keys: 3, clicks: 2, moves: 9, drawOps: 7, inBytes: 1024)
+        )
+
+        let cursor = IOSVNCPreloadRuntime.cursorTelemetry(from: [
+            "kind": "cursor",
+            "x": 10.5,
+            "y": 20.25,
+            "type": "drag",
+        ])
+        XCTAssertEqual(cursor?.x, 10.5)
+        XCTAssertEqual(cursor?.y, 20.25)
+        XCTAssertEqual(cursor?.kind, .drag)
+        XCTAssertNil(IOSVNCPreloadRuntime.cursorTelemetry(from: [
+            "kind": "cursor",
+            "x": -1,
+            "y": 2,
+            "type": "move",
+        ]))
+    }
+
+    func testVNCBootstrapScriptUsesRealNoVNCSignalsAndCounters() {
+        let script = IOSVNCPreloadRuntime.bootstrapScript
+        XCTAssertTrue(script.contains("noVNC_connected"))
+        XCTAssertTrue(script.contains("noVNC_reconnecting"))
+        XCTAssertTrue(script.contains("rfb_state"))
+        XCTAssertTrue(script.contains("core/rfb.js"))
+        XCTAssertTrue(script.contains("core/display.js"))
+        XCTAssertTrue(script.contains("core/websock.js"))
+        XCTAssertTrue(script.contains("fabushiVNC"))
+        XCTAssertFalse(
+            script.contains("didFinish"),
+            "RFB connectivity must never be inferred from WebKit navigation completion"
+        )
+    }
+
     func testBrowserIdentityProviderAllowlistAndNavigationPolicy() throws {
         XCTAssertTrue(IOSBrowserPreloadPolicy.isAllowlistedIdentityProvider(hostname: "login.microsoftonline.com"))
         XCTAssertTrue(IOSBrowserPreloadPolicy.isAllowlistedIdentityProvider(hostname: "tenant.okta.com"))
