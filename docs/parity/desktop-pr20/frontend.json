@@ -1627,17 +1627,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/view.tsx",
       "desktop_blob_sha": "897cda83d3702811a3c6b2962b9c9f985ac54dfd",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Composes the Desktop Computer user experience from controller/model state: fullscreen and preview surfaces, status placeholders/retry, VNC stage/warm previews, monitor switching, handoff actions, cursor overlay, focus/keyboard routing, accessibility labels, and teach-recording injection.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Users can open the current Computer, understand loading/unavailable/local/running states, reconnect on failure, switch active computer-use monitors, see Agent cursor/handoff attention, and exit back to chat without stale screen state.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Native SwiftUI/WKWebView replaces React preview/fullscreen DOM. The shipping RemoteComputerSurface provides the full-screen Computer destination, scope title, loading/error/reconnect affordances, rebuild/migration banner and canonical Host Computer Use activity. Chat remains the single handoff interaction owner through box.handoff.resolve rather than duplicating handoff controls inside Computer. Desktop monitor strip/cursor overlay and their VNC source remain applicable but cannot be rendered honestly until canonical ForeverBox/subagent monitor/cursor state is available in the new iOS Host composition.",
+      "implementation_status": "mapped",
+      "production_evidence": "RemoteComputerSurface is reached from both the global profile Computer entry and Agent Settings, uses one rebuild/activity/WebKit composition, and exposes accessible scope/status/activity/reconnect/rebuild states. MobileBotChat already renders and resolves the same Host box handoff lifecycle. No static monitor or cursor UI is fabricated without live Host data.",
+      "test_evidence": "RemoteComputerRebuildTests covers scope title/key, rebuild user-visible projections, Agent activity and stale fencing; PreloadParityTests covers WebKit/VNC visibility policy. Fresh exact-HEAD UI/protected acceptance is required. Monitor switching/cursor overlay acceptance remains outstanding with the missing live Host source.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. Keep mapped until canonical ForeverBox/VNC monitor and cursor data are composed, or each missing behavior receives a separately justified iOS replacement. Desktop CSS/pane-resize mechanics are tracked separately and do not block this row by themselves."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/vnc-webview.tsx",
