@@ -487,10 +487,7 @@ internal struct MobileBotChat: View {
             HStack {
                 Spacer(minLength: 54)
                 VStack(alignment: .leading, spacing: 7) {
-                    if !entry.text.isEmpty {
-                        Text(entry.text)
-                            .font(.system(size: 16))
-                    }
+                    messageTextContent(entry)
                     attachmentContent(entry)
                 }
                 .foregroundStyle(.white)
@@ -508,16 +505,8 @@ internal struct MobileBotChat: View {
                 HStack(alignment: .bottom, spacing: 7) {
                     ClothGhostAvatar(botId: bot.id, size: 20)
                     VStack(alignment: .leading, spacing: 7) {
-                        if !entry.text.isEmpty {
-                            Text(entry.text)
-                                .overlay(alignment: .trailing) {
-                                    if entry.streaming {
-                                        Text("▌").foregroundStyle(.black.opacity(0.65))
-                                    }
-                                }
-                                .font(.system(size: 16))
-                                .foregroundStyle(.black)
-                        }
+                        messageTextContent(entry)
+                            .foregroundStyle(.black)
                         attachmentContent(entry)
                     }
                     .padding(.horizontal, 15).padding(.vertical, 10)
@@ -529,6 +518,78 @@ internal struct MobileBotChat: View {
                     Spacer(minLength: 30)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func messageTextContent(_ entry: MobileChatMessage) -> some View {
+        if let projection = entry.sendMessageTextProjection {
+            switch projection.presentation {
+            case .urlCard(let rawURL):
+                if let url = URL(string: rawURL) {
+                    Link(destination: url) {
+                        HStack(spacing: 7) {
+                            Image(systemName: "link")
+                            Text(rawURL)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .font(.system(size: 15, weight: .medium))
+                    }
+                    .accessibilityIdentifier(Self.semanticId("mobile-bot-url-card-\(projection.id)"))
+                } else if !projection.content.isEmpty {
+                    Text(projection.content)
+                        .font(.system(size: 16))
+                }
+            case .text:
+                if !projection.content.isEmpty {
+                    Text(projection.content)
+                        .overlay(alignment: .trailing) {
+                            if projection.streaming {
+                                Text("▌").foregroundStyle(.black.opacity(0.65))
+                            }
+                        }
+                        .font(.system(size: 16))
+                }
+            }
+            ForEach(Array(projection.images.enumerated()), id: \.offset) { index, image in
+                if let url = URL(string: image.url),
+                   let scheme = url.scheme?.lowercased(),
+                   scheme == "http" || scheme == "https"
+                {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let imageView):
+                            imageView
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 220)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        case .failure:
+                            Label(image.alt ?? "Image unavailable", systemImage: "photo")
+                                .font(.caption)
+                        case .empty:
+                            ProgressView().controlSize(.small)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .accessibilityLabel(image.alt ?? "Attached image")
+                    .accessibilityIdentifier(Self.semanticId("mobile-bot-text-image-\(projection.id)-\(index)"))
+                } else {
+                    Label(image.alt ?? "Attached image", systemImage: "photo")
+                        .font(.caption)
+                        .accessibilityIdentifier(Self.semanticId("mobile-bot-text-image-\(projection.id)-\(index)"))
+                }
+            }
+        } else if !entry.text.isEmpty {
+            Text(entry.text)
+                .overlay(alignment: .trailing) {
+                    if entry.streaming {
+                        Text("▌").foregroundStyle(.black.opacity(0.65))
+                    }
+                }
+                .font(.system(size: 16))
         }
     }
 
