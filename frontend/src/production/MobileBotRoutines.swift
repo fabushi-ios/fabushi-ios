@@ -1421,6 +1421,10 @@ internal struct MobileBotRoutinesSection: View {
     @StateObject private var controller: MobileBotRoutinesController
     @State private var showingEditor = false
     @State private var editingRoutine: MobileBotRoutine?
+    @State private var runHistoryClock: MobileBotRoutineRunHistoryClock
+    @State private var runHistoryClockStop: (() -> Void)?
+    @State private var runHistoryNowMilliseconds: Int64
+    @State private var runHistoryTimeZoneIdentifier: String
 
     init(
         agentId: String,
@@ -1429,6 +1433,13 @@ internal struct MobileBotRoutinesSection: View {
     ) {
         self.agentId = agentId
         self.accountScopeKey = accountScopeKey
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineRunHistoryClock.detectTimeZone()
+        )
+        _runHistoryClock = State(initialValue: clock)
+        _runHistoryClockStop = State(initialValue: nil)
+        _runHistoryNowMilliseconds = State(initialValue: clock.nowMilliseconds)
+        _runHistoryTimeZoneIdentifier = State(initialValue: clock.timeZoneIdentifier)
         _controller = StateObject(
             wrappedValue: MobileBotRoutinesController(
                 source: MobileBotRoutinesSource(bridge: bridge)
@@ -1502,7 +1513,20 @@ internal struct MobileBotRoutinesSection: View {
             controller.reset()
             await controller.refresh(agentId: agentId)
         }
+        .onAppear {
+            guard runHistoryClockStop == nil else { return }
+            runHistoryNowMilliseconds = runHistoryClock.nowMilliseconds
+            runHistoryTimeZoneIdentifier = runHistoryClock.timeZoneIdentifier
+            runHistoryClockStop = runHistoryClock.subscribe {
+                Task { @MainActor in
+                    runHistoryNowMilliseconds = runHistoryClock.nowMilliseconds
+                    runHistoryTimeZoneIdentifier = runHistoryClock.timeZoneIdentifier
+                }
+            }
+        }
         .onDisappear {
+            runHistoryClockStop?()
+            runHistoryClockStop = nil
             controller.reset()
         }
     }
@@ -1578,7 +1602,11 @@ internal struct MobileBotRoutinesSection: View {
                     .disabled(controller.pending.contains(routine.id))
                 }
 
-                MobileBotRoutineInlineRunHistory(runs: routine.runs)
+                MobileBotRoutineInlineRunHistory(
+                    runs: routine.runs,
+                    nowMilliseconds: runHistoryNowMilliseconds,
+                    timeZoneIdentifier: runHistoryTimeZoneIdentifier
+                )
 
                 if let error = controller.mutationError(for: routine.id) {
                     Text(error)
@@ -1695,16 +1723,14 @@ internal struct MobileBotRoutineEditorSheet: View {
 @MainActor
 internal struct MobileBotRoutineInlineRunHistory: View {
     let runs: [MobileBotRoutineRun]
-
-    @State private var nowMilliseconds = Int64(
-        (Date().timeIntervalSince1970 * 1_000).rounded(.towardZero)
-    )
+    let nowMilliseconds: Int64
+    let timeZoneIdentifier: String
 
     var body: some View {
         let rows = MobileBotRoutineRunHistoryModel.presentHistory(
             runs,
             now: nowMilliseconds,
-            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
+            timeZoneIdentifier: timeZoneIdentifier
         ).rows
 
         VStack(alignment: .leading, spacing: 4) {
@@ -1727,15 +1753,6 @@ internal struct MobileBotRoutineInlineRunHistory: View {
                     }
                     .help(row.title ?? row.accessibilityLabel)
                 }
-            }
-        }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
-                guard !Task.isCancelled else { return }
-                nowMilliseconds = Int64(
-                    (Date().timeIntervalSince1970 * 1_000).rounded(.towardZero)
-                )
             }
         }
     }
