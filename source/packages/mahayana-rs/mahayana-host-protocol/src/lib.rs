@@ -132,6 +132,11 @@ pub enum AutomationTrigger {
         event: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filter: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filters: Option<BTreeMap<String, Value>>,
+    },
+    Group {
+        listeners: Vec<AutomationTrigger>,
     },
 }
 
