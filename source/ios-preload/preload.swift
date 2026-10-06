@@ -6,6 +6,180 @@ import Foundation
 /// Foundation JSON values are converted at this compatibility edge, then every
 /// production request crosses the same typed request/reply/cancel port protocol
 /// as the Grok renderer/coordinator boundary.
+enum IOSFeatureEventBrokerError: LocalizedError, Equatable {
+    case timedOut
+
+    var errorDescription: String? {
+        switch self {
+        case .timedOut:
+            return "Timed out waiting for a FeatureHost event"
+        }
+    }
+}
+
+@MainActor
+final class IOSFeatureEventBroker {
+    typealias Receiver = (_ timeoutMilliseconds: Int) async throws -> [String: Any]?
+    typealias Predicate = ([String: Any]) -> Bool
+
+    private struct Waiter {
+        let id: UUID
+        let expiresAt: Date
+        let predicate: Predicate
+        let continuation: CheckedContinuation<[String: Any], Error>
+    }
+
+    private let receive: Receiver
+    private let receiveTimeoutMilliseconds: Int
+    private let bufferLimit: Int
+    private var waiters: [UUID: Waiter] = [:]
+    private var waiterOrder: [UUID] = []
+    private var buffered: [[String: Any]] = []
+    private var pumpTask: Task<Void, Never>?
+    private var disposed = false
+
+    init(
+        receiveTimeoutMilliseconds: Int = 80,
+        bufferLimit: Int = 256,
+        receive: @escaping Receiver
+    ) {
+        self.receiveTimeoutMilliseconds = max(1, receiveTimeoutMilliseconds)
+        self.bufferLimit = max(1, bufferLimit)
+        self.receive = receive
+    }
+
+    func next(
+        deadlineMilliseconds: Int,
+        matching predicate: @escaping Predicate
+    ) async throws -> [String: Any] {
+        guard !disposed else { throw CancellationError() }
+        guard deadlineMilliseconds > 0 else {
+            throw IOSFeatureEventBrokerError.timedOut
+        }
+
+        if let bufferedEvent = takeBuffered(matching: predicate) {
+            return bufferedEvent
+        }
+
+        let id = UUID()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                if Task.isCancelled || disposed {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                waiters[id] = Waiter(
+                    id: id,
+                    expiresAt: Date().addingTimeInterval(
+                        Double(deadlineMilliseconds) / 1_000
+                    ),
+                    predicate: predicate,
+                    continuation: continuation
+                )
+                waiterOrder.append(id)
+                startPumpIfNeeded()
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.cancelWaiter(id)
+            }
+        }
+    }
+
+    func dispose() {
+        guard !disposed else { return }
+        disposed = true
+        pumpTask?.cancel()
+        pumpTask = nil
+        buffered.removeAll()
+        failAll(with: CancellationError())
+    }
+
+    private func startPumpIfNeeded() {
+        guard pumpTask == nil, !disposed, !waiters.isEmpty else { return }
+        pumpTask = Task { @MainActor [weak self] in
+            await self?.runPump()
+        }
+    }
+
+    private func runPump() async {
+        defer {
+            pumpTask = nil
+            if !disposed, !waiters.isEmpty {
+                startPumpIfNeeded()
+            }
+        }
+
+        while !disposed, !waiters.isEmpty, !Task.isCancelled {
+            expireWaiters()
+            guard !waiters.isEmpty else { break }
+            do {
+                if let event = try await receive(receiveTimeoutMilliseconds) {
+                    route(event)
+                }
+            } catch is CancellationError {
+                if Task.isCancelled || disposed { break }
+            } catch {
+                failAll(with: error)
+                break
+            }
+        }
+    }
+
+    private func route(_ event: [String: Any]) {
+        expireWaiters()
+        for id in waiterOrder {
+            guard let waiter = waiters[id], waiter.predicate(event) else { continue }
+            removeWaiter(id)
+            waiter.continuation.resume(returning: event)
+            return
+        }
+
+        buffered.append(event)
+        if buffered.count > bufferLimit {
+            buffered.removeFirst(buffered.count - bufferLimit)
+        }
+    }
+
+    private func takeBuffered(matching predicate: Predicate) -> [String: Any]? {
+        guard let index = buffered.firstIndex(where: predicate) else { return nil }
+        return buffered.remove(at: index)
+    }
+
+    private func expireWaiters() {
+        let now = Date()
+        let expired = waiterOrder.filter {
+            guard let waiter = waiters[$0] else { return false }
+            return waiter.expiresAt <= now
+        }
+        for id in expired {
+            guard let waiter = waiters[id] else { continue }
+            removeWaiter(id)
+            waiter.continuation.resume(throwing: IOSFeatureEventBrokerError.timedOut)
+        }
+    }
+
+    private func cancelWaiter(_ id: UUID) {
+        guard let waiter = waiters[id] else { return }
+        removeWaiter(id)
+        waiter.continuation.resume(throwing: CancellationError())
+    }
+
+    private func removeWaiter(_ id: UUID) {
+        waiters.removeValue(forKey: id)
+        waiterOrder.removeAll { $0 == id }
+    }
+
+    private func failAll(with error: Error) {
+        let current = waiterOrder.compactMap { waiters[$0] }
+        waiters.removeAll()
+        waiterOrder.removeAll()
+        for waiter in current {
+            waiter.continuation.resume(throwing: error)
+        }
+    }
+}
+
 @MainActor
 final class IOSPreloadBridge {
     struct JSONResult: @unchecked Sendable {
@@ -14,6 +188,7 @@ final class IOSPreloadBridge {
 
     private let server: RendererPortServer
     private let client: IOSCoordinatorPortClient
+    private var featureEventBroker: IOSFeatureEventBroker?
 
     init(main: IOSMainRuntime) {
         let pair = InProcessCoordinatorPort.makePair(bootstrap: main.coordinatorBootstrap)
@@ -28,6 +203,14 @@ final class IOSPreloadBridge {
 
         self.server = server
         client = IOSCoordinatorPortClient(port: pair.client)
+        featureEventBroker = IOSFeatureEventBroker { [weak self] timeoutMilliseconds in
+            guard let self else { throw CancellationError() }
+            let result = try await self.request(
+                method: "feature.receive",
+                params: ["timeoutMs": timeoutMilliseconds]
+            )
+            return result.value as? [String: Any]
+        }
     }
 
     func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
@@ -44,7 +227,22 @@ final class IOSPreloadBridge {
         try await request(method: "listAllAutomations")
     }
 
+    func receiveFeatureEvent(
+        deadlineMilliseconds: Int,
+        matching predicate: @escaping IOSFeatureEventBroker.Predicate
+    ) async throws -> JSONResult {
+        guard let featureEventBroker else { throw CancellationError() }
+        return JSONResult(
+            value: try await featureEventBroker.next(
+                deadlineMilliseconds: deadlineMilliseconds,
+                matching: predicate
+            )
+        )
+    }
+
     func shutdown() {
+        featureEventBroker?.dispose()
+        featureEventBroker = nil
         client.shutdown()
     }
 }
