@@ -1822,17 +1822,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/attachment-data.ts",
       "desktop_blob_sha": "52c8606066fe778b297759434c0f8a28d95fc696",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_responsibility": "Owns transcript attachment data classification and projection for legacy send-message attachments and server user-attachment events: box/link/media/file discrimination, HTTP URL normalization, box request/snapshot metadata, media resolution eligibility, gallery attachment shape, filename fallback, batch/reply/clientNonce correlation, and strict malformed metadata rejection.",
+      "desktop_owner": "renderer / transcript-card attachment data adapter",
+      "desktop_visible_effect": "Transcript attachments consistently render as Computer cards, links, media, or files; uploaded user attachments retain the metadata needed for grouped gallery/read/download behavior, while malformed attachment records fail closed instead of producing misleading cards.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native typed MobileAttachmentCardProjection replaces the Desktop TypeScript adapter while preserving box/legacy-link/media/file classification, normalized HTTP links, strict malformed-metadata fail-closed behavior, user-attachment batch/reply/clientNonce metadata and basename fallback. The existing MobileChatMessage owner carries the projection; MobileBotChat renders that same projection for both user and assistant transcript rows without creating a second attachment store.",
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift defines classifyMobileAttachmentURL/projectMobileAttachmentCard/projectMobileChatMessageAttachment and wires live chat.message plus transcript.card attachment events into one typed MobileChatMessage projection. frontend/src/recovered/features/conversation/MobileBotChat.swift consumes that projection on the shipping transcript for box/link/media/file presentation, including user attachments.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers Desktop attachment kind classification, box metadata, normalized legacy links, media/file classification, user-attachment metadata/basename projection, malformed metadata rejection, and shared transcript/live-chat typed projection. Fresh exact-HEAD ordinary/protected Actions required before verified.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and attachment-data.ts blob 9f51c3e56a5eaf984a4bb36e86d694981bdb4af6. Implemented on current branch; do not promote to verified until current exact-HEAD CI and artifact provenance are terminal-success."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and canonical desktop blob 52c8606066fe778b297759434c0f8a28d95fc696. MarketplaceModel.swift is the single attachment data/projection owner; MobileBotChat.swift is supporting shipping presentation evidence, not a second data owner. Implemented on current branch; do not promote to verified until current exact-HEAD CI and artifact provenance are terminal-success."
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/auto-review-actions.ts",
