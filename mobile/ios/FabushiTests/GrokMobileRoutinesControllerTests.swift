@@ -642,4 +642,123 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         }
     }
 
+
+    func testRoutineTriggerSchemaRoundTripsSupportedNativeForms() {
+        let forms: [RoutineTriggerForm] = [
+            .schedule(" 0 9 * * 1-5 "),
+            .slack(channel: "alerts", match: .keyword("regression")),
+            .github(
+                repo: "openai/example",
+                events: ["pr-opened", "ci-failed"],
+                userAllowlist: "@Alice, alice Bob",
+                ciBranch: "main"
+            ),
+            .microsoftTeams(
+                tenantId: "tenant-a",
+                teamIds: "team-a, team-b",
+                channelIds: "channel-a",
+                messageContains: "urgent",
+                messageContainsIsRegex: false,
+                blockUnauthenticatedTeamsUsers: true
+            ),
+            .linear(
+                eventCase: "statusChanged",
+                statusIds: "done, blocked",
+                cycleIds: "",
+                projectIds: "project-a",
+                teamIds: "team-a"
+            ),
+            .sentry(eventCase: "issueResolved", projectIds: "web, api"),
+            .pagerduty(eventCase: "incidentTriggered", serviceIds: "payments"),
+        ]
+
+        let trigger = routineTriggerFromForms(forms)
+        XCTAssertNotNil(trigger)
+        XCTAssertEqual(trigger.map(triggerList).map(\.count), forms.count)
+
+        let roundTripped = trigger.flatMap(routineTriggerForms(from:))
+        XCTAssertEqual(roundTripped?.count, forms.count)
+
+        guard let roundTripped else {
+            return XCTFail("expected trigger forms")
+        }
+        guard case .schedule(let schedule) = roundTripped[0] else {
+            return XCTFail("expected schedule form")
+        }
+        XCTAssertEqual(schedule, "0 9 * * 1-5")
+
+        guard case .github(let repo, let events, let users, let branch) = roundTripped[2] else {
+            return XCTFail("expected github form")
+        }
+        XCTAssertEqual(repo, "openai/example")
+        XCTAssertEqual(events, ["pr-opened", "ci-failed"])
+        XCTAssertEqual(users, "Alice, Bob")
+        XCTAssertEqual(branch, "main")
+    }
+
+    func testRoutineTriggerSchemaFailsClosedOnInvalidFormsAndRowCounts() {
+        let invalid: [RoutineTriggerForm] = [
+            .schedule("61 25 * * *"),
+            .slack(channel: "   ", match: .message),
+            .slack(channel: "alerts", match: .keyword("   ")),
+            .github(repo: "not-a-repo", events: ["pr-opened"], userAllowlist: "", ciBranch: ""),
+            .github(repo: "openai/example", events: ["ci-failed"], userAllowlist: "", ciBranch: "bad branch"),
+            .microsoftTeams(
+                tenantId: "",
+                teamIds: "team-a",
+                channelIds: "",
+                messageContains: "",
+                messageContainsIsRegex: false,
+                blockUnauthenticatedTeamsUsers: false
+            ),
+            .linear(eventCase: "unknown", statusIds: "", cycleIds: "", projectIds: "", teamIds: ""),
+            .sentry(eventCase: "unknown", projectIds: ""),
+            .pagerduty(eventCase: "unknown", serviceIds: ""),
+        ]
+
+        for form in invalid {
+            XCTAssertFalse(routineTriggerFormIsValid(form), "invalid trigger form must fail closed: \(form)")
+        }
+
+        XCTAssertNil(routineTriggerFromForms([]))
+        XCTAssertNil(
+            routineTriggerFromForms(
+                Array(repeating: RoutineTriggerForm.schedule("@daily"), count: TRIGGER_MAX_GROUP_LISTENERS + 1)
+            )
+        )
+    }
+
+    func testRoutineTriggerSchemaNormalizesReactionEmojiAndGitHubAllowlist() {
+        let reaction = routineTriggerFormToMember(
+            .slack(
+                channel: "*",
+                match: .reaction(
+                    emoji: [":Ship:", "ship", "bad emoji", "rocket::skin", "rocket"],
+                    bySelf: true
+                )
+            )
+        )
+        guard case .slack(let slack)? = reaction,
+              case .reaction(let emoji, let bySelf) = slack.match
+        else {
+            return XCTFail("expected reaction listener")
+        }
+        XCTAssertEqual(emoji, ["ship", "rocket"])
+        XCTAssertEqual(bySelf, true)
+
+        let github = routineTriggerFormToMember(
+            .github(
+                repo: "owner/repo",
+                events: ["pr-opened"],
+                userAllowlist: "@Alice alice BOB",
+                ciBranch: ""
+            )
+        )
+        guard case .github(let value)? = github else {
+            return XCTFail("expected github listener")
+        }
+        XCTAssertEqual(value.userAllowlist, ["Alice", "BOB"])
+        XCTAssertNil(value.ciBranch)
+    }
+
 }
