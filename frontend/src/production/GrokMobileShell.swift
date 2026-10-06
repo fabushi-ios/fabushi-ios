@@ -101,7 +101,13 @@ internal struct GrokMobileShell: View {
     }
 
     private var unauthenticatedContent: some View {
-        ContentView(model: model, messaging: messaging, appAgentSurface: appAgentSurface)
+        ContentView(
+            model: model,
+            messaging: messaging,
+            appAgentSurface: appAgentSurface,
+            bridge: bridge,
+            reconnectGeneration: reconnectGeneration
+        )
     }
 
     private func selectedBotContent(_ bot: MobileBotSummary) -> some View {
@@ -158,6 +164,8 @@ internal struct GrokMobileShell: View {
                 model: model,
                 messaging: messaging,
                 appAgentSurface: appAgentSurface,
+                bridge: bridge,
+                reconnectGeneration: reconnectGeneration,
                 initialConversation: legacyConversationID.flatMap { id in
                     messaging.conversations.first(where: { $0.id == id })
                 },

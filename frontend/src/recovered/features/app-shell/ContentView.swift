@@ -71,12 +71,16 @@ struct ContentView: View {
     @Bindable var model: MarketplaceModel
     @Bindable var messaging: MessagingModel
     let appAgentSurface: FabushiAppAgentSurface
+    let bridge: IOSPreloadBridge?
+    let reconnectGeneration: Int
     let onShellBack: (() -> Void)?
 
     init(
         model: MarketplaceModel,
         messaging: MessagingModel,
         appAgentSurface: FabushiAppAgentSurface,
+        bridge: IOSPreloadBridge? = nil,
+        reconnectGeneration: Int = 0,
         initialConversation: ConversationSummary? = nil,
         initialMessageID: String? = nil,
         initialSection: MobileSection? = nil,
@@ -85,6 +89,8 @@ struct ContentView: View {
         self.model = model
         self.messaging = messaging
         self.appAgentSurface = appAgentSurface
+        self.bridge = bridge
+        self.reconnectGeneration = reconnectGeneration
         self.onShellBack = onShellBack
         _selectedConversation = State(initialValue: initialConversation)
         _pendingInitialMessageID = State(initialValue: initialMessageID)

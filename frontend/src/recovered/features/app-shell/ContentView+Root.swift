@@ -25,7 +25,12 @@ extension ContentView {
             case .marketplace:
                 marketplaceView
             case .remoteComputer:
-                RemoteComputerSurface { destination = .home }
+                RemoteComputerSurface(
+                    bridge: bridge,
+                    reconnectGeneration: reconnectGeneration
+                ) {
+                    destination = .home
+                }
             }
         }
         .fullScreenCover(item: $openedMiniApp) { plugin in

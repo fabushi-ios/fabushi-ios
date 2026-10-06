@@ -1,21 +1,1103 @@
+import Foundation
 import SwiftUI
 import UIKit
 import WebKit
 
 private let remoteComputerOriginHost = "fabushi.ombhrum.com"
 private let remoteComputerURL = URL(string: "https://fabushi.ombhrum.com/remote-computer")!
+private let remoteComputerForeverBoxID = "forever-box"
 
-/// A deliberately narrow browser surface for human-operated remote computer sessions.
-///
-/// Unlike `MiniAppWebMcpSurface`, this view never registers a native script handler or
-/// injects a native bridge. The hosted page can use normal browser APIs (including
-/// WebRTC), but it cannot call arbitrary native application capabilities.
+enum RemoteComputerRebuildKind: String, Equatable, Sendable {
+    case update
+    case reset
+    case recover
+    case reconnecting
+
+    var isResetLike: Bool {
+        self == .reset || self == .recover
+    }
+}
+
+enum RemoteComputerRebuildUpdateSource: String, Equatable, Sendable {
+    case auto
+    case request
+    case migration
+}
+
+enum RemoteComputerRebuildTeardown: String, Equatable, Sendable {
+    case none
+    case transport
+    case box
+}
+
+enum RemoteComputerRebuildResolution: String, Equatable, Sendable {
+    case settled
+    case failed
+    case cancelled
+}
+
+struct RemoteComputerRebuildOperationID: Equatable, Sendable {
+    let value: String
+}
+
+enum RemoteComputerMigrationPhase: String, CaseIterable, Equatable, Sendable {
+    case backingUp = "backing-up"
+    case creating
+    case moving
+    case cleaningUp = "cleaning-up"
+    case wiping
+    case done
+    case failed
+
+    var isTerminal: Bool {
+        self == .done || self == .failed
+    }
+}
+
+struct RemoteComputerRebuildState: Equatable, Sendable {
+    var kind: RemoteComputerRebuildKind?
+    var operationID: RemoteComputerRebuildOperationID?
+    var updateSource: RemoteComputerRebuildUpdateSource?
+    var lockBoxID: String?
+    var isPending: Bool
+    var hasRequestAcknowledgement: Bool
+    var imageUpdateAvailable: Bool?
+    var expectsImageUpgrade: Bool
+    var boxPhase: String?
+    var observedBoxID: String?
+    var lastHealthyBoxID: String?
+    var hasLeftHealthy: Bool
+    var teardownObserved: RemoteComputerRebuildTeardown
+    var reconnectedSinceLeft: Bool
+    var readySince: Int64?
+    var isConnected: Bool
+    var connectedSince: Int64?
+    var resetOperationID: RemoteComputerRebuildOperationID?
+    var hasTerminalMigration: Bool
+    var lastResolution: RemoteComputerRebuildResolution?
+    var lastResolutionKind: RemoteComputerRebuildKind?
+
+    static func initial(
+        boxPhase: String? = nil,
+        imageUpdateAvailable: Bool? = nil
+    ) -> Self {
+        .init(
+            kind: nil,
+            operationID: nil,
+            updateSource: nil,
+            lockBoxID: nil,
+            isPending: false,
+            hasRequestAcknowledgement: false,
+            imageUpdateAvailable: imageUpdateAvailable,
+            expectsImageUpgrade: false,
+            boxPhase: boxPhase,
+            observedBoxID: nil,
+            lastHealthyBoxID: nil,
+            hasLeftHealthy: false,
+            teardownObserved: .none,
+            reconnectedSinceLeft: false,
+            readySince: nil,
+            isConnected: true,
+            connectedSince: nil,
+            resetOperationID: nil,
+            hasTerminalMigration: false,
+            lastResolution: nil,
+            lastResolutionKind: nil
+        )
+    }
+}
+
+enum RemoteComputerRebuildEvent: Equatable, Sendable {
+    case request(
+        kind: RemoteComputerRebuildKind,
+        operationID: RemoteComputerRebuildOperationID?,
+        source: RemoteComputerRebuildUpdateSource?,
+        at: Int64
+    )
+    case pending(Bool, at: Int64)
+    case acknowledged(at: Int64)
+    case imageUpdate(Bool?, at: Int64)
+    case box(boxID: String?, phase: String?, at: Int64)
+    case migration(
+        operationID: RemoteComputerRebuildOperationID?,
+        phase: RemoteComputerMigrationPhase,
+        at: Int64
+    )
+    case connection(isConnected: Bool, at: Int64)
+    case error(at: Int64)
+    case deactivate(at: Int64)
+    case tick(at: Int64)
+}
+
+enum RemoteComputerRebuildReducer {
+    private static func healthy(_ phase: String?) -> Bool {
+        phase == "running" || phase == "local"
+    }
+
+    private static func sameOperation(
+        _ left: RemoteComputerRebuildOperationID?,
+        _ right: RemoteComputerRebuildOperationID?
+    ) -> Bool {
+        guard let left, let right else { return false }
+        return left.value == right.value
+    }
+
+    private static func sameLockedBox(_ state: RemoteComputerRebuildState) -> Bool {
+        state.lockBoxID == nil
+            || state.observedBoxID == nil
+            || state.lockBoxID == state.observedBoxID
+    }
+
+    private static func clearOperation(
+        _ state: RemoteComputerRebuildState,
+        resolution: RemoteComputerRebuildResolution?
+    ) -> RemoteComputerRebuildState {
+        var next = state
+        let previousKind = state.kind
+        next.kind = nil
+        next.operationID = nil
+        next.updateSource = nil
+        next.lockBoxID = nil
+        next.hasLeftHealthy = false
+        next.teardownObserved = .none
+        next.reconnectedSinceLeft = false
+        next.readySince = nil
+        next.resetOperationID = nil
+        next.hasTerminalMigration = false
+        next.hasRequestAcknowledgement = false
+        next.expectsImageUpgrade = false
+        next.lastResolution = resolution
+        next.lastResolutionKind = previousKind
+        return next
+    }
+
+    private static func begin(
+        _ state: RemoteComputerRebuildState,
+        kind: RemoteComputerRebuildKind,
+        operationID: RemoteComputerRebuildOperationID?,
+        source: RemoteComputerRebuildUpdateSource?,
+        at: Int64
+    ) -> RemoteComputerRebuildState {
+        let scopedOperationID = kind.isResetLike ? operationID : nil
+        let updateSource = kind == .update ? source : nil
+
+        if state.kind != nil {
+            if kind.isResetLike
+                && (
+                    state.kind?.isResetLike != true
+                    || (
+                        operationID != nil
+                        && !sameOperation(state.resetOperationID, operationID)
+                    )
+                )
+            {
+                var next = state
+                next.kind = kind
+                next.operationID = scopedOperationID
+                next.resetOperationID = scopedOperationID
+                next.updateSource = nil
+                next.lockBoxID = state.observedBoxID
+                next.hasLeftHealthy = true
+                next.reconnectedSinceLeft = false
+                next.readySince = nil
+                next.hasTerminalMigration = false
+                next.hasRequestAcknowledgement = false
+                next.expectsImageUpgrade = false
+                next.lastResolution = nil
+                next.lastResolutionKind = nil
+                return next
+            }
+
+            if state.kind == .reconnecting && kind != .reconnecting {
+                var next = state
+                next.kind = kind
+                next.operationID = scopedOperationID
+                next.resetOperationID = scopedOperationID
+                next.updateSource = updateSource
+                next.lockBoxID = state.observedBoxID
+                next.expectsImageUpgrade =
+                    kind == .update && state.imageUpdateAvailable == true
+                return next
+            }
+
+            if state.kind == .update
+                && kind == .update
+                && state.updateSource == .auto
+                && source != nil
+                && source != .auto
+            {
+                var next = state
+                next.updateSource = source
+                return next
+            }
+
+            return state
+        }
+
+        let leavesHealthy = kind == .reconnecting || kind.isResetLike
+        var next = state
+        next.kind = kind
+        next.operationID = scopedOperationID
+        next.resetOperationID = scopedOperationID
+        next.updateSource = updateSource
+        next.lockBoxID = state.observedBoxID
+        next.hasLeftHealthy = leavesHealthy
+        next.reconnectedSinceLeft = false
+        next.readySince =
+            !leavesHealthy && healthy(state.boxPhase) ? at : nil
+        next.connectedSince =
+            state.isConnected ? state.connectedSince ?? at : nil
+        next.hasTerminalMigration = false
+        next.hasRequestAcknowledgement = false
+        next.expectsImageUpgrade =
+            kind == .update && state.imageUpdateAvailable == true
+        next.lastResolution = nil
+        next.lastResolutionKind = nil
+        return next
+    }
+
+    static func reduce(
+        _ state: RemoteComputerRebuildState,
+        _ event: RemoteComputerRebuildEvent
+    ) -> RemoteComputerRebuildState {
+        switch event {
+        case .request(let kind, let operationID, let source, let at):
+            return begin(
+                state,
+                kind: kind,
+                operationID: operationID,
+                source: source,
+                at: at
+            )
+
+        case .pending(let isPending, _):
+            if !isPending && state.kind == nil {
+                var next = clearOperation(state, resolution: nil)
+                next.isPending = false
+                return next
+            }
+            var next = state
+            next.isPending = isPending
+            return next
+
+        case .acknowledged:
+            guard state.kind == .update || state.kind?.isResetLike == true else {
+                return state
+            }
+            var next = state
+            next.hasRequestAcknowledgement = true
+            return next
+
+        case .imageUpdate(let available, _):
+            var next = state
+            next.imageUpdateAvailable = available
+            return next
+
+        case .box(let boxID, let phase, let at):
+            if state.observedBoxID == boxID && state.boxPhase == phase {
+                return state
+            }
+
+            var next = state
+            next.observedBoxID = boxID
+            next.boxPhase = phase
+            if healthy(phase) {
+                next.lastHealthyBoxID = boxID
+            }
+
+            if next.kind == nil
+                && !next.isPending
+                && phase == "pulling"
+                && boxID != nil
+                && next.lastHealthyBoxID == boxID
+            {
+                next = begin(
+                    next,
+                    kind: .update,
+                    operationID: nil,
+                    source: .auto,
+                    at: at
+                )
+            }
+
+            guard next.kind != nil else { return next }
+            if next.lockBoxID == nil, let boxID {
+                next.lockBoxID = boxID
+            }
+            guard sameLockedBox(next) else {
+                next.readySince = nil
+                return next
+            }
+
+            if healthy(phase) {
+                next.readySince = next.readySince ?? at
+            } else {
+                next.hasLeftHealthy = true
+                next.teardownObserved = .box
+                next.readySince = nil
+            }
+            return next
+
+        case .migration(let operationID, let phase, let at):
+            if phase == .failed {
+                return state.kind == nil
+                    ? state
+                    : clearOperation(state, resolution: .failed)
+            }
+
+            if phase == .done {
+                let eligible =
+                    state.kind?.isResetLike == true
+                    || (
+                        state.kind == .update
+                        && state.updateSource == .migration
+                    )
+                guard eligible, !state.hasTerminalMigration else {
+                    return state
+                }
+                if state.operationID != nil
+                    && operationID != nil
+                    && !sameOperation(state.operationID, operationID)
+                {
+                    return state
+                }
+                var next = state
+                next.hasTerminalMigration = true
+                next.hasLeftHealthy = true
+                next.readySince =
+                    state.isConnected
+                    && healthy(state.boxPhase)
+                    && sameLockedBox(state)
+                    ? at
+                    : nil
+                return next
+            }
+
+            if phase == .wiping {
+                return begin(
+                    state,
+                    kind: .reset,
+                    operationID: operationID,
+                    source: nil,
+                    at: at
+                )
+            }
+
+            return begin(
+                state,
+                kind: .update,
+                operationID: operationID,
+                source: .migration,
+                at: at
+            )
+
+        case .connection(let isConnected, let at):
+            if isConnected {
+                var next = state
+                next.isConnected = true
+                next.connectedSince = state.connectedSince ?? at
+                next.reconnectedSinceLeft =
+                    state.hasLeftHealthy || state.reconnectedSinceLeft
+                if state.kind != nil
+                    && state.hasLeftHealthy
+                    && healthy(state.boxPhase)
+                    && sameLockedBox(state)
+                {
+                    next.readySince = state.readySince ?? at
+                }
+                return next
+            }
+
+            var next = state
+            next.isConnected = false
+            next.connectedSince = nil
+            if state.kind != nil {
+                next.hasLeftHealthy = true
+                if state.teardownObserved == .none {
+                    next.teardownObserved = .transport
+                }
+                next.readySince = nil
+            }
+            return next
+
+        case .error:
+            return state.kind == nil
+                ? state
+                : clearOperation(state, resolution: .failed)
+
+        case .deactivate:
+            return state.kind == nil
+                ? state
+                : clearOperation(
+                    state,
+                    resolution: state.hasTerminalMigration ? .settled : .cancelled
+                )
+
+        case .tick:
+            return state
+        }
+    }
+}
+
+struct RemoteComputerMigrationEvent: Equatable, Sendable {
+    let operationID: RemoteComputerRebuildOperationID?
+    let phase: RemoteComputerMigrationPhase
+    let detail: String
+}
+
+struct RemoteComputerMigrationSnapshot: Equatable, Sendable {
+    let operationID: RemoteComputerRebuildOperationID?
+    let phase: RemoteComputerMigrationPhase?
+    let detail: String
+    let phases: [RemoteComputerMigrationPhase]
+
+    static let empty = Self(
+        operationID: nil,
+        phase: nil,
+        detail: "",
+        phases: []
+    )
+}
+
+struct RemoteComputerMigrationAccumulator: Equatable, Sendable {
+    private(set) var current: RemoteComputerMigrationEvent?
+    private(set) var snapshot: RemoteComputerMigrationSnapshot = .empty
+    private var episodeOperationID: RemoteComputerRebuildOperationID?
+
+    mutating func ingest(_ next: RemoteComputerMigrationEvent) -> Bool {
+        guard current != next else { return false }
+
+        let keepsAnonymousEpisode =
+            episodeOperationID == nil
+            && next.operationID == nil
+            && current != nil
+            && current?.phase.isTerminal != true
+
+        if !keepsAnonymousEpisode
+            && !Self.sameOperation(episodeOperationID, next.operationID)
+        {
+            episodeOperationID = next.operationID
+            snapshot = .empty
+        }
+
+        var phases = snapshot.phases
+        if !next.phase.isTerminal && phases.last != next.phase {
+            phases.append(next.phase)
+        }
+
+        current = next
+        snapshot = .init(
+            operationID: episodeOperationID,
+            phase: next.phase,
+            detail: next.detail,
+            phases: phases
+        )
+        return true
+    }
+
+    mutating func reset() {
+        current = nil
+        episodeOperationID = nil
+        snapshot = .empty
+    }
+
+    private static func sameOperation(
+        _ left: RemoteComputerRebuildOperationID?,
+        _ right: RemoteComputerRebuildOperationID?
+    ) -> Bool {
+        guard let left, let right else { return false }
+        return left.value == right.value
+    }
+}
+
+struct RemoteComputerForeverBoxStatus: Equatable, Sendable {
+    let agentID: String
+    let state: String
+    let pullPercent: Double?
+    let vncURL: String?
+    let imageUpdateAvailable: Bool?
+}
+
+enum RemoteComputerForeverBoxProjection {
+    static func phase(
+        _ value: RemoteComputerForeverBoxStatus,
+        isStarting: Bool = false
+    ) -> String {
+        if value.pullPercent != nil {
+            return "pulling"
+        }
+        if value.state == "running" {
+            return value.vncURL?.isEmpty == false ? "running" : "local"
+        }
+        if isStarting {
+            return "starting"
+        }
+        if value.state == "hibernated" {
+            return "sleeping"
+        }
+        return "off"
+    }
+}
+
+enum RemoteComputerReconnectVariant: String, Equatable, Sendable {
+    case checking
+    case network
+    case restarting
+}
+
+struct RemoteComputerRebuildPresentation: Equatable, Sendable {
+    let title: String
+    let subtitle: String?
+    let progress: Double?
+    let reconnectVariant: RemoteComputerReconnectVariant?
+    let accessibilityIdentifier: String
+
+    static func project(
+        state: RemoteComputerRebuildState,
+        migration: RemoteComputerMigrationSnapshot
+    ) -> Self? {
+        guard let kind = state.kind else { return nil }
+
+        if kind == .reconnecting {
+            if state.boxPhase == "pulling" || state.boxPhase == "starting" {
+                return .init(
+                    title: "电脑正在重新启动",
+                    subtitle: "正在启动我的电脑",
+                    progress: nil,
+                    reconnectVariant: .restarting,
+                    accessibilityIdentifier: "remote-computer-rebuild-reconnecting"
+                )
+            }
+            if !state.isConnected {
+                return .init(
+                    title: "正在重新连接",
+                    subtitle: nil,
+                    progress: nil,
+                    reconnectVariant: .network,
+                    accessibilityIdentifier: "remote-computer-rebuild-reconnecting"
+                )
+            }
+            return .init(
+                title: "正在检查连接",
+                subtitle: "正在重新连接",
+                progress: nil,
+                reconnectVariant: .checking,
+                accessibilityIdentifier: "remote-computer-rebuild-reconnecting"
+            )
+        }
+
+        let steps: [String]
+        switch kind {
+        case .update:
+            steps = [
+                "正在准备",
+                "正在备份数据",
+                "正在重新创建电脑",
+                "正在启动电脑",
+                "正在清理",
+                "正在重新连接",
+            ]
+        case .reset:
+            steps = [
+                "正在准备",
+                "正在清除数据",
+                "正在创建电脑",
+                "正在启动电脑",
+                "正在清理",
+                "正在重新连接",
+            ]
+        case .recover:
+            steps = [
+                "正在准备",
+                "正在恢复电脑",
+                "正在启动电脑",
+                "正在重新连接",
+            ]
+        case .reconnecting:
+            return nil
+        }
+
+        let activeIndex = activeStepIndex(
+            kind: kind,
+            state: state,
+            migration: migration,
+            count: steps.count
+        )
+        let title: String
+        switch kind {
+        case .update: title = "正在更新我的电脑"
+        case .reset: title = "正在重置我的电脑"
+        case .recover: title = "正在恢复我的电脑"
+        case .reconnecting: title = "正在重新连接"
+        }
+
+        return .init(
+            title: title,
+            subtitle: activeIndex.map { steps[$0] },
+            progress: activeIndex.map { Double($0) / Double(max(steps.count, 1)) },
+            reconnectVariant: nil,
+            accessibilityIdentifier: "remote-computer-rebuild-\(kind.rawValue)"
+        )
+    }
+
+    private static func activeStepIndex(
+        kind: RemoteComputerRebuildKind,
+        state: RemoteComputerRebuildState,
+        migration: RemoteComputerMigrationSnapshot,
+        count: Int
+    ) -> Int? {
+        var active = 0
+        var afterHealthyPhase = false
+        let phases = migration.phases
+            + (
+                migration.phase.map { phase in
+                    !phase.isTerminal && migration.phases.last != phase ? [phase] : []
+                } ?? []
+            )
+
+        for phase in phases {
+            let index: Int
+            switch kind {
+            case .reset:
+                switch phase {
+                case .wiping: index = 1
+                case .creating: index = 2
+                case .moving: index = 3
+                case .cleaningUp: index = afterHealthyPhase ? 4 : 1
+                case .backingUp: index = 0
+                case .done, .failed: index = active
+                }
+            case .recover:
+                switch phase {
+                case .backingUp, .wiping, .creating: index = 1
+                case .moving: index = 2
+                case .cleaningUp: index = afterHealthyPhase ? 3 : 1
+                case .done, .failed: index = active
+                }
+            case .update:
+                switch phase {
+                case .backingUp: index = 1
+                case .creating: index = 2
+                case .moving: index = 3
+                case .cleaningUp: index = afterHealthyPhase ? 4 : 2
+                case .wiping: index = 0
+                case .done, .failed: index = active
+                }
+            case .reconnecting:
+                index = 0
+            }
+            active = max(active, index)
+            if phase != .cleaningUp {
+                afterHealthyPhase = true
+            }
+        }
+
+        if state.boxPhase == "starting" || state.boxPhase == "pulling" {
+            switch kind {
+            case .update, .reset:
+                active = max(active, 3)
+            case .recover:
+                active = max(active, 2)
+            case .reconnecting:
+                break
+            }
+        }
+
+        if state.hasTerminalMigration && state.isConnected
+            && (state.boxPhase == "running" || state.boxPhase == "local")
+        {
+            active = max(active, count - 1)
+        }
+
+        guard active >= 0, active < count else { return nil }
+        return active
+    }
+}
+
+@MainActor
+protocol RemoteComputerRebuildSource: AnyObject {
+    func getMigrationStatus() async throws -> Any
+    func update(force: Bool) async throws -> Any
+    func recreate() async throws -> Any
+    func reconnect() async throws -> Any
+}
+
+@MainActor
+final class IOSRemoteComputerRebuildSource: RemoteComputerRebuildSource {
+    enum SourceError: LocalizedError {
+        case bridgeUnavailable
+
+        var errorDescription: String? {
+            "remote_computer_bridge_unavailable"
+        }
+    }
+
+    private let bridge: IOSPreloadBridge?
+
+    init(bridge: IOSPreloadBridge?) {
+        self.bridge = bridge
+    }
+
+    func getMigrationStatus() async throws -> Any {
+        guard let bridge else { throw SourceError.bridgeUnavailable }
+        return try await bridge.request(method: "getBoxMigrationStatus").value
+    }
+
+    func update(force: Bool) async throws -> Any {
+        guard let bridge else { throw SourceError.bridgeUnavailable }
+        return try await bridge.request(
+            method: "updateComputer",
+            params: [
+                "id": remoteComputerForeverBoxID,
+                "force": force,
+            ]
+        ).value
+    }
+
+    func recreate() async throws -> Any {
+        guard let bridge else { throw SourceError.bridgeUnavailable }
+        return try await bridge.request(method: "forceRecreateComputer").value
+    }
+
+    func reconnect() async throws -> Any {
+        guard let bridge else { throw SourceError.bridgeUnavailable }
+        return try await bridge.request(method: "forceReconnectGateway").value
+    }
+}
+
+@MainActor
+final class RemoteComputerRebuildOwner: ObservableObject {
+    @Published private(set) var state = RemoteComputerRebuildState.initial()
+    @Published private(set) var migrationSnapshot = RemoteComputerMigrationSnapshot.empty
+    @Published private(set) var isHydrating = false
+    @Published private(set) var requestError: String?
+    @Published private(set) var reloadRevision = 0
+
+    private let source: any RemoteComputerRebuildSource
+    private let now: () -> Int64
+    private var migrationAccumulator = RemoteComputerMigrationAccumulator()
+    private var connected = false
+    private var disposed = false
+    private var hydrationGeneration = 0
+    private var requestGeneration = 0
+    private var hasObservedHealthyWebSession = false
+    private var webSessionHealthy = false
+
+    init(
+        source: any RemoteComputerRebuildSource,
+        now: @escaping () -> Int64 = {
+            Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        }
+    ) {
+        self.source = source
+        self.now = now
+    }
+
+    func connect() async {
+        guard !disposed else { return }
+        connected = true
+        await hydrateMigration()
+    }
+
+    func noteReconnect() async {
+        guard !disposed, connected else { return }
+        await hydrateMigration()
+        if webSessionHealthy {
+            ingest(.box(
+                boxID: remoteComputerForeverBoxID,
+                phase: "running",
+                at: now()
+            ))
+            ingest(.connection(isConnected: true, at: now()))
+        }
+    }
+
+    func requestUpdate(force: Bool = false) async {
+        await performRequest(kind: .update, force: force)
+    }
+
+    func requestReset() async {
+        await performRequest(kind: .reset, force: false)
+    }
+
+    func requestRecover() async {
+        await performRequest(kind: .recover, force: false)
+    }
+
+    func requestReconnect() async {
+        await performRequest(kind: .reconnecting, force: false)
+    }
+
+    func noteNavigationStarted() {
+        guard !disposed else { return }
+        let at = now()
+        if hasObservedHealthyWebSession {
+            if state.kind == nil {
+                ingest(.request(
+                    kind: .reconnecting,
+                    operationID: nil,
+                    source: nil,
+                    at: at
+                ))
+            }
+            ingest(.connection(isConnected: false, at: at))
+        }
+        webSessionHealthy = false
+        ingest(.box(
+            boxID: remoteComputerForeverBoxID,
+            phase: "starting",
+            at: at
+        ))
+    }
+
+    func noteNavigationFinished() {
+        guard !disposed else { return }
+        let at = now()
+        webSessionHealthy = true
+        hasObservedHealthyWebSession = true
+        ingest(.box(
+            boxID: remoteComputerForeverBoxID,
+            phase: "running",
+            at: at
+        ))
+        ingest(.connection(isConnected: true, at: at))
+
+        if state.hasTerminalMigration || state.kind == .reconnecting {
+            ingest(.deactivate(at: at))
+        }
+    }
+
+    func noteNavigationFailed() {
+        guard !disposed else { return }
+        webSessionHealthy = false
+        let at = now()
+        ingest(.connection(isConnected: false, at: at))
+        ingest(.box(
+            boxID: remoteComputerForeverBoxID,
+            phase: "off",
+            at: at
+        ))
+    }
+
+    func dispose() {
+        guard !disposed else { return }
+        hydrationGeneration &+= 1
+        requestGeneration &+= 1
+        connected = false
+        isHydrating = false
+        if state.kind != nil {
+            ingest(.deactivate(at: now()))
+        }
+        disposed = true
+    }
+
+    private func performRequest(
+        kind: RemoteComputerRebuildKind,
+        force: Bool
+    ) async {
+        guard !disposed, !state.isPending else { return }
+
+        hydrationGeneration &+= 1
+        requestGeneration &+= 1
+        let attempt = requestGeneration
+        requestError = nil
+        let at = now()
+        ingest(.request(
+            kind: kind,
+            operationID: nil,
+            source: kind == .update ? .request : nil,
+            at: at
+        ))
+        ingest(.pending(true, at: at))
+
+        if kind == .reconnecting {
+            reloadRevision &+= 1
+        }
+
+        do {
+            let response: Any
+            switch kind {
+            case .update:
+                response = try await source.update(force: force)
+            case .reset, .recover:
+                response = try await source.recreate()
+            case .reconnecting:
+                response = try await source.reconnect()
+            }
+
+            guard !disposed, attempt == requestGeneration else { return }
+            ingest(.pending(false, at: now()))
+            ingest(.acknowledged(at: now()))
+
+            if kind.isResetLike,
+               let operationID = Self.operationID(from: response)
+            {
+                ingest(.request(
+                    kind: kind,
+                    operationID: operationID,
+                    source: nil,
+                    at: now()
+                ))
+            }
+
+            if let responseStatus = Self.responseStatus(from: response),
+               responseStatus.status == "rejected"
+            {
+                requestError = responseStatus.reason ?? "电脑操作被拒绝。"
+                ingest(.error(at: now()))
+                return
+            }
+
+            await hydrateMigration()
+        } catch {
+            guard !disposed, attempt == requestGeneration else { return }
+            ingest(.pending(false, at: now()))
+            requestError = String(error.localizedDescription.prefix(240))
+            ingest(.error(at: now()))
+        }
+    }
+
+    private func hydrateMigration() async {
+        guard !disposed, connected else { return }
+        hydrationGeneration &+= 1
+        let attempt = hydrationGeneration
+        isHydrating = true
+
+        do {
+            let value = try await source.getMigrationStatus()
+            guard !disposed,
+                  connected,
+                  attempt == hydrationGeneration
+            else { return }
+            if let event = Self.parseMigrationEvent(value) {
+                ingestMigration(event)
+            }
+        } catch {
+            // Desktop's hydration stores deliberately keep their last good
+            // snapshot on hydrate failure. The WebKit transport remains the
+            // native box/connection authority, so a failed status read does
+            // not invent a second error state.
+        }
+
+        if !disposed, attempt == hydrationGeneration {
+            isHydrating = false
+        }
+    }
+
+    private func ingestMigration(_ event: RemoteComputerMigrationEvent) {
+        guard migrationAccumulator.ingest(event) else { return }
+        migrationSnapshot = migrationAccumulator.snapshot
+        ingest(.migration(
+            operationID: event.operationID,
+            phase: event.phase,
+            at: now()
+        ))
+
+        if event.phase == .done,
+           webSessionHealthy,
+           state.hasTerminalMigration
+        {
+            ingest(.box(
+                boxID: remoteComputerForeverBoxID,
+                phase: "running",
+                at: now()
+            ))
+            ingest(.connection(isConnected: true, at: now()))
+            ingest(.deactivate(at: now()))
+        }
+    }
+
+    private func ingest(_ event: RemoteComputerRebuildEvent) {
+        state = RemoteComputerRebuildReducer.reduce(state, event)
+    }
+
+    private static func parseMigrationEvent(
+        _ value: Any
+    ) -> RemoteComputerMigrationEvent? {
+        guard let object = value as? [String: Any],
+              let rawPhase = object["phase"] as? String,
+              let phase = RemoteComputerMigrationPhase(rawValue: rawPhase)
+        else {
+            return nil
+        }
+
+        let rawOperationID = object["operationId"]
+        let operationID = operationID(from: rawOperationID)
+        if rawOperationID != nil,
+           !(rawOperationID is NSNull),
+           operationID == nil
+        {
+            return nil
+        }
+
+        return .init(
+            operationID: operationID,
+            phase: phase,
+            detail: object["detail"] as? String ?? ""
+        )
+    }
+
+    private static func operationID(
+        from value: Any?
+    ) -> RemoteComputerRebuildOperationID? {
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : .init(value: trimmed)
+        }
+        if let object = value as? [String: Any],
+           let string = object["value"] as? String
+        {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : .init(value: trimmed)
+        }
+        if let object = value as? [String: Any],
+           let nested = object["operationId"]
+        {
+            return operationID(from: nested)
+        }
+        return nil
+    }
+
+    private static func responseStatus(
+        from value: Any
+    ) -> (status: String, reason: String?)? {
+        guard let object = value as? [String: Any],
+              let status = object["status"] as? String
+        else {
+            return nil
+        }
+        return (status, object["reason"] as? String)
+    }
+}
+
+/// The existing shipping remote-computer surface remains the sole native
+/// Computer UI owner. Desktop's empty lazy overlay is intentionally not copied:
+/// native iOS renders the rebuild/reconnect state directly above this WebKit
+/// session, and the WebKit navigation lifecycle is the platform transport/box
+/// signal instead of a second reachability watcher.
 struct RemoteComputerSurface: View {
+    let reconnectGeneration: Int
     let onClose: () -> Void
 
+    @StateObject private var rebuildOwner: RemoteComputerRebuildOwner
     @State private var status = "正在连接我的电脑…"
     @State private var errorMessage: String?
-    @State private var reloadToken = 0
+    @State private var resetConfirmationPresented = false
+    @State private var recoverConfirmationPresented = false
+
+    init(
+        bridge: IOSPreloadBridge? = nil,
+        reconnectGeneration: Int = 0,
+        onClose: @escaping () -> Void
+    ) {
+        self.reconnectGeneration = reconnectGeneration
+        self.onClose = onClose
+        _rebuildOwner = StateObject(
+            wrappedValue: RemoteComputerRebuildOwner(
+                source: IOSRemoteComputerRebuildSource(bridge: bridge)
+            )
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,8 +1121,49 @@ struct RemoteComputerSurface: View {
                         .controlSize(.small)
                         .accessibilityIdentifier("remote-computer-loading")
                 }
+
+                Menu {
+                    Button("更新电脑") {
+                        Task { await rebuildOwner.requestUpdate() }
+                    }
+                    Button("重新连接") {
+                        errorMessage = nil
+                        status = "正在重新连接…"
+                        Task { await rebuildOwner.requestReconnect() }
+                    }
+                    Button("重置电脑", role: .destructive) {
+                        resetConfirmationPresented = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .disabled(rebuildOwner.state.isPending)
+                .accessibilityIdentifier("remote-computer-actions")
             }
             .padding(12)
+
+            if let presentation = RemoteComputerRebuildPresentation.project(
+                state: rebuildOwner.state,
+                migration: rebuildOwner.migrationSnapshot
+            ) {
+                RemoteComputerRebuildBanner(
+                    presentation: presentation,
+                    detail: rebuildOwner.migrationSnapshot.detail,
+                    isHydrating: rebuildOwner.isHydrating
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+
+            if let requestError = rebuildOwner.requestError {
+                Text(requestError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+                    .accessibilityIdentifier("remote-computer-rebuild-error")
+            }
 
             if let errorMessage {
                 VStack(alignment: .leading, spacing: 10) {
@@ -49,12 +1172,19 @@ struct RemoteComputerSurface: View {
                     Text(errorMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Button("重新加载") {
-                        self.errorMessage = nil
-                        status = "正在重新连接…"
-                        reloadToken += 1
+                    HStack {
+                        Button("重新连接") {
+                            self.errorMessage = nil
+                            status = "正在重新连接…"
+                            Task { await rebuildOwner.requestReconnect() }
+                        }
+                        .accessibilityIdentifier("remote-computer-reload")
+
+                        Button("恢复电脑") {
+                            recoverConfirmationPresented = true
+                        }
+                        .accessibilityIdentifier("remote-computer-recover")
                     }
-                    .accessibilityIdentifier("remote-computer-reload")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
@@ -65,14 +1195,98 @@ struct RemoteComputerSurface: View {
             }
 
             RemoteComputerWebView(
-                reloadToken: reloadToken,
+                reloadToken: rebuildOwner.reloadRevision,
                 status: $status,
-                errorMessage: $errorMessage
+                errorMessage: $errorMessage,
+                onNavigationStarted: { rebuildOwner.noteNavigationStarted() },
+                onNavigationFinished: { rebuildOwner.noteNavigationFinished() },
+                onNavigationFailed: { rebuildOwner.noteNavigationFailed() }
             )
         }
         .background(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("remote-computer-surface")
+        .task {
+            await rebuildOwner.connect()
+        }
+        .onChange(of: reconnectGeneration) { _, _ in
+            Task { await rebuildOwner.noteReconnect() }
+        }
+        .onDisappear {
+            rebuildOwner.dispose()
+        }
+        .confirmationDialog(
+            "重置我的电脑？",
+            isPresented: $resetConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("重置电脑", role: .destructive) {
+                Task { await rebuildOwner.requestReset() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("重置会重新创建远程电脑。")
+        }
+        .confirmationDialog(
+            "恢复我的电脑？",
+            isPresented: $recoverConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("恢复电脑", role: .destructive) {
+                errorMessage = nil
+                status = "正在恢复我的电脑…"
+                Task { await rebuildOwner.requestRecover() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("恢复会重新创建当前远程电脑。")
+        }
+    }
+}
+
+private struct RemoteComputerRebuildBanner: View {
+    let presentation: RemoteComputerRebuildPresentation
+    let detail: String
+    let isHydrating: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let progress = presentation.progress {
+                ProgressView(value: progress)
+                    .frame(width: 28)
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(presentation.title)
+                    .font(.subheadline.weight(.semibold))
+                if let subtitle = presentation.subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
+
+            if isHydrating {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("正在刷新电脑状态")
+            }
+        }
+        .padding(10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(presentation.accessibilityIdentifier)
     }
 }
 
@@ -80,9 +1294,18 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     let reloadToken: Int
     @Binding var status: String
     @Binding var errorMessage: String?
+    let onNavigationStarted: @MainActor () -> Void
+    let onNavigationFinished: @MainActor () -> Void
+    let onNavigationFailed: @MainActor () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(status: $status, errorMessage: $errorMessage)
+        Coordinator(
+            status: $status,
+            errorMessage: $errorMessage,
+            onNavigationStarted: onNavigationStarted,
+            onNavigationFinished: onNavigationFinished,
+            onNavigationFailed: onNavigationFailed
+        )
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -92,7 +1315,9 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
 
-        // This restricted surface deliberately has no native bridge or injected script.
+        // This restricted surface deliberately has no native script handler or
+        // injected WebMCP bridge. Computer lifecycle state uses the app's
+        // Coordinator RPC plus this exact WebKit navigation lifecycle.
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.accessibilityIdentifier = "remote-computer-webview"
         webView.navigationDelegate = context.coordinator
@@ -105,7 +1330,12 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     func updateUIView(_ webView: WKWebView, context: Context) {
         guard context.coordinator.loadedReloadToken != reloadToken else { return }
         context.coordinator.loadedReloadToken = reloadToken
-        webView.load(URLRequest(url: remoteComputerURL, cachePolicy: .useProtocolCachePolicy))
+        webView.load(
+            URLRequest(
+                url: remoteComputerURL,
+                cachePolicy: .useProtocolCachePolicy
+            )
+        )
     }
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
@@ -118,23 +1348,43 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         @Binding private var status: String
         @Binding private var errorMessage: String?
+        private let onNavigationStarted: @MainActor () -> Void
+        private let onNavigationFinished: @MainActor () -> Void
+        private let onNavigationFailed: @MainActor () -> Void
         weak var webView: WKWebView?
         var loadedReloadToken: Int?
 
-        init(status: Binding<String>, errorMessage: Binding<String?>) {
+        init(
+            status: Binding<String>,
+            errorMessage: Binding<String?>,
+            onNavigationStarted: @escaping @MainActor () -> Void,
+            onNavigationFinished: @escaping @MainActor () -> Void,
+            onNavigationFailed: @escaping @MainActor () -> Void
+        ) {
             _status = status
             _errorMessage = errorMessage
+            self.onNavigationStarted = onNavigationStarted
+            self.onNavigationFinished = onNavigationFinished
+            self.onNavigationFailed = onNavigationFailed
         }
 
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation?) {
+        func webView(
+            _ webView: WKWebView,
+            didStartProvisionalNavigation navigation: WKNavigation?
+        ) {
             errorMessage = nil
             status = "正在安全连接…"
+            onNavigationStarted()
         }
 
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+        func webView(
+            _ webView: WKWebView,
+            didFinish navigation: WKNavigation?
+        ) {
             if errorMessage == nil {
                 status = "已安全连接"
             }
+            onNavigationFinished()
         }
 
         func webView(
@@ -145,13 +1395,18 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             handleNavigationError(error)
         }
 
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation?, withError error: Error) {
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation?,
+            withError error: Error
+        ) {
             handleNavigationError(error)
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             status = "连接已中断"
             errorMessage = "远程电脑页面已停止响应，请重新加载。"
+            onNavigationFailed()
         }
 
         func webView(
@@ -177,6 +1432,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             if navigationAction.targetFrame?.isMainFrame != false {
                 status = "已阻止外部导航"
                 errorMessage = "远程电脑页面只允许访问 https://fabushi.ombhrum.com。"
+                onNavigationFailed()
             }
             decisionHandler(.cancel)
         }
@@ -186,6 +1442,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             guard nsError.code != NSURLErrorCancelled else { return }
             status = "连接失败"
             errorMessage = nsError.localizedDescription
+            onNavigationFailed()
         }
 
         private func isAllowedRemoteComputerURL(_ url: URL) -> Bool {
@@ -195,7 +1452,5 @@ private struct RemoteComputerWebView: UIViewRepresentable {
                 && url.password == nil
                 && (url.port == nil || url.port == 443)
         }
-
-
     }
 }
