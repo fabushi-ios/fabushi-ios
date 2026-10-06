@@ -39,19 +39,22 @@ struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
     let vncURL: URL?
     let imageUpdateAvailable: Bool
     let diskPressure: RemoteComputerAgentBoxDiskPressureSnapshot?
+    let hasHandoff: Bool
 
     init(
         agentID: String,
         state: String,
         vncURL: URL?,
         imageUpdateAvailable: Bool,
-        diskPressure: RemoteComputerAgentBoxDiskPressureSnapshot? = nil
+        diskPressure: RemoteComputerAgentBoxDiskPressureSnapshot? = nil,
+        hasHandoff: Bool = false
     ) {
         self.agentID = agentID
         self.state = state
         self.vncURL = vncURL
         self.imageUpdateAvailable = imageUpdateAvailable
         self.diskPressure = diskPressure
+        self.hasHandoff = hasHandoff
     }
 
     var isReadyForVNC: Bool {
@@ -178,7 +181,8 @@ final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
             state: state,
             vncURL: vncURL,
             imageUpdateAvailable: object["imageUpdateAvailable"] as? Bool ?? false,
-            diskPressure: projectDiskPressure(object["diskPressure"])
+            diskPressure: projectDiskPressure(object["diskPressure"]),
+            hasHandoff: object["handoff"] != nil && !(object["handoff"] is NSNull)
         )
     }
 
