@@ -737,7 +737,7 @@ final class MarketplaceModel {
         onboardingStep = UserDefaults.standard.bool(forKey: onboardingKey) ? 3 : 0
     }
 
-    static func projectLinkMetadata(
+    nonisolated static func projectLinkMetadata(
         url: String,
         value: Any
     ) -> MobileLinkMetadata? {
