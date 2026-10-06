@@ -715,6 +715,10 @@ final class CoordinatorMcpSurface {
             "transport": server.transport.rawValue,
             "toolCount": server.toolCount,
             "disabledToolCount": server.disabledToolCount,
+            "isTeamServer": server.isTeamServer,
+            "pluginId": server.attribution.pluginId ?? NSNull(),
+            "isRequired": server.attribution.isRequired,
+            "managedByTeamPluginPolicy": server.attribution.managedByTeamPluginPolicy,
             "status": server.status,
             "statusDetail": server.statusDetail ?? NSNull(),
         ]

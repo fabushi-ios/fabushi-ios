@@ -701,6 +701,22 @@ extension ContentView {
                                         Text("账号：\(server.accountKey)")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
+                                        HStack(spacing: 6) {
+                                            if server.isTeamServer {
+                                                Label("团队", systemImage: "person.3.fill")
+                                            }
+                                            if server.isRequired {
+                                                Label("团队必需", systemImage: "lock.fill")
+                                            }
+                                            if server.managedByTeamPluginPolicy {
+                                                Label("团队策略管理", systemImage: "building.2.fill")
+                                            }
+                                            if server.isDisabledByTeamAdminPolicy {
+                                                Label("管理员已禁用", systemImage: "nosign")
+                                            }
+                                        }
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                         if let detail = server.statusDetail, !detail.isEmpty {
                                             Text(detail).font(.caption2).foregroundStyle(.secondary)
                                         }
@@ -709,12 +725,15 @@ extension ContentView {
                                     Button(model.mcpLoadingServerId == server.serverId ? "读取中…" : "工具") {
                                         Task { await model.loadMcpTools(serverId: server.serverId) }
                                     }
-                                    .disabled(model.mcpLoadingServerId == server.serverId)
+                                    .disabled(
+                                        model.mcpLoadingServerId == server.serverId
+                                            || server.isDisabledByTeamAdminPolicy
+                                    )
                                 }
                                 .accessibilityElement(children: .contain)
                                 .accessibilityIdentifier("mcp-server-\(server.id)")
 
-                                if model.mcpBackendLoggedIn {
+                                if model.mcpBackendLoggedIn && !server.isDisabledByTeamAdminPolicy {
                                     HStack(spacing: 8) {
                                         if server.status == "needsAuth" {
                                             Button("连接此账号") {
@@ -849,8 +868,9 @@ extension ContentView {
                                             )
                                             .labelsHidden()
                                             .disabled(
-                                                model.mcpMutatingToolKey
-                                                    == "\(server.serverId):\(tool.name)"
+                                                server.isDisabledByTeamAdminPolicy
+                                                    || model.mcpMutatingToolKey
+                                                        == "\(server.serverId):\(tool.name)"
                                             )
                                             .accessibilityIdentifier(
                                                 "mcp-tool-\(server.id)-\(tool.name)"

@@ -744,8 +744,13 @@ struct MarketplaceMcpServer: Identifiable, Equatable, Sendable {
     let statusDetail: String?
     let toolCount: Int
     let disabledToolCount: Int
+    let isTeamServer: Bool
+    let pluginId: String?
+    let isRequired: Bool
+    let managedByTeamPluginPolicy: Bool
 
     var id: String { "\(serverId):\(accountKey)" }
+    var isDisabledByTeamAdminPolicy: Bool { status == "disabledByTeamAdminPolicy" }
 }
 
 struct MarketplaceMcpTool: Identifiable, Equatable, Sendable {
@@ -1923,7 +1928,7 @@ final class MarketplaceModel {
         )
     }
 
-    private static func mcpServer(from row: [String: Any]) -> MarketplaceMcpServer? {
+    static func mcpServer(from row: [String: Any]) -> MarketplaceMcpServer? {
         guard let id = row["id"] as? String,
               !id.isEmpty,
               let name = row["name"] as? String,
@@ -1940,7 +1945,11 @@ final class MarketplaceModel {
             status: status,
             statusDetail: row["statusDetail"] as? String,
             toolCount: (row["toolCount"] as? NSNumber)?.intValue ?? 0,
-            disabledToolCount: (row["disabledToolCount"] as? NSNumber)?.intValue ?? 0
+            disabledToolCount: (row["disabledToolCount"] as? NSNumber)?.intValue ?? 0,
+            isTeamServer: row["isTeamServer"] as? Bool ?? false,
+            pluginId: row["pluginId"] as? String,
+            isRequired: row["isRequired"] as? Bool ?? false,
+            managedByTeamPluginPolicy: row["managedByTeamPluginPolicy"] as? Bool ?? false
         )
     }
 

@@ -185,3 +185,49 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
     }
 
 }
+
+
+final class MarketplaceMcpTeamPolicyProjectionTests: XCTestCase {
+    func testMcpServerProjectionPreservesTeamPolicyFacts() throws {
+        let server = try XCTUnwrap(MarketplaceModel.mcpServer(from: [
+            "id": "17",
+            "name": "Team GitHub",
+            "serverIdentifier": "github",
+            "accountKey": "default",
+            "transport": "http",
+            "status": "disabledByTeamAdminPolicy",
+            "statusDetail": "Disabled by team admin",
+            "toolCount": 0,
+            "disabledToolCount": 0,
+            "isTeamServer": true,
+            "pluginId": "42",
+            "isRequired": true,
+            "managedByTeamPluginPolicy": true,
+        ]))
+
+        XCTAssertTrue(server.isTeamServer)
+        XCTAssertEqual(server.pluginId, "42")
+        XCTAssertTrue(server.isRequired)
+        XCTAssertTrue(server.managedByTeamPluginPolicy)
+        XCTAssertTrue(server.isDisabledByTeamAdminPolicy)
+    }
+
+    func testMcpServerProjectionDefaultsPolicyFactsForPersonalRows() throws {
+        let server = try XCTUnwrap(MarketplaceModel.mcpServer(from: [
+            "id": "18",
+            "name": "Personal",
+            "serverIdentifier": "personal",
+            "accountKey": "default",
+            "transport": "http",
+            "status": "connected",
+            "toolCount": 1,
+            "disabledToolCount": 0,
+        ]))
+
+        XCTAssertFalse(server.isTeamServer)
+        XCTAssertNil(server.pluginId)
+        XCTAssertFalse(server.isRequired)
+        XCTAssertFalse(server.managedByTeamPluginPolicy)
+        XCTAssertFalse(server.isDisabledByTeamAdminPolicy)
+    }
+}
