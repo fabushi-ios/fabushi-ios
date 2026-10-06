@@ -456,32 +456,33 @@ fn active_agent_id_for_state(state: &FeatureState) -> Option<String> {
         .map(|bot| bot.id.clone())
 }
 
-fn automation_listener_resume_key(
+fn automation_listener_resume_keys(
     automation: &AutomationSummary,
-) -> Option<(String, ListenerPlatform)> {
+) -> Vec<(String, ListenerPlatform)> {
     if !automation.enabled {
-        return None;
+        return Vec::new();
     }
-    let AutomationTrigger::Event { source, .. } = automation.trigger.as_ref()? else {
-        return None;
+    let Some(trigger) = automation.trigger.as_ref() else {
+        return Vec::new();
     };
-    if !matches!(source, ListenerPlatform::Slack | ListenerPlatform::Github) {
-        return None;
-    }
-    Some((
-        automation
-            .agent_id
-            .clone()
-            .unwrap_or_else(|| "mahayana-assistant".into()),
-        *source,
-    ))
+    let agent_id = automation
+        .agent_id
+        .clone()
+        .unwrap_or_else(|| "mahayana-assistant".into());
+    let mut platforms = BTreeSet::new();
+    automation_trigger_listener_platforms(trigger, &mut platforms);
+    platforms
+        .into_iter()
+        .filter(|platform| matches!(platform, ListenerPlatform::Slack | ListenerPlatform::Github))
+        .map(|platform| (agent_id.clone(), platform))
+        .collect()
 }
 
 fn prune_pending_listener_resumes(state: &mut FeatureState) {
     let required = state
         .automations
         .values()
-        .filter_map(automation_listener_resume_key)
+        .flat_map(automation_listener_resume_keys)
         .collect::<BTreeSet<_>>();
     state
         .pending_listener_resumes
@@ -6001,42 +6002,43 @@ impl FeatureHostController {
         &self,
         automation: &AutomationSummary,
     ) -> Result<(), FeatureHostError> {
-        let Some((agent_id, platform)) = automation_listener_resume_key(automation) else {
-            let mut state = self.state()?;
-            prune_pending_listener_resumes(&mut state);
-            return Ok(());
-        };
-        let Some(is_connected) = self.listener_connected_for_automation_write(platform) else {
-            // Match Desktop fail-soft listener lookup: an unavailable connection
-            // projection must not block or mutate a successfully persisted routine.
-            return Ok(());
-        };
+        let keys = automation_listener_resume_keys(automation);
         let mut state = self.state()?;
         prune_pending_listener_resumes(&mut state);
-        if is_connected {
-            state.pending_listener_resumes.remove(&(agent_id, platform));
-            return Ok(());
+        drop(state);
+
+        for (agent_id, platform) in keys {
+            let Some(is_connected) = self.listener_connected_for_automation_write(platform) else {
+                // Match Desktop fail-soft listener lookup: an unavailable connection
+                // projection must not block or mutate a successfully persisted routine.
+                continue;
+            };
+            let mut state = self.state()?;
+            if is_connected {
+                state.pending_listener_resumes.remove(&(agent_id, platform));
+                continue;
+            }
+            if !state
+                .pending_listener_resumes
+                .insert((agent_id.clone(), platform))
+            {
+                continue;
+            }
+            state.events.push_back(HostEvent::TranscriptCard {
+                timestamp: timestamp(),
+                entry_id: format!(
+                    "listener-connect:{agent_id}:{}",
+                    listener_platform_slug(platform)
+                ),
+                operation_id: None,
+                card: TranscriptCard::ListenerConnect {
+                    platform,
+                    reason: Some("so this routine can fire".into()),
+                    connected: false,
+                    pending: Some(true),
+                },
+            });
         }
-        if !state
-            .pending_listener_resumes
-            .insert((agent_id.clone(), platform))
-        {
-            return Ok(());
-        }
-        state.events.push_back(HostEvent::TranscriptCard {
-            timestamp: timestamp(),
-            entry_id: format!(
-                "listener-connect:{agent_id}:{}",
-                listener_platform_slug(platform)
-            ),
-            operation_id: None,
-            card: TranscriptCard::ListenerConnect {
-                platform,
-                reason: Some("so this routine can fire".into()),
-                connected: false,
-                pending: Some(true),
-            },
-        });
         Ok(())
     }
 
@@ -9574,6 +9576,23 @@ fn automation_trigger_legacy_schedule(trigger: &AutomationTrigger) -> String {
                 _ => None,
             })
             .unwrap_or_else(|| "event:group".into()),
+    }
+}
+
+fn automation_trigger_listener_platforms(
+    trigger: &AutomationTrigger,
+    output: &mut BTreeSet<ListenerPlatform>,
+) {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => {}
+        AutomationTrigger::Event { source, .. } => {
+            output.insert(*source);
+        }
+        AutomationTrigger::Group { listeners } => {
+            for listener in listeners {
+                automation_trigger_listener_platforms(listener, output);
+            }
+        }
     }
 }
 
