@@ -116,7 +116,14 @@ final class IOSRemoteComputerTeachRecordingSource: RemoteComputerTeachRecordingS
 }
 
 @MainActor
-final class RemoteComputerTeachCaptureController: ObservableObject {
+protocol RemoteComputerTeachCapturing: AnyObject {
+    var isRecording: Bool { get }
+    func start(path: String) async throws
+    func stop(save: Bool) async
+}
+
+@MainActor
+final class RemoteComputerTeachCaptureController: ObservableObject, RemoteComputerTeachCapturing {
     enum CaptureError: LocalizedError {
         case viewerUnavailable
         case invalidDestination
@@ -426,14 +433,14 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private let source: any RemoteComputerTeachRecordingSourcing
-    private let capture: RemoteComputerTeachCaptureController
+    private let capture: any RemoteComputerTeachCapturing
     private var generation = 0
     private var timerTask: Task<Void, Never>?
     private var disposed = false
 
     init(
         source: any RemoteComputerTeachRecordingSourcing,
-        capture: RemoteComputerTeachCaptureController,
+        capture: any RemoteComputerTeachCapturing,
         now: @escaping () -> Int = {
             Int(Date().timeIntervalSince1970 * 1_000)
         }
