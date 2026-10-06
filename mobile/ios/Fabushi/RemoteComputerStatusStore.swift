@@ -766,15 +766,17 @@ final class RemoteComputerAgentBoxOwner: ObservableObject {
 
     private func evictRecordsIfNeeded() {
         while records.count > Self.recordLimit {
-            guard let candidate = records.values
-                .filter {
-                    $0.watchers == 0
-                        && pendingReads[$0.agentID] == nil
-                        && pendingEnsures[$0.agentID] == nil
-                        && $0.agentID != activeAgentID
-                }
-                .min(by: { $0.lastTouch < $1.lastTouch })
-            else { return }
+            let candidates = records.values.filter { record in
+                record.watchers == 0
+                    && pendingReads[record.agentID] == nil
+                    && pendingEnsures[record.agentID] == nil
+                    && record.agentID != activeAgentID
+            }
+            guard let candidate = candidates.min(by: { left, right in
+                left.lastTouch < right.lastTouch
+            }) else {
+                return
+            }
             records[candidate.agentID] = nil
         }
     }
