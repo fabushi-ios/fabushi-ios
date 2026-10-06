@@ -185,6 +185,24 @@ final class PreloadParityTests: XCTestCase {
         }
     }
 
+
+    @MainActor
+    func testVNCRuntimeVisibilityLifecycleRebaselinesLivenessOnReveal() {
+        let runtime = IOSVNCPreloadRuntime()
+        XCTAssertTrue(runtime.updateViewerVisibility(true))
+        XCTAssertTrue(runtime.viewerIsVisible)
+        XCTAssertFalse(runtime.updateViewerVisibility(true))
+        XCTAssertFalse(runtime.updateViewerVisibility(false))
+        XCTAssertFalse(runtime.viewerIsVisible)
+        XCTAssertTrue(runtime.updateViewerVisibility(true))
+        runtime.resetLiveness()
+        XCTAssertNil(runtime.sampleLiveness(
+            nowMilliseconds: 10_000,
+            counters: .init(keys: 4, clicks: 1, moves: 2, drawOps: 0, inBytes: 0)
+        ))
+    }
+
+
     @MainActor
     func testVNCRuntimeEntrypointUsesSharedNativePolicy() {
         let runtime = IOSVNCPreloadEntrypoint.install()
