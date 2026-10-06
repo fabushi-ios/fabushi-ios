@@ -1633,11 +1633,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native SwiftUI/WKWebView replaces React preview/fullscreen DOM. Agent scope renders authenticated Host-owned VNC, a live monitor picker backed by running Computer-use subagent status, trusted noVNC cursor overlay and native teach-recording controls. Broader Desktop handoff actions/focus-keyboard/warm-preview details remain independently auditable, so this aggregate row stays mapped.",
+      "ios_platform_delta": "Native SwiftUI/WKWebView replaces React preview/fullscreen DOM. Agent scope renders authenticated Host-owned VNC, a live monitor picker, trusted noVNC cursor overlay, real handoff instruction/actions and native teach-recording controls. Desktop warm-WebView pooling and window-level focus/keyboard mechanics still need explicit iOS disposition/acceptance, so this aggregate row remains mapped.",
       "implementation_status": "mapped",
-      "production_evidence": "RemoteComputerSurface is the single shipping Computer presentation owner. selectedAgentVNCURL drives the actual WKWebView; shippingMonitorPicker changes that URL; RemoteComputerTrustedCursorOverlay renders trusted noVNC telemetry; teachRecordingBar composes the native teach owner. No model-only surrogate is used.",
-      "test_evidence": "RemoteComputerRebuildTests covers selection/cursor models and typed VNC lifecycle; RemoteComputerTeachRecordingTests covers teach lifecycle. Fresh current-head UI/protected acceptance remains required.",
-      "notes": "Monitor switching, trusted cursor overlay and teach composition are now production-wired. Keep this aggregate row mapped until remaining view.tsx responsibilities (including complete handoff action and focus/keyboard/warm-preview behavior) are audited and closed."
+      "production_evidence": "RemoteComputerSurface is the single shipping Computer presentation owner. selectedAgentVNCURL drives the actual WKWebView; shippingMonitorPicker changes that URL; RemoteComputerTrustedCursorOverlay renders trusted telemetry; selectedHandoffBanner preserves Host handoff request/instruction and calls the canonical handBackForeverBox owner for dismissed/button outcomes; teachRecordingBar composes the native teach owner.",
+      "test_evidence": "RemoteComputerRebuildTests covers monitor/cursor models and typed VNC lifecycle; RemoteComputerTeachRecordingTests covers teach lifecycle and handoff payload preservation. Fresh current-head Swift UI/protected acceptance remains required.",
+      "notes": "Monitor switching, trusted cursor overlay, handoff actions and teach composition are now production-wired. Keep this aggregate row mapped only for remaining warm-preview and native focus/keyboard disposition/evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/vnc-webview.tsx",
