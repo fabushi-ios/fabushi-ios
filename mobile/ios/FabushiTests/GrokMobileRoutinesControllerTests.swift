@@ -761,4 +761,100 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertNil(value.ciBranch)
     }
 
+
+    @MainActor
+    func testTriggerDraftControllerEnforcesEightRowsAndCommitsOnlyValidDrafts() async {
+        var committed: [[RoutineTriggerForm]] = []
+        let controller = MobileBotRoutineTriggerDraftController(
+            initialRows: [.schedule("@daily")],
+            onDraftCommit: { committed.append($0) }
+        )
+
+        let didCommit = await controller.addRowAndCommit(
+            .github(
+                repo: "owner/repo",
+                events: ["pr-opened"],
+                userAllowlist: "",
+                ciBranch: ""
+            )
+        )
+        XCTAssertTrue(didCommit)
+        XCTAssertEqual(controller.rows.count, 2)
+        XCTAssertEqual(controller.lastValidRows.count, 2)
+        XCTAssertEqual(committed.count, 1)
+
+        while controller.rows.count < MobileBotRoutineTriggerDraftController.maximumRows {
+            _ = await controller.addRow(.schedule("@hourly"))
+        }
+        XCTAssertEqual(controller.rows.count, TRIGGER_MAX_GROUP_LISTENERS)
+        XCTAssertFalse(await controller.addRowAndCommit(.schedule("@weekly")))
+        XCTAssertEqual(controller.rows.count, TRIGGER_MAX_GROUP_LISTENERS)
+    }
+
+    @MainActor
+    func testTriggerDraftControllerCustomScheduleFailsClosedAndReturnsFocus() async {
+        var changes: [[RoutineTriggerForm]] = []
+        var closeCommits: [[RoutineTriggerForm]] = []
+        let controller = MobileBotRoutineTriggerDraftController(
+            initialRows: [.schedule("@daily")],
+            onDraftChange: { changes.append($0) },
+            onCommitOrRevert: { closeCommits.append($0) }
+        )
+
+        controller.openEditor(0)
+        let invalid = await controller.blurCustomSchedule(0, value: "61 25 * * *")
+        XCTAssertFalse(invalid)
+        XCTAssertTrue(controller.customInvalid)
+        XCTAssertEqual(changes.last, [.schedule("61 25 * * *")])
+        XCTAssertEqual(controller.lastValidRows, [.schedule("@daily")])
+
+        let closed = await controller.closeEditor()
+        XCTAssertTrue(closed)
+        XCTAssertEqual(closeCommits.last, [.schedule("@daily")])
+        XCTAssertEqual(controller.focusReturnRow, 0)
+        controller.clearFocusReturnRow()
+        XCTAssertNil(controller.focusReturnRow)
+    }
+
+    @MainActor
+    func testTriggerDraftControllerFencesPendingCompletionAfterDispose() async {
+        let gate = AsyncStream<Void>.makeStream()
+        var iterator = gate.stream.makeAsyncIterator()
+        let controller = MobileBotRoutineTriggerDraftController(
+            initialRows: [.schedule("@daily")],
+            onDraftCommit: { _ in
+                _ = await iterator.next()
+            }
+        )
+
+        let task = Task {
+            await controller.addRowAndCommit(.schedule("@weekly"))
+        }
+        await Task.yield()
+        XCTAssertTrue(controller.pending)
+        controller.dispose()
+        gate.continuation.yield(())
+        gate.continuation.finish()
+        let result = await task.value
+
+        XCTAssertFalse(result)
+        XCTAssertFalse(controller.pending)
+        XCTAssertEqual(controller.lastValidRows, [.schedule("@daily")])
+    }
+
+    @MainActor
+    func testTriggerDraftControllerSingleRowRemovalKeepsLastValidDraftForRevert() async {
+        var changes: [[RoutineTriggerForm]] = []
+        let controller = MobileBotRoutineTriggerDraftController(
+            initialRows: [.schedule("@daily")],
+            onDraftChange: { changes.append($0) }
+        )
+
+        let committed = await controller.removeRow(0)
+        XCTAssertFalse(committed)
+        XCTAssertEqual(controller.rows, [])
+        XCTAssertEqual(changes.last, [])
+        XCTAssertEqual(controller.lastValidRows, [.schedule("@daily")])
+    }
+
 }
