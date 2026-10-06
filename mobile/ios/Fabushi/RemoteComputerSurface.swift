@@ -1348,6 +1348,39 @@ private struct RemoteComputerRebuildBanner: View {
     }
 }
 
+enum RemoteComputerWebProcessCrashRecovery: Equatable, Sendable {
+    case reload
+    case failClosed
+}
+
+struct RemoteComputerWebProcessCrashPolicy: Equatable, Sendable {
+    static let automaticReloadLimit = 3
+    static let crashWindowMilliseconds: Int64 = 60_000
+
+    private(set) var crashCount = 0
+    private(set) var lastCrashAtMilliseconds: Int64?
+    private(set) var failedClosed = false
+
+    mutating func recordCrash(
+        atMilliseconds now: Int64
+    ) -> RemoteComputerWebProcessCrashRecovery {
+        let sameWindow =
+            lastCrashAtMilliseconds.map {
+                now >= $0 && now - $0 < Self.crashWindowMilliseconds
+            } ?? false
+        crashCount = sameWindow ? crashCount + 1 : 1
+        lastCrashAtMilliseconds = now
+        failedClosed = crashCount > Self.automaticReloadLimit
+        return failedClosed ? .failClosed : .reload
+    }
+
+    mutating func resetForExplicitReload() {
+        crashCount = 0
+        lastCrashAtMilliseconds = nil
+        failedClosed = false
+    }
+}
+
 private struct RemoteComputerWebView: UIViewRepresentable {
     let reloadToken: Int
     @Binding var status: String
@@ -1388,6 +1421,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     func updateUIView(_ webView: WKWebView, context: Context) {
         guard context.coordinator.loadedReloadToken != reloadToken else { return }
         context.coordinator.loadedReloadToken = reloadToken
+        context.coordinator.prepareExplicitReload()
         webView.load(
             URLRequest(
                 url: remoteComputerURL,
@@ -1411,6 +1445,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         private let onNavigationFailed: @MainActor () -> Void
         weak var webView: WKWebView?
         var loadedReloadToken: Int?
+        private var crashPolicy = RemoteComputerWebProcessCrashPolicy()
 
         init(
             status: Binding<String>,
@@ -1462,9 +1497,21 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-            status = "连接已中断"
-            errorMessage = "远程电脑页面已停止响应，请重新加载。"
             onNavigationFailed()
+            let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+            switch crashPolicy.recordCrash(atMilliseconds: now) {
+            case .reload:
+                errorMessage = nil
+                status = "远程电脑页面停止响应，正在自动恢复…"
+                webView.reload()
+            case .failClosed:
+                status = "连接已中断"
+                errorMessage = "远程电脑页面连续停止响应，请手动重新连接。"
+            }
+        }
+
+        func prepareExplicitReload() {
+            crashPolicy.resetForExplicitReload()
         }
 
         func webView(
