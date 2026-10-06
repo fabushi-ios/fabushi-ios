@@ -444,6 +444,37 @@ extension ContentView {
                     }
                 }
 
+                if let permission = model.permissionRequest {
+                    Section("插件权限") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(permission.pluginId)
+                                .font(.headline)
+                            Text("此插件请求以下权限。只有明确批准后，Fabushi 才会把这些权限授予已安装插件。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            ForEach(permission.permissions, id: \.self) { capability in
+                                Label(capability, systemImage: "lock.shield")
+                                    .font(.caption)
+                            }
+                            HStack(spacing: 8) {
+                                Button("拒绝") {
+                                    model.denyPermissions()
+                                }
+                                .buttonStyle(.bordered)
+                                .accessibilityIdentifier("plugin-permission-deny-\(permission.pluginId)")
+
+                                Button("批准并继续") {
+                                    Task { await model.approvePermissions() }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .accessibilityIdentifier("plugin-permission-approve-\(permission.pluginId)")
+                            }
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("plugin-permission-request-\(permission.pluginId)")
+                    }
+                }
+
                 Section("插件") {
                     if model.plugins.isEmpty && !model.loading {
                         Text("没有匹配的 iOS 插件。")
