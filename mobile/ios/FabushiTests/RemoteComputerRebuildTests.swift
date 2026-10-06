@@ -242,6 +242,24 @@ final class RemoteComputerRebuildTests: XCTestCase {
         )
     }
 
+
+    func testRemoteComputerScopeUsesAgentNameInVisibleTitle() {
+        let account = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: nil,
+            agentName: nil
+        )
+        XCTAssertEqual(account.displayTitle, "我的电脑")
+
+        let agent = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: "agent-7",
+            agentName: "研究助手"
+        )
+        XCTAssertEqual(agent.displayTitle, "研究助手 的电脑")
+        XCTAssertNotEqual(agent.scopeKey, account.scopeKey)
+    }
+
     func testWebProcessCrashPolicyReloadsThreeTimesThenFailsClosed() {
         var policy = RemoteComputerWebProcessCrashPolicy()
 
