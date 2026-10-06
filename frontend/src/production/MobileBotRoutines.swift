@@ -522,6 +522,7 @@ internal struct MobileBotRoutine: Identifiable, Equatable {
     let name: String
     let prompt: String
     let schedule: String
+    let trigger: AutomationTrigger
     let isEnabled: Bool
     let createdAtMs: Int64
     let runs: [MobileBotRoutineRun]
@@ -851,7 +852,14 @@ internal enum MobileBotRoutinesModel {
         let parsedRuns = rawRuns.map(parseRun)
         let lastRunAt = optionalInteger(row["lastRunAtMs"])
         let nextRunAt = optionalInteger(row["nextRunAtMs"])
+        let trigger: AutomationTrigger?
+        if let rawTrigger = row["trigger"], !(rawTrigger is NSNull) {
+            trigger = routineTriggerFromWireValue(rawTrigger)
+        } else {
+            trigger = routineTriggerFromForms([.schedule(schedule)])
+        }
         guard parsedRuns.allSatisfy({ $0 != nil }),
+              let trigger,
               case .value(let lastRunAtMs) = lastRunAt,
               case .value(let nextRunAtMs) = nextRunAt
         else {
@@ -864,6 +872,7 @@ internal enum MobileBotRoutinesModel {
             name: name,
             prompt: prompt,
             schedule: schedule,
+            trigger: trigger,
             isEnabled: isEnabled,
             createdAtMs: createdAtMs,
             runs: parsedRuns.compactMap { $0 },
