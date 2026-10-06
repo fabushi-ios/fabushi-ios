@@ -413,6 +413,10 @@ pub struct TeachRecordingStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub started_at_ms: Option<i64>,
     pub max_duration_ms: i64,
+    /// Native iOS capture target owned by the Host teach session. Desktop
+    /// capture remains Host-internal and therefore does not expose this path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture_path: Option<String>,
 }
 
 impl Default for TeachRecordingStatus {
@@ -422,6 +426,7 @@ impl Default for TeachRecordingStatus {
             agent_id: None,
             started_at_ms: None,
             max_duration_ms: TEACH_MAX_DURATION_MS,
+            capture_path: None,
         }
     }
 }
