@@ -334,8 +334,15 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         serverIdentifiers: [String],
         timeoutMs: Int
     ) async throws -> [BackendMcpToolServerWire] {
-        let dashboardIdentifiers = serverIdentifiers.filter { port.usesDashboardServer($0) }
-        let hostIdentifiers = serverIdentifiers.filter { !port.usesDashboardServer($0) }
+        var dashboardIdentifiers: [String] = []
+        var hostIdentifiers: [String] = []
+        for identifier in serverIdentifiers {
+            if await port.usesDashboardServer(identifier) {
+                dashboardIdentifiers.append(identifier)
+            } else {
+                hostIdentifiers.append(identifier)
+            }
+        }
         var rows: [BackendMcpToolServerWire] = []
         if !dashboardIdentifiers.isEmpty {
             rows += try await dashboard.listSandMcpTools(
@@ -357,7 +364,7 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         agentId: String,
         timeoutMs: Int
     ) async throws -> McpExecResult? {
-        if port.usesDashboardServer(serverIdentifier) {
+        if await port.usesDashboardServer(serverIdentifier) {
             return try await dashboard.executeSandMcpTool(
                 serverIdentifier: serverIdentifier,
                 toolName: toolName,
@@ -530,12 +537,12 @@ final class CoordinatorMcpSurface {
                    let fetched = await fetchAccountMcpServers(accountDependencies),
                    !fetched.unavailable {
                     let display = accountDisplayConfig(from: fetched)
-                    port.updateDashboardServerIdentifiers(
+                    await port.updateDashboardServerIdentifiers(
                         Set(display.servers.compactMap(\.serverIdentifier))
                     )
                     return display
                 }
-                port.updateDashboardServerIdentifiers([])
+                await port.updateDashboardServerIdentifiers([])
                 return try await port.loadAccountDisplay(forceFresh: requireFreshRead)
             },
             accountMcpWriter: createAccountMcpWriter(accountDependencies),
@@ -624,12 +631,13 @@ final class CoordinatorMcpSurface {
                 forceReauth: params["forceReauth"] as? Bool ?? false,
                 trigger: "connector_card"
             )
-            return .handled([
+            let payload: [String: Any] = [
                 "status": result.status.rawValue,
                 "serverName": result.serverName,
                 "authorizationUrl": result.authorizationUrl ?? NSNull(),
                 "message": result.message ?? NSNull(),
-            ])
+            ]
+            return .handled(payload)
 
         case "coordinator.mcp.oauthCallback":
             guard let rawURL = nonEmptyString(params["url"]),
