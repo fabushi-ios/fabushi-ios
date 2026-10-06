@@ -620,12 +620,15 @@ final class MarketplaceModel {
     }
 
     private func receiveFeatureEvent(type expectedType: String) async throws -> [String: Any] {
-        for _ in 0..<64 {
-            let result = try await bridge.request(method: "feature.receive")
-            guard let event = result.value as? [String: Any] else { continue }
-            if event["type"] as? String == expectedType { return event }
+        let result = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 5_120
+        ) { event in
+            event["type"] as? String == expectedType
         }
-        throw MahayanaCoordinator.CoordinatorError.requestFailed("未收到 FeatureHost 事件 \(expectedType)")
+        guard let event = result.value as? [String: Any] else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return event
     }
 
     func handleDeepLink(_ url: URL) {
@@ -806,11 +809,35 @@ final class MarketplaceModel {
         for _ in 0..<1800 {
             if Task.isCancelled { return .nonTerminal }
             do {
-                let result = try await bridge.request(method: "feature.receive")
-                guard let event = result.value as? [String: Any], let type = event["type"] as? String else {
-                    try? await Task.sleep(nanoseconds: 80_000_000)
-                    continue
+                let ownedHandoffRequestIDs = Set(
+                    chatMessages.compactMap(\.handoffRequestId)
+                )
+                let result = try await bridge.receiveFeatureEvent(
+                    deadlineMilliseconds: 450_000
+                ) { event in
+                    guard let type = event["type"] as? String else { return false }
+                    if type == "box.handoff.resolved" {
+                        guard let requestID = event["requestId"] as? String else { return false }
+                        return ownedHandoffRequestIDs.contains(requestID)
+                    }
+                    let acceptedTypes: Set<String> = [
+                        "box.handoff.requested",
+                        "model.routed",
+                        "operation.started",
+                        "chat.message",
+                        "chat.delta",
+                        "agent.step",
+                        "transcript.card",
+                        "operation.completed",
+                        "operation.interrupted",
+                        "operation.failed",
+                    ]
+                    guard acceptedTypes.contains(type) else { return false }
+                    return (event["operationId"] as? String ?? operationId) == operationId
                 }
+                guard let event = result.value as? [String: Any],
+                      let type = event["type"] as? String
+                else { continue }
                 switch type {
                 case "box.handoff.requested":
                     let eventOperationId = event["operationId"] as? String ?? operationId
