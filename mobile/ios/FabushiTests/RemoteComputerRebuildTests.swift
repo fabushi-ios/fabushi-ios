@@ -453,11 +453,11 @@ final class RemoteComputerRebuildTests: XCTestCase {
         XCTAssertNotEqual(agent.scopeKey, account.scopeKey)
     }
 
-    func testAgentBoxSourceContractNeverUsesPairedComputerAPI() throws {
-        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.ensurePath, "/v1/agent-boxes/ensure")
-        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.releasePath, "/v1/agent-boxes/release")
-        XCTAssertFalse(IOSRemoteComputerAgentBoxSource.ensurePath.contains("/v1/computers"))
-        XCTAssertFalse(IOSRemoteComputerAgentBoxSource.releasePath.contains("/v1/computers"))
+    func testAgentBoxSourceContractUsesTypedHostLifecycleRPC() throws {
+        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.ensureMethod, "computer.agentBox.ensure")
+        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.releaseMethod, "computer.agentBox.release")
+        XCTAssertFalse(IOSRemoteComputerAgentBoxSource.ensureMethod.contains("platform.request"))
+        XCTAssertFalse(IOSRemoteComputerAgentBoxSource.releaseMethod.contains("platform.request"))
 
         let snapshot = try IOSRemoteComputerAgentBoxSource.projectStatus(
             [
