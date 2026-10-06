@@ -12970,18 +12970,23 @@ fn load_automations(path: &Path) -> BTreeMap<String, AutomationSummary> {
             if !is_safe_automation_id(&item.id)
                 || item.name.trim().is_empty()
                 || item.prompt.trim().is_empty()
-                || normalize_automation_schedule(&item.schedule).is_err()
             {
                 return None;
             }
-            item.next_run_at_ms = item
-                .enabled
-                .then(|| {
-                    item.next_run_at_ms
-                        .filter(|next| *next > now)
-                        .or_else(|| next_automation_run(&item.schedule, now))
-                })
-                .flatten();
+            let trigger = item.trigger.clone().unwrap_or_else(|| AutomationTrigger::Schedule {
+                schedule: item.schedule.clone(),
+            });
+            let Ok(trigger) = normalize_automation_trigger(trigger) else {
+                return None;
+            };
+            item.schedule = automation_trigger_legacy_schedule(&trigger);
+            item.trigger = Some(trigger.clone());
+            item.next_run_at_ms = automation_next_run(
+                &trigger,
+                &item.schedule,
+                item.enabled,
+                now,
+            );
             Some((item.id.clone(), item))
         })
         .collect()
