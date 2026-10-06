@@ -203,6 +203,22 @@ jobs:
             fi
           done
 
+          # build-for-testing creates both the app and the UI-test runner, but
+          # the explicit .xctestrun path does not reliably install the runner
+          # before FrontBoard launch on fresh macOS-15 simulators. Install and
+          # verify both built products first; the real protected journey and all
+          # of its assertions still execute through the same .xctestrun.
+          app_bundle="$(find "$RUNNER_TEMP/FabushiProtectedDerivedData/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name 'Fabushi.app' -type d -print -quit)"
+          test_runner="$(find "$RUNNER_TEMP/FabushiProtectedDerivedData/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name 'FabushiUITests-Runner.app' -type d -print -quit)"
+          test -n "$app_bundle"
+          test -d "$app_bundle"
+          test -n "$test_runner"
+          test -d "$test_runner"
+          xcrun simctl install "${{ steps.sim.outputs.udid }}" "$app_bundle"
+          xcrun simctl install "${{ steps.sim.outputs.udid }}" "$test_runner"
+          xcrun simctl get_app_container "${{ steps.sim.outputs.udid }}" com.ombhrum.fabushi app >/dev/null
+          xcrun simctl get_app_container "${{ steps.sim.outputs.udid }}" com.ombhrum.FabushiUITests.xctrunner app >/dev/null
+
           xcodebuild test-without-building \
             -xctestrun "$PROTECTED_XCTESTRUN" \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
