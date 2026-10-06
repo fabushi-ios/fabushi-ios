@@ -124,3 +124,23 @@ final class CoordinatorMcpSurfaceTests: XCTestCase {
         XCTAssertTrue((loggedOutObject["servers"] as? [[String: Any]])?.isEmpty == true)
     }
 }
+
+
+final class CoordinatorSkillPublishTargetProjectionTests: XCTestCase {
+    func testTargetsKeepOnlyDirectPositiveTeamsAndSortStably() {
+        let rows = projectSkillPublishTargets([
+            .init(teamId: 9, name: "Zulu", isDirectMember: true),
+            .init(teamId: 7, name: "Alpha", isDirectMember: true),
+            .init(teamId: 3, name: "Alpha", isDirectMember: true),
+            .init(teamId: 4, name: "Indirect", isDirectMember: false),
+            .init(teamId: 0, name: "Invalid", isDirectMember: true),
+        ])
+
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows.map { $0["name"] as? String }, ["Alpha", "Alpha", "Zulu"])
+        XCTAssertEqual(
+            rows.compactMap { ($0["teamId"] as? NSNumber)?.intValue },
+            [3, 7, 9]
+        )
+    }
+}

@@ -45,6 +45,23 @@ private func accountDisplayConfig(from fetched: AccountMcpFetchResult) -> Accoun
 
 import Foundation
 
+func projectSkillPublishTargets(_ teams: [IOSCursorSkillPublishTeam]) -> [[String: Any]] {
+    teams
+        .filter { $0.isDirectMember && $0.teamId > 0 }
+        .sorted {
+            if $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedSame {
+                return $0.teamId < $1.teamId
+            }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        .map {
+            [
+                "teamId": NSNumber(value: $0.teamId),
+                "name": $0.name,
+            ]
+        }
+}
+
 private struct CoordinatorMcpSnapshot: Sendable {
     let display: AccountDisplayConfig
     let backendServers: [BackendMcpToolServerWire]
@@ -124,6 +141,23 @@ private final class CoordinatorMcpHostPort {
             )
         }
         lastSnapshot = nil
+    }
+
+    func exportWorkflowPublishPackage(
+        agentId: String,
+        workflowId: String
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.workflow.publishPackage",
+            params: [
+                "agentId": agentId,
+                "workflowId": workflowId,
+            ]
+        )
+        guard let package = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Skill publish package response is invalid.")
+        }
+        return package
     }
 
     func executeTool(
@@ -465,15 +499,18 @@ final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
     private let cursorAuth: IOSCursorAuthService
+    private let dashboard: IOSCursorDashboardClient
 
     private init(
         manager: SandMcpManager,
         port: CoordinatorMcpHostPort,
-        cursorAuth: IOSCursorAuthService
+        cursorAuth: IOSCursorAuthService,
+        dashboard: IOSCursorDashboardClient
     ) {
         self.manager = manager
         self.port = port
         self.cursorAuth = cursorAuth
+        self.dashboard = dashboard
     }
 
     static func make(
@@ -558,7 +595,8 @@ final class CoordinatorMcpSurface {
         return .init(
             manager: SandMcpManager(deps: dependencies),
             port: port,
-            cursorAuth: cursorAuth
+            cursorAuth: cursorAuth,
+            dashboard: dashboard
         )
     }
 
@@ -571,6 +609,58 @@ final class CoordinatorMcpSurface {
         params: [String: Any]
     ) async throws -> CoordinatorDevControlRouting {
         switch method {
+        case "coordinator.skill.publishTargets":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw SandMcpConfigError("Skill publishing requires Cursor sign-in.")
+            }
+            let teams = try await dashboard.getSkillPublishTeams()
+            return .handled(["teams": projectSkillPublishTargets(teams)])
+
+        case "coordinator.skill.publishUpload":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw SandMcpConfigError("Skill publishing requires Cursor sign-in.")
+            }
+            guard let agentId = nonEmptyString(params["agentId"]),
+                  let workflowId = nonEmptyString(params["workflowId"]),
+                  let teamNumber = params["teamId"] as? NSNumber
+            else {
+                throw SandMcpConfigError(
+                    "Skill publishing requires agentId, workflowId, and teamId."
+                )
+            }
+            let teamValue = teamNumber.int64Value
+            guard teamValue > 0, teamValue <= Int64(Int32.max) else {
+                throw SandMcpConfigError("Skill publishing teamId is invalid.")
+            }
+            let package = try await port.exportWorkflowPublishPackage(
+                agentId: agentId,
+                workflowId: workflowId
+            )
+            guard let name = nonEmptyString(package["name"]),
+                  let displayName = nonEmptyString(package["displayName"]),
+                  let description = nonEmptyString(package["description"]),
+                  let encoded = nonEmptyString(package["pluginTarGzBase64"]),
+                  let archive = Data(base64Encoded: encoded)
+            else {
+                throw SandMcpConfigError("Skill publish package is incomplete.")
+            }
+            let published = try await dashboard.publishSkillPlugin(
+                teamId: Int32(teamValue),
+                name: name,
+                displayName: displayName,
+                description: description,
+                pluginTarGz: archive
+            )
+            // This is intentionally only an upload primitive. The private workflow
+            // remains authoritative until a later refresh confirms the same plugin
+            // id + commit SHA in the installed plugin-skill projection.
+            return .handled([
+                "workflowId": workflowId,
+                "pluginId": published.pluginId,
+                "commitSha": published.commitSha,
+                "confirmed": false,
+            ])
+
         case "coordinator.mcp.servers":
             let state = try await manager.listServers()
             return .handled(["servers": state.servers.map(projectServer)])
