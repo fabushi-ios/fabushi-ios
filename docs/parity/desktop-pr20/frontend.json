@@ -1420,14 +1420,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift (shipping native add/edit routine sheet, 96 quarter-hour picker options, controlled custom schedule field, and canonical create/update wiring through MobileBotRoutinesController). The editor delegates schedule normalization/validation to the existing source/shared/automation-schedule.swift runtime rather than owning a second parser.",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers the exact 15-minute/96-option picker contract, custom blur normalization/commit decision, accepted aliases/@every/time-zone forms, and malformed/out-of-range fail-closed cases. Fresh exact-HEAD ordinary/protected Actions are required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. Native SwiftUI replaces the recovered React draft editor while preserving the shipped schedule leaf responsibilities; trigger-draft multi-row semantics remain separately gated by trigger-draft-controller.ts / trigger-schema.ts rows."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/schedule.ts",
@@ -1435,14 +1435,14 @@
       "desktop_responsibility": "pending-review",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/shared/automation-schedule.swift",
       "ios_language": "",
       "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "implementation_status": "implemented",
+      "production_evidence": "source/shared/automation-schedule.swift is the existing canonical iOS schedule runtime for normalization, cron aliases, five-field parsing/ranges, @every intervals, CRON_TZ/TZ validation, next-run computation, and human schedule descriptions. frontend/src/production/MobileBotRoutines.swift reuses it for the native editor instead of duplicating schedule ownership.",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift adds editor-facing validation coverage; existing exact-HEAD Rust/Swift application test gates exercise the shared automation runtime in shipping composition. Fresh ordinary/protected Actions are required before verified.",
+      "notes": "Platform delta: iOS retains the canonical raw schedule string as the Host contract and does not recreate the renderer-only TypeScript ScheduleSpec object graph. The applicable parse/validate/execute/describe semantics are owned by source/shared/automation-schedule.swift; the native editor emits canonical cron directly."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/trigger-draft-controller.ts",
