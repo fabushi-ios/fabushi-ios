@@ -19,6 +19,13 @@ struct IOSVNCSessionSignal: Equatable, Sendable {
     let clean: Bool
 }
 
+enum IOSVNCHostKey: String, Equatable, Sendable {
+    case arrowUp = "ArrowUp"
+    case arrowDown = "ArrowDown"
+    case arrowLeft = "ArrowLeft"
+    case arrowRight = "ArrowRight"
+}
+
 struct IOSVNCCursorTelemetry: Equatable, Sendable {
     enum Kind: String, Equatable, Sendable {
         case click
@@ -161,6 +168,14 @@ final class IOSVNCPreloadRuntime {
         return .init(x: x, y: y, kind: kind)
     }
 
+    static func hostKey(from body: Any) -> IOSVNCHostKey? {
+        guard let object = body as? [String: Any],
+              object["kind"] as? String == "host_key",
+              let rawKey = object["key"] as? String
+        else { return nil }
+        return IOSVNCHostKey(rawValue: rawKey)
+    }
+
     private static func integer(_ value: Any?) -> Int64? {
         if let value = value as? Int64 { return value }
         if let value = value as? Int { return Int64(value) }
@@ -205,6 +220,29 @@ final class IOSVNCPreloadRuntime {
 
       function post(payload) {
         try { handler.postMessage(payload); } catch (_error) {}
+      }
+
+      function isInteractiveViewer() {
+        try {
+          return new URLSearchParams(window.location.search).get("sandInteractive") === "1";
+        } catch (_error) {
+          return false;
+        }
+      }
+
+      if (isInteractiveViewer()) {
+        var forwardedArrowKeys = {
+          ArrowUp: true,
+          ArrowDown: true,
+          ArrowLeft: true,
+          ArrowRight: true
+        };
+        document.addEventListener("keydown", function (event) {
+          if (!event || !forwardedArrowKeys[event.key]) return;
+          // Match Desktop: report the trusted host key without preventing the
+          // noVNC page from also receiving the keyboard event.
+          post({ kind: "host_key", key: event.key });
+        }, true);
       }
 
       function currentState() {
