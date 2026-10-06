@@ -33,6 +33,12 @@ impl DeadlinePolicy {
     where
         F: Future<Output = T>,
     {
+        if self.timeout.is_zero() {
+            return Err(DeadlineExceededError {
+                policy_name: self.name.clone(),
+            });
+        }
+
         let deadline = tokio::time::sleep(self.timeout);
         tokio::pin!(deadline);
         tokio::pin!(work);
