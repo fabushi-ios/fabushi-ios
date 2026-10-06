@@ -14,6 +14,7 @@ final class FabushiRuntime {
     let marketplace: MarketplaceModel
     let messaging: MessagingModel
     let authCallbackRegistration: IOSAuthCallbackRegistration
+    private(set) var reconnectGeneration = 0
 
     @ObservationIgnored private var deepLinkController: IOSDeepLinkController?
     @ObservationIgnored private var wasBackgrounded = false
@@ -148,6 +149,7 @@ final class FabushiRuntime {
             await messaging.refresh()
         }
         main.markResyncCompleted()
+        reconnectGeneration &+= 1
         main.lifecycleReporter.report(
             .coordinatorHandoff,
             metadata: [

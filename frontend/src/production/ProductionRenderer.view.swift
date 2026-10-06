@@ -10,13 +10,15 @@ internal struct ProductionRenderer: View {
     @Bindable var messaging: MessagingModel
     let bridge: IOSPreloadBridge
     let appAgentSurface: FabushiAppAgentSurface
+    var reconnectGeneration: Int = 0
 
     var body: some View {
         GrokMobileShell(
             model: model,
             messaging: messaging,
             bridge: bridge,
-            appAgentSurface: appAgentSurface
+            appAgentSurface: appAgentSurface,
+            reconnectGeneration: reconnectGeneration
         )
     }
 }

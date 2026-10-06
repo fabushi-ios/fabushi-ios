@@ -5,6 +5,7 @@ internal struct GrokMobileShell: View {
     @Bindable var messaging: MessagingModel
     let bridge: IOSPreloadBridge
     let appAgentSurface: FabushiAppAgentSurface
+    var reconnectGeneration: Int = 0
     @Environment(\.openURL) var openExternalURL
 
     @State var query = ""
@@ -55,6 +56,7 @@ internal struct GrokMobileShell: View {
                 roster: bots,
                 bridge: bridge,
                 accountScopeKey: mobileAccountScopeKey,
+                reconnectGeneration: reconnectGeneration,
                 onRosterChanged: { updated in
                     applyBotRosterUpdate(updated)
                     groupMembersTarget = updated.first(where: { $0.id == group.id })

@@ -575,6 +575,80 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         } else {
             XCTFail("account scope reset must return loading")
         }
+
+        fake.snapshot = .ready([providerRoutine()])
+        provider.setScope(
+            MobileBotRoutineRunHistoryScope(
+                accountKey: "account-b",
+                agentId: "agent-2",
+                automationId: "routine-2"
+            )
+        )
+        XCTAssertEqual(fake.resetCalls, 2)
+        if case .loading(let scope, let rows, _) = provider.snapshot() {
+            XCTAssertEqual(scope.agentId, "agent-2")
+            XCTAssertEqual(scope.automationId, "routine-2")
+            XCTAssertTrue(rows.isEmpty)
+        } else {
+            XCTFail("Agent scope change must fence old rows")
+        }
+    }
+
+    @MainActor
+    func testRunHistoryProviderProjectsRequestedRoutineWithoutCrossRowLeakage() {
+        let second = MobileBotRoutine(
+            id: "routine-2",
+            agentId: "agent-1",
+            name: "Second",
+            prompt: "",
+            schedule: "@hourly",
+            trigger: .member(.cron(.init(schedule: "@hourly"))),
+            isEnabled: true,
+            createdAtMs: 11,
+            runs: [
+                MobileBotRoutineRun(
+                    id: "run-2",
+                    status: .error,
+                    startedAt: 40,
+                    detail: "Second failure",
+                    event: nil
+                ),
+            ],
+            lastRunAtMs: 40,
+            nextRunAtMs: nil
+        )
+        let fake = FakeRoutinesController(snapshot: .ready([providerRoutine(), second]))
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "UTC",
+                overrideTimeZone: nil
+            ),
+            now: { Date(timeIntervalSince1970: 0.040) },
+            scheduler: { _, _, _ in { } }
+        )
+        let provider = MobileBotRoutineRunHistoryProvider(
+            controller: fake,
+            clock: clock,
+            initialScope: MobileBotRoutineRunHistoryScope(
+                accountKey: "account-a",
+                agentId: "agent-1",
+                automationId: ""
+            )
+        )
+
+        if case .ready(let scope, let rows, _) = provider.snapshot(automationId: "routine-2") {
+            XCTAssertEqual(scope.automationId, "routine-2")
+            XCTAssertEqual(rows.map(\.id), ["run-2"])
+            XCTAssertEqual(rows.first?.title, "Second failure")
+        } else {
+            XCTFail("requested routine must project only its own rows")
+        }
+
+        if case .ready(_, let rows, _) = provider.snapshot(automationId: "routine-1") {
+            XCTAssertEqual(rows.map(\.id), ["run-1"])
+        } else {
+            XCTFail("first routine history must remain isolated")
+        }
     }
 
     @MainActor

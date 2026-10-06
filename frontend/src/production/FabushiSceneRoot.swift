@@ -52,7 +52,8 @@ private struct FabushiProductionSceneRoot: View {
             model: runtime.marketplace,
             messaging: runtime.messaging,
             bridge: runtime.bridge,
-            appAgentSurface: runtime.appAgentSurface
+            appAgentSurface: runtime.appAgentSurface,
+            reconnectGeneration: runtime.reconnectGeneration
         )
         .task {
             await runtime.start()

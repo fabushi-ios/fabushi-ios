@@ -390,6 +390,25 @@ internal final class MobileBotRoutineRunHistoryProvider {
         guard !disposed, let scope else {
             return .unavailable
         }
+        return snapshot(for: scope)
+    }
+
+    func snapshot(automationId: String) -> MobileBotRoutineRunHistorySnapshot {
+        guard !disposed, let scope else {
+            return .unavailable
+        }
+        return snapshot(
+            for: MobileBotRoutineRunHistoryScope(
+                accountKey: scope.accountKey,
+                agentId: scope.agentId,
+                automationId: automationId
+            )
+        )
+    }
+
+    private func snapshot(
+        for scope: MobileBotRoutineRunHistoryScope
+    ) -> MobileBotRoutineRunHistorySnapshot {
         let routineSnapshot = controller.snapshot
         let routine = routineSnapshot.value.first {
             $0.id == scope.automationId
@@ -423,12 +442,14 @@ internal final class MobileBotRoutineRunHistoryProvider {
 
     func setScope(_ next: MobileBotRoutineRunHistoryScope?) {
         guard !disposed, scope != next else { return }
-        let accountChanged = scope?.accountKey != next?.accountKey
+        let ownerChanged =
+            scope?.accountKey != next?.accountKey
+            || scope?.agentId != next?.agentId
         scope = next
         generation += 1
         request += 1
         refreshing = false
-        if accountChanged {
+        if ownerChanged {
             controller.reset()
         }
         notify()
@@ -1444,34 +1465,42 @@ extension MobileBotRoutinesController: MobileBotRoutinesControlling {}
 internal struct MobileBotRoutinesSection: View {
     let agentId: String
     let accountScopeKey: String
+    let reconnectGeneration: Int
 
     @StateObject private var controller: MobileBotRoutinesController
     @State private var showingEditor = false
     @State private var editingRoutine: MobileBotRoutine?
-    @State private var runHistoryClock: MobileBotRoutineRunHistoryClock
-    @State private var runHistoryClockStop: (() -> Void)?
-    @State private var runHistoryNowMilliseconds: Int64
-    @State private var runHistoryTimeZoneIdentifier: String
+    @State private var runHistoryProvider: MobileBotRoutineRunHistoryProvider
+    @State private var runHistoryProviderStop: (() -> Void)?
+    @State private var runHistoryRevision = 0
 
     init(
         agentId: String,
         bridge: IOSPreloadBridge,
-        accountScopeKey: String
+        accountScopeKey: String,
+        reconnectGeneration: Int = 0
     ) {
         self.agentId = agentId
         self.accountScopeKey = accountScopeKey
+        self.reconnectGeneration = reconnectGeneration
+        let controller = MobileBotRoutinesController(
+            source: MobileBotRoutinesSource(bridge: bridge)
+        )
         let clock = MobileBotRoutineRunHistoryClock(
             initialTimeZone: MobileBotRoutineRunHistoryClock.detectTimeZone()
         )
-        _runHistoryClock = State(initialValue: clock)
-        _runHistoryClockStop = State(initialValue: nil)
-        _runHistoryNowMilliseconds = State(initialValue: clock.nowMilliseconds)
-        _runHistoryTimeZoneIdentifier = State(initialValue: clock.timeZoneIdentifier)
-        _controller = StateObject(
-            wrappedValue: MobileBotRoutinesController(
-                source: MobileBotRoutinesSource(bridge: bridge)
+        let provider = MobileBotRoutineRunHistoryProvider(
+            controller: controller,
+            clock: clock,
+            initialScope: MobileBotRoutineRunHistoryScope(
+                accountKey: accountScopeKey,
+                agentId: agentId,
+                automationId: ""
             )
         )
+        _controller = StateObject(wrappedValue: controller)
+        _runHistoryProvider = State(initialValue: provider)
+        _runHistoryProviderStop = State(initialValue: nil)
     }
 
     var body: some View {
@@ -1537,23 +1566,30 @@ internal struct MobileBotRoutinesSection: View {
             }
         }
         .task(id: "\(accountScopeKey)|\(agentId)") {
-            controller.reset()
-            await controller.refresh(agentId: agentId)
+            runHistoryProvider.setScope(
+                MobileBotRoutineRunHistoryScope(
+                    accountKey: accountScopeKey,
+                    agentId: agentId,
+                    automationId: ""
+                )
+            )
+            _ = await runHistoryProvider.refresh()
+        }
+        .onChange(of: reconnectGeneration) { _, _ in
+            Task { @MainActor in
+                _ = await runHistoryProvider.refreshOnReconnect()
+            }
         }
         .onAppear {
-            guard runHistoryClockStop == nil else { return }
-            runHistoryNowMilliseconds = runHistoryClock.nowMilliseconds
-            runHistoryTimeZoneIdentifier = runHistoryClock.timeZoneIdentifier
-            runHistoryClockStop = runHistoryClock.subscribe {
-                Task { @MainActor in
-                    runHistoryNowMilliseconds = runHistoryClock.nowMilliseconds
-                    runHistoryTimeZoneIdentifier = runHistoryClock.timeZoneIdentifier
-                }
+            guard runHistoryProviderStop == nil else { return }
+            runHistoryProviderStop = runHistoryProvider.subscribe {
+                runHistoryRevision &+= 1
             }
         }
         .onDisappear {
-            runHistoryClockStop?()
-            runHistoryClockStop = nil
+            runHistoryProviderStop?()
+            runHistoryProviderStop = nil
+            runHistoryProvider.dispose()
             controller.reset()
         }
     }
@@ -1630,9 +1666,8 @@ internal struct MobileBotRoutinesSection: View {
                 }
 
                 MobileBotRoutineInlineRunHistory(
-                    runs: routine.runs,
-                    nowMilliseconds: runHistoryNowMilliseconds,
-                    timeZoneIdentifier: runHistoryTimeZoneIdentifier
+                    snapshot: runHistoryProvider.snapshot(automationId: routine.id),
+                    revision: runHistoryRevision
                 )
 
                 if let error = controller.mutationError(for: routine.id) {
@@ -1815,28 +1850,28 @@ internal struct MobileBotRoutineEditorSheet: View {
 
 @MainActor
 internal struct MobileBotRoutineInlineRunHistory: View {
-    let runs: [MobileBotRoutineRun]
-    let nowMilliseconds: Int64
-    let timeZoneIdentifier: String
+    let snapshot: MobileBotRoutineRunHistorySnapshot
+    let revision: Int
 
     var body: some View {
-        let rows = MobileBotRoutineRunHistoryModel.presentHistory(
-            runs,
-            now: nowMilliseconds,
-            timeZoneIdentifier: timeZoneIdentifier
-        ).rows
+        let _ = revision
+        let state = visibleState(snapshot)
 
         VStack(alignment: .leading, spacing: 4) {
             Text("Run history")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if rows.isEmpty {
+            if state.loading && state.rows.isEmpty {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Loading run history")
+            } else if state.rows.isEmpty {
                 Text("No runs yet")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(rows.prefix(5)) { row in
+                ForEach(state.rows.prefix(5)) { row in
                     HStack(spacing: 6) {
                         Text(row.timestampLabel)
                             .font(.caption2)
@@ -1847,6 +1882,29 @@ internal struct MobileBotRoutineInlineRunHistory: View {
                     .help(row.title ?? row.accessibilityLabel)
                 }
             }
+
+            if let message = state.error {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func visibleState(
+        _ snapshot: MobileBotRoutineRunHistorySnapshot
+    ) -> (rows: [MobileBotRoutineRunPresentation], loading: Bool, error: String?) {
+        switch snapshot {
+        case .unavailable:
+            return ([], false, nil)
+        case .loading(_, let rows, _):
+            return (rows, true, nil)
+        case .empty:
+            return ([], false, nil)
+        case .ready(_, let rows, _):
+            return (rows, false, nil)
+        case .failed(_, let rows, _, let message):
+            return (rows, false, message)
         }
     }
 
