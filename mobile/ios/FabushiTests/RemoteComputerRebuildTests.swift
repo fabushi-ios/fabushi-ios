@@ -339,6 +339,22 @@ final class RemoteComputerRebuildTests: XCTestCase {
         XCTAssertNotEqual(agent.scopeKey, account.scopeKey)
     }
 
+    func testAgentComputerScopeCannotReusePairedComputerSurface() {
+        let account = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: nil,
+            agentName: nil
+        )
+        XCTAssertFalse(account.isAgentScope)
+
+        let agent = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: "agent-7",
+            agentName: "研究助手"
+        )
+        XCTAssertTrue(agent.isAgentScope)
+    }
+
     func testWebProcessCrashPolicyReloadsThreeTimesThenFailsClosed() {
         var policy = RemoteComputerWebProcessCrashPolicy()
 
