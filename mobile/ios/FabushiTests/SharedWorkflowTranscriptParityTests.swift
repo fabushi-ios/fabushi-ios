@@ -156,6 +156,94 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(automation.timelineAutomationId, "routine-7")
     }
 
+    func testSendMessageTextProjectionPreservesDesktopGuardsAndBareLinkGate() throws {
+        let plain = try XCTUnwrap(projectMobileSendMessageText([
+            "kind": "send-message",
+            "id": "text-1",
+            "message": [
+                "type": "text",
+                "content": "Hello",
+                "channel": "slack",
+            ],
+            "streaming": true,
+            "timestampMs": 1_500,
+        ]))
+        XCTAssertEqual(plain.id, "text-1")
+        XCTAssertEqual(plain.content, "Hello")
+        XCTAssertEqual(plain.channel, "slack")
+        XCTAssertTrue(plain.streaming)
+        XCTAssertEqual(plain.timestampMs, 1_500)
+        XCTAssertEqual(plain.presentation, .text)
+
+        let bareLink = try XCTUnwrap(projectMobileSendMessageText([
+            "kind": "send-message",
+            "id": "text-2",
+            "message": [
+                "type": "text",
+                "content": " [Example](https://example.com/path?x=1) ",
+            ],
+        ]))
+        XCTAssertEqual(
+            bareLink.presentation,
+            .urlCard("https://example.com/path?x=1")
+        )
+
+        let withImage = try XCTUnwrap(projectMobileSendMessageText([
+            "kind": "send-message",
+            "id": "text-3",
+            "message": [
+                "type": "text",
+                "content": "https://example.com",
+                "images": [[
+                    "url": "https://example.com/a.png",
+                    "alt": "A",
+                ]],
+            ],
+        ]))
+        XCTAssertEqual(withImage.presentation, .text)
+        XCTAssertEqual(withImage.images, [
+            .init(url: "https://example.com/a.png", alt: "A"),
+        ])
+
+        XCTAssertNil(projectMobileSendMessageText([
+            "kind": "send-message",
+            "id": "text-4",
+            "message": ["type": "text", "content": "x", "images": "bad"],
+        ]))
+        XCTAssertNil(projectMobileSendMessageText([
+            "kind": "send-message",
+            "id": "text-5",
+            "message": ["type": "text", "content": "x"],
+            "streaming": "yes",
+        ]))
+        XCTAssertNil(projectMobileSendMessageText([
+            "kind": "send-message",
+            "id": "text-6",
+            "message": ["type": "text", "content": "x", "channel": 7],
+        ]))
+    }
+
+    func testTranscriptCardDispatchesSendMessageTextBeforeAttachmentProjection() throws {
+        let row = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "outer",
+                "card": [
+                    "kind": "send-message",
+                    "id": "text-7",
+                    "message": [
+                        "type": "text",
+                        "content": "https://example.com",
+                    ],
+                ],
+            ],
+            operationId: "op-text"
+        ))
+        XCTAssertEqual(row.id, "text-7")
+        XCTAssertEqual(row.text, "https://example.com")
+        XCTAssertEqual(row.sendMessageTextProjection?.presentation, .urlCard("https://example.com/"))
+        XCTAssertNil(row.attachmentProjection)
+    }
+
     func testAttachmentDataProjectsDesktopKindsAndBoxMetadata() throws {
         let box = try XCTUnwrap(projectMobileAttachmentCard([
             "kind": "send-message",
