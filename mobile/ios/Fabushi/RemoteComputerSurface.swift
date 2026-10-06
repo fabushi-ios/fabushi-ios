@@ -1348,14 +1348,395 @@ private struct RemoteComputerRebuildBanner: View {
     }
 }
 
+enum RemoteComputerShellPhase: String, Equatable, Sendable {
+    case off
+    case starting
+    case sleeping
+    case local
+    case running
+    case pulling
+}
+
+enum RemoteComputerShellReadState: String, Equatable, Sendable {
+    case unknown
+    case known
+    case error
+}
+
+struct RemoteComputerShellHandoff: Equatable, Sendable {
+    let requestID: String
+    let instruction: String
+    let snapshotDataURL: String?
+}
+
+struct RemoteComputerShellStatusProjection {
+    let phase: RemoteComputerShellPhase
+    let readState: RemoteComputerShellReadState
+    let isStatusKnown: Bool
+    let isStatusUnavailable: Bool
+    let pullPercent: Double?
+    let vncURL: String?
+    let handoff: RemoteComputerShellHandoff?
+    let windows: [Any]
+}
+
+struct RemoteComputerShellMonitor: Equatable, Sendable {
+    let subagentID: String
+    let title: String
+    let vncURL: String
+    let handoff: RemoteComputerShellHandoff?
+}
+
+struct RemoteComputerShellStageCopy: Equatable, Sendable {
+    let message: String
+    let progressPercent: Double?
+    let isBusy: Bool
+    let hasRetry: Bool
+}
+
+enum RemoteComputerShellCursorType: String, Equatable, Sendable {
+    case click
+    case drag
+    case move
+    case scroll
+}
+
+struct RemoteComputerShellCursor: Equatable, Sendable {
+    let x: Double
+    let y: Double
+    let type: RemoteComputerShellCursorType
+    let sequence: Int
+    let clickSequence: Int
+    let millisecondsSinceMove: Int64?
+    let lastMovedAtMilliseconds: Int64?
+}
+
+struct RemoteComputerShellCursorPresentation: Equatable, Sendable {
+    struct Press: Equatable, Sendable {
+        let key: Int
+        let delayMilliseconds: Int64
+    }
+
+    let isGliding: Bool
+    let isVisible: Bool
+    let press: Press?
+}
+
+struct RemoteComputerShellVNCSession: Equatable, Sendable {
+    enum Phase: String, Equatable, Sendable {
+        case connect = "rfb_connect"
+        case disconnect = "rfb_disconnect"
+        case reconnect
+    }
+
+    let phase: Phase
+    let clean: Bool?
+}
+
+struct RemoteComputerShellVNCIdentity: Equatable, Sendable {
+    let host: String?
+    let display: String?
+}
+
+enum RemoteComputerShellModel {
+    static let statusTimeoutMilliseconds: Int64 = 15_000
+    static let crashLimit = 3
+    static let crashWindowMilliseconds: Int64 = 60_000
+    static let focusDelayMilliseconds: Int64 = 32
+    static let warmPreviewLimit = 3
+    static let directMonitorLimit = 3
+    static let activeHoldMilliseconds: Int64 = 2_500
+
+    static func projectHandoff(_ value: Any?) -> RemoteComputerShellHandoff? {
+        guard let object = value as? [String: Any],
+              let requestID = object["requestId"] as? String,
+              let instruction = object["instruction"] as? String
+        else { return nil }
+        return .init(
+            requestID: requestID,
+            instruction: instruction,
+            snapshotDataURL: object["snapshotDataUrl"] as? String
+        )
+    }
+
+    static func projectStatus(
+        _ value: Any?,
+        readState: RemoteComputerShellReadState,
+        isEnsureStarting: Bool = false
+    ) -> RemoteComputerShellStatusProjection {
+        let status = value as? [String: Any]
+        let state = status?["state"] as? String
+        let rawVNC = status?["vncUrl"] as? String
+        let vncURL = state == "running" && rawVNC?.isEmpty == false ? rawVNC : nil
+        let pull = status?["pull"] as? [String: Any]
+
+        let phase: RemoteComputerShellPhase
+        if pull != nil {
+            phase = .pulling
+        } else if state == "running" {
+            phase = vncURL == nil ? .local : .running
+        } else if isEnsureStarting {
+            phase = .starting
+        } else if state == "hibernated" {
+            phase = .sleeping
+        } else {
+            phase = .off
+        }
+
+        return .init(
+            phase: phase,
+            readState: readState,
+            isStatusKnown: readState == .known,
+            isStatusUnavailable: readState == .error,
+            pullPercent: numeric(pull?["percent"]),
+            vncURL: vncURL,
+            handoff: projectHandoff(status?["handoff"]),
+            windows: vncURL == nil ? [] : (status?["windows"] as? [Any] ?? [])
+        )
+    }
+
+    static func projectMonitors(
+        subagents: Any?,
+        statusFor: (String) -> Any?
+    ) -> [RemoteComputerShellMonitor] {
+        guard let rows = subagents as? [Any] else { return [] }
+        return rows.compactMap { raw in
+            guard let row = raw as? [String: Any],
+                  row["status"] as? String == "running",
+                  row["subagentType"] as? String == "computerUse",
+                  let id = row["subagentId"] as? String,
+                  let status = statusFor(id) as? [String: Any],
+                  status["state"] as? String == "running",
+                  let vncURL = status["vncUrl"] as? String,
+                  !vncURL.isEmpty
+            else { return nil }
+            let title = (row["title"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return .init(
+                subagentID: id,
+                title: title.isEmpty ? "Subagent" : title,
+                vncURL: vncURL,
+                handoff: nil
+            )
+        }
+    }
+
+    static func isComputerUseTaskActive(_ value: Any?) -> Bool {
+        guard let rows = value as? [Any] else { return false }
+        return rows.contains {
+            ($0 as? [String: Any])?["subagentType"] as? String == "computerUse"
+        }
+    }
+
+    static func stageCopy(
+        isScreenLoading: Bool,
+        isScreenUnavailable: Bool,
+        subjectLabel: String,
+        emptyMessage: String? = nil,
+        isEmptyLoading: Bool,
+        pullPercent: Double?
+    ) -> RemoteComputerShellStageCopy {
+        if isScreenLoading {
+            return .init(
+                message: "Switching to \(subjectLabel)'s screen…",
+                progressPercent: nil,
+                isBusy: true,
+                hasRetry: false
+            )
+        }
+        if isScreenUnavailable {
+            return .init(
+                message: "Can't reach \(subjectLabel)'s screen",
+                progressPercent: nil,
+                isBusy: false,
+                hasRetry: true
+            )
+        }
+        if let pullPercent {
+            return .init(
+                message: "Setting up the computer",
+                progressPercent: pullPercent,
+                isBusy: true,
+                hasRetry: false
+            )
+        }
+        return .init(
+            message: emptyMessage ?? "Booting up the computer",
+            progressPercent: nil,
+            isBusy: isEmptyLoading,
+            hasRetry: false
+        )
+    }
+
+    static func vncDimensions(_ value: String) -> (width: Int, height: Int) {
+        guard let url = URL(string: value),
+              url.path.hasSuffix("/sand-special-treatment-v1/vnc.html")
+        else { return (1280, 800) }
+        return (2048, 2048)
+    }
+
+    static func retainWarmVNCSources(
+        _ previous: [String],
+        source: String?,
+        maxWarm: Int = warmPreviewLimit
+    ) -> [String] {
+        guard let source, previous.first != source else { return previous }
+        let limit = max(1, maxWarm)
+        let next = [source] + previous.filter { $0 != source }
+        return Array(next.prefix(limit))
+    }
+
+    static func vncViewerURL(_ value: String, interactive: Bool) -> URL? {
+        guard var components = URLComponents(string: value) else { return nil }
+        var items = components.queryItems ?? []
+        func set(_ name: String, _ value: String) {
+            items.removeAll { $0.name == name }
+            items.append(URLQueryItem(name: name, value: value))
+        }
+        set("autoconnect", "true")
+        set("resize", "scale")
+        set("reconnect", "true")
+        if interactive {
+            set("sandInteractive", "1")
+        } else {
+            items.removeAll { $0.name == "sandInteractive" }
+        }
+        components.queryItems = items
+        return components.url
+    }
+
+    static func vncIdentity(_ value: String) -> RemoteComputerShellVNCIdentity {
+        guard let url = URL(string: value),
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return .init(host: nil, display: nil) }
+
+        if let path = components.queryItems?.first(where: { $0.name == "path" })?.value,
+           let question = path.firstIndex(of: "?")
+        {
+            let query = String(path[path.index(after: question)...])
+            if let nested = URLComponents(string: "https://local.invalid/?\(query)"),
+               let token = nested.queryItems?.first(where: { $0.name == "token" })?.value,
+               !token.isEmpty
+            {
+                return .init(host: url.host, display: token)
+            }
+        }
+        return .init(host: url.host, display: "primary")
+    }
+
+    static func parseVNCSession(_ value: Any?) -> RemoteComputerShellVNCSession? {
+        guard let string = value as? String,
+              let data = string.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let phaseValue = object["phase"] as? String,
+              let phase = RemoteComputerShellVNCSession.Phase(rawValue: phaseValue)
+        else { return nil }
+        return .init(phase: phase, clean: object["clean"] as? Bool)
+    }
+
+    static func projectCursor(
+        _ value: Any?,
+        previous: RemoteComputerShellCursor?,
+        nowMilliseconds: Int64
+    ) -> RemoteComputerShellCursor? {
+        guard let object = value as? [String: Any],
+              object["agentId"] is String,
+              let typeValue = object["type"] as? String,
+              let type = RemoteComputerShellCursorType(rawValue: typeValue),
+              let x = numeric(object["x"]), x >= 0,
+              let y = numeric(object["y"]), y >= 0
+        else { return nil }
+
+        let changed = previous.map { $0.x != x || $0.y != y } ?? false
+        let lastMoved = changed
+            ? nowMilliseconds
+            : previous?.lastMovedAtMilliseconds
+        return .init(
+            x: x,
+            y: y,
+            type: type,
+            sequence: (previous?.sequence ?? 0) + 1,
+            clickSequence: (previous?.clickSequence ?? 0) + (type == .click ? 1 : 0),
+            millisecondsSinceMove: lastMoved.map { max(0, nowMilliseconds - $0) },
+            lastMovedAtMilliseconds: lastMoved
+        )
+    }
+
+    static func cursorPresentation(
+        _ cursor: RemoteComputerShellCursor?,
+        hasFrame: Bool
+    ) -> RemoteComputerShellCursorPresentation {
+        let visible = cursor != nil && hasFrame
+        let press: RemoteComputerShellCursorPresentation.Press?
+        if visible, cursor?.type == .click, let cursor {
+            press = .init(
+                key: cursor.clickSequence,
+                delayMilliseconds: cursor.millisecondsSinceMove.map {
+                    max(0, 500 - $0)
+                } ?? 0
+            )
+        } else {
+            press = nil
+        }
+        return .init(
+            isGliding: (cursor?.sequence ?? 0) > 1,
+            isVisible: visible,
+            press: press
+        )
+    }
+
+    static func firstSelectedMonitor(
+        _ monitors: [RemoteComputerShellMonitor],
+        requested: String?
+    ) -> String? {
+        if let requested, monitors.contains(where: { $0.subagentID == requested }) {
+            return requested
+        }
+        return monitors.first(where: { $0.handoff != nil })?.subagentID
+            ?? monitors.first?.subagentID
+    }
+
+    static func stepSelectedMonitor(
+        _ monitors: [RemoteComputerShellMonitor],
+        current: String?,
+        delta: Int
+    ) -> String? {
+        guard monitors.count >= 2 else { return current }
+        let found = monitors.firstIndex(where: { $0.subagentID == current }) ?? 0
+        let normalized = delta < 0 ? -1 : 1
+        let index = (found + normalized + monitors.count) % monitors.count
+        return monitors[index].subagentID
+    }
+
+    static func handoffStatusLabel(
+        _ status: String
+    ) -> (label: String, muted: Bool) {
+        switch status {
+        case "waiting": return ("Action needed", false)
+        case "handed_back": return ("Done", false)
+        case "replied": return ("Answered", false)
+        case "dismissed": return ("Skipped", true)
+        default: return ("Status unavailable", true)
+        }
+    }
+
+    private static func numeric(_ value: Any?) -> Double? {
+        if let value = value as? Double { return value.isFinite ? value : nil }
+        if let value = value as? Int { return Double(value) }
+        if let value = value as? Int64 { return Double(value) }
+        if let value = value as? NSNumber { return value.doubleValue.isFinite ? value.doubleValue : nil }
+        return nil
+    }
+}
+
 enum RemoteComputerWebProcessCrashRecovery: Equatable, Sendable {
     case reload
     case failClosed
 }
 
 struct RemoteComputerWebProcessCrashPolicy: Equatable, Sendable {
-    static let automaticReloadLimit = 3
-    static let crashWindowMilliseconds: Int64 = 60_000
+    static let automaticReloadLimit = RemoteComputerShellModel.crashLimit
+    static let crashWindowMilliseconds = RemoteComputerShellModel.crashWindowMilliseconds
 
     private(set) var crashCount = 0
     private(set) var lastCrashAtMilliseconds: Int64?
