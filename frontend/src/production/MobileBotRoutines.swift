@@ -811,7 +811,21 @@ internal struct MobileBotRoutineSpec: Equatable {
     let prompt: String
     let schedule: String
     let isEnabled: Bool
-    let trigger: AutomationTrigger? = nil
+    let trigger: AutomationTrigger?
+
+    init(
+        name: String,
+        prompt: String,
+        schedule: String,
+        isEnabled: Bool,
+        trigger: AutomationTrigger? = nil
+    ) {
+        self.name = name
+        self.prompt = prompt
+        self.schedule = schedule
+        self.isEnabled = isEnabled
+        self.trigger = trigger
+    }
 }
 
 internal enum MobileBotRoutinesSnapshot: Equatable {
