@@ -1124,25 +1124,21 @@ internal struct MobileBotRoutinesSource {
             ]
         )
 
-        for _ in 0..<64 {
-            try Task.checkCancellation()
-            let result = try await bridge.request(
-                method: "feature.receive",
-                params: ["timeoutMs": 80]
-            )
-            guard let event = result.value as? [String: Any],
-                  event["type"] as? String == "automation.listed",
-                  let rows = event["automations"]
-            else {
-                continue
-            }
-            return try MobileBotRoutinesModel.parseAutomations(rows, agentId: agentId)
+        let result = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 5_120
+        ) { event in
+            event["type"] as? String == "automation.listed"
         }
-        throw NSError(
-            domain: "Fabushi.MobileBotRoutines",
-            code: 2,
-            userInfo: [NSLocalizedDescriptionKey: "Timed out waiting for Host automation.listed"]
-        )
+        guard let event = result.value as? [String: Any],
+              let rows = event["automations"]
+        else {
+            throw NSError(
+                domain: "Fabushi.MobileBotRoutines",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid Host automation.listed payload"]
+            )
+        }
+        return try MobileBotRoutinesModel.parseAutomations(rows, agentId: agentId)
     }
 
     func create(agentId: String, spec: MobileBotRoutineSpec) async throws {
