@@ -12,6 +12,21 @@ struct TeachRecordingStatus: Equatable, Sendable {
     let agentId: String?
     let startedAtMs: Int?
     let maxDurationMs: Int
+    let capturePath: String?
+
+    init(
+        state: State,
+        agentId: String?,
+        startedAtMs: Int?,
+        maxDurationMs: Int,
+        capturePath: String? = nil
+    ) {
+        self.state = state
+        self.agentId = agentId
+        self.startedAtMs = startedAtMs
+        self.maxDurationMs = maxDurationMs
+        self.capturePath = capturePath
+    }
 }
 
 let IDLE_TEACH_RECORDING_STATUS = TeachRecordingStatus(
