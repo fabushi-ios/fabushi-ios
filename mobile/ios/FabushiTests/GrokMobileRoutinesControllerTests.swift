@@ -1040,4 +1040,20 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         XCTAssertEqual(filters["actorAllowlist"] as? [String], ["Alice", "Bob"])
     }
 
+    func testFocusedRoutineResolvesExactAutomationIdFromRealSnapshot() throws {
+        var second = valid
+        second["id"] = "routine-2"
+        second["name"] = "Second"
+        let firstRoutine = try XCTUnwrap(MobileBotRoutinesModel.parseAutomation(valid))
+        let secondRoutine = try XCTUnwrap(MobileBotRoutinesModel.parseAutomation(second))
+        let snapshot = MobileBotRoutinesSnapshot.ready([firstRoutine, secondRoutine])
+
+        XCTAssertEqual(
+            MobileBotRoutinesModel.focusedRoutine(automationId: "routine-2", snapshot: snapshot)?.id,
+            "routine-2"
+        )
+        XCTAssertNil(MobileBotRoutinesModel.focusedRoutine(automationId: "missing", snapshot: snapshot))
+        XCTAssertNil(MobileBotRoutinesModel.focusedRoutine(automationId: nil, snapshot: snapshot))
+    }
+
 }

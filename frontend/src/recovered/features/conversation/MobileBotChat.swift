@@ -19,6 +19,7 @@ internal struct MobileBotChat: View {
     let appAgentSurface: FabushiAppAgentSurface
     let onClose: () -> Void
     let onOpenSettings: () -> Void
+    let onOpenAutomation: (String) -> Void
 
     @Binding var draft: String
     @Binding var entries: [MobileChatMessage]
@@ -457,6 +458,17 @@ internal struct MobileBotChat: View {
                 Text(entry.text)
                     .font(.caption)
                     .lineLimit(1)
+                if let automationId = entry.timelineAutomationId,
+                   case let .automationChanged(_, automationName)? = entry.timelineEvent
+                {
+                    Button(automationName) {
+                        onOpenAutomation(automationId)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .accessibilityLabel("Open routine \(automationName)")
+                    .accessibilityIdentifier(Self.semanticId("mobile-bot-open-routine-\(automationId)"))
+                }
                 Spacer(minLength: 8)
                 Text(entry.createdAt, style: .time)
                     .font(.caption2)

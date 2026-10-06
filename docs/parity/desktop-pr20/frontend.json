@@ -1768,11 +1768,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native projection preserves automationId/action/name and visible copy. The current iOS Bot chat has no canonical routine-navigation callback, so it does not expose a fake Open routine action.",
-      "implementation_status": "mapped",
-      "production_evidence": "projectMobileTranscriptCard produces a typed .timelineEvent with timelineAutomationId and MobileBotChat renders the visible event row.",
-      "test_evidence": "SharedWorkflowTranscriptParityTests covers automation id/action/name projection. A shipping routine-navigation test is still required.",
-      "notes": "Keep mapped until the real routine navigation owner is composed into MobileBotChat; do not substitute settings or a disabled button."
+      "ios_platform_delta": "SwiftUI timeline card calls a typed automation-id callback; GrokMobileShell opens the existing Agent Settings sheet and MobileBotRoutinesSection focuses the exact controller-backed routine editor after refresh.",
+      "implementation_status": "implemented",
+      "production_evidence": "MobileBotChat renders the automation name as an Open routine action; GrokMobileShell carries timelineAutomationId through MobileBotAgentSettingsSheet into MobileBotRoutinesSection, which resolves the exact routine from its live controller snapshot and opens MobileBotRoutineEditorSheet.",
+      "test_evidence": "SharedWorkflowTranscriptParityTests preserves automation id/action/name projection; GrokMobileRoutinesControllerTests verifies exact focused-routine selection and fail-closed missing/nil ids. Fresh exact-HEAD Actions required.",
+      "notes": "Native navigation reuses the real routine owner; it does not substitute generic settings or a disabled button. Fresh exact-HEAD ordinary/protected evidence is still required before verified."
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/timeline-event-registry.ts",

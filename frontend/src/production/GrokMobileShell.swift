@@ -26,6 +26,7 @@ internal struct GrokMobileShell: View {
     @State var selectedBot: MobileBotSummary?
     @State var groupMembersTarget: MobileBotSummary?
     @State var botSettingsTarget: MobileBotSummary?
+    @State var botSettingsRoutineID: String?
     @State var remoteComputerAgentTarget: MobileBotSummary?
     @State var botDrafts: [String: String] = [:]
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
@@ -71,6 +72,7 @@ internal struct GrokMobileShell: View {
                 bridge: bridge,
                 accountScopeKey: mobileAccountScopeKey,
                 reconnectGeneration: reconnectGeneration,
+                focusedAutomationId: botSettingsRoutineID,
                 onRosterChanged: { updated in
                     applyBotRosterUpdate(updated)
                     botSettingsTarget = updated.first(where: { $0.id == agent.id })
@@ -80,7 +82,10 @@ internal struct GrokMobileShell: View {
                     remoteComputerAgentTarget =
                         bots.first(where: { $0.id == scopedAgent.id }) ?? scopedAgent
                 },
-                onClose: { botSettingsTarget = nil }
+                onClose: {
+                    botSettingsRoutineID = nil
+                    botSettingsTarget = nil
+                }
             )
         }
         .fullScreenCover(item: $remoteComputerAgentTarget) { agent in
@@ -141,6 +146,11 @@ internal struct GrokMobileShell: View {
             appAgentSurface: appAgentSurface,
             onClose: { self.selectedBot = nil },
             onOpenSettings: {
+                self.botSettingsRoutineID = nil
+                self.botSettingsTarget = self.bots.first(where: { $0.id == bot.id }) ?? bot
+            },
+            onOpenAutomation: { automationId in
+                self.botSettingsRoutineID = automationId
                 self.botSettingsTarget = self.bots.first(where: { $0.id == bot.id }) ?? bot
             },
             draft: botDraftBinding(for: bot.id),

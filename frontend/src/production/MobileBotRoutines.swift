@@ -871,6 +871,14 @@ internal enum MobileBotRoutinesSnapshot: Equatable {
 }
 
 internal enum MobileBotRoutinesModel {
+    static func focusedRoutine(
+        automationId: String?,
+        snapshot: MobileBotRoutinesSnapshot
+    ) -> MobileBotRoutine? {
+        guard let automationId, !automationId.isEmpty else { return nil }
+        return snapshot.value.first { $0.id == automationId }
+    }
+
     static func parseAutomation(_ row: [String: Any]) -> MobileBotRoutine? {
         guard let id = nonEmptyString(row["id"]),
               let agentId = nonEmptyString(row["agentId"]),
@@ -1462,6 +1470,7 @@ internal struct MobileBotRoutinesSection: View {
     let agentId: String
     let accountScopeKey: String
     let reconnectGeneration: Int
+    let focusedAutomationId: String?
 
     @StateObject private var controller: MobileBotRoutinesController
     @State private var showingEditor = false
@@ -1469,16 +1478,19 @@ internal struct MobileBotRoutinesSection: View {
     @State private var runHistoryProvider: MobileBotRoutineRunHistoryProvider
     @State private var runHistoryProviderStop: (() -> Void)?
     @State private var runHistoryRevision = 0
+    @State private var openedFocusedAutomationId: String?
 
     init(
         agentId: String,
         bridge: IOSPreloadBridge,
         accountScopeKey: String,
-        reconnectGeneration: Int = 0
+        reconnectGeneration: Int = 0,
+        focusedAutomationId: String? = nil
     ) {
         self.agentId = agentId
         self.accountScopeKey = accountScopeKey
         self.reconnectGeneration = reconnectGeneration
+        self.focusedAutomationId = focusedAutomationId
         let controller = MobileBotRoutinesController(
             source: MobileBotRoutinesSource(bridge: bridge)
         )
@@ -1497,6 +1509,7 @@ internal struct MobileBotRoutinesSection: View {
         _controller = StateObject(wrappedValue: controller)
         _runHistoryProvider = State(initialValue: provider)
         _runHistoryProviderStop = State(initialValue: nil)
+        _openedFocusedAutomationId = State(initialValue: nil)
     }
 
     var body: some View {
@@ -1561,7 +1574,7 @@ internal struct MobileBotRoutinesSection: View {
                 }
             }
         }
-        .task(id: "\(accountScopeKey)|\(agentId)") {
+        .task(id: "\(accountScopeKey)|\(agentId)|\(focusedAutomationId ?? "")") {
             runHistoryProvider.setScope(
                 MobileBotRoutineRunHistoryScope(
                     accountKey: accountScopeKey,
@@ -1570,6 +1583,7 @@ internal struct MobileBotRoutinesSection: View {
                 )
             )
             _ = await runHistoryProvider.refresh()
+            openFocusedRoutineIfAvailable()
         }
         .onChange(of: reconnectGeneration) { _, _ in
             Task { @MainActor in
@@ -1588,6 +1602,19 @@ internal struct MobileBotRoutinesSection: View {
             runHistoryProvider.dispose()
             controller.reset()
         }
+    }
+
+    @MainActor
+    private func openFocusedRoutineIfAvailable() {
+        guard focusedAutomationId != openedFocusedAutomationId,
+              let routine = MobileBotRoutinesModel.focusedRoutine(
+                automationId: focusedAutomationId,
+                snapshot: controller.snapshot
+              )
+        else { return }
+        openedFocusedAutomationId = routine.id
+        editingRoutine = routine
+        showingEditor = true
     }
 
     @ViewBuilder

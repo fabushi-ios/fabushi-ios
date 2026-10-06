@@ -6,6 +6,7 @@ internal struct MobileBotAgentSettingsSheet: View {
     let bridge: IOSPreloadBridge
     let accountScopeKey: String
     let reconnectGeneration: Int
+    let focusedAutomationId: String?
     let onRosterChanged: ([MobileBotSummary]) -> Void
     let onOpenComputer: (MobileBotSummary) -> Void
     let onClose: () -> Void
@@ -25,6 +26,7 @@ internal struct MobileBotAgentSettingsSheet: View {
         bridge: IOSPreloadBridge,
         accountScopeKey: String,
         reconnectGeneration: Int = 0,
+        focusedAutomationId: String? = nil,
         onRosterChanged: @escaping ([MobileBotSummary]) -> Void,
         onOpenComputer: @escaping (MobileBotSummary) -> Void,
         onClose: @escaping () -> Void
@@ -34,6 +36,7 @@ internal struct MobileBotAgentSettingsSheet: View {
         self.bridge = bridge
         self.accountScopeKey = accountScopeKey
         self.reconnectGeneration = reconnectGeneration
+        self.focusedAutomationId = focusedAutomationId
         self.onRosterChanged = onRosterChanged
         self.onOpenComputer = onOpenComputer
         self.onClose = onClose
@@ -150,7 +153,8 @@ internal struct MobileBotAgentSettingsSheet: View {
                 agentId: currentAgent.id,
                 bridge: bridge,
                 accountScopeKey: accountScopeKey,
-                reconnectGeneration: reconnectGeneration
+                reconnectGeneration: reconnectGeneration,
+                focusedAutomationId: focusedAutomationId
             )
 
             Section {
