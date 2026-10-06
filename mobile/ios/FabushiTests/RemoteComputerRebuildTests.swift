@@ -4,10 +4,20 @@ import XCTest
 @MainActor
 final class RemoteComputerRebuildTests: XCTestCase {
     private final class FakeAgentBoxSource: RemoteComputerAgentBoxSourcing {
+        var statusCalls: [String] = []
         var ensureCalls: [String] = []
         var releaseCalls: [(agentID: String, trigger: String)] = []
         var snapshots: [String: RemoteComputerAgentBoxSnapshot] = [:]
+        var statusHandler: ((String) async throws -> RemoteComputerAgentBoxSnapshot?)?
         var ensureHandler: ((String) async throws -> RemoteComputerAgentBoxSnapshot)?
+
+        func status(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot? {
+            statusCalls.append(agentID)
+            if let statusHandler {
+                return try await statusHandler(agentID)
+            }
+            return snapshots[agentID]
+        }
 
         func ensure(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot {
             ensureCalls.append(agentID)
@@ -454,8 +464,10 @@ final class RemoteComputerRebuildTests: XCTestCase {
     }
 
     func testAgentBoxSourceContractUsesTypedHostLifecycleRPC() throws {
-        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.ensureMethod, "computer.agentBox.ensure")
-        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.releaseMethod, "computer.agentBox.release")
+        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.statusMethod, "getForeverBoxStatus")
+        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.ensureMethod, "ensureForeverBox")
+        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.releaseMethod, "handBackForeverBox")
+        XCTAssertFalse(IOSRemoteComputerAgentBoxSource.statusMethod.contains("platform.request"))
         XCTAssertFalse(IOSRemoteComputerAgentBoxSource.ensureMethod.contains("platform.request"))
         XCTAssertFalse(IOSRemoteComputerAgentBoxSource.releaseMethod.contains("platform.request"))
 

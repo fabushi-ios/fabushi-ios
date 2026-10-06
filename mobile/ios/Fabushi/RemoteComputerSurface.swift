@@ -6,281 +6,6 @@ import WebKit
 private let remoteComputerURL = URL(string: "https://fabushi.ombhrum.com/remote-computer")!
 private let remoteComputerForeverBoxID = "forever-box"
 
-struct RemoteComputerScope: Equatable, Sendable {
-    let accountScopeKey: String
-    let agentID: String?
-    let agentName: String?
-
-    var scopeKey: String {
-        [accountScopeKey, agentID ?? "account"].joined(separator: ":")
-    }
-
-    var displayTitle: String {
-        guard let agentName, !agentName.isEmpty else { return "我的电脑" }
-        return "\(agentName) 的电脑"
-    }
-
-    var isAgentScope: Bool {
-        agentID?.isEmpty == false
-    }
-}
-
-struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
-    let agentID: String
-    let state: String
-    let vncURL: URL?
-    let imageUpdateAvailable: Bool
-
-    var isReadyForVNC: Bool {
-        state == "running" && vncURL != nil
-    }
-}
-
-@MainActor
-protocol RemoteComputerAgentBoxSourcing: AnyObject {
-    func ensure(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot
-    func release(agentID: String, trigger: String) async throws
-}
-
-@MainActor
-final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
-    enum SourceError: LocalizedError {
-        case bridgeUnavailable
-        case invalidResponse
-        case agentScopeMismatch
-        case unsafeVNCURL
-        case backend(status: Int, message: String)
-
-        var errorDescription: String? {
-            switch self {
-            case .bridgeUnavailable:
-                return "Agent 电脑 Host bridge 不可用。"
-            case .invalidResponse:
-                return "Agent 电脑控制面返回了无效响应。"
-            case .agentScopeMismatch:
-                return "Agent 电脑响应与当前 Agent scope 不一致。"
-            case .unsafeVNCURL:
-                return "Agent 电脑控制面没有返回可验证的 HTTPS VNC 地址。"
-            case .backend(let status, let message):
-                let detail = message.trimmingCharacters(in: .whitespacesAndNewlines)
-                return detail.isEmpty
-                    ? "Agent 电脑控制面请求失败（HTTP \(status)）。"
-                    : String(detail.prefix(240))
-            }
-        }
-    }
-
-    static let ensureMethod = "computer.agentBox.ensure"
-    static let releaseMethod = "computer.agentBox.release"
-
-    private let bridge: IOSPreloadBridge?
-
-    init(bridge: IOSPreloadBridge?) {
-        self.bridge = bridge
-    }
-
-    func ensure(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot {
-        let payload = try await hostAgentBoxRequest(
-            method: Self.ensureMethod,
-            params: ["agentId": agentID]
-        )
-        return try Self.projectStatus(payload, expectedAgentID: agentID)
-    }
-
-    func release(agentID: String, trigger: String) async throws {
-        _ = try await hostAgentBoxRequest(
-            method: Self.releaseMethod,
-            params: [
-                "agentId": agentID,
-                "trigger": trigger,
-            ]
-        )
-    }
-
-    static func projectStatus(
-        _ payload: [String: Any],
-        expectedAgentID: String
-    ) throws -> RemoteComputerAgentBoxSnapshot {
-        let object = (payload["box"] as? [String: Any]) ?? payload
-        if let returnedAgentID = object["agentId"] as? String,
-           returnedAgentID != expectedAgentID
-        {
-            throw SourceError.agentScopeMismatch
-        }
-
-        guard let state = object["state"] as? String,
-              ["running", "starting", "hibernated", "stopped", "local"].contains(state)
-        else {
-            throw SourceError.invalidResponse
-        }
-
-        let rawVNC = (object["vncUrl"] as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        var vncURL: URL?
-        if let rawVNC, !rawVNC.isEmpty {
-            guard let candidate = URL(string: rawVNC),
-                  candidate.scheme?.lowercased() == "https",
-                  candidate.host?.isEmpty == false,
-                  candidate.user == nil,
-                  candidate.password == nil,
-                  (candidate.port == nil || candidate.port == 443)
-            else {
-                throw SourceError.unsafeVNCURL
-            }
-            vncURL = candidate
-        }
-
-        return .init(
-            agentID: expectedAgentID,
-            state: state,
-            vncURL: vncURL,
-            imageUpdateAvailable: object["imageUpdateAvailable"] as? Bool ?? false
-        )
-    }
-
-    private func hostAgentBoxRequest(
-        method: String,
-        params: [String: Any]
-    ) async throws -> [String: Any] {
-        guard let bridge else { throw SourceError.bridgeUnavailable }
-
-        let value = try await bridge.request(
-            method: method,
-            params: params
-        ).value
-
-        guard let envelope = value as? [String: Any],
-              let ok = envelope["ok"] as? Bool
-        else {
-            throw SourceError.invalidResponse
-        }
-        guard ok else {
-            let status = (envelope["statusCode"] as? NSNumber)?.intValue
-                ?? envelope["statusCode"] as? Int
-                ?? 0
-            let message: String
-            if let data = envelope["data"] as? [String: Any],
-               let candidate = (data["message"] as? String) ?? (data["error"] as? String)
-            {
-                message = candidate
-            } else {
-                message = envelope["bodyText"] as? String ?? ""
-            }
-            throw SourceError.backend(status: status, message: message)
-        }
-        guard let data = envelope["data"] as? [String: Any] else {
-            throw SourceError.invalidResponse
-        }
-        return data
-    }
-}
-
-@MainActor
-final class RemoteComputerAgentBoxOwner: ObservableObject {
-    @Published private(set) var snapshot: RemoteComputerAgentBoxSnapshot?
-    @Published private(set) var isLoading = false
-    @Published private(set) var errorMessage: String?
-    @Published private(set) var reloadRevision = 0
-
-    private let source: any RemoteComputerAgentBoxSourcing
-    private var activeScopeKey: String?
-    private var activeAgentID: String?
-    private var generation = 0
-    private var disposed = false
-
-    init(source: any RemoteComputerAgentBoxSourcing) {
-        self.source = source
-    }
-
-    var vncURL: URL? {
-        snapshot?.isReadyForVNC == true ? snapshot?.vncURL : nil
-    }
-
-    func connect(scope: RemoteComputerScope) async {
-        guard !disposed, let agentID = scope.agentID, !agentID.isEmpty else {
-            await disconnect(trigger: "scope-cleared")
-            return
-        }
-
-        if let activeScopeKey, activeScopeKey != scope.scopeKey {
-            await invalidateAndRelease(trigger: "scope-changed")
-        }
-        activeScopeKey = scope.scopeKey
-        activeAgentID = agentID
-        await ensureCurrentAgent(incrementReload: false)
-    }
-
-    func noteReconnect() async {
-        guard !disposed, activeAgentID != nil else { return }
-        await ensureCurrentAgent(incrementReload: true)
-    }
-
-    func disconnect(trigger: String) async {
-        guard activeAgentID != nil || snapshot != nil || isLoading else { return }
-        await invalidateAndRelease(trigger: trigger)
-    }
-
-    func dispose() {
-        generation &+= 1
-        activeScopeKey = nil
-        activeAgentID = nil
-        snapshot = nil
-        isLoading = false
-        disposed = true
-    }
-
-    private func ensureCurrentAgent(incrementReload: Bool) async {
-        guard !disposed, let agentID = activeAgentID, let scopeKey = activeScopeKey else { return }
-        generation &+= 1
-        let attempt = generation
-        isLoading = true
-        errorMessage = nil
-        if incrementReload {
-            reloadRevision &+= 1
-        }
-
-        do {
-            let next = try await source.ensure(agentID: agentID)
-            guard !disposed,
-                  attempt == generation,
-                  activeAgentID == agentID,
-                  activeScopeKey == scopeKey
-            else { return }
-
-            snapshot = next
-            if next.isReadyForVNC {
-                errorMessage = nil
-            } else {
-                errorMessage = "Agent 电脑已响应，但当前没有可用的 HTTPS VNC 会话。"
-            }
-        } catch {
-            guard !disposed,
-                  attempt == generation,
-                  activeAgentID == agentID,
-                  activeScopeKey == scopeKey
-            else { return }
-            snapshot = nil
-            errorMessage = String(error.localizedDescription.prefix(240))
-        }
-
-        if !disposed, attempt == generation {
-            isLoading = false
-        }
-    }
-
-    private func invalidateAndRelease(trigger: String) async {
-        generation &+= 1
-        let agentID = activeAgentID
-        activeScopeKey = nil
-        activeAgentID = nil
-        snapshot = nil
-        isLoading = false
-        errorMessage = nil
-        guard let agentID else { return }
-        try? await source.release(agentID: agentID, trigger: trigger)
-    }
-}
-
 enum RemoteComputerRebuildKind: String, Equatable, Sendable {
     case update
     case reset
@@ -1603,6 +1328,8 @@ final class RemoteComputerHostActivityOwner: ObservableObject {
 /// session, and the WebKit navigation lifecycle is the platform transport/box
 /// signal instead of a second reachability watcher.
 struct RemoteComputerSurface: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     let scope: RemoteComputerScope?
     let reconnectGeneration: Int
     let onClose: () -> Void
@@ -1780,21 +1507,48 @@ struct RemoteComputerSurface: View {
                         onNavigationFailed: {},
                         onVNCSession: { session, identity in
                             vncIdentity = identity
+                            agentBoxOwner.ingestComputerAction(
+                                .init(
+                                    agentID: scope?.agentID,
+                                    kind: session.phase.rawValue,
+                                    x: nil,
+                                    y: nil
+                                )
+                            )
                             switch session.phase {
                             case .connect:
                                 status = "已安全连接"
                             case .reconnect:
                                 status = "已重新连接"
                             case .disconnect:
+                                agentBoxOwner.ingestVncUserPresence(isPresent: false)
                                 status = "连接已中断"
                             }
                         },
                         onVNCLiveness: { report, identity in
                             vncIdentity = identity
                             lastLivenessReport = report
+                            agentBoxOwner.ingestVncUserPresence(isPresent: true)
+                            agentBoxOwner.ingestComputerAction(
+                                .init(
+                                    agentID: scope?.agentID,
+                                    kind: "liveness-stall",
+                                    x: nil,
+                                    y: nil
+                                )
+                            )
                         },
                         onVNCCursor: { cursor in
                             trustedCursor = cursor
+                            agentBoxOwner.ingestVncUserPresence(isPresent: true)
+                            agentBoxOwner.ingestComputerAction(
+                                .init(
+                                    agentID: scope?.agentID,
+                                    kind: cursor.kind.rawValue,
+                                    x: cursor.x,
+                                    y: cursor.y
+                                )
+                            )
                         }
                     )
                     .accessibilityIdentifier("remote-computer-agent-vnc")
@@ -1891,6 +1645,15 @@ struct RemoteComputerSurface: View {
                 } else {
                     await rebuildOwner.noteReconnect()
                 }
+                await activityOwner.refresh(agentID: scope?.agentID)
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            if scope?.isAgentScope == true {
+                agentBoxOwner.noteWindowFocus()
+            }
+            Task {
                 await activityOwner.refresh(agentID: scope?.agentID)
             }
         }

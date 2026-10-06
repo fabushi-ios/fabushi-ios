@@ -53,6 +53,7 @@ use std::time::UNIX_EPOCH;
 const DEFAULT_API_BASE_URL: &str = "https://api.ombhrum.com";
 const DEFAULT_PLATFORM_CONTROL_PLANE_API_BASE_URL: &str =
     "https://mahayana-platform.bhrumom.workers.dev";
+pub const AGENT_BOX_STATUS_PATH: &str = "/v1/agent-boxes/status";
 pub const AGENT_BOX_ENSURE_PATH: &str = "/v1/agent-boxes/ensure";
 pub const AGENT_BOX_RELEASE_PATH: &str = "/v1/agent-boxes/release";
 const LEGACY_API_BACKEND_ONLY_RESPONSE: &str = "This Cloudflare Worker is an API backend only.";
@@ -1328,6 +1329,16 @@ impl MahayanaProductClient {
     /// Native/UI surfaces can choose only the Agent identity and lifecycle trigger.
     /// The Rust product client owns the bearer credential and the canonical
     /// control-plane path so callers cannot synthesize arbitrary platform routes.
+    pub fn status_agent_box(&self, agent_id: &str) -> Result<Value, ProductError> {
+        let agent_id = validate_agent_box_identity(agent_id, "agentId")?;
+        self.platform_request(&json!({
+            "method": "POST",
+            "path": AGENT_BOX_STATUS_PATH,
+            "authenticated": true,
+            "body": {"agentId": agent_id},
+        }))
+    }
+
     pub fn ensure_agent_box(&self, agent_id: &str) -> Result<Value, ProductError> {
         let agent_id = validate_agent_box_identity(agent_id, "agentId")?;
         self.platform_request(&json!({
@@ -4032,6 +4043,7 @@ mod tests {
 
     #[test]
     fn agent_box_contract_is_host_owned_and_identity_scoped() {
+        assert_eq!(AGENT_BOX_STATUS_PATH, "/v1/agent-boxes/status");
         assert_eq!(AGENT_BOX_ENSURE_PATH, "/v1/agent-boxes/ensure");
         assert_eq!(AGENT_BOX_RELEASE_PATH, "/v1/agent-boxes/release");
         assert_eq!(

@@ -193,6 +193,21 @@ impl AppHost {
                 .product
                 .execute("mahayana.platform.request", &params)
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "getForeverBoxStatus" => self
+                .product
+                .status_agent_box(string_param(&params, "id")?)
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "ensureForeverBox" => self
+                .product
+                .ensure_agent_box(string_param(&params, "id")?)
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "handBackForeverBox" => self
+                .product
+                .release_agent_box(
+                    string_param(&params, "id")?,
+                    string_param(&params, "trigger")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "computer.agentBox.ensure" => self
                 .product
                 .ensure_agent_box(string_param(&params, "agentId")?)
