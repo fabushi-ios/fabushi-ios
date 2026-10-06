@@ -277,6 +277,37 @@ private enum RemoteComputerAgentBoxDeadlineError: Error {
     case exceeded
 }
 
+/// An unstructured one-shot race lets the timeout settle independently while
+/// the source request remains alive for the existing late-result recovery path.
+private final class RemoteComputerDeadlineRace<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Error>?
+    private var settled = false
+
+    init(continuation: CheckedContinuation<Value, Error>) {
+        self.continuation = continuation
+    }
+
+    func resolve(_ result: Result<Value, Error>) {
+        lock.lock()
+        guard !settled else {
+            lock.unlock()
+            return
+        }
+        settled = true
+        let continuation = continuation
+        self.continuation = nil
+        lock.unlock()
+
+        switch result {
+        case .success(let value):
+            continuation?.resume(returning: value)
+        case .failure(let error):
+            continuation?.resume(throwing: error)
+        }
+    }
+}
+
 @MainActor
 final class RemoteComputerAgentBoxOwner: ObservableObject {
     static let recordLimit = 32
@@ -557,6 +588,13 @@ final class RemoteComputerAgentBoxOwner: ObservableObject {
         guard !disposed, connected else { return }
         let watched = records.values.filter { $0.watchers > 0 }.map(\.agentID)
         for agentID in watched {
+            // Focus is an explicit hydration boundary. Fence an older in-flight
+            // status read so a fresh request is guaranteed while its late
+            // completion can no longer overwrite this focus generation.
+            let record = recordFor(agentID)
+            record.readAttempt &+= 1
+            pendingReads[agentID] = nil
+
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 await self.refresh(agentID: agentID)
@@ -717,19 +755,25 @@ final class RemoteComputerAgentBoxOwner: ObservableObject {
 
     private func awaitWithDeadline<T: Sendable>(_ task: Task<T, Error>) async throws -> T {
         let timeoutNanoseconds = statusTimeoutMilliseconds * 1_000_000
-        return try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try await task.value
+        return try await withCheckedThrowingContinuation { continuation in
+            let race = RemoteComputerDeadlineRace<T>(continuation: continuation)
+
+            Task { @MainActor in
+                do {
+                    race.resolve(.success(try await task.value))
+                } catch {
+                    race.resolve(.failure(error))
+                }
             }
-            group.addTask {
-                try await Task.sleep(nanoseconds: timeoutNanoseconds)
-                throw RemoteComputerAgentBoxDeadlineError.exceeded
+
+            Task { @MainActor in
+                do {
+                    try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                } catch {
+                    return
+                }
+                race.resolve(.failure(RemoteComputerAgentBoxDeadlineError.exceeded))
             }
-            defer { group.cancelAll() }
-            guard let value = try await group.next() else {
-                throw RemoteComputerAgentBoxDeadlineError.exceeded
-            }
-            return value
         }
     }
 

@@ -455,7 +455,8 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
 
     var elapsedMilliseconds: Int {
         guard status.state == .recording, let started = status.startedAtMs else { return 0 }
-        return max(0, min(status.maxDurationMs, nowMilliseconds - started))
+        let current = max(nowMilliseconds, now())
+        return max(0, min(status.maxDurationMs, current - started))
     }
 
     func arm(agentID: String, entryPoint: String = "fullscreen_title_bar") {

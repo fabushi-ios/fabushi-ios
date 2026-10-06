@@ -224,7 +224,25 @@ private let mobileAttachmentVideoExtensions: Set<String> = [
 ]
 
 private func mobileAttachmentExtension(_ value: String) -> String {
-    let path = URL(string: value)?.path ?? value
+    let normalized = value.replacingOccurrences(of: "\\", with: "/")
+    let path: String
+    if let url = URL(string: value),
+       let scheme = url.scheme?.lowercased(),
+       ["http", "https", "file"].contains(scheme)
+    {
+        path = url.path
+    } else {
+        let withoutQuery = normalized.split(
+            separator: "?",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        ).first.map(String.init) ?? normalized
+        path = withoutQuery.split(
+            separator: "#",
+            maxSplits: 1,
+            omittingEmptySubsequences: false
+        ).first.map(String.init) ?? withoutQuery
+    }
     let lower = path.lowercased()
     guard let dot = lower.lastIndex(of: ".") else { return "" }
     return String(lower[dot...])
