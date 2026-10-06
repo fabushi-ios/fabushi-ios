@@ -21,6 +21,21 @@ protocol RemoteComputerStatusStoreSourcing: AnyObject {
 
 struct RemoteComputerStatusDeadlineExceeded: Error, Equatable {}
 
+@MainActor
+private final class RemoteComputerStatusDeadlineGate {
+    private var continuation: CheckedContinuation<RemoteComputerAgentBoxSnapshot?, Error>?
+
+    init(_ continuation: CheckedContinuation<RemoteComputerAgentBoxSnapshot?, Error>) {
+        self.continuation = continuation
+    }
+
+    func finish(_ result: Result<RemoteComputerAgentBoxSnapshot?, Error>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        continuation.resume(with: result)
+    }
+}
+
 struct RemoteComputerStatusDeadline: Sendable {
     let timeoutNanoseconds: UInt64
 
@@ -28,24 +43,28 @@ struct RemoteComputerStatusDeadline: Sendable {
         self.timeoutNanoseconds = timeoutNanoseconds
     }
 
+    @MainActor
     func run(
-        _ request: Task<RemoteComputerAgentBoxSnapshot?, Error>
+        request: Task<RemoteComputerAgentBoxSnapshot?, Error>
     ) async throws -> RemoteComputerAgentBoxSnapshot? {
-        try await withThrowingTaskGroup(
-            of: RemoteComputerAgentBoxSnapshot?.self
-        ) { group in
-            group.addTask {
-                try await request.value
+        try await withCheckedThrowingContinuation { continuation in
+            let gate = RemoteComputerStatusDeadlineGate(continuation)
+            Task { @MainActor in
+                do {
+                    gate.finish(.success(try await request.value))
+                } catch {
+                    gate.finish(.failure(error))
+                }
             }
-            group.addTask {
-                try await Task.sleep(nanoseconds: timeoutNanoseconds)
-                throw RemoteComputerStatusDeadlineExceeded()
+            Task { @MainActor in
+                do {
+                    try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                    gate.finish(.failure(RemoteComputerStatusDeadlineExceeded()))
+                } catch {
+                    // The source request owns its own lifecycle. A cancelled timer
+                    // must never cancel the late source result.
+                }
             }
-            guard let first = try await group.next() else {
-                throw CancellationError()
-            }
-            group.cancelAll()
-            return first
         }
     }
 }
@@ -64,10 +83,11 @@ final class RemoteComputerStatusStore: ObservableObject {
         var settledReadState: RemoteComputerShellReadState?
         var readAttempt = 0
         var pendingRead: Task<Void, Never>?
+        var pendingReadToken: UUID?
         var pendingEnsure: Task<Void, Never>?
+        var pendingEnsureToken: UUID?
         var isEnsureStarting = false
         var watchers = 0
-        var lastAccess = 0
 
         init(agentID: String) {
             self.agentID = agentID
@@ -76,9 +96,7 @@ final class RemoteComputerStatusStore: ObservableObject {
         var snapshot: RemoteComputerStatusStoreSnapshot {
             .init(
                 status: status,
-                readState: status == nil
-                    ? settledReadState ?? .unknown
-                    : .known,
+                readState: status == nil ? settledReadState ?? .unknown : .known,
                 isEnsureStarting: isEnsureStarting
             )
         }
@@ -87,12 +105,12 @@ final class RemoteComputerStatusStore: ObservableObject {
     private let source: any RemoteComputerStatusStoreSourcing
     private let deadline: RemoteComputerStatusDeadline
     private var records: [String: Record] = [:]
+    private var recordOrder: [String] = []
     private var demanded: Set<String> = []
     private var actionListeners: [UUID: (Any) -> Void] = [:]
     private var connected = false
     private var disposed = false
     private var ensureGeneration = 0
-    private var accessClock = 0
 
     init(
         source: any RemoteComputerStatusStoreSourcing,
@@ -112,15 +130,26 @@ final class RemoteComputerStatusStore: ObservableObject {
         return records[agentID]?.status
     }
 
+    func readState(for agentID: String?) -> RemoteComputerShellReadState {
+        snapshot(for: agentID).readState
+    }
+
+    func hasDemanded(_ agentID: String?) -> Bool {
+        guard let agentID else { return false }
+        return demanded.contains(agentID)
+    }
+
     func mostRecentStatus() -> RemoteComputerAgentBoxSnapshot? {
-        records.values
-            .filter { $0.status != nil }
-            .max { $0.lastAccess < $1.lastAccess }?
-            .status
+        for agentID in recordOrder.reversed() {
+            if let status = records[agentID]?.status {
+                return status
+            }
+        }
+        return nil
     }
 
     @discardableResult
-    func retain(_ agentID: String) -> () -> Void {
+    func retain(_ agentID: String) -> @MainActor () -> Void {
         let record = recordFor(agentID)
         record.watchers += 1
         if connected {
@@ -148,43 +177,51 @@ final class RemoteComputerStatusStore: ObservableObject {
         }
 
         let source = source
-        let request = Task { @MainActor in
+        let sourceRequest = Task { @MainActor in
             try await source.read(agentID: agentID)
         }
         let deadline = deadline
+        let token = UUID()
+        record.pendingReadToken = token
         let pending = Task { @MainActor [weak self, weak record] in
             guard let self, let record else { return }
+            let result: Result<RemoteComputerAgentBoxSnapshot?, Error>
             do {
-                let status = try await deadline.run(request)
-                guard !self.disposed, record.readAttempt == attempt else { return }
-                if let status {
-                    self.cache(status)
-                } else {
-                    record.settledReadState = .known
-                    self.publish(record)
-                }
-            } catch is RemoteComputerStatusDeadlineExceeded {
-                guard !self.disposed, record.readAttempt == attempt else { return }
-                record.settledReadState = .error
-                self.publish(record)
-                Task { @MainActor [weak self, weak record] in
-                    guard let self, let record else { return }
-                    if let late = try? await request.value,
-                       let late,
-                       !self.disposed,
-                       record.readAttempt == attempt
-                    {
-                        self.cache(late)
-                    }
-                }
+                result = .success(try await deadline.run(request: sourceRequest))
             } catch {
-                guard !self.disposed, record.readAttempt == attempt else { return }
-                record.settledReadState = .error
-                self.publish(record)
+                result = .failure(error)
             }
 
-            if record.pendingRead?.isCancelled == false {
+            if record.pendingReadToken == token {
                 record.pendingRead = nil
+                record.pendingReadToken = nil
+            }
+            guard !self.disposed else { return }
+
+            switch result {
+            case .success(let status):
+                if record.readAttempt == attempt, let status {
+                    self.cache(status)
+                } else {
+                    self.settleRead(record, attempt: attempt, state: .known)
+                }
+            case .failure(let error):
+                self.settleRead(record, attempt: attempt, state: .error)
+                if error is RemoteComputerStatusDeadlineExceeded {
+                    Task { @MainActor [weak self, weak record] in
+                        guard let self, let record else { return }
+                        do {
+                            if let late = try await sourceRequest.value,
+                               !self.disposed,
+                               record.readAttempt == attempt
+                            {
+                                self.cache(late)
+                            }
+                        } catch {
+                            self.settleRead(record, attempt: attempt, state: .error)
+                        }
+                    }
+                }
             }
         }
         record.pendingRead = pending
@@ -201,49 +238,49 @@ final class RemoteComputerStatusStore: ObservableObject {
         publish(record)
 
         let source = source
-        let request = Task { @MainActor in
+        let sourceRequest = Task { @MainActor in
             try await source.ensure(agentID: agentID)
         }
         let deadline = deadline
+        let token = UUID()
+        record.pendingEnsureToken = token
         let pending = Task { @MainActor [weak self, weak record] in
             guard let self, let record else { return }
-            defer {
-                if record.pendingEnsure?.isCancelled == false {
-                    record.pendingEnsure = nil
-                    record.isEnsureStarting = false
-                    if !self.disposed {
-                        self.publish(record)
-                    }
+            let result: Result<RemoteComputerAgentBoxSnapshot?, Error>
+            do {
+                result = .success(try await deadline.run(request: sourceRequest))
+            } catch {
+                result = .failure(error)
+            }
+
+            if record.pendingEnsureToken == token {
+                record.pendingEnsure = nil
+                record.pendingEnsureToken = nil
+                record.isEnsureStarting = false
+                if !self.disposed {
+                    self.publish(record)
                 }
             }
 
-            do {
-                if let status = try await deadline.run(request),
-                   !self.disposed,
-                   generation == self.ensureGeneration
-                {
+            guard !self.disposed, generation == self.ensureGeneration else { return }
+            switch result {
+            case .success(let status):
+                if let status {
                     self.cache(status)
                 }
-            } catch is RemoteComputerStatusDeadlineExceeded {
-                guard !self.disposed, generation == self.ensureGeneration else { return }
-                if record.status == nil {
-                    record.settledReadState = .error
-                    self.publish(record)
-                }
-                Task { @MainActor [weak self] in
-                    guard let self,
-                          let late = try? await request.value,
-                          let late,
-                          !self.disposed,
-                          generation == self.ensureGeneration
-                    else { return }
-                    self.cache(late)
-                }
-            } catch {
-                guard !self.disposed, generation == self.ensureGeneration else { return }
-                if record.status == nil {
-                    record.settledReadState = .error
-                    self.publish(record)
+            case .failure(let error):
+                self.recordFailure(record)
+                if error is RemoteComputerStatusDeadlineExceeded {
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        if let late = try? await sourceRequest.value,
+                           let late,
+                           !self.disposed,
+                           generation == self.ensureGeneration
+                        {
+                            self.cache(late)
+                        }
+                    }
                 }
             }
         }
@@ -257,18 +294,15 @@ final class RemoteComputerStatusStore: ObservableObject {
 
     func recordReadFailure(_ agentID: String) {
         guard !disposed else { return }
-        let record = recordFor(agentID)
-        guard record.status == nil else { return }
-        record.settledReadState = .error
-        publish(record)
+        recordFailure(recordFor(agentID))
     }
 
     func ingest(status: RemoteComputerAgentBoxSnapshot) {
         guard !disposed else { return }
         let record = recordFor(status.agentID)
         record.readAttempt &+= 1
-        record.pendingRead?.cancel()
         record.pendingRead = nil
+        record.pendingReadToken = nil
         cache(status)
     }
 
@@ -298,7 +332,7 @@ final class RemoteComputerStatusStore: ObservableObject {
     @discardableResult
     func subscribeComputerActions(
         _ listener: @escaping (Any) -> Void
-    ) -> () -> Void {
+    ) -> @MainActor () -> Void {
         guard !disposed else { return {} }
         let id = UUID()
         actionListeners[id] = listener
@@ -319,8 +353,8 @@ final class RemoteComputerStatusStore: ObservableObject {
         guard !disposed, connected else { return }
         for record in records.values where record.watchers > 0 {
             record.readAttempt &+= 1
-            record.pendingRead?.cancel()
             record.pendingRead = nil
+            record.pendingReadToken = nil
             refresh(record.agentID)
             if demanded.contains(record.agentID) {
                 ensure(record.agentID)
@@ -344,15 +378,21 @@ final class RemoteComputerStatusStore: ObservableObject {
         ensureGeneration &+= 1
         for record in records.values {
             record.readAttempt &+= 1
-            record.pendingRead?.cancel()
             record.pendingRead = nil
-            record.pendingEnsure?.cancel()
+            record.pendingReadToken = nil
             record.pendingEnsure = nil
+            record.pendingEnsureToken = nil
             record.status = nil
             record.settledReadState = nil
             record.isEnsureStarting = false
+            if record.watchers > 0 {
+                publish(record)
+            }
         }
-        records = records.filter { $0.value.watchers > 0 }
+        for agentID in recordOrder where records[agentID]?.watchers == 0 {
+            records.removeValue(forKey: agentID)
+        }
+        recordOrder.removeAll { records[$0] == nil }
         demanded.removeAll()
         diskPressure = nil
         vncUserPresent = false
@@ -366,22 +406,21 @@ final class RemoteComputerStatusStore: ObservableObject {
         ensureGeneration &+= 1
         for record in records.values {
             record.readAttempt &+= 1
-            record.pendingRead?.cancel()
-            record.pendingEnsure?.cancel()
             record.pendingRead = nil
+            record.pendingReadToken = nil
             record.pendingEnsure = nil
+            record.pendingEnsureToken = nil
         }
         actionListeners.removeAll()
     }
 
     private func recordFor(_ agentID: String) -> Record {
         if let existing = records[agentID] {
-            touch(existing)
             return existing
         }
         let record = Record(agentID: agentID)
-        touch(record)
         records[agentID] = record
+        recordOrder.append(agentID)
         evictRecordsIfNeeded()
         return record
     }
@@ -390,31 +429,45 @@ final class RemoteComputerStatusStore: ObservableObject {
         let record = recordFor(status.agentID)
         record.status = status
         record.settledReadState = nil
-        touch(record)
+        recordOrder.removeAll { $0 == record.agentID }
+        recordOrder.append(record.agentID)
         publish(record)
     }
 
-    private func touch(_ record: Record) {
-        accessClock &+= 1
-        record.lastAccess = accessClock
+    private func settleRead(
+        _ record: Record,
+        attempt: Int,
+        state: RemoteComputerShellReadState
+    ) {
+        guard record.readAttempt == attempt,
+              record.status == nil,
+              record.settledReadState != state
+        else { return }
+        record.settledReadState = state
+        publish(record)
+    }
+
+    private func recordFailure(_ record: Record) {
+        guard record.status == nil, record.settledReadState != .error else { return }
+        record.settledReadState = .error
+        publish(record)
     }
 
     private func publish(_ record: Record) {
-        touch(record)
+        _ = record
         version &+= 1
     }
 
     private func evictRecordsIfNeeded() {
         guard records.count > Self.recordLimit else { return }
-        let candidates = records.values
-            .filter {
-                $0.watchers == 0
-                    && $0.pendingRead == nil
-                    && $0.pendingEnsure == nil
-            }
-            .sorted { $0.lastAccess < $1.lastAccess }
-        for record in candidates {
-            records.removeValue(forKey: record.agentID)
+        for agentID in recordOrder {
+            guard let record = records[agentID],
+                  record.watchers == 0,
+                  record.pendingRead == nil,
+                  record.pendingEnsure == nil
+            else { continue }
+            records.removeValue(forKey: agentID)
+            recordOrder.removeAll { $0 == agentID }
             if records.count <= Self.recordLimit {
                 return
             }
