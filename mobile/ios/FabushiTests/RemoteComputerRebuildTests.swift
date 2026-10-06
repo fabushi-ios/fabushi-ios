@@ -57,6 +57,191 @@ final class RemoteComputerRebuildTests: XCTestCase {
     }
 
 
+
+    func testComputerShellModelProjectsStatusMonitorsAndTaskActivity() {
+        let status: [String: Any] = [
+            "state": "running",
+            "vncUrl": "https://vnc.example/view",
+            "pull": ["percent": 0.25],
+            "windows": [["id": "window-1"]],
+            "handoff": [
+                "requestId": "handoff-1",
+                "instruction": "Complete sign-in",
+                "snapshotDataUrl": "data:image/png;base64,abc",
+            ],
+        ]
+        let projection = RemoteComputerShellModel.projectStatus(
+            status,
+            readState: .known
+        )
+        XCTAssertEqual(projection.phase, .pulling)
+        XCTAssertTrue(projection.isStatusKnown)
+        XCTAssertFalse(projection.isStatusUnavailable)
+        XCTAssertEqual(projection.pullPercent, 0.25)
+        XCTAssertEqual(projection.vncURL, "https://vnc.example/view")
+        XCTAssertEqual(projection.handoff?.requestID, "handoff-1")
+        XCTAssertEqual(projection.windows.count, 1)
+
+        let subagents: [Any] = [
+            [
+                "status": "running",
+                "subagentType": "computerUse",
+                "subagentId": "sub-1",
+                "title": "  Research  ",
+            ],
+            [
+                "status": "done",
+                "subagentType": "computerUse",
+                "subagentId": "sub-2",
+            ],
+        ]
+        let monitors = RemoteComputerShellModel.projectMonitors(
+            subagents: subagents
+        ) { id in
+            id == "sub-1"
+                ? ["state": "running", "vncUrl": "https://vnc.example/sub"] as [String: Any]
+                : nil
+        }
+        XCTAssertEqual(monitors.map(\.subagentID), ["sub-1"])
+        XCTAssertEqual(monitors.first?.title, "Research")
+        XCTAssertTrue(RemoteComputerShellModel.isComputerUseTaskActive([
+            ["subagentType": "computerUse"],
+        ]))
+    }
+
+    func testComputerShellModelPreservesVNCAndCursorSemantics() {
+        let special = "https://vnc.example/sand-special-treatment-v1/vnc.html?path=websockify%3Ftoken%3Ddisplay-7"
+        let dimensions = RemoteComputerShellModel.vncDimensions(special)
+        XCTAssertEqual(dimensions.width, 2048)
+        XCTAssertEqual(dimensions.height, 2048)
+
+        let identity = RemoteComputerShellModel.vncIdentity(special)
+        XCTAssertEqual(identity.host, "vnc.example")
+        XCTAssertEqual(identity.display, "display-7")
+
+        let viewer = RemoteComputerShellModel.vncViewerURL(
+            "https://vnc.example/vnc.html?foo=1",
+            interactive: true
+        )
+        let query = URLComponents(
+            url: try XCTUnwrap(viewer),
+            resolvingAgainstBaseURL: false
+        )?.queryItems ?? []
+        XCTAssertEqual(query.first(where: { $0.name == "autoconnect" })?.value, "true")
+        XCTAssertEqual(query.first(where: { $0.name == "resize" })?.value, "scale")
+        XCTAssertEqual(query.first(where: { $0.name == "reconnect" })?.value, "true")
+        XCTAssertEqual(query.first(where: { $0.name == "sandInteractive" })?.value, "1")
+
+        let first = RemoteComputerShellModel.projectCursor(
+            [
+                "agentId": "agent-1",
+                "type": "move",
+                "x": 10,
+                "y": 20,
+            ],
+            previous: nil,
+            nowMilliseconds: 1_000
+        )
+        XCTAssertEqual(first?.sequence, 1)
+        XCTAssertNil(first?.lastMovedAtMilliseconds)
+
+        let click = RemoteComputerShellModel.projectCursor(
+            [
+                "agentId": "agent-1",
+                "type": "click",
+                "x": 11,
+                "y": 20,
+            ],
+            previous: first,
+            nowMilliseconds: 1_200
+        )
+        XCTAssertEqual(click?.sequence, 2)
+        XCTAssertEqual(click?.clickSequence, 1)
+        XCTAssertEqual(click?.millisecondsSinceMove, 0)
+        let presentation = RemoteComputerShellModel.cursorPresentation(
+            click,
+            hasFrame: true
+        )
+        XCTAssertTrue(presentation.isGliding)
+        XCTAssertTrue(presentation.isVisible)
+        XCTAssertEqual(presentation.press?.key, 1)
+        XCTAssertEqual(presentation.press?.delayMilliseconds, 500)
+    }
+
+    func testComputerShellModelPreservesStageSessionWarmPoolAndSelection() throws {
+        XCTAssertEqual(
+            RemoteComputerShellModel.stageCopy(
+                isScreenLoading: true,
+                isScreenUnavailable: false,
+                subjectLabel: "Agent",
+                isEmptyLoading: false,
+                pullPercent: nil
+            ).message,
+            "Switching to Agent's screen…"
+        )
+        XCTAssertTrue(
+            RemoteComputerShellModel.stageCopy(
+                isScreenLoading: false,
+                isScreenUnavailable: true,
+                subjectLabel: "Agent",
+                isEmptyLoading: false,
+                pullPercent: nil
+            ).hasRetry
+        )
+        XCTAssertEqual(
+            RemoteComputerShellModel.retainWarmVNCSources(
+                ["b", "a", "c"],
+                source: "a",
+                maxWarm: 2
+            ),
+            ["a", "b"]
+        )
+
+        let session = RemoteComputerShellModel.parseVNCSession(
+            "{\"phase\":\"rfb_disconnect\",\"clean\":true}"
+        )
+        XCTAssertEqual(session?.phase, .disconnect)
+        XCTAssertEqual(session?.clean, true)
+
+        let monitors = [
+            RemoteComputerShellMonitor(
+                subagentID: "a",
+                title: "A",
+                vncURL: "https://a.example",
+                handoff: nil
+            ),
+            RemoteComputerShellMonitor(
+                subagentID: "b",
+                title: "B",
+                vncURL: "https://b.example",
+                handoff: .init(
+                    requestID: "handoff",
+                    instruction: "Help",
+                    snapshotDataURL: nil
+                )
+            ),
+        ]
+        XCTAssertEqual(
+            RemoteComputerShellModel.firstSelectedMonitor(monitors, requested: nil),
+            "b"
+        )
+        XCTAssertEqual(
+            RemoteComputerShellModel.stepSelectedMonitor(
+                monitors,
+                current: "b",
+                delta: 1
+            ),
+            "a"
+        )
+        XCTAssertEqual(
+            RemoteComputerShellModel.handoffStatusLabel("dismissed").label,
+            "Skipped"
+        )
+        XCTAssertTrue(
+            RemoteComputerShellModel.handoffStatusLabel("unknown").muted
+        )
+    }
+
     func testWebProcessCrashPolicyReloadsThreeTimesThenFailsClosed() {
         var policy = RemoteComputerWebProcessCrashPolicy()
 
