@@ -1582,17 +1582,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/model.ts",
       "desktop_blob_sha": "b99b77f2299d83cd49e66875e7b78081ed6fec8c",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Owns pure Computer shell projection semantics: phase/read-state and handoff projection, computer-use monitor/task derivation, stage copy, VNC dimensions/warm-source/viewer URL/identity/session parsing, cursor projection/presentation, monitor selection, and handoff status labels plus shared timing/limit constants.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Computer status, monitor selection, viewer URL identity, cursor feedback, handoff labels and loading/retry presentation remain deterministic across malformed, missing, loading, disconnected and multi-monitor inputs.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Native Swift value types and Foundation URL/JSON projection replace TypeScript/DOM helpers. Electron-only channel/partition/webPreferences constants are not copied; behavior consumed by native WebKit remains represented. The shipping crash policy now consumes this model's authoritative crash limit/window rather than duplicating constants.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift now contains RemoteComputerShellModel and native status/handoff/monitor/task/VNC/cursor/selection projections. RemoteComputerWebProcessCrashPolicy consumes RemoteComputerShellModel.crashLimit/crashWindowMilliseconds in the shipping WebView path.",
+      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift covers status/handoff/monitor/task projection, VNC dimensions/viewer params/identity/session parsing, warm-source retention, cursor projection/presentation, stage retry copy, monitor selection and handoff labels. Fresh exact-HEAD ordinary/protected CI is required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This row owns pure model/projection semantics only. Live ForeverBox/subagent/task/handoff data ownership and shipping UI composition remain separate status-store/controller/view rows, so this implementation does not claim those responsibilities are closed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/status-store.ts",
