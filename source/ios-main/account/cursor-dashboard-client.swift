@@ -5,19 +5,221 @@ struct IOSCursorDashboardError: Error, LocalizedError, Sendable {
     var errorDescription: String? { message }
 }
 
+
+private enum IOSCursorDashboardProto {
+    private enum WireValue {
+        case varint(UInt64)
+        case bytes(Data)
+    }
+
+    private struct Reader {
+        private let bytes: [UInt8]
+        private var index = 0
+
+        init(_ data: Data) {
+            bytes = Array(data)
+        }
+
+        mutating func readFields() throws -> [(Int, WireValue)] {
+            var fields: [(Int, WireValue)] = []
+            while index < bytes.count {
+                let key = try readVarint()
+                let field = Int(key >> 3)
+                guard field > 0 else {
+                    throw IOSCursorDashboardError(message: "Dashboard protobuf contained field zero.")
+                }
+                switch Int(key & 0x07) {
+                case 0:
+                    fields.append((field, .varint(try readVarint())))
+                case 1:
+                    try skip(8)
+                case 2:
+                    let length = try readLength()
+                    let end = index + length
+                    guard end <= bytes.count else {
+                        throw IOSCursorDashboardError(message: "Dashboard protobuf length exceeded the response body.")
+                    }
+                    fields.append((field, .bytes(Data(bytes[index..<end]))))
+                    index = end
+                case 5:
+                    try skip(4)
+                default:
+                    throw IOSCursorDashboardError(message: "Dashboard protobuf used an unsupported wire type.")
+                }
+            }
+            return fields
+        }
+
+        private mutating func readVarint() throws -> UInt64 {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while index < bytes.count, shift < 64 {
+                let byte = bytes[index]
+                index += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 {
+                    return value
+                }
+                shift += 7
+            }
+            throw IOSCursorDashboardError(message: "Dashboard protobuf contained an invalid varint.")
+        }
+
+        private mutating func readLength() throws -> Int {
+            let value = try readVarint()
+            guard value <= UInt64(Int.max) else {
+                throw IOSCursorDashboardError(message: "Dashboard protobuf length overflowed this platform.")
+            }
+            return Int(value)
+        }
+
+        private mutating func skip(_ count: Int) throws {
+            guard count >= 0, index + count <= bytes.count else {
+                throw IOSCursorDashboardError(message: "Dashboard protobuf ended unexpectedly.")
+            }
+            index += count
+        }
+    }
+
+    static func getTeamsRequest(activeOnly: Bool) -> Data {
+        var data = Data()
+        appendVarintField(1, activeOnly ? 1 : 0, to: &data)
+        return data
+    }
+
+    static func publishPluginRequest(
+        teamId: Int32,
+        name: String,
+        displayName: String,
+        description: String,
+        pluginTarGz: Data
+    ) throws -> Data {
+        guard teamId >= 0 else {
+            throw IOSCursorDashboardError(message: "Skill publish team id must be non-negative.")
+        }
+        var data = Data()
+        appendVarintField(1, UInt64(teamId), to: &data)
+        appendBytesField(2, Data(name.utf8), to: &data)
+        appendBytesField(3, Data(displayName.utf8), to: &data)
+        appendBytesField(4, Data(description.utf8), to: &data)
+        appendBytesField(5, pluginTarGz, to: &data)
+        return data
+    }
+
+    static func unpublishPluginRequest(pluginId: Int64, teamId: Int32) throws -> Data {
+        guard pluginId >= 0, teamId >= 0 else {
+            throw IOSCursorDashboardError(message: "Skill unpublish ids must be non-negative.")
+        }
+        var data = Data()
+        appendVarintField(1, UInt64(pluginId), to: &data)
+        appendVarintField(2, UInt64(teamId), to: &data)
+        return data
+    }
+
+    static func decodeTeams(_ data: Data) throws -> [IOSCursorSkillPublishTeam] {
+        var reader = Reader(data)
+        var teams: [IOSCursorSkillPublishTeam] = []
+        for (field, value) in try reader.readFields() where field == 1 {
+            guard case .bytes(let message) = value else { continue }
+            var nested = Reader(message)
+            var name = ""
+            var id: Int32 = 0
+            var isDirectMember = false
+            for (nestedField, nestedValue) in try nested.readFields() {
+                switch (nestedField, nestedValue) {
+                case (1, .bytes(let bytes)):
+                    name = String(data: bytes, encoding: .utf8) ?? ""
+                case (2, .varint(let value)):
+                    id = Int32(truncatingIfNeeded: value)
+                case (36, .varint(let value)):
+                    isDirectMember = value != 0
+                default:
+                    break
+                }
+            }
+            teams.append(.init(teamId: id, name: name, isDirectMember: isDirectMember))
+        }
+        return teams
+    }
+
+    static func decodePublishedSkill(_ data: Data) throws -> IOSCursorPublishedSkill {
+        var reader = Reader(data)
+        var pluginId: Int64 = 0
+        var commitSha = ""
+        for (field, value) in try reader.readFields() {
+            switch (field, value) {
+            case (1, .varint(let value)):
+                pluginId = Int64(bitPattern: value)
+            case (3, .bytes(let bytes)):
+                commitSha = String(data: bytes, encoding: .utf8) ?? ""
+            default:
+                break
+            }
+        }
+        guard pluginId > 0, !commitSha.isEmpty else {
+            throw IOSCursorDashboardError(message: "Dashboard publish response was missing plugin identity or commit SHA.")
+        }
+        return .init(pluginId: String(pluginId), commitSha: commitSha)
+    }
+
+    private static func appendVarintField(_ field: Int, _ value: UInt64, to data: inout Data) {
+        appendVarint(UInt64(field << 3), to: &data)
+        appendVarint(value, to: &data)
+    }
+
+    private static func appendBytesField(_ field: Int, _ value: Data, to data: inout Data) {
+        appendVarint(UInt64((field << 3) | 2), to: &data)
+        appendVarint(UInt64(value.count), to: &data)
+        data.append(value)
+    }
+
+    private static func appendVarint(_ value: UInt64, to data: inout Data) {
+        var value = value
+        repeat {
+            var byte = UInt8(value & 0x7f)
+            value >>= 7
+            if value != 0 { byte |= 0x80 }
+            data.append(byte)
+        } while value != 0
+    }
+}
+
+struct IOSCursorSkillPublishTeam: Equatable, Sendable {
+    let teamId: Int32
+    let name: String
+    let isDirectMember: Bool
+}
+
+struct IOSCursorPublishedSkill: Equatable, Sendable {
+    let pluginId: String
+    let commitSha: String
+}
+
 final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient {
+    typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+
     private let credentials: AccountMcpCredentials
     private let backendURL: URL
     private let session: URLSession
+    private let requestExecutor: RequestExecutor?
 
     init(
         credentials: AccountMcpCredentials,
         backendURL: URL = URL(string: getConfiguredBackendUrl())!,
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        requestExecutor: RequestExecutor? = nil
     ) {
         self.credentials = credentials
         self.backendURL = backendURL
         self.session = session
+        self.requestExecutor = requestExecutor
+    }
+
+    private func perform(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        if let requestExecutor {
+            return try await requestExecutor(request)
+        }
+        return try await session.data(for: request)
     }
 
     private func rpc(
@@ -46,7 +248,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             request.setValue(value, forHTTPHeaderField: name)
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await perform(request)
         guard let http = response as? HTTPURLResponse else {
             throw IOSCursorDashboardError(message: "Dashboard RPC returned no HTTP response.")
         }
@@ -64,6 +266,92 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             throw IOSCursorDashboardError(message: "Dashboard RPC \(method) returned invalid JSON.")
         }
         return object
+    }
+
+
+    private func protoRPC(
+        _ method: String,
+        body: Data,
+        timeoutMs: Int
+    ) async throws -> Data {
+        let backend = backendURL.absoluteString
+        let headers = try await createSandInferenceHeaders(
+            backendUrl: backend,
+            getAccessToken: { value in
+                try await self.credentials.getAccessToken(value)
+            },
+            getMachineId: credentials.getMachineId,
+            resolveGhostMode: { _ in "true" }
+        )
+        let url = backendURL
+            .appendingPathComponent("aiserver.v1.DashboardService")
+            .appendingPathComponent(method)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = TimeInterval(max(1, timeoutMs)) / 1_000
+        request.setValue("application/proto", forHTTPHeaderField: "Content-Type")
+        request.setValue("1", forHTTPHeaderField: "Connect-Protocol-Version")
+        for (name, value) in headers.headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        request.httpBody = body
+        let (data, response) = try await perform(request)
+        guard let http = response as? HTTPURLResponse else {
+            throw IOSCursorDashboardError(message: "Dashboard Connect RPC returned no HTTP response.")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let detail = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(512)
+            let suffix = detail.map { $0.isEmpty ? "" : ": \($0)" } ?? ""
+            throw IOSCursorDashboardError(
+                message: "Dashboard Connect RPC \(method) failed with HTTP \(http.statusCode)\(suffix)"
+            )
+        }
+        return data
+    }
+
+    func getSkillPublishTeams(timeoutMs: Int = 10_000) async throws -> [IOSCursorSkillPublishTeam] {
+        let response = try await protoRPC(
+            "GetTeams",
+            body: IOSCursorDashboardProto.getTeamsRequest(activeOnly: true),
+            timeoutMs: timeoutMs
+        )
+        return try IOSCursorDashboardProto.decodeTeams(response)
+    }
+
+    func publishSkillPlugin(
+        teamId: Int32,
+        name: String,
+        displayName: String,
+        description: String,
+        pluginTarGz: Data,
+        timeoutMs: Int = 60_000
+    ) async throws -> IOSCursorPublishedSkill {
+        let body = try IOSCursorDashboardProto.publishPluginRequest(
+            teamId: teamId,
+            name: name,
+            displayName: displayName,
+            description: description,
+            pluginTarGz: pluginTarGz
+        )
+        let response = try await protoRPC("PublishPlugin", body: body, timeoutMs: timeoutMs)
+        return try IOSCursorDashboardProto.decodePublishedSkill(response)
+    }
+
+    func unpublishSkillPlugin(
+        pluginId: String,
+        teamId: Int32,
+        timeoutMs: Int = 60_000
+    ) async throws {
+        guard let parsedPluginId = Int64(pluginId) else {
+            throw IOSCursorDashboardError(message: "Published plugin id is not an int64.")
+        }
+        let body = try IOSCursorDashboardProto.unpublishPluginRequest(
+            pluginId: parsedPluginId,
+            teamId: teamId
+        )
+        _ = try await protoRPC("UnpublishPlugin", body: body, timeoutMs: timeoutMs)
     }
 
     private func uint64(_ value: Any?) -> UInt64? {

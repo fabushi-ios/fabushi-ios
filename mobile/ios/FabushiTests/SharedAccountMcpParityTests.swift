@@ -249,3 +249,107 @@ final class SharedAccountMcpParityTests: XCTestCase {
         XCTAssertEqual(client.updated.first?.1, ["TOKEN": "value"])
     }
 }
+
+
+private actor CursorDashboardProtoRequestRecorder {
+    private var requests: [URLRequest] = []
+
+    func record(_ request: URLRequest) -> Data {
+        requests.append(request)
+        switch request.url?.path {
+        case "/aiserver.v1.DashboardService/GetTeams":
+            return Data([
+                0x0a, 0x0b,
+                0x0a, 0x04, 0x43, 0x6f, 0x72, 0x65,
+                0x10, 0x07,
+                0xa0, 0x02, 0x01,
+            ])
+        case "/aiserver.v1.DashboardService/PublishPlugin":
+            return Data([
+                0x08, 0x2a,
+                0x10, 0x0b,
+                0x1a, 0x06, 0x61, 0x62, 0x63, 0x31, 0x32, 0x33,
+            ])
+        case "/aiserver.v1.DashboardService/UnpublishPlugin":
+            return Data([0x0a, 0x03, 0x6f, 0x6b, 0x31])
+        default:
+            return Data()
+        }
+    }
+
+    func snapshot() -> [URLRequest] {
+        requests
+    }
+}
+
+final class CursorDashboardProtoConnectParityTests: XCTestCase {
+    func testSkillPublishingUsesDesktopTypedBinaryConnectContract() async throws {
+        let recorder = CursorDashboardProtoRequestRecorder()
+        let credentials = AccountMcpCredentials(
+            getAccessToken: { _ in "cursor-token" },
+            getMachineId: { "machine-1" }
+        )
+        let client = IOSCursorDashboardClient(
+            credentials: credentials,
+            backendURL: URL(string: "https://api.example.test")!,
+            requestExecutor: { request in
+                let body = await recorder.record(request)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/2",
+                    headerFields: ["Content-Type": "application/proto"]
+                )!
+                return (body, response)
+            }
+        )
+
+        let teams = try await client.getSkillPublishTeams()
+        XCTAssertEqual(teams, [
+            .init(teamId: 7, name: "Core", isDirectMember: true),
+        ])
+
+        let published = try await client.publishSkillPlugin(
+            teamId: 7,
+            name: "skill-a",
+            displayName: "Skill A",
+            description: "Desc",
+            pluginTarGz: Data([0x01, 0x02, 0x03])
+        )
+        XCTAssertEqual(published, .init(pluginId: "42", commitSha: "abc123"))
+
+        try await client.unpublishSkillPlugin(pluginId: "42", teamId: 7)
+
+        let requests = await recorder.snapshot()
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertEqual(requests.map { $0.httpMethod }, ["POST", "POST", "POST"])
+        XCTAssertEqual(
+            requests.map { $0.url?.path },
+            [
+                "/aiserver.v1.DashboardService/GetTeams",
+                "/aiserver.v1.DashboardService/PublishPlugin",
+                "/aiserver.v1.DashboardService/UnpublishPlugin",
+            ]
+        )
+        for request in requests {
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/proto")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Connect-Protocol-Version"), "1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer cursor-token")
+            XCTAssertTrue(
+                request.value(forHTTPHeaderField: "x-cursor-checksum")?.hasSuffix("machine-1") == true
+            )
+        }
+        XCTAssertEqual(requests[0].httpBody, Data([0x08, 0x01]))
+        XCTAssertEqual(
+            requests[1].httpBody,
+            Data([
+                0x08, 0x07,
+                0x12, 0x07, 0x73, 0x6b, 0x69, 0x6c, 0x6c, 0x2d, 0x61,
+                0x1a, 0x07, 0x53, 0x6b, 0x69, 0x6c, 0x6c, 0x20, 0x41,
+                0x22, 0x04, 0x44, 0x65, 0x73, 0x63,
+                0x2a, 0x03, 0x01, 0x02, 0x03,
+            ])
+        )
+        XCTAssertEqual(requests[2].httpBody, Data([0x08, 0x2a, 0x10, 0x07]))
+    }
+}
