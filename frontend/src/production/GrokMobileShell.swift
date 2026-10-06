@@ -56,7 +56,6 @@ internal struct GrokMobileShell: View {
                 roster: bots,
                 bridge: bridge,
                 accountScopeKey: mobileAccountScopeKey,
-                reconnectGeneration: reconnectGeneration,
                 onRosterChanged: { updated in
                     applyBotRosterUpdate(updated)
                     groupMembersTarget = updated.first(where: { $0.id == group.id })
@@ -70,6 +69,7 @@ internal struct GrokMobileShell: View {
                 roster: bots,
                 bridge: bridge,
                 accountScopeKey: mobileAccountScopeKey,
+                reconnectGeneration: reconnectGeneration,
                 onRosterChanged: { updated in
                     applyBotRosterUpdate(updated)
                     botSettingsTarget = updated.first(where: { $0.id == agent.id })
