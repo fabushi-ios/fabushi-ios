@@ -3,6 +3,28 @@ import XCTest
 
 @MainActor
 final class RemoteComputerRebuildTests: XCTestCase {
+    private final class FakeAgentBoxSource: RemoteComputerAgentBoxSourcing {
+        var ensureCalls: [String] = []
+        var releaseCalls: [(agentID: String, trigger: String)] = []
+        var snapshots: [String: RemoteComputerAgentBoxSnapshot] = [:]
+        var ensureHandler: ((String) async throws -> RemoteComputerAgentBoxSnapshot)?
+
+        func ensure(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot {
+            ensureCalls.append(agentID)
+            if let ensureHandler {
+                return try await ensureHandler(agentID)
+            }
+            guard let snapshot = snapshots[agentID] else {
+                throw IOSRemoteComputerAgentBoxSource.SourceError.invalidResponse
+            }
+            return snapshot
+        }
+
+        func release(agentID: String, trigger: String) async throws {
+            releaseCalls.append((agentID, trigger))
+        }
+    }
+
     private final class FakeSource: RemoteComputerRebuildSource {
         var supportsManagedLifecycle = true
         var migrationValue: Any = NSNull()
@@ -429,6 +451,152 @@ final class RemoteComputerRebuildTests: XCTestCase {
         )
         XCTAssertEqual(agent.displayTitle, "研究助手 的电脑")
         XCTAssertNotEqual(agent.scopeKey, account.scopeKey)
+    }
+
+    func testAgentBoxSourceContractNeverUsesPairedComputerAPI() throws {
+        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.ensurePath, "/v1/agent-boxes/ensure")
+        XCTAssertEqual(IOSRemoteComputerAgentBoxSource.releasePath, "/v1/agent-boxes/release")
+        XCTAssertFalse(IOSRemoteComputerAgentBoxSource.ensurePath.contains("/v1/computers"))
+        XCTAssertFalse(IOSRemoteComputerAgentBoxSource.releasePath.contains("/v1/computers"))
+
+        let snapshot = try IOSRemoteComputerAgentBoxSource.projectStatus(
+            [
+                "agentId": "agent-a",
+                "state": "running",
+                "vncUrl": "https://agent-box.example/vnc.html?token=opaque",
+                "imageUpdateAvailable": true,
+            ],
+            expectedAgentID: "agent-a"
+        )
+        XCTAssertEqual(snapshot.agentID, "agent-a")
+        XCTAssertEqual(snapshot.state, "running")
+        XCTAssertEqual(snapshot.vncURL?.host, "agent-box.example")
+        XCTAssertTrue(snapshot.isReadyForVNC)
+        XCTAssertTrue(snapshot.imageUpdateAvailable)
+    }
+
+    func testAgentBoxSourceRejectsCrossAgentAndUnsafeVNC() {
+        XCTAssertThrowsError(
+            try IOSRemoteComputerAgentBoxSource.projectStatus(
+                [
+                    "agentId": "agent-b",
+                    "state": "running",
+                    "vncUrl": "https://agent-box.example/vnc.html",
+                ],
+                expectedAgentID: "agent-a"
+            )
+        ) { error in
+            guard case IOSRemoteComputerAgentBoxSource.SourceError.agentScopeMismatch = error else {
+                return XCTFail("expected agentScopeMismatch, got \(error)")
+            }
+        }
+
+        XCTAssertThrowsError(
+            try IOSRemoteComputerAgentBoxSource.projectStatus(
+                [
+                    "agentId": "agent-a",
+                    "state": "running",
+                    "vncUrl": "http://agent-box.example/vnc.html",
+                ],
+                expectedAgentID: "agent-a"
+            )
+        ) { error in
+            guard case IOSRemoteComputerAgentBoxSource.SourceError.unsafeVNCURL = error else {
+                return XCTFail("expected unsafeVNCURL, got \(error)")
+            }
+        }
+    }
+
+    func testAgentBoxOwnerReconnectAndReleaseUseSingleScopedSource() async {
+        let source = FakeAgentBoxSource()
+        source.snapshots["agent-a"] = .init(
+            agentID: "agent-a",
+            state: "running",
+            vncURL: URL(string: "https://agent-a.example/vnc.html"),
+            imageUpdateAvailable: false
+        )
+        let owner = RemoteComputerAgentBoxOwner(source: source)
+        let scope = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: "agent-a",
+            agentName: "Agent A"
+        )
+
+        await owner.connect(scope: scope)
+        XCTAssertEqual(source.ensureCalls, ["agent-a"])
+        XCTAssertEqual(owner.vncURL?.host, "agent-a.example")
+        XCTAssertEqual(owner.reloadRevision, 0)
+
+        await owner.noteReconnect()
+        XCTAssertEqual(source.ensureCalls, ["agent-a", "agent-a"])
+        XCTAssertEqual(owner.reloadRevision, 1)
+
+        await owner.disconnect(trigger: "test-close")
+        XCTAssertEqual(source.releaseCalls.count, 1)
+        XCTAssertEqual(source.releaseCalls.first?.agentID, "agent-a")
+        XCTAssertEqual(source.releaseCalls.first?.trigger, "test-close")
+        XCTAssertNil(owner.vncURL)
+        owner.dispose()
+    }
+
+    func testAgentBoxOwnerFencesStaleScopeAndReleasesPreviousAgent() async throws {
+        let source = FakeAgentBoxSource()
+        var continuations: [String: CheckedContinuation<RemoteComputerAgentBoxSnapshot, Error>] = [:]
+        source.ensureHandler = { agentID in
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<RemoteComputerAgentBoxSnapshot, Error>) in
+                continuations[agentID] = continuation
+            }
+        }
+
+        let owner = RemoteComputerAgentBoxOwner(source: source)
+        let scopeA = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: "agent-a",
+            agentName: "Agent A"
+        )
+        let scopeB = RemoteComputerScope(
+            accountScopeKey: "account-a",
+            agentID: "agent-b",
+            agentName: "Agent B"
+        )
+
+        let first = Task { await owner.connect(scope: scopeA) }
+        for _ in 0..<100 where continuations["agent-a"] == nil {
+            await Task.yield()
+        }
+
+        let second = Task { await owner.connect(scope: scopeB) }
+        for _ in 0..<100 where continuations["agent-b"] == nil {
+            await Task.yield()
+        }
+
+        let continuationB = try XCTUnwrap(continuations["agent-b"])
+        continuationB.resume(returning: .init(
+            agentID: "agent-b",
+            state: "running",
+            vncURL: URL(string: "https://agent-b.example/vnc.html"),
+            imageUpdateAvailable: false
+        ))
+        await second.value
+
+        let continuationA = try XCTUnwrap(continuations["agent-a"])
+        continuationA.resume(returning: .init(
+            agentID: "agent-a",
+            state: "running",
+            vncURL: URL(string: "https://agent-a.example/vnc.html"),
+            imageUpdateAvailable: false
+        ))
+        await first.value
+
+        XCTAssertEqual(owner.snapshot?.agentID, "agent-b")
+        XCTAssertEqual(owner.vncURL?.host, "agent-b.example")
+        XCTAssertTrue(
+            source.releaseCalls.contains {
+                $0.agentID == "agent-a" && $0.trigger == "scope-changed"
+            }
+        )
+        owner.dispose()
     }
 
     func testAgentComputerScopeCannotReusePairedComputerSurface() {

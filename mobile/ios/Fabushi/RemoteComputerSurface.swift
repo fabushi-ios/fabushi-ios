@@ -3,7 +3,6 @@ import SwiftUI
 import UIKit
 import WebKit
 
-private let remoteComputerOriginHost = "fabushi.ombhrum.com"
 private let remoteComputerURL = URL(string: "https://fabushi.ombhrum.com/remote-computer")!
 private let remoteComputerForeverBoxID = "forever-box"
 
@@ -23,6 +22,267 @@ struct RemoteComputerScope: Equatable, Sendable {
 
     var isAgentScope: Bool {
         agentID?.isEmpty == false
+    }
+}
+
+struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
+    let agentID: String
+    let state: String
+    let vncURL: URL?
+    let imageUpdateAvailable: Bool
+
+    var isReadyForVNC: Bool {
+        state == "running" && vncURL != nil
+    }
+}
+
+@MainActor
+protocol RemoteComputerAgentBoxSourcing: AnyObject {
+    func ensure(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot
+    func release(agentID: String, trigger: String) async throws
+}
+
+@MainActor
+final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
+    enum SourceError: LocalizedError {
+        case bridgeUnavailable
+        case invalidResponse
+        case agentScopeMismatch
+        case unsafeVNCURL
+        case backend(status: Int, message: String)
+
+        var errorDescription: String? {
+            switch self {
+            case .bridgeUnavailable:
+                return "Agent 电脑 Host bridge 不可用。"
+            case .invalidResponse:
+                return "Agent 电脑控制面返回了无效响应。"
+            case .agentScopeMismatch:
+                return "Agent 电脑响应与当前 Agent scope 不一致。"
+            case .unsafeVNCURL:
+                return "Agent 电脑控制面没有返回可验证的 HTTPS VNC 地址。"
+            case .backend(let status, let message):
+                let detail = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                return detail.isEmpty
+                    ? "Agent 电脑控制面请求失败（HTTP \(status)）。"
+                    : String(detail.prefix(240))
+            }
+        }
+    }
+
+    static let ensurePath = "/v1/agent-boxes/ensure"
+    static let releasePath = "/v1/agent-boxes/release"
+
+    private let bridge: IOSPreloadBridge?
+
+    init(bridge: IOSPreloadBridge?) {
+        self.bridge = bridge
+    }
+
+    func ensure(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot {
+        let payload = try await hostAuthenticatedRequest(
+            path: Self.ensurePath,
+            body: ["agentId": agentID]
+        )
+        return try Self.projectStatus(payload, expectedAgentID: agentID)
+    }
+
+    func release(agentID: String, trigger: String) async throws {
+        _ = try await hostAuthenticatedRequest(
+            path: Self.releasePath,
+            body: [
+                "agentId": agentID,
+                "trigger": trigger,
+            ]
+        )
+    }
+
+    static func projectStatus(
+        _ payload: [String: Any],
+        expectedAgentID: String
+    ) throws -> RemoteComputerAgentBoxSnapshot {
+        let object = (payload["box"] as? [String: Any]) ?? payload
+        if let returnedAgentID = object["agentId"] as? String,
+           returnedAgentID != expectedAgentID
+        {
+            throw SourceError.agentScopeMismatch
+        }
+
+        guard let state = object["state"] as? String,
+              ["running", "starting", "hibernated", "stopped", "local"].contains(state)
+        else {
+            throw SourceError.invalidResponse
+        }
+
+        let rawVNC = (object["vncUrl"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var vncURL: URL?
+        if let rawVNC, !rawVNC.isEmpty {
+            guard let candidate = URL(string: rawVNC),
+                  candidate.scheme?.lowercased() == "https",
+                  candidate.host?.isEmpty == false,
+                  candidate.user == nil,
+                  candidate.password == nil,
+                  (candidate.port == nil || candidate.port == 443)
+            else {
+                throw SourceError.unsafeVNCURL
+            }
+            vncURL = candidate
+        }
+
+        return .init(
+            agentID: expectedAgentID,
+            state: state,
+            vncURL: vncURL,
+            imageUpdateAvailable: object["imageUpdateAvailable"] as? Bool ?? false
+        )
+    }
+
+    private func hostAuthenticatedRequest(
+        path: String,
+        body: [String: Any]
+    ) async throws -> [String: Any] {
+        guard let bridge else { throw SourceError.bridgeUnavailable }
+
+        let value = try await bridge.request(
+            method: "platform.request",
+            params: [
+                "method": "POST",
+                "path": path,
+                "authenticated": true,
+                "body": body,
+            ]
+        ).value
+
+        guard let envelope = value as? [String: Any],
+              let ok = envelope["ok"] as? Bool
+        else {
+            throw SourceError.invalidResponse
+        }
+        guard ok else {
+            let status = (envelope["statusCode"] as? NSNumber)?.intValue
+                ?? envelope["statusCode"] as? Int
+                ?? 0
+            let message: String
+            if let data = envelope["data"] as? [String: Any],
+               let candidate = (data["message"] as? String) ?? (data["error"] as? String)
+            {
+                message = candidate
+            } else {
+                message = envelope["bodyText"] as? String ?? ""
+            }
+            throw SourceError.backend(status: status, message: message)
+        }
+        guard let data = envelope["data"] as? [String: Any] else {
+            throw SourceError.invalidResponse
+        }
+        return data
+    }
+}
+
+@MainActor
+final class RemoteComputerAgentBoxOwner: ObservableObject {
+    @Published private(set) var snapshot: RemoteComputerAgentBoxSnapshot?
+    @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
+    @Published private(set) var reloadRevision = 0
+
+    private let source: any RemoteComputerAgentBoxSourcing
+    private var activeScopeKey: String?
+    private var activeAgentID: String?
+    private var generation = 0
+    private var disposed = false
+
+    init(source: any RemoteComputerAgentBoxSourcing) {
+        self.source = source
+    }
+
+    var vncURL: URL? {
+        snapshot?.isReadyForVNC == true ? snapshot?.vncURL : nil
+    }
+
+    func connect(scope: RemoteComputerScope) async {
+        guard !disposed, let agentID = scope.agentID, !agentID.isEmpty else {
+            await disconnect(trigger: "scope-cleared")
+            return
+        }
+
+        if let activeScopeKey, activeScopeKey != scope.scopeKey {
+            await invalidateAndRelease(trigger: "scope-changed")
+        }
+        activeScopeKey = scope.scopeKey
+        activeAgentID = agentID
+        await ensureCurrentAgent(incrementReload: false)
+    }
+
+    func noteReconnect() async {
+        guard !disposed, activeAgentID != nil else { return }
+        await ensureCurrentAgent(incrementReload: true)
+    }
+
+    func disconnect(trigger: String) async {
+        guard activeAgentID != nil || snapshot != nil || isLoading else { return }
+        await invalidateAndRelease(trigger: trigger)
+    }
+
+    func dispose() {
+        generation &+= 1
+        activeScopeKey = nil
+        activeAgentID = nil
+        snapshot = nil
+        isLoading = false
+        disposed = true
+    }
+
+    private func ensureCurrentAgent(incrementReload: Bool) async {
+        guard !disposed, let agentID = activeAgentID, let scopeKey = activeScopeKey else { return }
+        generation &+= 1
+        let attempt = generation
+        isLoading = true
+        errorMessage = nil
+        if incrementReload {
+            reloadRevision &+= 1
+        }
+
+        do {
+            let next = try await source.ensure(agentID: agentID)
+            guard !disposed,
+                  attempt == generation,
+                  activeAgentID == agentID,
+                  activeScopeKey == scopeKey
+            else { return }
+
+            snapshot = next
+            if next.isReadyForVNC {
+                errorMessage = nil
+            } else {
+                errorMessage = "Agent 电脑已响应，但当前没有可用的 HTTPS VNC 会话。"
+            }
+        } catch {
+            guard !disposed,
+                  attempt == generation,
+                  activeAgentID == agentID,
+                  activeScopeKey == scopeKey
+            else { return }
+            snapshot = nil
+            errorMessage = String(error.localizedDescription.prefix(240))
+        }
+
+        if !disposed, attempt == generation {
+            isLoading = false
+        }
+    }
+
+    private func invalidateAndRelease(trigger: String) async {
+        generation &+= 1
+        let agentID = activeAgentID
+        activeScopeKey = nil
+        activeAgentID = nil
+        snapshot = nil
+        isLoading = false
+        errorMessage = nil
+        guard let agentID else { return }
+        try? await source.release(agentID: agentID, trigger: trigger)
     }
 }
 
@@ -1341,6 +1601,7 @@ struct RemoteComputerSurface: View {
     let onClose: () -> Void
 
     @StateObject private var rebuildOwner: RemoteComputerRebuildOwner
+    @StateObject private var agentBoxOwner: RemoteComputerAgentBoxOwner
     @StateObject private var activityOwner: RemoteComputerHostActivityOwner
     @State private var status = "正在连接我的电脑…"
     @State private var errorMessage: String?
@@ -1359,6 +1620,11 @@ struct RemoteComputerSurface: View {
         _rebuildOwner = StateObject(
             wrappedValue: RemoteComputerRebuildOwner(
                 source: IOSRemoteComputerRebuildSource(bridge: bridge)
+            )
+        )
+        _agentBoxOwner = StateObject(
+            wrappedValue: RemoteComputerAgentBoxOwner(
+                source: IOSRemoteComputerAgentBoxSource(bridge: bridge)
             )
         )
         let activitySource = IOSRemoteComputerHostActivitySource(bridge: bridge)
@@ -1395,9 +1661,12 @@ struct RemoteComputerSurface: View {
 
                 Spacer()
 
-                if scope?.isAgentScope != true
-                    && errorMessage == nil
-                    && status != "已安全连接"
+                if (scope?.isAgentScope == true && agentBoxOwner.isLoading)
+                    || (
+                        scope?.isAgentScope != true
+                        && errorMessage == nil
+                        && status != "已安全连接"
+                    )
                 {
                     ProgressView()
                         .controlSize(.small)
@@ -1463,12 +1732,17 @@ struct RemoteComputerSurface: View {
                     HStack {
                         Button("重新连接") {
                             self.errorMessage = nil
-                            status = "正在重新连接…"
-                            Task { await rebuildOwner.requestReconnect() }
+                            if scope?.isAgentScope == true {
+                                status = "正在重新连接 Agent 电脑…"
+                                Task { await agentBoxOwner.noteReconnect() }
+                            } else {
+                                status = "正在重新连接…"
+                                Task { await rebuildOwner.requestReconnect() }
+                            }
                         }
                         .accessibilityIdentifier("remote-computer-reload")
 
-                        if rebuildOwner.managedLifecycleAvailable {
+                        if scope?.isAgentScope != true && rebuildOwner.managedLifecycleAvailable {
                             Button("恢复电脑") {
                                 recoverConfirmationPresented = true
                             }
@@ -1485,24 +1759,55 @@ struct RemoteComputerSurface: View {
             }
 
             if scope?.isAgentScope == true {
-                VStack(spacing: 12) {
-                    Image(systemName: "desktopcomputer.trianglebadge.exclamationmark")
-                        .font(.system(size: 34))
-                        .foregroundStyle(.secondary)
-                    Text("Agent 电脑暂不可用")
-                        .font(.headline)
-                    Text("当前 iOS Host 尚未提供 Desktop ForeverBox 的 Agent 沙箱/VNC 生命周期。为避免误打开你的配对电脑，此入口会保持关闭，直到原生 Host 服务完成迁移。")
+                if let vncURL = agentBoxOwner.vncURL {
+                    RemoteComputerWebView(
+                        targetURL: vncURL,
+                        reloadToken: agentBoxOwner.reloadRevision,
+                        status: $status,
+                        errorMessage: $errorMessage,
+                        onNavigationStarted: {},
+                        onNavigationFinished: {},
+                        onNavigationFailed: {}
+                    )
+                    .accessibilityIdentifier("remote-computer-agent-vnc")
+                } else {
+                    VStack(spacing: 12) {
+                        if agentBoxOwner.isLoading {
+                            ProgressView()
+                                .controlSize(.regular)
+                        } else {
+                            Image(systemName: "desktopcomputer.trianglebadge.exclamationmark")
+                                .font(.system(size: 34))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(agentBoxOwner.isLoading ? "正在启动 Agent 电脑…" : "Agent 电脑不可用")
+                            .font(.headline)
+                        Text(
+                            agentBoxOwner.errorMessage
+                                ?? "iOS 只接受当前 Fabushi 账号下、由 Host 鉴权的 Agent ForeverBox。没有可验证的 HTTPS VNC 会话时会保持关闭，不会回退到配对电脑。"
+                        )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 420)
+
+                        if !agentBoxOwner.isLoading {
+                            Button("重新连接") {
+                                errorMessage = nil
+                                status = "正在重新连接 Agent 电脑…"
+                                Task { await agentBoxOwner.noteReconnect() }
+                            }
+                            .accessibilityIdentifier("remote-computer-agent-reconnect")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(24)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("remote-computer-agent-unavailable")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(24)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("remote-computer-agent-unavailable")
             } else {
                 RemoteComputerWebView(
+                    targetURL: remoteComputerURL,
                     reloadToken: rebuildOwner.reloadRevision,
                     status: $status,
                     errorMessage: $errorMessage,
@@ -1517,17 +1822,26 @@ struct RemoteComputerSurface: View {
         .accessibilityIdentifier("remote-computer-surface")
         .id(scope?.scopeKey ?? "account")
         .task(id: scope?.scopeKey ?? "account") {
-            if scope?.isAgentScope == true {
-                status = "等待原生 Agent 电脑服务"
-                errorMessage = nil
+            errorMessage = nil
+            if let scope, scope.isAgentScope {
+                status = "正在启动 Agent 电脑…"
+                await agentBoxOwner.connect(scope: scope)
+                status = agentBoxOwner.vncURL == nil
+                    ? "Agent 电脑不可用"
+                    : "正在安全连接…"
             } else {
+                await agentBoxOwner.disconnect(trigger: "scope-account")
                 await rebuildOwner.connect()
             }
             await activityOwner.refresh(agentID: scope?.agentID)
         }
         .onChange(of: reconnectGeneration) { _, _ in
             Task {
-                if scope?.isAgentScope != true {
+                if scope?.isAgentScope == true {
+                    errorMessage = nil
+                    status = "正在重新连接 Agent 电脑…"
+                    await agentBoxOwner.noteReconnect()
+                } else {
                     await rebuildOwner.noteReconnect()
                 }
                 await activityOwner.refresh(agentID: scope?.agentID)
@@ -1536,6 +1850,14 @@ struct RemoteComputerSurface: View {
         .onDisappear {
             rebuildOwner.dispose()
             activityOwner.dispose()
+            if scope?.isAgentScope == true {
+                Task {
+                    await agentBoxOwner.disconnect(trigger: "surface-disappear")
+                    agentBoxOwner.dispose()
+                }
+            } else {
+                agentBoxOwner.dispose()
+            }
         }
         .confirmationDialog(
             "重置我的电脑？",
@@ -2027,6 +2349,7 @@ struct RemoteComputerWebProcessCrashPolicy: Equatable, Sendable {
 }
 
 private struct RemoteComputerWebView: UIViewRepresentable {
+    let targetURL: URL
     let reloadToken: Int
     @Binding var status: String
     @Binding var errorMessage: String?
@@ -2036,6 +2359,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
+            targetURL: targetURL,
             status: $status,
             errorMessage: $errorMessage,
             onNavigationStarted: onNavigationStarted,
@@ -2065,12 +2389,17 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        guard context.coordinator.loadedReloadToken != reloadToken else { return }
+        context.coordinator.updateTargetURL(targetURL)
+        guard context.coordinator.loadedReloadToken != reloadToken
+                || context.coordinator.loadedTargetURL != targetURL
+        else { return }
+
         context.coordinator.loadedReloadToken = reloadToken
+        context.coordinator.loadedTargetURL = targetURL
         context.coordinator.prepareExplicitReload()
         webView.load(
             URLRequest(
-                url: remoteComputerURL,
+                url: targetURL,
                 cachePolicy: .useProtocolCachePolicy
             )
         )
@@ -2087,21 +2416,25 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         @Binding private var status: String
         @Binding private var errorMessage: String?
+        private var targetURL: URL
         private let onNavigationStarted: @MainActor () -> Void
         private let onNavigationFinished: @MainActor () -> Void
         private let onNavigationFailed: @MainActor () -> Void
         weak var webView: WKWebView?
         var loadedReloadToken: Int?
+        var loadedTargetURL: URL?
         private var crashPolicy = RemoteComputerWebProcessCrashPolicy()
         private let vncRuntime = IOSVNCPreloadRuntime()
 
         init(
+            targetURL: URL,
             status: Binding<String>,
             errorMessage: Binding<String?>,
             onNavigationStarted: @escaping @MainActor () -> Void,
             onNavigationFinished: @escaping @MainActor () -> Void,
             onNavigationFailed: @escaping @MainActor () -> Void
         ) {
+            self.targetURL = targetURL
             _status = status
             _errorMessage = errorMessage
             self.onNavigationStarted = onNavigationStarted
@@ -2192,7 +2525,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
             if navigationAction.targetFrame?.isMainFrame != false {
                 status = "已阻止外部导航"
-                errorMessage = "远程电脑页面只允许访问 https://fabushi.ombhrum.com。"
+                errorMessage = "远程电脑页面只允许访问当前已鉴权 VNC 会话的同源 HTTPS 地址。"
                 onNavigationFailed()
             }
             decisionHandler(.cancel)
@@ -2206,12 +2539,23 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             onNavigationFailed()
         }
 
+        func updateTargetURL(_ targetURL: URL) {
+            self.targetURL = targetURL
+        }
+
         private func isAllowedRemoteComputerURL(_ url: URL) -> Bool {
-            url.scheme?.lowercased() == "https"
-                && url.host?.lowercased() == remoteComputerOriginHost
-                && url.user == nil
-                && url.password == nil
-                && (url.port == nil || url.port == 443)
+            guard url.scheme?.lowercased() == "https",
+                  targetURL.scheme?.lowercased() == "https",
+                  url.user == nil,
+                  url.password == nil,
+                  targetURL.user == nil,
+                  targetURL.password == nil
+            else { return false }
+
+            let lhsPort = url.port ?? 443
+            let rhsPort = targetURL.port ?? 443
+            return url.host?.lowercased() == targetURL.host?.lowercased()
+                && lhsPort == rhsPort
         }
     }
 }
