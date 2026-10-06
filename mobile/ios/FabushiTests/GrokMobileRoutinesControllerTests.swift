@@ -831,7 +831,8 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
             _ = await controller.addRow(.schedule("@hourly"))
         }
         XCTAssertEqual(controller.rows.count, TRIGGER_MAX_GROUP_LISTENERS)
-        XCTAssertFalse(await controller.addRowAndCommit(.schedule("@weekly")))
+        let committedAfterDispose = await controller.addRowAndCommit(.schedule("@weekly"))
+        XCTAssertFalse(committedAfterDispose)
         XCTAssertEqual(controller.rows.count, TRIGGER_MAX_GROUP_LISTENERS)
     }
 
