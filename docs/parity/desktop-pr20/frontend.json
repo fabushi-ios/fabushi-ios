@@ -1462,17 +1462,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/trigger-schema.ts",
       "desktop_blob_sha": "a4a776cb4e7b74bcf53e8955c7aa6c4e58947b80",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Owns routine trigger form/schema projection for schedule, Slack, GitHub, Microsoft Teams, Linear, Sentry, and PagerDuty: defaults, wire-listener ↔ editable-form conversion, strict per-platform validation/normalization, grouped-trigger projection, and user-facing trigger descriptions.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Routine trigger rows round-trip without silently losing platform-specific fields; malformed repo/branch/schedule/integration values fail closed, reaction emoji and allowlists normalize deterministically, grouped listeners are bounded, and the editor can render stable human-readable trigger sentences.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/shared/automations.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "The native product reuses the existing iOS-owned AutomationTrigger/AutomationTriggerMember model instead of recreating TypeScript wire types. Swift helpers now project editable RoutineTriggerForm values into that canonical model, enforce the Desktop eight-listener cap and platform validation rules, round-trip forms, and reuse native trigger description helpers. Persistence/wire expansion for rich triggers remains owned by the separate draft/controller and Host protocol responsibilities.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/shared/automations.swift now owns native RoutineTriggerForm schema/projection for schedule, Slack, GitHub, Teams, Linear, Sentry and PagerDuty on top of the existing AutomationTrigger model, including schedule validation through source/shared/automation-schedule.swift, GitHub repo/CI-branch validation, reaction emoji and allowlist normalization, integration token projection, bounded group construction, reverse projection, and existing native trigger descriptions.",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers supported-form round-trip, the eight-row group bound, malformed schedule/Slack/GitHub/Teams/integration fail-closed cases, reaction emoji dedupe/normalization, and case-insensitive GitHub allowlist dedupe. Fresh exact-HEAD ordinary/protected Actions are required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This row is the pure schema/projection responsibility only. Do not treat it as proof that rich triggers are durably persisted or editable in shipping UI; trigger-draft-controller.ts and Host wire composition remain separate gates."
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/view.css",
