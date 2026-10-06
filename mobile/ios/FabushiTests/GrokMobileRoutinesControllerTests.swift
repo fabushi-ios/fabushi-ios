@@ -393,6 +393,7 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
             name: "Daily research",
             prompt: "Summarize sources",
             schedule: "@daily",
+            trigger: .member(.cron(.init(schedule: "@daily"))),
             isEnabled: true,
             createdAtMs: 10,
             runs: [
