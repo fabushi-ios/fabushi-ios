@@ -480,14 +480,47 @@ extension ContentView {
                         Text("登录 Fabushi 后可管理当前账号的 MCP 连接器与工具。")
                             .foregroundStyle(.secondary)
                     } else {
+                        HStack(spacing: 10) {
+                            if model.mcpBackendLoggedIn {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("MCP 账号后端已连接")
+                                        .font(.subheadline.weight(.medium))
+                                    if !model.mcpBackendEmail.isEmpty {
+                                        Text(model.mcpBackendEmail)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Button("退出") {
+                                    Task { await model.logoutMcpBackend() }
+                                }
+                                .disabled(model.mcpBackendBusy)
+                                .accessibilityIdentifier("mcp-backend-logout")
+                            } else {
+                                Text("连接账号后可使用 Desktop 同源的多账号 OAuth、重命名与移除。")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button(model.mcpBackendBusy ? "连接中…" : "连接") {
+                                    Task { await model.beginMcpBackendLogin() }
+                                }
+                                .disabled(model.mcpBackendBusy)
+                                .accessibilityIdentifier("mcp-backend-login")
+                            }
+                        }
+
                         HStack {
-                            Text("服务器与工具状态由 Coordinator / Rust Host 管理。")
+                            Text("服务器与工具状态由同一 Coordinator / SandMcpManager 管理。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
                             if model.mcpLoading { ProgressView() }
                             Button("刷新") {
-                                Task { await model.refreshMcpServers() }
+                                Task {
+                                    await model.refreshMcpBackendStatus()
+                                    await model.refreshMcpServers()
+                                }
                             }
                             .disabled(model.mcpLoading)
                             .accessibilityIdentifier("mcp-refresh")
@@ -513,20 +546,121 @@ extension ContentView {
                                         Text("\(server.transport.uppercased()) · \(server.status) · \(server.toolCount) 个启用工具")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
+                                        Text("账号：\(server.accountKey)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
                                         if let detail = server.statusDetail, !detail.isEmpty {
                                             Text(detail).font(.caption2).foregroundStyle(.secondary)
                                         }
                                     }
                                     Spacer()
-                                    Button(model.mcpLoadingServerId == server.id ? "读取中…" : "工具") {
-                                        Task { await model.loadMcpTools(serverId: server.id) }
+                                    Button(model.mcpLoadingServerId == server.serverId ? "读取中…" : "工具") {
+                                        Task { await model.loadMcpTools(serverId: server.serverId) }
                                     }
-                                    .disabled(model.mcpLoadingServerId == server.id)
+                                    .disabled(model.mcpLoadingServerId == server.serverId)
                                 }
                                 .accessibilityElement(children: .contain)
                                 .accessibilityIdentifier("mcp-server-\(server.id)")
 
-                                if let tools = model.mcpToolsByServerId[server.id] {
+                                if model.mcpBackendLoggedIn {
+                                    HStack(spacing: 8) {
+                                        if server.status == "needsAuth" {
+                                            Button("连接此账号") {
+                                                Task {
+                                                    await model.authenticateMcpServer(
+                                                        serverId: server.serverId,
+                                                        accountKey: server.accountKey
+                                                    )
+                                                }
+                                            }
+                                            .accessibilityIdentifier("mcp-account-auth-\(server.id)")
+                                        } else {
+                                            Button("重新认证") {
+                                                Task {
+                                                    await model.authenticateMcpServer(
+                                                        serverId: server.serverId,
+                                                        accountKey: server.accountKey,
+                                                        forceReauth: true
+                                                    )
+                                                }
+                                            }
+                                            Button("退出账号") {
+                                                Task {
+                                                    await model.logoutMcpAccount(
+                                                        serverId: server.serverId,
+                                                        accountKey: server.accountKey
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Button("移除账号", role: .destructive) {
+                                            Task {
+                                                await model.removeMcpAccount(
+                                                    serverId: server.serverId,
+                                                    accountKey: server.accountKey
+                                                )
+                                            }
+                                        }
+                                    }
+                                    .buttonStyle(.borderless)
+
+                                    HStack(spacing: 8) {
+                                        TextField(
+                                            "重命名账号",
+                                            text: Binding(
+                                                get: {
+                                                    model.mcpRenameDraftByIdentity[server.id]
+                                                        ?? server.accountKey
+                                                },
+                                                set: {
+                                                    model.mcpRenameDraftByIdentity[server.id] = $0
+                                                }
+                                            )
+                                        )
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        Button("重命名") {
+                                            let next = model.mcpRenameDraftByIdentity[server.id]
+                                                ?? server.accountKey
+                                            Task {
+                                                await model.renameMcpAccount(
+                                                    serverId: server.serverId,
+                                                    accountKey: server.accountKey,
+                                                    newAccountKey: next
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    HStack(spacing: 8) {
+                                        TextField(
+                                            "新账号标签",
+                                            text: Binding(
+                                                get: {
+                                                    model.mcpNewAccountDraftByServerId[server.serverId]
+                                                        ?? ""
+                                                },
+                                                set: {
+                                                    model.mcpNewAccountDraftByServerId[server.serverId] = $0
+                                                }
+                                            )
+                                        )
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        Button("添加账号") {
+                                            let key = model.mcpNewAccountDraftByServerId[server.serverId]
+                                                ?? ""
+                                            Task {
+                                                await model.authenticateMcpServer(
+                                                    serverId: server.serverId,
+                                                    accountKey: key
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if let tools = model.mcpToolsByServerId[server.serverId] {
                                     if tools.isEmpty {
                                         Text("此服务器没有报告可管理工具。")
                                             .font(.caption)
@@ -551,7 +685,7 @@ extension ContentView {
                                                     set: { enabled in
                                                         Task {
                                                             await model.setMcpToolEnabled(
-                                                                serverId: server.id,
+                                                                serverId: server.serverId,
                                                                 toolName: tool.name,
                                                                 enabled: enabled
                                                             )
@@ -560,8 +694,13 @@ extension ContentView {
                                                 )
                                             )
                                             .labelsHidden()
-                                            .disabled(model.mcpMutatingToolKey == "\(server.id):\(tool.name)")
-                                            .accessibilityIdentifier("mcp-tool-\(server.id)-\(tool.name)")
+                                            .disabled(
+                                                model.mcpMutatingToolKey
+                                                    == "\(server.serverId):\(tool.name)"
+                                            )
+                                            .accessibilityIdentifier(
+                                                "mcp-tool-\(server.id)-\(tool.name)"
+                                            )
                                         }
                                     }
                                 }

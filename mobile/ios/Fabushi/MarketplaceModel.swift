@@ -697,14 +697,17 @@ struct PluginPermissionRequest: Identifiable, Equatable {
 }
 
 struct MarketplaceMcpServer: Identifiable, Equatable, Sendable {
-    let id: String
+    let serverId: String
     let name: String
     let serverIdentifier: String
+    let accountKey: String
     let transport: String
     let status: String
     let statusDetail: String?
     let toolCount: Int
     let disabledToolCount: Int
+
+    var id: String { "\(serverId):\(accountKey)" }
 }
 
 struct MarketplaceMcpTool: Identifiable, Equatable, Sendable {
@@ -743,6 +746,11 @@ final class MarketplaceModel {
     var mcpLoadingServerId: String?
     var mcpMutatingToolKey: String?
     var mcpError: String?
+    var mcpBackendLoggedIn = false
+    var mcpBackendEmail = ""
+    var mcpBackendBusy = false
+    var mcpNewAccountDraftByServerId: [String: String] = [:]
+    var mcpRenameDraftByIdentity: [String: String] = [:]
     var featureHostSmokeStatus: String?
     var authResolved = false
     var loggedIn = false
@@ -770,6 +778,8 @@ final class MarketplaceModel {
     private static let globalDharmaExecutionKeyPrefix = "fabushi.ios.miniapp-execution.v1:"
     @ObservationIgnored private let browserAuthPresentationContext = BrowserAuthPresentationContext()
     @ObservationIgnored private var webAuthenticationSession: ASWebAuthenticationSession?
+    @ObservationIgnored private var mcpOAuthSession: ASWebAuthenticationSession?
+    @ObservationIgnored private var mcpBackendLoginAttemptId: String?
     @ObservationIgnored private var linkMetadataCache: [String: MobileLinkMetadata] = [:]
     @ObservationIgnored private var linkMetadataTasks: [String: Task<MobileLinkMetadata, Error>] = [:]
     @ObservationIgnored private var mcpAccountEpoch = 0
@@ -1017,6 +1027,8 @@ final class MarketplaceModel {
         mcpLoadingServerId = nil
         mcpMutatingToolKey = nil
         mcpError = nil
+        mcpNewAccountDraftByServerId = [:]
+        mcpRenameDraftByIdentity = [:]
     }
 
     func initializeApp() async {
@@ -1028,6 +1040,7 @@ final class MarketplaceModel {
             if loggedIn {
                 await refreshAccountUsage()
                 await refresh()
+                await refreshMcpBackendStatus()
                 await refreshMcpServers()
             }
         } catch {
@@ -1790,9 +1803,10 @@ final class MarketplaceModel {
               let status = row["status"] as? String
         else { return nil }
         return .init(
-            id: id,
+            serverId: id,
             name: name,
             serverIdentifier: identifier,
+            accountKey: (row["accountKey"] as? String) ?? DEFAULT_MCP_ACCOUNT_KEY,
             transport: transport,
             status: status,
             statusDetail: row["statusDetail"] as? String,
@@ -1811,6 +1825,213 @@ final class MarketplaceModel {
             description: row["description"] as? String,
             isDisabled: isDisabled
         )
+    }
+
+    func refreshMcpBackendStatus() async {
+        guard loggedIn else {
+            mcpBackendLoggedIn = false
+            mcpBackendEmail = ""
+            return
+        }
+        do {
+            let response = try await bridge.request(method: "coordinator.mcp.cursorAuth.status")
+            guard let auth = response.value as? [String: Any] else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            mcpBackendLoggedIn = auth["loggedIn"] as? Bool ?? false
+            mcpBackendEmail = auth["email"] as? String ?? ""
+        } catch {
+            mcpBackendLoggedIn = false
+            mcpBackendEmail = ""
+            mcpError = error.localizedDescription
+        }
+    }
+
+    func beginMcpBackendLogin() async {
+        guard loggedIn, !mcpBackendBusy else { return }
+        mcpBackendBusy = true
+        mcpError = nil
+        do {
+            let response = try await bridge.request(method: "coordinator.mcp.cursorAuth.start")
+            guard let object = response.value as? [String: Any],
+                  let attemptId = object["attemptId"] as? String,
+                  let rawURL = object["loginUrl"] as? String,
+                  let url = URL(string: rawURL)
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            mcpBackendLoginAttemptId = attemptId
+            await UIApplication.shared.open(url)
+            for _ in 0..<150 {
+                try? await Task.sleep(for: .seconds(1))
+                guard mcpBackendLoginAttemptId == attemptId else {
+                    mcpBackendBusy = false
+                    return
+                }
+                let poll = try await bridge.request(
+                    method: "coordinator.mcp.cursorAuth.poll",
+                    params: ["attemptId": attemptId]
+                )
+                guard let value = poll.value as? [String: Any] else {
+                    throw MahayanaCoordinator.CoordinatorError.invalidResponse
+                }
+                if value["completed"] as? Bool == true {
+                    mcpBackendLoginAttemptId = nil
+                    mcpBackendBusy = false
+                    await refreshMcpBackendStatus()
+                    await refreshMcpServers()
+                    return
+                }
+            }
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "MCP backend sign-in timed out."
+            )
+        } catch {
+            if let attemptId = mcpBackendLoginAttemptId {
+                _ = try? await bridge.request(
+                    method: "coordinator.mcp.cursorAuth.cancel",
+                    params: ["attemptId": attemptId]
+                )
+            }
+            mcpBackendLoginAttemptId = nil
+            mcpBackendBusy = false
+            mcpError = error.localizedDescription
+        }
+    }
+
+    func logoutMcpBackend() async {
+        guard !mcpBackendBusy else { return }
+        mcpBackendBusy = true
+        defer { mcpBackendBusy = false }
+        do {
+            _ = try await bridge.request(method: "coordinator.mcp.cursorAuth.logout")
+            mcpBackendLoggedIn = false
+            mcpBackendEmail = ""
+            await refreshMcpServers()
+        } catch {
+            mcpError = error.localizedDescription
+        }
+    }
+
+    func authenticateMcpServer(
+        serverId: String,
+        accountKey: String,
+        forceReauth: Bool = false
+    ) async {
+        let key = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard loggedIn, mcpBackendLoggedIn, !key.isEmpty else { return }
+        mcpError = nil
+        do {
+            let response = try await bridge.request(
+                method: "coordinator.mcp.authenticate",
+                params: [
+                    "serverId": serverId,
+                    "accountKey": key,
+                    "forceReauth": forceReauth,
+                ]
+            )
+            guard let value = response.value as? [String: Any],
+                  let status = value["status"] as? String
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            if status == McpAuthStartStatus.started.rawValue,
+               let rawURL = value["authorizationUrl"] as? String,
+               let url = URL(string: rawURL) {
+                presentMcpOAuth(url)
+            } else {
+                if let message = value["message"] as? String, !message.isEmpty {
+                    mcpError = message
+                }
+                await refreshMcpServers()
+            }
+        } catch {
+            mcpError = error.localizedDescription
+        }
+    }
+
+    private func presentMcpOAuth(_ url: URL) {
+        mcpOAuthSession?.cancel()
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: "fabushi"
+        ) { [weak self] callbackURL, error in
+            Task { @MainActor in
+                guard let self else { return }
+                self.mcpOAuthSession = nil
+                if let callbackURL {
+                    do {
+                        let result = try await self.bridge.request(
+                            method: "coordinator.mcp.oauthCallback",
+                            params: ["url": callbackURL.absoluteString]
+                        )
+                        let outcome = (result.value as? [String: Any])?["outcome"] as? String
+                        if outcome != "success" {
+                            self.mcpError = outcome ?? "MCP OAuth callback failed."
+                        }
+                        await self.refreshMcpServers()
+                    } catch {
+                        self.mcpError = error.localizedDescription
+                    }
+                } else if let error,
+                          (error as? ASWebAuthenticationSessionError)?.code
+                            != .canceledLogin {
+                    self.mcpError = error.localizedDescription
+                }
+            }
+        }
+        session.presentationContextProvider = browserAuthPresentationContext
+        session.prefersEphemeralWebBrowserSession = false
+        mcpOAuthSession = session
+        if !session.start() {
+            mcpOAuthSession = nil
+            mcpError = "Unable to start MCP authentication."
+        }
+    }
+
+    func logoutMcpAccount(serverId: String, accountKey: String) async {
+        await mutateMcpAccount(
+            method: "coordinator.mcp.logoutAccount",
+            params: ["serverId": serverId, "accountKey": accountKey]
+        )
+    }
+
+    func removeMcpAccount(serverId: String, accountKey: String) async {
+        await mutateMcpAccount(
+            method: "coordinator.mcp.removeAccount",
+            params: ["serverId": serverId, "accountKey": accountKey]
+        )
+    }
+
+    func renameMcpAccount(
+        serverId: String,
+        accountKey: String,
+        newAccountKey: String
+    ) async {
+        let next = newAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !next.isEmpty else { return }
+        await mutateMcpAccount(
+            method: "coordinator.mcp.renameAccount",
+            params: [
+                "serverId": serverId,
+                "accountKey": accountKey,
+                "newAccountKey": next,
+            ]
+        )
+    }
+
+    private func mutateMcpAccount(
+        method: String,
+        params: [String: Any]
+    ) async {
+        guard loggedIn, mcpBackendLoggedIn else { return }
+        mcpError = nil
+        do {
+            _ = try await bridge.request(method: method, params: params)
+            await refreshMcpServers()
+        } catch {
+            mcpError = error.localizedDescription
+        }
     }
 
     func refreshMcpServers() async {
@@ -1838,7 +2059,7 @@ final class MarketplaceModel {
             }
             let next = rows.compactMap(Self.mcpServer(from:))
             mcpServers = next
-            let validIds = Set(next.map(\.id))
+            let validIds = Set(next.map(\.serverId))
             mcpToolsByServerId = mcpToolsByServerId.filter { validIds.contains($0.key) }
         } catch {
             guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return }

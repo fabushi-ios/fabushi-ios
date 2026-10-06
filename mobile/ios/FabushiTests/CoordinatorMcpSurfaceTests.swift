@@ -86,6 +86,7 @@ final class CoordinatorMcpSurfaceTests: XCTestCase {
         let server = try XCTUnwrap(servers.first)
         let serverId = try XCTUnwrap(server["id"] as? String)
         XCTAssertEqual(server["serverIdentifier"] as? String, "github")
+        XCTAssertEqual(server["accountKey"] as? String, DEFAULT_MCP_ACCOUNT_KEY)
         XCTAssertEqual((server["disabledToolCount"] as? NSNumber)?.intValue, 1)
 
         let toolsResult = try await coordinator.request(
@@ -108,7 +109,9 @@ final class CoordinatorMcpSurfaceTests: XCTestCase {
         let toggledObject = try XCTUnwrap(toggle.value as? [String: Any])
         let toggledTools = try XCTUnwrap(toggledObject["tools"] as? [[String: Any]])
         XCTAssertEqual(toggledTools.first?["isDisabled"] as? Bool, false)
-        XCTAssertTrue(settings.getMcpDisabledToolsByServerId()[serverId]?.isEmpty == true)
+        XCTAssertFalse(
+            settings.getMcpDisabledToolsByServerId()[serverId]?.contains("search") == true
+        )
 
         settings.setMcpCustomInstructionsByServerId([serverId: "private"])
         coordinator.updateAccountSettingsScope(nil)

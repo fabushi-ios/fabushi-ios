@@ -1,3 +1,48 @@
+
+private func accountDisplayConfig(from fetched: AccountMcpFetchResult) -> AccountDisplayConfig {
+    let servers = fetched.servers.map { server -> DisplayServer in
+        let config: McpServerConfig
+        switch server.config {
+        case .stdio(let value):
+            config = .stdio(
+                command: value.command,
+                args: value.args,
+                env: value.env ?? [:]
+            )
+        case .remote(let value):
+            if value.type?.lowercased() == "sse" {
+                config = .sse(url: value.url, headers: value.headers ?? [:])
+            } else {
+                config = .http(url: value.url, headers: value.headers ?? [:])
+            }
+        }
+        return .init(
+            id: server.id,
+            name: server.name,
+            serverIdentifier: server.serverIdentifier,
+            config: config,
+            isTeamServer: server.isTeamServer,
+            disabledByTeamAdminPolicy: server.disabledByTeamAdminPolicy,
+            pluginId: server.pluginId,
+            isRequired: server.isRequired,
+            managedByTeamPluginPolicy: server.managedByTeamPluginPolicy,
+            accounts: (server.accounts ?? []).map {
+                .init(
+                    accountKey: $0.accountKey,
+                    hasToken: $0.hasToken,
+                    serverIdentifier: $0.serverIdentifier
+                )
+            }
+        )
+    }
+    return .init(
+        servers: servers,
+        cacheScope: fetched.cacheScope,
+        unavailable: fetched.unavailable,
+        unresolvedServerIds: fetched.unresolvedServerIds
+    )
+}
+
 import Foundation
 
 private struct CoordinatorMcpSnapshot: Sendable {
@@ -14,6 +59,7 @@ private final class CoordinatorMcpHostPort {
     private var accountScope: String?
     private var scopeGeneration: UInt64 = 0
     private var lastSnapshot: CoordinatorMcpSnapshot?
+    private var dashboardServerIdentifiers = Set<String>()
 
     init(
         hostSupervisor: MahayanaLocalHostSupervisor,
@@ -21,6 +67,14 @@ private final class CoordinatorMcpHostPort {
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
+    }
+
+    func updateDashboardServerIdentifiers(_ identifiers: Set<String>) {
+        dashboardServerIdentifiers = identifiers
+    }
+
+    func usesDashboardServer(_ identifier: String) -> Bool {
+        dashboardServerIdentifiers.contains(identifier)
     }
 
     func updateAccountScope(_ rawScope: String?) {
@@ -266,16 +320,33 @@ private final class CoordinatorMcpHostPort {
 
 private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchecked Sendable {
     private let port: CoordinatorMcpHostPort
+    private let dashboard: IOSCursorDashboardClient
 
-    init(port: CoordinatorMcpHostPort) {
+    init(
+        port: CoordinatorMcpHostPort,
+        dashboard: IOSCursorDashboardClient
+    ) {
         self.port = port
+        self.dashboard = dashboard
     }
 
     func listSandMcpTools(
         serverIdentifiers: [String],
         timeoutMs: Int
     ) async throws -> [BackendMcpToolServerWire] {
-        try await port.listBackendServers(serverIdentifiers: serverIdentifiers)
+        let dashboardIdentifiers = serverIdentifiers.filter { port.usesDashboardServer($0) }
+        let hostIdentifiers = serverIdentifiers.filter { !port.usesDashboardServer($0) }
+        var rows: [BackendMcpToolServerWire] = []
+        if !dashboardIdentifiers.isEmpty {
+            rows += try await dashboard.listSandMcpTools(
+                serverIdentifiers: dashboardIdentifiers,
+                timeoutMs: timeoutMs
+            )
+        }
+        if !hostIdentifiers.isEmpty {
+            rows += try await port.listBackendServers(serverIdentifiers: hostIdentifiers)
+        }
+        return rows
     }
 
     func executeSandMcpTool(
@@ -286,7 +357,17 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         agentId: String,
         timeoutMs: Int
     ) async throws -> McpExecResult? {
-        .init(
+        if port.usesDashboardServer(serverIdentifier) {
+            return try await dashboard.executeSandMcpTool(
+                serverIdentifier: serverIdentifier,
+                toolName: toolName,
+                args: args,
+                toolCallId: toolCallId,
+                agentId: agentId,
+                timeoutMs: timeoutMs
+            )
+        }
+        return .init(
             caseName: "success",
             value: try await port.executeTool(
                 serverIdentifier: serverIdentifier,
@@ -303,8 +384,12 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         accountKey: String,
         timeoutMs: Int
     ) async throws -> [BackendMcpAuthStatusWire] {
-        throw SandBackendMcpExecError(
-            message: "MCP account authentication is not wired to the iOS Marketplace yet."
+        try await dashboard.checkHttpMcpStatus(
+            serverIds: serverIds,
+            oauthRedirectUri: oauthRedirectUri,
+            forceReauth: forceReauth,
+            accountKey: accountKey,
+            timeoutMs: timeoutMs
         )
     }
 
@@ -313,8 +398,10 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         authorizationCode: String,
         timeoutMs: Int
     ) async throws {
-        throw SandBackendMcpExecError(
-            message: "MCP account authentication is not wired to the iOS Marketplace yet."
+        try await dashboard.completeMcpOAuth(
+            stateId: stateId,
+            authorizationCode: authorizationCode,
+            timeoutMs: timeoutMs
         )
     }
 
@@ -322,7 +409,7 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         targets: [BackendMcpTokenTarget],
         timeoutMs: Int
     ) async throws -> [BackendMcpTokenValidation] {
-        []
+        try await dashboard.validateMcpOAuthTokens(targets: targets, timeoutMs: timeoutMs)
     }
 
     func deleteMcpOAuthToken(
@@ -331,8 +418,11 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         source: String,
         timeoutMs: Int
     ) async throws {
-        throw SandBackendMcpExecError(
-            message: "MCP account management is not wired to the iOS Marketplace yet."
+        try await dashboard.deleteMcpOAuthToken(
+            serverUrl: serverUrl,
+            accountKey: accountKey,
+            source: source,
+            timeoutMs: timeoutMs
         )
     }
 
@@ -342,8 +432,11 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         newAccountKey: String,
         timeoutMs: Int
     ) async throws {
-        throw SandBackendMcpExecError(
-            message: "MCP account management is not wired to the iOS Marketplace yet."
+        try await dashboard.renameMcpOAuthAccount(
+            serverId: serverId,
+            accountKey: accountKey,
+            newAccountKey: newAccountKey,
+            timeoutMs: timeoutMs
         )
     }
 
@@ -352,8 +445,10 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
         accountKey: String,
         timeoutMs: Int
     ) async throws {
-        throw SandBackendMcpExecError(
-            message: "MCP account management is not wired to the iOS Marketplace yet."
+        try await dashboard.deleteMcpOAuthAccount(
+            serverId: serverId,
+            accountKey: accountKey,
+            timeoutMs: timeoutMs
         )
     }
 }
@@ -362,10 +457,16 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
+    private let cursorAuth: IOSCursorAuthService
 
-    private init(manager: SandMcpManager, port: CoordinatorMcpHostPort) {
+    private init(
+        manager: SandMcpManager,
+        port: CoordinatorMcpHostPort,
+        cursorAuth: IOSCursorAuthService
+    ) {
         self.manager = manager
         self.port = port
+        self.cursorAuth = cursorAuth
     }
 
     static func make(
@@ -376,7 +477,29 @@ final class CoordinatorMcpSurface {
             hostSupervisor: hostSupervisor,
             settingsStore: settingsStore
         )
-        let client = CoordinatorMcpBackendClient(port: port)
+        let cursorAuth = IOSCursorAuthService()
+        let credentials = AccountMcpCredentials(
+            getAccessToken: { backendURL in
+                try await cursorAuth.getValidAccessToken(backendURL: backendURL)
+            },
+            getMachineId: {
+                try await cursorAuth.getMachineID()
+            }
+        )
+        let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        let accountDependencies = AccountMcpDependencies(
+            getAccessToken: { backendURL in
+                try await cursorAuth.getValidAccessToken(backendURL: backendURL)
+            },
+            getMachineId: {
+                try await cursorAuth.getMachineID()
+            },
+            getBackendUrl: { getConfiguredBackendUrl() },
+            createClient: { credentials in
+                IOSCursorDashboardClient(credentials: credentials)
+            }
+        )
+        let client = CoordinatorMcpBackendClient(port: port, dashboard: dashboard)
         let backend = DashboardSandBackendMcpExec(deps: .init(client: client))
         let definitionSource = SandMcpDefinitionSource(includeBuiltins: false)
         let discovery = SandMcpToolsDiscovery(deps: .init(
@@ -402,10 +525,21 @@ final class CoordinatorMcpSurface {
             backendMcpExec: backend,
             definitionSource: definitionSource,
             toolsDiscovery: discovery,
-            accountDisplayConfigProvider: { _ in
-                try await port.loadAccountDisplay(forceFresh: true)
+            accountDisplayConfigProvider: { requireFreshRead in
+                if await cursorAuth.status().loggedIn,
+                   let fetched = await fetchAccountMcpServers(accountDependencies),
+                   !fetched.unavailable {
+                    let display = accountDisplayConfig(from: fetched)
+                    port.updateDashboardServerIdentifiers(
+                        Set(display.servers.compactMap(\.serverIdentifier))
+                    )
+                    return display
+                }
+                port.updateDashboardServerIdentifiers([])
+                return try await port.loadAccountDisplay(forceFresh: requireFreshRead)
             },
-            autoPollEnabled: false
+            accountMcpWriter: createAccountMcpWriter(accountDependencies),
+            autoPollEnabled: true
         )
         dependencies.setToolDisabled = { identifier, tool, disabled in
             try await port.setToolDisabled(
@@ -416,7 +550,8 @@ final class CoordinatorMcpSurface {
         }
         return .init(
             manager: SandMcpManager(deps: dependencies),
-            port: port
+            port: port,
+            cursorAuth: cursorAuth
         )
     }
 
@@ -442,6 +577,101 @@ final class CoordinatorMcpSurface {
                 "serverId": serverId,
                 "tools": tools.map(projectTool),
             ])
+
+        case "coordinator.mcp.cursorAuth.status":
+            return .handled(projectCursorAuthStatus(await cursorAuth.status()))
+
+        case "coordinator.mcp.cursorAuth.start":
+            let start = try cursorAuth.beginLogin()
+            return .handled([
+                "attemptId": start.attemptId,
+                "loginUrl": start.loginURL.absoluteString,
+            ])
+
+        case "coordinator.mcp.cursorAuth.poll":
+            guard let attemptId = nonEmptyString(params["attemptId"]) else {
+                throw SandMcpConfigError("MCP backend sign-in attempt id is required.")
+            }
+            if let status = try await cursorAuth.pollLogin(attemptId: attemptId) {
+                await manager.reload()
+                return .handled([
+                    "completed": true,
+                    "auth": projectCursorAuthStatus(status),
+                ])
+            }
+            return .handled(["completed": false])
+
+        case "coordinator.mcp.cursorAuth.cancel":
+            guard let attemptId = nonEmptyString(params["attemptId"]) else {
+                throw SandMcpConfigError("MCP backend sign-in attempt id is required.")
+            }
+            cursorAuth.cancelLogin(attemptId: attemptId)
+            return .handled(["cancelled": true])
+
+        case "coordinator.mcp.cursorAuth.logout":
+            try await cursorAuth.logout()
+            await manager.reload()
+            return .handled(["loggedIn": false])
+
+        case "coordinator.mcp.authenticate":
+            guard let serverId = nonEmptyString(params["serverId"]) else {
+                throw SandMcpConfigError("MCP server id is required.")
+            }
+            let accountKey = nonEmptyString(params["accountKey"]) ?? DEFAULT_MCP_ACCOUNT_KEY
+            let result = try await manager.authenticateServer(
+                serverId,
+                accountKey: accountKey,
+                forceReauth: params["forceReauth"] as? Bool ?? false,
+                trigger: "connector_card"
+            )
+            return .handled([
+                "status": result.status.rawValue,
+                "serverName": result.serverName,
+                "authorizationUrl": result.authorizationUrl ?? NSNull(),
+                "message": result.message ?? NSNull(),
+            ])
+
+        case "coordinator.mcp.oauthCallback":
+            guard let rawURL = nonEmptyString(params["url"]),
+                  let url = URL(string: rawURL)
+            else {
+                throw SandMcpConfigError("MCP OAuth callback URL is invalid.")
+            }
+            let outcome = await manager.handleOAuthCallback(url)
+            await manager.reload()
+            return .handled(["outcome": projectOAuthOutcome(outcome)])
+
+        case "coordinator.mcp.logoutAccount":
+            guard let serverId = nonEmptyString(params["serverId"]),
+                  let accountKey = nonEmptyString(params["accountKey"])
+            else {
+                throw SandMcpConfigError("MCP server id and account label are required.")
+            }
+            let state = try await manager.logoutAccount(serverId: serverId, accountKey: accountKey)
+            return .handled(["servers": state.servers.map(projectServer)])
+
+        case "coordinator.mcp.renameAccount":
+            guard let serverId = nonEmptyString(params["serverId"]),
+                  let accountKey = nonEmptyString(params["accountKey"]),
+                  let newAccountKey = nonEmptyString(params["newAccountKey"])
+            else {
+                throw SandMcpConfigError("MCP server id and account labels are required.")
+            }
+            let state = try await manager.renameAccount(
+                serverId: serverId,
+                accountKey: accountKey,
+                newAccountKey: newAccountKey
+            )
+            return .handled(["servers": state.servers.map(projectServer)])
+
+        case "coordinator.mcp.removeAccount":
+            guard let serverId = nonEmptyString(params["serverId"]),
+                  let accountKey = nonEmptyString(params["accountKey"])
+            else {
+                throw SandMcpConfigError("MCP server id and account label are required.")
+            }
+            let state = try await manager.removeAccount(serverId: serverId, accountKey: accountKey)
+            return .handled(["servers": state.servers.map(projectServer)])
 
         case "coordinator.mcp.setToolDisabled":
             guard let serverId = nonEmptyString(params["serverId"]),
@@ -472,12 +702,34 @@ final class CoordinatorMcpSurface {
             "id": server.id,
             "name": server.name,
             "serverIdentifier": server.serverIdentifier,
+            "accountKey": server.accountKey,
+            "rowServerIdentifier": server.rowServerIdentifier,
             "transport": server.transport.rawValue,
             "toolCount": server.toolCount,
             "disabledToolCount": server.disabledToolCount,
             "status": server.status,
             "statusDetail": server.statusDetail ?? NSNull(),
         ]
+    }
+
+    private func projectCursorAuthStatus(_ status: IOSCursorAuthStatus) -> [String: Any] {
+        [
+            "loggedIn": status.loggedIn,
+            "authId": status.authId ?? NSNull(),
+            "email": status.email ?? NSNull(),
+            "expiresAtMs": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
+        ]
+    }
+
+    private func projectOAuthOutcome(_ outcome: McpOAuthCallbackOutcome) -> String {
+        switch outcome {
+        case .success: return "success"
+        case .refused(let reason): return "refused:\(reason.rawValue)"
+        case .failed(let reason, let retryable):
+            return "failed:\(reason.rawValue):\(retryable ? "retryable" : "terminal")"
+        case .notFound: return "notFound"
+        case .unsupportedURL: return "unsupportedURL"
+        }
     }
 
     private func projectTool(_ tool: McpToolListing) -> [String: Any] {
