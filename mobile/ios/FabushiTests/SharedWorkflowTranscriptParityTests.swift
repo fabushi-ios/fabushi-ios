@@ -156,6 +156,139 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(automation.timelineAutomationId, "routine-7")
     }
 
+    func testAttachmentDataProjectsDesktopKindsAndBoxMetadata() throws {
+        let box = try XCTUnwrap(projectMobileAttachmentCard([
+            "kind": "send-message",
+            "id": "box-1",
+            "message": [
+                "type": "attachment",
+                "url": "sand://box?request=1",
+            ],
+            "boxInstruction": "Open the browser",
+            "boxRequest": "Complete checkout",
+            "boxRequestId": "request-1",
+            "boxResolution": "completed",
+            "boxSnapshot": "data:image/png;base64,abc",
+            "timestampMs": 2_500,
+        ]))
+        XCTAssertEqual(box.kind, .box)
+        XCTAssertEqual(box.instruction, "Open the browser")
+        XCTAssertEqual(box.request, "Complete checkout")
+        XCTAssertEqual(box.requestId, "request-1")
+        XCTAssertEqual(box.resolution, "completed")
+        XCTAssertEqual(box.screenshotDataURL, "data:image/png;base64,abc")
+        XCTAssertEqual(box.timestampMs, 2_500)
+
+        let link = try XCTUnwrap(projectMobileAttachmentCard([
+            "kind": "send-message",
+            "id": "link-1",
+            "message": [
+                "type": "attachment",
+                "url": " https://example.com/report ",
+            ],
+        ]))
+        XCTAssertEqual(link.kind, .legacyLink)
+        XCTAssertEqual(link.url, "https://example.com/report")
+
+        let media = try XCTUnwrap(projectMobileAttachmentCard([
+            "kind": "send-message",
+            "id": "media-1",
+            "message": [
+                "type": "attachment",
+                "url": "https://example.com/PHOTO.PNG?download=1",
+                "alt": "Screenshot",
+            ],
+        ]))
+        XCTAssertEqual(media.kind, .media)
+        XCTAssertEqual(media.alt, "Screenshot")
+
+        let file = try XCTUnwrap(projectMobileAttachmentCard([
+            "kind": "send-message",
+            "id": "file-1",
+            "message": [
+                "type": "attachment",
+                "url": "/tmp/report.pdf",
+            ],
+        ]))
+        XCTAssertEqual(file.kind, .file)
+    }
+
+    func testUserAttachmentProjectionPreservesGalleryMetadataAndFailsClosed() throws {
+        let projected = try XCTUnwrap(projectMobileAttachmentCard([
+            "kind": "user-attachment",
+            "id": "upload-1",
+            "file_path": "C:\\tmp\\photo.PNG",
+            "file_name": "",
+            "byteSize": 42,
+            "width": 640,
+            "height": 480,
+            "timestampMs": 3_000,
+            "batchId": "batch-7",
+            "replyTo": "message-2",
+            "clientNonce": "nonce-9",
+        ]))
+        XCTAssertEqual(projected.kind, .media)
+        XCTAssertEqual(projected.name, "photo.PNG")
+        XCTAssertEqual(projected.byteSize, 42)
+        XCTAssertEqual(projected.width, 640)
+        XCTAssertEqual(projected.height, 480)
+        XCTAssertEqual(projected.timestampMs, 3_000)
+        XCTAssertEqual(projected.batchId, "batch-7")
+        XCTAssertEqual(projected.replyTo, "message-2")
+        XCTAssertEqual(projected.clientNonce, "nonce-9")
+
+        XCTAssertNil(projectMobileAttachmentCard([
+            "kind": "user-attachment",
+            "id": "upload-2",
+            "file_path": "/tmp/a.txt",
+            "byteSize": -1,
+        ]))
+        XCTAssertNil(projectMobileAttachmentCard([
+            "kind": "user-attachment",
+            "id": "upload-3",
+            "file_path": "/tmp/a.txt",
+            "batchId": "",
+        ]))
+        XCTAssertNil(projectMobileAttachmentCard([
+            "kind": "user-attachment",
+            "id": "upload-4",
+            "file_path": "/tmp/a.txt",
+            "file_name": 7,
+        ]))
+    }
+
+    func testTranscriptAndLiveChatUseTheSameTypedAttachmentProjection() throws {
+        let transcript = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "card": [
+                    "kind": "user-attachment",
+                    "id": "upload-5",
+                    "file_path": "/tmp/notes.txt",
+                    "batchId": "batch-8",
+                ],
+            ],
+            operationId: "op-attachment"
+        ))
+        XCTAssertEqual(transcript.role, .user)
+        XCTAssertEqual(transcript.attachmentProjection?.kind, .file)
+        XCTAssertEqual(transcript.attachmentFileName, "notes.txt")
+        XCTAssertEqual(transcript.attachmentBatchId, "batch-8")
+
+        let live = try XCTUnwrap(projectMobileChatMessageAttachment(
+            id: "message-9",
+            raw: [
+                "url": "https://example.com/video.webm",
+                "file_name": "video.webm",
+                "alt": "Demo",
+            ],
+            batchId: "batch-9"
+        ))
+        XCTAssertEqual(live.kind, .media)
+        XCTAssertEqual(live.name, "video.webm")
+        XCTAssertEqual(live.alt, "Demo")
+        XCTAssertEqual(live.batchId, "batch-9")
+    }
+
     func testNativeTranscriptCardsRejectMalformedOrUnknownRecoveredCards() {
         XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "notice"]], operationId: nil))
         XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "permission-request", "permission": [:]]], operationId: nil))
