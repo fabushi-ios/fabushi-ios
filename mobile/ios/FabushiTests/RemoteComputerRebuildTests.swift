@@ -354,6 +354,9 @@ final class RemoteComputerRebuildTests: XCTestCase {
         XCTAssertTrue(owner.snapshot.isActive)
         XCTAssertEqual(owner.snapshot.runningComputerSubagentIDs, ["computer-a"])
 
+        for _ in 0..<100 where sleepContinuation == nil {
+            await Task.yield()
+        }
         let continuation = try XCTUnwrap(sleepContinuation)
         continuation.resume(returning: ())
         await Task.yield()
@@ -394,6 +397,9 @@ final class RemoteComputerRebuildTests: XCTestCase {
 
         await owner.refresh(agentID: "agent-a")
         await owner.refresh(agentID: "agent-a")
+        for _ in 0..<100 where sleepContinuation == nil {
+            await Task.yield()
+        }
         let staleHold = try XCTUnwrap(sleepContinuation)
 
         await owner.refresh(agentID: "agent-a")
