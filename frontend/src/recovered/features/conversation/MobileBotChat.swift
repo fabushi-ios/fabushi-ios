@@ -486,15 +486,21 @@ internal struct MobileBotChat: View {
         } else if entry.role == .user {
             HStack {
                 Spacer(minLength: 54)
-                Text(entry.text)
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 15).padding(.vertical, 10)
-                    .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .contextMenu {
-                        Button("Reply") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = false }
-                        Button("Reply in Fork") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = true }
+                VStack(alignment: .leading, spacing: 7) {
+                    if !entry.text.isEmpty {
+                        Text(entry.text)
+                            .font(.system(size: 16))
                     }
+                    attachmentContent(entry)
+                }
+                .foregroundStyle(.white)
+                .tint(.white)
+                .padding(.horizontal, 15).padding(.vertical, 10)
+                .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .contextMenu {
+                    Button("Reply") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = false }
+                    Button("Reply in Fork") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = true }
+                }
             }
         } else {
             VStack(alignment: .leading, spacing: 3) {
@@ -512,12 +518,7 @@ internal struct MobileBotChat: View {
                                 .font(.system(size: 16))
                                 .foregroundStyle(.black)
                         }
-                        if let rawURL = entry.attachmentURL, let url = URL(string: rawURL) {
-                            Link(destination: url) {
-                                Label(entry.attachmentFileName ?? entry.attachmentAlt ?? "Open attachment", systemImage: "paperclip")
-                                    .font(.caption.weight(.medium))
-                            }
-                        }
+                        attachmentContent(entry)
                     }
                     .padding(.horizontal, 15).padding(.vertical, 10)
                     .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -529,6 +530,70 @@ internal struct MobileBotChat: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func attachmentContent(_ entry: MobileChatMessage) -> some View {
+        if let attachment = entry.attachmentProjection {
+            switch attachment.kind {
+            case .box:
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(
+                        attachment.instruction ?? attachment.request ?? "Computer attachment",
+                        systemImage: "desktopcomputer"
+                    )
+                    .font(.caption.weight(.medium))
+                    if attachment.screenshotDataURL != nil {
+                        Text("Computer snapshot attached")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-box-\(attachment.id)"))
+            case .legacyLink, .media, .file:
+                let label = attachment.name
+                    ?? attachment.alt
+                    ?? (attachment.kind == .legacyLink
+                        ? "Open link"
+                        : attachment.kind == .media ? "Open media" : "Open attachment")
+                let icon = attachment.kind == .media
+                    ? "photo"
+                    : attachment.kind == .legacyLink ? "link" : "paperclip"
+                if let destination = attachmentDestinationURL(attachment.url) {
+                    Link(destination: destination) {
+                        Label(label, systemImage: icon)
+                            .font(.caption.weight(.medium))
+                    }
+                    .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
+                } else {
+                    Label(label, systemImage: icon)
+                        .font(.caption.weight(.medium))
+                        .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
+                }
+            }
+        } else if let rawURL = entry.attachmentURL,
+                  let destination = attachmentDestinationURL(rawURL)
+        {
+            Link(destination: destination) {
+                Label(
+                    entry.attachmentFileName ?? entry.attachmentAlt ?? "Open attachment",
+                    systemImage: "paperclip"
+                )
+                .font(.caption.weight(.medium))
+            }
+        }
+    }
+
+    private func attachmentDestinationURL(_ raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let url = URL(string: trimmed), url.scheme != nil {
+            return url
+        }
+        if trimmed.hasPrefix("/") {
+            return URL(fileURLWithPath: trimmed)
+        }
+        return nil
     }
 
     @MainActor
@@ -802,13 +867,28 @@ internal struct MobileBotChat: View {
                         upsertAssistant(operationId, text: eventText, append: false, streaming: false)
                     }
                     if let index = entries.lastIndex(where: { $0.kind == .message && $0.role == .assistant && $0.operationId == operationId }) {
-                        entries[index].canonicalMessageId = event["messageId"] as? String
+                        let canonicalMessageId = event["messageId"] as? String
+                        let attachmentBatchId = event["attachmentBatchId"] as? String
+                        entries[index].canonicalMessageId = canonicalMessageId
                         entries[index].replyToMessageId = event["replyToMessageId"] as? String
-                        entries[index].attachmentBatchId = event["attachmentBatchId"] as? String
-                        if let attachment = event["attachment"] as? [String: Any] {
-                            entries[index].attachmentURL = attachment["url"] as? String
-                            entries[index].attachmentFileName = attachment["file_name"] as? String
-                            entries[index].attachmentAlt = attachment["alt"] as? String
+                        entries[index].attachmentBatchId = attachmentBatchId
+                        if let rawAttachment = event["attachment"] as? [String: Any],
+                           let attachment = projectMobileChatMessageAttachment(
+                                id: canonicalMessageId ?? "assistant:\(operationId)",
+                                raw: rawAttachment,
+                                batchId: attachmentBatchId,
+                                timestampMs: event["timestampMs"]
+                           )
+                        {
+                            entries[index].attachmentProjection = attachment
+                            entries[index].attachmentURL = attachment.url
+                            entries[index].attachmentFileName = attachment.name
+                            entries[index].attachmentAlt = attachment.alt
+                        } else {
+                            entries[index].attachmentProjection = nil
+                            entries[index].attachmentURL = nil
+                            entries[index].attachmentFileName = nil
+                            entries[index].attachmentAlt = nil
                         }
                         entries[index].branched = event["branched"] as? Bool ?? false
                     }
