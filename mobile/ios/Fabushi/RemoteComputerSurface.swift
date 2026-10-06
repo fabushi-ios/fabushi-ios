@@ -1927,6 +1927,15 @@ struct RemoteComputerSurface: View {
                                         y: cursor.y
                                     )
                                 )
+                            },
+                            onVNCHostKey: { key in
+                                guard shippingMonitors.count >= 2 else { return }
+                                switch key {
+                                case .arrowDown, .arrowRight:
+                                    selectAdjacentMonitor(delta: 1)
+                                case .arrowUp, .arrowLeft:
+                                    selectAdjacentMonitor(delta: -1)
+                                }
                             }
                         )
                         .accessibilityIdentifier("remote-computer-agent-vnc")
@@ -1997,7 +2006,8 @@ struct RemoteComputerSurface: View {
                 },
                 onVNCCursor: { cursor in
                     trustedCursor = cursor
-                }
+                },
+                onVNCHostKey: { _ in }
             )
         }
     }
@@ -2504,6 +2514,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     let onVNCSession: @MainActor (RemoteComputerShellVNCSession, RemoteComputerShellVNCIdentity) -> Void
     let onVNCLiveness: @MainActor (IOSVNCLivenessReport, RemoteComputerShellVNCIdentity) -> Void
     let onVNCCursor: @MainActor (IOSVNCCursorTelemetry) -> Void
+    let onVNCHostKey: @MainActor (IOSVNCHostKey) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -2516,7 +2527,8 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             onNavigationFailed: onNavigationFailed,
             onVNCSession: onVNCSession,
             onVNCLiveness: onVNCLiveness,
-            onVNCCursor: onVNCCursor
+            onVNCCursor: onVNCCursor,
+            onVNCHostKey: onVNCHostKey
         )
     }
 
@@ -2593,6 +2605,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         private let onVNCSession: @MainActor (RemoteComputerShellVNCSession, RemoteComputerShellVNCIdentity) -> Void
         private let onVNCLiveness: @MainActor (IOSVNCLivenessReport, RemoteComputerShellVNCIdentity) -> Void
         private let onVNCCursor: @MainActor (IOSVNCCursorTelemetry) -> Void
+        private let onVNCHostKey: @MainActor (IOSVNCHostKey) -> Void
         weak var webView: WKWebView?
         var loadedReloadToken: Int?
         var loadedTargetURL: URL?
@@ -2609,7 +2622,8 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             onNavigationFailed: @escaping @MainActor () -> Void,
             onVNCSession: @escaping @MainActor (RemoteComputerShellVNCSession, RemoteComputerShellVNCIdentity) -> Void,
             onVNCLiveness: @escaping @MainActor (IOSVNCLivenessReport, RemoteComputerShellVNCIdentity) -> Void,
-            onVNCCursor: @escaping @MainActor (IOSVNCCursorTelemetry) -> Void
+            onVNCCursor: @escaping @MainActor (IOSVNCCursorTelemetry) -> Void,
+            onVNCHostKey: @escaping @MainActor (IOSVNCHostKey) -> Void
         ) {
             self.targetURL = targetURL
             self.teachCapture = teachCapture
@@ -2621,6 +2635,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
             self.onVNCSession = onVNCSession
             self.onVNCLiveness = onVNCLiveness
             self.onVNCCursor = onVNCCursor
+            self.onVNCHostKey = onVNCHostKey
         }
 
         func webView(
@@ -2679,6 +2694,11 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
             if let cursor = IOSVNCPreloadRuntime.cursorTelemetry(from: message.body) {
                 onVNCCursor(cursor)
+                return
+            }
+
+            if let key = IOSVNCPreloadRuntime.hostKey(from: message.body) {
+                onVNCHostKey(key)
             }
         }
 
