@@ -4,6 +4,7 @@ internal struct MobileBotAgentSettingsSheet: View {
     let agent: MobileBotSummary
     let roster: [MobileBotSummary]
     let bridge: IOSPreloadBridge
+    @Bindable var marketplaceModel: MarketplaceModel
     let accountScopeKey: String
     let reconnectGeneration: Int
     let focusedAutomationId: String?
@@ -24,6 +25,7 @@ internal struct MobileBotAgentSettingsSheet: View {
         agent: MobileBotSummary,
         roster: [MobileBotSummary],
         bridge: IOSPreloadBridge,
+        marketplaceModel: MarketplaceModel,
         accountScopeKey: String,
         reconnectGeneration: Int = 0,
         focusedAutomationId: String? = nil,
@@ -34,6 +36,7 @@ internal struct MobileBotAgentSettingsSheet: View {
         self.agent = agent
         self.roster = roster
         self.bridge = bridge
+        self.marketplaceModel = marketplaceModel
         self.accountScopeKey = accountScopeKey
         self.reconnectGeneration = reconnectGeneration
         self.focusedAutomationId = focusedAutomationId
@@ -72,9 +75,19 @@ internal struct MobileBotAgentSettingsSheet: View {
                 }
         }
         .accessibilityIdentifier("mobile-agent-settings")
+        .task(id: "\(currentAgent.id)|\(accountScopeKey)|\(reconnectGeneration)") {
+            marketplaceModel.bindPrivateSkillAgentScope(
+                agentId: currentAgent.id,
+                agentName: currentAgent.name
+            )
+            await marketplaceModel.refreshPrivateSkills()
+        }
         .onChange(of: agent.id) { _, _ in invalidatePending() }
         .onChange(of: accountScopeKey) { _, _ in invalidatePending() }
-        .onDisappear { invalidatePending() }
+        .onDisappear {
+            marketplaceModel.clearPrivateSkillAgentScope(agentId: currentAgent.id)
+            invalidatePending()
+        }
     }
 
     private var settingsForm: some View {
@@ -156,6 +169,86 @@ internal struct MobileBotAgentSettingsSheet: View {
                 reconnectGeneration: reconnectGeneration,
                 focusedAutomationId: focusedAutomationId
             )
+
+            Section {
+                if marketplaceModel.privateSkillsLoading {
+                    ProgressView("正在读取 \(currentAgent.name) 的 Skills…")
+                }
+                if let error = marketplaceModel.privateSkillError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                        .accessibilityIdentifier("mobile-agent-skills-error")
+                }
+                HStack(spacing: 8) {
+                    TextField("搜索 Skills", text: $marketplaceModel.privateSkillQuery)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("mobile-agent-skills-search")
+                    Button("刷新") { Task { await marketplaceModel.refreshPrivateSkills() } }
+                        .disabled(marketplaceModel.privateSkillsLoading)
+                        .accessibilityIdentifier("mobile-agent-skills-refresh")
+                }
+                Picker("来源", selection: $marketplaceModel.privateSkillOwnershipFilter) {
+                    ForEach(MarketplaceSkillOwnershipFilter.allCases) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("mobile-agent-skills-filter")
+                if marketplaceModel.visiblePrivateSkills.isEmpty
+                    && !marketplaceModel.privateSkillsLoading
+                    && marketplaceModel.privateSkillError == nil {
+                    Text("此 Agent 当前没有匹配的 Skills。").foregroundStyle(.secondary)
+                }
+                ForEach(marketplaceModel.visiblePrivateSkills) { skill in
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("名称", text: Binding(
+                                get: { marketplaceModel.privateSkillNameDrafts[skill.id] ?? skill.name },
+                                set: { marketplaceModel.privateSkillNameDrafts[skill.id] = $0 }
+                            )).disabled(!skill.canEdit)
+                            TextField("Description / Use when", text: Binding(
+                                get: { marketplaceModel.privateSkillDescriptionDrafts[skill.id] ?? skill.description },
+                                set: { marketplaceModel.privateSkillDescriptionDrafts[skill.id] = $0 }
+                            ), axis: .vertical).disabled(!skill.canEdit)
+                            TextEditor(text: Binding(
+                                get: { marketplaceModel.privateSkillBodyDrafts[skill.id] ?? skill.body },
+                                set: { marketplaceModel.privateSkillBodyDrafts[skill.id] = $0 }
+                            )).frame(minHeight: 88).disabled(!skill.canEdit)
+                            if skill.canEdit {
+                                HStack(spacing: 8) {
+                                    Button("保存") { Task { await marketplaceModel.savePrivateSkill(skill) } }
+                                        .disabled(marketplaceModel.privateSkillMutatingId != nil)
+                                    Button("删除", role: .destructive) { Task { await marketplaceModel.deletePrivateSkill(skill) } }
+                                        .disabled(marketplaceModel.privateSkillMutatingId != nil)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(skill.name).font(.headline)
+                                Text(skill.sourceLabel).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if skill.canToggle {
+                                Toggle("启用", isOn: Binding(
+                                    get: { skill.isEnabledForAgent },
+                                    set: { enabled in
+                                        Task { await marketplaceModel.setPrivateSkillEnabled(skill, enabled: enabled) }
+                                    }
+                                ))
+                                .labelsHidden()
+                                .disabled(marketplaceModel.privateSkillMutatingId != nil)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("mobile-agent-skill-\(skill.id)")
+                }
+            } header: {
+                Text("Skills")
+            } footer: {
+                Text("Yours 始终绑定当前 Agent。保存、启停和删除后会从 Host 重新读取权威状态；团队发布/同步/取消发布仍需后续迁移 Desktop Host owner。")
+            }
 
             Section {
                 Button {

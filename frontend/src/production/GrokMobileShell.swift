@@ -70,6 +70,7 @@ internal struct GrokMobileShell: View {
                 agent: bots.first(where: { $0.id == agent.id }) ?? agent,
                 roster: bots,
                 bridge: bridge,
+                marketplaceModel: model,
                 accountScopeKey: mobileAccountScopeKey,
                 reconnectGeneration: reconnectGeneration,
                 focusedAutomationId: botSettingsRoutineID,

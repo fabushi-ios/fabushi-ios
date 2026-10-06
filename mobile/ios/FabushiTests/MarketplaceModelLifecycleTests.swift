@@ -154,4 +154,23 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         )
     }
 
+
+    @MainActor
+    func testPrivateSkillScopeFailsClosedAndCanBeExplicitlyBoundToAgent() {
+        let bridge = IOSPreloadBridge(coordinator: MahayanaCoordinator())
+        let model = MarketplaceModel(bridge: bridge)
+        XCTAssertFalse(model.hasPrivateSkillAgentScope)
+        XCTAssertNil(model.privateSkillAgentId)
+        model.bindPrivateSkillAgentScope(agentId: " agent-42 ", agentName: " Research ")
+        XCTAssertTrue(model.hasPrivateSkillAgentScope)
+        XCTAssertEqual(model.privateSkillAgentId, "agent-42")
+        XCTAssertEqual(model.privateSkillAgentName, "Research")
+        model.clearPrivateSkillAgentScope(agentId: "other-agent")
+        XCTAssertEqual(model.privateSkillAgentId, "agent-42")
+        model.clearPrivateSkillAgentScope(agentId: "agent-42")
+        XCTAssertFalse(model.hasPrivateSkillAgentScope)
+        XCTAssertTrue(model.privateSkills.isEmpty)
+        XCTAssertTrue(model.privateSkillNameDrafts.isEmpty)
+    }
+
 }

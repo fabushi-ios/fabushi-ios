@@ -491,6 +491,14 @@ extension ContentView {
 
                 if model.pluginBrowserTab == .yours {
                     Section("我的 Skills") {
+                        if !model.hasPrivateSkillAgentScope {
+                            Label(
+                                "请从某个 Agent 的“设置 → Skills”进入 Yours；这里不会默认绑定主助手。",
+                                systemImage: "person.crop.circle.badge.exclamationmark"
+                            )
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("plugin-yours-agent-scope-required")
+                        }
                         HStack(spacing: 8) {
                             TextField("搜索 Yours", text: $model.privateSkillQuery)
                                 .textInputAutocapitalization(.never)
@@ -499,10 +507,11 @@ extension ContentView {
                             Button("刷新") {
                                 Task { await model.refreshPrivateSkills() }
                             }
-                            .disabled(model.privateSkillsLoading)
+                            .disabled(model.privateSkillsLoading || !model.hasPrivateSkillAgentScope)
                             .accessibilityIdentifier("plugin-yours-refresh")
                         }
 
+                        if model.hasPrivateSkillAgentScope {
                         Picker("来源", selection: $model.privateSkillOwnershipFilter) {
                             ForEach(MarketplaceSkillOwnershipFilter.allCases) { filter in
                                 Text(filter.rawValue).tag(filter)
@@ -615,6 +624,7 @@ extension ContentView {
                         Text("Publish / Sync / Unpublish 仍需接入 Desktop 等价的团队发布 owner；在该 production contract 闭合前不会把这部分标记为完成。")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                        }
                     }
 
                 Section("MCP 连接器") {
@@ -900,7 +910,9 @@ extension ContentView {
                 if model.pluginBrowserTab == .marketplace {
                     await model.refresh()
                 } else {
-                    await model.refreshPrivateSkills()
+                    if model.hasPrivateSkillAgentScope {
+                        await model.refreshPrivateSkills()
+                    }
                     if model.loggedIn {
                         await model.refreshMcpServers()
                     }
@@ -912,7 +924,7 @@ extension ContentView {
                         await model.refresh()
                     }
                 } else {
-                    if model.privateSkills.isEmpty {
+                    if model.hasPrivateSkillAgentScope && model.privateSkills.isEmpty {
                         await model.refreshPrivateSkills()
                     }
                     if model.loggedIn && model.mcpServers.isEmpty {
@@ -925,7 +937,9 @@ extension ContentView {
                     if tab == .marketplace {
                         if model.plugins.isEmpty { await model.refresh() }
                     } else {
-                        await model.refreshPrivateSkills()
+                        if model.hasPrivateSkillAgentScope {
+                            await model.refreshPrivateSkills()
+                        }
                         if model.loggedIn && model.mcpServers.isEmpty {
                             await model.refreshMcpServers()
                         }

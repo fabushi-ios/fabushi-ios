@@ -787,6 +787,8 @@ final class MarketplaceModel {
     var privateSkillNameDrafts: [String: String] = [:]
     var privateSkillDescriptionDrafts: [String: String] = [:]
     var privateSkillBodyDrafts: [String: String] = [:]
+    var privateSkillAgentId: String?
+    var privateSkillAgentName: String?
     var permissionRequest: PluginPermissionRequest?
     var mcpServers: [MarketplaceMcpServer] = []
     var mcpToolsByServerId: [String: [MarketplaceMcpTool]] = [:]
@@ -835,7 +837,7 @@ final class MarketplaceModel {
     @ObservationIgnored private var mcpToolRequestSerial: [String: Int] = [:]
     @ObservationIgnored private var mcpMutationSerial: [String: Int] = [:]
     @ObservationIgnored private var privateSkillRequestSerial = 0
-    private static let marketplaceAgentId = "mahayana-assistant"
+    @ObservationIgnored private var privateSkillScopeGeneration = 0
 
     init(bridge: IOSPreloadBridge) {
         self.bridge = bridge
@@ -2274,13 +2276,60 @@ final class MarketplaceModel {
     }
 
 
+
+    var hasPrivateSkillAgentScope: Bool {
+        privateSkillAgentId?.isEmpty == false
+    }
+
+    func bindPrivateSkillAgentScope(agentId: String, agentName: String) {
+        let normalizedId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedId.isEmpty else {
+            clearPrivateSkillAgentScope()
+            return
+        }
+        let normalizedName = agentName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard privateSkillAgentId != normalizedId else {
+            privateSkillAgentName = normalizedName.isEmpty ? normalizedId : normalizedName
+            return
+        }
+        privateSkillScopeGeneration = privateSkillScopeGeneration == Int.max ? 1 : privateSkillScopeGeneration + 1
+        privateSkillRequestSerial = privateSkillRequestSerial == Int.max ? 1 : privateSkillRequestSerial + 1
+        privateSkillAgentId = normalizedId
+        privateSkillAgentName = normalizedName.isEmpty ? normalizedId : normalizedName
+        resetPrivateSkillProjection()
+    }
+
+    func clearPrivateSkillAgentScope(agentId: String? = nil) {
+        if let agentId, privateSkillAgentId != agentId { return }
+        privateSkillScopeGeneration = privateSkillScopeGeneration == Int.max ? 1 : privateSkillScopeGeneration + 1
+        privateSkillRequestSerial = privateSkillRequestSerial == Int.max ? 1 : privateSkillRequestSerial + 1
+        privateSkillAgentId = nil
+        privateSkillAgentName = nil
+        resetPrivateSkillProjection()
+    }
+
+    private func resetPrivateSkillProjection() {
+        privateSkills = []
+        privateSkillsLoading = false
+        privateSkillMutatingId = nil
+        privateSkillError = nil
+        privateSkillNameDrafts = [:]
+        privateSkillDescriptionDrafts = [:]
+        privateSkillBodyDrafts = [:]
+    }
+
     func refreshPrivateSkills() async {
         guard !privateSkillsLoading else { return }
+        guard let agentId = privateSkillAgentId, !agentId.isEmpty else {
+            resetPrivateSkillProjection()
+            privateSkillError = "请从具体 Agent 的设置中打开 Yours；Skills 必须绑定明确的 Agent。"
+            return
+        }
         privateSkillsLoading = true
         privateSkillError = nil
-        privateSkillRequestSerial += 1
+        privateSkillRequestSerial = privateSkillRequestSerial == Int.max ? 1 : privateSkillRequestSerial + 1
         let serial = privateSkillRequestSerial
-        let agentId = Self.marketplaceAgentId
+        let scopeGeneration = privateSkillScopeGeneration
         do {
             _ = try await executeFeatureCommand(
                 type: "workflow.list",
@@ -2294,10 +2343,14 @@ final class MarketplaceModel {
                     && event["agentId"] as? String == agentId
             }
             guard serial == privateSkillRequestSerial,
+                  scopeGeneration == privateSkillScopeGeneration,
+                  privateSkillAgentId == agentId,
                   let event = result.value as? [String: Any],
                   let rows = event["workflows"] as? [[String: Any]]
             else {
-                if serial == privateSkillRequestSerial {
+                if serial == privateSkillRequestSerial,
+                   scopeGeneration == privateSkillScopeGeneration,
+                   privateSkillAgentId == agentId {
                     throw MahayanaCoordinator.CoordinatorError.invalidResponse
                 }
                 return
@@ -2314,16 +2367,25 @@ final class MarketplaceModel {
             privateSkillDescriptionDrafts = Dictionary(uniqueKeysWithValues: projected.map { ($0.id, $0.description) })
             privateSkillBodyDrafts = Dictionary(uniqueKeysWithValues: projected.map { ($0.id, $0.body) })
         } catch {
-            guard serial == privateSkillRequestSerial else { return }
+            guard serial == privateSkillRequestSerial,
+                  scopeGeneration == privateSkillScopeGeneration,
+                  privateSkillAgentId == agentId
+            else { return }
             privateSkillError = error.localizedDescription
         }
-        if serial == privateSkillRequestSerial {
+        if serial == privateSkillRequestSerial,
+           scopeGeneration == privateSkillScopeGeneration,
+           privateSkillAgentId == agentId {
             privateSkillsLoading = false
         }
     }
 
     func savePrivateSkill(_ skill: MarketplacePrivateSkill) async {
-        guard skill.canEdit, privateSkillMutatingId == nil else { return }
+        guard skill.canEdit,
+              privateSkillMutatingId == nil,
+              let agentId = privateSkillAgentId,
+              !agentId.isEmpty
+        else { return }
         let name = (privateSkillNameDrafts[skill.id] ?? skill.name)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let description = (privateSkillDescriptionDrafts[skill.id] ?? skill.description)
@@ -2334,7 +2396,7 @@ final class MarketplaceModel {
             return
         }
         var fields: [String: Any] = [
-            "agentId": Self.marketplaceAgentId,
+            "agentId": agentId,
             "id": skill.id,
             "name": name,
             "description": description,
@@ -2358,13 +2420,17 @@ final class MarketplaceModel {
     }
 
     func setPrivateSkillEnabled(_ skill: MarketplacePrivateSkill, enabled: Bool) async {
-        guard skill.canToggle, privateSkillMutatingId == nil else { return }
+        guard skill.canToggle,
+              privateSkillMutatingId == nil,
+              let agentId = privateSkillAgentId,
+              !agentId.isEmpty
+        else { return }
         await mutatePrivateSkill(
             skillId: skill.id,
             type: "workflow.setEnabled",
             action: "enabled",
             fields: [
-                "agentId": Self.marketplaceAgentId,
+                "agentId": agentId,
                 "id": skill.id,
                 "enabled": enabled,
             ]
@@ -2372,13 +2438,17 @@ final class MarketplaceModel {
     }
 
     func deletePrivateSkill(_ skill: MarketplacePrivateSkill) async {
-        guard skill.source == "workflow", privateSkillMutatingId == nil else { return }
+        guard skill.source == "workflow",
+              privateSkillMutatingId == nil,
+              let agentId = privateSkillAgentId,
+              !agentId.isEmpty
+        else { return }
         await mutatePrivateSkill(
             skillId: skill.id,
             type: "workflow.delete",
             action: "deleted",
             fields: [
-                "agentId": Self.marketplaceAgentId,
+                "agentId": agentId,
                 "id": skill.id,
             ]
         )
@@ -2390,14 +2460,17 @@ final class MarketplaceModel {
         action: String,
         fields: [String: Any]
     ) async {
+        guard let agentId = privateSkillAgentId, !agentId.isEmpty else { return }
+        let scopeGeneration = privateSkillScopeGeneration
         privateSkillMutatingId = skillId
         privateSkillError = nil
         defer {
-            if privateSkillMutatingId == skillId {
+            if privateSkillMutatingId == skillId,
+               scopeGeneration == privateSkillScopeGeneration,
+               privateSkillAgentId == agentId {
                 privateSkillMutatingId = nil
             }
         }
-        let agentId = Self.marketplaceAgentId
         do {
             _ = try await executeFeatureCommand(
                 type: type,
@@ -2414,11 +2487,17 @@ final class MarketplaceModel {
                 if event["id"] as? String == skillId { return true }
                 return (event["workflow"] as? [String: Any])?["id"] as? String == skillId
             }
+            guard scopeGeneration == privateSkillScopeGeneration,
+                  privateSkillAgentId == agentId
+            else { return }
             // Never trust the mutation echo as the long-lived UI owner. Read the
             // authoritative workflow directory + enablement state back through
             // the same Host before updating the visible Yours surface.
             await refreshPrivateSkills()
         } catch {
+            guard scopeGeneration == privateSkillScopeGeneration,
+                  privateSkillAgentId == agentId
+            else { return }
             privateSkillError = error.localizedDescription
         }
     }
