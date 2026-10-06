@@ -1515,7 +1515,7 @@ internal struct MobileBotRoutinesSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(routine.name)
                             .font(.headline)
-                        Text(routine.schedule)
+                        Text(routine.isEnabled ? describeSchedule(routine.schedule) : "Paused")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -1577,6 +1577,8 @@ internal struct MobileBotRoutinesSection: View {
                     }
                     .disabled(controller.pending.contains(routine.id))
                 }
+
+                MobileBotRoutineInlineRunHistory(runs: routine.runs)
 
                 if let error = controller.mutationError(for: routine.id) {
                     Text(error)
@@ -1656,7 +1658,10 @@ internal struct MobileBotRoutineEditorSheet: View {
                     Button("保存") {
                         save()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
                 }
             }
         }
@@ -1674,15 +1679,73 @@ internal struct MobileBotRoutineEditorSheet: View {
         scheduleInvalid = result.isInvalid || !result.shouldCommit
         guard result.shouldCommit else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, !trimmedPrompt.isEmpty else { return }
         onSave(
             MobileBotRoutineSpec(
                 name: trimmedName,
-                prompt: prompt,
+                prompt: trimmedPrompt,
                 schedule: result.schedule,
                 isEnabled: isEnabled
             )
         )
+    }
+}
+
+@MainActor
+internal struct MobileBotRoutineInlineRunHistory: View {
+    let runs: [MobileBotRoutineRun]
+
+    @State private var nowMilliseconds = Int64(
+        (Date().timeIntervalSince1970 * 1_000).rounded(.towardZero)
+    )
+
+    var body: some View {
+        let rows = MobileBotRoutineRunHistoryModel.presentHistory(
+            runs,
+            now: nowMilliseconds,
+            timeZoneIdentifier: TimeZone.autoupdatingCurrent.identifier
+        ).rows
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Run history")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if rows.isEmpty {
+                Text("No runs yet")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(rows.prefix(5)) { row in
+                    HStack(spacing: 6) {
+                        Text(row.timestampLabel)
+                            .font(.caption2)
+                        Spacer()
+                        Image(systemName: symbolName(row.iconName))
+                            .accessibilityLabel(row.accessibilityLabel)
+                    }
+                    .help(row.title ?? row.accessibilityLabel)
+                }
+            }
+        }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                nowMilliseconds = Int64(
+                    (Date().timeIntervalSince1970 * 1_000).rounded(.towardZero)
+                )
+            }
+        }
+    }
+
+    private func symbolName(_ iconName: String) -> String {
+        switch iconName {
+        case "loading": return "progress.indicator"
+        case "check": return "checkmark.circle"
+        default: return "xmark.circle"
+        }
     }
 }
 
