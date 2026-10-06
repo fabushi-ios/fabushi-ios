@@ -70,8 +70,8 @@ final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
         }
     }
 
-    static let ensurePath = "/v1/agent-boxes/ensure"
-    static let releasePath = "/v1/agent-boxes/release"
+    static let ensureMethod = "computer.agentBox.ensure"
+    static let releaseMethod = "computer.agentBox.release"
 
     private let bridge: IOSPreloadBridge?
 
@@ -80,17 +80,17 @@ final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
     }
 
     func ensure(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot {
-        let payload = try await hostAuthenticatedRequest(
-            path: Self.ensurePath,
-            body: ["agentId": agentID]
+        let payload = try await hostAgentBoxRequest(
+            method: Self.ensureMethod,
+            params: ["agentId": agentID]
         )
         return try Self.projectStatus(payload, expectedAgentID: agentID)
     }
 
     func release(agentID: String, trigger: String) async throws {
-        _ = try await hostAuthenticatedRequest(
-            path: Self.releasePath,
-            body: [
+        _ = try await hostAgentBoxRequest(
+            method: Self.releaseMethod,
+            params: [
                 "agentId": agentID,
                 "trigger": trigger,
             ]
@@ -138,20 +138,15 @@ final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
         )
     }
 
-    private func hostAuthenticatedRequest(
-        path: String,
-        body: [String: Any]
+    private func hostAgentBoxRequest(
+        method: String,
+        params: [String: Any]
     ) async throws -> [String: Any] {
         guard let bridge else { throw SourceError.bridgeUnavailable }
 
         let value = try await bridge.request(
-            method: "platform.request",
-            params: [
-                "method": "POST",
-                "path": path,
-                "authenticated": true,
-                "body": body,
-            ]
+            method: method,
+            params: params
         ).value
 
         guard let envelope = value as? [String: Any],
