@@ -15,6 +15,7 @@ use mahayana_plugin_runtime::{
 use mahayana_product::MahayanaProductClient;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
@@ -1375,20 +1376,11 @@ fn routine_projection(automation: AutomationSummary) -> Option<Value> {
     if agent_id.is_empty() {
         return None;
     }
-    let trigger_description = match automation.trigger.as_ref() {
-        Some(AutomationTrigger::Schedule { schedule }) => schedule.clone(),
-        Some(AutomationTrigger::Event { source, event, filter }) => {
-            let source = serde_json::to_value(source)
-                .ok()
-                .and_then(|value| value.as_str().map(str::to_string))
-                .unwrap_or_else(|| "event".into());
-            match filter.as_deref().filter(|value| !value.trim().is_empty()) {
-                Some(filter) => format!("{source} · {event} · {filter}"),
-                None => format!("{source} · {event}"),
-            }
-        }
-        None => automation.schedule.clone(),
-    };
+    let trigger_description = automation
+        .trigger
+        .as_ref()
+        .map(routine_trigger_description)
+        .unwrap_or_else(|| automation.schedule.clone());
     Some(json!({
         "agentId": agent_id,
         "automation": {
@@ -1399,6 +1391,83 @@ fn routine_projection(automation: AutomationSummary) -> Option<Value> {
             "lastRunAt": automation.last_run_at_ms,
         }
     }))
+}
+
+fn routine_trigger_description(trigger: &AutomationTrigger) -> String {
+    match trigger {
+        AutomationTrigger::Schedule { schedule } => schedule.clone(),
+        AutomationTrigger::Event {
+            source,
+            event,
+            filter,
+            filters,
+        } => {
+            let source = serde_json::to_value(source)
+                .ok()
+                .and_then(|value| value.as_str().map(str::to_string))
+                .unwrap_or_else(|| "event".into());
+            routine_event_description(
+                &source,
+                event,
+                filter.as_deref(),
+                filters.as_ref(),
+            )
+        }
+        AutomationTrigger::Group { listeners } => {
+            let descriptions = listeners
+                .iter()
+                .map(routine_trigger_description)
+                .filter(|description| !description.trim().is_empty())
+                .collect::<Vec<_>>();
+            if descriptions.is_empty() {
+                "group".into()
+            } else {
+                descriptions.join(" or ")
+            }
+        }
+    }
+}
+
+fn routine_event_description(
+    source: &str,
+    event: &str,
+    legacy_filter: Option<&str>,
+    filters: Option<&BTreeMap<String, Value>>,
+) -> String {
+    let mut segments = vec![source.to_string(), event.to_string()];
+    if let Some(filter) = legacy_filter
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        segments.push(filter.to_string());
+    }
+    if let Some(filters) = filters {
+        segments.extend(filters.iter().filter_map(|(key, value)| {
+            routine_filter_value(value).map(|value| format!("{key}={value}"))
+        }));
+    }
+    segments.join(" · ")
+}
+
+fn routine_filter_value(value: &Value) -> Option<String> {
+    match value {
+        Value::Null => None,
+        Value::String(value) => {
+            let value = value.trim();
+            (!value.is_empty()).then(|| value.to_string())
+        }
+        Value::Array(values) => {
+            let values = values
+                .iter()
+                .filter_map(routine_filter_value)
+                .collect::<Vec<_>>();
+            (!values.is_empty()).then(|| values.join(", "))
+        }
+        Value::Object(values) if values.is_empty() => None,
+        Value::Object(_) | Value::Bool(_) | Value::Number(_) => {
+            serde_json::to_string(value).ok()
+        }
+    }
 }
 
 fn validate_public_link_url(raw: &str) -> Result<url::Url, AppHostError> {
@@ -1696,6 +1765,151 @@ mod fabushi_shipping_inference_tests {
         assert_eq!(row["automation"]["triggerDescription"], "@daily");
         assert_eq!(row["automation"]["createdAt"], 10);
         assert_eq!(row["automation"]["lastRunAt"], 20);
+    }
+
+    #[test]
+    fn routine_projection_event_preserves_legacy_and_structured_filters() {
+        let row = routine_projection(AutomationSummary {
+            id: "regression-triage".into(),
+            agent_id: Some("research".into()),
+            name: "Regression triage".into(),
+            prompt: "Inspect regressions".into(),
+            schedule: "event:sentry:issue.regressed".into(),
+            trigger: Some(AutomationTrigger::Event {
+                source: mahayana_host_protocol::ListenerPlatform::Sentry,
+                event: "issue.regressed".into(),
+                filter: Some("legacy-web".into()),
+                filters: Some(BTreeMap::from([
+                    ("projectIds".into(), json!(["web", "api"])),
+                    ("resolved".into(), json!(false)),
+                ])),
+            }),
+            enabled: true,
+            created_at_ms: 10,
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        })
+        .expect("event automation should project");
+        assert_eq!(
+            row["automation"]["triggerDescription"],
+            "sentry · issue.regressed · legacy-web · projectIds=web, api · resolved=false"
+        );
+    }
+
+    #[test]
+    fn routine_projection_event_preserves_structured_filter_readback_without_legacy_filter() {
+        let row = routine_projection(AutomationSummary {
+            id: "github-watch".into(),
+            agent_id: Some("research".into()),
+            name: "GitHub watch".into(),
+            prompt: "Inspect matching repository events".into(),
+            schedule: "event:github:*".into(),
+            trigger: Some(AutomationTrigger::Event {
+                source: mahayana_host_protocol::ListenerPlatform::Github,
+                event: "*".into(),
+                filter: None,
+                filters: Some(BTreeMap::from([
+                    ("events".into(), json!(["pr-opened", "ci-failed"])),
+                    ("repo".into(), json!("owner/repo")),
+                ])),
+            }),
+            enabled: true,
+            created_at_ms: 10,
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        })
+        .expect("structured event automation should project");
+        assert_eq!(
+            row["automation"]["triggerDescription"],
+            "github · * · events=pr-opened, ci-failed · repo=owner/repo"
+        );
+    }
+
+    #[test]
+    fn routine_projection_event_omits_empty_filter_values_and_handles_absent_filters() {
+        let empty = routine_projection(AutomationSummary {
+            id: "slack-empty".into(),
+            agent_id: Some("research".into()),
+            name: "Slack empty".into(),
+            prompt: "Inspect messages".into(),
+            schedule: "event:slack:mention".into(),
+            trigger: Some(AutomationTrigger::Event {
+                source: mahayana_host_protocol::ListenerPlatform::Slack,
+                event: "mention".into(),
+                filter: Some("   ".into()),
+                filters: Some(BTreeMap::from([
+                    ("blank".into(), json!("   ")),
+                    ("emptyArray".into(), json!([])),
+                    ("emptyObject".into(), json!({})),
+                    ("nullValue".into(), Value::Null),
+                ])),
+            }),
+            enabled: true,
+            created_at_ms: 10,
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        })
+        .expect("empty-filter event automation should project");
+        assert_eq!(empty["automation"]["triggerDescription"], "slack · mention");
+
+        let absent = routine_projection(AutomationSummary {
+            id: "github-plain".into(),
+            agent_id: Some("research".into()),
+            name: "GitHub plain".into(),
+            prompt: "Inspect events".into(),
+            schedule: "event:github:pr-opened".into(),
+            trigger: Some(AutomationTrigger::Event {
+                source: mahayana_host_protocol::ListenerPlatform::Github,
+                event: "pr-opened".into(),
+                filter: None,
+                filters: None,
+            }),
+            enabled: true,
+            created_at_ms: 10,
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        })
+        .expect("plain event automation should project");
+        assert_eq!(
+            absent["automation"]["triggerDescription"],
+            "github · pr-opened"
+        );
+    }
+
+    #[test]
+    fn routine_projection_group_describes_each_rich_trigger_member() {
+        let row = routine_projection(AutomationSummary {
+            id: "group".into(),
+            agent_id: Some("research".into()),
+            name: "Group".into(),
+            prompt: "Handle grouped triggers".into(),
+            schedule: "event:group".into(),
+            trigger: Some(AutomationTrigger::Group {
+                listeners: vec![
+                    AutomationTrigger::Schedule {
+                        schedule: "@daily".into(),
+                    },
+                    AutomationTrigger::Event {
+                        source: mahayana_host_protocol::ListenerPlatform::Slack,
+                        event: "mention".into(),
+                        filter: None,
+                        filters: Some(BTreeMap::from([(
+                            "channel".into(),
+                            json!("alerts"),
+                        )])),
+                    },
+                ],
+            }),
+            enabled: true,
+            created_at_ms: 10,
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        })
+        .expect("group automation should project");
+        assert_eq!(
+            row["automation"]["triggerDescription"],
+            "@daily or slack · mention · channel=alerts"
+        );
     }
 
     #[test]
