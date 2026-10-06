@@ -1982,6 +1982,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         webView.allowsBackForwardNavigationGestures = true
         webView.isInspectable = false
         context.coordinator.webView = webView
+        context.coordinator.updateViewerVisibility(true)
         return webView
     }
 
@@ -1998,6 +1999,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        coordinator.updateViewerVisibility(false)
         webView.stopLoading()
         webView.navigationDelegate = nil
         coordinator.webView = nil
@@ -2013,6 +2015,7 @@ private struct RemoteComputerWebView: UIViewRepresentable {
         weak var webView: WKWebView?
         var loadedReloadToken: Int?
         private var crashPolicy = RemoteComputerWebProcessCrashPolicy()
+        private let vncRuntime = IOSVNCPreloadRuntime()
 
         init(
             status: Binding<String>,
@@ -2079,6 +2082,14 @@ private struct RemoteComputerWebView: UIViewRepresentable {
 
         func prepareExplicitReload() {
             crashPolicy.resetForExplicitReload()
+            vncRuntime.resetLiveness()
+        }
+
+        func updateViewerVisibility(_ visible: Bool) {
+            let becameVisible = vncRuntime.updateViewerVisibility(visible)
+            if becameVisible {
+                vncRuntime.resetLiveness()
+            }
         }
 
         func webView(
