@@ -156,6 +156,46 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(automation.timelineAutomationId, "routine-7")
     }
 
+    func testLinkMetadataProjectionAcceptsSafeOptionalFieldsAndRejectsWrongTypes() throws {
+        let metadata = try XCTUnwrap(MarketplaceModel.projectLinkMetadata(
+            url: " https://example.com/path ",
+            value: [
+                "title": "Example",
+                "description": "Description",
+                "hostname": "example.com",
+                "imageUrl": "https://example.com/og.png",
+                "imageDataUrl": NSNull(),
+                "faviconDataUrl": NSNull(),
+            ]
+        ))
+        XCTAssertEqual(metadata.url, "https://example.com/path")
+        XCTAssertEqual(metadata.displayTitle, "Example")
+        XCTAssertEqual(metadata.description, "Description")
+        XCTAssertEqual(metadata.hostname, "example.com")
+        XCTAssertEqual(metadata.imageURL, "https://example.com/og.png")
+        XCTAssertNil(metadata.imageDataURL)
+        XCTAssertNil(metadata.faviconDataURL)
+
+        let hostnameFallback = try XCTUnwrap(MarketplaceModel.projectLinkMetadata(
+            url: "https://example.com",
+            value: ["hostname": "example.com"]
+        ))
+        XCTAssertEqual(hostnameFallback.displayTitle, "example.com")
+
+        XCTAssertNil(MarketplaceModel.projectLinkMetadata(
+            url: "file:///tmp/a",
+            value: ["title": "bad"]
+        ))
+        XCTAssertNil(MarketplaceModel.projectLinkMetadata(
+            url: "https://example.com",
+            value: ["title": 7]
+        ))
+        XCTAssertNil(MarketplaceModel.projectLinkMetadata(
+            url: "https://example.com",
+            value: "not-object"
+        ))
+    }
+
     func testSendMessageTextProjectionPreservesDesktopGuardsAndBareLinkGate() throws {
         let plain = try XCTUnwrap(projectMobileSendMessageText([
             "kind": "send-message",
