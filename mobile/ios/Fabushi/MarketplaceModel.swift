@@ -25,6 +25,33 @@ enum MahayanaChatPumpOutcome: Equatable {
     var shouldSettleLifecycle: Bool { self == .terminal }
 }
 
+enum MobileAttachmentCardKind: String, Equatable {
+    case box
+    case legacyLink
+    case media
+    case file
+}
+
+struct MobileAttachmentCardProjection: Equatable {
+    let id: String
+    let kind: MobileAttachmentCardKind
+    let url: String
+    var name: String?
+    var alt: String?
+    var instruction: String?
+    var request: String?
+    var requestId: String?
+    var resolution: String?
+    var screenshotDataURL: String?
+    var byteSize: Double?
+    var width: Double?
+    var height: Double?
+    var timestampMs: Double?
+    var batchId: String?
+    var replyTo: String?
+    var clientNonce: String?
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
@@ -42,11 +69,213 @@ struct MobileChatMessage: Identifiable, Equatable {
     var attachmentURL: String?
     var attachmentFileName: String?
     var attachmentAlt: String?
+    var attachmentProjection: MobileAttachmentCardProjection?
     var timelineEvent: SandTimelineEvent?
     var timelineAutomationId: String?
     var branched = false
     var streaming = false
     var createdAt = Date()
+}
+
+private let mobileAttachmentImageExtensions: Set<String> = [
+    ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".webp",
+]
+private let mobileAttachmentVideoExtensions: Set<String> = [
+    ".m4v", ".mov", ".mp4", ".ogv", ".webm",
+]
+
+private func mobileAttachmentExtension(_ value: String) -> String {
+    let path = URL(string: value)?.path ?? value
+    let lower = path.lowercased()
+    guard let dot = lower.lastIndex(of: ".") else { return "" }
+    return String(lower[dot...])
+}
+
+private func isMobileAttachmentMediaURL(_ value: String) -> Bool {
+    let ext = mobileAttachmentExtension(value)
+    return mobileAttachmentImageExtensions.contains(ext)
+        || mobileAttachmentVideoExtensions.contains(ext)
+}
+
+private func normalizedMobileHTTPURL(_ value: String) -> String? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty,
+          !trimmed.contains(where: \.isWhitespace),
+          let url = URL(string: trimmed),
+          let scheme = url.scheme?.lowercased(),
+          scheme == "http" || scheme == "https",
+          let host = url.host,
+          !host.isEmpty
+    else { return nil }
+    return url.absoluteString
+}
+
+func classifyMobileAttachmentURL(_ value: String) -> MobileAttachmentCardKind {
+    if value == "sand://box" || value.hasPrefix("sand://box?") {
+        return .box
+    }
+    if normalizedMobileHTTPURL(value) != nil, !isMobileAttachmentMediaURL(value) {
+        return .legacyLink
+    }
+    return isMobileAttachmentMediaURL(value) ? .media : .file
+}
+
+private func finiteAttachmentNumber(_ value: Any?) -> Double? {
+    guard !(value is Bool), let number = value as? NSNumber else { return nil }
+    let result = number.doubleValue
+    return result.isFinite ? result : nil
+}
+
+private func optionalNonNegativeAttachmentNumber(
+    _ value: Any?
+) -> (valid: Bool, value: Double?) {
+    guard let value else { return (true, nil) }
+    guard let number = finiteAttachmentNumber(value), number >= 0 else {
+        return (false, nil)
+    }
+    return (true, number)
+}
+
+private func optionalNonEmptyAttachmentString(
+    _ value: Any?
+) -> (valid: Bool, value: String?) {
+    guard let value else { return (true, nil) }
+    guard let string = value as? String, !string.isEmpty else {
+        return (false, nil)
+    }
+    return (true, string)
+}
+
+private func mobileAttachmentBasename(_ value: String) -> String {
+    let normalized = value.replacingOccurrences(of: "\\", with: "/")
+    let leaf = normalized.split(separator: "/", omittingEmptySubsequences: false).last
+        .map(String.init) ?? ""
+    return leaf.isEmpty ? "Attachment" : leaf
+}
+
+/// Native data projection for Desktop transcript-card/attachment-data.ts.
+/// Malformed metadata fails closed instead of becoming a generic attachment.
+func projectMobileAttachmentCard(
+    _ value: [String: Any]
+) -> MobileAttachmentCardProjection? {
+    guard let rawKind = value["kind"] as? String else { return nil }
+
+    if rawKind == "send-message" {
+        guard let id = value["id"] as? String, !id.isEmpty,
+              let message = value["message"] as? [String: Any],
+              message["type"] as? String == "attachment",
+              let rawURL = message["url"] as? String
+        else { return nil }
+
+        let timestamp: Double?
+        if value["timestampMs"] == nil {
+            timestamp = nil
+        } else {
+            guard let parsed = finiteAttachmentNumber(value["timestampMs"]) else { return nil }
+            timestamp = parsed
+        }
+
+        let kind = classifyMobileAttachmentURL(rawURL)
+        let projectedURL = kind == .legacyLink
+            ? (normalizedMobileHTTPURL(rawURL) ?? rawURL)
+            : rawURL
+
+        var projection = MobileAttachmentCardProjection(
+            id: id,
+            kind: kind,
+            url: projectedURL,
+            timestampMs: timestamp
+        )
+        if kind == .media {
+            projection.alt = message["alt"] as? String
+        }
+        if kind == .box {
+            projection.instruction = value["boxInstruction"] as? String
+            projection.request = value["boxRequest"] as? String
+            projection.requestId = value["boxRequestId"] as? String
+            if value["boxResolution"] is NSNull {
+                projection.resolution = nil
+            } else if let resolution = value["boxResolution"] as? String {
+                projection.resolution = resolution
+            } else if value["boxResolution"] != nil {
+                return nil
+            }
+            projection.screenshotDataURL = value["boxSnapshot"] as? String
+        }
+        return projection
+    }
+
+    if rawKind == "user-attachment" {
+        guard let id = value["id"] as? String, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let filePath = value["file_path"] as? String,
+              !filePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+
+        if let fileName = value["file_name"], !(fileName is String) {
+            return nil
+        }
+        let byteSize = optionalNonNegativeAttachmentNumber(value["byteSize"])
+        let width = optionalNonNegativeAttachmentNumber(value["width"])
+        let height = optionalNonNegativeAttachmentNumber(value["height"])
+        let timestamp = optionalNonNegativeAttachmentNumber(value["timestampMs"])
+        let batchId = optionalNonEmptyAttachmentString(value["batchId"])
+        let replyTo = optionalNonEmptyAttachmentString(value["replyTo"])
+        let clientNonce = optionalNonEmptyAttachmentString(value["clientNonce"])
+        guard byteSize.valid, width.valid, height.valid, timestamp.valid,
+              batchId.valid, replyTo.valid, clientNonce.valid
+        else { return nil }
+
+        let explicitName = value["file_name"] as? String
+        return MobileAttachmentCardProjection(
+            id: id,
+            kind: isMobileAttachmentMediaURL(filePath) ? .media : .file,
+            url: filePath,
+            name: explicitName == nil || explicitName?.isEmpty == true
+                ? mobileAttachmentBasename(filePath)
+                : explicitName,
+            byteSize: byteSize.value,
+            width: width.value,
+            height: height.value,
+            timestampMs: timestamp.value,
+            batchId: batchId.value,
+            replyTo: replyTo.value,
+            clientNonce: clientNonce.value
+        )
+    }
+
+    return nil
+}
+
+func projectMobileChatMessageAttachment(
+    id: String,
+    raw: [String: Any],
+    batchId: String?,
+    timestampMs: Any? = nil
+) -> MobileAttachmentCardProjection? {
+    guard let rawURL = raw["url"] as? String else { return nil }
+    var message: [String: Any] = [
+        "type": "attachment",
+        "url": rawURL,
+    ]
+    if let alt = raw["alt"] as? String {
+        message["alt"] = alt
+    }
+    var envelope: [String: Any] = [
+        "kind": "send-message",
+        "id": id,
+        "message": message,
+    ]
+    if let timestampMs {
+        envelope["timestampMs"] = timestampMs
+    }
+    guard var projection = projectMobileAttachmentCard(envelope) else { return nil }
+    if let fileName = raw["file_name"] as? String, !fileName.isEmpty {
+        projection.name = fileName
+    }
+    if let batchId, !batchId.isEmpty {
+        projection.batchId = batchId
+    }
+    return projection
 }
 
 private func mobileTranscriptCardDate(_ value: Any?) -> Date {
@@ -99,6 +328,25 @@ func projectMobileTranscriptCard(
         ?? (card["id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         ?? "transcript-card:\(UUID().uuidString.lowercased())"
     let createdAt = mobileTranscriptCardDate(event["timestampMs"] ?? card["timestampMs"])
+
+    if kind == "send-message" || kind == "user-attachment" {
+        guard let attachment = projectMobileAttachmentCard(card) else { return nil }
+        return MobileChatMessage(
+            id: attachment.id,
+            role: kind == "user-attachment" ? .user : .assistant,
+            text: "",
+            operationId: operationId,
+            replyToMessageId: attachment.replyTo,
+            attachmentBatchId: attachment.batchId,
+            attachmentURL: attachment.url,
+            attachmentFileName: attachment.name,
+            attachmentAlt: attachment.alt,
+            attachmentProjection: attachment,
+            createdAt: attachment.timestampMs.map {
+                Date(timeIntervalSince1970: $0 / 1_000)
+            } ?? createdAt
+        )
+    }
 
     switch kind {
     case "notice":
@@ -977,13 +1225,28 @@ final class MarketplaceModel {
                             upsertAssistantMessage(operationId: operationId, text: eventText, append: false)
                         }
                         if let index = chatMessages.lastIndex(where: { $0.kind == .message && $0.role == .assistant && $0.operationId == operationId }) {
-                            chatMessages[index].canonicalMessageId = event["messageId"] as? String
+                            let canonicalMessageId = event["messageId"] as? String
+                            let attachmentBatchId = event["attachmentBatchId"] as? String
+                            chatMessages[index].canonicalMessageId = canonicalMessageId
                             chatMessages[index].replyToMessageId = event["replyToMessageId"] as? String
-                            chatMessages[index].attachmentBatchId = event["attachmentBatchId"] as? String
-                            if let attachment = event["attachment"] as? [String: Any] {
-                                chatMessages[index].attachmentURL = attachment["url"] as? String
-                                chatMessages[index].attachmentFileName = attachment["file_name"] as? String
-                                chatMessages[index].attachmentAlt = attachment["alt"] as? String
+                            chatMessages[index].attachmentBatchId = attachmentBatchId
+                            if let rawAttachment = event["attachment"] as? [String: Any],
+                               let attachment = projectMobileChatMessageAttachment(
+                                    id: canonicalMessageId ?? "assistant:\(operationId)",
+                                    raw: rawAttachment,
+                                    batchId: attachmentBatchId,
+                                    timestampMs: event["timestampMs"]
+                               )
+                            {
+                                chatMessages[index].attachmentProjection = attachment
+                                chatMessages[index].attachmentURL = attachment.url
+                                chatMessages[index].attachmentFileName = attachment.name
+                                chatMessages[index].attachmentAlt = attachment.alt
+                            } else {
+                                chatMessages[index].attachmentProjection = nil
+                                chatMessages[index].attachmentURL = nil
+                                chatMessages[index].attachmentFileName = nil
+                                chatMessages[index].attachmentAlt = nil
                             }
                             chatMessages[index].branched = event["branched"] as? Bool ?? false
                         }
