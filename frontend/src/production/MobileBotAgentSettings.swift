@@ -153,7 +153,7 @@ internal struct MobileBotAgentSettingsSheet: View {
                 reconnectGeneration: reconnectGeneration
             )
 
-            Section("电脑") {
+            Section {
                 Button {
                     invalidatePending()
                     onOpenComputer(currentAgent)
@@ -162,6 +162,8 @@ internal struct MobileBotAgentSettingsSheet: View {
                 }
                 .disabled(pending != nil)
                 .accessibilityIdentifier("mobile-agent-settings-open-computer")
+            } header: {
+                Text("电脑")
             } footer: {
                 Text("从 Agent 设置打开时会显式绑定当前账号与 Agent 作用域。")
             }
