@@ -25,6 +25,25 @@ enum MahayanaChatPumpOutcome: Equatable {
     var shouldSettleLifecycle: Bool { self == .terminal }
 }
 
+struct MobileLinkMetadata: Equatable {
+    let url: String
+    var title: String?
+    var description: String?
+    var hostname: String?
+    var imageURL: String?
+    var imageDataURL: String?
+    var faviconDataURL: String?
+
+    var displayTitle: String {
+        for candidate in [title, hostname] {
+            if let candidate, !candidate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return candidate
+            }
+        }
+        return url
+    }
+}
+
 struct MobileSendMessageTextImage: Equatable {
     let url: String
     var alt: String?
@@ -704,12 +723,107 @@ final class MarketplaceModel {
     private static let globalDharmaExecutionKeyPrefix = "fabushi.ios.miniapp-execution.v1:"
     @ObservationIgnored private let browserAuthPresentationContext = BrowserAuthPresentationContext()
     @ObservationIgnored private var webAuthenticationSession: ASWebAuthenticationSession?
+    @ObservationIgnored private var linkMetadataCache: [String: MobileLinkMetadata] = [:]
+    @ObservationIgnored private var linkMetadataTasks: [String: Task<MobileLinkMetadata, Error>] = [:]
 
     init(bridge: IOSPreloadBridge) {
         self.bridge = bridge
         globalDharmaBridge = GlobalDharmaMiniAppBridge(bridge: bridge)
         globalDharmaCommerce = GlobalDharmaCommerceModel(bridge: bridge)
         onboardingStep = UserDefaults.standard.bool(forKey: onboardingKey) ? 3 : 0
+    }
+
+    static func projectLinkMetadata(
+        url: String,
+        value: Any
+    ) -> MobileLinkMetadata? {
+        guard let normalizedURL = normalizeMobileLinkURL(url),
+              let object = value as? [String: Any]
+        else { return nil }
+
+        func optionalString(_ key: String) -> String? {
+            guard let raw = object[key] else { return nil }
+            if raw is NSNull { return nil }
+            guard let string = raw as? String else { return nil }
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        if object["title"] != nil, !(object["title"] is String), !(object["title"] is NSNull) {
+            return nil
+        }
+        if object["description"] != nil, !(object["description"] is String), !(object["description"] is NSNull) {
+            return nil
+        }
+        if object["hostname"] != nil, !(object["hostname"] is String), !(object["hostname"] is NSNull) {
+            return nil
+        }
+        if object["imageUrl"] != nil, !(object["imageUrl"] is String), !(object["imageUrl"] is NSNull) {
+            return nil
+        }
+        if object["imageDataUrl"] != nil, !(object["imageDataUrl"] is String), !(object["imageDataUrl"] is NSNull) {
+            return nil
+        }
+        if object["faviconDataUrl"] != nil, !(object["faviconDataUrl"] is String), !(object["faviconDataUrl"] is NSNull) {
+            return nil
+        }
+
+        return .init(
+            url: normalizedURL,
+            title: optionalString("title"),
+            description: optionalString("description"),
+            hostname: optionalString("hostname"),
+            imageURL: optionalString("imageUrl"),
+            imageDataURL: optionalString("imageDataUrl"),
+            faviconDataURL: optionalString("faviconDataUrl")
+        )
+    }
+
+    func linkMetadata(for rawURL: String) async throws -> MobileLinkMetadata {
+        guard let url = normalizeMobileLinkURL(rawURL) else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("Invalid HTTP(S) link")
+        }
+        if let cached = linkMetadataCache[url] {
+            return cached
+        }
+        if let pending = linkMetadataTasks[url] {
+            return try await pending.value
+        }
+
+        let bridge = self.bridge
+        let task = Task { @MainActor in
+            let response = try await bridge.request(
+                method: "getLinkMetadata",
+                params: ["url": url]
+            )
+            guard let projected = Self.projectLinkMetadata(
+                url: url,
+                value: response.value
+            ) else {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Invalid link metadata response"
+                )
+            }
+            return projected
+        }
+        linkMetadataTasks[url] = task
+        do {
+            let metadata = try await task.value
+            linkMetadataTasks[url] = nil
+            linkMetadataCache[url] = metadata
+            return metadata
+        } catch {
+            linkMetadataTasks[url] = nil
+            throw error
+        }
+    }
+
+    func resetLinkMetadataCache() {
+        for task in linkMetadataTasks.values {
+            task.cancel()
+        }
+        linkMetadataTasks.removeAll()
+        linkMetadataCache.removeAll()
     }
 
     static func nextGlobalDharmaExecution(
