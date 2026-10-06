@@ -193,6 +193,17 @@ impl AppHost {
                 .product
                 .execute("mahayana.platform.request", &params)
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "computer.agentBox.ensure" => self
+                .product
+                .ensure_agent_box(string_param(&params, "agentId")?)
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "computer.agentBox.release" => self
+                .product
+                .release_agent_box(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "trigger")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             method if method.starts_with("sharing.") => self.handle_sharing(method, params),
             "getLinkMetadata" => self.get_link_metadata(params),
             "listAllAutomations" => self.list_all_automations(),
@@ -1951,6 +1962,27 @@ mod fabushi_shipping_inference_tests {
                 .insert(field.to_string(), invalid);
             assert!(validate_sharing_params(rpc, &params).is_err());
         }
+    }
+
+    #[test]
+    fn agent_box_rpc_surface_is_typed_and_not_platform_passthrough() {
+        let ensure = HostRequest {
+            id: "box-ensure".into(),
+            method: "computer.agentBox.ensure".into(),
+            params: json!({}),
+        };
+        let release = HostRequest {
+            id: "box-release".into(),
+            method: "computer.agentBox.release".into(),
+            params: json!({"agentId": "agent-a"}),
+        };
+        let host = AppHost::new_for_test();
+        let ensure_response = host.dispatch(ensure);
+        let release_response = host.dispatch(release);
+        assert!(!ensure_response.ok);
+        assert!(ensure_response.error.unwrap_or_default().contains("agentId is required"));
+        assert!(!release_response.ok);
+        assert!(release_response.error.unwrap_or_default().contains("trigger is required"));
     }
 
     #[test]
