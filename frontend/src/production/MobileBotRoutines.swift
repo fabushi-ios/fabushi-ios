@@ -1552,7 +1552,7 @@ internal struct MobileBotRoutinesSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(routine.name)
                             .font(.headline)
-                        Text(routine.isEnabled ? describeSchedule(routine.schedule) : "Paused")
+                        Text(routine.isEnabled ? describeTrigger(routine.trigger) : "Paused")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -1640,9 +1640,8 @@ internal struct MobileBotRoutineEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var prompt: String
-    @State private var schedule: String
     @State private var isEnabled: Bool
-    @State private var scheduleInvalid = false
+    @StateObject private var triggerDraft: MobileBotRoutineTriggerDraftController
 
     init(
         initial: MobileBotRoutine?,
@@ -1652,8 +1651,15 @@ internal struct MobileBotRoutineEditorSheet: View {
         self.onSave = onSave
         _name = State(initialValue: initial?.name ?? "")
         _prompt = State(initialValue: initial?.prompt ?? "")
-        _schedule = State(initialValue: initial?.schedule ?? "0 * * * *")
         _isEnabled = State(initialValue: initial?.isEnabled ?? true)
+        let initialForms = initial
+            .flatMap { routineTriggerForms(from: $0.trigger) }
+            ?? [.schedule("0 * * * *")]
+        _triggerDraft = StateObject(
+            wrappedValue: MobileBotRoutineTriggerDraftController(
+                initialRows: initialForms
+            )
+        )
     }
 
     var body: some View {
@@ -1666,23 +1672,84 @@ internal struct MobileBotRoutineEditorSheet: View {
                     Toggle("启用", isOn: $isEnabled)
                 }
 
-                Section("触发时间") {
-                    Picker("时间", selection: $schedule) {
-                        ForEach(MobileBotRoutineSchedule.pickerOptions()) { option in
-                            Text(option.label).tag(option.schedule)
+                Section("触发条件") {
+                    ForEach(Array(triggerDraft.rows.enumerated()), id: \.offset) { index, form in
+                        VStack(alignment: .leading, spacing: 8) {
+                            if case .schedule(let currentSchedule) = form {
+                                Picker(
+                                    "时间",
+                                    selection: Binding(
+                                        get: { currentSchedule },
+                                        set: { value in
+                                            var rows = triggerDraft.rows
+                                            guard rows.indices.contains(index) else { return }
+                                            rows[index] = .schedule(value)
+                                            triggerDraft.replaceDraft(rows)
+                                        }
+                                    )
+                                ) {
+                                    Text("自定义").tag(currentSchedule)
+                                    ForEach(MobileBotRoutineSchedule.pickerOptions()) { option in
+                                        Text(option.label).tag(option.schedule)
+                                    }
+                                }
+
+                                TextField(
+                                    "Schedule",
+                                    text: Binding(
+                                        get: {
+                                            guard triggerDraft.rows.indices.contains(index),
+                                                  case .schedule(let value) = triggerDraft.rows[index]
+                                            else { return "" }
+                                            return value
+                                        },
+                                        set: { value in
+                                            var rows = triggerDraft.rows
+                                            guard rows.indices.contains(index) else { return }
+                                            rows[index] = .schedule(value)
+                                            triggerDraft.replaceDraft(rows)
+                                        }
+                                    )
+                                )
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            } else if let member = routineTriggerFormToMember(form) {
+                                Text(describeListener(member))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Button("移除此触发条件", role: .destructive) {
+                                Task {
+                                    _ = await triggerDraft.removeRow(index)
+                                }
+                            }
+                            .disabled(triggerDraft.pending)
                         }
                     }
 
-                    TextField("Schedule", text: $schedule)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onSubmit {
-                            validateSchedule()
+                    if triggerDraft.rows.count < MobileBotRoutineTriggerDraftController.maximumRows {
+                        Menu(triggerDraft.rows.isEmpty ? "添加触发条件" : "再添加一个") {
+                            Button("每小时") {
+                                Task {
+                                    _ = await triggerDraft.addRowAndCommit(
+                                        .schedule("0 * * * *")
+                                    )
+                                }
+                            }
+                            Button("高级计划…") {
+                                Task {
+                                    _ = await triggerDraft.addRow(
+                                        .schedule(""),
+                                        openEditor: true
+                                    )
+                                }
+                            }
                         }
-                        .accessibilityValue(scheduleInvalid ? "invalid" : "valid")
+                    }
 
-                    if scheduleInvalid {
-                        Text("请输入有效的 cron、@every 或带时区的 cron 表达式")
+                    if routineTriggerFromForms(triggerDraft.rows) == nil {
+                        Text("请保留 1–8 个有效触发条件；自定义计划必须是有效的 cron、@every 或带时区 cron。")
                             .font(.caption)
                             .foregroundStyle(.red)
                     }
@@ -1702,32 +1769,31 @@ internal struct MobileBotRoutineEditorSheet: View {
                     .disabled(
                         name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || routineTriggerFromForms(triggerDraft.rows) == nil
                     )
                 }
             }
         }
     }
 
-    private func validateSchedule() {
-        let result = MobileBotRoutineSchedule.resolveCustomBlur(schedule)
-        schedule = result.schedule
-        scheduleInvalid = result.isInvalid || !result.shouldCommit
-    }
-
     private func save() {
-        let result = MobileBotRoutineSchedule.resolveCustomBlur(schedule)
-        schedule = result.schedule
-        scheduleInvalid = result.isInvalid || !result.shouldCommit
-        guard result.shouldCommit else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty, !trimmedPrompt.isEmpty else { return }
+        guard !trimmedName.isEmpty,
+              !trimmedPrompt.isEmpty,
+              let trigger = routineTriggerFromForms(triggerDraft.rows)
+        else { return }
+
+        let schedule = triggerSchedule(trigger)
+            ?? initial?.schedule
+            ?? "event:group"
         onSave(
             MobileBotRoutineSpec(
                 name: trimmedName,
                 prompt: trimmedPrompt,
-                schedule: result.schedule,
-                isEnabled: isEnabled
+                schedule: schedule,
+                isEnabled: isEnabled,
+                trigger: trigger
             )
         )
     }
