@@ -14195,6 +14195,7 @@ mod tests {
                         source: ListenerPlatform::Github,
                         event: "push".into(),
                         filter: None,
+                        filters: None,
                     }),
                     enabled: true,
                 })
