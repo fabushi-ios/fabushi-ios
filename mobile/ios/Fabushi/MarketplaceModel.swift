@@ -25,6 +25,26 @@ enum MahayanaChatPumpOutcome: Equatable {
     var shouldSettleLifecycle: Bool { self == .terminal }
 }
 
+struct MobileSendMessageTextImage: Equatable {
+    let url: String
+    var alt: String?
+}
+
+enum MobileSendMessageTextPresentation: Equatable {
+    case text
+    case urlCard(String)
+}
+
+struct MobileSendMessageTextProjection: Equatable {
+    let id: String
+    let content: String
+    let images: [MobileSendMessageTextImage]
+    var channel: String?
+    let streaming: Bool
+    var timestampMs: Double?
+    let presentation: MobileSendMessageTextPresentation
+}
+
 enum MobileAttachmentCardKind: String, Equatable {
     case box
     case legacyLink
@@ -70,11 +90,107 @@ struct MobileChatMessage: Identifiable, Equatable {
     var attachmentFileName: String?
     var attachmentAlt: String?
     var attachmentProjection: MobileAttachmentCardProjection?
+    var sendMessageTextProjection: MobileSendMessageTextProjection?
     var timelineEvent: SandTimelineEvent?
     var timelineAutomationId: String?
     var branched = false
     var streaming = false
     var createdAt = Date()
+}
+
+private func normalizeMobileLinkURL(_ value: Any?) -> String? {
+    guard let string = value as? String else { return nil }
+    let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.range(of: #"^https?://"#, options: [.regularExpression, .caseInsensitive]) != nil,
+          let url = URL(string: trimmed),
+          let scheme = url.scheme?.lowercased(),
+          (scheme == "http" || scheme == "https"),
+          let host = url.host,
+          !host.isEmpty
+    else { return nil }
+    return url.absoluteString
+}
+
+private func extractMobileBareLink(_ content: String) -> String? {
+    let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let expression = try? NSRegularExpression(
+        pattern: #"^\[[^\]\n]*\]\(\s*([^\)\s]+)(?:\s+[^)]*)?\)\s*$"#
+    ) {
+        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+        if let match = expression.firstMatch(in: trimmed, range: range),
+           match.numberOfRanges > 1,
+           let targetRange = Range(match.range(at: 1), in: trimmed)
+        {
+            return normalizeMobileLinkURL(String(trimmed[targetRange]))
+        }
+    }
+    return normalizeMobileLinkURL(trimmed)
+}
+
+/// Native projector for Desktop transcript-card/send-message-text.ts.
+/// It preserves the exact non-streaming, image-free bare-link presentation gate.
+func projectMobileSendMessageText(
+    _ value: [String: Any]
+) -> MobileSendMessageTextProjection? {
+    guard value["kind"] as? String == "send-message",
+          let id = value["id"] as? String,
+          !id.isEmpty,
+          let message = value["message"] as? [String: Any],
+          message["type"] as? String == "text",
+          let content = message["content"] as? String
+    else { return nil }
+
+    if let rawStreaming = value["streaming"], !(rawStreaming is Bool) {
+        return nil
+    }
+    let streaming = value["streaming"] as? Bool ?? false
+
+    let timestampMs: Double?
+    if let rawTimestamp = value["timestampMs"] {
+        guard let parsed = finiteAttachmentNumber(rawTimestamp) else { return nil }
+        timestampMs = parsed
+    } else {
+        timestampMs = nil
+    }
+
+    let channel: String?
+    if let rawChannel = message["channel"] {
+        if rawChannel is NSNull {
+            channel = nil
+        } else {
+            guard let parsed = rawChannel as? String else { return nil }
+            channel = parsed
+        }
+    } else {
+        channel = nil
+    }
+
+    var images: [MobileSendMessageTextImage] = []
+    if let rawImages = message["images"] {
+        guard let values = rawImages as? [[String: Any]] else { return nil }
+        for image in values {
+            guard let url = image["url"] as? String, !url.isEmpty else { return nil }
+            if let alt = image["alt"], !(alt is String) { return nil }
+            images.append(.init(url: url, alt: image["alt"] as? String))
+        }
+    }
+
+    let presentation: MobileSendMessageTextPresentation
+    if !streaming, images.isEmpty, let url = extractMobileBareLink(content) {
+        presentation = .urlCard(url)
+    } else {
+        presentation = .text
+    }
+
+    return .init(
+        id: id,
+        content: content,
+        images: images,
+        channel: channel,
+        streaming: streaming,
+        timestampMs: timestampMs,
+        presentation: presentation
+    )
 }
 
 private let mobileAttachmentImageExtensions: Set<String> = [
@@ -329,11 +445,49 @@ func projectMobileTranscriptCard(
         ?? "transcript-card:\(UUID().uuidString.lowercased())"
     let createdAt = mobileTranscriptCardDate(event["timestampMs"] ?? card["timestampMs"])
 
-    if kind == "send-message" || kind == "user-attachment" {
+    if kind == "send-message" {
+        guard let message = card["message"] as? [String: Any],
+              let type = message["type"] as? String
+        else { return nil }
+        if type == "text" {
+            guard let projection = projectMobileSendMessageText(card) else { return nil }
+            return MobileChatMessage(
+                id: projection.id,
+                role: .assistant,
+                text: projection.content,
+                operationId: operationId,
+                sendMessageTextProjection: projection,
+                streaming: projection.streaming,
+                createdAt: projection.timestampMs.map {
+                    Date(timeIntervalSince1970: $0 / 1_000)
+                } ?? createdAt
+            )
+        }
+        if type == "attachment" {
+            guard let attachment = projectMobileAttachmentCard(card) else { return nil }
+            return MobileChatMessage(
+                id: attachment.id,
+                role: .assistant,
+                text: "",
+                operationId: operationId,
+                attachmentBatchId: attachment.batchId,
+                attachmentURL: attachment.url,
+                attachmentFileName: attachment.name,
+                attachmentAlt: attachment.alt,
+                attachmentProjection: attachment,
+                createdAt: attachment.timestampMs.map {
+                    Date(timeIntervalSince1970: $0 / 1_000)
+                } ?? createdAt
+            )
+        }
+        return nil
+    }
+
+    if kind == "user-attachment" {
         guard let attachment = projectMobileAttachmentCard(card) else { return nil }
         return MobileChatMessage(
             id: attachment.id,
-            role: kind == "user-attachment" ? .user : .assistant,
+            role: .user,
             text: "",
             operationId: operationId,
             replyToMessageId: attachment.replyTo,
