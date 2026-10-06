@@ -1607,7 +1607,13 @@ struct RemoteComputerSurface: View {
                 subagentID: subagentID,
                 title: "Computer \(subagentID)",
                 vncURL: url.absoluteString,
-                handoff: nil
+                handoff: status.handoff.map {
+                    .init(
+                        requestID: $0.requestID,
+                        instruction: $0.instruction,
+                        snapshotDataURL: $0.snapshotDataURL
+                    )
+                }
             )
         }
     }
@@ -1632,6 +1638,55 @@ struct RemoteComputerSurface: View {
         scope?.isAgentScope == true
             && selectedAgentVNCURL != nil
             && selectedAgentBoxSnapshot?.hasHandoff != true
+    }
+
+    @ViewBuilder
+    private var selectedHandoffBanner: some View {
+        if let snapshot = selectedAgentBoxSnapshot,
+           let handoff = snapshot.handoff
+        {
+            HStack(spacing: 10) {
+                Image(systemName: "hand.raised.fill")
+                    .foregroundStyle(.yellow)
+                Text(
+                    handoff.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? "\(scope?.agentName ?? "Agent") 需要你完成这一步"
+                        : handoff.instruction
+                )
+                .font(.caption)
+                .lineLimit(2)
+                Spacer()
+                Button("跳过") {
+                    Task {
+                        await agentBoxOwner.handBack(
+                            agentID: snapshot.agentID,
+                            trigger: "dismissed"
+                        )
+                        await agentBoxOwner.refresh(agentID: snapshot.agentID)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityIdentifier("remote-computer-handoff-dismiss")
+                Button("我已完成，继续") {
+                    Task {
+                        await agentBoxOwner.handBack(
+                            agentID: snapshot.agentID,
+                            trigger: "button"
+                        )
+                        await agentBoxOwner.refresh(agentID: snapshot.agentID)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .accessibilityIdentifier("remote-computer-handoff-complete")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.thinMaterial)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("remote-computer-handoff-banner")
+        }
     }
 
     @ViewBuilder
@@ -1813,6 +1868,7 @@ struct RemoteComputerSurface: View {
         if scope?.isAgentScope == true {
             if let vncURL = selectedAgentVNCURL {
                 VStack(spacing: 0) {
+                    selectedHandoffBanner
                     teachRecordingBar
                     if shippingMonitors.count > 1 {
                         shippingMonitorPicker
