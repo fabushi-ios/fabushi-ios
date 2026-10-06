@@ -20,6 +20,10 @@ struct RemoteComputerScope: Equatable, Sendable {
         guard let agentName, !agentName.isEmpty else { return "我的电脑" }
         return "\(agentName) 的电脑"
     }
+
+    var isAgentScope: Bool {
+        agentID?.isEmpty == false
+    }
 }
 
 enum RemoteComputerRebuildKind: String, Equatable, Sendable {
@@ -1348,33 +1352,38 @@ struct RemoteComputerSurface: View {
 
                 Spacer()
 
-                if errorMessage == nil && status != "已安全连接" {
+                if scope?.isAgentScope != true
+                    && errorMessage == nil
+                    && status != "已安全连接"
+                {
                     ProgressView()
                         .controlSize(.small)
                         .accessibilityIdentifier("remote-computer-loading")
                 }
 
-                Menu {
-                    if rebuildOwner.managedLifecycleAvailable {
-                        Button("更新电脑") {
-                            Task { await rebuildOwner.requestUpdate() }
+                if scope?.isAgentScope != true {
+                    Menu {
+                        if rebuildOwner.managedLifecycleAvailable {
+                            Button("更新电脑") {
+                                Task { await rebuildOwner.requestUpdate() }
+                            }
                         }
-                    }
-                    Button("重新连接") {
-                        errorMessage = nil
-                        status = "正在重新连接…"
-                        Task { await rebuildOwner.requestReconnect() }
-                    }
-                    if rebuildOwner.managedLifecycleAvailable {
-                        Button("重置电脑", role: .destructive) {
-                            resetConfirmationPresented = true
+                        Button("重新连接") {
+                            errorMessage = nil
+                            status = "正在重新连接…"
+                            Task { await rebuildOwner.requestReconnect() }
                         }
+                        if rebuildOwner.managedLifecycleAvailable {
+                            Button("重置电脑", role: .destructive) {
+                                resetConfirmationPresented = true
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                    .disabled(rebuildOwner.state.isPending || rebuildOwner.state.kind != nil)
+                    .accessibilityIdentifier("remote-computer-actions")
                 }
-                .disabled(rebuildOwner.state.isPending || rebuildOwner.state.kind != nil)
-                .accessibilityIdentifier("remote-computer-actions")
             }
             .padding(12)
 
@@ -1432,26 +1441,52 @@ struct RemoteComputerSurface: View {
                 .accessibilityIdentifier("remote-computer-error")
             }
 
-            RemoteComputerWebView(
-                reloadToken: rebuildOwner.reloadRevision,
-                status: $status,
-                errorMessage: $errorMessage,
-                onNavigationStarted: { rebuildOwner.noteNavigationStarted() },
-                onNavigationFinished: { rebuildOwner.noteNavigationFinished() },
-                onNavigationFailed: { rebuildOwner.noteNavigationFailed() }
-            )
+            if scope?.isAgentScope == true {
+                VStack(spacing: 12) {
+                    Image(systemName: "desktopcomputer.trianglebadge.exclamationmark")
+                        .font(.system(size: 34))
+                        .foregroundStyle(.secondary)
+                    Text("Agent 电脑暂不可用")
+                        .font(.headline)
+                    Text("当前 iOS Host 尚未提供 Desktop ForeverBox 的 Agent 沙箱/VNC 生命周期。为避免误打开你的配对电脑，此入口会保持关闭，直到原生 Host 服务完成迁移。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 420)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(24)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("remote-computer-agent-unavailable")
+            } else {
+                RemoteComputerWebView(
+                    reloadToken: rebuildOwner.reloadRevision,
+                    status: $status,
+                    errorMessage: $errorMessage,
+                    onNavigationStarted: { rebuildOwner.noteNavigationStarted() },
+                    onNavigationFinished: { rebuildOwner.noteNavigationFinished() },
+                    onNavigationFailed: { rebuildOwner.noteNavigationFailed() }
+                )
+            }
         }
         .background(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("remote-computer-surface")
         .id(scope?.scopeKey ?? "account")
         .task(id: scope?.scopeKey ?? "account") {
-            await rebuildOwner.connect()
+            if scope?.isAgentScope == true {
+                status = "等待原生 Agent 电脑服务"
+                errorMessage = nil
+            } else {
+                await rebuildOwner.connect()
+            }
             await activityOwner.refresh(agentID: scope?.agentID)
         }
         .onChange(of: reconnectGeneration) { _, _ in
             Task {
-                await rebuildOwner.noteReconnect()
+                if scope?.isAgentScope != true {
+                    await rebuildOwner.noteReconnect()
+                }
                 await activityOwner.refresh(agentID: scope?.agentID)
             }
         }
