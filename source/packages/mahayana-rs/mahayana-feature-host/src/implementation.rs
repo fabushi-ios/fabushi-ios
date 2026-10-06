@@ -2337,7 +2337,16 @@ impl FeatureHostController {
                 })?;
                 let video_path = session_dir.join("demo.mp4");
                 let child = if self.config.mode == HostMode::Production {
-                    Some(spawn_teach_capture(&video_path)?)
+                    #[cfg(target_os = "ios")]
+                    {
+                        // iOS owns capture through the shipping WKWebView. The
+                        // Host still owns session identity, storage and learning.
+                        None
+                    }
+                    #[cfg(not(target_os = "ios"))]
+                    {
+                        Some(spawn_teach_capture(&video_path)?)
+                    }
                 } else {
                     None
                 };
@@ -2483,7 +2492,12 @@ impl FeatureHostController {
         .map_err(|error| FeatureHostError::Contract(format!("write teach manifest: {error}")))?;
 
         if self.config.mode == HostMode::Production {
-            let _ = extract_teach_frames(&active.video_path, &active.session_dir.join("frames"));
+            #[cfg(not(target_os = "ios"))]
+            {
+                let _ = extract_teach_frames(&active.video_path, &active.session_dir.join("frames"));
+            }
+            // On iOS the native WKWebView capture owner writes both demo.mp4
+            // and sampled JPEG frames into this Host-owned session directory.
         }
         let video_path = active.video_path.to_string_lossy().to_string();
         let _ = self.schedule_teach_learning(&active.agent_id, &video_path, &active.session_dir);
@@ -12385,6 +12399,11 @@ fn teach_recording_status(active: Option<&TeachCaptureProcess>) -> TeachRecordin
             agent_id: Some(active.agent_id.clone()),
             started_at_ms: Some(active.started_at_ms),
             max_duration_ms: TEACH_MAX_DURATION_MS,
+            capture_path: if cfg!(target_os = "ios") {
+                Some(active.video_path.to_string_lossy().to_string())
+            } else {
+                None
+            },
         },
         None => TeachRecordingStatus::default(),
     }
