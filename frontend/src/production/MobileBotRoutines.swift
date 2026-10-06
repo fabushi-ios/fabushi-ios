@@ -810,6 +810,7 @@ internal struct MobileBotRoutineSpec: Equatable {
     let prompt: String
     let schedule: String
     let isEnabled: Bool
+    let trigger: AutomationTrigger? = nil
 }
 
 internal enum MobileBotRoutinesSnapshot: Equatable {
@@ -968,9 +969,12 @@ internal enum MobileBotRoutinesModel {
             "agentId": agentId,
             "name": spec.name,
             "prompt": spec.prompt,
-            "schedule": spec.schedule,
+            "schedule": spec.trigger.flatMap(triggerSchedule) ?? spec.schedule,
             "enabled": spec.isEnabled,
         ]
+        if let trigger = spec.trigger {
+            command["trigger"] = routineTriggerWireValue(trigger)
+        }
         if let id {
             command["id"] = id
         }
