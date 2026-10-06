@@ -33,13 +33,21 @@ struct RemoteComputerAgentBoxAction: Equatable, Sendable {
     let y: Double?
 }
 
+struct RemoteComputerAgentBoxHandoff: Equatable, Sendable {
+    let requestID: String
+    let instruction: String
+    let snapshotDataURL: String?
+}
+
 struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
     let agentID: String
     let state: String
     let vncURL: URL?
     let imageUpdateAvailable: Bool
     let diskPressure: RemoteComputerAgentBoxDiskPressureSnapshot?
-    let hasHandoff: Bool
+    let handoff: RemoteComputerAgentBoxHandoff?
+
+    var hasHandoff: Bool { handoff != nil }
 
     init(
         agentID: String,
@@ -47,14 +55,14 @@ struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
         vncURL: URL?,
         imageUpdateAvailable: Bool,
         diskPressure: RemoteComputerAgentBoxDiskPressureSnapshot? = nil,
-        hasHandoff: Bool = false
+        handoff: RemoteComputerAgentBoxHandoff? = nil
     ) {
         self.agentID = agentID
         self.state = state
         self.vncURL = vncURL
         self.imageUpdateAvailable = imageUpdateAvailable
         self.diskPressure = diskPressure
-        self.hasHandoff = hasHandoff
+        self.handoff = handoff
     }
 
     var isReadyForVNC: Bool {
@@ -182,7 +190,23 @@ final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
             vncURL: vncURL,
             imageUpdateAvailable: object["imageUpdateAvailable"] as? Bool ?? false,
             diskPressure: projectDiskPressure(object["diskPressure"]),
-            hasHandoff: object["handoff"] != nil && !(object["handoff"] is NSNull)
+            handoff: projectHandoff(object["handoff"])
+        )
+    }
+
+    private static func projectHandoff(_ value: Any?) -> RemoteComputerAgentBoxHandoff? {
+        guard let object = value as? [String: Any] else { return nil }
+        let requestID =
+            (object["requestId"] as? String)
+            ?? (object["id"] as? String)
+            ?? ""
+        guard !requestID.isEmpty else { return nil }
+        return .init(
+            requestID: requestID,
+            instruction: (object["instruction"] as? String) ?? "",
+            snapshotDataURL:
+                (object["snapshotDataUrl"] as? String)
+                ?? (object["snapshotDataURL"] as? String)
         )
     }
 
