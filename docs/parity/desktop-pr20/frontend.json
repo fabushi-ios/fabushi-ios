@@ -1633,11 +1633,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native SwiftUI/WKWebView replaces React preview/fullscreen DOM. Account scope retains the paired-computer page; Agent scope now renders the authenticated HTTPS VNC URL returned by the typed Host-owned Agent-box lifecycle and never falls back to the account paired-computer URL. The native surface still lacks full live monitor-strip/cursor-overlay/teach composition, so this broader view row remains mapped.",
+      "ios_platform_delta": "Native SwiftUI/WKWebView replaces React preview/fullscreen DOM. Agent scope renders authenticated Host-owned VNC, a live monitor picker backed by running Computer-use subagent status, trusted noVNC cursor overlay and native teach-recording controls. Broader Desktop handoff actions/focus-keyboard/warm-preview details remain independently auditable, so this aggregate row stays mapped.",
       "implementation_status": "mapped",
-      "production_evidence": "RemoteComputerSurface is the single shipping Computer presentation owner. Agent scope calls computer.agentBox.ensure through the Host, validates same-Agent HTTPS VNC identity, renders that session in RemoteComputerWebView, reconnects through the same owner and releases it on scope change/disappear. Failure remains closed with an Agent-unavailable state.",
-      "test_evidence": "RemoteComputerRebuildTests covers the typed source contract, same-Agent HTTPS VNC projection, unsafe/cross-Agent rejection, reconnect, stale fencing and release. Exact-HEAD UI/protected acceptance is required; live monitor/cursor/teach acceptance remains outstanding.",
-      "notes": "Keep mapped. Agent VNC presentation is now real rather than a permanent unavailable placeholder, but the Desktop view responsibility also includes monitor switching, trusted cursor overlay and teach-recording composition that are not yet closed."
+      "production_evidence": "RemoteComputerSurface is the single shipping Computer presentation owner. selectedAgentVNCURL drives the actual WKWebView; shippingMonitorPicker changes that URL; RemoteComputerTrustedCursorOverlay renders trusted noVNC telemetry; teachRecordingBar composes the native teach owner. No model-only surrogate is used.",
+      "test_evidence": "RemoteComputerRebuildTests covers selection/cursor models and typed VNC lifecycle; RemoteComputerTeachRecordingTests covers teach lifecycle. Fresh current-head UI/protected acceptance remains required.",
+      "notes": "Monitor switching, trusted cursor overlay and teach composition are now production-wired. Keep this aggregate row mapped until remaining view.tsx responsibilities (including complete handoff action and focus/keyboard/warm-preview behavior) are audited and closed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/vnc-webview.tsx",
@@ -1663,11 +1663,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native SwiftUI must compose one Agent-scoped teach-recording owner into RemoteComputerSurface. The existing Agent Computer surface is currently fail-closed because the authenticated ForeverBox/VNC lifecycle is not yet migrated, so teach composition cannot be truthfully enabled yet.",
-      "implementation_status": "mapped",
-      "production_evidence": "RemoteComputerSurface is the single shipping Agent Computer presentation owner and already distinguishes Agent scope from paired-computer account scope; no parallel teach surface is introduced.",
-      "test_evidence": "Desktop source audit at PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701 establishes live-stage/no-handoff gating and fullscreen/composer-focus composition. Native focused tests remain required with the Agent VNC/teach owner.",
-      "notes": "Applicable. Do not mark N/A: the product behavior is user-visible and must land with the real Agent Computer lifecycle rather than on the paired-computer WebKit path."
+      "ios_platform_delta": "Native SwiftUI composes one Agent-scoped teach owner into RemoteComputerSurface. Availability is gated on a live authenticated Agent VNC stage and absence of a Host-projected handoff. The Host remains the lifecycle owner; iOS replaces only Desktop renderer composition and capture mechanics.",
+      "implementation_status": "implemented",
+      "production_evidence": "RemoteComputerSurface owns the shipping Agent Computer composition, creates one RemoteComputerTeachRecordingOwner, gates Teach a task on selectedAgentVNCURL plus hasHandoff == false, and binds the same owner to the active RemoteComputerWebView capture source. Account-scope paired Computer never exposes teach controls.",
+      "test_evidence": "RemoteComputerTeachRecordingTests covers Host status projection, live capture start/save, capture failure discard/rollback, reconnect healing, reset cleanup and handoff gating. Fresh exact-HEAD ordinary/protected CI is required before verified.",
+      "notes": "Implemented on the current branch; do not promote to verified until the resulting exact HEAD is green and real-device archive/protected evidence is current."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/teach-recording/primitives.tsx",
@@ -1693,11 +1693,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Requires one native @MainActor Agent-scoped teach-recording owner using the canonical Host/Computer source. It must not reuse VoiceRecorder (different product responsibility) or add a second Computer polling owner. The current iOS Host lacks the authenticated Agent ForeverBox/VNC/teach source, so implementation is blocked behind that lifecycle service.",
-      "implementation_status": "mapped",
-      "production_evidence": "No native teach-recording owner is currently shipping. RemoteComputerSurface remains the designated single Computer owner and intentionally fails closed for Agent scope until the Host lifecycle exists.",
-      "test_evidence": "Required focused tests: reconnect heal, Agent/account scope fencing, exactly one elapsed timer, start/stop optimistic rollback, save/discard, reset orphan cleanup, dispose cancellation and 10-minute limit. Not yet implemented.",
-      "notes": "Applicable and not complete. Voice recording/transcription paths are not substitutes for Computer teach recording."
+      "ios_platform_delta": "RemoteComputerTeachRecordingOwner is the single @MainActor native store. It uses canonical Host feature.execute teach.status/start/stop commands, owns arm/idle/recording projection, one 1-second elapsed timer, optimistic start/stop, generation fencing, reconnect healing, reset/dispose cleanup and the 10-minute cap. RemoteComputerTeachCaptureController is capture mechanics only and never owns teach state.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerTeachRecording.swift contains IOSRemoteComputerTeachRecordingSource, RemoteComputerTeachRecordingOwner and the native WKWebView capture adapter. Host protocol status carries an iOS-only Host-owned capturePath; Mahayana FeatureHost keeps canonical teach session/save/learning ownership.",
+      "test_evidence": "RemoteComputerTeachRecordingTests exercises start/save, capture-start failure with discard rollback, reconnect status healing, reset orphan cleanup and Host projection. Current-head Actions are pending.",
+      "notes": "Implemented but not verified. Native capture replaces iOS-incompatible ffmpeg/x11grab; VoiceRecorder is not reused."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/teach-recording/view.tsx",
@@ -1708,11 +1708,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "SwiftUI should project the same state from the single native teach-recording owner; React fragments/CSS are not copied. The view stays mapped until Agent VNC and the teach source are real so iOS does not expose inert recording controls.",
-      "implementation_status": "mapped",
-      "production_evidence": "RemoteComputerSurface is the shipping Computer surface and currently exposes an explicit Agent-unavailable replacement instead of fake teach controls.",
-      "test_evidence": "Focused native projection/UI tests remain required for hidden/armed/recording, duration formatting, own-vs-peer labels and save/discard actions once the source exists.",
-      "notes": "Applicable user-visible behavior; blocked by the same authenticated Agent Computer lifecycle as shell view/controller."
+      "ios_platform_delta": "SwiftUI replaces React/CSS. The shipping surface projects hidden/armed/recording states, REC duration, own-vs-peer copy, start, stop-and-save, discard and dismiss controls directly from the one RemoteComputerTeachRecordingOwner.",
+      "implementation_status": "implemented",
+      "production_evidence": "RemoteComputerSurface.teachRecordingBar is rendered only in Agent Computer scope and uses the live owner. Recording state is visible above the real WKWebView; the same view supplies the capture frames and controls save/discard.",
+      "test_evidence": "RemoteComputerTeachRecordingTests covers the owner state transitions backing armed/recording UI and duration state; exact-HEAD Swift UI/protected acceptance remains required.",
+      "notes": "Implemented on the current branch; verification waits for current exact-HEAD ordinary and protected acceptance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/update/confirmation.ts",
