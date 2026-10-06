@@ -1597,17 +1597,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/status-store.ts",
       "desktop_blob_sha": "e57c92249587250d310ab0c26ba187d77f47d41b",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Owns the Desktop Computer status cache and lifecycle around ForeverBox reads/ensure/hand-back: watched-record retention/eviction, read and ensure dedupe, timeout with late-result acceptance, stale-attempt fencing, reconnect/focus hydration, reset/dispose, disk-pressure/computer-action/VNC-presence ingestion, and the short active-task hold used by the shell.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Computer status does not flash stale boxes across reconnects or Agent changes; duplicate reads/ensure calls are suppressed, late stale replies cannot overwrite newer state, handoff returns through the canonical box owner, and temporary task transitions do not make the Computer affordance flicker.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS has no production service for Desktop's Cursor ForeverBox get/ensure lifecycle, so it must not copy the read-timeout/ensure RPC path against unserved methods. The shipping RemoteComputerRebuildOwner already owns scope-stale fencing plus transport/box hydration from the real WKWebView lifecycle, while MobileBotChat is the existing single Host owner for box.handoff.resolve. The remaining live subagent/task/cursor status cache and active-hold behavior must be composed from canonical Host state before this row can be implemented.",
+      "implementation_status": "mapped",
+      "production_evidence": "RemoteComputerSurface uses one RemoteComputerRebuildOwner for scope reset/dispose, box/transport state and reconnect hydration; IOSRemoteComputerRebuildSource.supportsManagedLifecycle=false prevents calls to unserved get/update/recreate lifecycle RPCs. MobileBotChat resolves Host box handoffs through feature.execute type=box.handoff.resolve and updates the same transcript flow.",
+      "test_evidence": "RemoteComputerRebuildTests covers stale operation fencing, scope reset/dispose, healthy→disconnect→reconnect and fail-closed unavailable managed lifecycle. Existing MobileBotChat production code demonstrates the canonical handoff path. Live subagent/task/cursor cache and active-hold tests remain outstanding.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. Keep mapped: do not invent a second ForeverBox RPC/timer or treat the paired-phone RemoteComputer Host protocol as the Desktop ForeverBox backend. Next closure requires canonical Host subagent/task/cursor composition or an authenticated iOS-owned lifecycle service."
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/view.css",
