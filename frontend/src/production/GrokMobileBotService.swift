@@ -243,18 +243,16 @@ struct GrokMobileBotService {
                 method: "feature.execute",
                 params: ["command": ["type": "bot.list", "requestId": requestId]]
             )
-            for _ in 0..<32 {
-                try Task.checkCancellation()
-                let result = try await bridge.request(
-                    method: "feature.receive",
-                    params: ["timeoutMs": 80]
-                )
-                guard let event = result.value as? [String: Any],
-                      let type = event["type"] as? String
-                else { continue }
-                if type == "bot.listed", let rows = event["bots"] as? [[String: Any]] {
-                    return rows.compactMap(Self.parseBot).filter { $0.id != "mahayana-assistant" }
-                }
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 2_560
+            ) { event in
+                event["type"] as? String == "bot.listed"
+            }
+            if let event = result.value as? [String: Any],
+               let rows = event["bots"] as? [[String: Any]]
+            {
+                return rows.compactMap(Self.parseBot)
+                    .filter { $0.id != "mahayana-assistant" }
             }
         } catch {
             return []
@@ -269,18 +267,15 @@ struct GrokMobileBotService {
                 method: "feature.execute",
                 params: ["command": ["type": "group.list", "requestId": requestId]]
             )
-            for _ in 0..<32 {
-                try Task.checkCancellation()
-                let result = try await bridge.request(
-                    method: "feature.receive",
-                    params: ["timeoutMs": 80]
-                )
-                guard let event = result.value as? [String: Any],
-                      let type = event["type"] as? String
-                else { continue }
-                if type == "group.listed", let rows = event["groups"] as? [[String: Any]] {
-                    return rows.compactMap(Self.parseGroup)
-                }
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 2_560
+            ) { event in
+                event["type"] as? String == "group.listed"
+            }
+            if let event = result.value as? [String: Any],
+               let rows = event["groups"] as? [[String: Any]]
+            {
+                return rows.compactMap(Self.parseGroup)
             }
         } catch {
             return []
