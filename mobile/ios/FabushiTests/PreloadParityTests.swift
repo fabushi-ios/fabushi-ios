@@ -115,6 +115,7 @@ final class PreloadParityTests: XCTestCase {
         ]))
     }
 
+    @MainActor
     func testVNCBootstrapScriptUsesRealNoVNCSignalsAndCounters() {
         let script = IOSVNCPreloadRuntime.bootstrapScript
         XCTAssertTrue(script.contains("noVNC_connected"))
