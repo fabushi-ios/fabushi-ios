@@ -422,7 +422,7 @@ struct AccountFeedbackView: View {
                         .accessibilityIdentifier("account-feedback-message")
                     Text("\(message.count) / 10,000")
                         .font(.caption)
-                        .foregroundStyle(message.count > 10_000 ? .red : .secondary)
+                        .foregroundStyle(message.count > 10_000 ? Color.red : Color.secondary)
                 }
                 if let errorMessage {
                     Section {
