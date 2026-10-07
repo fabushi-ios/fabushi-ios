@@ -62,31 +62,43 @@ struct GrokMobileBotService {
                 userInfo: [NSLocalizedDescriptionKey: "Bot 名称不能为空"]
             )
         }
-        return try await executeBotMutation(
-            Self.renameCommand(
-                id: id,
-                name: trimmed,
-                requestId: "ios-mobile-bot-rename-\(UUID().uuidString.lowercased())"
-            )
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.renameCommand(
+                    id: id,
+                    name: trimmed,
+                    requestId: "ios-mobile-bot-rename-\(UUID().uuidString.lowercased())"
+                ),
+            ]
         )
+        return await loadBots()
     }
 
     func duplicateBot(id: String) async throws -> [MobileBotSummary] {
-        try await executeBotMutation(
-            Self.duplicateCommand(
-                id: id,
-                requestId: "ios-mobile-bot-clone-\(UUID().uuidString.lowercased())"
-            )
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.duplicateCommand(
+                    id: id,
+                    requestId: "ios-mobile-bot-clone-\(UUID().uuidString.lowercased())"
+                ),
+            ]
         )
+        return await loadBots()
     }
 
     func deleteBot(id: String) async throws -> [MobileBotSummary] {
-        try await executeBotMutation(
-            Self.deleteCommand(
-                id: id,
-                requestId: "ios-mobile-bot-delete-\(UUID().uuidString.lowercased())"
-            )
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.deleteCommand(
+                    id: id,
+                    requestId: "ios-mobile-bot-delete-\(UUID().uuidString.lowercased())"
+                ),
+            ]
         )
+        return await loadBots()
     }
 
     func loadPinnedBotIds() async throws -> [String] {
@@ -142,23 +154,31 @@ struct GrokMobileBotService {
     }
 
     func setBotHidden(id: String, hidden: Bool) async throws -> [MobileBotSummary] {
-        try await executeBotMutation(
-            Self.setHiddenCommand(
-                id: id,
-                hidden: hidden,
-                requestId: "ios-mobile-bot-hidden-\(UUID().uuidString.lowercased())"
-            )
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.setHiddenCommand(
+                    id: id,
+                    hidden: hidden,
+                    requestId: "ios-mobile-bot-hidden-\(UUID().uuidString.lowercased())"
+                ),
+            ]
         )
+        return await loadBots()
     }
 
     func setBotUnread(id: String, unread: Bool) async throws -> [MobileBotSummary] {
-        try await executeBotMutation(
-            Self.setUnreadCommand(
-                id: id,
-                unread: unread,
-                requestId: "ios-mobile-bot-unread-\(UUID().uuidString.lowercased())"
-            )
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.setUnreadCommand(
+                    id: id,
+                    unread: unread,
+                    requestId: "ios-mobile-bot-unread-\(UUID().uuidString.lowercased())"
+                ),
+            ]
         )
+        return await loadBots()
     }
 
     func asyncTasks(agentId: String) async throws -> [MobileAgentAsyncTask] {
@@ -370,11 +390,6 @@ struct GrokMobileBotService {
             "id": id,
             "memberIds": memberIds,
         ]
-    }
-
-    private func executeBotMutation(_ command: [String: Any]) async throws -> [MobileBotSummary] {
-        _ = try await bridge.request(method: "feature.execute", params: ["command": command])
-        return await loadBots()
     }
 
     private func loadIndividualBots() async -> [MobileBotSummary] {
