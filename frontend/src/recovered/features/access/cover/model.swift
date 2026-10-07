@@ -47,26 +47,29 @@ struct AccessCoverGateInput: Equatable, Sendable {
 
 enum AccessCoverModel {
     static func project(stateWire: Int, reasonWire: Int) -> AccessCoverSandAccess {
-        .init(
-            state: switch stateWire {
-            case 1: .granted
-            case 2: .unavailable
-            case 3: .paymentRequired
-            default: .unknown
-            },
-            reason: switch reasonWire {
-            case 1: .none
-            case 2: .teamPrivacyMode
-            case 3: .teamSetupRequired
-            case 4: .teamAccessRequired
-            case 5: .notOffered
-            case 6: .freeTrialAvailable
-            case 7: .paywallIndividual
-            case 8: .paywallTeamMember
-            case 9: .paywallTeamAdmin
-            default: .unspecified
-            }
-        )
+        let state: AccessCoverSandAccessState
+        switch stateWire {
+        case 1: state = .granted
+        case 2: state = .unavailable
+        case 3: state = .paymentRequired
+        default: state = .unknown
+        }
+
+        let reason: AccessCoverSandAccessBlockReason
+        switch reasonWire {
+        case 1: reason = .none
+        case 2: reason = .teamPrivacyMode
+        case 3: reason = .teamSetupRequired
+        case 4: reason = .teamAccessRequired
+        case 5: reason = .notOffered
+        case 6: reason = .freeTrialAvailable
+        case 7: reason = .paywallIndividual
+        case 8: reason = .paywallTeamMember
+        case 9: reason = .paywallTeamAdmin
+        default: reason = .unspecified
+        }
+
+        return .init(state: state, reason: reason)
     }
 
     static func noticeCopy(for access: AccessCoverSandAccess) -> AccessCoverCopy? {
