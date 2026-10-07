@@ -2075,7 +2075,7 @@ impl EngineBackend for NativeEngine {
                             )));
                         }
                         Some(OperationAttemptState::Interrupted) => {
-                            return Err(KernelError::Interrupted(format!(
+                            return Err(KernelError::Backend(format!(
                                 "{} was interrupted before Host settlement",
                                 request.operation_id.as_str()
                             )));

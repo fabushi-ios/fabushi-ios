@@ -499,7 +499,9 @@ impl FeatureHostController {
             execution.epoch = state.routine_epoch;
             if !routine_owner_matches(&state, &execution, self.config.mode == HostMode::Test) { continue; }
             if matches!(execution.phase, RoutinePhase::Dispatching | RoutinePhase::Running) {
-                execution.phase = if execution.operation_id.is_some() {
+                execution.phase = if self.config.mode == HostMode::Production
+                    && execution.operation_id.is_some()
+                {
                     RoutinePhase::Suspended
                 } else {
                     RoutinePhase::RecoveryRequired
