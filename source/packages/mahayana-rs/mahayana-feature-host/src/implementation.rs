@@ -1159,6 +1159,7 @@ impl FeatureHostController {
         if restored.exists() {
             if !metadata.unpublish_restore_prepared
                 || !restored.join(WORKFLOW_FILENAME).is_file()
+                || !unpublish_recovery_marker_matches(&restored, &metadata)
             {
                 return Err(FeatureHostError::Contract(format!(
                     "A private skill with id \"{}\" already exists; refusing to overwrite it.",
@@ -1189,6 +1190,7 @@ impl FeatureHostController {
         ));
         let restore_result = (|| {
             copy_workflow_tree(&cache_root.join("skill"), &temp_restore)?;
+            write_unpublish_recovery_marker(&temp_restore, &metadata)?;
             std::fs::rename(&temp_restore, &restored).map_err(|error| {
                 FeatureHostError::Contract(format!("restore private skill: {error}"))
             })?;
@@ -1222,6 +1224,19 @@ impl FeatureHostController {
             .as_deref()
             .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
         let cache_root = published_workflow_cache_root(workflow_root, plugin_id)?;
+        if let Some(metadata) = read_published_workflow_cache(&cache_root) {
+            let restored = workflow_root.join(&metadata.original_workflow_id);
+            if unpublish_recovery_marker_matches(&restored, &metadata) {
+                let marker = restored.join(PUBLISHED_WORKFLOW_RECOVERY_MARKER);
+                if marker.exists() {
+                    std::fs::remove_file(&marker).map_err(|error| {
+                        FeatureHostError::Contract(format!(
+                            "remove unpublish recovery marker: {error}"
+                        ))
+                    })?;
+                }
+            }
+        }
         if cache_root.exists() {
             std::fs::remove_dir_all(&cache_root).map_err(|error| {
                 FeatureHostError::Contract(format!("remove unpublished skill cache: {error}"))
@@ -12352,6 +12367,7 @@ fn write_workflow(
 
 const PUBLISHED_WORKFLOW_CACHE_DIR: &str = ".published-plugin-skills";
 const PUBLISHED_WORKFLOW_CACHE_METADATA: &str = "metadata.json";
+const PUBLISHED_WORKFLOW_RECOVERY_MARKER: &str = ".fabushi-publish-recovery.json";
 
 fn is_exact_skill_publish_version(value: &str) -> bool {
     let value = value.trim();
@@ -12399,6 +12415,41 @@ fn write_published_workflow_cache(
     .map_err(|error| {
         FeatureHostError::Contract(format!("write published skill cache: {error}"))
     })
+}
+
+fn write_unpublish_recovery_marker(
+    workflow_dir: &Path,
+    metadata: &PublishedWorkflowCacheMetadata,
+) -> Result<(), FeatureHostError> {
+    let body = serde_json::to_vec_pretty(&json!({
+        "pluginId": metadata.plugin_id,
+        "originalWorkflowId": metadata.original_workflow_id,
+    }))
+    .map_err(|error| {
+        FeatureHostError::Contract(format!("serialize unpublish recovery marker: {error}"))
+    })?;
+    std::fs::write(
+        workflow_dir.join(PUBLISHED_WORKFLOW_RECOVERY_MARKER),
+        [body.as_slice(), b"\n"].concat(),
+    )
+    .map_err(|error| {
+        FeatureHostError::Contract(format!("write unpublish recovery marker: {error}"))
+    })
+}
+
+fn unpublish_recovery_marker_matches(
+    workflow_dir: &Path,
+    metadata: &PublishedWorkflowCacheMetadata,
+) -> bool {
+    let Ok(bytes) = std::fs::read(workflow_dir.join(PUBLISHED_WORKFLOW_RECOVERY_MARKER)) else {
+        return false;
+    };
+    let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
+        return false;
+    };
+    value.get("pluginId").and_then(Value::as_str) == Some(metadata.plugin_id.as_str())
+        && value.get("originalWorkflowId").and_then(Value::as_str)
+            == Some(metadata.original_workflow_id.as_str())
 }
 
 fn copy_workflow_tree(source: &Path, target: &Path) -> Result<(), FeatureHostError> {
@@ -17267,7 +17318,47 @@ mod tests {
         assert_eq!(retry_prepared["restoredWorkflowId"], workflow_id);
         assert_eq!(retry_prepared["restoreReused"], true);
         assert!(workflow_root.join(workflow_id).join(WORKFLOW_FILENAME).is_file());
+        assert!(
+            workflow_root
+                .join(workflow_id)
+                .join(PUBLISHED_WORKFLOW_RECOVERY_MARKER)
+                .is_file()
+        );
         assert!(cache_root.exists());
+
+        // A persisted "restore intended" bit is not enough to prove ownership
+        // of an existing private copy. If the Host-prepared copy disappears and
+        // an unrelated skill reuses the same id, retry must still fail closed.
+        std::fs::remove_dir_all(workflow_root.join(workflow_id))
+            .expect("remove prepared recovery copy");
+        write_workflow(
+            &workflow_root,
+            &agent_root,
+            agent_id,
+            Some(workflow_id),
+            "Unrelated local replacement",
+            "Must never be mistaken for the Host recovery copy.",
+            "Do not overwrite this private skill.",
+            None,
+            None,
+        )
+        .expect("create unrelated replacement");
+        let collision = controller
+            .prepare_workflow_unpublish(agent_id, &promoted_id)
+            .expect_err("unrelated replacement must fail closed");
+        assert!(collision.to_string().contains("refusing to overwrite"));
+        std::fs::remove_dir_all(workflow_root.join(workflow_id))
+            .expect("remove unrelated replacement");
+        let recreated = controller
+            .prepare_workflow_unpublish(agent_id, &promoted_id)
+            .expect("recreate missing Host-owned recovery copy");
+        assert_eq!(recreated["restoreReused"], false);
+        assert!(
+            workflow_root
+                .join(workflow_id)
+                .join(PUBLISHED_WORKFLOW_RECOVERY_MARKER)
+                .is_file()
+        );
 
         controller
             .complete_workflow_unpublish(agent_id, plugin_id)
@@ -17276,6 +17367,13 @@ mod tests {
         assert!(
             workflow_root.join(workflow_id).join(WORKFLOW_FILENAME).is_file(),
             "successful unpublish must preserve the restored private copy"
+        );
+        assert!(
+            !workflow_root
+                .join(workflow_id)
+                .join(PUBLISHED_WORKFLOW_RECOVERY_MARKER)
+                .exists(),
+            "successful unpublish must remove the internal recovery marker"
         );
         let _ = std::fs::remove_dir_all(&workflow_root);
     }
