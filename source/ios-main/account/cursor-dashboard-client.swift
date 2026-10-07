@@ -340,7 +340,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             resolveGhostMode: { _ in "true" }
         )
         let url = backendURL
-            .appendingPathComponent("aiserver.v1.\(service)")
+            .appendingPathComponent("aiserver.v1.DashboardService")
             .appendingPathComponent(method)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -388,7 +388,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             resolveGhostMode: { _ in "true" }
         )
         let url = backendURL
-            .appendingPathComponent("aiserver.v1.DashboardService")
+            .appendingPathComponent("aiserver.v1.\(service)")
             .appendingPathComponent(method)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
