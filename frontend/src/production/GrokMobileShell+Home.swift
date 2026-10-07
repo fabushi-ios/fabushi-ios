@@ -68,12 +68,14 @@ extension GrokMobileShell {
                                 if let prompt, !prompt.isEmpty {
                                     botDrafts["mahayana-assistant"] = prompt
                                 }
-                                selectedBot = bots.first(where: { $0.id == "mahayana-assistant" })
-                                    ?? MobileBotSummary(
-                                        id: "mahayana-assistant",
-                                        name: "Mahayana",
-                                        description: "Ready to help"
-                                    )
+                                selectBotForConversation(
+                                    bots.first(where: { $0.id == "mahayana-assistant" })
+                                        ?? MobileBotSummary(
+                                            id: "mahayana-assistant",
+                                            name: "Mahayana",
+                                            description: "Ready to help"
+                                        )
+                                )
                             }
                         )
                         .padding(.bottom, 12)
@@ -285,7 +287,7 @@ extension GrokMobileShell {
                 if bot.isGroup && !bot.isSharedRoom {
                     groupMembersTarget = bot
                 } else {
-                    selectedBot = bot
+                    selectBotForConversation(bot)
                 }
             } label: {
                 HStack(spacing: 12) {
