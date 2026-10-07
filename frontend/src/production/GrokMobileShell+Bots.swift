@@ -495,18 +495,8 @@ extension GrokMobileShell {
     }
 
     @MainActor
-    func showAsyncTasks(_ bot: MobileBotSummary) async {
+    func showAsyncTasks(_ bot: MobileBotSummary) {
         guard !bot.isGroup, bot.miniAppId == nil else { return }
         asyncTasksTarget = bot
-        asyncTasks = []
-        asyncTasksError = nil
-        asyncTasksBusy = true
-        defer { asyncTasksBusy = false }
-        do {
-            asyncTasks = try await GrokMobileBotService(bridge: bridge)
-                .asyncTasks(agentId: bot.id)
-        } catch {
-            asyncTasksError = "加载异步任务失败：\(error.localizedDescription)"
-        }
     }
 }

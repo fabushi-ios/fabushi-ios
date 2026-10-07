@@ -31,9 +31,6 @@ internal struct GrokMobileShell: View {
     @State var rosterSelectionScopeKey = ""
     @State var pinnedBotIdOrder: [String] = []
     @State var asyncTasksTarget: MobileBotSummary?
-    @State var asyncTasks: [MobileAgentAsyncTask] = []
-    @State var asyncTasksBusy = false
-    @State var asyncTasksError: String?
     @State var agentSidebarSections: [MobileAgentSidebarSection] = []
     @State var newSectionBot: MobileBotSummary?
     @State var newSectionName = ""
@@ -154,44 +151,12 @@ internal struct GrokMobileShell: View {
             Text("其中的 Bots 会移到“未分组”，不会删除任何 Bot。")
         }
         .sheet(item: $asyncTasksTarget) { agent in
-            NavigationStack {
-                List {
-                    if asyncTasksBusy {
-                        ProgressView("正在加载异步任务…")
-                    } else if let asyncTasksError {
-                        Text(asyncTasksError)
-                            .foregroundStyle(.red)
-                            .accessibilityIdentifier("agent-async-tasks-error")
-                    } else if asyncTasks.isEmpty {
-                        Text("当前没有运行中的异步任务")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(asyncTasks) { task in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(task.label).font(.headline)
-                                    Spacer()
-                                    Text(task.kind).font(.caption).foregroundStyle(.secondary)
-                                }
-                                if let detail = task.detail, !detail.isEmpty {
-                                    Text(detail).font(.subheadline).foregroundStyle(.secondary)
-                                }
-                                if let resourceId = task.resourceId, !resourceId.isEmpty {
-                                    Text(resourceId).font(.caption2).foregroundStyle(.tertiary)
-                                }
-                            }
-                        }
-                    }
-                }
-                .navigationTitle("\(agent.name) · 异步任务")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("关闭") { asyncTasksTarget = nil }
-                    }
-                }
-            }
-            .accessibilityIdentifier("agent-async-tasks")
+            MobileAsyncTasksPanel(
+                agentId: agent.id,
+                agentName: agent.name,
+                bridge: bridge,
+                onClose: { asyncTasksTarget = nil }
+            )
         }
         .sheet(item: $botSettingsTarget) { agent in
             MobileBotAgentSettingsSheet(

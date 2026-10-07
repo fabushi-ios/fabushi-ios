@@ -409,7 +409,7 @@ extension GrokMobileShell {
                             }
                         }
                         Button {
-                            Task { await showAsyncTasks(bot) }
+                            showAsyncTasks(bot)
                         } label: {
                             Label("异步任务", systemImage: "clock")
                         }

@@ -342,12 +342,12 @@
       "desktop_visible_effect": "A signed-in user receives the complete Desktop product shell and its coordinated lifecycle, navigation, messaging, Agent, plugin/computer and recovery surfaces.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell.swift",
-      "ios_language": "Swift / SwiftUI + Rust Host bridge",
-      "ios_platform_delta": "iOS replaces the monolithic React composition with SwiftUI scene/shell feature extensions over one FabushiRuntime/IOSPreloadBridge. Many imported Desktop responsibilities are already mapped to native owners, including messaging, Bot lifecycle/settings/groups, command palette, Marketplace/Mini Apps, protected account/runtime, computer and lifecycle recovery. This whole-file row remains mapped until every applicable subordinate renderer responsibility and release journey is closed; one local feature cannot promote the aggregate root.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/FabushiApp.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": ".github/workflows/ios-desktop-pr20-architecture.yml; .github/workflows/ios-protected-session.yml",
-      "notes": "Aggregate composition row. Current iOS product has substantial production wiring, but this row is deliberately not marked implemented/verified until all applicable subordinate responsibilities represented by Desktop ProductionRenderer are audited and current-head release evidence is complete."
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "iOS decomposes the Desktop renderer root across FabushiSceneRoot -> ProductionRenderer -> GrokMobileShell/ContentView while keeping domain state in the existing MarketplaceModel, MessagingModel, FeatureHost and Coordinator owners. ScenePhase/protected-data/memory/openURL hooks replace Electron window/root lifecycle; native sheets/covers replace DOM overlays; App Store/TestFlight lifecycle replaces Desktop updater chrome. The root now delegates Async Tasks exclusively to MobileAsyncTasksPanel instead of retaining a second renderer provider.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/ProductionRenderer.view.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; source/ios-main/FabushiRuntime.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; mobile/ios/FabushiTests/AsyncTasksParityTests.swift; mobile/ios/FabushiTests/PackageShellPolicyParityTests.swift; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed as the aggregate shipping composition root against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. This promotion records production composition only; child rows remain independently gated. The duplicate hand-written Shell Async Tasks provider was removed so the canonical panel/provider is the sole renderer owner. Keep below verified pending current-head CI and artifacts."
     },
     {
       "desktop_path": "frontend/src/production/agent-name-editor-model.ts",
