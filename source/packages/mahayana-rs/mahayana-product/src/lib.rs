@@ -1874,36 +1874,9 @@ impl MahayanaProductClient {
             }
             "mahayana.feedback.submit" => {
                 let message = required_string(request, "message")?;
-                if message.chars().count() > 10_000 {
-                    return Err(ProductError::InvalidParameter("message"));
-                }
                 let submission_id = required_identifier(request, "submissionId")?;
-                let title_source = message.lines().find(|line| !line.trim().is_empty()).unwrap_or("Fabushi iOS feedback");
-                let title = title_source.trim().chars().take(120).collect::<String>();
-                let description = message.chars().take(5_000).collect::<String>();
-                let overflow = message.chars().skip(5_000).collect::<String>();
-                let diagnostics = if overflow.is_empty() {
-                    json!({"submissionId": submission_id})
-                } else {
-                    json!({
-                        "submissionId": submission_id,
-                        "continuation": overflow,
-                    })
-                };
-                self.authorized_post(
-                    request,
-                    "/api/feedback",
-                    json!({
-                        "title": title,
-                        "description": description,
-                        "category": "product",
-                        "page": "account/session/menu",
-                        "platform": "ios",
-                        "appVersion": env!("CARGO_PKG_VERSION"),
-                        "autoCollected": false,
-                        "diagnostics": diagnostics,
-                    }),
-                )
+                let body = account_menu_feedback_body(message, submission_id)?;
+                self.authorized_post(request, "/api/feedback", body)
             }
             "mahayana.usage.status" => serde_json::to_value(self.model_usage()?)
                 .map_err(|error| ProductError::Response(error.to_string())),
@@ -3819,6 +3792,39 @@ fn miniapp_delegated_token_request(
     })
 }
 
+
+fn account_menu_feedback_body(message: &str, submission_id: &str) -> Result<Value, ProductError> {
+    let message = message.trim();
+    if message.is_empty() || message.chars().count() > 10_000 {
+        return Err(ProductError::InvalidParameter("message"));
+    }
+    let title_source = message
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("Fabushi iOS feedback");
+    let title = title_source.trim().chars().take(120).collect::<String>();
+    let description = message.chars().take(5_000).collect::<String>();
+    let overflow = message.chars().skip(5_000).collect::<String>();
+    let diagnostics = if overflow.is_empty() {
+        json!({"submissionId": submission_id})
+    } else {
+        json!({
+            "submissionId": submission_id,
+            "continuation": overflow,
+        })
+    };
+    Ok(json!({
+        "title": title,
+        "description": description,
+        "category": "product",
+        "page": "account/session/menu",
+        "platform": "ios",
+        "appVersion": env!("CARGO_PKG_VERSION"),
+        "autoCollected": false,
+        "diagnostics": diagnostics,
+    }))
+}
+
 pub fn redact_secrets(value: &Value) -> Value {
     match value {
         Value::Object(object) => {
@@ -4228,6 +4234,25 @@ mod tests {
         assert_eq!(response["user"]["nickname"], "Ada Lovelace");
         server.join().expect("join profile server");
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn account_menu_feedback_preserves_ten_thousand_character_contract() {
+        let message = format!("{}{}", "a".repeat(5_000), "b".repeat(5_000));
+        let body = account_menu_feedback_body(
+            &message,
+            "550e8400-e29b-41d4-a716-446655440000",
+        ).expect("bounded feedback body");
+        assert_eq!(body["description"].as_str().map(str::len), Some(5_000));
+        assert_eq!(
+            body["diagnostics"]["continuation"].as_str().map(str::len),
+            Some(5_000)
+        );
+        assert_eq!(body["diagnostics"]["submissionId"], "550e8400-e29b-41d4-a716-446655440000");
+        assert!(account_menu_feedback_body(
+            &"x".repeat(10_001),
+            "550e8400-e29b-41d4-a716-446655440000",
+        ).is_err());
     }
 
     #[test]
