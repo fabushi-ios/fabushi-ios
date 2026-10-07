@@ -408,6 +408,89 @@ fn bounded_conversation_window(
     (window, next_before_message_id)
 }
 
+const ASYNC_TASK_STALE_MAX_AGE_MS: i64 = 48 * 60 * 60 * 1_000;
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PendingAsyncTasksFile {
+    version: u8,
+    #[serde(default)]
+    tasks: Vec<AsyncTaskSummary>,
+}
+
+fn load_pending_async_tasks(path: &Path, now_ms: i64) -> BTreeMap<String, AsyncTaskSummary> {
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return BTreeMap::new();
+    };
+    let Ok(file) = serde_json::from_str::<PendingAsyncTasksFile>(&raw) else {
+        return BTreeMap::new();
+    };
+    file.tasks
+        .into_iter()
+        .filter(|task| {
+            task.status == AsyncTaskStatus::Running
+                && !task.id.trim().is_empty()
+                && !task.parent_agent_id.trim().is_empty()
+                && now_ms.saturating_sub(task.started_at_ms) <= ASYNC_TASK_STALE_MAX_AGE_MS
+        })
+        .map(|mut task| {
+            let restart_detail = "rearmed after a Host restart";
+            task.detail = Some(match task.detail.as_deref().filter(|detail| !detail.is_empty()) {
+                Some(detail) if !detail.contains(restart_detail) => {
+                    format!("{detail} · {restart_detail}")
+                }
+                Some(detail) => detail.to_string(),
+                None => restart_detail.to_string(),
+            });
+            (task.id.clone(), task)
+        })
+        .collect()
+}
+
+fn persist_pending_async_tasks(
+    path: Option<&Path>,
+    tasks: &BTreeMap<String, AsyncTaskSummary>,
+) -> Result<(), FeatureHostError> {
+    let Some(path) = path else {
+        return Ok(());
+    };
+    if tasks.is_empty() {
+        match std::fs::remove_file(path) {
+            Ok(()) => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(FeatureHostError::Contract(format!(
+                    "remove pending async task store: {error}"
+                )));
+            }
+        }
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| {
+            FeatureHostError::Contract(format!("create pending async task store directory: {error}"))
+        })?;
+    }
+    let file = PendingAsyncTasksFile {
+        version: 1,
+        tasks: tasks.values().cloned().collect(),
+    };
+    let bytes = serde_json::to_vec(&file).map_err(|error| {
+        FeatureHostError::Contract(format!("serialize pending async tasks: {error}"))
+    })?;
+    let part = PathBuf::from(format!("{}.part", path.display()));
+    std::fs::write(&part, bytes).map_err(|error| {
+        FeatureHostError::Contract(format!("write pending async task store: {error}"))
+    })?;
+    if path.exists() {
+        std::fs::remove_file(path).map_err(|error| {
+            FeatureHostError::Contract(format!("replace pending async task store: {error}"))
+        })?;
+    }
+    std::fs::rename(&part, path).map_err(|error| {
+        FeatureHostError::Contract(format!("commit pending async task store: {error}"))
+    })
+}
+
 #[derive(Debug)]
 struct FeatureState {
     events: VecDeque<HostEvent>,
@@ -812,6 +895,26 @@ impl FeatureHostController {
             info: controller.info.clone(),
         });
         Ok(controller)
+    }
+
+    pub fn async_tasks_for_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<Vec<AsyncTaskSummary>, FeatureHostError> {
+        let state = self.state()?;
+        ensure_open(&state)?;
+        let mut tasks = state
+            .async_tasks
+            .values()
+            .filter(|task| task.parent_agent_id == agent_id)
+            .cloned()
+            .collect::<Vec<_>>();
+        tasks.sort_by(|left, right| {
+            left.started_at_ms
+                .cmp(&right.started_at_ms)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        Ok(tasks)
     }
 
     pub fn info(&self) -> HostInfo {
@@ -8209,6 +8312,14 @@ impl FeatureHostController {
                             subagent,
                         });
                     }
+                    persist_pending_async_tasks(
+                        self.async_tasks_path.as_deref(),
+                        &state.async_tasks,
+                    )?;
+                    persist_pending_async_tasks(
+                        self.async_tasks_path.as_deref(),
+                        &state.async_tasks,
+                    )?;
                     let mut tasks = state
                         .async_tasks
                         .values()
