@@ -72,6 +72,37 @@ enum AccessCoverModel {
         return .init(state: state, reason: reason)
     }
 
+    static func project(foundationValue value: Any) -> AccessCoverSandAccess {
+        guard let outer = value as? [String: Any] else { return .unknown }
+        let object = (outer["access"] as? [String: Any]) ?? outer
+
+        func integer(_ value: Any?) -> Int? {
+            if let value = value as? Int { return value }
+            if let value = value as? NSNumber { return value.intValue }
+            return nil
+        }
+
+        if let stateWire = integer(object["state"]),
+           let reasonWire = integer(object["reason"])
+        {
+            return project(stateWire: stateWire, reasonWire: reasonWire)
+        }
+
+        let state: AccessCoverSandAccessState
+        switch object["state"] as? String {
+        case "granted": state = .granted
+        case "unavailable": state = .unavailable
+        case "paymentRequired": state = .paymentRequired
+        case "checking": state = .checking
+        default: state = .unknown
+        }
+
+        let reason = AccessCoverSandAccessBlockReason(
+            rawValue: object["reason"] as? String ?? ""
+        ) ?? .unspecified
+        return .init(state: state, reason: reason)
+    }
+
     static func noticeCopy(for access: AccessCoverSandAccess) -> AccessCoverCopy? {
         if access.state == .checking || access.state == .unknown || access.state == .granted {
             return nil
