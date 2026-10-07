@@ -176,10 +176,18 @@ extension GrokMobileShell {
                     || $0.description.localizedCaseInsensitiveContains(query)
             }
         let pinned = pinnedBotIds
+        let pinnedRank = Dictionary(
+            uniqueKeysWithValues: pinnedBotIdOrder.enumerated().map { ($0.element, $0.offset) }
+        )
         return filtered.sorted {
             let lhsPinned = pinned.contains($0.id)
             let rhsPinned = pinned.contains($1.id)
             if lhsPinned != rhsPinned { return lhsPinned }
+            if lhsPinned, rhsPinned {
+                let lhsRank = pinnedRank[$0.id] ?? Int.max
+                let rhsRank = pinnedRank[$1.id] ?? Int.max
+                if lhsRank != rhsRank { return lhsRank < rhsRank }
+            }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
@@ -254,8 +262,23 @@ extension GrokMobileShell {
                             Label("移到分组", systemImage: "folder")
                         }
                     }
+                    if let pinnedIndex = pinnedBotIdOrder.firstIndex(of: bot.id) {
+                        Button {
+                            Task { await movePinnedBot(bot, offset: -1) }
+                        } label: {
+                            Label("上移置顶", systemImage: "arrow.up")
+                        }
+                        .disabled(pinnedIndex == 0)
+
+                        Button {
+                            Task { await movePinnedBot(bot, offset: 1) }
+                        } label: {
+                            Label("下移置顶", systemImage: "arrow.down")
+                        }
+                        .disabled(pinnedIndex == pinnedBotIdOrder.count - 1)
+                    }
                     Button {
-                        toggleBotPin(bot)
+                        Task { await toggleBotPin(bot) }
                     } label: {
                         Label(
                             pinnedBotIds.contains(bot.id) ? "取消置顶" : "置顶",

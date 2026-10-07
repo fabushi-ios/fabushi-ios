@@ -64,6 +64,31 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertEqual(bot.conversationId, "conversation:agent-1")
     }
 
+    func testPinnedBotProjectionPreservesCanonicalHostOrderAndFailsClosed() {
+        XCTAssertEqual(
+            GrokMobileBotService.canonicalPinnedBotIds(from: ["bot-b", "bot-a", "bot-b"] as [Any]),
+            ["bot-b", "bot-a"]
+        )
+        XCTAssertNil(GrokMobileBotService.canonicalPinnedBotIds(from: ["bot-a", 42] as [Any]))
+        XCTAssertNil(GrokMobileBotService.canonicalPinnedBotIds(from: [""] as [Any]))
+    }
+
+    func testPinnedBotNativeReorderPreservesDesktopStoredOrderSemantics() {
+        let ids = ["bot-a", "bot-b", "bot-c"]
+        XCTAssertEqual(
+            GrokMobileBotService.movedPinnedBotIds(ids, movedId: "bot-b", offset: -1),
+            ["bot-b", "bot-a", "bot-c"]
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.movedPinnedBotIds(ids, movedId: "bot-b", offset: 1),
+            ["bot-a", "bot-c", "bot-b"]
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.movedPinnedBotIds(ids, movedId: "bot-a", offset: -1),
+            ids
+        )
+    }
+
     @MainActor
     func testAgentRowMutationsUseCanonicalHostCommands() {
         let hidden = GrokMobileBotService.setHiddenCommand(

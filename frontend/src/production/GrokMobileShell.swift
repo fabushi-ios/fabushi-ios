@@ -23,7 +23,7 @@ internal struct GrokMobileShell: View {
     @State var botActionBusy = false
     @State var botActionError: String?
     @State var bots: [MobileBotSummary] = []
-    @AppStorage("fabushi.mobile.pinnedBotIds") var pinnedBotIdsStorage = "[]"
+    @State var pinnedBotIdOrder: [String] = []
     @State var asyncTasksTarget: MobileBotSummary?
     @State var asyncTasks: [MobileAgentAsyncTask] = []
     @State var asyncTasksBusy = false
@@ -292,6 +292,7 @@ internal struct GrokMobileShell: View {
                 agentSidebarSections = MobileAgentSidebarSections.load(
                     accountScopeKey: mobileAccountScopeKey
                 )
+                await loadPinnedBotIds()
             }
             .task { await messaging.refresh() }
             .task(id: appAgentSurfaceFingerprint) { publishAppAgentSurface() }

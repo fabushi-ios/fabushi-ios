@@ -89,6 +89,58 @@ struct GrokMobileBotService {
         )
     }
 
+    func loadPinnedBotIds() async throws -> [String] {
+        let result = try await bridge.request(method: "getHostPinnedAgents")
+        guard let ids = Self.canonicalPinnedBotIds(from: result.value) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "Host returned malformed pinned Bot state"]
+            )
+        }
+        return ids
+    }
+
+    func setPinnedBotIds(_ ids: [String]) async throws -> [String] {
+        let requested = Self.canonicalPinnedBotIds(from: ids as [Any]) ?? []
+        let result = try await bridge.request(
+            method: "setHostPinnedAgents",
+            params: ["pinnedAgentIds": requested]
+        )
+        guard let authoritative = Self.canonicalPinnedBotIds(from: result.value) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Host returned malformed pinned Bot state"]
+            )
+        }
+        return authoritative
+    }
+
+    static func canonicalPinnedBotIds(from value: Any) -> [String]? {
+        guard let rows = value as? [Any] else { return nil }
+        var seen = Set<String>()
+        var result: [String] = []
+        for row in rows {
+            guard let id = row as? String, !id.isEmpty else { return nil }
+            if seen.insert(id).inserted {
+                result.append(id)
+            }
+        }
+        return result
+    }
+
+    static func movedPinnedBotIds(_ ids: [String], movedId: String, offset: Int) -> [String] {
+        guard offset != 0,
+              let source = ids.firstIndex(of: movedId)
+        else { return ids }
+        let target = source + offset
+        guard ids.indices.contains(target) else { return ids }
+        var next = ids
+        next.swapAt(source, target)
+        return next
+    }
+
     func setBotHidden(id: String, hidden: Bool) async throws -> [MobileBotSummary] {
         try await executeBotMutation(
             Self.setHiddenCommand(

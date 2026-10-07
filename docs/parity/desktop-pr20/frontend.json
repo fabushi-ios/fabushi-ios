@@ -313,11 +313,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native SwiftUI Bot-row menus preserve Desktop AgentRowActions semantics while keeping lifecycle truth in existing owners: profile/settings and async-task queries route through the Host bridge; full conversation uses the canonical Host conversationId; hide/unread/duplicate/delete mutate the canonical Rust Host; copy is presentation-only; section membership is account-scoped native presentation state; pinned or hidden Bots cannot be moved between sections, matching Desktop gating.",
+      "ios_platform_delta": "Native SwiftUI Bot-row menus preserve Desktop AgentRowActions semantics while keeping lifecycle truth in existing owners: profile/settings and async-task queries route through the Host bridge; full conversation uses canonical conversationId; hide/unread/duplicate/delete mutate the Rust Host; copy is presentation-only; section membership is account-scoped presentation state; pin state and ordering round-trip through getHostPinnedAgents/setHostPinnedAgents. Pinned/hidden Bots cannot move between sections.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileAgentSidebarSections.swift; frontend/src/production/GrokMobileShell.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileAgentSidebarSections.swift; source/ios-preload/main-rpc-runtime.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The native row now exposes profile/settings, full conversation, async tasks, section moves/new section, pin, unread, duplicate, copy conversation ID, hide/restore, and destructive delete. Section movement is suppressed for pinned/hidden Bots like Desktop. Keep below verified until this exact iOS HEAD obtains current ordinary/protected acceptance and artifact provenance."
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Pin ownership now matches Desktop Host persistence rather than global AppStorage, including authoritative ordering and account replacement reset. Keep below verified until this exact iOS HEAD obtains current ordinary/protected acceptance and artifact provenance."
     },
     {
       "desktop_path": "frontend/src/production/CommandPalette.tsx",
@@ -373,11 +373,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "SwiftUI derives the same state-dependent row actions from MobileBotSummary and existing shell state: hidden Bots are removed from the active roster menu, pin toggles are local presentation state, unread/hide/duplicate/delete mutate canonical Host state, and copy conversation ID is presentation-only. The menu preserves the Desktop pin/unpin and read/unread value direction.",
+      "ios_platform_delta": "SwiftUI derives the same state-dependent row actions from MobileBotSummary and canonical Host pin state: hidden Bots leave the active roster menu; pin/unpin round-trips through getHostPinnedAgents/setHostPinnedAgents; unread/hide/duplicate/delete mutate canonical Host state; copy conversation ID is presentation-only. Toggle values match Desktop.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/recovered/features/agent-info/MobileBotSummary.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/ios-preload/main-rpc-runtime.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "All applicable Desktop row-action values are now present through native iOS owners; keep below verified until current exact-head acceptance."
+      "notes": "All applicable Desktop row-action values now use their canonical native owner; keep below verified until current exact-head acceptance."
     },
     {
       "desktop_path": "frontend/src/production/bootstrap.tsx",
@@ -637,17 +637,17 @@
     {
       "desktop_path": "frontend/src/production/sidebar-model.ts",
       "desktop_blob_sha": "d925c699091706a0e65624f67c1cc5db6211292e",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Partition visible Agents into authoritative pinned/unpinned rails and reorder the stored pinned Agent ID sequence without manufacturing pin state.",
+      "desktop_owner": "renderer projection over Host-owned pinned Agent IDs",
+      "desktop_visible_effect": "Pinned Agents stay ahead of unpinned Agents in the Host-defined order and users can reorder pinned Agents deterministically.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "iOS loads and persists the ordered pinned ID list through getHostPinnedAgents/setHostPinnedAgents, sorts native Bot rows by that authoritative order, and exposes native up/down reorder actions in place of Desktop drag placement. Unknown/unpinned Bots remain outside the pinned prefix.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/ios-preload/main-rpc-runtime.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Native reorder interaction differs, but Host ownership and ordered visible effect are preserved. Keep below verified pending current-head CI."
     },
     {
       "desktop_path": "frontend/src/production/strict-mode-disposal.ts",

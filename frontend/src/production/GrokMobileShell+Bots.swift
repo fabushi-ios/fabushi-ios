@@ -120,11 +120,20 @@ extension GrokMobileShell {
         defer { botActionBusy = false }
 
         do {
-            bots = try await GrokMobileBotService(bridge: bridge).deleteBot(id: bot.id)
+            let service = GrokMobileBotService(bridge: bridge)
+            bots = try await service.deleteBot(id: bot.id)
             botDeleteTarget = nil
-            var pinned = pinnedBotIds
-            pinned.remove(bot.id)
-            persistPinnedBotIds(pinned)
+            if pinnedBotIds.contains(bot.id) {
+                let next = pinnedBotIdOrder.filter { $0 != bot.id }
+                do {
+                    pinnedBotIdOrder = try await service.setPinnedBotIds(next)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    pinnedBotIdOrder = next
+                    botActionError = "Bot 已删除，但更新置顶顺序失败：\(error.localizedDescription)"
+                }
+            }
             await messaging.refresh()
         } catch {
             botActionError = bot.isGroup
@@ -134,30 +143,65 @@ extension GrokMobileShell {
     }
 
     var pinnedBotIds: Set<String> {
-        guard let data = pinnedBotIdsStorage.data(using: .utf8),
-              let values = try? JSONDecoder().decode([String].self, from: data)
-        else { return [] }
-        return Set(values)
+        Set(pinnedBotIdOrder)
     }
 
     @MainActor
-    func toggleBotPin(_ bot: MobileBotSummary) {
-        var pinned = pinnedBotIds
-        if pinned.contains(bot.id) {
-            pinned.remove(bot.id)
-        } else {
-            pinned.insert(bot.id)
+    func loadPinnedBotIds() async {
+        pinnedBotIdOrder = []
+        do {
+            let ids = try await GrokMobileBotService(bridge: bridge).loadPinnedBotIds()
+            try Task.checkCancellation()
+            pinnedBotIdOrder = ids
+        } catch is CancellationError {
+            return
+        } catch {
+            // Match Desktop: a failed pin read is non-fatal and leaves no
+            // account from the previous session projected into the new shell.
         }
-        persistPinnedBotIds(pinned)
     }
 
     @MainActor
-    func persistPinnedBotIds(_ ids: Set<String>) {
-        let ordered = ids.sorted()
-        guard let data = try? JSONEncoder().encode(ordered),
-              let value = String(data: data, encoding: .utf8)
-        else { return }
-        pinnedBotIdsStorage = value
+    func toggleBotPin(_ bot: MobileBotSummary) async {
+        guard !botActionBusy else { return }
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+
+        let next = pinnedBotIds.contains(bot.id)
+            ? pinnedBotIdOrder.filter { $0 != bot.id }
+            : pinnedBotIdOrder + [bot.id]
+        do {
+            pinnedBotIdOrder = try await GrokMobileBotService(bridge: bridge)
+                .setPinnedBotIds(next)
+        } catch is CancellationError {
+            return
+        } catch {
+            botActionError = "更新置顶状态失败：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    func movePinnedBot(_ bot: MobileBotSummary, offset: Int) async {
+        guard !botActionBusy else { return }
+        let next = GrokMobileBotService.movedPinnedBotIds(
+            pinnedBotIdOrder,
+            movedId: bot.id,
+            offset: offset
+        )
+        guard next != pinnedBotIdOrder else { return }
+
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+        do {
+            pinnedBotIdOrder = try await GrokMobileBotService(bridge: bridge)
+                .setPinnedBotIds(next)
+        } catch is CancellationError {
+            return
+        } catch {
+            botActionError = "调整置顶顺序失败：\(error.localizedDescription)"
+        }
     }
 
     @MainActor
