@@ -101,6 +101,51 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertEqual(task.resourceId, "process-1")
     }
 
+    func testNativeAgentSectionsMoveMembershipWithoutDuplicateOwnership() throws {
+        let initial = [
+            MobileAgentSidebarSection(id: "one", name: "One", agentIds: ["agent-1", "agent-2"]),
+            MobileAgentSidebarSection(id: "two", name: "Two", agentIds: ["agent-3"]),
+        ]
+        let moved = MobileAgentSidebarSections.assigning(
+            agentId: "agent-1",
+            to: "two",
+            in: initial
+        )
+        XCTAssertEqual(moved[0].agentIds, ["agent-2"])
+        XCTAssertEqual(moved[1].agentIds, ["agent-3", "agent-1"])
+
+        let unassigned = MobileAgentSidebarSections.assigning(
+            agentId: "agent-1",
+            to: nil,
+            in: moved
+        )
+        XCTAssertFalse(unassigned.flatMap(\.agentIds).contains("agent-1"))
+    }
+
+    func testNativeAgentSectionsCreateAndNormalizeLikeDesktopSidebar() throws {
+        let created = try XCTUnwrap(MobileAgentSidebarSections.creating(
+            name: "  Research  ",
+            with: "agent-1",
+            in: [
+                MobileAgentSidebarSection(id: "old", name: "Old", agentIds: ["agent-1", "agent-2"])
+            ],
+            id: "stable"
+        ))
+        XCTAssertEqual(created.first?.id, "section-stable")
+        XCTAssertEqual(created.first?.name, "Research")
+        XCTAssertEqual(created.first?.agentIds, ["agent-1"])
+        XCTAssertEqual(created[1].agentIds, ["agent-2"])
+
+        let normalized = MobileAgentSidebarSections.normalized([
+            MobileAgentSidebarSection(id: " one ", name: "One", agentIds: ["a", "a", "b"]),
+            MobileAgentSidebarSection(id: "one", name: "Duplicate", agentIds: ["c"]),
+            MobileAgentSidebarSection(id: "two", name: "Two", agentIds: ["b", "c"]),
+        ])
+        XCTAssertEqual(normalized.map(\.id), ["one", "two"])
+        XCTAssertEqual(normalized[0].agentIds, ["a", "b"])
+        XCTAssertEqual(normalized[1].agentIds, ["c"])
+    }
+
     @MainActor
     func testParseBotRejectsMissingIdentity() {
         XCTAssertNil(GrokMobileBotService.parseBot(["name": "Missing id"]))
