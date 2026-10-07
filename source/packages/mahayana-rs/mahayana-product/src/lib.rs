@@ -1861,6 +1861,50 @@ impl MahayanaProductClient {
             "mahayana.auth.apple.complete" => self.apple_complete(request),
             "mahayana.auth.firebase.phone.complete" => self.firebase_phone_complete(request),
             "mahayana.auth.logout" => self.logout(),
+            "mahayana.auth.profile.update" => {
+                let display_name = required_string(request, "displayName")?;
+                if display_name.chars().count() > 200 {
+                    return Err(ProductError::InvalidParameter("displayName"));
+                }
+                self.authorized_post(
+                    request,
+                    "/api/auth/update-profile",
+                    json!({"displayName": display_name}),
+                )
+            }
+            "mahayana.feedback.submit" => {
+                let message = required_string(request, "message")?;
+                if message.chars().count() > 10_000 {
+                    return Err(ProductError::InvalidParameter("message"));
+                }
+                let submission_id = required_identifier(request, "submissionId")?;
+                let title_source = message.lines().find(|line| !line.trim().is_empty()).unwrap_or("Fabushi iOS feedback");
+                let title = title_source.trim().chars().take(120).collect::<String>();
+                let description = message.chars().take(5_000).collect::<String>();
+                let overflow = message.chars().skip(5_000).collect::<String>();
+                let diagnostics = if overflow.is_empty() {
+                    json!({"submissionId": submission_id})
+                } else {
+                    json!({
+                        "submissionId": submission_id,
+                        "continuation": overflow,
+                    })
+                };
+                self.authorized_post(
+                    request,
+                    "/api/feedback",
+                    json!({
+                        "title": title,
+                        "description": description,
+                        "category": "product",
+                        "page": "account/session/menu",
+                        "platform": "ios",
+                        "appVersion": env!("CARGO_PKG_VERSION"),
+                        "autoCollected": false,
+                        "diagnostics": diagnostics,
+                    }),
+                )
+            }
             "mahayana.usage.status" => serde_json::to_value(self.model_usage()?)
                 .map_err(|error| ProductError::Response(error.to_string())),
             "mahayana.platform.request" => self.platform_request(request),
