@@ -116,6 +116,100 @@ private enum IOSCursorDashboardProto {
         return data
     }
 
+    static func getBackgroundComposerInfoRequest(bcId: String) throws -> Data {
+        let bcId = bcId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bcId.isEmpty else {
+            throw IOSCursorDashboardError(message: "Background composer id is required.")
+        }
+        var data = Data()
+        appendBytesField(1, Data(bcId.utf8), to: &data)
+        appendVarintField(2, 0, to: &data)
+        appendVarintField(3, 1, to: &data)
+        return data
+    }
+
+    static func decodeBackgroundComposerInfo(_ data: Data) throws -> IOSCloudAgentComposerInfo {
+        var response = Reader(data)
+        var detailedMessage: Data?
+        for (field, value) in try response.readFields() where field == 1 {
+            if case .bytes(let bytes) = value {
+                detailedMessage = bytes
+                break
+            }
+        }
+        guard let detailedMessage else {
+            throw IOSCursorDashboardError(message: "Background composer response was missing composer details.")
+        }
+
+        var detailed = Reader(detailedMessage)
+        var composerMessage: Data?
+        var detailedStatus: Int32?
+        var summary: String?
+        var permanentErrorMessage: Data?
+        for (field, value) in try detailed.readFields() {
+            switch (field, value) {
+            case (1, .bytes(let bytes)):
+                composerMessage = bytes
+            case (5, .varint(let value)):
+                detailedStatus = Int32(truncatingIfNeeded: value)
+            case (10, .bytes(let bytes)):
+                summary = String(data: bytes, encoding: .utf8)
+            case (16, .bytes(let bytes)):
+                permanentErrorMessage = bytes
+            default:
+                break
+            }
+        }
+
+        var composerStatus: Int32?
+        if let composerMessage {
+            var composer = Reader(composerMessage)
+            for (field, value) in try composer.readFields() where field == 12 {
+                if case .varint(let value) = value {
+                    composerStatus = Int32(truncatingIfNeeded: value)
+                    break
+                }
+            }
+        }
+
+        var permanentError: String?
+        if let permanentErrorMessage {
+            var errorEnvelope = Reader(permanentErrorMessage)
+            var customErrorMessage: Data?
+            for (field, value) in try errorEnvelope.readFields() where field == 2 {
+                if case .bytes(let bytes) = value {
+                    customErrorMessage = bytes
+                    break
+                }
+            }
+            if let customErrorMessage {
+                var customError = Reader(customErrorMessage)
+                var title: String?
+                var detail: String?
+                for (field, value) in try customError.readFields() {
+                    switch (field, value) {
+                    case (1, .bytes(let bytes)):
+                        title = String(data: bytes, encoding: .utf8)
+                    case (2, .bytes(let bytes)):
+                        detail = String(data: bytes, encoding: .utf8)
+                    default:
+                        break
+                    }
+                }
+                let joined = [title, detail]
+                    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: ": ")
+                permanentError = joined.isEmpty ? nil : joined
+            }
+        }
+
+        guard let status = composerStatus ?? detailedStatus else {
+            throw IOSCursorDashboardError(message: "Background composer response was missing status.")
+        }
+        return .init(status: status, summary: summary, permanentError: permanentError)
+    }
+
     static func decodeTeams(_ data: Data) throws -> [IOSCursorSkillPublishTeam] {
         var reader = Reader(data)
         var teams: [IOSCursorSkillPublishTeam] = []
@@ -193,6 +287,15 @@ struct IOSCursorSkillPublishTeam: Equatable, Sendable {
 struct IOSCursorPublishedSkill: Equatable, Sendable {
     let pluginId: String
     let commitSha: String
+}
+
+struct IOSCloudAgentComposerInfo: Equatable, Sendable {
+    let status: Int32
+    let summary: String?
+    let permanentError: String?
+
+    var isActive: Bool { status == 1 || status == 4 }
+    var isError: Bool { status == 3 || status == 5 || permanentError != nil }
 }
 
 final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient {
