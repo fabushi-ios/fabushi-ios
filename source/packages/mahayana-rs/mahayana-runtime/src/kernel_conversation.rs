@@ -1202,6 +1202,42 @@ mod tests {
     }
 
     #[test]
+    fn hidden_background_can_project_completion_without_persisting_chat_history() {
+        let conversation_id = conversation("mahayana-ai:agent:background");
+        let state = Arc::new(Mutex::new(ConversationState::default()));
+        let events = Arc::new(CapturedRuntimeEvents::default());
+        let bridge = RuntimeKernelEventBridge {
+            conversation_id: conversation_id.clone(),
+            operation_id: OperationId::generated("background-operation"),
+            events: events.clone(),
+            state: state.clone(),
+            history_path: None,
+            hide_assistant_history: true,
+            suppress_assistant_events: false,
+            reply_to_message_id: None,
+            is_fork: false,
+            attachment_batch_id: None,
+            streaming_assistant: Mutex::new(None),
+            suspended: Arc::new(AtomicBool::new(false)),
+        };
+        bridge.emit(KernelEvent::MessageCompleted {
+            operation_id: KernelOperationId::from_string("background-operation"),
+            text: "durable background result".into(),
+        }).expect("project hidden completion");
+
+        assert!(
+            state.lock().expect("state").history.iter().all(|message| message.role != MessageRole::Assistant),
+            "hidden background completion must not enter visible conversation history"
+        );
+        assert!(events.0.lock().expect("events").iter().any(|event| matches!(
+            event,
+            RuntimeEvent::MessageCompleted { message, .. }
+                if message.text == "durable background result"
+                    && message.metadata.get("providerStream").and_then(Value::as_bool) == Some(true)
+        )));
+    }
+
+    #[test]
     fn provider_stream_reuses_one_canonical_message_and_preserves_reply_fork_identity() {
         let conversation_id = conversation(mahayana_core::MAHAYANA_AI_CONVERSATION_ID);
         let reply = message(&conversation_id, MessageRole::User, "reply target");
