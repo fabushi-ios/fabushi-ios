@@ -28,6 +28,9 @@ internal struct GrokMobileShell: View {
     @State var asyncTasks: [MobileAgentAsyncTask] = []
     @State var asyncTasksBusy = false
     @State var asyncTasksError: String?
+    @State var agentSidebarSections: [MobileAgentSidebarSection] = []
+    @State var newSectionBot: MobileBotSummary?
+    @State var newSectionName = ""
     @State var selectedBot: MobileBotSummary?
     @State var groupMembersTarget: MobileBotSummary?
     @State var botSettingsTarget: MobileBotSummary?
@@ -69,6 +72,34 @@ internal struct GrokMobileShell: View {
                 },
                 onClose: { groupMembersTarget = nil }
             )
+        }
+        .sheet(item: $newSectionBot) { bot in
+            NavigationStack {
+                Form {
+                    Section("分组名称") {
+                        TextField("新分组", text: $newSectionName)
+                            .accessibilityIdentifier("agent-new-section-name")
+                    }
+                }
+                .navigationTitle("移动 \(bot.name)")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("取消") {
+                            newSectionBot = nil
+                            newSectionName = ""
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("创建并移动") {
+                            createAgentSidebarSection(for: bot)
+                        }
+                        .disabled(newSectionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("agent-new-section-submit")
+                    }
+                }
+            }
+            .accessibilityIdentifier("agent-new-section")
         }
         .sheet(item: $asyncTasksTarget) { agent in
             NavigationStack {
@@ -257,6 +288,11 @@ internal struct GrokMobileShell: View {
     private var homeContent: some View {
         home
             .task { await loadBots() }
+            .task(id: mobileAccountScopeKey) {
+                agentSidebarSections = MobileAgentSidebarSections.load(
+                    accountScopeKey: mobileAccountScopeKey
+                )
+            }
             .task { await messaging.refresh() }
             .task(id: appAgentSurfaceFingerprint) { publishAppAgentSurface() }
     }
