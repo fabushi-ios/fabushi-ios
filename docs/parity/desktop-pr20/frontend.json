@@ -580,14 +580,14 @@
       "desktop_responsibility": "Owns the recovered renderer-wide presentation contract for shell/sidebar/account/search, onboarding, dialogs, command palette, focus-visible behavior, chat/org-chart titlebar interaction, and the immutable cursor-icon font dependency.",
       "desktop_owner": "renderer presentation layer",
       "desktop_visible_effect": "Desktop shell surfaces have stable layout, focus/accessibility affordances and native titlebar interaction; sidebar/account/command-palette/onboarding/dialog surfaces remain visually and interactively usable.",
-      "ios_disposition": "ios-adapted",
+      "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "frontend/src/recovered/features/app-shell/ContentView+Root.swift",
       "ios_language": "SwiftUI / UIKit",
-      "ios_platform_delta": "Applicable visible presentation semantics are native SwiftUI/UIKit responsibilities: ContentView/ProductionRenderer owns navigation, sidebar/home/marketplace/dialog/alert composition and accessibility; GrokMobileShell owns Agent/search/command-palette presentation. Electron CSS selectors, container queries, webfont URL resolution and app-region drag/no-drag are Desktop mechanisms and are not copied onto iOS.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; current-head Swift UI acceptance covers the composed native surfaces, but this aggregate presentation row remains split by surface.",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. This file mixes product-visible presentation with Electron/browser-only mechanics, so it is intentionally mapped rather than globally verified; each native surface keeps its own owner/evidence."
+      "ios_platform_delta": "Desktop CSS/DOM/container-query/webfont/app-region drag mechanics are not applicable to UIKit/SwiftUI. Their product-visible effects are replaced by native SwiftUI navigation, focus/accessibility, sheets/alerts, command palette/search, onboarding/account/About surfaces and SF Symbols. This disposition is deliberately limited to presentation mechanics; each product behavior remains independently tracked by its own ledger row.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; frontend/src/recovered/features/about/overlay/view.view.swift; frontend/src/recovered/features/account/session/menu.view.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiUITests/FabushiUITests.swift; product behavior remains subject to each child responsibility's own exact-head acceptance.",
+      "notes": "Strict not-applicable-with-replacement for the CSS/Electron/browser presentation mechanism only. It does not waive shell/account/search/onboarding/dialog/chat/Org Chart behavior rows."
     },
     {
       "desktop_path": "frontend/src/production/reaction-root.ts",
@@ -1841,13 +1841,13 @@
       "desktop_owner": "renderer / transcript-card auto-review action controller",
       "desktop_visible_effect": "Auto-review approval cards can approve, deny, or safely remember a proposed allow rule without leaking credentials; stale or duplicate actions cannot mutate a replacement conversation.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
+      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "The native transcript owner can host equivalent action state, but current iOS production only exposes generic feature.approval.resolve. Desktop parity additionally requires an authenticated resolveAutoReviewApproval transport plus the autoReviewInstructions load/set resource used by Always allow. Do not alias the generic approval route because that would lose Desktop-specific request identity, persistence, redaction, and stale semantics.",
-      "implementation_status": "mapped",
-      "production_evidence": "Current Host exposes generic feature.approval.resolve only; no resolveAutoReviewApproval or autoReviewInstructions load/set route is present in the iOS shipping graph.",
-      "test_evidence": "Desktop contract audited at final PR #20 HEAD; focused iOS tests must be added with the missing production transport/resource, not as model-only substitutes.",
-      "notes": "Blocked on porting the Desktop-specific auto-review approval + instructions production contracts. Continue later without weakening the distinction between generic approvals and auto-review approvals."
+      "ios_platform_delta": "The native transcript card now consumes operation-scoped approval.requested events, generation-fences actions, suppresses non-pending duplicates, resolves allow-once/deny through the canonical Rust Host approval owner, and implements Always allow by redacting/whitespace-normalizing/bounding/deduplicating the proposed rule, persisting account-scoped instructions, syncing a bounded Host auto-review-rule projection, then resolving the current approval. Instruction persistence failure deliberately degrades to one-time allow; unknown Host approval maps to stale.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/shared/sand-auto-review-redact.swift; source/shared/sand-auto-review-instructions.swift; source/shared/node/settings/sand-settings-store.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AutoReviewApprovalParityTests.swift; Rust Host/Swift/Swift UI current-head Actions still required before verified.",
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Runtime approval operationId is preserved into the Host wire so concurrent Bot pumps cannot claim another operation's request. Remains implemented, not verified, until same-head CI and artifacts succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/cloud-agent-provider.ts",
