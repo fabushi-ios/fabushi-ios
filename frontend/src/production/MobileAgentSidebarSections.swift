@@ -50,9 +50,8 @@ enum MobileAgentSidebarSections {
         guard !trimmed.isEmpty else { return nil }
         let unassigned = assigning(agentId: agentId, to: nil, in: sections)
         return [
-            MobileAgentSidebarSection(id: "section-\(id)", name: trimmed, agentIds: [agentId]),
-            ...unassigned
-        ]
+            MobileAgentSidebarSection(id: "section-\(id)", name: trimmed, agentIds: [agentId])
+        ] + unassigned
     }
 
     static func load(
