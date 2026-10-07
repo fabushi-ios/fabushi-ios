@@ -50,6 +50,58 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
     @MainActor
+    func testParseBotProjectsCanonicalAgentRowState() throws {
+        let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-1",
+            "name": "Research",
+            "description": "Verify",
+            "hidden": true,
+            "unread": true,
+            "conversationId": "conversation:agent-1",
+        ]))
+        XCTAssertTrue(bot.hidden)
+        XCTAssertTrue(bot.unread)
+        XCTAssertEqual(bot.conversationId, "conversation:agent-1")
+    }
+
+    @MainActor
+    func testAgentRowMutationsUseCanonicalHostCommands() {
+        let hidden = GrokMobileBotService.setHiddenCommand(
+            id: "agent-1",
+            hidden: true,
+            requestId: "hidden-1"
+        )
+        XCTAssertEqual(hidden["type"] as? String, "bot.setHidden")
+        XCTAssertEqual(hidden["id"] as? String, "agent-1")
+        XCTAssertEqual(hidden["hidden"] as? Bool, true)
+
+        let unread = GrokMobileBotService.setUnreadCommand(
+            id: "agent-1",
+            unread: true,
+            requestId: "unread-1"
+        )
+        XCTAssertEqual(unread["type"] as? String, "bot.update")
+        XCTAssertEqual(unread["id"] as? String, "agent-1")
+        XCTAssertEqual(unread["unread"] as? Bool, true)
+    }
+
+    @MainActor
+    func testAsyncTaskProjectionPreservesHostIdentity() throws {
+        let task = try XCTUnwrap(GrokMobileBotService.parseAsyncTask([
+            "id": "shell-1",
+            "kind": "shell",
+            "label": "Run validation",
+            "detail": "cargo test",
+            "resourceId": "process-1",
+        ]))
+        XCTAssertEqual(task.id, "shell-1")
+        XCTAssertEqual(task.kind, "shell")
+        XCTAssertEqual(task.label, "Run validation")
+        XCTAssertEqual(task.detail, "cargo test")
+        XCTAssertEqual(task.resourceId, "process-1")
+    }
+
+    @MainActor
     func testParseBotRejectsMissingIdentity() {
         XCTAssertNil(GrokMobileBotService.parseBot(["name": "Missing id"]))
     }
