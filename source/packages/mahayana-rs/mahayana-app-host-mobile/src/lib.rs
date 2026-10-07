@@ -1,4 +1,4 @@
-use mahayana_app_host::{AppHostFeatureMode, HostRequest, HostResponse, default_app_data_dir};
+use mahayana_app_host::{AppHostFeatureMode, HostResponse, default_app_data_dir};
 use mahayana_unified_app_host::{UnifiedAppHost, dispatch_json as dispatch_unified_json};
 use std::cell::RefCell;
 use std::ffi::{CStr, CString, c_char};
@@ -7,10 +7,6 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{Arc, mpsc};
 use std::thread::{self, JoinHandle};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-mod async_tasks;
-
 #[path = "../../../../internal/host-extensions.rs"]
 mod host_extensions;
 #[path = "../../../../internal/scheduling.rs"]
@@ -704,16 +700,12 @@ struct MobileAppHost {
     host_thread: Option<JoinHandle<()>>,
     extension_runtime: tokio::runtime::Runtime,
     extensions: Option<host_extensions::StartedHostExtensions>,
-    async_tasks: async_tasks::AsyncTasksRuntime,
 }
 
 impl MobileAppHost {
     fn new(app_data_dir: impl Into<PathBuf>) -> Result<Self, String> {
         let path = app_data_dir.into();
-        let runtime_path = path.clone();
-        Self::from_factory(runtime_path, move || {
-            UnifiedAppHost::new(path).map_err(|error| error.to_string())
-        })
+        Self::from_factory(move || UnifiedAppHost::new(path).map_err(|error| error.to_string()))
     }
 
     fn new_with_feature_mode(
@@ -721,8 +713,7 @@ impl MobileAppHost {
         feature_mode: AppHostFeatureMode,
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
-        let runtime_path = path.clone();
-        Self::from_factory(runtime_path, move || {
+        Self::from_factory(move || {
             UnifiedAppHost::new_with_feature_mode(path, feature_mode)
                 .map_err(|error| error.to_string())
         })
@@ -734,8 +725,7 @@ impl MobileAppHost {
         storage_passphrase: String,
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
-        let runtime_path = path.clone();
-        Self::from_factory(runtime_path, move || {
+        Self::from_factory(move || {
             UnifiedAppHost::new_with_feature_mode_and_storage_passphrase(
                 path,
                 feature_mode,
@@ -745,7 +735,7 @@ impl MobileAppHost {
         })
     }
 
-    fn from_factory<Factory>(app_data_dir: PathBuf, factory: Factory) -> Result<Self, String>
+    fn from_factory<Factory>(factory: Factory) -> Result<Self, String>
     where
         Factory: FnOnce() -> Result<UnifiedAppHost, String> + Send + 'static,
     {
@@ -774,42 +764,15 @@ impl MobileAppHost {
                 return Err(format!("start mobile Host extensions: {error}"));
             }
         };
-        let async_tasks = async_tasks::AsyncTasksRuntime::new(&app_data_dir);
-        let _ = async_tasks.rearm_after_restart(system_now_ms());
         Ok(Self {
             host,
             host_thread: Some(host_thread),
             extension_runtime,
             extensions: Some(extensions),
-            async_tasks,
         })
     }
 
     fn dispatch_json(&self, input: &str) -> String {
-        if let Ok(request) = serde_json::from_str::<HostRequest>(input) {
-            if let Some(result) = self
-                .async_tasks
-                .handle_rpc(&request.method, &request.params, system_now_ms())
-            {
-                let response = match result {
-                    Ok(value) => HostResponse {
-                        id: request.id,
-                        ok: true,
-                        result: Some(value),
-                        error: None,
-                    },
-                    Err(error) => HostResponse {
-                        id: request.id,
-                        ok: false,
-                        result: None,
-                        error: Some(error),
-                    },
-                };
-                return serde_json::to_string(&response).unwrap_or_else(|error| {
-                    format!("{{\"ok\":false,\"error\":\"async task serialization failed: {error}\"}}")
-                });
-            }
-        }
         self.host.dispatch_json(input)
     }
 
@@ -846,13 +809,6 @@ fn host_fault_response(fault: process_crash_guard::HostFault) -> String {
         error: Some(format!("host_fault[{}]: {}", fault.scope, fault.message)),
     })
     .unwrap_or_else(|_| "{\"ok\":false,\"error\":\"host fault\"}".to_owned())
-}
-
-fn system_now_ms() -> f64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as f64)
-        .unwrap_or(0.0)
 }
 
 thread_local! {
