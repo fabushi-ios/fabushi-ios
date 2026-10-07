@@ -603,6 +603,7 @@ pub struct FeatureHostController {
     peer_messages_path: Option<PathBuf>,
     settings_path: Option<PathBuf>,
     remote_device_state_path: Option<PathBuf>,
+    async_tasks_path: Option<PathBuf>,
     test_auth_state_path: Option<PathBuf>,
     memory_root_path: Option<PathBuf>,
     workflow_root_path: Option<PathBuf>,
@@ -682,6 +683,7 @@ impl FeatureHostController {
             peer_messages_path: None,
             settings_path: None,
             remote_device_state_path: None,
+            async_tasks_path: test_data_dir.map(|data_dir| data_dir.join("pending-async-tasks.json")),
             test_auth_state_path,
             memory_root_path,
             workflow_root_path,
@@ -741,6 +743,11 @@ impl FeatureHostController {
             .data_dir
             .as_ref()
             .map(|data_dir| data_dir.join("remote-computer-device.json"));
+        let async_tasks_path = host_config
+            .runtime
+            .data_dir
+            .as_ref()
+            .map(|data_dir| data_dir.join("pending-async-tasks.json"));
         let memory_root_path = host_config
             .runtime
             .data_dir
@@ -758,6 +765,10 @@ impl FeatureHostController {
             platform,
         };
         let mut state = FeatureState::default();
+        if let Some(path) = async_tasks_path.as_deref() {
+            state.async_tasks = load_pending_async_tasks(path, now_millis());
+            persist_pending_async_tasks(path, &state.async_tasks)?;
+        }
         if let Some(path) = settings_path.as_deref() {
             state.settings = load_product_host_settings(path);
             // The bundled Computer Use MCP independently rereads this canonical
@@ -784,6 +795,7 @@ impl FeatureHostController {
             peer_messages_path,
             settings_path,
             remote_device_state_path,
+            async_tasks_path,
             test_auth_state_path: None,
             memory_root_path,
             workflow_root_path,
