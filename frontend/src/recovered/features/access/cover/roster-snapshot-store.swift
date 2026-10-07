@@ -213,6 +213,114 @@ enum AccessRosterPersistence {
     }
 }
 
+struct AccessRosterSelectionState: Equatable, Sendable {
+    let currentAgentID: String?
+    let isLoadPending: Bool
+
+    static let empty = Self(currentAgentID: nil, isLoadPending: false)
+}
+
+enum AccessRosterSelectionPersistence {
+    static let schemaVersion = 1
+    private static let keyPrefix = "fabushi.ios.roster.selection.last-agent.v1:"
+
+    private struct Envelope: Codable {
+        let schemaVersion: Int
+        let agentID: String
+    }
+
+    static func load(
+        accountScopeKey: String,
+        defaults: UserDefaults = .standard
+    ) -> AccessRosterSelectionState {
+        guard !accountScopeKey.isEmpty,
+              let data = defaults.data(forKey: key(accountScopeKey)),
+              let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              envelope.schemaVersion == schemaVersion
+        else {
+            if !accountScopeKey.isEmpty {
+                defaults.removeObject(forKey: key(accountScopeKey))
+            }
+            return .empty
+        }
+        let agentID = envelope.agentID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !agentID.isEmpty else {
+            defaults.removeObject(forKey: key(accountScopeKey))
+            return .empty
+        }
+        return .init(currentAgentID: agentID, isLoadPending: false)
+    }
+
+    static func save(
+        _ state: AccessRosterSelectionState,
+        accountScopeKey: String,
+        defaults: UserDefaults = .standard
+    ) {
+        guard !accountScopeKey.isEmpty else { return }
+        guard let agentID = state.currentAgentID, !agentID.isEmpty else {
+            clear(accountScopeKey: accountScopeKey, defaults: defaults)
+            return
+        }
+        let envelope = Envelope(schemaVersion: schemaVersion, agentID: agentID)
+        guard let data = try? JSONEncoder().encode(envelope) else { return }
+        defaults.set(data, forKey: key(accountScopeKey))
+    }
+
+    static func clear(
+        accountScopeKey: String,
+        defaults: UserDefaults = .standard
+    ) {
+        guard !accountScopeKey.isEmpty else { return }
+        defaults.removeObject(forKey: key(accountScopeKey))
+    }
+
+    private static func key(_ accountScopeKey: String) -> String {
+        keyPrefix + Data(accountScopeKey.utf8).base64EncodedString()
+    }
+}
+
+enum AccessRosterSelectionProjection {
+    static func select(
+        _ agentID: String?,
+        previous: AccessRosterSelectionState
+    ) -> AccessRosterSelectionState {
+        let normalized = agentID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let next = normalized?.isEmpty == false ? normalized : nil
+        guard next != previous.currentAgentID else { return previous }
+        return .init(currentAgentID: next, isLoadPending: next != nil)
+    }
+
+    static func reconcile(
+        _ previous: AccessRosterSelectionState,
+        agentIDs: [String],
+        isRosterComplete: Bool
+    ) -> AccessRosterSelectionState {
+        guard isRosterComplete else { return previous }
+        if let current = previous.currentAgentID {
+            if agentIDs.contains(current) { return previous }
+            if previous.isLoadPending { return previous }
+        }
+        return .init(currentAgentID: agentIDs.first, isLoadPending: false)
+    }
+
+    static func settle(
+        _ previous: AccessRosterSelectionState,
+        attemptedAgentID: String,
+        completeAgentIDs: [String]?
+    ) -> AccessRosterSelectionState {
+        guard previous.currentAgentID == attemptedAgentID,
+              previous.isLoadPending
+        else { return previous }
+        let next: String?
+        if let completeAgentIDs, !completeAgentIDs.contains(attemptedAgentID) {
+            next = completeAgentIDs.first
+        } else {
+            next = attemptedAgentID
+        }
+        return .init(currentAgentID: next, isLoadPending: false)
+    }
+}
+
 enum AccessRosterFailureClassifier {
     static func transportKind(for error: Error) -> String? {
         if let urlError = error as? URLError {
