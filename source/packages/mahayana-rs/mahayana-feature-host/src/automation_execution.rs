@@ -392,18 +392,25 @@ impl FeatureHostController {
 
     fn set_routine_quiescing(&self, quiescing: bool) -> Result<(), FeatureHostError> {
         let _gate = self.routine_dispatch_lock.lock().map_err(|_| FeatureHostError::StatePoisoned)?;
-        let operations = {
+        let (operations, background_operations) = {
             let mut state = self.state()?;
             if state.closed { return Ok(()); }
             state.routine_quiescing = quiescing;
             self.persist_routine_executions(&state)?;
+            self.persist_background_recoveries(&state)?;
             if quiescing {
-                state.routine_executions.values()
-                    .filter(|execution| execution.phase == RoutinePhase::Running)
-                    .filter_map(|execution| execution.operation_id.clone().map(|operation_id| (execution.run_id.clone(), operation_id)))
-                    .collect::<Vec<_>>()
+                (
+                    state.routine_executions.values()
+                        .filter(|execution| execution.phase == RoutinePhase::Running)
+                        .filter_map(|execution| execution.operation_id.clone().map(|operation_id| (execution.run_id.clone(), operation_id)))
+                        .collect::<Vec<_>>(),
+                    state.background_recoveries.values()
+                        .filter(|execution| execution.phase == BackgroundRecoveryPhase::Running)
+                        .map(|execution| execution.operation_id.clone())
+                        .collect::<Vec<_>>(),
+                )
             } else {
-                Vec::new()
+                (Vec::new(), Vec::new())
             }
         };
         if quiescing && self.config.mode == HostMode::Production {
@@ -422,14 +429,32 @@ impl FeatureHostController {
                     self.persist_routine_executions(&state)?;
                 }
             }
+            #[cfg(feature = "production")]
+            for operation_id in background_operations {
+                self.runtime()?.suspend_operation(
+                    OperationId(operation_id.clone()),
+                    Some("product lifecycle quiesce".into()),
+                )?;
+                let mut state = self.state()?;
+                if let Some(execution) = state.background_recoveries.get_mut(&operation_id) {
+                    if execution.phase == BackgroundRecoveryPhase::Running {
+                        execution.phase = BackgroundRecoveryPhase::Suspended;
+                        self.persist_background_recoveries(&state)?;
+                    }
+                }
+            }
             #[cfg(not(feature = "production"))]
             return Err(FeatureHostError::ProductionUnavailable);
         }
         #[cfg(not(feature = "production"))]
-        let _ = operations;
+        {
+            let _ = operations;
+            let _ = background_operations;
+        }
         drop(_gate);
         if !quiescing {
             self.advance_pending_routine()?;
+            self.resume_suspended_background_operations()?;
         }
         Ok(())
     }

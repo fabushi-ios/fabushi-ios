@@ -152,6 +152,7 @@ use std::time::UNIX_EPOCH;
 use uuid::Uuid;
 
 include!("automation_execution.rs");
+include!("background_recovery.rs");
 
 #[derive(Debug, thiserror::Error)]
 pub enum FeatureHostError {
@@ -423,6 +424,7 @@ struct FeatureState {
     awaited_operations: BTreeSet<String>,
     operation_terminals: BTreeMap<String, Value>,
     background_operations: BTreeMap<String, BackgroundOperationContext>,
+    background_recoveries: BTreeMap<String, BackgroundRecoveryExecution>,
     pending_box_handoffs: BTreeMap<String, PendingBoxHandoff>,
     remote_computer_sessions: BTreeMap<String, RemoteComputerLocalSession>,
     remote_computer_device_secrets: BTreeMap<String, String>,
@@ -465,6 +467,7 @@ impl Default for FeatureState {
             awaited_operations: BTreeSet::new(),
             operation_terminals: BTreeMap::new(),
             background_operations: BTreeMap::new(),
+            background_recoveries: BTreeMap::new(),
             pending_box_handoffs: BTreeMap::new(),
             remote_computer_sessions: BTreeMap::new(),
             remote_computer_device_secrets: BTreeMap::new(),
@@ -2908,44 +2911,14 @@ impl FeatureHostController {
         }
         #[cfg(feature = "production")]
         {
-            let conversation_id = bot.conversation_id.clone().ok_or_else(|| {
-                FeatureHostError::Contract(format!("bot has no conversation: {}", bot.id))
-            })?;
-            let response = self.runtime()?.execute(RuntimeCommand::SendMessage {
-                conversation_id: ConversationId(conversation_id),
-                text: prompt,
-                display_text: None,
-                client_message_id: Some(format!("teach:{}:{}", bot.id, now_millis())),
-                hidden: true,
-                show_assistant_output: false,
-                recovery_eligible: false,
-                reply_to_message_id: None,
-                is_fork: false,
-                attachment_batch_id: None,
-                selected_image_data_urls: Vec::new(),
-            })?;
-            let operation_id = match response {
-                RuntimeResponse::Accepted { operation_id } => operation_id.to_string(),
-                other => return Err(unexpected_response("teach.learn", other)),
-            };
-            let mut state = self.state()?;
-            state.background_operations.insert(
-                operation_id.clone(),
-                BackgroundOperationContext {
-                    agent_id: bot.id.clone(),
-                    agent_name: bot.name.clone(),
-                    source: "teach-recording".into(),
-                    teach_artifact: Some(video_path.to_string()),
-                },
-            );
-            state.events.push_back(HostEvent::AgentBackgroundStarted {
-                timestamp: timestamp(),
-                agent_id: bot.id,
-                agent_name: bot.name,
-                operation_id: operation_id.clone(),
-                source: "teach-recording".into(),
-            });
-            Ok(Some(operation_id))
+            self.schedule_recoverable_background_turn(
+                &bot,
+                "teach-recording",
+                prompt,
+                format!("teach:{}:{}", bot.id, now_millis()),
+                Vec::new(),
+                Some(video_path.to_string()),
+            )
         }
         #[cfg(not(feature = "production"))]
         Ok(None)
@@ -3371,48 +3344,101 @@ impl FeatureHostController {
 
         #[cfg(feature = "production")]
         {
-            let conversation_id = target.conversation_id.clone().ok_or_else(|| {
-                FeatureHostError::Contract(format!("bot has no conversation: {}", target.id))
-            })?;
-            let response = self.runtime()?.execute(RuntimeCommand::SendMessage {
-                conversation_id: ConversationId(conversation_id),
-                text: prompt,
-                display_text: None,
-                client_message_id: Some(client_message_id.clone()),
-                hidden: true,
-                show_assistant_output: false,
-                recovery_eligible: false,
-                reply_to_message_id: None,
-                is_fork: false,
-                attachment_batch_id: (!selected_image_data_urls.is_empty())
-                    .then(|| format!("attachment-batch:{client_message_id}")),
+            self.schedule_recoverable_background_turn(
+                target,
+                source,
+                prompt,
+                client_message_id,
                 selected_image_data_urls,
-            })?;
-            let operation_id = match response {
-                RuntimeResponse::Accepted { operation_id } => operation_id.to_string(),
-                other => return Err(unexpected_response("agent.background", other)),
-            };
+                None,
+            )
+        }
+        #[cfg(not(feature = "production"))]
+        Err(FeatureHostError::ProductionUnavailable)
+    }
+
+    #[cfg(feature = "production")]
+    fn schedule_recoverable_background_turn(
+        &self,
+        target: &BotSummary,
+        source: &str,
+        prompt: String,
+        client_message_id: String,
+        selected_image_data_urls: Vec<String>,
+        teach_artifact: Option<String>,
+    ) -> Result<Option<String>, FeatureHostError> {
+        self.require_authenticated_account()?;
+        let _gate = self.routine_dispatch_lock.lock().map_err(|_| FeatureHostError::StatePoisoned)?;
+        let conversation_id = target.conversation_id.clone().ok_or_else(|| {
+            FeatureHostError::Contract(format!("bot has no conversation: {}", target.id))
+        })?;
+        let account_key = self.routine_account_key()?;
+        let operation_id = format!("background-operation:{}", Uuid::new_v4());
+        {
             let mut state = self.state()?;
+            ensure_open(&state)?;
+            if state.routine_quiescing {
+                return Err(FeatureHostError::Contract("background work is quiescing".into()));
+            }
+            if state.background_recoveries.len() >= BACKGROUND_RECOVERY_MAX_ACTIVE {
+                return Err(FeatureHostError::Contract("background recovery capacity reached".into()));
+            }
+            let execution = BackgroundRecoveryExecution {
+                operation_id: operation_id.clone(),
+                conversation_id: conversation_id.clone(),
+                account_key,
+                epoch: state.routine_epoch,
+                agent_id: target.id.clone(),
+                agent_name: target.name.clone(),
+                source: source.to_string(),
+                teach_artifact: teach_artifact.clone(),
+                phase: BackgroundRecoveryPhase::Dispatching,
+            };
+            state.background_recoveries.insert(operation_id.clone(), execution);
             state.background_operations.insert(
                 operation_id.clone(),
                 BackgroundOperationContext {
                     agent_id: target.id.clone(),
                     agent_name: target.name.clone(),
                     source: source.to_string(),
-                    teach_artifact: None,
+                    teach_artifact: teach_artifact.clone(),
                 },
             );
-            state.events.push_back(HostEvent::AgentBackgroundStarted {
-                timestamp: timestamp(),
-                agent_id: target.id.clone(),
-                agent_name: target.name.clone(),
-                operation_id: operation_id.clone(),
-                source: source.to_string(),
-            });
-            Ok(Some(operation_id))
+            self.persist_background_recoveries(&state)?;
         }
-        #[cfg(not(feature = "production"))]
-        Err(FeatureHostError::ProductionUnavailable)
+        let accepted = self.runtime()?.start_recoverable_message(mahayana_conversation::SendMessageRequest {
+            conversation_id: ConversationId(conversation_id),
+            operation_id: OperationId(operation_id.clone()),
+            text: prompt,
+            display_text: None,
+            client_message_id: Some(client_message_id.clone()),
+            hidden: true,
+            show_assistant_output: false,
+            recovery_eligible: true,
+            reply_to_message_id: None,
+            is_fork: false,
+            attachment_batch_id: (!selected_image_data_urls.is_empty())
+                .then(|| format!("attachment-batch:{client_message_id}")),
+            selected_image_data_urls,
+        })?;
+        if accepted.as_str() != operation_id {
+            return Err(FeatureHostError::Contract("runtime changed preassigned background operation identity".into()));
+        }
+        let mut state = self.state()?;
+        let current = state.background_recoveries.get_mut(&operation_id)
+            .ok_or_else(|| FeatureHostError::Contract("background recovery disappeared during dispatch".into()))?;
+        current.phase = BackgroundRecoveryPhase::Running;
+        state.operations.insert(operation_id.clone());
+        state.operation_agents.insert(operation_id.clone(), target.id.clone());
+        self.persist_background_recoveries(&state)?;
+        state.events.push_back(HostEvent::AgentBackgroundStarted {
+            timestamp: timestamp(),
+            agent_id: target.id.clone(),
+            agent_name: target.name.clone(),
+            operation_id: operation_id.clone(),
+            source: source.to_string(),
+        });
+        Ok(Some(operation_id))
     }
 
     fn execute_computer(
@@ -7115,6 +7141,7 @@ impl FeatureHostController {
             state.awaited_operations.clear();
             state.operation_terminals.clear();
             state.background_operations.clear();
+            state.background_recoveries.clear();
             state.automations = automations;
             state.published_plugins_by_agent.clear();
             state.bots = bots;
@@ -7132,6 +7159,7 @@ impl FeatureHostController {
                 .lock()
                 .map_err(|_| FeatureHostError::StatePoisoned)? = next_account_id.clone();
             self.restore_routine_executions()?;
+            self.restore_background_recoveries()?;
         }
         {
             let mut state = self.state()?;
@@ -7296,7 +7324,6 @@ impl FeatureHostController {
             state.pending_approvals.clear();
             state.awaited_operations.clear();
             state.operation_terminals.clear();
-            state.background_operations.clear();
             state.pending_box_handoffs.clear();
             state.pending_listener_resumes.clear();
             state.remote_computer_sessions.clear();
@@ -7309,12 +7336,22 @@ impl FeatureHostController {
                 .filter_map(|execution| execution.operation_id.as_ref())
                 .cloned()
                 .collect::<BTreeSet<_>>();
+            let suspended_background_operations = state
+                .background_recoveries
+                .values()
+                .filter(|execution| execution.phase == BackgroundRecoveryPhase::Suspended)
+                .map(|execution| execution.operation_id.clone())
+                .collect::<BTreeSet<_>>();
             let operation_ids = state
                 .operations
                 .iter()
-                .filter(|operation_id| !suspended_routine_operations.contains(*operation_id))
+                .filter(|operation_id| {
+                    !suspended_routine_operations.contains(*operation_id)
+                        && !suspended_background_operations.contains(*operation_id)
+                })
                 .cloned()
                 .collect::<Vec<_>>();
+            state.background_operations.clear();
             state.operations.clear();
             state.operation_agents.clear();
             *self
@@ -7776,6 +7813,10 @@ impl FeatureHostController {
                 } else if let Some(context) =
                     self.state()?.background_operations.remove(&operation_id)
                 {
+                    self.settle_background_recovery(&operation_id)?;
+                    let mut state = self.state()?;
+                    state.operations.remove(&operation_id);
+                    state.operation_agents.remove(&operation_id);
                     Some(HostEvent::AgentBackgroundFinished {
                         timestamp: timestamp(),
                         agent_id: context.agent_id,
@@ -7810,6 +7851,20 @@ impl FeatureHostController {
                 self.finish_automation_operation(
                     &operation_id, AutomationRunStatus::Error, Some(reason.clone()), "interrupted",
                 )?;
+                if let Some(context) = self.state()?.background_operations.remove(&operation_id) {
+                    self.settle_background_recovery(&operation_id)?;
+                    let mut state = self.state()?;
+                    state.operations.remove(&operation_id);
+                    state.operation_agents.remove(&operation_id);
+                    Some(HostEvent::AgentBackgroundFinished {
+                        timestamp: timestamp(),
+                        agent_id: context.agent_id,
+                        agent_name: context.agent_name,
+                        operation_id,
+                        source: context.source,
+                        error: Some(reason),
+                    })
+                } else {
                 let mut state = self.state()?;
                 if !state.operations.remove(&operation_id) {
                     None
@@ -7829,6 +7884,7 @@ impl FeatureHostController {
                         operation_id,
                         reason: Some(reason),
                     })
+                }
                 }
             }
             RuntimeEvent::OperationFailed {
@@ -7861,7 +7917,10 @@ impl FeatureHostController {
                 } else if let Some(context) =
                     self.state()?.background_operations.remove(&operation_id)
                 {
+                    self.settle_background_recovery(&operation_id)?;
                     let mut state = self.state()?;
+                    state.operations.remove(&operation_id);
+                    state.operation_agents.remove(&operation_id);
                     push_error_tray(
                         &mut state,
                         context.agent_id.clone(),
