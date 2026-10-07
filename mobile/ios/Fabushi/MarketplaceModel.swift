@@ -1359,7 +1359,7 @@ final class MarketplaceModel {
         accountEmail = user["email"] as? String ?? ""
     }
 
-    static func normalizedAccountDisplayName(_ value: String) -> String {
+    nonisolated static func normalizedAccountDisplayName(_ value: String) -> String {
         value
             .split(whereSeparator: { $0.isWhitespace })
             .joined(separator: " ")

@@ -83,13 +83,14 @@ final class CursorGenerateImageClientTests: XCTestCase {
                 )
             }
         )
+        let response = try await client.runGenerateImage(.init(
+            description: " avatar ",
+            referenceImages: [],
+            modelId: "model-1",
+            maxMode: false
+        ))
         XCTAssertEqual(
-            try await client.runGenerateImage(.init(
-                description: " avatar ",
-                referenceImages: [],
-                modelId: "model-1",
-                maxMode: false
-            )),
+            response,
             .success(.init(imageData: "YWJj", mimeType: "image/png"))
         )
     }
