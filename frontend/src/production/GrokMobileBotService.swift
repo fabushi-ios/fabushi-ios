@@ -7,6 +7,14 @@ import Foundation
 /// `group.list`. The adapter projects both into one native roster without
 /// creating a second group store on iOS.
 @MainActor
+struct MobileAgentAsyncTask: Identifiable, Equatable {
+    let id: String
+    let kind: String
+    let label: String
+    let detail: String?
+    let resourceId: String?
+}
+
 struct GrokMobileBotService {
     static let groupMaximumMembers = 6
 
@@ -78,6 +86,59 @@ struct GrokMobileBotService {
                 id: id,
                 requestId: "ios-mobile-bot-delete-\(UUID().uuidString.lowercased())"
             )
+        )
+    }
+
+    func setBotHidden(id: String, hidden: Bool) async throws -> [MobileBotSummary] {
+        try await executeBotMutation([
+            "type": "bot.setHidden",
+            "requestId": "ios-mobile-bot-hidden-\(UUID().uuidString.lowercased())",
+            "id": id,
+            "hidden": hidden,
+        ])
+    }
+
+    func setBotUnread(id: String, unread: Bool) async throws -> [MobileBotSummary] {
+        try await executeBotMutation([
+            "type": "bot.update",
+            "requestId": "ios-mobile-bot-unread-\(UUID().uuidString.lowercased())",
+            "id": id,
+            "unread": unread,
+        ])
+    }
+
+    func asyncTasks(agentId: String) async throws -> [MobileAgentAsyncTask] {
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": [
+                    "type": "asyncTask.list",
+                    "requestId": "ios-mobile-async-task-list-\(UUID().uuidString.lowercased())",
+                    "agentId": agentId,
+                ],
+            ]
+        )
+        let result = try await bridge.receiveFeatureEvent(deadlineMilliseconds: 2_560) { event in
+            event["type"] as? String == "asyncTask.listed"
+                && event["agentId"] as? String == agentId
+        }
+        guard let event = result.value as? [String: Any],
+              let rows = event["tasks"] as? [[String: Any]]
+        else { return [] }
+        return rows.compactMap(Self.parseAsyncTask)
+    }
+
+    static func parseAsyncTask(_ row: [String: Any]) -> MobileAgentAsyncTask? {
+        guard let id = row["id"] as? String, !id.isEmpty,
+              let kind = row["kind"] as? String, !kind.isEmpty,
+              let label = row["label"] as? String, !label.isEmpty
+        else { return nil }
+        return MobileAgentAsyncTask(
+            id: id,
+            kind: kind,
+            label: label,
+            detail: row["detail"] as? String,
+            resourceId: row["resourceId"] as? String
         )
     }
 
@@ -294,6 +355,9 @@ struct GrokMobileBotService {
                     description: installedBot.description,
                     title: canonical.title,
                     notifyOnUpdatesEnabled: canonical.notifyOnUpdatesEnabled,
+                    hidden: canonical.hidden,
+                    unread: canonical.unread,
+                    conversationId: canonical.conversationId,
                     miniAppId: installedBot.miniAppId ?? canonical.miniAppId,
                     menuButtonText: installedBot.menuButtonText ?? canonical.menuButtonText,
                     isGroup: canonical.isGroup,
@@ -330,6 +394,9 @@ struct GrokMobileBotService {
             description: row["description"] as? String ?? "",
             title: row["title"] as? String,
             notifyOnUpdatesEnabled: row["notifyOnUpdates"] as? Bool ?? false,
+            hidden: row["hidden"] as? Bool ?? false,
+            unread: row["unread"] as? Bool ?? false,
+            conversationId: row["conversationId"] as? String,
             miniAppId: miniAppId,
             menuButtonText: menuText?.isEmpty == false ? menuText : (miniAppId == nil ? nil : "打开应用")
         )
