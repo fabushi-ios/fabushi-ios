@@ -130,14 +130,14 @@
       "desktop_responsibility": "Defines canonical Fabushi/Dacheng brand identity, tagline, mission and public domain used by product surfaces.",
       "desktop_owner": "shared brand contract",
       "desktop_visible_effect": "Product surfaces consistently present 法布施 / 大乘 identity and the same public-facing positioning.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/app-shell/ContentView+Root.swift",
+      "ios_disposition": "direct-port",
+      "ios_target_path": "frontend/src/production/FabushiBrand.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS already renders Fabushi/Dacheng names in native product surfaces, but there is no single canonical native brand contract carrying the full tagline/mission/domain set yet.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
-      "test_evidence": "",
-      "notes": "Do not mark implemented from scattered literals alone; native brand ownership still needs consolidation or an explicit platform-specific canonical source."
+      "ios_platform_delta": "Canonical brand data is expressed as a native Swift contract and consumed by shipping product surfaces; no platform-specific semantic delta.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/FabushiBrand.swift; frontend/src/production/FabushiProductExperience.swift",
+      "test_evidence": "mobile/ios/FabushiTests/FabushiProductExperienceTests.swift",
+      "notes": "Canonical name, English identity, tagline, mission and public domain match Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Keep below verified until same-head Actions pass."
     },
     {
       "desktop_path": "frontend/packages/shared/src/business.ts",
