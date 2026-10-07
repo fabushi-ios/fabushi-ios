@@ -172,6 +172,14 @@ extension GrokMobileShell {
                     Spacer(minLength: 40)
                 }
             }
+
+            AccessCoverView(
+                access: accessCoverComposition.access,
+                isVisible: accessCoverComposition.isVisible,
+                onOpenAccess: {
+                    openExternalURL(ACCESS_ONBOARDING_URL)
+                }
+            )
         }
         .confirmationDialog("Create", isPresented: $composeOpen, titleVisibility: .visible) {
             Button("New Bot") { createBotOpen = true }
