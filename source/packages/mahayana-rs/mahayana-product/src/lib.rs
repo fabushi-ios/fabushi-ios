@@ -1875,7 +1875,7 @@ impl MahayanaProductClient {
             "mahayana.feedback.submit" => {
                 let message = required_string(request, "message")?;
                 let submission_id = required_identifier(request, "submissionId")?;
-                let body = account_menu_feedback_body(message, submission_id)?;
+                let body = account_menu_feedback_body(message, &submission_id)?;
                 self.authorized_post(request, "/api/feedback", body)
             }
             "mahayana.usage.status" => serde_json::to_value(self.model_usage()?)
