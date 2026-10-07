@@ -4741,15 +4741,17 @@ mod tests {
         {
             let session = first.session(&session_id).expect("session");
             let mut session = session.lock().await;
-            let prompt = PromptEntry {
-                id: "prompt:recover-inflight-tool".into(),
-                text: "continue after interrupted subordinate".into(),
-                priority: PromptPriority::Background,
-                state: mahayana_orchestrator::PromptState::Running,
-                created_at_ms: now_ms(),
-                dedupe_key: None,
-                metadata: json!({"hidden": true}),
-            };
+            let prompt_id = session
+                .prompt_queue
+                .enqueue(
+                    "continue after interrupted subordinate",
+                    PromptPriority::Background,
+                    None,
+                    json!({"hidden": true}),
+                )
+                .expect("enqueue recoverable parent prompt");
+            let prompt = session.prompt_queue.take_next().expect("activate recoverable parent prompt");
+            assert_eq!(prompt.id, prompt_id);
             session.active_prompt = Some(prompt.clone());
             session.history.push(json!({
                 "type": "function_call",
@@ -4861,15 +4863,17 @@ mod tests {
         {
             let session = first.session(&session_id).expect("session");
             let mut session = session.lock().await;
-            let prompt = PromptEntry {
-                id: "prompt:recover-durable-subagent-completion".into(),
-                text: "continue after durable subordinate result".into(),
-                priority: PromptPriority::Background,
-                state: mahayana_orchestrator::PromptState::Running,
-                created_at_ms: now_ms(),
-                dedupe_key: None,
-                metadata: json!({"hidden": true}),
-            };
+            let prompt_id = session
+                .prompt_queue
+                .enqueue(
+                    "continue after durable subordinate result",
+                    PromptPriority::Background,
+                    None,
+                    json!({"hidden": true}),
+                )
+                .expect("enqueue recoverable parent prompt");
+            let prompt = session.prompt_queue.take_next().expect("activate recoverable parent prompt");
+            assert_eq!(prompt.id, prompt_id);
             session.active_prompt = Some(prompt.clone());
             session.history.push(json!({
                 "type": "function_call",
