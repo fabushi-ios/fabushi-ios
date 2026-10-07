@@ -277,12 +277,8 @@ extension GrokMobileShell {
                     .font(.title2.weight(.semibold))
                 Text("“\(bot.name)”")
                     .font(.headline)
-                Text(
-                    bot.isGroup
-                        ? "这会永久删除该群组及其聊天记录。群组中的 Bots 不会被删除，仍可单独使用。此操作无法撤销。"
-                        : "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
-                )
-                .foregroundStyle(.secondary)
+                Text(mobileBotDeleteDescription(bot))
+                    .foregroundStyle(.secondary)
 
                 if let botActionError {
                     Text(botActionError)
