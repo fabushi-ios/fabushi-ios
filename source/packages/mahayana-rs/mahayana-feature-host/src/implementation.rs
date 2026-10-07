@@ -410,6 +410,15 @@ fn bounded_conversation_window(
 
 const ASYNC_TASK_STALE_MAX_AGE_MS: i64 = 48 * 60 * 60 * 1_000;
 
+fn async_task_key(kind: AsyncTaskKind, id: &str) -> String {
+    let kind = match kind {
+        AsyncTaskKind::Subagent => "subagent",
+        AsyncTaskKind::Shell => "shell",
+        AsyncTaskKind::CloudAgent => "cloud-agent",
+    };
+    format!("{kind}\u{1f}{id}")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PendingAsyncTaskEntry {
@@ -475,9 +484,9 @@ fn load_pending_async_tasks(
             .map(str::trim)
             .filter(|value| !value.is_empty())
         {
-            operation_ids.insert(task.id.clone(), operation_id.to_string());
+            operation_ids.insert(async_task_key(task.kind, &task.id), operation_id.to_string());
         }
-        tasks.insert(task.id.clone(), task.clone());
+        tasks.insert(async_task_key(task.kind, &task.id), task.clone());
     }
     (tasks, operation_ids)
 }
@@ -509,11 +518,10 @@ fn persist_pending_async_tasks(
     let file = PendingAsyncTasksFile {
         version: 2,
         entries: tasks
-            .values()
-            .cloned()
-            .map(|task| PendingAsyncTaskEntry {
-                operation_id: operation_ids.get(&task.id).cloned(),
-                task,
+            .iter()
+            .map(|(key, task)| PendingAsyncTaskEntry {
+                operation_id: operation_ids.get(key).cloned(),
+                task: task.clone(),
             })
             .collect(),
         tasks: Vec::new(),
@@ -8477,11 +8485,15 @@ impl FeatureHostController {
                     );
                     for subagent in changed {
                         if subagent.status == SubagentStatus::Running {
-                            state
-                                .async_task_operation_ids
-                                .insert(subagent.id.clone(), operation_id.clone());
+                            state.async_task_operation_ids.insert(
+                                async_task_key(AsyncTaskKind::Subagent, &subagent.id),
+                                operation_id.clone(),
+                            );
                         } else {
-                            state.async_task_operation_ids.remove(&subagent.id);
+                            state.async_task_operation_ids.remove(&async_task_key(
+                                AsyncTaskKind::Subagent,
+                                &subagent.id,
+                            ));
                         }
                         state.events.push_back(HostEvent::SubagentChanged {
                             timestamp: timestamp(),
@@ -8523,6 +8535,7 @@ impl FeatureHostController {
                     } else {
                         AsyncTaskKind::Shell
                     };
+                    let task_key = async_task_key(task_kind, &task_id);
                     let resource_id = if task_kind == AsyncTaskKind::CloudAgent {
                         cloud_task_resource_id(metadata.as_ref())
                     } else {
@@ -8531,7 +8544,7 @@ impl FeatureHostController {
                     let mut state = self.state()?;
                     if status == RuntimeActivityStatus::Running {
                         state.async_tasks.insert(
-                            task_id.clone(),
+                            task_key.clone(),
                             AsyncTaskSummary {
                                 kind: task_kind,
                                 id: task_id.clone(),
@@ -8546,10 +8559,10 @@ impl FeatureHostController {
                         );
                         state
                             .async_task_operation_ids
-                            .insert(task_id.clone(), operation_id.clone());
+                            .insert(task_key.clone(), operation_id.clone());
                     } else {
-                        state.async_tasks.remove(&task_id);
-                        state.async_task_operation_ids.remove(&task_id);
+                        state.async_tasks.remove(&task_key);
+                        state.async_task_operation_ids.remove(&task_key);
                     }
                     persist_pending_async_tasks(
                         async_tasks_path.as_deref(),
@@ -13467,7 +13480,7 @@ fn update_subagents_from_activity(
     for subagent in &changed {
         if subagent.status == SubagentStatus::Running {
             state.async_tasks.insert(
-                subagent.id.clone(),
+                async_task_key(AsyncTaskKind::Subagent, &subagent.id),
                 AsyncTaskSummary {
                     kind: AsyncTaskKind::Subagent,
                     id: subagent.id.clone(),
@@ -13481,7 +13494,9 @@ fn update_subagents_from_activity(
                 },
             );
         } else {
-            state.async_tasks.remove(&subagent.id);
+            state
+                .async_tasks
+                .remove(&async_task_key(AsyncTaskKind::Subagent, &subagent.id));
         }
     }
 
@@ -14532,10 +14547,14 @@ mod tests {
         let (restored, restored_operations) = load_pending_async_tasks(&path, now);
         assert_eq!(restored.len(), 1);
         assert_eq!(
-            restored_operations.get("recent-shell").map(String::as_str),
+            restored_operations
+                .get(&async_task_key(AsyncTaskKind::Shell, "recent-shell"))
+                .map(String::as_str),
             Some("operation-a")
         );
-        let shell = restored.get("recent-shell").expect("recent shell restored");
+        let shell = restored
+            .get(&async_task_key(AsyncTaskKind::Shell, "recent-shell"))
+            .expect("recent shell restored");
         assert_eq!(shell.parent_agent_id, "agent-a");
         assert!(
             shell
