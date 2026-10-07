@@ -45,10 +45,27 @@ jobs:
             echo "EVIDENCE_DIR=$GITHUB_WORKSPACE/ios-protected-session-evidence"
           } >> "$GITHUB_ENV"
           mkdir -p ios-protected-session-evidence/screenshots
+          SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+          DESKTOP_HEAD_SHA="$(sed -n 's/^- Pinned source commit: //p' MIGRATION_SOURCE.md)"
+          [[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DESKTOP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ARTIFACT_NAME="fabushi-ios-protected-session-${actual}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           {
             echo "source_sha=$actual"
             echo "run_id=$GITHUB_RUN_ID"
             echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "IOS_HEAD_SHA=$actual"
+            echo "IOS_EXPECTED_HEAD_SHA=$EXPECTED_SHA"
+            echo "IOS_TREE_SHA=$SOURCE_TREE"
+            echo "DESKTOP_HEAD_SHA=$DESKTOP_HEAD_SHA"
+            echo "WORKFLOW_HEAD_SHA=$EXPECTED_SHA"
+            echo "WORKFLOW_EVENT_SHA=$GITHUB_SHA"
+            echo "REPOSITORY=$GITHUB_REPOSITORY"
+            echo "ARTIFACT_NAME=$ARTIFACT_NAME"
+            echo "EVIDENCE_KIND=protected-simulator-global-dharma-journey"
+            echo "SIGNED_EXPORT_NOT_PROVEN=true"
+            echo "REAL_DEVICE_JOURNEY_NOT_PROVEN=true"
+            echo "PERFORMANCE_ACCEPTANCE_NOT_PROVEN=true"
           } > ios-protected-session-evidence/source.env
 
       - name: Require protected Fabushi CI account
@@ -274,6 +291,37 @@ jobs:
             xcrun simctl spawn "$UDID" log show --style compact --last 20m --predicate 'process == "Fabushi"' > "$EVIDENCE_DIR/fabushi-system.log" 2>&1 || true
           fi
           rm -f "${HOST_CI_SESSION:-}"
+
+      - name: Package protected evidence provenance
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$EVIDENCE_DIR"
+          test -s "$EVIDENCE_DIR/source.env"
+          python3 - "$EVIDENCE_DIR" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          output = root / "SHA256SUMS.txt"
+          files = sorted(
+              path for path in root.rglob("*")
+              if path.is_file() and path != output
+          )
+          if not files:
+              raise SystemExit("protected evidence directory is empty")
+          with output.open("w", encoding="utf-8") as handle:
+              for path in files:
+                  digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                  relative = path.relative_to(root).as_posix()
+                  handle.write(f"{digest}  {relative}\n")
+          PY
+          (
+            cd "$EVIDENCE_DIR"
+            shasum -a 256 -c SHA256SUMS.txt
+          )
 
       - name: Upload protected-session evidence
         if: always()
