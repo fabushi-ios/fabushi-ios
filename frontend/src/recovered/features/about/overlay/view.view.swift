@@ -132,6 +132,7 @@ struct FabushiAboutOverlayView: View {
                     copyGeneration = copyGeneration == Int.max ? 1 : copyGeneration + 1
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityLabel(copied ? "已复制" : "复制版本信息")
                 .accessibilityIdentifier("about-copy-version")
             }
             .padding(24)
