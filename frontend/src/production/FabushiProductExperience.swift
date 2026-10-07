@@ -81,9 +81,107 @@ func flashcardNextIntervalDays(
     }
 }
 
+struct FabushiHeroPrompt: Identifiable, Equatable {
+    let id: String
+    let label: String
+    let prompt: String
+    let symbol: String
+    let tool: FabushiProductModule?
+}
+
+let fabushiHeroPrompts: [FabushiHeroPrompt] = [
+    .init(id: "who", label: "你是谁", prompt: "你是谁？请用一句话介绍大乘能帮我做什么。", symbol: "sparkle", tool: nil),
+    .init(id: "global-dharma", label: "全球法布施", prompt: "帮我整理一段适合全球法布施的善法文字。", symbol: "globe.asia.australia.fill", tool: .globalDharma),
+    .init(id: "flashcards", label: "背诵闪卡", prompt: "把这段经文拆成适合背诵的闪卡。", symbol: "rectangle.on.rectangle.angled", tool: .flashcards),
+    .init(id: "simple", label: "原来是这样", prompt: "请用庄重、简洁、容易记住的方式解释这段佛法内容。", symbol: "lightbulb.fill", tool: nil),
+    .init(id: "today", label: "我今天修什么？", prompt: "根据今天的状态安排一个 20 分钟修行计划。", symbol: "safari.fill", tool: nil),
+]
+
+let fabushiGlobalDharmaRegions = [
+    "中国", "新加坡", "日本", "印度", "澳大利亚", "德国",
+    "法国", "英国", "美国", "加拿大", "巴西", "南非",
+]
+
+struct FabushiGeneratedFlashcard: Identifiable, Equatable {
+    let id: String
+    let front: String
+    let back: String
+    let kind: String
+    let reviews: Int
+    let due: String
+}
+
+func splitFabushiSentences(_ text: String) -> [String] {
+    text
+        .components(separatedBy: CharacterSet(charactersIn: "。！？!?；;\n"))
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { $0.count > 5 }
+        .prefix(6)
+        .map(String.init)
+}
+
+func makeFabushiFlashcards(
+    from text: String,
+    createID: () -> String = { UUID().uuidString }
+) -> [FabushiGeneratedFlashcard] {
+    splitFabushiSentences(text).flatMap { sentence in
+        let removable = CharacterSet(charactersIn: "，、：, \t\r\n")
+        let plainCharacters = sentence.unicodeScalars
+            .filter { !removable.contains($0) }
+            .map(Character.init)
+        let start = max(0, plainCharacters.count / 3 - 1)
+        let end = min(plainCharacters.count, start + 4)
+        let term = start < end ? String(plainCharacters[start..<end]) : ""
+        let cloze: String
+        if !term.isEmpty, sentence.contains(term) {
+            cloze = sentence.replacingOccurrences(of: term, with: "〔……〕")
+        } else {
+            let head = String(sentence.prefix(8))
+            let tail = String(sentence.dropFirst(min(sentence.count, 14)))
+            cloze = "\(head)〔……〕\(tail)"
+        }
+        let excerpt = String(sentence.prefix(18))
+        return [
+            FabushiGeneratedFlashcard(
+                id: createID(),
+                front: cloze,
+                back: sentence,
+                kind: "挖空",
+                reviews: 0,
+                due: "现在"
+            ),
+            FabushiGeneratedFlashcard(
+                id: createID(),
+                front: "请背诵并解释：\(excerpt)…",
+                back: sentence,
+                kind: "双向",
+                reviews: 0,
+                due: "现在"
+            ),
+        ]
+    }
+}
+
+func flashcardDueLabel(for rating: FabushiFlashcardRating) -> String {
+    switch rating {
+    case .again: "10 分钟后"
+    case .hard: "明天"
+    case .good: "3 天后"
+    case .easy: "7 天后"
+    }
+}
+
+func buildFabushiGlobalDharmaChecklist(_ text: String) -> [(region: String, text: String)] {
+    let summary = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let finalText = summary.isEmpty
+        ? "愿以此功德，普及于一切，我等与众生，皆共成佛道。"
+        : summary
+    return fabushiGlobalDharmaRegions.map { ($0, finalText) }
+}
+
 struct FabushiProductHub: View {
     let onOpenGlobalDharma: () -> Void
-    let onOpenAI: () -> Void
+    let onOpenAI: (String?) -> Void
 
     @State private var selectedModule: FabushiProductModule?
 
@@ -135,6 +233,25 @@ struct FabushiProductHub: View {
                 }
             }
             .padding(.horizontal, 18)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(fabushiHeroPrompts) { item in
+                        Button {
+                            openHero(item)
+                        } label: {
+                            Label(item.label, systemImage: item.symbol)
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.78), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("fabushi-hero-\(item.id)")
+                    }
+                }
+                .padding(.horizontal, 18)
+            }
         }
         .sheet(item: $selectedModule) { module in
             NavigationStack {
@@ -155,9 +272,20 @@ struct FabushiProductHub: View {
         case .globalDharma:
             onOpenGlobalDharma()
         case .ai:
-            onOpenAI()
+            onOpenAI(nil)
         default:
             selectedModule = module
+        }
+    }
+
+    private func openHero(_ item: FabushiHeroPrompt) {
+        switch item.tool {
+        case .globalDharma:
+            onOpenGlobalDharma()
+        case .flashcards:
+            selectedModule = .flashcards
+        default:
+            onOpenAI(item.prompt)
         }
     }
 
@@ -179,57 +307,95 @@ struct FabushiProductHub: View {
 }
 
 struct FabushiFlashcardReviewView: View {
-    private let cards = [
+    private let sampleCards = [
         FabushiFlashcard(id: "heart-sutra-form", prompt: "色不异空，下一句？", answer: "空不异色。色即是空，空即是色。"),
         FabushiFlashcard(id: "diamond-no-abiding", prompt: "应无所住，下一句？", answer: "而生其心。"),
         FabushiFlashcard(id: "dedication", prompt: "每日功课结束后，最小可持续动作是什么？", answer: "如实记录，并作回向。"),
     ]
 
+    @State private var sourceText = ""
+    @State private var generatedCards: [FabushiGeneratedFlashcard] = []
     @State private var index = 0
     @State private var revealed = false
     @State private var intervalDays = 1
+    @State private var dueLabel = "现在"
     @AppStorage("fabushi.flashcards.reviewCount") private var reviewCount = 0
 
     var body: some View {
-        VStack(spacing: 18) {
-            Text("今日复习 \(reviewCount)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            let card = cards[index % cards.count]
-            VStack(alignment: .leading, spacing: 16) {
-                Text(card.prompt)
-                    .font(.title3.weight(.semibold))
-                if revealed {
-                    Divider()
-                    Text(card.answer)
-                        .font(.body)
-                } else {
-                    Button("显示答案") { revealed = true }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("fabushi-flashcard-reveal")
+        ScrollView {
+            VStack(spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("从经文制卡").font(.headline)
+                    TextField("粘贴一段经文或学习内容", text: $sourceText, axis: .vertical)
+                        .lineLimit(2...5)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("fabushi-flashcard-source")
+                    Button("生成闪卡") {
+                        generatedCards = makeFabushiFlashcards(from: sourceText)
+                        index = 0
+                        revealed = false
+                        dueLabel = "现在"
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(splitFabushiSentences(sourceText).isEmpty)
+                    .accessibilityIdentifier("fabushi-flashcard-generate")
                 }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
-            if revealed {
-                HStack {
-                    ForEach(FabushiFlashcardRating.allCases) { rating in
-                        Button(rating.rawValue) { review(rating) }
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier("fabushi-flashcard-rating-\(rating.rawValue.lowercased())")
+                Text("今日复习 \(reviewCount)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(currentPrompt)
+                        .font(.title3.weight(.semibold))
+                    if revealed {
+                        Divider()
+                        Text(currentAnswer)
+                            .font(.body)
+                    } else {
+                        Button("显示答案") { revealed = true }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("fabushi-flashcard-reveal")
                     }
                 }
+                .padding(20)
+                .frame(maxWidth: .infinity, minHeight: 220, alignment: .topLeading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+                if revealed {
+                    HStack {
+                        ForEach(FabushiFlashcardRating.allCases) { rating in
+                            Button(rating.rawValue) { review(rating) }
+                                .buttonStyle(.bordered)
+                                .accessibilityIdentifier("fabushi-flashcard-rating-\(rating.rawValue.lowercased())")
+                        }
+                    }
+                }
+                Text("当前间隔：\(intervalDays) 天 · 下次：\(dueLabel)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            Text("当前间隔：\(intervalDays) 天")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
+            .padding()
         }
-        .padding()
         .accessibilityIdentifier("fabushi-flashcards-surface")
+    }
+
+    private var currentPrompt: String {
+        if generatedCards.isEmpty {
+            return sampleCards[index % sampleCards.count].prompt
+        }
+        return generatedCards[index % generatedCards.count].front
+    }
+
+    private var currentAnswer: String {
+        if generatedCards.isEmpty {
+            return sampleCards[index % sampleCards.count].answer
+        }
+        return generatedCards[index % generatedCards.count].back
+    }
+
+    private var activeCardCount: Int {
+        generatedCards.isEmpty ? sampleCards.count : generatedCards.count
     }
 
     private func review(_ rating: FabushiFlashcardRating) {
@@ -237,8 +403,9 @@ struct FabushiFlashcardReviewView: View {
             rating: rating,
             currentIntervalDays: intervalDays
         )
+        dueLabel = flashcardDueLabel(for: rating)
         reviewCount += 1
-        index = (index + 1) % cards.count
+        index = (index + 1) % max(1, activeCardCount)
         revealed = false
     }
 }
