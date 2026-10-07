@@ -118,6 +118,7 @@ use mahayana_host_protocol::SkillTeamSummary;
 use mahayana_host_protocol::SubagentStatus;
 use mahayana_host_protocol::SubagentSummary;
 use mahayana_host_protocol::SurfacePlatform;
+use mahayana_host_protocol::TranscriptReaction;
 use mahayana_host_protocol::TEACH_MAX_DURATION_MS;
 use mahayana_host_protocol::TeachEntryPoint;
 use mahayana_host_protocol::TeachRecordingResult;
@@ -9562,6 +9563,23 @@ impl FeatureHostController {
                     RuntimeMessageRole::User => MessageRole::User,
                     _ => MessageRole::Assistant,
                 },
+                reactions: message
+                    .metadata
+                    .get("reactions")
+                    .and_then(Value::as_array)
+                    .map(|rows| {
+                        rows.iter()
+                            .filter_map(|row| {
+                                let emoji = row.get("emoji")?.as_str()?.trim();
+                                let by = row.get("by")?.as_str()?.trim();
+                                (!emoji.is_empty() && !by.is_empty()).then(|| TranscriptReaction {
+                                    emoji: emoji.to_string(),
+                                    by: by.to_string(),
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 text: message.text,
                 created_at_ms: message.created_at_ms,
             })
@@ -9595,6 +9613,23 @@ impl FeatureHostController {
                     RuntimeMessageRole::User => MessageRole::User,
                     _ => MessageRole::Assistant,
                 },
+                reactions: message
+                    .metadata
+                    .get("reactions")
+                    .and_then(Value::as_array)
+                    .map(|rows| {
+                        rows.iter()
+                            .filter_map(|row| {
+                                let emoji = row.get("emoji")?.as_str()?.trim();
+                                let by = row.get("by")?.as_str()?.trim();
+                                (!emoji.is_empty() && !by.is_empty()).then(|| TranscriptReaction {
+                                    emoji: emoji.to_string(),
+                                    by: by.to_string(),
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 text: message.text,
                 created_at_ms: message.created_at_ms,
             })
@@ -17786,6 +17821,7 @@ mod tests {
                 role: MessageRole::Assistant,
                 text: id.into(),
                 created_at_ms: 0,
+                reactions: Vec::new(),
             })
             .collect::<Vec<_>>();
         assert_eq!(
