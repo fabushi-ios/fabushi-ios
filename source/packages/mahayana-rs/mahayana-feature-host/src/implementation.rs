@@ -956,6 +956,70 @@ impl FeatureHostController {
         }
     }
 
+    #[cfg(feature = "production")]
+    fn rearm_pending_async_operations(&self) -> Result<(), FeatureHostError> {
+        let candidates = {
+            let state = self.state()?;
+            let routine_operations = state
+                .routine_executions
+                .values()
+                .filter_map(|execution| execution.operation_id.as_deref())
+                .collect::<BTreeSet<_>>();
+            let background_operations = state
+                .background_recoveries
+                .keys()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>();
+            let mut candidates = BTreeMap::<String, (String, String)>::new();
+            for (task_id, operation_id) in &state.async_task_operation_ids {
+                if routine_operations.contains(operation_id.as_str())
+                    || background_operations.contains(operation_id.as_str())
+                {
+                    continue;
+                }
+                let Some(task) = state.async_tasks.get(task_id) else {
+                    continue;
+                };
+                let conversation_id = state
+                    .bots
+                    .get(&task.parent_agent_id)
+                    .and_then(|bot| bot.conversation_id.clone())
+                    .unwrap_or_else(|| MAHAYANA_AI_CONVERSATION_ID.to_string());
+                candidates
+                    .entry(operation_id.clone())
+                    .or_insert_with(|| (task.parent_agent_id.clone(), conversation_id));
+            }
+            candidates
+        };
+
+        for (operation_id, (agent_id, conversation_id)) in candidates {
+            {
+                let mut state = self.state()?;
+                state.operations.insert(operation_id.clone());
+                state
+                    .operation_agents
+                    .insert(operation_id.clone(), agent_id.clone());
+            }
+            let resumed = self.runtime()?.resume_operation(
+                mahayana_conversation::ResumeConversationOperationRequest {
+                    conversation_id: ConversationId(conversation_id),
+                    operation_id: OperationId(operation_id.clone()),
+                    hidden: false,
+                    show_assistant_output: false,
+                    reply_to_message_id: None,
+                    is_fork: false,
+                    attachment_batch_id: None,
+                },
+            );
+            if resumed.is_err() {
+                let mut state = self.state()?;
+                state.operations.remove(&operation_id);
+                state.operation_agents.remove(&operation_id);
+            }
+        }
+        Ok(())
+    }
+
     pub fn async_tasks_for_agent(
         &self,
         agent_id: &str,
@@ -7426,6 +7490,9 @@ impl FeatureHostController {
                 .warmup_conversation(ConversationId(MAHAYANA_AI_CONVERSATION_ID.to_string()))?;
             if !self.state()?.routine_quiescing {
                 self.resume_suspended_background_operations()?;
+            }
+            if changed && !initialized {
+                self.rearm_pending_async_operations()?;
             }
         }
         Ok(())
