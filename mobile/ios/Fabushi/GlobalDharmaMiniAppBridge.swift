@@ -10,7 +10,7 @@ struct GlobalDharmaInstalledBot: Equatable, Sendable {
 
 @MainActor
 final class GlobalDharmaMiniAppBridge {
-    static let globalDharmaId = "global-dharma"
+    nonisolated static let globalDharmaId = "global-dharma"
     static let prayerWheelCapability = "local.prayer-wheel.start"
     static let prayerWheelLifetimeSku = "local-prayer-wheel.lifetime"
     static let prayerWheelLifetimeProductId = "prod.global-dharma.local-prayer-wheel.lifetime"
