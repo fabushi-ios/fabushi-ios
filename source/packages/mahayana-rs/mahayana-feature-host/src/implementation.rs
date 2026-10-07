@@ -8316,10 +8316,6 @@ impl FeatureHostController {
                         self.async_tasks_path.as_deref(),
                         &state.async_tasks,
                     )?;
-                    persist_pending_async_tasks(
-                        self.async_tasks_path.as_deref(),
-                        &state.async_tasks,
-                    )?;
                     let mut tasks = state
                         .async_tasks
                         .values()
@@ -8367,6 +8363,10 @@ impl FeatureHostController {
                     } else {
                         state.async_tasks.remove(&task_id);
                     }
+                    persist_pending_async_tasks(
+                        self.async_tasks_path.as_deref(),
+                        &state.async_tasks,
+                    )?;
                     let mut tasks = state
                         .async_tasks
                         .values()
