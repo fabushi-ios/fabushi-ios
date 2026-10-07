@@ -15,9 +15,30 @@ extension ContentView {
                 authenticatedContent
             }
         }
+        .overlay(alignment: .top) {
+            SettingsNoticeView(controller: model.settingsNoticeController)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+        }
+        .task(id: settingsNoticeScopeKey) {
+            model.settingsNoticeController.updateScope(
+                accountKey: model.settingsNoticeAccountKey,
+                surface: settingsNoticeSurface
+            )
+        }
         .onOpenURL { url in
             model.handleDeepLink(url)
         }
+    }
+
+    var settingsNoticeSurface: SettingsNoticeSurface {
+        if case .marketplace = destination { return .plugins }
+        if case .settings? = activeSection { return .settings }
+        return .none
+    }
+
+    var settingsNoticeScopeKey: String {
+        "\(model.settingsNoticeAccountKey):\(settingsNoticeSurface.rawValue)"
     }
 
     var authenticatedContent: some View {

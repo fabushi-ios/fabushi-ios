@@ -834,6 +834,7 @@ final class MarketplaceModel {
     var chatBusy = false
     var activeOperationId: String?
     let globalDharmaCommerce: GlobalDharmaCommerceModel
+    @ObservationIgnored let settingsNoticeController = SettingsNoticeController()
 
     private let bridge: IOSPreloadBridge
     private let globalDharmaBridge: GlobalDharmaMiniAppBridge
@@ -859,6 +860,31 @@ final class MarketplaceModel {
         globalDharmaBridge = GlobalDharmaMiniAppBridge(bridge: bridge)
         globalDharmaCommerce = GlobalDharmaCommerceModel(bridge: bridge)
         onboardingStep = UserDefaults.standard.bool(forKey: onboardingKey) ? 3 : 0
+    }
+
+    var settingsNoticeAccountKey: String {
+        guard loggedIn else { return "logged-out" }
+        if let globalDharmaAccountScope, !globalDharmaAccountScope.isEmpty {
+            return globalDharmaAccountScope
+        }
+        let email = accountEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return email.isEmpty ? "account" : email
+    }
+
+    private func publishPluginsNotice(
+        _ operation: PluginsNoticeOperation,
+        kind: SurfaceNoticeKind,
+        message: String,
+        fence: SettingsNoticeFence
+    ) {
+        settingsNoticeController.publish(
+            RootSettingsNoticeEvent(
+                kind: kind,
+                operation: .plugins(operation),
+                message: message
+            ),
+            fence: fence
+        )
     }
 
     nonisolated static func projectLinkMetadata(
@@ -2183,6 +2209,7 @@ final class MarketplaceModel {
     }
 
     func refreshMcpServers() async {
+        let noticeFence = settingsNoticeController.makeFence()
         guard loggedIn else {
             resetMcpState()
             return
@@ -2211,12 +2238,15 @@ final class MarketplaceModel {
             mcpToolsByServerId = mcpToolsByServerId.filter { validIds.contains($0.key) }
         } catch {
             guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return }
-            mcpError = error.localizedDescription
+            let notice = error.localizedDescription
+            mcpError = notice
+            publishPluginsNotice(.load, kind: .error, message: notice, fence: noticeFence)
         }
     }
 
     func loadMcpTools(serverId: String) async {
         guard loggedIn else { return }
+        let noticeFence = settingsNoticeController.makeFence()
         let epoch = mcpAccountEpoch
         let previous = mcpToolRequestSerial[serverId] ?? 0
         let serial = previous == Int.max ? 1 : previous + 1
@@ -2248,7 +2278,9 @@ final class MarketplaceModel {
             guard epoch == mcpAccountEpoch,
                   mcpToolRequestSerial[serverId] == serial
             else { return }
-            mcpError = error.localizedDescription
+            let notice = error.localizedDescription
+            mcpError = notice
+            publishPluginsNotice(.serverToolsLoad, kind: .error, message: notice, fence: noticeFence)
         }
     }
 
@@ -2258,6 +2290,7 @@ final class MarketplaceModel {
         enabled: Bool
     ) async {
         guard loggedIn else { return }
+        let noticeFence = settingsNoticeController.makeFence()
         let epoch = mcpAccountEpoch
         let key = "\(serverId):\(toolName)"
         let previous = mcpMutationSerial[key] ?? 0
@@ -2284,13 +2317,21 @@ final class MarketplaceModel {
             }
             mcpToolsByServerId[serverId] = rows.compactMap(Self.mcpTool(from:))
             if mcpMutatingToolKey == key { mcpMutatingToolKey = nil }
+            publishPluginsNotice(
+                .serverToolToggle,
+                kind: .success,
+                message: enabled ? "\(toolName) 已启用" : "\(toolName) 已停用",
+                fence: noticeFence
+            )
             await refreshMcpServers()
         } catch {
             guard epoch == mcpAccountEpoch,
                   mcpMutationSerial[key] == serial
             else { return }
             if mcpMutatingToolKey == key { mcpMutatingToolKey = nil }
-            mcpError = error.localizedDescription
+            let notice = error.localizedDescription
+            mcpError = notice
+            publishPluginsNotice(.serverToolToggle, kind: .error, message: notice, fence: noticeFence)
         }
     }
 
@@ -2343,9 +2384,12 @@ final class MarketplaceModel {
 
     func refreshPrivateSkills() async {
         guard !privateSkillsLoading else { return }
+        let noticeFence = settingsNoticeController.makeFence()
         guard let agentId = privateSkillAgentId, !agentId.isEmpty else {
             resetPrivateSkillProjection()
-            privateSkillError = "请从具体 Agent 的设置中打开 Yours；Skills 必须绑定明确的 Agent。"
+            let notice = "请从具体 Agent 的设置中打开 Yours；Skills 必须绑定明确的 Agent。"
+            privateSkillError = notice
+            publishPluginsNotice(.privateSkillsLoad, kind: .error, message: notice, fence: noticeFence)
             return
         }
         privateSkillsLoading = true
@@ -2401,7 +2445,9 @@ final class MarketplaceModel {
                   scopeGeneration == privateSkillScopeGeneration,
                   privateSkillAgentId == agentId
             else { return }
-            privateSkillError = error.localizedDescription
+            let notice = error.localizedDescription
+            privateSkillError = notice
+            publishPluginsNotice(.privateSkillsLoad, kind: .error, message: notice, fence: noticeFence)
         }
         if serial == privateSkillRequestSerial,
            scopeGeneration == privateSkillScopeGeneration,
@@ -2505,6 +2551,7 @@ final class MarketplaceModel {
         requireConfirmed: Bool
     ) async {
         guard let agentId = privateSkillAgentId else { return }
+        let noticeFence = settingsNoticeController.makeFence()
         let scopeGeneration = privateSkillScopeGeneration
         privateSkillPublishingId = skillId
         privateSkillError = nil
@@ -2527,11 +2574,21 @@ final class MarketplaceModel {
                 )
             }
             await refreshPrivateSkills()
+            if privateSkillError == nil {
+                publishPluginsNotice(
+                    .privateSkillSync,
+                    kind: .success,
+                    message: "Skill 已与权威插件状态同步",
+                    fence: noticeFence
+                )
+            }
         } catch {
             guard scopeGeneration == privateSkillScopeGeneration,
                   privateSkillAgentId == agentId
             else { return }
-            privateSkillError = error.localizedDescription
+            let notice = error.localizedDescription
+            privateSkillError = notice
+            publishPluginsNotice(.privateSkillSync, kind: .error, message: notice, fence: noticeFence)
             await refreshPrivateSkills()
         }
     }
@@ -2548,7 +2605,14 @@ final class MarketplaceModel {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let body = privateSkillBodyDrafts[skill.id] ?? skill.body
         guard !name.isEmpty, !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            privateSkillError = "Skill 名称和 Instructions 不能为空。"
+            let notice = "Skill 名称和 Instructions 不能为空。"
+            privateSkillError = notice
+            publishPluginsNotice(
+                .privateSkillUpdate,
+                kind: .error,
+                message: notice,
+                fence: settingsNoticeController.makeFence()
+            )
             return
         }
         var fields: [String: Any] = [
@@ -2617,6 +2681,12 @@ final class MarketplaceModel {
         fields: [String: Any]
     ) async {
         guard let agentId = privateSkillAgentId, !agentId.isEmpty else { return }
+        let noticeFence = settingsNoticeController.makeFence()
+        let noticeOperation: PluginsNoticeOperation = switch type {
+        case "workflow.delete": .privateSkillDelete
+        case "workflow.setEnabled": .privateSkillToggle
+        default: .privateSkillUpdate
+        }
         let scopeGeneration = privateSkillScopeGeneration
         privateSkillMutatingId = skillId
         privateSkillError = nil
@@ -2650,15 +2720,26 @@ final class MarketplaceModel {
             // authoritative workflow directory + enablement state back through
             // the same Host before updating the visible Yours surface.
             await refreshPrivateSkills()
+            if privateSkillError == nil {
+                publishPluginsNotice(
+                    noticeOperation,
+                    kind: .success,
+                    message: "Skill 已更新",
+                    fence: noticeFence
+                )
+            }
         } catch {
             guard scopeGeneration == privateSkillScopeGeneration,
                   privateSkillAgentId == agentId
             else { return }
-            privateSkillError = error.localizedDescription
+            let notice = error.localizedDescription
+            privateSkillError = notice
+            publishPluginsNotice(noticeOperation, kind: .error, message: notice, fence: noticeFence)
         }
     }
 
     func refresh() async {
+        let noticeFence = settingsNoticeController.makeFence()
         loading = true
         defer { loading = false }
         do {
@@ -2671,13 +2752,18 @@ final class MarketplaceModel {
             plugins = rows.compactMap(Self.marketplacePlugin(from:))
             message = "原生 iOS · Rust Host 已连接"
         } catch {
-            message = "市场加载失败：\(error.localizedDescription)"
+            let notice = "市场加载失败：\(error.localizedDescription)"
+            message = notice
+            publishPluginsNotice(.load, kind: .error, message: notice, fence: noticeFence)
         }
     }
 
     func install(_ plugin: MarketplacePlugin) async {
+        let noticeFence = settingsNoticeController.makeFence()
         guard let version = plugin.latestVersion, !version.isEmpty else {
-            message = "\(plugin.pluginId) 没有可安装版本"
+            let notice = "\(plugin.pluginId) 没有可安装版本"
+            message = notice
+            publishPluginsNotice(.install, kind: .error, message: notice, fence: noticeFence)
             return
         }
         installingPluginId = plugin.pluginId
@@ -2722,6 +2808,12 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App 已本地安装，但 Fabushi 账号/Bot 同步未完成")
             }
             installingPluginId = nil
+            publishPluginsNotice(
+                .install,
+                kind: .success,
+                message: "\(pluginId) 已安装",
+                fence: noticeFence
+            )
             if permissions.isEmpty {
                 await startPortableRuntime(pluginId: pluginId, runtime: runtime)
             } else {
@@ -2734,12 +2826,15 @@ final class MarketplaceModel {
             }
         } catch {
             installingPluginId = nil
-            message = "安装失败：\(error.localizedDescription)"
+            let notice = "安装失败：\(error.localizedDescription)"
+            message = notice
+            publishPluginsNotice(.install, kind: .error, message: notice, fence: noticeFence)
         }
     }
 
     func approvePermissions() async {
         guard let request = permissionRequest else { return }
+        let noticeFence = settingsNoticeController.makeFence()
         permissionRequest = nil
         installingPluginId = request.pluginId
         message = "正在授权 \(request.pluginId)…"
@@ -2751,10 +2846,18 @@ final class MarketplaceModel {
                 )
             }
             installingPluginId = nil
+            publishPluginsNotice(
+                .authenticate,
+                kind: .success,
+                message: "\(request.pluginId) 权限已授权",
+                fence: noticeFence
+            )
             await startPortableRuntime(pluginId: request.pluginId, runtime: request.runtime)
         } catch {
             installingPluginId = nil
-            message = "授权失败：\(error.localizedDescription)"
+            let notice = "授权失败：\(error.localizedDescription)"
+            message = notice
+            publishPluginsNotice(.authenticate, kind: .error, message: notice, fence: noticeFence)
         }
     }
 

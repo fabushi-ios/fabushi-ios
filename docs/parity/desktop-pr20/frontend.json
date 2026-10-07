@@ -622,17 +622,17 @@
     {
       "desktop_path": "frontend/src/production/settings-notice-controller.ts",
       "desktop_blob_sha": "06b5960030a886714aa7ae57284728dcbaf4b9c8",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Root-owned typed Settings/Plugins notice event storage with latest-snapshot publish/reset/dispose semantics; account/surface scope generation prevents stale asynchronous completions from leaking into a different root surface, while expiry and dismissal remain presenter-owned.",
+      "desktop_owner": "production renderer root over Settings and Plugins surfaces",
+      "desktop_visible_effect": "Settings/plugin operations surface one scoped success/error notice at the product root; changing account or leaving the owning surface clears the notice, stale async completions are rejected, success notices expire after 3.5 seconds, errors after 6 seconds, and users can dismiss immediately.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/settings-notice-controller.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "Swift Observation replaces useSyncExternalStore subscriptions. A single native root controller owns the typed snapshot and scope-generation fence; SwiftUI owns timer expiry/manual dismissal. Existing MarketplaceModel message/privateSkillError/mcpError fields remain local compatibility presentation and are not a second root authority.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/settings-notice-controller.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
+      "test_evidence": "mobile/ios/FabushiTests/SettingsNoticeControllerParityTests.swift; new exact-head ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701, including recovered settings overlay notice.tsx. Do not count the prior a12d878 acceptance after this implementation commit moves HEAD."
     },
     {
       "desktop_path": "frontend/src/production/sidebar-model.ts",
