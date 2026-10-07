@@ -667,17 +667,17 @@
     {
       "desktop_path": "frontend/src/recovered/catalog.ts",
       "desktop_blob_sha": "5e353cb5c173ecff46320b4c345123daaf835d51",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Expose reconstruction-only React component boundary metadata and match DOM-inspector elements to recovered CSS selectors for developer inspection.",
+      "desktop_owner": "renderer reconstruction/dev tooling",
+      "desktop_visible_effect": "Developer DOM inspection can label recovered React boundaries; this does not own a shipping product interaction or persisted/runtime state.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "frontend/src/production/FabushiSceneRoot.swift",
+      "ios_language": "SwiftUI",
+      "ios_platform_delta": "Desktop catalog.ts is tied to React DOM class selectors, manifests/component-names.json and the development DOM inspector. Native iOS has no DOM/class-selector reconstruction layer; shipping composition is typed SwiftUI and UI identity/acceptance is exposed through native accessibility identifiers and focused UI tests instead of a recovered-component selector catalog.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/ProductionRenderer.swift",
+      "test_evidence": "mobile/ios/FabushiUITests/GlobalDharmaJourneyUITests.swift; current exact-head UI acceptance pending",
+      "notes": "Strict platform replacement: no iOS product responsibility is removed. Only Desktop reconstruction/dev inspection machinery is omitted; native SwiftUI composition and accessibility/UI acceptance replace its diagnostic purpose."
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/desktop-bridge.contract.test.ts",
