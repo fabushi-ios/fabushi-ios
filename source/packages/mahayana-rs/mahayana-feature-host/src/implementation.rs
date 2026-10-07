@@ -7338,8 +7338,8 @@ impl FeatureHostController {
                 .unwrap_or_default();
             let next_async_tasks_path =
                 self.async_tasks_path_for_account(next_account_id.as_deref());
-            let restored_async_tasks = if initialized {
-                BTreeMap::new()
+            let (restored_async_tasks, restored_async_task_operation_ids) = if initialized {
+                (BTreeMap::new(), BTreeMap::new())
             } else {
                 next_async_tasks_path
                     .as_deref()
@@ -7349,14 +7349,23 @@ impl FeatureHostController {
             if initialized {
                 let previous_async_tasks_path =
                     self.async_tasks_path_for_account(previous_account_id.as_deref());
-                persist_pending_async_tasks(previous_async_tasks_path.as_deref(), &BTreeMap::new())?;
+                persist_pending_async_tasks(
+                    previous_async_tasks_path.as_deref(),
+                    &BTreeMap::new(),
+                    &BTreeMap::new(),
+                )?;
                 if next_async_tasks_path != previous_async_tasks_path {
-                    persist_pending_async_tasks(next_async_tasks_path.as_deref(), &BTreeMap::new())?;
+                    persist_pending_async_tasks(
+                        next_async_tasks_path.as_deref(),
+                        &BTreeMap::new(),
+                        &BTreeMap::new(),
+                    )?;
                 }
             } else {
                 persist_pending_async_tasks(
                     next_async_tasks_path.as_deref(),
                     &restored_async_tasks,
+                    &restored_async_task_operation_ids,
                 )?;
             }
             let mut state = self.state()?;
@@ -7373,6 +7382,7 @@ impl FeatureHostController {
             state.background_operations.clear();
             state.background_recoveries.clear();
             state.async_tasks = restored_async_tasks;
+            state.async_task_operation_ids = restored_async_task_operation_ids;
             state.subagents.clear();
             state.automations = automations;
             state.published_plugins_by_agent.clear();
@@ -8399,6 +8409,13 @@ impl FeatureHostController {
                         metadata.as_ref(),
                     );
                     for subagent in changed {
+                        if subagent.status == SubagentStatus::Running {
+                            state
+                                .async_task_operation_ids
+                                .insert(subagent.id.clone(), operation_id.clone());
+                        } else {
+                            state.async_task_operation_ids.remove(&subagent.id);
+                        }
                         state.events.push_back(HostEvent::SubagentChanged {
                             timestamp: timestamp(),
                             subagent,
@@ -8407,6 +8424,7 @@ impl FeatureHostController {
                     persist_pending_async_tasks(
                         async_tasks_path.as_deref(),
                         &state.async_tasks,
+                        &state.async_task_operation_ids,
                     )?;
                     let mut tasks = state
                         .async_tasks
@@ -8459,12 +8477,17 @@ impl FeatureHostController {
                                 resource_id: resource_id.clone(),
                             },
                         );
+                        state
+                            .async_task_operation_ids
+                            .insert(task_id.clone(), operation_id.clone());
                     } else {
                         state.async_tasks.remove(&task_id);
+                        state.async_task_operation_ids.remove(&task_id);
                     }
                     persist_pending_async_tasks(
                         async_tasks_path.as_deref(),
                         &state.async_tasks,
+                        &state.async_task_operation_ids,
                     )?;
                     let mut tasks = state
                         .async_tasks
@@ -14432,10 +14455,19 @@ mod tests {
                 now - ASYNC_TASK_STALE_MAX_AGE_MS - 1,
             ),
         );
-        persist_pending_async_tasks(Some(&path), &tasks).expect("persist pending tasks");
+        let operation_ids = BTreeMap::from([
+            ("recent-shell".to_string(), "operation-a".to_string()),
+            ("stale-cloud".to_string(), "operation-b".to_string()),
+        ]);
+        persist_pending_async_tasks(Some(&path), &tasks, &operation_ids)
+            .expect("persist pending tasks");
 
-        let restored = load_pending_async_tasks(&path, now);
+        let (restored, restored_operations) = load_pending_async_tasks(&path, now);
         assert_eq!(restored.len(), 1);
+        assert_eq!(
+            restored_operations.get("recent-shell").map(String::as_str),
+            Some("operation-a")
+        );
         let shell = restored.get("recent-shell").expect("recent shell restored");
         assert_eq!(shell.parent_agent_id, "agent-a");
         assert!(
@@ -14445,7 +14477,8 @@ mod tests {
                 .is_some_and(|detail| detail.contains("reattached after a host restart"))
         );
 
-        persist_pending_async_tasks(Some(&path), &restored).expect("prune durable store");
+        persist_pending_async_tasks(Some(&path), &restored, &restored_operations)
+            .expect("prune durable store");
         let raw = std::fs::read_to_string(&path).expect("read pruned pending store");
         assert!(!raw.contains("stale-cloud"));
         let _ = std::fs::remove_dir_all(root);
@@ -14465,11 +14498,16 @@ mod tests {
             "subagent-1".into(),
             async_task_fixture("subagent-1", "agent-a", AsyncTaskKind::Subagent, 10),
         );
-        persist_pending_async_tasks(Some(&path), &tasks).expect("persist one task");
+        let mut operation_ids =
+            BTreeMap::from([("subagent-1".to_string(), "operation-a".to_string())]);
+        persist_pending_async_tasks(Some(&path), &tasks, &operation_ids)
+            .expect("persist one task");
         assert!(path.is_file());
 
         tasks.remove("subagent-1");
-        persist_pending_async_tasks(Some(&path), &tasks).expect("settle final task");
+        operation_ids.remove("subagent-1");
+        persist_pending_async_tasks(Some(&path), &tasks, &operation_ids)
+            .expect("settle final task");
         assert!(!path.exists());
         let _ = std::fs::remove_dir_all(root);
     }
