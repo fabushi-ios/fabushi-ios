@@ -18,6 +18,7 @@ internal struct MobileBotAgentSettingsSheet: View {
     @State private var descriptionDraft: String
     @State private var pending: GrokMobileAgentSettingsModel.Pending?
     @State private var failure: String?
+    @State private var avatarEditorPresented = false
     @State private var generation = 0
     @State private var mutationTask: Task<Void, Never>?
 
@@ -82,6 +83,20 @@ internal struct MobileBotAgentSettingsSheet: View {
             )
             await marketplaceModel.refreshPrivateSkills()
         }
+        .sheet(isPresented: $avatarEditorPresented) {
+            MobileAvatarEditorSheet(
+                agent: currentAgent,
+                bridge: bridge,
+                onSaved: { updated in
+                    guard let authoritative = updated.first(where: { $0.id == currentAgent.id }) else {
+                        return
+                    }
+                    applyAuthoritative(authoritative)
+                    onRosterChanged(updated)
+                },
+                onClose: { avatarEditorPresented = false }
+            )
+        }
         .onChange(of: agent.id) { _, _ in invalidatePending() }
         .onChange(of: accountScopeKey) { _, _ in invalidatePending() }
         .onDisappear {
@@ -102,6 +117,21 @@ internal struct MobileBotAgentSettingsSheet: View {
 
     private var profileSection: some View {
         Section("资料") {
+            if !currentAgent.isGroup {
+                Button {
+                    avatarEditorPresented = true
+                } label: {
+                    Label(
+                        currentAgent.avatarDataURL == nil
+                            ? "设置头像与角色"
+                            : "编辑头像与角色",
+                        systemImage: "person.crop.circle"
+                    )
+                }
+                .disabled(pending != nil)
+                .accessibilityIdentifier("mobile-agent-settings-avatar")
+            }
+
             TextField("名称", text: $nameDraft)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()

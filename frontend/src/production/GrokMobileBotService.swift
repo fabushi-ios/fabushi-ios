@@ -265,6 +265,38 @@ struct GrokMobileBotService {
         return updated
     }
 
+    func updateBotAvatar(
+        id: String,
+        avatarDataURL: String? = nil,
+        clearAvatar: Bool = false,
+        avatarShape: String? = nil,
+        avatarColor: String? = nil
+    ) async throws -> [MobileBotSummary] {
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": Self.botAvatarUpdateCommand(
+                    id: id,
+                    avatarDataURL: avatarDataURL,
+                    clearAvatar: clearAvatar,
+                    avatarShape: avatarShape,
+                    avatarColor: avatarColor,
+                    requestId: "ios-mobile-avatar-\(UUID().uuidString.lowercased())"
+                ),
+            ]
+        )
+        try Task.checkCancellation()
+        let updated = await loadBots()
+        guard updated.contains(where: { $0.id == id }) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 8,
+                userInfo: [NSLocalizedDescriptionKey: "头像更新后无法从 Host roster 重新读取该 Agent"]
+            )
+        }
+        return updated
+    }
+
     func setAgentNotifyOnUpdates(id: String, isEnabled: Bool) async throws -> [MobileBotSummary] {
         _ = try await bridge.request(
             method: "feature.execute",
@@ -333,6 +365,29 @@ struct GrokMobileBotService {
         if !isGroup, let title {
             command["title"] = title
         }
+        return command
+    }
+
+    static func botAvatarUpdateCommand(
+        id: String,
+        avatarDataURL: String?,
+        clearAvatar: Bool,
+        avatarShape: String?,
+        avatarColor: String?,
+        requestId: String
+    ) -> [String: Any] {
+        var command: [String: Any] = [
+            "type": "bot.update",
+            "requestId": requestId,
+            "id": id,
+        ]
+        if let avatarDataURL {
+            command["avatar"] = avatarDataURL
+        } else if clearAvatar {
+            command["avatar"] = ""
+        }
+        if let avatarShape { command["avatarShape"] = avatarShape }
+        if let avatarColor { command["avatarColor"] = avatarColor }
         return command
     }
 
@@ -661,6 +716,9 @@ struct GrokMobileBotService {
             name: (row["name"] as? String) ?? (row["displayName"] as? String) ?? id,
             description: row["description"] as? String ?? "",
             title: row["title"] as? String,
+            avatarDataURL: row["avatar"] as? String,
+            avatarShape: row["avatarShape"] as? String,
+            avatarColor: row["avatarColor"] as? String,
             notifyOnUpdatesEnabled: row["notifyOnUpdates"] as? Bool ?? false,
             hidden: row["hidden"] as? Bool ?? false,
             unread: (row["hasUnread"] as? Bool) ?? (row["unread"] as? Bool) ?? false,

@@ -1065,9 +1065,9 @@
       "ios_language": "Swift/SwiftUI",
       "ios_platform_delta": "iOS currently carries only the 25 MB source policy. It has no PhotosPicker/file ingest controller, crop/zoom/pan owner, image-generation flow, avatar-byte mutation composition, character staging or generation-fenced editor lifecycle.",
       "implementation_status": "mapped",
-      "production_evidence": "source/shared/media/avatar-image.swift",
-      "test_evidence": "",
-      "notes": "Real production gap; policy constants are not avatar-editor parity."
+      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; exact-HEAD GitHub Actions required",
+      "notes": "Partial production closure on iOS: individual Agent upload/crop/256px PNG save, character shape/color staging/reset, canonical bot.update persistence and generation fencing are wired. Keep mapped because Desktop group-avatar upload and concrete Cursor AiService RunGenerateImage production client are still unresolved; do not promote from partial evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/model.ts",
@@ -1080,9 +1080,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "Only AVATAR_SOURCE_MAX_BYTES and extension/MIME policy have been ported. Native 1024px normalization, crop geometry, 256px PNG encoding and character shape/color model are still missing.",
       "implementation_status": "mapped",
-      "production_evidence": "source/shared/media/avatar-image.swift",
-      "test_evidence": "",
-      "notes": "Partial policy port only."
+      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; exact-HEAD GitHub Actions required",
+      "notes": "Partial production closure on iOS: individual Agent upload/crop/256px PNG save, character shape/color staging/reset, canonical bot.update persistence and generation fencing are wired. Keep mapped because Desktop group-avatar upload and concrete Cursor AiService RunGenerateImage production client are still unresolved; do not promote from partial evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/production-adapter.ts",
@@ -1095,9 +1095,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "No equivalent scoped avatar editor production adapter is currently composed on iOS.",
       "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Must be implemented with the existing account scope and canonical Agent roster owner; no second avatar store."
+      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; exact-HEAD GitHub Actions required",
+      "notes": "Partial production closure on iOS: individual Agent upload/crop/256px PNG save, character shape/color staging/reset, canonical bot.update persistence and generation fencing are wired. Keep mapped because Desktop group-avatar upload and concrete Cursor AiService RunGenerateImage production client are still unresolved; do not promote from partial evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/view.tsx",
@@ -1110,9 +1110,9 @@
       "ios_language": "SwiftUI",
       "ios_platform_delta": "No native avatar editor view is currently wired. The existing ClothGhostAvatar renders identity but is not an editor.",
       "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Do not count avatar display as avatar editing."
+      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; exact-HEAD GitHub Actions required",
+      "notes": "Partial production closure on iOS: individual Agent upload/crop/256px PNG save, character shape/color staging/reset, canonical bot.update persistence and generation fencing are wired. Keep mapped because Desktop group-avatar upload and concrete Cursor AiService RunGenerateImage production client are still unresolved; do not promote from partial evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/channels/model.ts",

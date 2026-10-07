@@ -11,6 +11,9 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let name: String
     let description: String
     let title: String?
+    let avatarDataURL: String?
+    let avatarShape: String?
+    let avatarColor: String?
     let notifyOnUpdatesEnabled: Bool
     let hidden: Bool
     let unread: Bool
@@ -34,6 +37,9 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         name: String,
         description: String,
         title: String? = nil,
+        avatarDataURL: String? = nil,
+        avatarShape: String? = nil,
+        avatarColor: String? = nil,
         notifyOnUpdatesEnabled: Bool = false,
         hidden: Bool = false,
         unread: Bool = false,
@@ -56,6 +62,9 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         self.name = name
         self.description = description
         self.title = title
+        self.avatarDataURL = avatarDataURL
+        self.avatarShape = avatarShape
+        self.avatarColor = avatarColor
         self.notifyOnUpdatesEnabled = notifyOnUpdatesEnabled
         self.hidden = hidden
         self.unread = unread
