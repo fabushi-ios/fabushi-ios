@@ -27,6 +27,10 @@ extension ContentView {
                 homeView
             case .marketplace:
                 marketplaceView
+                    // List rows contain independent install/open and MCP actions.
+                    // Automatic row-wide activation can invoke both buttons and
+                    // open a full-screen MiniApp while merely installing it.
+                    .buttonStyle(.borderless)
             case .remoteComputer:
                 RemoteComputerSurface(
                     bridge: bridge,
