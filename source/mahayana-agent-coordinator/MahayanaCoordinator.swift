@@ -178,6 +178,17 @@ final class MahayanaCoordinator {
         return try await webAuthnSigner.sign(challenge)
     }
 
+    func cloudAgentInfo(bcId: String) async throws -> IOSCloudAgentComposerInfo {
+        guard let mcpSurface else {
+            throw CoordinatorError.unavailable
+        }
+        do {
+            return try await mcpSurface.cloudAgentInfo(bcId: bcId)
+        } catch {
+            throw CoordinatorError.requestFailed(error.localizedDescription)
+        }
+    }
+
     /// Compatibility entry used while feature-specific typed facades are
     /// replacing dictionary-shaped calls. Host ownership remains here.
     func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
