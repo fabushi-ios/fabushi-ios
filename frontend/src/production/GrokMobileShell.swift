@@ -325,8 +325,6 @@ internal struct GrokMobileShell: View {
         )
         guard next != previous else {
             if let id = next.currentAgentID,
-               let selectedBot,
-               selectedBot.id == id,
                let refreshed = roster.first(where: { $0.id == id }) {
                 self.selectedBot = refreshed
             }
