@@ -272,6 +272,13 @@ impl NativeEngine {
             .lock()
             .map_err(|_| KernelError::Backend("native session registry poisoned".into()))?
             .clear();
+        let persisted_session_paths = self
+            .persisted_sessions
+            .lock()
+            .map_err(|_| KernelError::Backend("persisted session registry poisoned".into()))?
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
         self.persisted_sessions
             .lock()
             .map_err(|_| KernelError::Backend("persisted session registry poisoned".into()))?
@@ -290,12 +297,11 @@ impl NativeEngine {
             .lock()
             .map_err(|_| KernelError::Backend("subagent scheduler poisoned".into()))? =
             SubagentScheduler::default();
+        for path in persisted_session_paths {
+            remove_session_state_file(&path)?;
+        }
         if let Some(path) = self.config.session_state_path.as_deref() {
-            match std::fs::remove_file(path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(KernelError::Backend(error.to_string())),
-            }
+            remove_all_conversation_session_state_files(path)?;
         }
         Ok(())
     }
@@ -2830,6 +2836,33 @@ fn ensure_operation_active(control: &OperationControl) -> Result<(), KernelError
     Ok(())
 }
 
+fn remove_session_state_file(path: &Path) -> Result<(), KernelError> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(KernelError::Backend(error.to_string())),
+    }
+}
+
+fn remove_all_conversation_session_state_files(base: &Path) -> Result<(), KernelError> {
+    remove_session_state_file(base)?;
+    let Some(parent) = base.parent() else { return Ok(()); };
+    let Some(file_name) = base.file_name().and_then(|name| name.to_str()) else { return Ok(()); };
+    let prefix = format!("{file_name}.conversation-");
+    let entries = match std::fs::read_dir(parent) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(KernelError::Backend(error.to_string())),
+    };
+    for entry in entries {
+        let entry = entry.map_err(|error| KernelError::Backend(error.to_string()))?;
+        if entry.file_name().to_str().is_some_and(|name| name.starts_with(&prefix)) {
+            remove_session_state_file(&entry.path())?;
+        }
+    }
+    Ok(())
+}
+
 fn session_state_path_for_conversation(base: &Path, conversation_id: &str) -> PathBuf {
     if conversation_id == MAIN_ASSISTANT_CONVERSATION_ID {
         return base.to_path_buf();
@@ -4266,6 +4299,30 @@ mod tests {
         assert!(!workspace.join("blocked.txt").exists());
         assert_eq!(engine.metrics_snapshot().approvals_timed_out, 1);
         std::fs::remove_dir_all(workspace).expect("cleanup");
+    }
+
+    #[tokio::test]
+    fn session_reset_cleanup_removes_every_conversation_snapshot_only() {
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-native-session-cleanup-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).expect("create temp root");
+        let base = root.join("session.json");
+        let agent = session_state_path_for_conversation(&base, "mahayana-ai:agent:alpha");
+        let other = session_state_path_for_conversation(&base, "mahayana-ai:agent:beta");
+        std::fs::write(&base, b"main").expect("write main");
+        std::fs::write(&agent, b"agent").expect("write agent");
+        std::fs::write(&other, b"other").expect("write other");
+        std::fs::write(root.join("unrelated.json"), b"keep").expect("write unrelated");
+
+        remove_all_conversation_session_state_files(&base).expect("cleanup snapshots");
+
+        assert!(!base.exists());
+        assert!(!agent.exists());
+        assert!(!other.exists());
+        assert!(root.join("unrelated.json").exists());
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[tokio::test]
