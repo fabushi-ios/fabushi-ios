@@ -1016,13 +1016,13 @@
       "desktop_owner": "renderer async-tasks presentation infrastructure",
       "desktop_visible_effect": "Running task age labels advance without per-row timers or leaked background intervals.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "",
-      "ios_language": "Swift/SwiftUI",
-      "ios_platform_delta": "A native TimelineView/clock owner is the platform replacement, but no async-tasks production surface exists yet, so introducing a detached timer alone would create dead infrastructure.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Blocked by the missing async-tasks provider/view shipping composition, not by CI or permissions."
+      "ios_target_path": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift",
+      "ios_language": "SwiftUI",
+      "ios_platform_delta": "SwiftUI owns one panel-scoped 30-second refresh/age clock using structured concurrency. The task is created only while the panel is mounted, is cancelled on disposal/Agent identity change, and shares the provider refresh generation rather than creating per-row timers.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; exact-HEAD GitHub Actions pending",
+      "notes": "Re-reviewed against Desktop PR #20 final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Production wiring is implemented; current exact-HEAD CI/acceptance is still required before verified."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/provider.ts",
@@ -1031,13 +1031,13 @@
       "desktop_owner": "renderer async-tasks provider over Coordinator",
       "desktop_visible_effect": "Agent Info shows currently running background tasks, retains the previous task list across transient failures, distinguishes capability-unavailable, and recovers on reconnect without stale results.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-preload/main-rpc-runtime.swift; frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
+      "ios_target_path": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift",
       "ios_language": "Swift/Rust",
-      "ios_platform_delta": "Current iOS has no getAsyncTasks RPC method, no asyncTasks event owner and no per-Agent snapshot provider. Automation/routines are a different responsibility and are not accepted as a substitute.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Real production gap: backend/Coordinator ownership must exist before a native provider can be honestly wired."
+      "ios_platform_delta": "The native provider calls canonical getAsyncTasks through IOSPreloadBridge/Coordinator into AppHost and the single FeatureHostController owner. It strictly decodes subagent/shell/cloud-agent rows, generation-fences stale Agent requests, refreshes every 30 seconds and on pull-to-refresh, retains the last known snapshot across transient failures, and cancels with panel lifetime.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs focused async-task durability/projection tests; exact-HEAD GitHub Actions pending",
+      "notes": "Canonical provider/backend ownership now exists and is shipping-composed. Do not promote to verified until the current iOS exact HEAD has ordinary Rust/Swift/UI/device-archive plus applicable protected evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/view.tsx",
@@ -1046,13 +1046,13 @@
       "desktop_owner": "renderer Agent Info async-tasks panel",
       "desktop_visible_effect": "Users can see currently running subagent, shell and cloud-agent work for the selected Agent with live age labels.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
+      "ios_target_path": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift",
       "ios_language": "SwiftUI",
-      "ios_platform_delta": "Native sheet/panel should replace the movable DOM panel, but the production provider/RPC/event owner is absent, so adding a mock UI would be a non-shipping demo.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Do not implement a UI-only panel before the canonical async-tasks provider is available."
+      "ios_platform_delta": "A native sheet replaces the movable DOM panel while preserving per-Agent scope, kind icon/label/detail, running state, live age, loading/empty/error-with-previous states and close/refresh actions. MobileBotChat exposes the shipping header entry and the same action through FabushiAppAgentSurface.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; exact-HEAD GitHub Actions pending",
+      "notes": "The panel is no longer UI-only: it is wired to canonical Rust Host state. Current-head compile/UI acceptance remains pending."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/controller.ts",
