@@ -7342,17 +7342,17 @@
     {
       "desktop_path": "source/host/src/runner/runner_prompt_glue.rs",
       "desktop_blob_sha": "fed229ea2c4226eba00466bd5413ec9b85c6aee5",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Runner-owned consumption-time prompt/context join: read confirmed-user watermark, profile, MCP context, remote Computer/box context, automation reminder/compaction, silence policy and Spotlight at the point a turn is consumed; also own MCP large-output spill/file-transfer projection so prompt growth does not create a second attachment owner.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
+      "desktop_visible_effect": "Each Runner turn sees the freshest user/profile/tool/Computer/automation/silence/Spotlight context, while oversized MCP text is converted into the canonical file-transfer path instead of being duplicated inline or dropped.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs; source/packages/mahayana-rs/mahayana-host/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "Keep dynamic prompt assembly on the iOS-owned Runner/Host consumption path rather than Swift UI or a static launch snapshot. Reuse the existing native attachment/file-transfer owners for oversized MCP output; iOS lifecycle changes the transport mechanism, not the single-owner or freshness semantics.",
+      "implementation_status": "mapped",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=unreviewed, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Current NativeEngine has turn prompt/instruction assembly and the Host owns native capabilities, but the audit did not find evidence that all Desktop consumption-time joins (watermark/profile/MCP/remote Computer/automation-compaction/silence/Spotlight) and MCP spill/file-transfer semantics are wired as one shipping path. This row is therefore mapped only, not implemented or verified; focused production wiring and exact-head CI remain required."
     },
     {
       "desktop_path": "source/host/src/runner/sand_action_audit.rs",
