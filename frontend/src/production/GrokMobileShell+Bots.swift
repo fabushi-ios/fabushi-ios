@@ -191,6 +191,41 @@ extension GrokMobileShell {
     }
 
     @MainActor
+    func assignBot(_ bot: MobileBotSummary, toSection sectionId: String?) {
+        agentSidebarSections = MobileAgentSidebarSections.assigning(
+            agentId: bot.id,
+            to: sectionId,
+            in: agentSidebarSections
+        )
+        MobileAgentSidebarSections.persist(
+            agentSidebarSections,
+            accountScopeKey: mobileAccountScopeKey
+        )
+    }
+
+    @MainActor
+    func beginCreateAgentSidebarSection(for bot: MobileBotSummary) {
+        newSectionName = ""
+        newSectionBot = bot
+    }
+
+    @MainActor
+    func createAgentSidebarSection(for bot: MobileBotSummary) {
+        guard let next = MobileAgentSidebarSections.creating(
+            name: newSectionName,
+            with: bot.id,
+            in: agentSidebarSections
+        ) else { return }
+        agentSidebarSections = next
+        MobileAgentSidebarSections.persist(
+            next,
+            accountScopeKey: mobileAccountScopeKey
+        )
+        newSectionBot = nil
+        newSectionName = ""
+    }
+
+    @MainActor
     func showAsyncTasks(_ bot: MobileBotSummary) async {
         guard !bot.isGroup, bot.miniAppId == nil else { return }
         asyncTasksTarget = bot
