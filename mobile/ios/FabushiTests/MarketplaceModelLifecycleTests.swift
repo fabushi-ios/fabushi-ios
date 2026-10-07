@@ -64,6 +64,7 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
     }
 
 
+    @MainActor
     func testPrivateSkillProjectionUsesWorkflowOwnerAndRejectsAutomationRows() throws {
         let skill = try XCTUnwrap(MarketplaceModel.marketplacePrivateSkill(from: [
             "id": "review-release",
@@ -188,6 +189,7 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
 
 
 final class MarketplaceMcpTeamPolicyProjectionTests: XCTestCase {
+    @MainActor
     func testMcpServerProjectionPreservesTeamPolicyFacts() throws {
         let server = try XCTUnwrap(MarketplaceModel.mcpServer(from: [
             "id": "17",
@@ -212,6 +214,7 @@ final class MarketplaceMcpTeamPolicyProjectionTests: XCTestCase {
         XCTAssertTrue(server.isDisabledByTeamAdminPolicy)
     }
 
+    @MainActor
     func testMcpServerProjectionDefaultsPolicyFactsForPersonalRows() throws {
         let server = try XCTUnwrap(MarketplaceModel.mcpServer(from: [
             "id": "18",
