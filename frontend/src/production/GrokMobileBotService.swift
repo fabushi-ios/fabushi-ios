@@ -453,6 +453,14 @@ struct GrokMobileBotService {
                     hidden: canonical.hidden,
                     unread: canonical.unread,
                     conversationId: canonical.conversationId,
+                    lastEntry: canonical.lastEntry,
+                    lastMessageId: canonical.lastMessageId,
+                    lastMessagePreview: canonical.lastMessagePreview,
+                    updatedAtMs: canonical.updatedAtMs,
+                    isComposingMessage: canonical.isComposingMessage,
+                    waitingReason: canonical.waitingReason,
+                    isRunning: canonical.isRunning,
+                    draftPrompt: canonical.draftPrompt,
                     miniAppId: installedBot.miniAppId ?? canonical.miniAppId,
                     menuButtonText: installedBot.menuButtonText ?? canonical.menuButtonText,
                     isGroup: canonical.isGroup,
@@ -474,6 +482,90 @@ struct GrokMobileBotService {
         }
     }
 
+    static func parseLastEntry(_ value: Any?) -> MobileBotLastEntry? {
+        guard let row = value as? [String: Any] else { return nil }
+        if row["kind"] as? String == "text", let text = row["text"] as? String {
+            return .text(text)
+        }
+        if row["kind"] as? String == "attachment",
+           let count = row["count"] as? Int,
+           count > 0,
+           let rawKinds = row["kinds"] as? [String: Any]
+        {
+            var kinds: [String: Int] = [:]
+            for (kind, rawCount) in rawKinds {
+                guard !kind.isEmpty, let amount = rawCount as? Int, amount > 0 else { return nil }
+                kinds[kind] = amount
+            }
+            return .attachment(count: count, kinds: kinds)
+        }
+        if row["kind"] as? String == "link",
+           let url = row["url"] as? String,
+           !url.isEmpty
+        {
+            return .link(url)
+        }
+
+        if let content = row["content"] as? String { return .text(content) }
+        if let text = row["text"] as? String { return .text(text) }
+        if let message = row["message"] as? [String: Any],
+           let content = message["content"] as? String
+        {
+            return .text(content)
+        }
+        return nil
+    }
+
+    static func derivedLastMessage(
+        lastEntry: MobileBotLastEntry?,
+        fallback: Any?
+    ) -> String? {
+        switch lastEntry {
+        case .text(let text):
+            return text
+        case .link(let url):
+            if let fallback = fallback as? String { return fallback }
+            return "Sent a link · \(url)"
+        case .attachment(let count, _):
+            if let fallback = fallback as? String { return fallback }
+            return count == 1 ? "Sent 1 file" : "Sent \(count) files"
+        case nil:
+            return fallback as? String
+        }
+    }
+
+    static func int64Value(_ value: Any?) -> Int64? {
+        if let value = value as? Int64 { return value }
+        if let value = value as? Int { return Int64(value) }
+        if let value = value as? Double, value.isFinite { return Int64(value) }
+        if let value = value as? NSNumber { return value.int64Value }
+        return nil
+    }
+
+    static func summaryProjection(_ row: [String: Any]) -> (
+        lastEntry: MobileBotLastEntry?,
+        lastMessageId: String?,
+        lastMessagePreview: String?,
+        updatedAtMs: Int64?,
+        isComposingMessage: Bool,
+        waitingReason: String?,
+        isRunning: Bool,
+        draftPrompt: String?
+    ) {
+        let lastEntry = parseLastEntry(row["lastEntry"])
+        let awaiting = row["awaitingUserResponse"] as? [String: Any]
+        return (
+            lastEntry,
+            row["lastMessageId"] as? String,
+            derivedLastMessage(lastEntry: lastEntry, fallback: row["lastMessagePreview"]),
+            int64Value(row["updatedAt"]),
+            row["isComposingMessage"] as? Bool ?? false,
+            (awaiting?["reason"] as? String) ?? (row["waitingReason"] as? String),
+            row["isRunning"] as? Bool ?? false,
+            row["draftPrompt"] as? String
+        )
+    }
+
     static func parseBot(_ row: [String: Any]) -> MobileBotSummary? {
         guard let id = row["id"] as? String, !id.isEmpty else { return nil }
         let explicitMiniAppId = (row["miniAppId"] as? String)?
@@ -483,6 +575,7 @@ struct GrokMobileBotService {
             : (id == "global-dharma-bot" ? GlobalDharmaMiniAppBridge.globalDharmaId : nil)
         let menuText = (row["menuButtonText"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let summary = summaryProjection(row)
         return MobileBotSummary(
             id: id,
             name: (row["name"] as? String) ?? (row["displayName"] as? String) ?? id,
@@ -490,8 +583,16 @@ struct GrokMobileBotService {
             title: row["title"] as? String,
             notifyOnUpdatesEnabled: row["notifyOnUpdates"] as? Bool ?? false,
             hidden: row["hidden"] as? Bool ?? false,
-            unread: row["unread"] as? Bool ?? false,
+            unread: (row["hasUnread"] as? Bool) ?? (row["unread"] as? Bool) ?? false,
             conversationId: row["conversationId"] as? String,
+            lastEntry: summary.lastEntry,
+            lastMessageId: summary.lastMessageId,
+            lastMessagePreview: summary.lastMessagePreview,
+            updatedAtMs: summary.updatedAtMs,
+            isComposingMessage: summary.isComposingMessage,
+            waitingReason: summary.waitingReason,
+            isRunning: summary.isRunning,
+            draftPrompt: summary.draftPrompt,
             miniAppId: miniAppId,
             menuButtonText: menuText?.isEmpty == false ? menuText : (miniAppId == nil ? nil : "打开应用")
         )
@@ -506,10 +607,21 @@ struct GrokMobileBotService {
               memberIds.allSatisfy({ !$0.isEmpty }),
               Set(memberIds).count == memberIds.count
         else { return nil }
+        let summary = summaryProjection(row)
         return MobileBotSummary(
             id: id,
             name: (row["name"] as? String) ?? id,
             description: row["description"] as? String ?? "",
+            unread: (row["hasUnread"] as? Bool) ?? (row["unread"] as? Bool) ?? false,
+            conversationId: row["conversationId"] as? String,
+            lastEntry: summary.lastEntry,
+            lastMessageId: summary.lastMessageId,
+            lastMessagePreview: summary.lastMessagePreview,
+            updatedAtMs: summary.updatedAtMs,
+            isComposingMessage: summary.isComposingMessage,
+            waitingReason: summary.waitingReason,
+            isRunning: summary.isRunning,
+            draftPrompt: summary.draftPrompt,
             isGroup: true,
             memberIds: memberIds,
             isSharedRoom: false
