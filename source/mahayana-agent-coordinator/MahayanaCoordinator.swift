@@ -70,18 +70,6 @@ final class MahayanaCoordinator {
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
-        if method == "openExternal" {
-            do {
-                let payload = try CoordinatorPayload.fromFoundation(params)
-                let result = try await nativeLocalCapabilities.execute(
-                    capability: .openExternalURL,
-                    params: payload
-                )
-                return JSONResult(value: result.foundationValue)
-            } catch {
-                throw CoordinatorError.requestFailed(error.localizedDescription)
-            }
-        }
 
         if let mcpSurface {
             self.mcpSurface = mcpSurface
@@ -194,6 +182,18 @@ final class MahayanaCoordinator {
     /// replacing dictionary-shaped calls. Host ownership remains here.
     func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
         guard lifecycleState != .shuttingDown else { throw CoordinatorError.unavailable }
+        if method == "openExternal" {
+            do {
+                let payload = try CoordinatorPayload.fromFoundation(params)
+                let result = try await nativeLocalCapabilities.execute(
+                    capability: .openExternalURL,
+                    params: payload
+                )
+                return JSONResult(value: result.foundationValue)
+            } catch {
+                throw CoordinatorError.requestFailed(error.localizedDescription)
+            }
+        }
         if case .failed = lifecycleState {
             do {
                 _ = try hostSupervisor.recoverAfterFailure(
