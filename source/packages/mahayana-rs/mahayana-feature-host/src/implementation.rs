@@ -926,7 +926,7 @@ impl FeatureHostController {
                             "remove confirmed private workflow: {error}"
                         ))
                     })?;
-                    forget_workflow_enablement(agent_root, agent_id, workflow_id)?;
+                    forget_workflow_enablement(&agent_root, agent_id, workflow_id)?;
                 }
                 return Ok(json!({
                     "confirmed": true,
@@ -938,7 +938,7 @@ impl FeatureHostController {
             ));
         }
 
-        let summary = load_workflow_summary(workflow_root, agent_root, agent_id, workflow_id)
+        let summary = load_workflow_summary(workflow_root, &agent_root, agent_id, workflow_id)
             .ok_or_else(|| FeatureHostError::Contract(
                 "That private skill no longer exists.".into()
             ))?;
@@ -957,7 +957,7 @@ impl FeatureHostController {
             display_name: summary.name.clone(),
             description: summary.description.clone(),
             marketplace_team_id: team_id,
-            enabled_before_publish: is_workflow_enabled(agent_root, agent_id, workflow_id),
+            enabled_before_publish: is_workflow_enabled(&agent_root, agent_id, workflow_id),
         };
         let parent = cache_root.parent().ok_or_else(|| {
             FeatureHostError::Contract("Published skill cache path is invalid.".into())
@@ -992,7 +992,7 @@ impl FeatureHostController {
         std::fs::remove_dir_all(&private_dir).map_err(|error| {
             FeatureHostError::Contract(format!("remove promoted private workflow: {error}"))
         })?;
-        forget_workflow_enablement(agent_root, agent_id, workflow_id)?;
+        forget_workflow_enablement(&agent_root, agent_id, workflow_id)?;
         Ok(json!({
             "confirmed": true,
             "promotedWorkflowId": promoted_workflow_id,
@@ -1097,7 +1097,7 @@ impl FeatureHostController {
                 metadata.display_name
             ))
         })?;
-        let summary = load_workflow_summary(&cache_root, agent_root, agent_id, "skill")
+        let summary = load_workflow_summary(&cache_root, &agent_root, agent_id, "skill")
             .ok_or_else(|| FeatureHostError::Contract(
                 "That published skill's local cache is unavailable.".into()
             ))?;
@@ -1176,7 +1176,7 @@ impl FeatureHostController {
         }
         restore_result?;
         set_workflow_enabled(
-            agent_root,
+            &agent_root,
             agent_id,
             &metadata.original_workflow_id,
             metadata.enabled_before_publish,
@@ -12456,7 +12456,7 @@ fn published_workflow_summaries(
         if metadata.agent_id != agent_id || metadata.plugin_id != fact.plugin_id {
             continue;
         }
-        let Some(mut summary) = load_workflow_summary(&cache_root, agent_root, agent_id, "skill")
+        let Some(mut summary) = load_workflow_summary(&cache_root, &agent_root, agent_id, "skill")
         else {
             continue;
         };
