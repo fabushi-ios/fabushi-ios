@@ -383,7 +383,7 @@ struct FabushiMeditationView: View {
     }
 
     private func elapsedSeconds(at date: Date) -> Int {
-        accumulatedSeconds + startedAt.map { max(0, Int(date.timeIntervalSince($0))) }!
+        accumulatedSeconds + (startedAt.map { max(0, Int(date.timeIntervalSince($0))) } ?? 0)
     }
 
     private func toggleTimer() {
