@@ -682,17 +682,17 @@
     {
       "desktop_path": "frontend/src/recovered/contracts/desktop-bridge.contract.test.ts",
       "desktop_blob_sha": "046a5f73f9d9ef48a176970812a1810372f898e0",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Regression contract proving the Desktop preload bridge exposes one governed top-level ownership surface and fails closed when mandatory bridge owners are missing.",
+      "desktop_owner": "renderer/preload contract tests",
+      "desktop_visible_effect": "Shipping renderer cannot silently operate with a partial or duplicated preload ownership boundary; missing required bridge capabilities fail closed.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/ios-preload/coordinator-port-bridge.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS replaces the Electron window.desktop namespace with one typed IOSCoordinatorPortClient/IOSPreloadBridge boundary. Protocol hello/version readiness is mandatory, requests are rejected before ready or after settlement, illegal peer-direction frames fail closed, pending calls settle on close/cancel, and SwiftUI never receives IOSMainRuntime/MahayanaHostRuntime directly.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-preload/coordinator-port-bridge.swift; source/ios-preload/runtime/PreloadPrimary.swift; source/ios-main/IOSMainRuntime.swift",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift (pre-hello rejection, handshake, cancellation, disconnect/protocol breach, preload port client, restart generation fencing); mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift; exact-HEAD CI pending",
+      "notes": "Native replacement preserves the ownership/fail-closed purpose rather than Desktop object-key names. Keep implemented until current exact-head ordinary/protected acceptance succeeds."
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/desktop-bridge.ts",
