@@ -1,6 +1,22 @@
 import SwiftUI
 import UIKit
 
+internal func mobileBotHomeSubtitle(_ bot: MobileBotSummary) -> String {
+    if bot.isComposingMessage { return "正在输入…" }
+    if let waitingReason = bot.waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !waitingReason.isEmpty
+    {
+        return waitingReason
+    }
+    if let preview = bot.lastMessagePreview?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !preview.isEmpty
+    {
+        return preview
+    }
+    if bot.isRunning { return "正在运行…" }
+    return bot.description.isEmpty ? "Ready" : bot.description
+}
+
 extension GrokMobileShell {
     var home: some View {
         ZStack {
@@ -82,7 +98,7 @@ extension GrokMobileShell {
                                 ForEach(filteredBots) { bot in
                                     botRow(
                                         bot,
-                                        subtitle: bot.description.isEmpty ? "Ready" : bot.description,
+                                        subtitle: mobileBotHomeSubtitle(bot),
                                         badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
                                     )
                                 }
@@ -97,7 +113,7 @@ extension GrokMobileShell {
                                         ForEach(sectionBots) { bot in
                                             botRow(
                                                 bot,
-                                                subtitle: bot.description.isEmpty ? "Ready" : bot.description,
+                                                subtitle: mobileBotHomeSubtitle(bot),
                                                 badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
                                             )
                                         }
@@ -110,7 +126,7 @@ extension GrokMobileShell {
                                     ForEach(unassignedBots) { bot in
                                         botRow(
                                             bot,
-                                            subtitle: bot.description.isEmpty ? "Ready" : bot.description,
+                                            subtitle: mobileBotHomeSubtitle(bot),
                                             badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
                                         )
                                     }
@@ -191,6 +207,9 @@ extension GrokMobileShell {
                 let rhsRank = pinnedRank[$1.id] ?? Int.max
                 if lhsRank != rhsRank { return lhsRank < rhsRank }
             }
+            let lhsUpdated = $0.updatedAtMs ?? 0
+            let rhsUpdated = $1.updatedAtMs ?? 0
+            if lhsUpdated != rhsUpdated { return lhsUpdated > rhsUpdated }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
@@ -268,10 +287,24 @@ extension GrokMobileShell {
                             Text(bot.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(.black)
                             Text(badge).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 7).padding(.vertical, 3).background(Color.black.opacity(0.045), in: Capsule())
                         }
-                        Text(subtitle).font(.system(size: 14)).foregroundStyle(.secondary).lineLimit(1)
+                        Text(subtitle)
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                     Spacer()
-                    Text("now").font(.caption).foregroundStyle(.secondary)
+                    if bot.unread {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 8, height: 8)
+                            .accessibilityLabel("未读")
+                    }
+                    if let updatedAtMs = bot.updatedAtMs, updatedAtMs > 0 {
+                        Text(Date(timeIntervalSince1970: Double(updatedAtMs) / 1000), style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 .padding(.leading, 18).padding(.vertical, 9)
                 .contentShape(Rectangle())
