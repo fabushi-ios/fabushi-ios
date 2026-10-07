@@ -151,6 +151,8 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use uuid::Uuid;
 
+include!("automation_execution.rs");
+
 #[derive(Debug, thiserror::Error)]
 pub enum FeatureHostError {
     #[cfg(feature = "production")]
@@ -414,6 +416,10 @@ struct FeatureState {
     operations: BTreeSet<String>,
     operation_agents: BTreeMap<String, String>,
     automation_operations: BTreeMap<String, (String, String)>,
+    routine_executions: BTreeMap<String, RoutineExecution>,
+    routine_operation_epochs: BTreeMap<String, u64>,
+    routine_epoch: u64,
+    routine_quiescing: bool,
     awaited_operations: BTreeSet<String>,
     operation_terminals: BTreeMap<String, Value>,
     background_operations: BTreeMap<String, BackgroundOperationContext>,
@@ -452,6 +458,10 @@ impl Default for FeatureState {
             operations: BTreeSet::new(),
             operation_agents: BTreeMap::new(),
             automation_operations: BTreeMap::new(),
+            routine_executions: BTreeMap::new(),
+            routine_operation_epochs: BTreeMap::new(),
+            routine_epoch: 1,
+            routine_quiescing: false,
             awaited_operations: BTreeSet::new(),
             operation_terminals: BTreeMap::new(),
             background_operations: BTreeMap::new(),
@@ -591,6 +601,8 @@ pub struct FeatureHostController {
     /// used to prevent transcript/state reuse across account boundaries.
     active_account_id: Mutex<Option<String>>,
     client_side_tool_v2: Mutex<ClientSideToolV2Producer>,
+    // Serializes routine admission with account replacement and native quiesce.
+    routine_dispatch_lock: Mutex<()>,
     state: Mutex<FeatureState>,
 }
 
@@ -660,6 +672,7 @@ impl FeatureHostController {
             teach_recording: Mutex::new(None),
             active_account_id: Mutex::new(None),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
+            routine_dispatch_lock: Mutex::new(()),
             state: Mutex::new(state),
         }
     }
@@ -760,6 +773,7 @@ impl FeatureHostController {
             teach_recording: Mutex::new(None),
             active_account_id: Mutex::new(None),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
+            routine_dispatch_lock: Mutex::new(()),
             state: Mutex::new(state),
         };
         controller.ensure_account_boundary(&controller.auth_status()?)?;
@@ -1256,9 +1270,12 @@ impl FeatureHostController {
         let now_ms = now_millis();
         let mut state = self.state()?;
         state.conversation_session.set_scene_active(active, now_ms);
+        let focused_at_ms = state.conversation_session.focused_at_ms;
+        drop(state);
+        self.set_routine_quiescing(!active)?;
         Ok(json!({
             "active": active,
-            "focusedAtMs": state.conversation_session.focused_at_ms,
+            "focusedAtMs": focused_at_ms,
         }))
     }
 
@@ -2296,152 +2313,10 @@ impl FeatureHostController {
                 })
             }
             FeatureCommand::AutomationRun { id, agent_id, .. } => {
-                let (automation, run_id) = {
-                    let mut state = self.state()?;
-                    let now = now_millis();
-                    state.sequence += 1;
-                    let run_id = format!("routine-run-{}-{}", now, state.sequence);
-                    let automation = state.automations.get_mut(&id).ok_or_else(|| {
-                        FeatureHostError::Contract(format!("unknown automation: {id}"))
-                    })?;
-                    ensure_automation_agent_scope(automation, agent_id.as_deref())?;
-                    automation.last_run_at_ms = Some(now);
-                    let trigger = automation.trigger.clone().unwrap_or_else(|| {
-                        AutomationTrigger::Schedule { schedule: automation.schedule.clone() }
-                    });
-                    automation.next_run_at_ms = automation_next_run(
-                        &trigger, &automation.schedule, automation.enabled, now,
-                    );
-                    automation.runs.push(AutomationRunSummary {
-                        id: run_id.clone(),
-                        status: AutomationRunStatus::Running,
-                        started_at: now,
-                        detail: None,
-                        event: automation_trigger_event_label(&trigger),
-                    });
-                    let automation = automation.clone();
-                    self.persist_automations(&state.automations)?;
-                    state.events.push_back(HostEvent::AutomationChanged {
-                        timestamp: timestamp(),
-                        action: "running".into(),
-                        automation: automation.clone(),
-                    });
-                    (automation, run_id)
-                };
-                if let Some(trigger) = automation.trigger.as_ref() {
-                    if let Some((source, event, filter)) = automation_trigger_first_event(trigger) {
-                        self.state()?.events.push_back(HostEvent::TranscriptCard {
-                            timestamp: timestamp(),
-                            entry_id: format!("event-{}-{}", automation.id, now_millis()),
-                            operation_id: None,
-                            card: TranscriptCard::Event {
-                                event: EventCard {
-                                    source,
-                                    event: event.clone(),
-                                    title: format!("{} event", listener_platform_display(source)),
-                                    summary: format!("{} woke routine “{}”.", event, automation.name),
-                                    url: None,
-                                    actor: None,
-                                    fields: filter.map(|filter| vec![EventField {
-                                        label: "Filter".into(), value: filter,
-                                    }]),
-                                    occurred_at_ms: Some(now_millis()),
-                                },
-                            },
-                        });
-                    }
-                }
-                let trigger_context = automation
-                    .trigger
-                    .as_ref()
-                    .and_then(automation_trigger_first_event)
-                    .map(|(source, event, _)| {
-                        format!("\n触发事件：{} / {}", listener_platform_display(source), event)
-                    })
-                    .unwrap_or_default();
-                let text = format!(
-                    "[自动化例程：{}]{}\n这是用户保存的 standing instruction。请立即执行并报告结果。\n\n{}",
-                    automation.name, trigger_context, automation.prompt
-                );
-                let target_agent_id = automation.agent_id.clone()
-                    .unwrap_or_else(|| "mahayana-assistant".into());
-                let dispatched = match self.config.mode {
-                    HostMode::Test => self.execute_test(FeatureCommand::ChatSend {
-                        request_id, text, agent_id: Some(target_agent_id.clone()),
-                        conversation_id: None, mode: AgentMode::Agent, mode_statement: None,
-                        model: None, attachments: Vec::new(), reply_to_message_id: None, is_fork: false,
-                    }),
-                    HostMode::Production => {
-                        #[cfg(feature = "production")]
-                        {
-                            self.production_chat(
-                                request_id, text, Some(target_agent_id), None, AgentMode::Agent,
-                                None, None, Vec::new(), None, false,
-                            )
-                        }
-                        #[cfg(not(feature = "production"))]
-                        { Err(FeatureHostError::ProductionUnavailable) }
-                    }
-                };
-                match dispatched {
-                    Ok(accepted) => {
-                        if self.config.mode == HostMode::Test {
-                            self.finish_automation_run(
-                                &automation.id, &run_id, AutomationRunStatus::Ok, None, "completed",
-                            )?;
-                        } else if let Some(operation_id) = accepted.operation_id.as_ref() {
-                            self.state()?.automation_operations.insert(
-                                operation_id.clone(), (automation.id.clone(), run_id),
-                            );
-                        }
-                        Ok(accepted)
-                    }
-                    Err(error) => {
-                        self.finish_automation_run(
-                            &automation.id, &run_id, AutomationRunStatus::Error,
-                            Some(error.to_string()), "failed",
-                        )?;
-                        Err(error)
-                    }
-                }
+                self.execute_routine(request_id, id, agent_id, RoutineTrigger::Manual)
             }
             _ => unreachable!("non-automation command routed to automation executor"),
         }
-    }
-
-    fn finish_automation_run(
-        &self,
-        automation_id: &str,
-        run_id: &str,
-        status: AutomationRunStatus,
-        detail: Option<String>,
-        action: &str,
-    ) -> Result<(), FeatureHostError> {
-        let mut state = self.state()?;
-        let Some(automation) = state.automations.get_mut(automation_id) else { return Ok(()); };
-        let Some(run) = automation.runs.iter_mut().find(|run| run.id == run_id) else { return Ok(()); };
-        run.status = status;
-        run.detail = detail;
-        let automation = automation.clone();
-        self.persist_automations(&state.automations)?;
-        state.events.push_back(HostEvent::AutomationChanged {
-            timestamp: timestamp(), action: action.into(), automation,
-        });
-        Ok(())
-    }
-
-    fn finish_automation_operation(
-        &self,
-        operation_id: &str,
-        status: AutomationRunStatus,
-        detail: Option<String>,
-        action: &str,
-    ) -> Result<(), FeatureHostError> {
-        let run = self.state()?.automation_operations.remove(operation_id);
-        if let Some((automation_id, run_id)) = run {
-            self.finish_automation_run(&automation_id, &run_id, status, detail, action)?;
-        }
-        Ok(())
     }
 
     fn execute_bot_profile(
@@ -6846,113 +6721,23 @@ impl FeatureHostController {
         let serialized = serde_json::to_string(&event).map_err(|error| {
             FeatureHostError::Contract(format!("encode listener event: {error}"))
         })?;
+        if serialized.len() > 64 * 1024 {
+            return Err(FeatureHostError::Contract("listener event exceeds 64 KiB".into()));
+        }
         let matching_ids = {
             let state = self.state()?;
-            state
-                .automations
-                .values()
-                .filter(|automation| {
-                    if !automation.enabled {
-                        return false;
-                    }
-                    automation
-                        .trigger
-                        .as_ref()
-                        .is_some_and(|trigger| automation_trigger_matches_event(trigger, &event, &serialized))
+            ensure_open(&state)?;
+            state.automations.values().filter(|automation| {
+                automation.enabled && automation.trigger.as_ref().is_some_and(|trigger| {
+                    automation_trigger_matches_event(trigger, &event, &serialized)
                 })
-                .map(|automation| automation.id.clone())
-                .collect::<Vec<_>>()
+            }).map(|automation| automation.id.clone()).collect::<Vec<_>>()
         };
-
         for id in &matching_ids {
-            let automation = {
-                let mut state = self.state()?;
-                let automation = state.automations.get_mut(id).ok_or_else(|| {
-                    FeatureHostError::Contract(format!("unknown automation: {id}"))
-                })?;
-                automation.last_run_at_ms = Some(event.occurred_at_ms.unwrap_or_else(now_millis));
-                let automation = automation.clone();
-                self.persist_automations(&state.automations)?;
-                state.events.push_back(HostEvent::AutomationChanged {
-                    timestamp: timestamp(),
-                    action: "triggered".into(),
-                    automation: automation.clone(),
-                });
-                state.events.push_back(HostEvent::TranscriptCard {
-                    timestamp: timestamp(),
-                    entry_id: format!("relay-{}-{}", automation.id, now_millis()),
-                    operation_id: None,
-                    card: TranscriptCard::Event {
-                        event: event.clone(),
-                    },
-                });
-                automation
-            };
-            let details = event
-                .fields
-                .as_ref()
-                .map(|fields| {
-                    fields
-                        .iter()
-                        .map(|field| format!("{}: {}", field.label, field.value))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                })
-                .unwrap_or_default();
-            let text = format!(
-                "[事件自动化：{}]\n来源：{}\n事件：{}\n标题：{}\n摘要：{}{}\n\n这是用户保存的 standing instruction。请基于上面的真实事件立即执行并报告结果。\n\n{}",
-                automation.name,
-                listener_platform_display(event.source),
-                event.event,
-                event.title,
-                event.summary,
-                if details.is_empty() {
-                    String::new()
-                } else {
-                    format!("\n{details}")
-                },
-                automation.prompt
-            );
-            let request_id = format!("listener-{}-{}", automation.id, now_millis());
-            let target_agent_id = automation
-                .agent_id
-                .clone()
-                .unwrap_or_else(|| "mahayana-assistant".into());
-            match self.config.mode {
-                HostMode::Test => {
-                    self.execute_test(FeatureCommand::ChatSend {
-                        request_id,
-                        text,
-                        agent_id: Some(target_agent_id.clone()),
-                        conversation_id: None,
-                        mode: AgentMode::Agent,
-                        mode_statement: None,
-                        model: None,
-                        attachments: Vec::new(),
-                        reply_to_message_id: None,
-                        is_fork: false,
-                    })?;
-                }
-                HostMode::Production => {
-                    #[cfg(feature = "production")]
-                    {
-                        self.production_chat(
-                            request_id,
-                            text,
-                            Some(target_agent_id),
-                            None,
-                            AgentMode::Agent,
-                            None,
-                            None,
-                            Vec::new(),
-                            None,
-                            false,
-                        )?;
-                    }
-                    #[cfg(not(feature = "production"))]
-                    return Err(FeatureHostError::ProductionUnavailable);
-                }
-            }
+            self.execute_routine(
+                format!("listener-{}", Uuid::new_v4()), id.clone(), None,
+                RoutineTrigger::Event(event.clone()),
+            )?;
         }
         Ok(matching_ids.len())
     }
@@ -7117,6 +6902,7 @@ impl FeatureHostController {
         &self,
         timeout: Duration,
     ) -> Result<Option<HostEvent>, FeatureHostError> {
+        self.advance_pending_routine()?;
         self.fire_due_automation()?;
         if let Some(event) = self.state()?.events.pop_front() {
             return Ok(Some(event));
@@ -7136,20 +6922,18 @@ impl FeatureHostController {
 
     fn fire_due_automation(&self) -> Result<(), FeatureHostError> {
         let now = now_millis();
-        let due = self
-            .state()?
-            .automations
-            .values()
-            .find(|automation| {
+        let due = {
+            let state = self.state()?;
+            if state.closed || state.routine_quiescing
+                || (self.config.mode == HostMode::Production && !state.session_active) {
+                return Ok(());
+            }
+            state.automations.values().find(|automation| {
                 automation.enabled && automation.next_run_at_ms.is_some_and(|next| next <= now)
-            })
-            .map(|automation| (automation.id.clone(), automation.agent_id.clone()));
+            }).map(|automation| (automation.id.clone(), automation.agent_id.clone()))
+        };
         if let Some((id, agent_id)) = due {
-            let _ = self.execute_automation(FeatureCommand::AutomationRun {
-                request_id: format!("scheduled-{id}-{now}"),
-                id,
-                agent_id,
-            })?;
+            self.execute_routine(format!("scheduled-{id}-{now}"), id, agent_id, RoutineTrigger::Schedule)?;
         }
         Ok(())
     }
@@ -7261,6 +7045,8 @@ impl FeatureHostController {
 
     #[cfg(feature = "production")]
     fn ensure_account_boundary(&self, response: &Value) -> Result<(), FeatureHostError> {
+        let _routine_gate = self.routine_dispatch_lock.lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?;
         let auth = auth_payload(response);
         let logged_in = auth.get("loggedIn").and_then(Value::as_bool) == Some(true);
         let next_account_id = logged_in.then(|| auth_account_id(auth)).flatten();
@@ -7272,6 +7058,7 @@ impl FeatureHostController {
             *active != next_account_id
         };
         if changed {
+            self.retire_routines_for_account_change()?;
             self.runtime()?.reset_session()?;
             let account_id = next_account_id.as_deref();
             let automations = self
@@ -7323,6 +7110,10 @@ impl FeatureHostController {
             state.operations.clear();
             state.operation_agents.clear();
             state.automation_operations.clear();
+            state.routine_executions.clear();
+            state.routine_epoch = state.routine_epoch.wrapping_add(1).max(1);
+            state.awaited_operations.clear();
+            state.operation_terminals.clear();
             state.background_operations.clear();
             state.automations = automations;
             state.published_plugins_by_agent.clear();
@@ -7340,6 +7131,7 @@ impl FeatureHostController {
                 .active_account_id
                 .lock()
                 .map_err(|_| FeatureHostError::StatePoisoned)? = next_account_id.clone();
+            self.restore_routine_executions()?;
         }
         {
             let mut state = self.state()?;
@@ -7490,6 +7282,7 @@ impl FeatureHostController {
     }
 
     pub fn close(&self) -> Result<(), FeatureHostError> {
+        self.set_routine_quiescing(true)?;
         let operation_ids = {
             let mut state = self.state()?;
             if state.closed {
@@ -7739,6 +7532,9 @@ impl FeatureHostController {
         &self,
         event: RuntimeEvent,
     ) -> Result<Option<HostEvent>, FeatureHostError> {
+        if self.stale_routine_runtime_event(&event)? {
+            return Ok(None);
+        }
         let event = match event {
             RuntimeEvent::Ready { .. } => None,
             RuntimeEvent::MessageDelta {
@@ -8000,7 +7796,7 @@ impl FeatureHostController {
             } => {
                 let operation_id = operation_id.to_string();
                 self.finish_automation_operation(
-                    &operation_id, AutomationRunStatus::Error, Some(reason.clone()), "failed",
+                    &operation_id, AutomationRunStatus::Error, Some(reason.clone()), "interrupted",
                 )?;
                 let mut state = self.state()?;
                 if !state.operations.remove(&operation_id) {
