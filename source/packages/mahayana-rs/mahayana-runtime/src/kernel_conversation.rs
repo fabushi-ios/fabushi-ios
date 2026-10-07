@@ -494,7 +494,8 @@ impl ConversationProvider for KernelConversationProvider {
             events,
             state: Arc::clone(&self.state),
             history_path: self.history_path.clone(),
-            hide_assistant_output: request.hidden && !request.show_assistant_output,
+            hide_assistant_history: request.hidden,
+            suppress_assistant_events: request.hidden && !request.show_assistant_output,
             reply_to_message_id: request.reply_to_message_id.clone(),
             is_fork: request.is_fork,
             attachment_batch_id: Some(turn_attachment_batch_id),
@@ -596,7 +597,8 @@ impl ConversationProvider for KernelConversationProvider {
             events,
             state: Arc::clone(&self.state),
             history_path: self.history_path.clone(),
-            hide_assistant_output: request.hidden && !request.show_assistant_output,
+            hide_assistant_history: request.hidden,
+            suppress_assistant_events: request.hidden && !request.show_assistant_output,
             reply_to_message_id: request.reply_to_message_id,
             is_fork: request.is_fork,
             attachment_batch_id: request.attachment_batch_id,
@@ -683,7 +685,8 @@ struct RuntimeKernelEventBridge {
     events: SharedConversationEventSink,
     state: Arc<Mutex<ConversationState>>,
     history_path: Option<PathBuf>,
-    hide_assistant_output: bool,
+    hide_assistant_history: bool,
+    suppress_assistant_events: bool,
     reply_to_message_id: Option<String>,
     is_fork: bool,
     attachment_batch_id: Option<String>,
@@ -760,7 +763,7 @@ impl KernelEventSink for RuntimeKernelEventBridge {
     fn emit(&self, event: KernelEvent) -> Result<(), KernelError> {
         match event {
             KernelEvent::MessageDelta { delta, .. } => {
-                if self.hide_assistant_output {
+                if self.suppress_assistant_events {
                     return Ok(());
                 }
                 let mut stream = self.streaming_assistant.lock().map_err(|_| {
@@ -773,7 +776,7 @@ impl KernelEventSink for RuntimeKernelEventBridge {
                     .get_or_insert_with(|| self.provider_stream_message(String::new(), &state));
                 message.text.push_str(&delta);
                 let should_persist =
-                    state.upsert_assistant_stream(message.clone(), self.hide_assistant_output);
+                    state.upsert_assistant_stream(message.clone(), self.hide_assistant_history);
                 drop(state);
                 drop(stream);
                 if should_persist {
@@ -799,13 +802,13 @@ impl KernelEventSink for RuntimeKernelEventBridge {
                     self.provider_stream_message(text, &state)
                 };
                 let should_persist =
-                    state.upsert_assistant_stream(message.clone(), self.hide_assistant_output);
+                    state.upsert_assistant_stream(message.clone(), self.hide_assistant_history);
                 drop(state);
                 drop(stream);
                 if should_persist {
                     persist_history(&self.state, self.history_path.as_deref())?;
                 }
-                if self.hide_assistant_output {
+                if self.suppress_assistant_events {
                     return Ok(());
                 }
                 self.emit_runtime(RuntimeEvent::MessageCompleted {
@@ -900,7 +903,7 @@ impl KernelEventSink for RuntimeKernelEventBridge {
                         )
                     })?;
                     let should_persist = state
-                        .record_assistant_completion(message.clone(), self.hide_assistant_output);
+                        .record_assistant_completion(message.clone(), self.hide_assistant_history);
                     drop(state);
                     if should_persist {
                         persist_history(&self.state, self.history_path.as_deref())?;
@@ -1211,7 +1214,8 @@ mod tests {
             events: events.clone(),
             state: state.clone(),
             history_path: None,
-            hide_assistant_output: false,
+            hide_assistant_history: false,
+            suppress_assistant_events: false,
             reply_to_message_id: Some(reply_id.clone()),
             is_fork: true,
             attachment_batch_id: None,

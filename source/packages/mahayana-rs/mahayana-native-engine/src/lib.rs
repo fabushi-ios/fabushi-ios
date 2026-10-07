@@ -154,6 +154,14 @@ struct OperationAttempt {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct InflightToolCheckpoint {
+    operation_id: String,
+    call_id: String,
+    tool: String,
+    arguments: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct NativeSession {
     workspace_root: Option<PathBuf>,
     history: Vec<Value>,
@@ -168,6 +176,10 @@ struct NativeSession {
     loop_state: LoopState,
     #[serde(default)]
     attempts: Vec<OperationAttempt>,
+    #[serde(default)]
+    inflight_tool: Option<InflightToolCheckpoint>,
+    #[serde(default)]
+    completed_outputs: BTreeMap<String, String>,
     #[serde(default)]
     updated_at_ms: i64,
 }
@@ -526,6 +538,7 @@ impl NativeEngine {
 
     async fn run_prompt(
         &self,
+        session_id: &SessionId,
         session: &mut NativeSession,
         operation_id: &OperationId,
         prompt: String,
@@ -794,6 +807,14 @@ impl NativeEngine {
                     }
                 }
 
+                session.inflight_tool = Some(InflightToolCheckpoint {
+                    operation_id: operation_id.as_str().to_string(),
+                    call_id: call.call_id.clone(),
+                    tool: call.name.clone(),
+                    arguments: call.arguments.clone(),
+                });
+                session.updated_at_ms = now_ms();
+                self.persist_session_state_if_configured(session_id, session)?;
                 self.apply_hooks(
                     HookPoint::BeforeTool,
                     &call.name,
@@ -851,10 +872,13 @@ impl NativeEngine {
                         })?;
                         session.history.push(json!({
                             "type": "function_call_output",
-                            "call_id": call.call_id,
+                            "call_id": call.call_id.clone(),
                             "output": serde_json::to_string(&output)
                                 .unwrap_or_else(|_| "null".into()),
                         }));
+                        session.inflight_tool = None;
+                        session.updated_at_ms = now_ms();
+                        self.persist_session_state_if_configured(session_id, session)?;
                         if waiting_user {
                             return Ok("waiting_user".into());
                         }
@@ -871,10 +895,13 @@ impl NativeEngine {
                         })?;
                         session.history.push(json!({
                             "type": "function_call_output",
-                            "call_id": call.call_id,
+                            "call_id": call.call_id.clone(),
                             "output": serde_json::to_string(&json!({"error": message}))
                                 .unwrap_or_else(|_| "null".into()),
                         }));
+                        session.inflight_tool = None;
+                        session.updated_at_ms = now_ms();
+                        self.persist_session_state_if_configured(session_id, session)?;
                     }
                 }
                 self.apply_hooks(
@@ -1582,6 +1609,7 @@ impl NativeEngine {
 
     async fn execute_active_prompt(
         &self,
+        session_id: &SessionId,
         session: &mut NativeSession,
         operation_id: &OperationId,
         prompt: PromptEntry,
@@ -1595,6 +1623,7 @@ impl NativeEngine {
             attempt_id.unwrap_or_else(|| Self::start_attempt(session, operation_id, &prompt.id));
         let result = self
             .run_prompt(
+                session_id,
                 session,
                 operation_id,
                 prompt.text.clone(),
@@ -1618,7 +1647,17 @@ impl NativeEngine {
             return Ok(());
         }
         match result {
-            Ok(_) => {
+            Ok(output) => {
+                if !output.trim().is_empty() && output != "waiting_user" {
+                    session.completed_outputs.insert(operation_id.as_str().to_string(), output);
+                    while session.completed_outputs.len() > 128 {
+                        if let Some(first) = session.completed_outputs.keys().next().cloned() {
+                            session.completed_outputs.remove(&first);
+                        } else {
+                            break;
+                        }
+                    }
+                }
                 session
                     .prompt_queue
                     .complete(&prompt.id)
@@ -1854,6 +1893,7 @@ impl EngineBackend for NativeEngine {
             session.updated_at_ms = now_ms();
             self.persist_session_state_if_configured(&request.session_id, &session)?;
             self.execute_active_prompt(
+                &request.session_id,
                 &mut session,
                 &request.operation_id,
                 prompt,
@@ -2049,6 +2089,35 @@ impl EngineBackend for NativeEngine {
         self.telemetry.operation_resumed();
         let result = async {
             let mut session = session.lock().await;
+            if let Some(inflight) = session.inflight_tool.clone() {
+                if inflight.operation_id != request.operation_id.as_str() {
+                    return Err(KernelError::Backend(format!(
+                        "session has in-flight tool {} owned by another operation",
+                        inflight.call_id
+                    )));
+                }
+                let interrupted_output = json!({
+                    "error": "tool execution was interrupted by Host recreation; external side effects are unknown and the tool will not be replayed",
+                    "recovery": "interrupted",
+                    "unknownSideEffects": true,
+                    "tool": inflight.tool,
+                });
+                events.emit(KernelEvent::ToolCompleted {
+                    operation_id: request.operation_id.clone(),
+                    tool_call_id: inflight.call_id.clone(),
+                    tool: inflight.tool.clone(),
+                    output: interrupted_output.clone(),
+                    success: false,
+                })?;
+                session.history.push(json!({
+                    "type": "function_call_output",
+                    "call_id": inflight.call_id,
+                    "output": serde_json::to_string(&interrupted_output).unwrap_or_else(|_| "null".into()),
+                }));
+                session.inflight_tool = None;
+                session.updated_at_ms = now_ms();
+                self.persist_session_state_if_configured(&request.session_id, &session)?;
+            }
             let prompt = match session.active_prompt.clone() {
                 Some(prompt) => prompt,
                 None => {
@@ -2059,7 +2128,17 @@ impl EngineBackend for NativeEngine {
                         .find(|attempt| attempt.operation_id == request.operation_id.as_str())
                         .map(|attempt| attempt.state);
                     match terminal {
-                        Some(OperationAttemptState::Completed) => return Ok(()),
+                        Some(OperationAttemptState::Completed) => {
+                            if let Some(output) = session.completed_outputs.get(request.operation_id.as_str()).cloned()
+                                && !output.trim().is_empty()
+                            {
+                                events.emit(KernelEvent::MessageCompleted {
+                                    operation_id: request.operation_id.clone(),
+                                    text: output,
+                                })?;
+                            }
+                            return Ok(());
+                        },
                         Some(OperationAttemptState::Failed) => {
                             return Err(KernelError::Backend(format!(
                                 "{} previously failed before Host settlement",
@@ -2090,6 +2169,7 @@ impl EngineBackend for NativeEngine {
                 metadata: json!({"promptId": prompt.id}),
             })?;
             self.execute_active_prompt(
+                &request.session_id,
                 &mut session,
                 &request.operation_id,
                 prompt,

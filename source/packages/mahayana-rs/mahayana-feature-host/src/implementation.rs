@@ -3392,6 +3392,7 @@ impl FeatureHostController {
                 agent_name: target.name.clone(),
                 source: source.to_string(),
                 teach_artifact: teach_artifact.clone(),
+                delivered_message_fingerprints: BTreeSet::new(),
                 phase: BackgroundRecoveryPhase::Dispatching,
             };
             state.background_recoveries.insert(operation_id.clone(), execution);
@@ -3413,7 +3414,7 @@ impl FeatureHostController {
             display_text: None,
             client_message_id: Some(client_message_id.clone()),
             hidden: true,
-            show_assistant_output: false,
+            show_assistant_output: true,
             recovery_eligible: true,
             reply_to_message_id: None,
             is_fork: false,
@@ -7693,6 +7694,16 @@ impl FeatureHostController {
                     .cloned()
                 {
                     if message.role == RuntimeMessageRole::Assistant {
+                        let fingerprint = background_message_fingerprint(
+                            &message.text,
+                            message.metadata.get("generatedSend").and_then(Value::as_bool) == Some(true),
+                        );
+                        if self.state()?.background_recoveries
+                            .get(&operation_id)
+                            .is_some_and(|execution| execution.delivered_message_fingerprints.contains(&fingerprint))
+                        {
+                            return Ok(None);
+                        }
                         if let Some(artifact) = context.teach_artifact.as_deref() {
                             if !message.text.trim().is_empty() {
                                 match self.persist_teach_workflow(
@@ -7723,6 +7734,13 @@ impl FeatureHostController {
                                         );
                                     }
                                 }
+                            }
+                        }
+                        {
+                            let mut state = self.state()?;
+                            if let Some(execution) = state.background_recoveries.get_mut(&operation_id) {
+                                execution.delivered_message_fingerprints.insert(fingerprint);
+                                self.persist_background_recoveries(&state)?;
                             }
                         }
                         Some(HostEvent::AgentBackgroundMessage {

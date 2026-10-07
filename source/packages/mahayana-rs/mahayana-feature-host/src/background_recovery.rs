@@ -20,6 +20,8 @@ struct BackgroundRecoveryExecution {
     agent_name: String,
     source: String,
     teach_artifact: Option<String>,
+    #[serde(default)]
+    delivered_message_fingerprints: BTreeSet<String>,
     phase: BackgroundRecoveryPhase,
 }
 
@@ -28,6 +30,15 @@ struct BackgroundRecoveryJournal {
     version: u32,
     account_key: Option<String>,
     executions: Vec<BackgroundRecoveryExecution>,
+}
+
+fn background_message_fingerprint(text: &str, generated_send: bool) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in [u8::from(generated_send)].into_iter().chain(text.as_bytes().iter().copied()) {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
 }
 
 fn background_recovery_owner_matches(
@@ -168,7 +179,7 @@ impl FeatureHostController {
                         conversation_id: ConversationId(execution.conversation_id.clone()),
                         operation_id: OperationId(execution.operation_id.clone()),
                         hidden: true,
-                        show_assistant_output: false,
+                        show_assistant_output: true,
                         reply_to_message_id: None,
                         is_fork: false,
                         attachment_batch_id: None,
@@ -258,6 +269,7 @@ mod background_recovery_tests {
                 agent_name: assistant.name.clone(),
                 source: "agent-message".into(),
                 teach_artifact: None,
+                delivered_message_fingerprints: BTreeSet::new(),
                 phase: BackgroundRecoveryPhase::Suspended,
             });
             host.persist_background_recoveries(&state).expect("persist background journal");
@@ -298,6 +310,7 @@ mod background_recovery_tests {
                 agent_name: assistant.name,
                 source: "broadcast".into(),
                 teach_artifact: None,
+                delivered_message_fingerprints: BTreeSet::new(),
                 phase: BackgroundRecoveryPhase::Running,
             });
             host.persist_background_recoveries(&state).expect("persist running background");
