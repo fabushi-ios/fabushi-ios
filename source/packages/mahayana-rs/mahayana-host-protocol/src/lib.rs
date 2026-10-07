@@ -2119,11 +2119,20 @@ pub struct ConversationSummary {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TranscriptReaction {
+    pub emoji: String,
+    pub by: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConversationMessage {
     pub id: String,
     pub role: MessageRole,
     pub text: String,
     pub created_at_ms: i64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reactions: Vec<TranscriptReaction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
