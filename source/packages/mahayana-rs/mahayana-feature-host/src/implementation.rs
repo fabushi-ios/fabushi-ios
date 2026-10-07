@@ -419,6 +419,16 @@ fn async_task_key(kind: AsyncTaskKind, id: &str) -> String {
     format!("{kind}\u{1f}{id}")
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeCloudAgentWake {
+    pub agent_id: String,
+    pub work_id: String,
+    pub operation_id: String,
+    pub title: String,
+    pub started_at_ms: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PendingAsyncTaskEntry {
@@ -1029,6 +1039,121 @@ impl FeatureHostController {
             }
         }
         Ok(())
+    }
+
+    pub fn pending_cloud_agent_wakes(
+        &self,
+    ) -> Result<Vec<NativeCloudAgentWake>, FeatureHostError> {
+        let state = self.state()?;
+        ensure_open(&state)?;
+        let mut wakes = state
+            .async_tasks
+            .iter()
+            .filter_map(|(key, task)| {
+                if task.kind != AsyncTaskKind::CloudAgent {
+                    return None;
+                }
+                let operation_id = state.async_task_operation_ids.get(key)?;
+                Some(NativeCloudAgentWake {
+                    agent_id: task.parent_agent_id.clone(),
+                    work_id: task.id.clone(),
+                    operation_id: operation_id.clone(),
+                    title: task.label.clone(),
+                    started_at_ms: task.started_at_ms,
+                })
+            })
+            .collect::<Vec<_>>();
+        wakes.sort_by(|left, right| {
+            left.started_at_ms
+                .cmp(&right.started_at_ms)
+                .then_with(|| left.work_id.cmp(&right.work_id))
+        });
+        Ok(wakes)
+    }
+
+    pub fn settle_cloud_agent_wake(
+        &self,
+        agent_id: &str,
+        work_id: &str,
+        status: &str,
+        result: &str,
+    ) -> Result<bool, FeatureHostError> {
+        let agent_id = required(agent_id.to_string(), "cloud agent parent id")?;
+        let work_id = required(work_id.to_string(), "cloud agent work id")?;
+        let status = match status.trim() {
+            "completed" | "error" => status.trim().to_string(),
+            other => {
+                return Err(FeatureHostError::Contract(format!(
+                    "cloud agent wake settlement requires completed/error status, got {other}"
+                )));
+            }
+        };
+        let task_key = async_task_key(AsyncTaskKind::CloudAgent, &work_id);
+        let (task, target) = {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            let Some(task) = state.async_tasks.get(&task_key).cloned() else {
+                return Ok(false);
+            };
+            if task.parent_agent_id != agent_id {
+                return Err(FeatureHostError::Contract(
+                    "cloud agent wake owner does not match settlement parent".into(),
+                ));
+            }
+            (task, state.bots.get(&agent_id).cloned())
+        };
+
+        if let Some(target) = target {
+            let outcome = if status == "error" { "failed" } else { "finished" };
+            let result = if result.trim().is_empty() {
+                "(the cloud agent finished without producing any output)"
+            } else {
+                result.trim()
+            };
+            let prompt = format!(
+                "[A background task just completed] A background task you started has finished.\n\nBackground task \"{}\" (cursor-agent) {outcome}:\n{result}\n\nPick the work back up: review the result, then either keep going or wrap up. If this result is genuinely new and relevant to the user, or the user asked to be told when this finished, tell them with a SendMessage. Lead with the concrete thing that finished, not a bare pronoun like \"That\". If it is stale, irrelevant, already handled, or a duplicate, and the user was not waiting on it, stay silent and end the turn with no SendMessage. Keep your status current, and clear it once everything is done and you're idle.",
+                task.label
+            );
+            self.schedule_background_agent_turn(
+                &target,
+                "subagent-revival",
+                prompt,
+                format!("cloud-agent-revival:{agent_id}:{work_id}"),
+                Vec::new(),
+            )?;
+        }
+
+        let account_id = self
+            .active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone();
+        let async_tasks_path = self.async_tasks_path_for_account(account_id.as_deref());
+        let mut state = self.state()?;
+        state.async_tasks.remove(&task_key);
+        state.async_task_operation_ids.remove(&task_key);
+        persist_pending_async_tasks(
+            async_tasks_path.as_deref(),
+            &state.async_tasks,
+            &state.async_task_operation_ids,
+        )?;
+        let mut tasks = state
+            .async_tasks
+            .values()
+            .filter(|task| task.parent_agent_id == agent_id)
+            .cloned()
+            .collect::<Vec<_>>();
+        tasks.sort_by(|left, right| {
+            left.started_at_ms
+                .cmp(&right.started_at_ms)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        state.events.push_back(HostEvent::AsyncTaskChanged {
+            timestamp: timestamp(),
+            agent_id,
+            tasks,
+        });
+        Ok(true)
     }
 
     pub fn async_tasks_for_agent(
