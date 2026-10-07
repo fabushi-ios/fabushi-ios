@@ -37,6 +37,23 @@ struct GrokMobileBotService {
         return Self.mergeBots(installedBots, surfaceBots + groups)
     }
 
+    func loadCanonicalRoster() async throws -> [MobileBotSummary] {
+        async let individuals = loadIndividualBotsStrict()
+        async let groups = loadGroupsStrict()
+        let surface = try await individuals + groups
+        let installed = (try? await GlobalDharmaMiniAppBridge(bridge: bridge).installedMiniAppBots()) ?? []
+        let installedBots = installed.map {
+            MobileBotSummary(
+                id: $0.id,
+                name: $0.name,
+                description: $0.description,
+                miniAppId: $0.miniAppId,
+                menuButtonText: $0.menuButtonText
+            )
+        }
+        return Self.mergeBots(installedBots, surface)
+    }
+
     func createBot(name: String, description: String) async throws -> [MobileBotSummary] {
         let requestId = "ios-mobile-bot-create-\(UUID().uuidString.lowercased())"
         _ = try await bridge.request(
@@ -390,6 +407,69 @@ struct GrokMobileBotService {
             "id": id,
             "memberIds": memberIds,
         ]
+    }
+
+    private func loadIndividualBotsStrict() async throws -> [MobileBotSummary] {
+        let requestId = "ios-mobile-bot-list-\(UUID().uuidString.lowercased())"
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: ["command": ["type": "bot.list", "requestId": requestId]]
+        )
+        let result = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 2_560
+        ) { event in
+            event["type"] as? String == "bot.listed"
+        }
+        guard let event = result.value as? [String: Any],
+              let rows = event["bots"] as? [[String: Any]]
+        else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 20,
+                userInfo: [NSLocalizedDescriptionKey: "Host returned a malformed Bot roster"]
+            )
+        }
+        let parsed = rows.compactMap(Self.parseBot)
+            .filter { $0.id != "mahayana-assistant" }
+        guard parsed.count == rows.filter({ ($0["id"] as? String) != "mahayana-assistant" }).count else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 21,
+                userInfo: [NSLocalizedDescriptionKey: "Host Bot roster contained malformed rows"]
+            )
+        }
+        return parsed
+    }
+
+    private func loadGroupsStrict() async throws -> [MobileBotSummary] {
+        let requestId = "ios-mobile-group-list-\(UUID().uuidString.lowercased())"
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: ["command": ["type": "group.list", "requestId": requestId]]
+        )
+        let result = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 2_560
+        ) { event in
+            event["type"] as? String == "group.listed"
+        }
+        guard let event = result.value as? [String: Any],
+              let rows = event["groups"] as? [[String: Any]]
+        else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 22,
+                userInfo: [NSLocalizedDescriptionKey: "Host returned a malformed group roster"]
+            )
+        }
+        let parsed = rows.compactMap(Self.parseGroup)
+        guard parsed.count == rows.count else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 23,
+                userInfo: [NSLocalizedDescriptionKey: "Host group roster contained malformed rows"]
+            )
+        }
+        return parsed
     }
 
     private func loadIndividualBots() async -> [MobileBotSummary] {
