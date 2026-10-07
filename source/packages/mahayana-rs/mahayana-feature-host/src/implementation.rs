@@ -848,10 +848,6 @@ impl FeatureHostController {
             platform,
         };
         let mut state = FeatureState::default();
-        if let Some(path) = async_tasks_path.as_deref() {
-            state.async_tasks = load_pending_async_tasks(path, now_millis());
-            persist_pending_async_tasks(path, &state.async_tasks)?;
-        }
         if let Some(path) = settings_path.as_deref() {
             state.settings = load_product_host_settings(path);
             // The bundled Computer Use MCP independently rereads this canonical
@@ -895,6 +891,15 @@ impl FeatureHostController {
             info: controller.info.clone(),
         });
         Ok(controller)
+    }
+
+    fn async_tasks_path_for_account(&self, account_id: Option<&str>) -> Option<PathBuf> {
+        match (self.async_tasks_path.as_deref(), account_id) {
+            (Some(base), Some(account_id)) if !account_id.is_empty() => {
+                Some(account_scoped_path(base, account_id))
+            }
+            _ => None,
+        }
     }
 
     pub fn async_tasks_for_agent(
@@ -7217,12 +7222,13 @@ impl FeatureHostController {
             .account_boundary_initialized
             .lock()
             .map_err(|_| FeatureHostError::StatePoisoned)?;
-        let (changed, reset_runtime) = {
+        let (previous_account_id, changed, reset_runtime) = {
             let active = self
                 .active_account_id
                 .lock()
                 .map_err(|_| FeatureHostError::StatePoisoned)?;
             (
+                active.clone(),
                 *active != next_account_id,
                 account_boundary_requires_runtime_reset(initialized, &active, &next_account_id),
             )
@@ -7276,6 +7282,29 @@ impl FeatureHostController {
                         .unwrap_or_default()
                 })
                 .unwrap_or_default();
+            let next_async_tasks_path =
+                self.async_tasks_path_for_account(next_account_id.as_deref());
+            let restored_async_tasks = if initialized {
+                BTreeMap::new()
+            } else {
+                next_async_tasks_path
+                    .as_deref()
+                    .map(|path| load_pending_async_tasks(path, now_millis()))
+                    .unwrap_or_default()
+            };
+            if initialized {
+                let previous_async_tasks_path =
+                    self.async_tasks_path_for_account(previous_account_id.as_deref());
+                persist_pending_async_tasks(previous_async_tasks_path.as_deref(), &BTreeMap::new())?;
+                if next_async_tasks_path != previous_async_tasks_path {
+                    persist_pending_async_tasks(next_async_tasks_path.as_deref(), &BTreeMap::new())?;
+                }
+            } else {
+                persist_pending_async_tasks(
+                    next_async_tasks_path.as_deref(),
+                    &restored_async_tasks,
+                )?;
+            }
             let mut state = self.state()?;
             state.events.clear();
             state.conversation_session = ConversationSessionState::default();
@@ -7289,6 +7318,8 @@ impl FeatureHostController {
             state.operation_terminals.clear();
             state.background_operations.clear();
             state.background_recoveries.clear();
+            state.async_tasks = restored_async_tasks;
+            state.subagents.clear();
             state.automations = automations;
             state.published_plugins_by_agent.clear();
             state.bots = bots;
@@ -8296,6 +8327,13 @@ impl FeatureHostController {
                     }
                 }
                 if kind == "subagent" {
+                    let account_id = self
+                        .active_account_id
+                        .lock()
+                        .map_err(|_| FeatureHostError::StatePoisoned)?
+                        .clone();
+                    let async_tasks_path =
+                        self.async_tasks_path_for_account(account_id.as_deref());
                     let mut state = self.state()?;
                     let changed = update_subagents_from_activity(
                         &mut state,
@@ -8313,7 +8351,7 @@ impl FeatureHostController {
                         });
                     }
                     persist_pending_async_tasks(
-                        self.async_tasks_path.as_deref(),
+                        async_tasks_path.as_deref(),
                         &state.async_tasks,
                     )?;
                     let mut tasks = state
@@ -8333,6 +8371,13 @@ impl FeatureHostController {
                     kind.as_str(),
                     "shell" | "command" | "local-exec" | "exec" | "cloud-agent" | "cloud_agent"
                 ) {
+                    let account_id = self
+                        .active_account_id
+                        .lock()
+                        .map_err(|_| FeatureHostError::StatePoisoned)?
+                        .clone();
+                    let async_tasks_path =
+                        self.async_tasks_path_for_account(account_id.as_deref());
                     let task_id = format!("{operation_id}:{step_id}");
                     let task_kind = if matches!(kind.as_str(), "cloud-agent" | "cloud_agent") {
                         AsyncTaskKind::CloudAgent
@@ -8364,7 +8409,7 @@ impl FeatureHostController {
                         state.async_tasks.remove(&task_id);
                     }
                     persist_pending_async_tasks(
-                        self.async_tasks_path.as_deref(),
+                        async_tasks_path.as_deref(),
                         &state.async_tasks,
                     )?;
                     let mut tasks = state
