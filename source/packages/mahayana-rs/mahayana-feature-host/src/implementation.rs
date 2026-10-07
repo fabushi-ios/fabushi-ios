@@ -8532,58 +8532,64 @@ impl FeatureHostController {
                         .clone();
                     let async_tasks_path =
                         self.async_tasks_path_for_account(account_id.as_deref());
-                    let task_id = format!("{operation_id}:{step_id}");
                     let task_kind = if matches!(kind.as_str(), "cloud-agent" | "cloud_agent") {
                         AsyncTaskKind::CloudAgent
                     } else {
                         AsyncTaskKind::Shell
                     };
-                    let task_key = async_task_key(task_kind, &task_id);
                     let resource_id = if task_kind == AsyncTaskKind::CloudAgent {
                         cloud_task_resource_id(metadata.as_ref())
                     } else {
                         None
                     };
-                    let mut state = self.state()?;
-                    if status == RuntimeActivityStatus::Running {
-                        state.async_tasks.insert(
-                            task_key.clone(),
-                            AsyncTaskSummary {
-                                kind: task_kind,
-                                id: task_id.clone(),
-                                parent_agent_id: agent_id.clone(),
-                                label: title.clone(),
-                                status: AsyncTaskStatus::Running,
-                                started_at_ms: now_millis(),
-                                detail: detail.clone(),
-                                subagent_type: None,
-                                resource_id: resource_id.clone(),
-                            },
-                        );
-                        state
-                            .async_task_operation_ids
-                            .insert(task_key.clone(), operation_id.clone());
-                    } else {
-                        state.async_tasks.remove(&task_key);
-                        state.async_task_operation_ids.remove(&task_key);
+                    let task_id = match task_kind {
+                        AsyncTaskKind::CloudAgent => resource_id.clone(),
+                        AsyncTaskKind::Shell => Some(format!("{operation_id}:{step_id}")),
+                        AsyncTaskKind::Subagent => None,
+                    };
+                    if let Some(task_id) = task_id {
+                        let task_key = async_task_key(task_kind, &task_id);
+                        let mut state = self.state()?;
+                        if status == RuntimeActivityStatus::Running {
+                            state.async_tasks.insert(
+                                task_key.clone(),
+                                AsyncTaskSummary {
+                                    kind: task_kind,
+                                    id: task_id.clone(),
+                                    parent_agent_id: agent_id.clone(),
+                                    label: title.clone(),
+                                    status: AsyncTaskStatus::Running,
+                                    started_at_ms: now_millis(),
+                                    detail: detail.clone(),
+                                    subagent_type: None,
+                                    resource_id: resource_id.clone(),
+                                },
+                            );
+                            state
+                                .async_task_operation_ids
+                                .insert(task_key.clone(), operation_id.clone());
+                        } else {
+                            state.async_tasks.remove(&task_key);
+                            state.async_task_operation_ids.remove(&task_key);
+                        }
+                        persist_pending_async_tasks(
+                            async_tasks_path.as_deref(),
+                            &state.async_tasks,
+                            &state.async_task_operation_ids,
+                        )?;
+                        let mut tasks = state
+                            .async_tasks
+                            .values()
+                            .filter(|task| task.parent_agent_id == agent_id)
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        tasks.sort_by_key(|task| task.started_at_ms);
+                        state.events.push_back(HostEvent::AsyncTaskChanged {
+                            timestamp: timestamp(),
+                            agent_id: agent_id.clone(),
+                            tasks,
+                        });
                     }
-                    persist_pending_async_tasks(
-                        async_tasks_path.as_deref(),
-                        &state.async_tasks,
-                        &state.async_task_operation_ids,
-                    )?;
-                    let mut tasks = state
-                        .async_tasks
-                        .values()
-                        .filter(|task| task.parent_agent_id == agent_id)
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    tasks.sort_by_key(|task| task.started_at_ms);
-                    state.events.push_back(HostEvent::AsyncTaskChanged {
-                        timestamp: timestamp(),
-                        agent_id: agent_id.clone(),
-                        tasks,
-                    });
                 }
                 if matches!(kind.as_str(), "shell" | "command" | "local-exec" | "exec")
                     && status != RuntimeActivityStatus::Running
