@@ -42,4 +42,7 @@ func redactSandAutoReviewInlineSecrets(_ value: String) -> String {
         replacement: "…"
     )
     return result
+        .split(whereSeparator: { $0.isWhitespace })
+        .joined(separator: " ")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
 }

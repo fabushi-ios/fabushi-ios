@@ -248,6 +248,20 @@ impl AppHost {
                     string_param(&params, "emoji")?,
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.settings.autoReviewRules" => {
+                let rules: Vec<mahayana_host_protocol::AutoReviewRule> = serde_json::from_value(
+                    params.get("rules").cloned().unwrap_or_else(|| json!([]))
+                )
+                .map_err(|error| AppHostError::InvalidRequest(format!(
+                    "invalid auto-review rules: {error}"
+                )))?;
+                serde_json::to_value(
+                    self.feature
+                        .set_auto_review_rules_direct(rules)
+                        .map_err(|error| AppHostError::Operation(error.to_string()))?
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string()))
+            }
             "getAgentChannels" => self
                 .feature
                 .agent_channels(string_param(&params, "id")?)

@@ -393,6 +393,32 @@ final class SandSettingsStore: @unchecked Sendable {
         update { $0.updateTrackOverride = track?.rawValue }
     }
 
+    func getAutoReviewInstructions() -> SandAutoReviewInstructions {
+        guard let stored = load().autoReviewInstructions else {
+            return normalizeSandAutoReviewInstructions(isEnabled: nil, allowInstructions: nil, blockInstructions: nil)
+        }
+        return normalizeSandAutoReviewInstructions(
+            isEnabled: stored.isEnabled,
+            allowInstructions: stored.allowInstructions,
+            blockInstructions: stored.blockInstructions
+        )
+    }
+
+    func setAutoReviewInstructions(_ value: SandAutoReviewInstructions) {
+        let normalized = normalizeSandAutoReviewInstructions(
+            isEnabled: value.isEnabled,
+            allowInstructions: value.allowInstructions,
+            blockInstructions: value.blockInstructions
+        )
+        update {
+            $0.autoReviewInstructions = .init(
+                isEnabled: normalized.isEnabled,
+                allowInstructions: normalized.allowInstructions,
+                blockInstructions: normalized.blockInstructions
+            )
+        }
+    }
+
     func getMcpCustomInstructions() -> [String: String] { load().mcpCustomInstructions }
     func setMcpCustomInstructions(_ value: [String: String]) { update { $0.mcpCustomInstructions = value } }
 

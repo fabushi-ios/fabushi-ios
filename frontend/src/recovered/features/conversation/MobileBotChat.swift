@@ -110,6 +110,7 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerPresented = false
     @State private var reactionPickerTargetId: String?
     @State private var reactionPickerDraft = ""
+    @State private var approvalGeneration = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -124,8 +125,14 @@ internal struct MobileBotChat: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mobile-bot-chat")
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
-        .onChange(of: bot.id) { _, _ in cancelVoiceInput() }
-        .onDisappear { cancelVoiceInput() }
+        .onChange(of: bot.id) { _, _ in
+            cancelVoiceInput()
+            approvalGeneration &+= 1
+        }
+        .onDisappear {
+            cancelVoiceInput()
+            approvalGeneration &+= 1
+        }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
         }
@@ -455,6 +462,17 @@ internal struct MobileBotChat: View {
                 : "Bot 消息"
             elements.append(.init(agentId: id, role: "log", name: roleName))
         }
+        for entry in entries where entry.kind == .permissionRequest && entry.actionStatus == "pending" {
+            let approveId = Self.semanticId("mobile-bot-approval-once-\(entry.id)")
+            let denyId = Self.semanticId("mobile-bot-approval-deny-\(entry.id)")
+            elements.append(.init(agentId: approveId, role: "button", name: "Allow once"))
+            elements.append(.init(agentId: denyId, role: "button", name: "Deny"))
+            if let proposed = entry.approvalProposedRule,
+               !proposed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let alwaysId = Self.semanticId("mobile-bot-approval-always-\(entry.id)")
+                elements.append(.init(agentId: alwaysId, role: "button", name: "Always allow"))
+            }
+        }
         for entry in entries where entry.kind == .handoff && entry.actionStatus == "pending" {
             let completeId = Self.semanticId("mobile-bot-handoff-complete-\(entry.id)")
             let dismissId = Self.semanticId("mobile-bot-handoff-dismiss-\(entry.id)")
@@ -472,6 +490,23 @@ internal struct MobileBotChat: View {
         }
         if bot.miniAppId == GlobalDharmaMiniAppBridge.globalDharmaId {
             actions["mobile-bot-open-miniapp"] = .init(allowed: ["invoke"]) { _ in openedMiniApp = true }
+        }
+        for entry in entries where entry.kind == .permissionRequest && entry.actionStatus == "pending" {
+            let approveId = Self.semanticId("mobile-bot-approval-once-\(entry.id)")
+            let denyId = Self.semanticId("mobile-bot-approval-deny-\(entry.id)")
+            actions[approveId] = .init(allowed: ["invoke"]) { _ in
+                Task { await resolveApproval(entry, resolution: .approved) }
+            }
+            actions[denyId] = .init(allowed: ["invoke"]) { _ in
+                Task { await resolveApproval(entry, resolution: .denied) }
+            }
+            if let proposed = entry.approvalProposedRule,
+               !proposed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let alwaysId = Self.semanticId("mobile-bot-approval-always-\(entry.id)")
+                actions[alwaysId] = .init(allowed: ["invoke"]) { _ in
+                    Task { await resolveApproval(entry, resolution: .always) }
+                }
+            }
         }
         for entry in entries where entry.kind == .handoff && entry.actionStatus == "pending" {
             let completeId = Self.semanticId("mobile-bot-handoff-complete-\(entry.id)")
@@ -539,17 +574,46 @@ internal struct MobileBotChat: View {
             .padding(.vertical, 4)
             .accessibilityIdentifier(Self.semanticId("mobile-bot-notice-\(entry.id)"))
         } else if entry.kind == .permissionRequest {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "lock.shield")
-                    .foregroundStyle(.secondary)
-                Text(entry.text)
-                    .font(.caption)
-                Spacer(minLength: 8)
-                Text(entry.createdAt, style: .time)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "lock.shield").foregroundStyle(.secondary)
+                    Text(entry.text).font(.caption)
+                    Spacer(minLength: 8)
+                    Text(entry.createdAt, style: .time).font(.caption2).foregroundStyle(.tertiary)
+                }
+                if let proposed = entry.approvalProposedRule,
+                   !proposed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(redactSandAutoReviewInlineSecrets(proposed))
+                        .font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(4)
+                }
+                if entry.actionStatus == "pending" {
+                    HStack(spacing: 8) {
+                        Button("Allow once") { Task { await resolveApproval(entry, resolution: .approved) } }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier(Self.semanticId("mobile-bot-approval-once-\(entry.id)"))
+                        if let proposed = entry.approvalProposedRule,
+                           !proposed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Button("Always allow") { Task { await resolveApproval(entry, resolution: .always) } }
+                                .buttonStyle(.bordered)
+                                .accessibilityIdentifier(Self.semanticId("mobile-bot-approval-always-\(entry.id)"))
+                        }
+                        Button("Deny", role: .destructive) { Task { await resolveApproval(entry, resolution: .denied) } }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier(Self.semanticId("mobile-bot-approval-deny-\(entry.id)"))
+                    }
+                } else if entry.actionStatus == "submitting" {
+                    ProgressView("Applying decision…").controlSize(.small)
+                } else if let status = entry.actionStatus {
+                    Text(status == "always" ? "Always allowed"
+                        : status == "approved" ? "Allowed once"
+                        : status == "denied" ? "Denied"
+                        : status == "stale" ? "This request is no longer pending."
+                        : "Approval failed. You can retry from the next request.")
+                        .font(.caption).foregroundStyle(status == "failed" ? .red : .secondary)
+                }
             }
-            .padding(.vertical, 4)
+            .padding(10)
+            .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .accessibilityIdentifier(Self.semanticId("mobile-bot-permission-request-\(entry.id)"))
         } else if entry.kind == .timelineEvent {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -1107,6 +1171,47 @@ internal struct MobileBotChat: View {
     }
 
     @MainActor
+    @MainActor
+    private func resolveApproval(_ entry: MobileChatMessage, resolution: MobileAutoReviewResolution) async {
+        guard let approvalId = entry.approvalId,
+              let initialIndex = entries.firstIndex(where: { $0.approvalId == approvalId }),
+              entries[initialIndex].actionStatus == "pending" else { return }
+
+        let ownedBotId = bot.id
+        let ownedGeneration = approvalGeneration
+        entries[initialIndex].actionStatus = "submitting"
+
+        if resolution == .always, let proposedRule = entry.approvalProposedRule {
+            do {
+                let currentResult = try await bridge.request(method: "getAutoReviewInstructions", params: [:])
+                let current = try decodeMobileAutoReviewInstructions(currentResult.value)
+                if let next = appendMobileAutoReviewAllowRule(current, proposedRule: proposedRule) {
+                    _ = try await bridge.request(method: "setAutoReviewInstructions", params: [
+                        "isEnabled": next.isEnabled,
+                        "allowInstructions": next.allowInstructions,
+                        "blockInstructions": next.blockInstructions,
+                    ])
+                }
+            } catch {
+                // Desktop parity: durable-rule failure degrades to one-time allow.
+            }
+        }
+
+        do {
+            _ = try await bridge.request(method: "feature.approval.resolve", params: [
+                "resolution": ["approvalId": approvalId, "decision": resolution.hostDecision],
+            ])
+            guard approvalGeneration == ownedGeneration, bot.id == ownedBotId,
+                  let index = entries.firstIndex(where: { $0.approvalId == approvalId }) else { return }
+            entries[index].actionStatus = resolution.rawValue
+        } catch {
+            guard approvalGeneration == ownedGeneration, bot.id == ownedBotId,
+                  let index = entries.firstIndex(where: { $0.approvalId == approvalId }) else { return }
+            entries[index].actionStatus = error.localizedDescription.localizedCaseInsensitiveContains("unknown approval")
+                ? "stale" : "failed"
+        }
+    }
+
     private func stop() async {
         guard bot.miniAppId == nil, let activeOperationId else { return }
         _ = try? await bridge.request(method: "feature.interrupt", params: ["operationId": activeOperationId])
@@ -1128,6 +1233,9 @@ internal struct MobileBotChat: View {
                         guard let requestID = event["requestId"] as? String else { return false }
                         return ownedHandoffRequestIDs.contains(requestID)
                     }
+                    if type == "approval.requested" {
+                        return event["operationId"] as? String == operationId
+                    }
                     if type == "host.transport" {
                         guard event["channel"] as? String == "transcript.reaction",
                               let payload = event["payload"] as? [String: Any]
@@ -1136,6 +1244,7 @@ internal struct MobileBotChat: View {
                     }
                     let acceptedTypes: Set<String> = [
                         "box.handoff.requested",
+                        "approval.requested",
                         "chat.message",
                         "chat.delta",
                         "agent.step",
@@ -1160,6 +1269,13 @@ internal struct MobileBotChat: View {
                         agentId: bot.id,
                         messages: &entries
                     )
+                case "approval.requested":
+                    guard let row = projectMobileApprovalRequest(event, operationId: operationId) else { continue }
+                    if let index = entries.firstIndex(where: { $0.approvalId == row.approvalId }) {
+                        entries[index] = row
+                    } else {
+                        entries.append(row)
+                    }
                 case "box.handoff.requested":
                     guard eventOperationId == operationId,
                           let requestId = event["requestId"] as? String,

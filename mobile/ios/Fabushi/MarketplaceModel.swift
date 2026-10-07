@@ -158,6 +158,9 @@ struct MobileChatMessage: Identifiable, Equatable {
     var actionStatus: String?
     var handoffRequestId: String?
     var handoffAgentId: String?
+    var approvalId: String?
+    var approvalKind: String?
+    var approvalProposedRule: String?
     var canonicalMessageId: String?
     var replyToMessageId: String?
     var attachmentBatchId: String?
@@ -173,6 +176,93 @@ struct MobileChatMessage: Identifiable, Equatable {
     var branched = false
     var streaming = false
     var createdAt = Date()
+}
+
+enum MobileAutoReviewResolution: String, Equatable {
+    case approved
+    case always
+    case denied
+
+    var hostDecision: String {
+        switch self {
+        case .approved, .always: "allow-once"
+        case .denied: "deny"
+        }
+    }
+}
+
+enum MobileAutoReviewProjectionError: Error {
+    case invalidInstructions
+}
+
+func decodeMobileAutoReviewInstructions(_ value: Any) throws -> SandAutoReviewInstructions {
+    guard let object = value as? [String: Any],
+          let isEnabled = object["isEnabled"] as? Bool,
+          let allow = object["allowInstructions"] as? [Any],
+          let block = object["blockInstructions"] as? [Any]
+    else {
+        throw MobileAutoReviewProjectionError.invalidInstructions
+    }
+    return normalizeSandAutoReviewInstructions(
+        isEnabled: isEnabled,
+        allowInstructions: allow,
+        blockInstructions: block
+    )
+}
+
+func appendMobileAutoReviewAllowRule(
+    _ current: SandAutoReviewInstructions,
+    proposedRule: String
+) -> SandAutoReviewInstructions? {
+    let redacted = redactSandAutoReviewInlineSecrets(proposedRule)
+    let bounded = String(redacted.prefix(SAND_AUTO_REVIEW_INSTRUCTION_MAX_CHARS))
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !bounded.isEmpty else { return nil }
+    var allow = current.allowInstructions
+    if !allow.contains(bounded) {
+        allow.append(bounded)
+        if allow.count > SAND_AUTO_REVIEW_INSTRUCTION_MAX_ENTRIES {
+            allow = Array(allow.suffix(SAND_AUTO_REVIEW_INSTRUCTION_MAX_ENTRIES))
+        }
+    }
+    return normalizeSandAutoReviewInstructions(
+        isEnabled: current.isEnabled,
+        allowInstructions: allow,
+        blockInstructions: current.blockInstructions
+    )
+}
+
+func projectMobileApprovalRequest(
+    _ event: [String: Any],
+    operationId: String
+) -> MobileChatMessage? {
+    guard event["type"] as? String == "approval.requested",
+          event["operationId"] as? String == operationId,
+          let approvalId = (event["approvalId"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+          !approvalId.isEmpty
+    else { return nil }
+
+    let title = [
+        event["subject"] as? String,
+        event["detail"] as? String,
+        event["reason"] as? String,
+        event["capability"] as? String,
+    ]
+    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+    .first { !$0.isEmpty } ?? "This action needs your approval."
+
+    return MobileChatMessage(
+        id: "approval:\(approvalId)",
+        role: .assistant,
+        text: title,
+        kind: .permissionRequest,
+        operationId: operationId,
+        actionStatus: "pending",
+        approvalId: approvalId,
+        approvalKind: event["kind"] as? String,
+        approvalProposedRule: event["proposedRule"] as? String
+    )
 }
 
 @discardableResult

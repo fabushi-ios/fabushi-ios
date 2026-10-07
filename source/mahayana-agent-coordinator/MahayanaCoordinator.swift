@@ -57,6 +57,7 @@ final class MahayanaCoordinator {
     private let clientSideToolV2Relay = ClientSideToolV2Relay()
     private let nativeLocalCapabilities = IOSNativeLocalCapabilityBackend()
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
+    private var autoReviewHostSyncNeeded = true
     private(set) var lifecycleState: LifecycleState = .starting
     private var inFlight = Set<String>()
 
@@ -168,7 +169,40 @@ final class MahayanaCoordinator {
         } else {
             settingsStore?.clearAccountScope()
         }
+        autoReviewHostSyncNeeded = true
         mcpSurface?.updateAccountScope(accountScope)
+    }
+
+    private func autoReviewInstructionsObject() -> [String: Any] {
+        let value = settingsStore?.getAutoReviewInstructions()
+            ?? normalizeSandAutoReviewInstructions(isEnabled: nil, allowInstructions: nil, blockInstructions: nil)
+        return [
+            "isEnabled": value.isEnabled,
+            "allowInstructions": value.allowInstructions,
+            "blockInstructions": value.blockInstructions,
+        ]
+    }
+
+    private func syncAutoReviewRulesToHost() async throws {
+        let value = settingsStore?.getAutoReviewInstructions()
+            ?? normalizeSandAutoReviewInstructions(isEnabled: nil, allowInstructions: nil, blockInstructions: nil)
+        let rules: [[String: Any]]
+        if value.isEnabled {
+            let allow = value.allowInstructions.enumerated().map { index, text in
+                ["id": "ios-auto-review-allow-\(index + 1)", "behavior": "allow", "text": text]
+            }
+            let ask = value.blockInstructions.enumerated().map { index, text in
+                ["id": "ios-auto-review-ask-\(index + 1)", "behavior": "ask", "text": text]
+            }
+            rules = allow + ask
+        } else {
+            rules = []
+        }
+        _ = try await hostSupervisor.request(
+            method: "feature.settings.autoReviewRules",
+            params: ["rules": rules]
+        )
+        autoReviewHostSyncNeeded = false
     }
 
     func signPasskey(_ challenge: PasskeyChallenge) async throws -> CoordinatorPayload {
@@ -193,6 +227,21 @@ final class MahayanaCoordinator {
     /// replacing dictionary-shaped calls. Host ownership remains here.
     func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
         guard lifecycleState != .shuttingDown else { throw CoordinatorError.unavailable }
+        if method == "getAutoReviewInstructions" {
+            return JSONResult(value: autoReviewInstructionsObject())
+        }
+        if method == "setAutoReviewInstructions" {
+            guard let settingsStore else { throw CoordinatorError.unavailable }
+            let normalized = normalizeSandAutoReviewInstructions(
+                isEnabled: params["isEnabled"] as? Bool,
+                allowInstructions: params["allowInstructions"] as? [Any],
+                blockInstructions: params["blockInstructions"] as? [Any]
+            )
+            settingsStore.setAutoReviewInstructions(normalized)
+            autoReviewHostSyncNeeded = true
+            try await syncAutoReviewRulesToHost()
+            return JSONResult(value: autoReviewInstructionsObject())
+        }
         if method == "openExternal" {
             do {
                 let payload = try CoordinatorPayload.fromFoundation(params)
@@ -237,6 +286,10 @@ final class MahayanaCoordinator {
             } catch {
                 throw CoordinatorError.requestFailed(error.localizedDescription)
             }
+        }
+
+        if autoReviewHostSyncNeeded && method == "feature.execute" {
+            try await syncAutoReviewRulesToHost()
         }
 
         let requestId = UUID().uuidString.lowercased()

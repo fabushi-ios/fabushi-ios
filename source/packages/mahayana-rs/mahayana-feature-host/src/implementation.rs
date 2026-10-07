@@ -7957,6 +7957,19 @@ impl FeatureHostController {
         Ok(secret)
     }
 
+    /// Main settings are canonical on iOS; the Host receives this bounded
+    /// runtime projection before execution so approval matching has one owner.
+    pub fn set_auto_review_rules_direct(
+        &self,
+        rules: Vec<AutoReviewRule>,
+    ) -> Result<Vec<AutoReviewRule>, FeatureHostError> {
+        let rules = sanitize_auto_review_rules(rules);
+        let mut state = self.state()?;
+        ensure_open(&state)?;
+        state.settings.auto_review_rules = rules.clone();
+        Ok(rules)
+    }
+
     pub fn resolve_approval(&self, resolution: ApprovalResolution) -> Result<(), FeatureHostError> {
         let pending = {
             let mut state = self.state()?;
@@ -8544,11 +8557,16 @@ impl FeatureHostController {
                 }
             }
             RuntimeEvent::ApprovalRequested {
+                operation_id,
                 approval_id,
                 title,
                 details,
-                ..
-            } => Some(self.translate_runtime_approval(approval_id, title, details)?),
+            } => Some(self.translate_runtime_approval(
+                operation_id.to_string(),
+                approval_id,
+                title,
+                details,
+            )?),
             RuntimeEvent::OperationCompleted { operation_id } => {
                 let operation_id = operation_id.to_string();
                 self.finish_automation_operation(
@@ -9126,6 +9144,7 @@ impl FeatureHostController {
     #[cfg(feature = "production")]
     fn translate_runtime_approval(
         &self,
+        operation_id: String,
         approval_id: ApprovalId,
         title: String,
         details: serde_json::Value,
@@ -9243,6 +9262,7 @@ impl FeatureHostController {
         );
         Ok(HostEvent::ApprovalRequested {
             timestamp: timestamp(),
+            operation_id: Some(operation_id),
             approval_id: approval_key,
             mini_app_id,
             capability,
@@ -9355,6 +9375,7 @@ impl FeatureHostController {
         );
         state.events.push_back(HostEvent::ApprovalRequested {
             timestamp: timestamp(),
+            operation_id: None,
             approval_id,
             mini_app_id,
             capability,
@@ -10289,6 +10310,7 @@ impl FeatureHostController {
                 );
                 state.events.push_back(HostEvent::ApprovalRequested {
                     timestamp: timestamp(),
+                    operation_id: None,
                     approval_id,
                     mini_app_id,
                     capability,
