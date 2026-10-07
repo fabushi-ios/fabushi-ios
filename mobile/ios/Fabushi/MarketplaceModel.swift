@@ -91,6 +91,23 @@ struct MobileAttachmentCardProjection: Equatable {
     var clientNonce: String?
 }
 
+struct MobileTranscriptReaction: Equatable, Hashable {
+    let emoji: String
+    let by: String
+}
+
+func projectMobileTranscriptReactions(_ raw: Any?) -> [MobileTranscriptReaction] {
+    guard let rows = raw as? [[String: Any]] else { return [] }
+    return rows.compactMap { row in
+        guard let emoji = (row["emoji"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !emoji.isEmpty,
+              let by = (row["by"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !by.isEmpty
+        else { return nil }
+        return MobileTranscriptReaction(emoji: emoji, by: by)
+    }
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
@@ -112,6 +129,8 @@ struct MobileChatMessage: Identifiable, Equatable {
     var sendMessageTextProjection: MobileSendMessageTextProjection?
     var timelineEvent: SandTimelineEvent?
     var timelineAutomationId: String?
+    var reactions: [MobileTranscriptReaction] = []
+    var myReactions: Set<String> = []
     var branched = false
     var streaming = false
     var createdAt = Date()
