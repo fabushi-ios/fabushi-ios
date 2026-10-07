@@ -517,17 +517,17 @@
     {
       "desktop_path": "frontend/src/production/evidence.ts",
       "desktop_blob_sha": "b38c8e60a89236b15909b21220e842d8867ce2fc",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Carries reconstruction-era traceability from production UI behaviors and visible strings back to immutable shipped Desktop bundle locations, plus an explicit list of renderer gaps.",
+      "desktop_owner": "renderer reconstruction evidence / product traceability",
+      "desktop_visible_effect": "Reviewers can prove that reconstructed Desktop UI behavior and copy came from the shipped artifact rather than an invented surface.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "docs/parity/desktop-pr20/frontend.json",
+      "ios_language": "JSON / GitHub Actions",
+      "ios_platform_delta": "The file's Grok-bundle line/UTF-8 anchors are specific to Desktop reconstruction and must not be copied into the native iOS product. iOS replaces that provenance mechanism with the pinned 7,943-row Desktop PR #20 ledger, exact-source workflow checks, protected native UI acceptance, and archive source.env/SHA256SUMS provenance.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "MIGRATION_SOURCE.md; docs/parity/desktop-pr20/frontend.json; docs/parity/desktop-pr20; .github/workflows/ios-desktop-pr20-parity.yml; .github/workflows/ios-protected-session.yml",
+      "test_evidence": "GitHub Actions exact-source architecture gate; protected native UI journey; archive provenance verification",
+      "notes": "Desktop evidence.ts points into immutable reconstruction bundles and contains historical Grok product copy, so copying it would create a second and stale authority. The replacement evidence system is iOS-owned and pinned to Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701."
     },
     {
       "desktop_path": "frontend/src/production/group-members-root.ts",
