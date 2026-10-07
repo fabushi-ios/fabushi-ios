@@ -562,17 +562,17 @@
     {
       "desktop_path": "frontend/src/production/model.ts",
       "desktop_blob_sha": "a0700444f6d9c629a34a718df3a4d4c8bc8d5b4e",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Aggregate renderer projection boundary for canonical Agent roster/session summaries, transcript/card/reaction/attachment entries and pagination metadata, deep-link intents, and Computer status/handoff state.",
+      "desktop_owner": "renderer projection layer over canonical Host/coordinator state",
+      "desktop_visible_effect": "The sidebar and conversation surface show authoritative Agent activity/last-message/unread state, transcript pages/cards/attachments/threads remain stable across snapshots and pagination, supported deep links resolve to native product intents, and Computer UI reflects canonical lifecycle/VNC/pull/handoff state.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/recovered/features/agent-info/MobileBotSummary.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/GrokMobileShell+Home.swift; mobile/ios/Fabushi/MessagingModel.swift; source/ios-main/deep-link/deep-link-controller.swift; mobile/ios/Fabushi/RemoteComputerStatusStore.swift",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "iOS keeps the same product responsibilities but splits the Desktop renderer aggregate across native owners: Host bot.list/group.list rows project into MobileBotSummary and the SwiftUI home; canonical messaging hydration owns transcript/message/reaction/media state instead of a TypeScript renderer adapter; native URL/deep-link routing replaces Electron renderer intents; RemoteComputerStatusStore owns native Computer lifecycle/status fencing. No second roster, transcript, deep-link, or Computer authority is introduced.",
+      "implementation_status": "mapped",
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileBotSummary.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/GrokMobileShell+Home.swift; mobile/ios/Fabushi/MessagingModel.swift; source/ios-main/deep-link/deep-link-controller.swift; mobile/ios/Fabushi/RemoteComputerStatusStore.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; mobile/ios/FabushiTests/SharedMessagingCoreParityTests.swift; mobile/ios/FabushiTests/RemoteComputerStatusStoreTests.swift; current-head ordinary/protected GitHub Actions required before implemented/verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The row is intentionally aggregate-mapped rather than globally verified: Agent session-summary projection was newly wired into the shipping iOS roster/home, while transcript, deep-link, and Computer sub-responsibilities remain owned by their existing native modules and must be judged from their focused evidence. Do not promote this aggregate row merely because the overall workflow is green."
     },
     {
       "desktop_path": "frontend/src/production/production.css",
