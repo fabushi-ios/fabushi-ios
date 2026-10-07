@@ -204,27 +204,6 @@ impl AsyncTasksRuntime {
                         .and_then(|tasks| serde_json::to_value(tasks).map_err(|error| error.to_string()))
                 }))
             }
-            "asyncTasks.markPending" => {
-                let marker = serde_json::from_value::<PendingWakeMarker>(params.clone())
-                    .map_err(|error| format!("invalid pending wake marker: {error}"));
-                Some(marker.and_then(|marker| {
-                    self.mark_pending(marker)?;
-                    Ok(json!({"status":"persisted"}))
-                }))
-            }
-            "asyncTasks.settle" => {
-                let agent_id = params.get("agentId").and_then(Value::as_str).unwrap_or_default();
-                let work_id = params.get("workId").and_then(Value::as_str).unwrap_or_default();
-                let kind = params
-                    .get("kind")
-                    .cloned()
-                    .ok_or_else(|| "asyncTasks.settle requires kind".to_string())
-                    .and_then(|value| serde_json::from_value::<AsyncTaskKind>(value).map_err(|error| error.to_string()));
-                Some(kind.and_then(|kind| {
-                    self.settle(agent_id, kind, work_id)
-                        .map(|cleared| json!({"status":"settled","cleared":cleared}))
-                }))
-            }
             _ => None,
         }
     }
