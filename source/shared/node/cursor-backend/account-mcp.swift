@@ -256,11 +256,15 @@ struct EffectivePluginWire: Equatable, Sendable {
         let id: UInt64
         let name: String
         let displayName: String
+        var gitRef: String? = nil
+        var publisherUserId: UInt64? = nil
+        var marketplaceTeamId: UInt64? = nil
     }
     var plugin: Plugin? = nil
     let installMode: Int
     let isTeamRequired: Bool
     let isEnabled: Bool
+    var pinnedGitRef: String? = nil
     var hasTeamConfiguredVariables: Bool = false
 }
 
@@ -270,6 +274,9 @@ struct EffectiveUserPlugin: Equatable, Sendable {
     let displayName: String
     let installMode: EffectivePluginInstallMode
     let isEnabled: Bool
+    var versionRef: String? = nil
+    var publisherUserId: UInt64? = nil
+    var marketplaceTeamId: UInt64? = nil
     var hasTeamConfiguredVariables: Bool = false
 }
 
@@ -506,6 +513,9 @@ func fetchEffectiveUserPlugins(
             displayName: plugin.displayName.isEmpty ? plugin.name : plugin.displayName,
             installMode: mapped == .unknown && effective.isTeamRequired ? .teamRequired : mapped,
             isEnabled: effective.isEnabled,
+            versionRef: effective.pinnedGitRef ?? plugin.gitRef,
+            publisherUserId: plugin.publisherUserId,
+            marketplaceTeamId: plugin.marketplaceTeamId,
             hasTeamConfiguredVariables: effective.hasTeamConfiguredVariables
         )
     }

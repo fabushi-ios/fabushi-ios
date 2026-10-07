@@ -62,6 +62,38 @@ func projectSkillPublishTargets(_ teams: [IOSCursorSkillPublishTeam]) -> [[Strin
         }
 }
 
+let SKILL_PUBLISH_CONFIRM_MAX_ATTEMPTS = 5
+
+func normalizedSkillPublishVersion(_ raw: String?) -> String? {
+    guard let raw else { return nil }
+    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard value.count == 40, value.utf8.allSatisfy({
+        ($0 >= 48 && $0 <= 57) || ($0 >= 97 && $0 <= 102)
+    }) else { return nil }
+    return value
+}
+
+func projectAuthoritativePublishedPlugins(
+    _ plugins: [EffectiveUserPlugin],
+    currentUserId: UInt64
+) -> [[String: Any]] {
+    plugins.compactMap { plugin in
+        guard let version = normalizedSkillPublishVersion(plugin.versionRef) else { return nil }
+        var row: [String: Any] = [
+            "pluginId": plugin.pluginId,
+            "pluginVersion": version,
+            "name": plugin.name,
+            "displayName": plugin.displayName,
+            "publishedByCurrentUser": plugin.publisherUserId == currentUserId,
+            "isEnabledForAgent": plugin.isEnabled,
+        ]
+        if let teamId = plugin.marketplaceTeamId {
+            row["marketplaceTeamId"] = NSNumber(value: teamId)
+        }
+        return row
+    }
+}
+
 private struct CoordinatorMcpSnapshot: Sendable {
     let display: AccountDisplayConfig
     let backendServers: [BackendMcpToolServerWire]
@@ -158,6 +190,91 @@ private final class CoordinatorMcpHostPort {
             throw SandMcpConfigError("Skill publish package response is invalid.")
         }
         return package
+    }
+
+    func syncWorkflowPluginFacts(
+        agentId: String,
+        plugins: [[String: Any]]
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.workflow.pluginFactsSync",
+            params: [
+                "agentId": agentId,
+                "plugins": plugins,
+            ]
+        )
+        guard let value = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Published skill projection response is invalid.")
+        }
+        return value
+    }
+
+    func confirmWorkflowPublish(
+        agentId: String,
+        workflowId: String,
+        pluginId: String,
+        commitSha: String
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.workflow.publishConfirm",
+            params: [
+                "agentId": agentId,
+                "workflowId": workflowId,
+                "pluginId": pluginId,
+                "commitSha": commitSha,
+            ]
+        )
+        guard let value = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Skill publish confirmation response is invalid.")
+        }
+        return value
+    }
+
+    func exportPublishedWorkflowPublishPackage(
+        agentId: String,
+        workflowId: String
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.workflow.resyncPackage",
+            params: [
+                "agentId": agentId,
+                "workflowId": workflowId,
+            ]
+        )
+        guard let value = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Published skill package response is invalid.")
+        }
+        return value
+    }
+
+    func prepareWorkflowUnpublish(
+        agentId: String,
+        workflowId: String
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.workflow.unpublishPrepare",
+            params: [
+                "agentId": agentId,
+                "workflowId": workflowId,
+            ]
+        )
+        guard let value = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Skill unpublish preparation response is invalid.")
+        }
+        return value
+    }
+
+    func completeWorkflowUnpublish(
+        agentId: String,
+        pluginId: String
+    ) async throws {
+        _ = try await hostSupervisor.request(
+            method: "feature.workflow.unpublishComplete",
+            params: [
+                "agentId": agentId,
+                "pluginId": pluginId,
+            ]
+        )
     }
 
     func executeTool(
@@ -592,6 +709,9 @@ final class CoordinatorMcpSurface {
                 disabled: disabled
             )
         }
+        dependencies.effectivePluginsProvider = {
+            try await fetchEffectiveUserPlugins(accountDependencies)
+        }
         return .init(
             manager: SandMcpManager(deps: dependencies),
             port: port,
@@ -602,6 +722,61 @@ final class CoordinatorMcpSurface {
 
     func updateAccountScope(_ scope: String?) {
         port.updateAccountScope(scope)
+    }
+
+    private func refreshAuthoritativePluginFacts(
+        agentId: String
+    ) async throws -> [[String: Any]] {
+        guard (await cursorAuth.status()).loggedIn else {
+            let empty: [[String: Any]] = []
+            _ = try await port.syncWorkflowPluginFacts(agentId: agentId, plugins: empty)
+            return empty
+        }
+        let currentUserId = try await dashboard.getCurrentUserId()
+        let effective = try await manager.listEffectivePlugins()
+        let projected = projectAuthoritativePublishedPlugins(
+            effective,
+            currentUserId: currentUserId
+        )
+        _ = try await port.syncWorkflowPluginFacts(agentId: agentId, plugins: projected)
+        return projected
+    }
+
+    private func publishTeamId(_ value: Any?) throws -> Int32 {
+        guard let number = value as? NSNumber else {
+            throw SandMcpConfigError("Skill publishing teamId is required.")
+        }
+        let raw = number.int64Value
+        guard raw > 0, raw <= Int64(Int32.max) else {
+            throw SandMcpConfigError("Skill publishing teamId is invalid.")
+        }
+        return Int32(raw)
+    }
+
+    private func uploadPrivateWorkflow(
+        agentId: String,
+        workflowId: String,
+        teamId: Int32
+    ) async throws -> IOSCursorPublishedSkill {
+        let package = try await port.exportWorkflowPublishPackage(
+            agentId: agentId,
+            workflowId: workflowId
+        )
+        guard let name = nonEmptyString(package["name"]),
+              let displayName = nonEmptyString(package["displayName"]),
+              let description = nonEmptyString(package["description"]),
+              let encoded = nonEmptyString(package["pluginTarGzBase64"]),
+              let archive = Data(base64Encoded: encoded)
+        else {
+            throw SandMcpConfigError("Skill publish package is incomplete.")
+        }
+        return try await dashboard.publishSkillPlugin(
+            teamId: teamId,
+            name: name,
+            displayName: displayName,
+            description: description,
+            pluginTarGz: archive
+        )
     }
 
     func route(
@@ -616,49 +791,166 @@ final class CoordinatorMcpSurface {
             let teams = try await dashboard.getSkillPublishTeams()
             return .handled(["teams": projectSkillPublishTargets(teams)])
 
+        case "coordinator.skill.pluginFactsSync":
+            guard let agentId = nonEmptyString(params["agentId"]) else {
+                throw SandMcpConfigError("Published skill refresh requires agentId.")
+            }
+            let plugins = try await refreshAuthoritativePluginFacts(agentId: agentId)
+            return .handled(["plugins": plugins])
+
+        case "coordinator.skill.publish":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw SandMcpConfigError("Skill publishing requires Cursor sign-in.")
+            }
+            guard let agentId = nonEmptyString(params["agentId"]),
+                  let workflowId = nonEmptyString(params["workflowId"])
+            else {
+                throw SandMcpConfigError(
+                    "Skill publishing requires agentId and workflowId."
+                )
+            }
+            let teamId = try publishTeamId(params["teamId"])
+            let published = try await uploadPrivateWorkflow(
+                agentId: agentId,
+                workflowId: workflowId,
+                teamId: teamId
+            )
+            var promotedWorkflowId: String?
+            for _ in 0..<SKILL_PUBLISH_CONFIRM_MAX_ATTEMPTS {
+                _ = try? await refreshAuthoritativePluginFacts(agentId: agentId)
+                let confirmation = try await port.confirmWorkflowPublish(
+                    agentId: agentId,
+                    workflowId: workflowId,
+                    pluginId: published.pluginId,
+                    commitSha: published.commitSha
+                )
+                if confirmation["confirmed"] as? Bool == true {
+                    promotedWorkflowId = nonEmptyString(confirmation["promotedWorkflowId"])
+                    break
+                }
+            }
+            var result: [String: Any] = [
+                "workflowId": workflowId,
+                "pluginId": published.pluginId,
+                "commitSha": published.commitSha,
+                "confirmed": promotedWorkflowId != nil,
+            ]
+            if let promotedWorkflowId {
+                result["promotedWorkflowId"] = promotedWorkflowId
+            }
+            return .handled(result)
+
         case "coordinator.skill.publishUpload":
             guard (await cursorAuth.status()).loggedIn else {
                 throw SandMcpConfigError("Skill publishing requires Cursor sign-in.")
             }
             guard let agentId = nonEmptyString(params["agentId"]),
-                  let workflowId = nonEmptyString(params["workflowId"]),
-                  let teamNumber = params["teamId"] as? NSNumber
+                  let workflowId = nonEmptyString(params["workflowId"])
             else {
                 throw SandMcpConfigError(
-                    "Skill publishing requires agentId, workflowId, and teamId."
+                    "Skill publishing requires agentId and workflowId."
                 )
             }
-            let teamValue = teamNumber.int64Value
-            guard teamValue > 0, teamValue <= Int64(Int32.max) else {
-                throw SandMcpConfigError("Skill publishing teamId is invalid.")
-            }
-            let package = try await port.exportWorkflowPublishPackage(
+            let published = try await uploadPrivateWorkflow(
                 agentId: agentId,
-                workflowId: workflowId
+                workflowId: workflowId,
+                teamId: try publishTeamId(params["teamId"])
             )
-            guard let name = nonEmptyString(package["name"]),
-                  let displayName = nonEmptyString(package["displayName"]),
-                  let description = nonEmptyString(package["description"]),
-                  let encoded = nonEmptyString(package["pluginTarGzBase64"]),
-                  let archive = Data(base64Encoded: encoded)
-            else {
-                throw SandMcpConfigError("Skill publish package is incomplete.")
-            }
-            let published = try await dashboard.publishSkillPlugin(
-                teamId: Int32(teamValue),
-                name: name,
-                displayName: displayName,
-                description: description,
-                pluginTarGz: archive
-            )
-            // This is intentionally only an upload primitive. The private workflow
-            // remains authoritative until a later refresh confirms the same plugin
-            // id + commit SHA in the installed plugin-skill projection.
             return .handled([
                 "workflowId": workflowId,
                 "pluginId": published.pluginId,
                 "commitSha": published.commitSha,
                 "confirmed": false,
+            ])
+
+        case "coordinator.skill.resync":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw SandMcpConfigError("Skill sync requires Cursor sign-in.")
+            }
+            guard let agentId = nonEmptyString(params["agentId"]),
+                  let workflowId = nonEmptyString(params["workflowId"])
+            else {
+                throw SandMcpConfigError("Skill sync requires agentId and workflowId.")
+            }
+            _ = try await refreshAuthoritativePluginFacts(agentId: agentId)
+            let package = try await port.exportPublishedWorkflowPublishPackage(
+                agentId: agentId,
+                workflowId: workflowId
+            )
+            guard let pluginId = nonEmptyString(package["pluginId"]),
+                  let teamIdNumber = package["teamId"] as? NSNumber,
+                  let name = nonEmptyString(package["name"]),
+                  let displayName = nonEmptyString(package["displayName"]),
+                  let description = nonEmptyString(package["description"]),
+                  let encoded = nonEmptyString(package["pluginTarGzBase64"]),
+                  let archive = Data(base64Encoded: encoded)
+            else {
+                throw SandMcpConfigError("Published skill package is incomplete.")
+            }
+            let teamRaw = teamIdNumber.int64Value
+            guard teamRaw > 0, teamRaw <= Int64(Int32.max) else {
+                throw SandMcpConfigError("Published skill team id is invalid.")
+            }
+            let published = try await dashboard.publishSkillPlugin(
+                teamId: Int32(teamRaw),
+                name: name,
+                displayName: displayName,
+                description: description,
+                pluginTarGz: archive
+            )
+            guard published.pluginId == pluginId else {
+                throw SandMcpConfigError(
+                    "Skill sync returned a different plugin id; local published state was preserved."
+                )
+            }
+            _ = try? await refreshAuthoritativePluginFacts(agentId: agentId)
+            return .handled([
+                "workflowId": workflowId,
+                "pluginId": published.pluginId,
+                "commitSha": published.commitSha,
+                "confirmed": true,
+            ])
+
+        case "coordinator.skill.unpublish":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw SandMcpConfigError("Skill unpublish requires Cursor sign-in.")
+            }
+            guard let agentId = nonEmptyString(params["agentId"]),
+                  let workflowId = nonEmptyString(params["workflowId"])
+            else {
+                throw SandMcpConfigError("Skill unpublish requires agentId and workflowId.")
+            }
+            _ = try await refreshAuthoritativePluginFacts(agentId: agentId)
+            let prepared = try await port.prepareWorkflowUnpublish(
+                agentId: agentId,
+                workflowId: workflowId
+            )
+            guard let pluginId = nonEmptyString(prepared["pluginId"]),
+                  let teamNumber = prepared["teamId"] as? NSNumber,
+                  let restoredWorkflowId = nonEmptyString(prepared["restoredWorkflowId"])
+            else {
+                throw SandMcpConfigError("Skill unpublish preparation is incomplete.")
+            }
+            let teamRaw = teamNumber.int64Value
+            guard teamRaw > 0, teamRaw <= Int64(Int32.max) else {
+                throw SandMcpConfigError("Published skill team id is invalid.")
+            }
+            // Host restores the private copy before this remote mutation. If the
+            // backend fails, that restored local copy intentionally remains.
+            try await dashboard.unpublishSkillPlugin(
+                pluginId: pluginId,
+                teamId: Int32(teamRaw)
+            )
+            try await port.completeWorkflowUnpublish(
+                agentId: agentId,
+                pluginId: pluginId
+            )
+            _ = try? await refreshAuthoritativePluginFacts(agentId: agentId)
+            return .handled([
+                "workflowId": workflowId,
+                "pluginId": pluginId,
+                "restoredWorkflowId": restoredWorkflowId,
+                "unpublished": true,
             ])
 
         case "coordinator.mcp.servers":

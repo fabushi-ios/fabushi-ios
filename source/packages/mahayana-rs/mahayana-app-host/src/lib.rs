@@ -428,6 +428,43 @@ impl AppHost {
                     string_param(&params, "workflowId")?,
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.pluginFactsSync" => self
+                .feature
+                .sync_workflow_plugin_facts(
+                    string_param(&params, "agentId")?,
+                    params.get("plugins").cloned().unwrap_or_else(|| json!([])),
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.publishConfirm" => self
+                .feature
+                .confirm_workflow_publish(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "workflowId")?,
+                    string_param(&params, "pluginId")?,
+                    string_param(&params, "commitSha")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.resyncPackage" => self
+                .feature
+                .export_published_workflow_publish_package(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "workflowId")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.unpublishPrepare" => self
+                .feature
+                .prepare_workflow_unpublish(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "workflowId")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.unpublishComplete" => self
+                .feature
+                .complete_workflow_unpublish(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "pluginId")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "feature.mcp.servers" => self
                 .feature
                 .mcp_servers_snapshot()

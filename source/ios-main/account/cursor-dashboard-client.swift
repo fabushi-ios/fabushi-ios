@@ -354,6 +354,14 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         _ = try await protoRPC("UnpublishPlugin", body: body, timeoutMs: timeoutMs)
     }
 
+    func getCurrentUserId(timeoutMs: Int = 10_000) async throws -> UInt64 {
+        let response = try await rpc("GetMe", body: [:], timeoutMs: timeoutMs)
+        guard let userId = uint64(response["userId"]), userId != 0 else {
+            throw IOSCursorDashboardError(message: "Dashboard GetMe response was missing the signed-in user id.")
+        }
+        return userId
+    }
+
     private func uint64(_ value: Any?) -> UInt64? {
         if let value = value as? String { return UInt64(value) }
         if let value = value as? NSNumber { return value.uint64Value }
@@ -451,10 +459,15 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             if let pluginObject,
                let id = uint64(pluginObject["id"]), id != 0,
                let name = pluginObject["name"] as? String {
+                let publisher = pluginObject["publisher"] as? [String: Any]
+                let marketplace = pluginObject["marketplace"] as? [String: Any]
                 plugin = .init(
                     id: id,
                     name: name,
-                    displayName: pluginObject["displayName"] as? String ?? ""
+                    displayName: pluginObject["displayName"] as? String ?? "",
+                    gitRef: pluginObject["gitRef"] as? String,
+                    publisherUserId: uint64(publisher?["ownerUserId"]),
+                    marketplaceTeamId: uint64(marketplace?["teamId"])
                 )
             } else {
                 plugin = nil
@@ -464,6 +477,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
                 installMode: (row["installMode"] as? NSNumber)?.intValue ?? 0,
                 isTeamRequired: row["isTeamRequired"] as? Bool ?? false,
                 isEnabled: row["isEnabled"] as? Bool ?? false,
+                pinnedGitRef: row["pinnedGitRef"] as? String,
                 hasTeamConfiguredVariables: row["hasTeamConfiguredVariables"] as? Bool ?? false
             )
         }

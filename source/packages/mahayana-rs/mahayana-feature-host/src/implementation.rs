@@ -129,6 +129,7 @@ use mahayana_host_protocol::WorkflowSummary;
 use mahayana_host_protocol::WorkflowTrigger;
 #[cfg(feature = "production")]
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_json::json;
 use sha2::Digest as _;
@@ -204,6 +205,38 @@ struct BackgroundOperationContext {
     agent_name: String,
     source: String,
     teach_artifact: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PublishedPluginSnapshot {
+    plugin_id: String,
+    plugin_version: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    display_name: String,
+    #[serde(default)]
+    published_by_current_user: bool,
+    #[serde(default)]
+    marketplace_team_id: Option<u64>,
+    #[serde(default)]
+    is_enabled_for_agent: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PublishedWorkflowCacheMetadata {
+    agent_id: String,
+    original_workflow_id: String,
+    promoted_workflow_id: String,
+    plugin_id: String,
+    plugin_version: String,
+    plugin_name: String,
+    display_name: String,
+    description: String,
+    marketplace_team_id: u64,
+    enabled_before_publish: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -395,6 +428,7 @@ struct FeatureState {
     session_active: bool,
     auth_user: Option<Value>,
     automations: BTreeMap<String, AutomationSummary>,
+    published_plugins_by_agent: BTreeMap<String, Vec<PublishedPluginSnapshot>>,
     connectors: BTreeMap<String, ConnectorSummary>,
     skills: BTreeMap<String, SkillSummary>,
     bots: BTreeMap<String, BotSummary>,
@@ -432,6 +466,7 @@ impl Default for FeatureState {
             session_active: true,
             auth_user: None,
             automations: BTreeMap::new(),
+            published_plugins_by_agent: BTreeMap::new(),
             connectors: default_connectors(),
             skills: default_skills(),
             bots: default_bots(),
@@ -797,6 +832,322 @@ impl FeatureHostController {
             "description": summary.description,
             "pluginTarGzBase64": base64::engine::general_purpose::STANDARD.encode(bytes),
         }))
+    }
+
+    pub fn sync_workflow_plugin_facts(
+        &self,
+        agent_id: &str,
+        plugins: Value,
+    ) -> Result<Value, FeatureHostError> {
+        if !is_safe_memory_agent_id(agent_id) {
+            return Err(FeatureHostError::Contract("unsafe published skill agent id".into()));
+        }
+        if !self.state()?.bots.contains_key(agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unknown workflow owner: {agent_id}"
+            )));
+        }
+        let plugins: Vec<PublishedPluginSnapshot> = serde_json::from_value(plugins)
+            .map_err(|error| FeatureHostError::Contract(format!(
+                "invalid published skill projection: {error}"
+            )))?;
+        for plugin in &plugins {
+            if plugin.plugin_id.trim().is_empty()
+                || !is_exact_skill_publish_version(&plugin.plugin_version)
+            {
+                return Err(FeatureHostError::Contract(
+                    "published skill projection has an invalid plugin identity".into(),
+                ));
+            }
+        }
+        let count = plugins.len();
+        self.state()?
+            .published_plugins_by_agent
+            .insert(agent_id.to_string(), plugins);
+        Ok(json!({"agentId": agent_id, "count": count}))
+    }
+
+    pub fn confirm_workflow_publish(
+        &self,
+        agent_id: &str,
+        workflow_id: &str,
+        plugin_id: &str,
+        commit_sha: &str,
+    ) -> Result<Value, FeatureHostError> {
+        if !is_safe_memory_agent_id(agent_id)
+            || !is_safe_memory_agent_id(workflow_id)
+            || plugin_id.trim().is_empty()
+            || !is_exact_skill_publish_version(commit_sha)
+        {
+            return Err(FeatureHostError::Contract(
+                "unsafe skill publish confirmation identity".into(),
+            ));
+        }
+        let snapshot = {
+            let state = self.state()?;
+            state
+                .published_plugins_by_agent
+                .get(agent_id)
+                .and_then(|plugins| plugins.iter().find(|plugin| {
+                    plugin.plugin_id == plugin_id
+                        && plugin.plugin_version.eq_ignore_ascii_case(commit_sha)
+                        && plugin.published_by_current_user
+                }))
+                .cloned()
+        };
+        let Some(snapshot) = snapshot else {
+            return Ok(json!({"confirmed": false}));
+        };
+        let team_id = snapshot.marketplace_team_id.ok_or_else(|| {
+            FeatureHostError::Contract(
+                "Published skill confirmation has no team marketplace identity.".into(),
+            )
+        })?;
+        let workflow_root = self
+            .workflow_root_path
+            .as_deref()
+            .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("agent storage is unavailable".into()))?;
+        let cache_root = published_workflow_cache_root(workflow_root, plugin_id)?;
+
+        if let Some(existing) = read_published_workflow_cache(&cache_root) {
+            if existing.agent_id == agent_id
+                && existing.original_workflow_id == workflow_id
+                && existing.plugin_id == plugin_id
+                && existing.plugin_version.eq_ignore_ascii_case(commit_sha)
+                && cache_root.join("skill").join(WORKFLOW_FILENAME).is_file()
+            {
+                let private_dir = workflow_root.join(workflow_id);
+                if private_dir.exists() {
+                    std::fs::remove_dir_all(&private_dir).map_err(|error| {
+                        FeatureHostError::Contract(format!(
+                            "remove confirmed private workflow: {error}"
+                        ))
+                    })?;
+                    forget_workflow_enablement(agent_root, agent_id, workflow_id)?;
+                }
+                return Ok(json!({
+                    "confirmed": true,
+                    "promotedWorkflowId": existing.promoted_workflow_id,
+                }));
+            }
+            return Err(FeatureHostError::Contract(
+                "A different published skill cache already owns this plugin id.".into(),
+            ));
+        }
+
+        let summary = load_workflow_summary(workflow_root, agent_root, agent_id, workflow_id)
+            .ok_or_else(|| FeatureHostError::Contract(
+                "That private skill no longer exists.".into()
+            ))?;
+        let promoted_workflow_id = format!(
+            "plugin-{}-{}",
+            plugin_id,
+            slugify_workflow_name(&summary.name)
+        );
+        let metadata = PublishedWorkflowCacheMetadata {
+            agent_id: agent_id.to_string(),
+            original_workflow_id: workflow_id.to_string(),
+            promoted_workflow_id: promoted_workflow_id.clone(),
+            plugin_id: plugin_id.to_string(),
+            plugin_version: commit_sha.to_ascii_lowercase(),
+            plugin_name: normalize_marketplace_plugin_name(workflow_id),
+            display_name: summary.name.clone(),
+            description: summary.description.clone(),
+            marketplace_team_id: team_id,
+            enabled_before_publish: is_workflow_enabled(agent_root, agent_id, workflow_id),
+        };
+        let parent = cache_root.parent().ok_or_else(|| {
+            FeatureHostError::Contract("Published skill cache path is invalid.".into())
+        })?;
+        std::fs::create_dir_all(parent).map_err(|error| {
+            FeatureHostError::Contract(format!("create published skill cache parent: {error}"))
+        })?;
+        let temp_root = parent.join(format!(
+            ".{}.tmp-{}",
+            plugin_id,
+            Uuid::new_v4()
+        ));
+        let cache_result = (|| {
+            copy_workflow_tree(&workflow_root.join(workflow_id), &temp_root.join("skill"))?;
+            write_published_workflow_cache(&temp_root, &metadata)?;
+            if !temp_root.join("skill").join(WORKFLOW_FILENAME).is_file() {
+                return Err(FeatureHostError::Contract(
+                    "Published skill cache is missing SKILL.md.".into(),
+                ));
+            }
+            std::fs::rename(&temp_root, &cache_root).map_err(|error| {
+                FeatureHostError::Contract(format!("commit published skill cache: {error}"))
+            })?;
+            Ok::<(), FeatureHostError>(())
+        })();
+        if cache_result.is_err() {
+            let _ = std::fs::remove_dir_all(&temp_root);
+        }
+        cache_result?;
+
+        let private_dir = workflow_root.join(workflow_id);
+        std::fs::remove_dir_all(&private_dir).map_err(|error| {
+            FeatureHostError::Contract(format!("remove promoted private workflow: {error}"))
+        })?;
+        forget_workflow_enablement(agent_root, agent_id, workflow_id)?;
+        Ok(json!({
+            "confirmed": true,
+            "promotedWorkflowId": promoted_workflow_id,
+        }))
+    }
+
+    pub fn export_published_workflow_publish_package(
+        &self,
+        agent_id: &str,
+        workflow_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let workflow_root = self
+            .workflow_root_path
+            .as_deref()
+            .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("agent storage is unavailable".into()))?;
+        let facts = self
+            .state()?
+            .published_plugins_by_agent
+            .get(agent_id)
+            .cloned()
+            .unwrap_or_default();
+        let (snapshot, metadata, cache_root) =
+            find_published_workflow_cache(workflow_root, agent_id, workflow_id, &facts)
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "That published skill is no longer installed.".into()
+                ))?;
+        if !snapshot.published_by_current_user {
+            return Err(FeatureHostError::Contract(format!(
+                "\"{}\" belongs to a plugin you did not publish.",
+                metadata.display_name
+            )));
+        }
+        let team_id = snapshot.marketplace_team_id.ok_or_else(|| {
+            FeatureHostError::Contract(format!(
+                "\"{}\" is not in a team marketplace.",
+                metadata.display_name
+            ))
+        })?;
+        let summary = load_workflow_summary(&cache_root, agent_root, agent_id, "skill")
+            .ok_or_else(|| FeatureHostError::Contract(
+                "That published skill's local cache is unavailable.".into()
+            ))?;
+        let bytes = pack_workflow_plugin_artifact(
+            &cache_root.join("skill"),
+            &metadata.original_workflow_id,
+            &summary.name,
+        )?;
+        Ok(json!({
+            "workflowId": workflow_id,
+            "pluginId": snapshot.plugin_id,
+            "teamId": team_id,
+            "name": metadata.plugin_name,
+            "displayName": summary.name,
+            "description": summary.description,
+            "pluginTarGzBase64": base64::engine::general_purpose::STANDARD.encode(bytes),
+        }))
+    }
+
+    pub fn prepare_workflow_unpublish(
+        &self,
+        agent_id: &str,
+        workflow_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let workflow_root = self
+            .workflow_root_path
+            .as_deref()
+            .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("agent storage is unavailable".into()))?;
+        let facts = self
+            .state()?
+            .published_plugins_by_agent
+            .get(agent_id)
+            .cloned()
+            .unwrap_or_default();
+        let (snapshot, metadata, cache_root) =
+            find_published_workflow_cache(workflow_root, agent_id, workflow_id, &facts)
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "That published skill is no longer installed.".into()
+                ))?;
+        if !snapshot.published_by_current_user {
+            return Err(FeatureHostError::Contract(format!(
+                "\"{}\" belongs to a plugin you did not publish.",
+                metadata.display_name
+            )));
+        }
+        let team_id = snapshot.marketplace_team_id.ok_or_else(|| {
+            FeatureHostError::Contract(format!(
+                "\"{}\" is not in a team marketplace.",
+                metadata.display_name
+            ))
+        })?;
+        let restored = workflow_root.join(&metadata.original_workflow_id);
+        if restored.exists() {
+            return Err(FeatureHostError::Contract(format!(
+                "A private skill with id \"{}\" already exists; refusing to overwrite it.",
+                metadata.original_workflow_id
+            )));
+        }
+        let temp_restore = workflow_root.join(format!(
+            ".restore-{}-{}",
+            metadata.original_workflow_id,
+            Uuid::new_v4()
+        ));
+        let restore_result = (|| {
+            copy_workflow_tree(&cache_root.join("skill"), &temp_restore)?;
+            std::fs::rename(&temp_restore, &restored).map_err(|error| {
+                FeatureHostError::Contract(format!("restore private skill: {error}"))
+            })?;
+            Ok::<(), FeatureHostError>(())
+        })();
+        if restore_result.is_err() {
+            let _ = std::fs::remove_dir_all(&temp_restore);
+        }
+        restore_result?;
+        set_workflow_enabled(
+            agent_root,
+            agent_id,
+            &metadata.original_workflow_id,
+            metadata.enabled_before_publish,
+        )?;
+        Ok(json!({
+            "pluginId": snapshot.plugin_id,
+            "teamId": team_id,
+            "restoredWorkflowId": metadata.original_workflow_id,
+        }))
+    }
+
+    pub fn complete_workflow_unpublish(
+        &self,
+        agent_id: &str,
+        plugin_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let workflow_root = self
+            .workflow_root_path
+            .as_deref()
+            .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
+        let cache_root = published_workflow_cache_root(workflow_root, plugin_id)?;
+        if cache_root.exists() {
+            std::fs::remove_dir_all(&cache_root).map_err(|error| {
+                FeatureHostError::Contract(format!("remove unpublished skill cache: {error}"))
+            })?;
+        }
+        if let Some(plugins) = self
+            .state()?
+            .published_plugins_by_agent
+            .get_mut(agent_id)
+        {
+            plugins.retain(|plugin| plugin.plugin_id != plugin_id);
+        }
+        Ok(json!({"pluginId": plugin_id, "removed": true}))
     }
 
     pub fn set_scene_active(&self, active: bool) -> Result<Value, FeatureHostError> {
@@ -3779,9 +4130,9 @@ impl FeatureHostController {
         match command {
             FeatureCommand::WorkflowList { .. } => {
                 let mut workflows = list_workflow_summaries(workflow_root, agent_root, &agent_id);
-                let automations = {
+                let (automations, published_plugins) = {
                     let state = self.state()?;
-                    state
+                    let automations = state
                         .automations
                         .values()
                         .filter(|automation| {
@@ -3791,9 +4142,21 @@ impl FeatureHostController {
                                 .is_none_or(|owner| owner == agent_id.as_str())
                         })
                         .map(workflow_from_automation)
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>();
+                    let published_plugins = state
+                        .published_plugins_by_agent
+                        .get(&agent_id)
+                        .cloned()
+                        .unwrap_or_default();
+                    (automations, published_plugins)
                 };
                 workflows.extend(automations);
+                workflows.extend(published_workflow_summaries(
+                    workflow_root,
+                    agent_root,
+                    &agent_id,
+                    &published_plugins,
+                ));
                 workflows.truncate(WORKFLOW_UI_LIMIT);
                 self.state()?.events.push_back(HostEvent::WorkflowListed {
                     timestamp: timestamp(),
@@ -6860,6 +7223,7 @@ impl FeatureHostController {
             state.automation_operations.clear();
             state.background_operations.clear();
             state.automations = automations;
+            state.published_plugins_by_agent.clear();
             state.bots = bots;
             state.peer_messages = peer_messages;
             state.groups.clear();
@@ -11897,6 +12261,156 @@ fn write_workflow(
         .map_err(|error| FeatureHostError::Contract(format!("commit workflow: {error}")))?;
     load_workflow_summary(workflow_root, agent_root, agent_id, &id)
         .ok_or_else(|| FeatureHostError::Contract("workflow could not be reloaded".into()))
+}
+
+const PUBLISHED_WORKFLOW_CACHE_DIR: &str = ".published-plugin-skills";
+const PUBLISHED_WORKFLOW_CACHE_METADATA: &str = "metadata.json";
+
+fn is_exact_skill_publish_version(value: &str) -> bool {
+    let value = value.trim();
+    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn published_workflow_cache_root(
+    workflow_root: &Path,
+    plugin_id: &str,
+) -> Result<PathBuf, FeatureHostError> {
+    let safe = !plugin_id.is_empty()
+        && plugin_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_');
+    if !safe {
+        return Err(FeatureHostError::Contract(
+            "Published plugin id cannot be mapped to local storage.".into(),
+        ));
+    }
+    Ok(workflow_root.join(PUBLISHED_WORKFLOW_CACHE_DIR).join(plugin_id))
+}
+
+fn read_published_workflow_cache(
+    cache_root: &Path,
+) -> Option<PublishedWorkflowCacheMetadata> {
+    std::fs::read(cache_root.join(PUBLISHED_WORKFLOW_CACHE_METADATA))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+}
+
+fn write_published_workflow_cache(
+    cache_root: &Path,
+    metadata: &PublishedWorkflowCacheMetadata,
+) -> Result<(), FeatureHostError> {
+    std::fs::create_dir_all(cache_root).map_err(|error| {
+        FeatureHostError::Contract(format!("create published skill cache: {error}"))
+    })?;
+    let body = serde_json::to_vec_pretty(metadata).map_err(|error| {
+        FeatureHostError::Contract(format!("serialize published skill cache: {error}"))
+    })?;
+    std::fs::write(
+        cache_root.join(PUBLISHED_WORKFLOW_CACHE_METADATA),
+        [body.as_slice(), b"\n"].concat(),
+    )
+    .map_err(|error| {
+        FeatureHostError::Contract(format!("write published skill cache: {error}"))
+    })
+}
+
+fn copy_workflow_tree(source: &Path, target: &Path) -> Result<(), FeatureHostError> {
+    let metadata = std::fs::symlink_metadata(source).map_err(|error| {
+        FeatureHostError::Contract(format!("inspect skill source: {error}"))
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(FeatureHostError::Contract(
+            "Skill source must be a real directory and may not be a symlink.".into(),
+        ));
+    }
+    std::fs::create_dir_all(target).map_err(|error| {
+        FeatureHostError::Contract(format!("create skill copy target: {error}"))
+    })?;
+    for entry in std::fs::read_dir(source)
+        .map_err(|error| FeatureHostError::Contract(format!("read skill source: {error}")))?
+    {
+        let entry = entry.map_err(|error| {
+            FeatureHostError::Contract(format!("read skill source entry: {error}"))
+        })?;
+        let entry_type = entry.file_type().map_err(|error| {
+            FeatureHostError::Contract(format!("inspect skill source entry: {error}"))
+        })?;
+        if entry_type.is_symlink() {
+            return Err(FeatureHostError::Contract(
+                "Published skills may not contain symlinks.".into(),
+            ));
+        }
+        let destination = target.join(entry.file_name());
+        if entry_type.is_dir() {
+            copy_workflow_tree(&entry.path(), &destination)?;
+        } else if entry_type.is_file() {
+            std::fs::copy(entry.path(), destination).map_err(|error| {
+                FeatureHostError::Contract(format!("copy skill source entry: {error}"))
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn find_published_workflow_cache(
+    workflow_root: &Path,
+    agent_id: &str,
+    workflow_id: &str,
+    facts: &[PublishedPluginSnapshot],
+) -> Option<(PublishedPluginSnapshot, PublishedWorkflowCacheMetadata, PathBuf)> {
+    for fact in facts {
+        let Ok(cache_root) = published_workflow_cache_root(workflow_root, &fact.plugin_id) else {
+            continue;
+        };
+        let Some(metadata) = read_published_workflow_cache(&cache_root) else {
+            continue;
+        };
+        if metadata.agent_id == agent_id
+            && metadata.promoted_workflow_id == workflow_id
+            && metadata.plugin_id == fact.plugin_id
+            && cache_root.join("skill").join(WORKFLOW_FILENAME).is_file()
+        {
+            return Some((fact.clone(), metadata, cache_root));
+        }
+    }
+    None
+}
+
+fn published_workflow_summaries(
+    workflow_root: &Path,
+    agent_root: &Path,
+    agent_id: &str,
+    facts: &[PublishedPluginSnapshot],
+) -> Vec<WorkflowSummary> {
+    let mut workflows = Vec::new();
+    for fact in facts {
+        let Ok(cache_root) = published_workflow_cache_root(workflow_root, &fact.plugin_id) else {
+            continue;
+        };
+        let Some(metadata) = read_published_workflow_cache(&cache_root) else {
+            continue;
+        };
+        if metadata.agent_id != agent_id || metadata.plugin_id != fact.plugin_id {
+            continue;
+        }
+        let Some(mut summary) = load_workflow_summary(&cache_root, agent_root, agent_id, "skill")
+        else {
+            continue;
+        };
+        summary.id = metadata.promoted_workflow_id;
+        summary.source = WorkflowSource::Plugin;
+        summary.plugin_id = Some(fact.plugin_id.clone());
+        summary.published_by_current_user = fact.published_by_current_user;
+        summary.is_enabled_for_agent = fact.is_enabled_for_agent;
+        workflows.push(summary);
+    }
+    workflows.sort_by(|left, right| {
+        left.name
+            .to_ascii_lowercase()
+            .cmp(&right.name.to_ascii_lowercase())
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    workflows
 }
 
 fn normalize_marketplace_plugin_name(value: &str) -> String {
