@@ -424,4 +424,24 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "unknown"]], operationId: nil))
     }
 
+    func testTranscriptReactionProjectionFiltersMalformedRowsAndPreservesSelf() {
+        let projected = projectMobileTranscriptReactions([
+            ["emoji": "👍", "by": "me"],
+            ["emoji": "❤️", "by": "agent-2"],
+            ["emoji": " ", "by": "me"],
+            ["emoji": "😂", "by": ""],
+            ["emoji": 7, "by": "me"],
+        ])
+        XCTAssertEqual(projected, [
+            .init(emoji: "👍", by: "me"),
+            .init(emoji: "❤️", by: "agent-2"),
+        ])
+        XCTAssertEqual(
+            Set(projected.filter { $0.by == "me" }.map(\.emoji)),
+            Set(["👍"])
+        )
+        XCTAssertTrue(projectMobileTranscriptReactions(nil).isEmpty)
+        XCTAssertTrue(projectMobileTranscriptReactions("bad").isEmpty)
+    }
+
 }
