@@ -237,6 +237,8 @@ struct PublishedWorkflowCacheMetadata {
     description: String,
     marketplace_team_id: u64,
     enabled_before_publish: bool,
+    #[serde(default)]
+    unpublish_restore_prepared: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -958,6 +960,7 @@ impl FeatureHostController {
             description: summary.description.clone(),
             marketplace_team_id: team_id,
             enabled_before_publish: is_workflow_enabled(&agent_root, agent_id, workflow_id),
+            unpublish_restore_prepared: false,
         };
         let parent = cache_root.parent().ok_or_else(|| {
             FeatureHostError::Contract("Published skill cache path is invalid.".into())
@@ -1135,7 +1138,7 @@ impl FeatureHostController {
             .get(agent_id)
             .cloned()
             .unwrap_or_default();
-        let (snapshot, metadata, cache_root) =
+        let (snapshot, mut metadata, cache_root) =
             find_published_workflow_cache(workflow_root, agent_id, workflow_id, &facts)
                 .ok_or_else(|| FeatureHostError::Contract(
                     "That published skill is no longer installed.".into()
@@ -1154,10 +1157,30 @@ impl FeatureHostController {
         })?;
         let restored = workflow_root.join(&metadata.original_workflow_id);
         if restored.exists() {
-            return Err(FeatureHostError::Contract(format!(
-                "A private skill with id \"{}\" already exists; refusing to overwrite it.",
-                metadata.original_workflow_id
-            )));
+            if !metadata.unpublish_restore_prepared
+                || !restored.join(WORKFLOW_FILENAME).is_file()
+            {
+                return Err(FeatureHostError::Contract(format!(
+                    "A private skill with id \"{}\" already exists; refusing to overwrite it.",
+                    metadata.original_workflow_id
+                )));
+            }
+            return Ok(json!({
+                "pluginId": snapshot.plugin_id,
+                "teamId": team_id,
+                "restoredWorkflowId": metadata.original_workflow_id,
+                "restoreReused": true,
+            }));
+        }
+
+        // Persist the recovery intent before materializing the private copy.
+        // If the remote unpublish later fails (or the app exits between these
+        // steps), a retry can safely reuse or recreate only the copy that this
+        // Host prepared, while unrelated pre-existing private skills still
+        // fail closed above.
+        if !metadata.unpublish_restore_prepared {
+            metadata.unpublish_restore_prepared = true;
+            write_published_workflow_cache(&cache_root, &metadata)?;
         }
         let temp_restore = workflow_root.join(format!(
             ".restore-{}-{}",
@@ -1185,6 +1208,7 @@ impl FeatureHostController {
             "pluginId": snapshot.plugin_id,
             "teamId": team_id,
             "restoredWorkflowId": metadata.original_workflow_id,
+            "restoreReused": false,
         }))
     }
 
@@ -17232,6 +17256,18 @@ mod tests {
             cache_root.exists(),
             "published cache must remain until the remote unpublish succeeds"
         );
+
+        // A failed remote mutation leaves both the restored private copy and
+        // published cache in place. Retrying must reuse that Host-prepared
+        // recovery copy rather than dead-ending on its own safety check.
+        let retry_prepared = controller
+            .prepare_workflow_unpublish(agent_id, &promoted_id)
+            .expect("retry unpublish after remote failure");
+        assert_eq!(retry_prepared["pluginId"], plugin_id);
+        assert_eq!(retry_prepared["restoredWorkflowId"], workflow_id);
+        assert_eq!(retry_prepared["restoreReused"], true);
+        assert!(workflow_root.join(workflow_id).join(WORKFLOW_FILENAME).is_file());
+        assert!(cache_root.exists());
 
         controller
             .complete_workflow_unpublish(agent_id, plugin_id)
