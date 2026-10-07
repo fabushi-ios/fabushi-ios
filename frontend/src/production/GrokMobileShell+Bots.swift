@@ -16,7 +16,92 @@ internal func mobileBotDeleteDescription(_ bot: MobileBotSummary) -> String {
 extension GrokMobileShell {
     @MainActor
     func loadBots() async {
-        bots = await GrokMobileBotService(bridge: bridge).loadBots()
+        await refreshAccessRoster()
+    }
+
+    @MainActor
+    func refreshAccessRoster() async {
+        accessRosterGeneration = accessRosterGeneration == Int.max ? 1 : accessRosterGeneration + 1
+        let expectedGeneration = accessRosterGeneration
+        let expectedScope = mobileAccountScopeKey
+        let expectedReconnect = reconnectGeneration
+
+        let restored = AccessRosterPersistence.load(accountScopeKey: expectedScope)
+        if !restored.isEmpty {
+            bots = restored
+            accessRosterSnapshot = AccessRosterSnapshotProjection.restore(restored)
+            accessCoverFirstBox = FirstBoxGate.project(
+                previous: accessCoverFirstBox,
+                roster: firstBoxSnapshot(from: accessRosterSnapshot)
+            )
+        } else {
+            accessRosterSnapshot = .initial
+            accessCoverFirstBox = .initial
+        }
+        accessCoverAccess = .checking
+        accessRosterSnapshot = AccessRosterSnapshotProjection.beginFetch(accessRosterSnapshot)
+
+        do {
+            let live = try await GrokMobileBotService(bridge: bridge).loadCanonicalRoster()
+            try Task.checkCancellation()
+            guard accessRosterGeneration == expectedGeneration,
+                  mobileAccountScopeKey == expectedScope,
+                  reconnectGeneration == expectedReconnect
+            else { return }
+
+            bots = live
+            AccessRosterPersistence.save(live, accountScopeKey: expectedScope)
+            accessRosterSnapshot = AccessRosterSnapshotProjection.complete(
+                live,
+                previous: accessRosterSnapshot
+            )
+            accessCoverAccess = .init(state: .granted, reason: .none)
+            accessCoverFirstBox = FirstBoxGate.project(
+                previous: accessCoverFirstBox,
+                roster: firstBoxSnapshot(from: accessRosterSnapshot)
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            let access: AccessCoverSandAccess
+            do {
+                let result = try await bridge.request(method: "getSandAccessFresh")
+                access = AccessCoverModel.project(foundationValue: result.value)
+            } catch {
+                access = .unknown
+            }
+            guard accessRosterGeneration == expectedGeneration,
+                  mobileAccountScopeKey == expectedScope,
+                  reconnectGeneration == expectedReconnect
+            else { return }
+
+            accessCoverAccess = access
+            accessRosterSnapshot = AccessRosterSnapshotProjection.fail(
+                AccessRosterFailureClassifier.failure(for: error, access: access),
+                previous: accessRosterSnapshot
+            )
+            accessCoverFirstBox = FirstBoxGate.project(
+                previous: accessCoverFirstBox,
+                roster: firstBoxSnapshot(from: accessRosterSnapshot)
+            )
+        }
+    }
+
+    private func firstBoxSnapshot(
+        from roster: AccessRosterSnapshot
+    ) -> FirstBoxRosterSnapshot {
+        .init(
+            loadState: {
+                switch roster.loadState {
+                case .loading: return .loading
+                case .ready: return .ready
+                case .error: return .error
+                }
+            }(),
+            isShowingRestoredRoster: roster.isShowingRestoredRoster,
+            failureCode: roster.failure?.code,
+            failureTransportKind: roster.failure?.transportKind
+        )
     }
 
     @MainActor
