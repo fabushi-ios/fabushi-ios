@@ -259,6 +259,26 @@ impl AppHost {
                     .collect::<Result<Vec<_>, AppHostError>>()?;
                 Ok(Value::Array(tasks))
             }
+            "native.cloudAgent.pendingWakes" => serde_json::to_value(
+                self.feature
+                    .pending_cloud_agent_wakes()
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string())),
+            "native.cloudAgent.settleWake" => {
+                let agent_id = string_param(&params, "agentId")?;
+                let work_id = string_param(&params, "workId")?;
+                let status = string_param(&params, "status")?;
+                let result = params
+                    .get("result")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let settled = self
+                    .feature
+                    .settle_cloud_agent_wake(agent_id, work_id, status, result)
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                Ok(json!({"settled": settled}))
+            }
             "listAllAutomations" => self.list_all_automations(),
             "plugin.permissions" => self.plugin_permissions(params),
             "plugin.permission.grant" => self.set_permission(params, true),
