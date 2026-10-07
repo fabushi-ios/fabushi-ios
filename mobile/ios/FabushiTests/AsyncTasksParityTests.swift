@@ -50,8 +50,9 @@ final class AsyncTasksParityTests: XCTestCase {
             _ = try await client.getBackgroundComposerInfo(bcId: "bc-1")
             XCTFail("status request should have been intercepted")
         } catch {
+            let path = await recorder.value()
             XCTAssertEqual(
-                await recorder.value(),
+                path,
                 "/aiserver.v1.BackgroundComposerService/GetBackgroundComposerInfo"
             )
         }
