@@ -584,6 +584,14 @@ fn queue_active_agent_automation_projection(state: &mut FeatureState, agent_id: 
     true
 }
 
+fn account_boundary_requires_runtime_reset(
+    initialized: bool,
+    active_account_id: &Option<String>,
+    next_account_id: &Option<String>,
+) -> bool {
+    initialized && active_account_id != next_account_id
+}
+
 pub struct FeatureHostController {
     config: HostConfig,
     info: HostInfo,
@@ -7090,19 +7098,22 @@ impl FeatureHostController {
         let auth = auth_payload(response);
         let logged_in = auth.get("loggedIn").and_then(Value::as_bool) == Some(true);
         let next_account_id = logged_in.then(|| auth_account_id(auth)).flatten();
-        let first_boundary = !*self
+        let initialized = *self
             .account_boundary_initialized
             .lock()
             .map_err(|_| FeatureHostError::StatePoisoned)?;
-        let changed = {
+        let (changed, reset_runtime) = {
             let active = self
                 .active_account_id
                 .lock()
                 .map_err(|_| FeatureHostError::StatePoisoned)?;
-            *active != next_account_id
+            (
+                *active != next_account_id,
+                account_boundary_requires_runtime_reset(initialized, &active, &next_account_id),
+            )
         };
         if changed {
-            if !first_boundary {
+            if reset_runtime {
                 self.retire_routines_for_account_change()?;
                 self.retire_background_recoveries_for_account_change()?;
                 self.runtime()?.reset_session()?;
@@ -14105,6 +14116,20 @@ fn actor_id_for_account_id(account_id: &str) -> ActorId {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn initial_persisted_account_preserves_runtime_checkpoint_but_later_replacement_resets() {
+        let none = None;
+        let account_a = Some("account-a".to_string());
+        let account_b = Some("account-b".to_string());
+
+        assert!(!account_boundary_requires_runtime_reset(false, &none, &account_a));
+        assert!(!account_boundary_requires_runtime_reset(false, &none, &none));
+        assert!(!account_boundary_requires_runtime_reset(true, &account_a, &account_a));
+        assert!(account_boundary_requires_runtime_reset(true, &account_a, &account_b));
+        assert!(account_boundary_requires_runtime_reset(true, &account_a, &none));
+        assert!(account_boundary_requires_runtime_reset(true, &none, &account_a));
+    }
     use mahayana_host_protocol::ApprovalDecision;
 
     #[cfg(feature = "production")]
