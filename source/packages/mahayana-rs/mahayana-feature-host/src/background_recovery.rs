@@ -201,11 +201,113 @@ impl FeatureHostController {
         Ok(())
     }
 
+    fn mark_background_recovery_required(&self, operation_id: &str) -> Result<(), FeatureHostError> {
+        let mut state = self.state()?;
+        if let Some(execution) = state.background_recoveries.get_mut(operation_id) {
+            execution.phase = BackgroundRecoveryPhase::RecoveryRequired;
+            state.background_operations.remove(operation_id);
+            state.operations.remove(operation_id);
+            state.operation_agents.remove(operation_id);
+            self.persist_background_recoveries(&state)?;
+        }
+        Ok(())
+    }
+
+    fn retire_background_recoveries_for_account_change(&self) -> Result<(), FeatureHostError> {
+        let mut state = self.state()?;
+        if !state.background_recoveries.is_empty() {
+            state.background_recoveries.clear();
+            state.background_operations.clear();
+            self.persist_background_recoveries(&state)?;
+        }
+        Ok(())
+    }
+
     fn settle_background_recovery(&self, operation_id: &str) -> Result<(), FeatureHostError> {
         let mut state = self.state()?;
         if state.background_recoveries.remove(operation_id).is_some() {
             self.persist_background_recoveries(&state)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod background_recovery_tests {
+    use super::*;
+
+    #[test]
+    fn suspended_background_recreate_keeps_owner_and_operation_identity() {
+        let root = std::env::temp_dir().join(format!("background-recovery-{}", Uuid::new_v4()));
+        let mut host = FeatureHostController::create(
+            HostConfig { profile_id: Uuid::new_v4().to_string(), mode: HostMode::Test },
+            SurfacePlatform::Electron,
+        ).expect("Host");
+        host.automation_path = Some(root.join("automations.json"));
+        let assistant = host.state().expect("state").bots["mahayana-assistant"].clone();
+        let conversation_id = assistant.conversation_id.clone().expect("assistant conversation");
+        {
+            let mut state = host.state().expect("state");
+            let epoch = state.routine_epoch;
+            state.background_recoveries.insert("background-operation:stable".into(), BackgroundRecoveryExecution {
+                operation_id: "background-operation:stable".into(),
+                conversation_id,
+                account_key: None,
+                epoch,
+                agent_id: assistant.id.clone(),
+                agent_name: assistant.name.clone(),
+                source: "agent-message".into(),
+                teach_artifact: None,
+                phase: BackgroundRecoveryPhase::Suspended,
+            });
+            host.persist_background_recoveries(&state).expect("persist background journal");
+            state.background_recoveries.clear();
+            state.background_operations.clear();
+            state.operations.clear();
+            state.operation_agents.clear();
+            state.routine_epoch = epoch + 1;
+        }
+        host.restore_background_recoveries().expect("restore background journal");
+        let state = host.state().expect("state");
+        assert_eq!(state.background_recoveries["background-operation:stable"].phase, BackgroundRecoveryPhase::Suspended);
+        assert!(state.background_operations.contains_key("background-operation:stable"));
+        assert!(state.operations.contains("background-operation:stable"));
+        assert_eq!(state.operation_agents["background-operation:stable"], assistant.id);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn abrupt_test_background_never_blindly_replays() {
+        let root = std::env::temp_dir().join(format!("background-recovery-fail-closed-{}", Uuid::new_v4()));
+        let mut host = FeatureHostController::create(
+            HostConfig { profile_id: Uuid::new_v4().to_string(), mode: HostMode::Test },
+            SurfacePlatform::Electron,
+        ).expect("Host");
+        host.automation_path = Some(root.join("automations.json"));
+        let assistant = host.state().expect("state").bots["mahayana-assistant"].clone();
+        let conversation_id = assistant.conversation_id.clone().expect("assistant conversation");
+        {
+            let mut state = host.state().expect("state");
+            let epoch = state.routine_epoch;
+            state.background_recoveries.insert("background-operation:ambiguous".into(), BackgroundRecoveryExecution {
+                operation_id: "background-operation:ambiguous".into(),
+                conversation_id,
+                account_key: None,
+                epoch,
+                agent_id: assistant.id,
+                agent_name: assistant.name,
+                source: "broadcast".into(),
+                teach_artifact: None,
+                phase: BackgroundRecoveryPhase::Running,
+            });
+            host.persist_background_recoveries(&state).expect("persist running background");
+            state.background_recoveries.clear();
+            state.routine_epoch = epoch + 1;
+        }
+        host.restore_background_recoveries().expect("restore background journal");
+        let state = host.state().expect("state");
+        assert_eq!(state.background_recoveries["background-operation:ambiguous"].phase, BackgroundRecoveryPhase::RecoveryRequired);
+        assert!(!state.operations.contains("background-operation:ambiguous"));
+        let _ = std::fs::remove_dir_all(root);
     }
 }

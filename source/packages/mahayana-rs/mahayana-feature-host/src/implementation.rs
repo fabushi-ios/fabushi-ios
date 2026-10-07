@@ -3406,7 +3406,7 @@ impl FeatureHostController {
             );
             self.persist_background_recoveries(&state)?;
         }
-        let accepted = self.runtime()?.start_recoverable_message(mahayana_conversation::SendMessageRequest {
+        let accepted = match self.runtime()?.start_recoverable_message(mahayana_conversation::SendMessageRequest {
             conversation_id: ConversationId(conversation_id),
             operation_id: OperationId(operation_id.clone()),
             text: prompt,
@@ -3420,7 +3420,13 @@ impl FeatureHostController {
             attachment_batch_id: (!selected_image_data_urls.is_empty())
                 .then(|| format!("attachment-batch:{client_message_id}")),
             selected_image_data_urls,
-        })?;
+        }) {
+            Ok(operation_id) => operation_id,
+            Err(error) => {
+                self.mark_background_recovery_required(&operation_id)?;
+                return Err(error.into());
+            }
+        };
         if accepted.as_str() != operation_id {
             return Err(FeatureHostError::Contract("runtime changed preassigned background operation identity".into()));
         }
@@ -7085,6 +7091,7 @@ impl FeatureHostController {
         };
         if changed {
             self.retire_routines_for_account_change()?;
+            self.retire_background_recoveries_for_account_change()?;
             self.runtime()?.reset_session()?;
             let account_id = next_account_id.as_deref();
             let automations = self
@@ -7178,6 +7185,9 @@ impl FeatureHostController {
             // provider process/thread.
             self.runtime()?
                 .warmup_conversation(ConversationId(MAHAYANA_AI_CONVERSATION_ID.to_string()))?;
+            if !self.state()?.routine_quiescing {
+                self.resume_suspended_background_operations()?;
+            }
         }
         Ok(())
     }
