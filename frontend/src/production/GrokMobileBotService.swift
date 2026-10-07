@@ -90,21 +90,23 @@ struct GrokMobileBotService {
     }
 
     func setBotHidden(id: String, hidden: Bool) async throws -> [MobileBotSummary] {
-        try await executeBotMutation([
-            "type": "bot.setHidden",
-            "requestId": "ios-mobile-bot-hidden-\(UUID().uuidString.lowercased())",
-            "id": id,
-            "hidden": hidden,
-        ])
+        try await executeBotMutation(
+            Self.setHiddenCommand(
+                id: id,
+                hidden: hidden,
+                requestId: "ios-mobile-bot-hidden-\(UUID().uuidString.lowercased())"
+            )
+        )
     }
 
     func setBotUnread(id: String, unread: Bool) async throws -> [MobileBotSummary] {
-        try await executeBotMutation([
-            "type": "bot.update",
-            "requestId": "ios-mobile-bot-unread-\(UUID().uuidString.lowercased())",
-            "id": id,
-            "unread": unread,
-        ])
+        try await executeBotMutation(
+            Self.setUnreadCommand(
+                id: id,
+                unread: unread,
+                requestId: "ios-mobile-bot-unread-\(UUID().uuidString.lowercased())"
+            )
+        )
     }
 
     func asyncTasks(agentId: String) async throws -> [MobileAgentAsyncTask] {
@@ -280,6 +282,32 @@ struct GrokMobileBotService {
             "type": "bot.delete",
             "requestId": requestId,
             "id": id,
+        ]
+    }
+
+    static func setHiddenCommand(
+        id: String,
+        hidden: Bool,
+        requestId: String
+    ) -> [String: Any] {
+        [
+            "type": "bot.setHidden",
+            "requestId": requestId,
+            "id": id,
+            "hidden": hidden,
+        ]
+    }
+
+    static func setUnreadCommand(
+        id: String,
+        unread: Bool,
+        requestId: String
+    ) -> [String: Any] {
+        [
+            "type": "bot.update",
+            "requestId": requestId,
+            "id": id,
+            "unread": unread,
         ]
     }
 
