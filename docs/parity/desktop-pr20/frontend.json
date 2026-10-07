@@ -1121,13 +1121,13 @@
       "desktop_owner": "renderer Agent-info Channels controller over canonical Coordinator channel RPCs",
       "desktop_visible_effect": "Users see which messaging platforms are available/coming soon, current connection identity/errors, can securely connect/reconnect/refresh/disconnect, and do not receive stale results after changing Agent or closing the panel.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/channels.swift; frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs",
       "ios_language": "Swift/SwiftUI",
-      "ios_platform_delta": "iOS already carries shared connector manifest/address/persistence contracts, but no production Agent-info controller or getAgentChannels/connectChannel/disconnectChannel/refreshChannel RPC surface exists. Shared-room/channel-delivery infrastructure is a different responsibility and is not accepted as this management UI.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/shared/channels.swift; source/shared/channel-messaging.swift",
-      "test_evidence": "mobile/ios/FabushiTests/SharedChannelsPersistenceParityTests.swift",
-      "notes": "Partial shared channel contracts only. Real gap is the Agent-scoped connection-management owner and canonical credential mutation RPC path."
+      "ios_platform_delta": "Rust Feature Host now owns account/Agent-scoped channel metadata plus encrypted credential storage and exposes UI-safe list/connect/disconnect/refresh semantics; Swift decodes and generation-fences the native Agent Settings projection without retaining token truth.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift; frontend/src/production/MobileBotAgentSettings.swift; source/shared/channels.swift",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs; mobile/ios/FabushiTests/AgentChannelsParityTests.swift; mobile/ios/FabushiTests/SharedChannelsPersistenceParityTests.swift",
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Credentials are stored separately in the existing Mahayana encrypted secret backend and never serialized to Swift; metadata is account/Agent scoped. Current exact-head ordinary/protected CI and artifact provenance are still required before verified promotion."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/channels/view.css",
@@ -1136,13 +1136,13 @@
       "desktop_owner": "renderer channels presentation CSS",
       "desktop_visible_effect": "Channel setup and status controls have the shipping layout, focus treatment, disabled states and readable detail hierarchy.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
+      "ios_target_path": "frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift",
       "ios_language": "SwiftUI",
-      "ios_platform_delta": "SwiftUI would replace CSS styling, but there is no shipping Agent-info Channels management surface yet, so no native presentation can be accepted from shared channel helpers alone.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Presentation remains a real gap until the channels model/controller and RPC owner exist."
+      "ios_platform_delta": "Native SwiftUI List/Section/SecureField/Button presentation replaces Desktop CSS while preserving readable status hierarchy, secure credential entry, disabled/pending states and setup-guide disclosure.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift; frontend/src/production/MobileBotAgentSettings.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AgentChannelsParityTests.swift",
+      "notes": "Native presentation now ships from Agent Settings, but remains implemented rather than verified until same-head ordinary/protected acceptance succeeds."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/channels/view.tsx",
@@ -1151,13 +1151,13 @@
       "desktop_owner": "renderer Agent-info Channels view",
       "desktop_visible_effect": "A user can inspect and manage each Agent's external messaging platform connection from Agent Info.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
+      "ios_target_path": "frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift",
       "ios_language": "SwiftUI",
-      "ios_platform_delta": "No equivalent native management view is currently shipping. Existing shared-room UI and channel outbound/inbound helpers do not expose per-Agent credential connection management.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Do not build a UI-only demo before canonical channel-management RPCs and controller semantics are present."
+      "ios_platform_delta": "A native SwiftUI panel is reachable from shipping Agent Settings and composes strict connection decoding, previous-snapshot retention, generation fencing, SecureField credential entry, connect/reconnect/refresh/disconnect actions, setup guidance and coming-soon fail-closed behavior over the Rust Host owner.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift; frontend/src/production/MobileBotAgentSettings.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AgentChannelsParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs",
+      "notes": "The UI does not manufacture connector availability: built-in Discord/Slack manifests remain coming-soon until their real runtime connector support ships. Same-head CI is required before verified promotion."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/bridge.ts",
