@@ -27,6 +27,7 @@ flate2.workspace = true
 fabushi-messaging-core.workspace = true
 mahayana-core.workspace = true
 mahayana-computer.workspace = true
+mahayana-conversation.workspace = true
 mahayana-harness.workspace = true
 mahayana-harness-services.workspace = true
 mahayana-host = { workspace = true, default-features = false, optional = true }

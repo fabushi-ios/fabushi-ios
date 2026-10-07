@@ -414,7 +414,11 @@ impl FeatureHostController {
         let Some(operation_id) = execution.operation_id.clone() else {
             return Err(FeatureHostError::Contract("suspended routine is missing operation identity".into()));
         };
-        if !routine_owner_matches(&self.state()?, execution, self.config.mode == HostMode::Test) {
+        let owner_matches = {
+            let state = self.state()?;
+            routine_owner_matches(&state, execution, self.config.mode == HostMode::Test)
+        };
+        if !owner_matches {
             return Err(FeatureHostError::Contract("suspended routine owner changed before resume".into()));
         }
         if self.config.mode == HostMode::Production {
@@ -497,15 +501,25 @@ impl FeatureHostController {
             }
         }
         state.routine_executions = restored;
-        for execution in state.routine_executions.values() {
-            if execution.phase == RoutinePhase::Suspended {
-                if let Some(operation_id) = &execution.operation_id {
-                    state.automation_operations.insert(operation_id.clone(), (execution.automation_id.clone(), execution.run_id.clone()));
-                    state.routine_operation_epochs.insert(operation_id.clone(), execution.epoch);
-                    state.operations.insert(operation_id.clone());
-                    state.operation_agents.insert(operation_id.clone(), execution.agent_id.clone());
-                }
-            }
+        let suspended_mappings = state
+            .routine_executions
+            .values()
+            .filter(|execution| execution.phase == RoutinePhase::Suspended)
+            .filter_map(|execution| {
+                execution.operation_id.clone().map(|operation_id| (
+                    operation_id,
+                    execution.automation_id.clone(),
+                    execution.run_id.clone(),
+                    execution.epoch,
+                    execution.agent_id.clone(),
+                ))
+            })
+            .collect::<Vec<_>>();
+        for (operation_id, automation_id, run_id, epoch, agent_id) in suspended_mappings {
+            state.automation_operations.insert(operation_id.clone(), (automation_id, run_id));
+            state.routine_operation_epochs.insert(operation_id.clone(), epoch);
+            state.operations.insert(operation_id.clone());
+            state.operation_agents.insert(operation_id, agent_id);
         }
         Self::trim_routine_terminals(&mut state);
         self.persist_automations(&state.automations)?; self.persist_routine_executions(&state)?; Ok(())
