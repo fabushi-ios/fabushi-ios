@@ -10357,9 +10357,9 @@
     {
       "desktop_path": "source/host/tests/cloud_agent_pending_wake_rearm_production_contract.rs",
       "desktop_blob_sha": "8e79206f5da1a70a6a0bdf42dd17be190eeb575c",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Production integration contract proving shipping Host startup rearms durable cloud-agent, interrupted shell, and lost-subagent wakes through the canonical pending-wake owner, and persists generated-subagent wake identity before provider execution.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "After Host recreation, shipping cloud work is re-watched, interrupted shell/lost-subagent completion is delivered through canonical revival paths, and newly generated subagents cannot run before durable pending-wake state exists.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "ios_language": "Rust",
