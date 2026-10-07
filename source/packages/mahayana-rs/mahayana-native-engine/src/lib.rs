@@ -4301,7 +4301,7 @@ mod tests {
         std::fs::remove_dir_all(workspace).expect("cleanup");
     }
 
-    #[tokio::test]
+    #[test]
     fn session_reset_cleanup_removes_every_conversation_snapshot_only() {
         let root = std::env::temp_dir().join(format!(
             "mahayana-native-session-cleanup-{}",
