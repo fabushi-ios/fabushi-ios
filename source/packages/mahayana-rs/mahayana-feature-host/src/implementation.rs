@@ -1145,8 +1145,8 @@ impl FeatureHostController {
                     payload: json!({
                         "agentId": agent_id,
                         "entryId": entry_id,
-                        "reactions": reaction_rows,
-                        "myReactions": my_reactions,
+                        "reactions": reaction_rows.clone(),
+                        "myReactions": my_reactions.clone(),
                     }),
                 });
             }
