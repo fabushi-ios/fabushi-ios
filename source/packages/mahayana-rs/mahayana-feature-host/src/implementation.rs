@@ -17012,4 +17012,142 @@ mod tests {
             "only explicit assistant open may clear assistant unread"
         );
     }
+
+    #[test]
+    fn published_workflow_lifecycle_keeps_private_until_exact_confirmation_and_restores_before_unpublish() {
+        let profile = format!("skill-publish-lifecycle-{}", Uuid::new_v4());
+        let controller = FeatureHostController::create_test_backend(
+            HostConfig {
+                profile_id: profile,
+                mode: HostMode::Test,
+            },
+            SurfacePlatform::Ios,
+            None,
+        );
+        let workflow_root = controller
+            .workflow_root_path
+            .as_deref()
+            .expect("workflow root")
+            .to_path_buf();
+        let agent_root = controller
+            .active_account_root(controller.memory_root_path.as_deref())
+            .expect("agent root");
+        let agent_id = "mahayana-assistant";
+        let workflow_id = "release-check";
+        let plugin_id = "9001";
+        let commit_sha = "abcdef0123456789abcdef0123456789abcdef01";
+        let other_sha = "1111111111111111111111111111111111111111";
+
+        let _ = std::fs::remove_dir_all(&workflow_root);
+        write_workflow(
+            &workflow_root,
+            &agent_root,
+            agent_id,
+            Some(workflow_id),
+            "Release check",
+            "Verify exact production evidence before shipping.",
+            "Inspect the release and its acceptance evidence.",
+            None,
+            None,
+        )
+        .expect("create private workflow");
+
+        controller
+            .sync_workflow_plugin_facts(
+                agent_id,
+                json!([{
+                    "pluginId": plugin_id,
+                    "pluginVersion": other_sha,
+                    "name": "release-check",
+                    "displayName": "Release check",
+                    "publishedByCurrentUser": true,
+                    "marketplaceTeamId": 7,
+                    "isEnabledForAgent": true
+                }]),
+            )
+            .expect("sync non-matching authoritative plugin facts");
+        let unconfirmed = controller
+            .confirm_workflow_publish(agent_id, workflow_id, plugin_id, commit_sha)
+            .expect("unconfirmed publish remains non-destructive");
+        assert_eq!(unconfirmed["confirmed"], false);
+        assert!(
+            workflow_root.join(workflow_id).join(WORKFLOW_FILENAME).is_file(),
+            "private copy must remain before exact pluginId + commit SHA confirmation"
+        );
+
+        controller
+            .sync_workflow_plugin_facts(
+                agent_id,
+                json!([{
+                    "pluginId": plugin_id,
+                    "pluginVersion": commit_sha,
+                    "name": "release-check",
+                    "displayName": "Release check",
+                    "publishedByCurrentUser": true,
+                    "marketplaceTeamId": 7,
+                    "isEnabledForAgent": true
+                }]),
+            )
+            .expect("sync exact authoritative plugin facts");
+        let confirmed = controller
+            .confirm_workflow_publish(agent_id, workflow_id, plugin_id, commit_sha)
+            .expect("promote confirmed publish");
+        assert_eq!(confirmed["confirmed"], true);
+        let promoted_id = confirmed["promotedWorkflowId"]
+            .as_str()
+            .expect("promoted workflow id")
+            .to_string();
+        assert!(
+            !workflow_root.join(workflow_id).exists(),
+            "private copy is removed only after authoritative confirmation"
+        );
+        let cache_root =
+            published_workflow_cache_root(&workflow_root, plugin_id).expect("cache root");
+        assert!(cache_root.join("skill").join(WORKFLOW_FILENAME).is_file());
+
+        let facts = controller
+            .state()
+            .expect("state")
+            .published_plugins_by_agent
+            .get(agent_id)
+            .cloned()
+            .expect("published facts");
+        let projected = published_workflow_summaries(
+            &workflow_root,
+            &agent_root,
+            agent_id,
+            &facts,
+        );
+        assert_eq!(projected.len(), 1);
+        assert_eq!(projected[0].id, promoted_id);
+        assert_eq!(projected[0].source, WorkflowSource::Plugin);
+        assert_eq!(projected[0].plugin_id.as_deref(), Some(plugin_id));
+        assert!(projected[0].published_by_current_user);
+
+        let prepared = controller
+            .prepare_workflow_unpublish(agent_id, &promoted_id)
+            .expect("restore private copy before remote unpublish");
+        assert_eq!(prepared["pluginId"], plugin_id);
+        assert_eq!(prepared["teamId"], 7);
+        assert_eq!(prepared["restoredWorkflowId"], workflow_id);
+        assert!(
+            workflow_root.join(workflow_id).join(WORKFLOW_FILENAME).is_file(),
+            "private copy must exist before the remote unpublish mutation"
+        );
+        assert!(
+            cache_root.exists(),
+            "published cache must remain until the remote unpublish succeeds"
+        );
+
+        controller
+            .complete_workflow_unpublish(agent_id, plugin_id)
+            .expect("complete remote unpublish");
+        assert!(!cache_root.exists());
+        assert!(
+            workflow_root.join(workflow_id).join(WORKFLOW_FILENAME).is_file(),
+            "successful unpublish must preserve the restored private copy"
+        );
+        let _ = std::fs::remove_dir_all(&workflow_root);
+    }
+
 }
