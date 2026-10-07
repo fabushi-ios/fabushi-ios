@@ -30,7 +30,7 @@ use mahayana_orchestrator::{
 use mahayana_workspace_engine::WorkspaceEngine;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
@@ -1825,6 +1825,8 @@ impl EngineBackend for NativeEngine {
                     approvals: ApprovalLedger::default(),
                     loop_state: LoopState::default(),
                     attempts: Vec::new(),
+                    inflight_tool: None,
+                    completed_outputs: BTreeMap::new(),
                     updated_at_ms: request
                         .metadata
                         .get("transcriptUpdatedAtMs")
