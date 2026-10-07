@@ -444,4 +444,63 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertTrue(projectMobileTranscriptReactions("bad").isEmpty)
     }
 
+    func testReactionPillsPreserveFirstSeenEmojiOrderAndDeduplicateReactors() {
+        let pills = projectMobileReactionPills([
+            .init(emoji: "❤️", by: "agent-2"),
+            .init(emoji: "👍", by: "me"),
+            .init(emoji: "❤️", by: "agent-3"),
+            .init(emoji: "❤️", by: "agent-2"),
+        ])
+        XCTAssertEqual(pills.map(\.emoji), ["❤️", "👍"])
+        XCTAssertEqual(pills[0].count, 2)
+        XCTAssertEqual(pills[0].reactors, ["agent-2", "agent-3"])
+        XCTAssertFalse(pills[0].chosenByMe)
+        XCTAssertTrue(pills[1].chosenByMe)
+    }
+
+    func testReactionInputUsesDesktopUtf16BoundAndTransportIsAgentScoped() {
+        XCTAssertEqual(normalizeMobileReactionInput(" 👍 "), "👍")
+        XCTAssertNotNil(normalizeMobileReactionInput(String(repeating: "😀", count: 8)))
+        XCTAssertNil(normalizeMobileReactionInput(String(repeating: "😀", count: 9)))
+        XCTAssertNil(normalizeMobileReactionInput("   "))
+
+        var messages = [
+            MobileChatMessage(
+                id: "local-user-1",
+                role: .user,
+                text: "thanks",
+                canonicalMessageId: "canonical-user-1"
+            )
+        ]
+        let event: [String: Any] = [
+            "type": "host.transport",
+            "channel": "transcript.reaction",
+            "payload": [
+                "agentId": "agent-1",
+                "entryId": "canonical-user-1",
+                "reactions": [
+                    ["emoji": "👍", "by": "assistant"],
+                    ["emoji": "❤️", "by": "me"],
+                ],
+                "myReactions": ["❤️"],
+            ],
+        ]
+        XCTAssertFalse(
+            applyMobileTranscriptReactionEvent(
+                event,
+                agentId: "other-agent",
+                messages: &messages
+            )
+        )
+        XCTAssertTrue(
+            applyMobileTranscriptReactionEvent(
+                event,
+                agentId: "agent-1",
+                messages: &messages
+            )
+        )
+        XCTAssertEqual(messages[0].reactions.count, 2)
+        XCTAssertEqual(messages[0].myReactions, Set(["❤️"]))
+    }
+
 }

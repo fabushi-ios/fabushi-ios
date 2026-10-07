@@ -104,6 +104,101 @@ impl ConversationState {
     }
 }
 
+const REACTION_MESSAGE_REFERENCE_LIMIT: usize = 32;
+const REACTION_MESSAGE_EXCERPT_CHARS: usize = 120;
+const MODEL_REACTION_ACTOR: &str = "assistant";
+
+fn reaction_message_excerpt(text: &str) -> String {
+    let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut excerpt = normalized
+        .chars()
+        .take(REACTION_MESSAGE_EXCERPT_CHARS)
+        .collect::<String>();
+    if normalized.chars().count() > REACTION_MESSAGE_EXCERPT_CHARS {
+        excerpt.push('…');
+    }
+    excerpt
+}
+
+fn reaction_message_refs(history: &[Message], conversation_id: &ConversationId) -> Vec<Value> {
+    let mut refs = history
+        .iter()
+        .rev()
+        .filter(|message| {
+            &message.conversation_id == conversation_id && message.role == MessageRole::User
+        })
+        .take(REACTION_MESSAGE_REFERENCE_LIMIT)
+        .map(|message| {
+            json!({
+                "id": message.id.as_str(),
+                "text": reaction_message_excerpt(&message.text),
+            })
+        })
+        .collect::<Vec<_>>();
+    refs.reverse();
+    refs
+}
+
+fn toggle_model_reaction(
+    history: &mut [Message],
+    conversation_id: &ConversationId,
+    message_id: &str,
+    emoji: &str,
+) -> Result<(bool, Vec<Value>, Vec<Value>), KernelError> {
+    let message = history
+        .iter_mut()
+        .find(|message| {
+            &message.conversation_id == conversation_id
+                && message.id.as_str() == message_id
+                && message.role == MessageRole::User
+        })
+        .ok_or_else(|| {
+            KernelError::Backend(format!(
+                "react_to_message target is not a live canonical user message: {message_id}"
+            ))
+        })?;
+    let mut reactions = message
+        .metadata
+        .get("reactions")
+        .and_then(Value::as_array)
+        .map(|rows| {
+            rows.iter()
+                .filter(|row| {
+                    row.get("emoji").and_then(Value::as_str).is_some_and(|value| !value.trim().is_empty())
+                        && row.get("by").and_then(Value::as_str).is_some_and(|value| !value.trim().is_empty())
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let existing = reactions.iter().position(|row| {
+        row.get("emoji").and_then(Value::as_str) == Some(emoji)
+            && row.get("by").and_then(Value::as_str) == Some(MODEL_REACTION_ACTOR)
+    });
+    let is_adding = if let Some(index) = existing {
+        reactions.remove(index);
+        false
+    } else {
+        reactions.push(json!({"emoji": emoji, "by": MODEL_REACTION_ACTOR}));
+        true
+    };
+    if !message.metadata.is_object() {
+        message.metadata = json!({});
+    }
+    message
+        .metadata
+        .as_object_mut()
+        .expect("reaction metadata object")
+        .insert("reactions".into(), Value::Array(reactions.clone()));
+    let my_reactions = reactions
+        .iter()
+        .filter(|row| row.get("by").and_then(Value::as_str) == Some("me"))
+        .filter_map(|row| row.get("emoji").and_then(Value::as_str))
+        .map(|emoji| Value::String(emoji.to_string()))
+        .collect::<Vec<_>>();
+    Ok((is_adding, reactions, my_reactions))
+}
+
 fn history_request_marks_read(limit: u32) -> bool {
     limit == OPEN_CONVERSATION_HISTORY_LIMIT
 }
@@ -451,6 +546,12 @@ impl ConversationProvider for KernelConversationProvider {
                 .push(user_message);
             persist_history(&self.state, self.history_path.as_deref()).map_err(kernel_error)?;
         }
+        let reaction_message_refs = {
+            let state = self.state.lock().map_err(|_| {
+                ConversationError::Provider("kernel conversation state mutex poisoned".into())
+            })?;
+            reaction_message_refs(&state.history, &request.conversation_id)
+        };
 
         let kernel_operation_id = KernelOperationId::from_string(request.operation_id.as_str());
         let conversation_key = request.conversation_id.as_str().to_string();
@@ -518,6 +619,7 @@ impl ConversationProvider for KernelConversationProvider {
                         "isFork": request.is_fork,
                         "attachmentBatchId": request.attachment_batch_id,
                         "selectedImageDataUrls": request.selected_image_data_urls,
+                        "reactionMessageRefs": reaction_message_refs,
                         "hidden": request.hidden,
                         "showAssistantOutput": request.show_assistant_output,
                     }),
@@ -880,10 +982,50 @@ impl KernelEventSink for RuntimeKernelEventBridge {
             KernelEvent::ToolCompleted {
                 tool_call_id,
                 tool,
-                output,
+                mut output,
                 success,
                 ..
             } => {
+                if tool == "react_to_message"
+                    && success
+                    && output.get("applied").and_then(Value::as_bool) == Some(true)
+                {
+                    let message_id = output
+                        .get("messageId")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| {
+                            KernelError::Backend(
+                                "react_to_message completed without a canonical messageId".into(),
+                            )
+                        })?
+                        .to_string();
+                    let emoji = output
+                        .get("emoji")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| {
+                            KernelError::Backend(
+                                "react_to_message completed without an emoji".into(),
+                            )
+                        })?
+                        .to_string();
+                    let (is_adding, reactions, my_reactions) = {
+                        let mut state = self.state.lock().map_err(|_| {
+                            KernelError::Backend(
+                                "kernel conversation state mutex poisoned".into(),
+                            )
+                        })?;
+                        toggle_model_reaction(
+                            &mut state.history,
+                            &self.conversation_id,
+                            &message_id,
+                            &emoji,
+                        )?
+                    };
+                    persist_history(&self.state, self.history_path.as_deref())?;
+                    output["isAdding"] = Value::Bool(is_adding);
+                    output["reactions"] = Value::Array(reactions);
+                    output["myReactions"] = Value::Array(my_reactions);
+                }
                 if tool == "send_message" && success {
                     let mut state = self.state.lock().map_err(|_| {
                         KernelError::Backend("kernel conversation state mutex poisoned".into())
@@ -1188,6 +1330,20 @@ mod tests {
         }
     }
 
+    #[test]
+    fn reaction_refs_are_bounded_to_canonical_user_messages() {
+        let conversation_id = conversation("mahayana-ai:agent:reaction-refs");
+        let other = conversation("mahayana-ai:agent:other");
+        let mut first = message(&conversation_id, MessageRole::User, "  hello   world  ");
+        first.id = MessageId("user-1".into());
+        let mut assistant = message(&conversation_id, MessageRole::Assistant, "assistant");
+        assistant.id = MessageId("assistant-1".into());
+        let mut other_user = message(&other, MessageRole::User, "other");
+        other_user.id = MessageId("other-1".into());
+        let refs = reaction_message_refs(&[first, assistant, other_user], &conversation_id);
+        assert_eq!(refs, vec![json!({"id":"user-1","text":"hello world"})]);
+    }
+
     #[derive(Default)]
     struct CapturedRuntimeEvents(Mutex<Vec<RuntimeEvent>>);
 
@@ -1199,6 +1355,54 @@ mod tests {
                 .push(event);
             Ok(())
         }
+    }
+
+    #[test]
+    fn model_reaction_tool_completion_toggles_canonical_user_message() {
+        let conversation_id = conversation("mahayana-ai:agent:reaction");
+        let mut user = message(&conversation_id, MessageRole::User, "thank you");
+        user.id = MessageId("user-reaction-1".into());
+        let state = Arc::new(Mutex::new(ConversationState::new(vec![user])));
+        let events = Arc::new(CapturedRuntimeEvents::default());
+        let bridge = RuntimeKernelEventBridge {
+            conversation_id: conversation_id.clone(),
+            operation_id: OperationId::generated("reaction-operation"),
+            events,
+            state: state.clone(),
+            history_path: None,
+            hide_assistant_history: false,
+            suppress_assistant_events: false,
+            reply_to_message_id: None,
+            is_fork: false,
+            attachment_batch_id: None,
+            streaming_assistant: Mutex::new(None),
+            suspended: Arc::new(AtomicBool::new(false)),
+        };
+        let reaction_event = || KernelEvent::ToolCompleted {
+            operation_id: KernelOperationId::from_string("reaction-operation"),
+            tool_call_id: "call-react".into(),
+            tool: "react_to_message".into(),
+            output: json!({
+                "delivered": true,
+                "applied": true,
+                "messageId": "user-reaction-1",
+                "emoji": "👍"
+            }),
+            success: true,
+        };
+        bridge.emit(reaction_event()).expect("apply model reaction");
+        {
+            let state = state.lock().expect("state");
+            assert_eq!(
+                state.history[0].metadata["reactions"],
+                json!([{"emoji":"👍","by":"assistant"}])
+            );
+        }
+        bridge.emit(reaction_event()).expect("toggle model reaction off");
+        assert_eq!(
+            state.lock().expect("state").history[0].metadata["reactions"],
+            json!([])
+        );
     }
 
     #[test]

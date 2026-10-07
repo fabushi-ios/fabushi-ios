@@ -8017,17 +8017,17 @@
     {
       "desktop_path": "source/host/src/runner/tools/sand_reaction_tool.rs",
       "desktop_blob_sha": "ed3800c9e65283bd5dda7606124337c49c4b0b35",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Own the model-side ReactToMessage delivery tool: validate a canonical user-message target and bounded emoji, toggle through the canonical reaction sink, and count a reaction as turn delivery only when the sink succeeds.",
+      "desktop_owner": "Host Runner reaction tool over the canonical transcript reaction sink",
+      "desktop_visible_effect": "An Agent may acknowledge a user message with a reaction alone; the reaction toggles on the canonical message and does not force a redundant closing SendMessage.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "iOS adapts Desktop message_address to the native canonical message_id exposed in bounded per-turn reactionMessageRefs. NativeEngine exposes react_to_message, enforces the 16 UTF-16-unit emoji bound and treats successful reaction as delivery; KernelConversation applies the toggle to canonical transcript metadata before the event projection succeeds; FeatureHost reuses transcript.reaction for UI projection.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs; source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs reaction_tool_is_terminal_delivery_without_forced_send_message; source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs model_reaction_tool_completion_toggles_canonical_user_message; exact-HEAD GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The canonical transcript remains the only message/reaction state owner; reaction delivery is not promoted to verified until new exact-HEAD Actions and artifacts pass."
     },
     {
       "desktop_path": "source/host/src/runner/tools/sand_secret_request.rs",
@@ -13147,17 +13147,17 @@
     {
       "desktop_path": "source/host/tests/sand_reaction_tool_contract.rs",
       "desktop_blob_sha": "5a5da6c0cbd27502d18597fbb0a4d55eb5b6c0cd",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Focused contract evidence for ReactToMessage target/schema validation, 16 UTF-16-unit emoji bounds, toggle behavior, sink failure handling, and delivery accounting only after successful canonical mutation.",
+      "desktop_owner": "Host Runner reaction tool contract tests",
+      "desktop_visible_effect": "Invalid/stale reaction targets fail closed, repeated same reaction toggles off, and successful reactions count as legitimate delivery without fabricating a message.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "The iOS-owned Rust tests split contract coverage across NativeEngine delivery semantics and KernelConversation canonical transcript mutation/event projection; Swift projection tests cover first-seen pills, UTF-16 bounds and Agent-scoped transport.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs; source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs; source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift; exact-HEAD GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level contract is implemented but not verified until current-head CI succeeds."
     },
     {
       "desktop_path": "source/host/tests/sand_spotlight_tools_contract.rs",
@@ -14207,7 +14207,7 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebased to ed06d2c. Desktop also marks the broader TurnRuntime responsibility implemented in its architecture manifest by explicitly composing existing Host/Runner owners; this row stays mapped until the iOS canonical runtime proves the equivalent behavior. Closing-send and ordinary empty-delivery behavior is implemented in NativeEngine, but this ed06 evidence row remains mapped because Desktop requires one SendMessage-or-reaction delivery predicate and iOS reaction ownership has not yet been proven. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=mapped, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Rebased to ed06d2c. Desktop also marks the broader TurnRuntime responsibility implemented in its architecture manifest by explicitly composing existing Host/Runner owners; this row stays mapped until the iOS canonical runtime proves the equivalent behavior. Closing-send and ordinary empty-delivery behavior plus the shared SendMessage-or-reaction delivery predicate are now implemented in NativeEngine, but this broader telemetry evidence row remains unreviewed until all Desktop telemetry/projection assertions in the file are audited rather than promoting it from reaction evidence alone. Exact-HEAD rebaseline 9a748dc4 -> a59a8fce changed this Desktop blob. Prior disposition=unreviewed and status=mapped, plus all evidence bound to the older upstream identity, are historical only and do not prove current parity. Re-review responsibility, owner, state machine, product effect, and current iOS shipping composition before promotion."
     },
     {
       "desktop_path": "source/host/tests/turn_tool_session_reminder_contract.rs",

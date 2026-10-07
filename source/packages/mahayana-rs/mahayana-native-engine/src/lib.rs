@@ -47,7 +47,7 @@ use web_research::{WebResearchClient, WebResearchConfig};
 
 const MAIN_ASSISTANT_CONVERSATION_ID: &str = "mahayana-ai:agent:assistant";
 const CONVERSATION_FAST_LANE_MAX_CHARS: usize = 280;
-const CONVERSATION_FAST_LANE_INSTRUCTION: &str = "CHAT-013 direct conversation fast lane: answer this simple conversational turn directly in plain text. Do not emit tool syntax or attempt a send_message call; the native Host streams provider text into the canonical user-visible transcript.";
+const CONVERSATION_FAST_LANE_INSTRUCTION: &str = "CHAT-013 direct conversation fast lane: answer this simple conversational turn directly in plain text. Do not attempt a send_message call; the native Host streams provider text into the canonical user-visible transcript. The react_to_message tool remains available when a reaction alone is the appropriate user-visible response.";
 const MAX_TOOL_OUTPUT_BYTES: usize = 64 * 1024;
 const DEFAULT_MAX_MODEL_TURNS: usize = 16;
 const MAX_REPLY_NUDGES: usize = 3;
@@ -621,6 +621,14 @@ impl NativeEngine {
                 &full_declared_tools,
             );
             let mut model_instructions = self.config.system_instructions.clone();
+            if let Some(reaction_context) =
+                reaction_message_reference_context(prompt_metadata)
+            {
+                if !model_instructions.trim().is_empty() {
+                    model_instructions.push_str("\n\n");
+                }
+                model_instructions.push_str(&reaction_context);
+            }
             if direct_conversation_fast_lane {
                 if !model_instructions.trim().is_empty() {
                     model_instructions.push_str("\n\n");
@@ -785,7 +793,7 @@ impl NativeEngine {
                 ensure_operation_active(control)?;
                 let mut call = call;
                 tool_call_count = tool_call_count.saturating_add(1);
-                if delivered_message && call.name != "send_message" {
+                if delivered_message && !is_delivery_tool(&call.name) {
                     tool_work_after_delivery = true;
                 }
                 if call.name == "workflow_status"
@@ -852,7 +860,7 @@ impl NativeEngine {
                     .await;
                 match output {
                     Ok(mut output) => {
-                        if call.name == "send_message"
+                        if is_delivery_tool(&call.name)
                             && output
                                 .get("delivered")
                                 .and_then(Value::as_bool)
@@ -1032,6 +1040,38 @@ impl NativeEngine {
                         "generatedAttachment": attachment,
                         "toolCallId": call.call_id.clone(),
                         "replyToMessageId": reply_to_message_id,
+                    }))
+                }
+                "react_to_message" => {
+                    let message_id = string_arg(&call.arguments, "message_id")?.trim();
+                    if message_id.is_empty() {
+                        return Err(KernelError::Backend(
+                            "react_to_message requires a non-empty message_id".into(),
+                        ));
+                    }
+                    let emoji = string_arg(&call.arguments, "emoji")?.trim();
+                    if emoji.is_empty() || emoji.encode_utf16().count() > 16 {
+                        return Err(KernelError::Backend(
+                            "react_to_message emoji must contain 1-16 UTF-16 code units".into(),
+                        ));
+                    }
+                    let is_live_target = session
+                        .active_prompt
+                        .as_ref()
+                        .is_some_and(|prompt| {
+                            reaction_message_ref_exists(&prompt.metadata, message_id)
+                        });
+                    if !is_live_target {
+                        return Err(KernelError::Backend(format!(
+                            "react_to_message target is not a canonical user message in this turn: {message_id}"
+                        )));
+                    }
+                    Ok(json!({
+                        "delivered": true,
+                        "applied": true,
+                        "messageId": message_id,
+                        "emoji": emoji,
+                        "toolCallId": call.call_id.clone(),
                     }))
                 }
                 "request_box_help" => {
@@ -2577,6 +2617,47 @@ fn model_user_content(prompt: &str, metadata: &Value) -> Value {
     Value::Array(content)
 }
 
+fn reaction_message_ref_exists(metadata: &Value, message_id: &str) -> bool {
+    metadata
+        .get("reactionMessageRefs")
+        .and_then(Value::as_array)
+        .is_some_and(|rows| {
+            rows.iter().any(|row| {
+                row.get("id")
+                    .and_then(Value::as_str)
+                    .is_some_and(|candidate| candidate == message_id)
+            })
+        })
+}
+
+fn reaction_message_reference_context(metadata: &Value) -> Option<String> {
+    let rows = metadata.get("reactionMessageRefs")?.as_array()?;
+    let mut references = Vec::new();
+    for row in rows.iter().take(32) {
+        let Some(message_id) = row
+            .get("id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+        let excerpt = row
+            .get("text")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or_default();
+        references.push(format!("- message_id={message_id}: {excerpt}"));
+    }
+    if references.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "[Canonical reaction targets]\nYou may call react_to_message when a reaction alone is an appropriate response. Only use one of these message_id values; never invent an id.\n{}",
+        references.join("\n")
+    ))
+}
+
 fn append_model_output(history: &mut Vec<Value>, payload: &Value) {
     if let Some(output) = payload.get("output").and_then(Value::as_array) {
         history.extend(output.iter().cloned());
@@ -2930,6 +3011,10 @@ fn string_arg<'a>(arguments: &'a Value, key: &str) -> Result<&'a str, KernelErro
         .ok_or_else(|| KernelError::Backend(format!("tool argument {key} is required")))
 }
 
+fn is_delivery_tool(tool: &str) -> bool {
+    matches!(tool, "send_message" | "react_to_message")
+}
+
 fn tool_risk(tool: &str) -> RiskLevel {
     match tool {
         "workspace_write" | "workspace_restore" => RiskLevel::WorkspaceWrite,
@@ -3206,8 +3291,14 @@ fn is_conversation_fast_lane(history: &[Value]) -> bool {
     !ACTION_MARKERS.iter().any(|marker| padded.contains(marker))
 }
 
-fn conversation_fast_lane_tools(history: &[Value]) -> Option<Vec<Value>> {
-    is_conversation_fast_lane(history).then(Vec::new)
+fn conversation_fast_lane_tools(history: &[Value], tools: &[Value]) -> Option<Vec<Value>> {
+    is_conversation_fast_lane(history).then(|| {
+        tools
+            .iter()
+            .filter(|tool| tool.get("name").and_then(Value::as_str) == Some("react_to_message"))
+            .cloned()
+            .collect()
+    })
 }
 
 fn model_turn_tools(
@@ -3217,7 +3308,7 @@ fn model_turn_tools(
     tools: &[Value],
 ) -> Vec<Value> {
     if visible_user_turn && provider_mode == ModelProviderMode::FirstPartyDacheng {
-        if let Some(reduced) = conversation_fast_lane_tools(history) {
+        if let Some(reduced) = conversation_fast_lane_tools(history, tools) {
             return reduced;
         }
     }
@@ -3230,6 +3321,11 @@ fn tool_definitions(enable_process_tools: bool, enable_web_research: bool) -> Ve
             "send_message",
             "Send a concise user-visible progress update or answer as a separate message bubble. Use this for meaningful milestones, confirmations, and the final answer in a multi-step task. Do not invent progress; only report work that has happened or is about to happen.",
             json!({"type":"object","properties":{"message":{"type":"string","description":"Optional concise text to show the user."},"attachment":{"type":"object","properties":{"url":{"type":"string"},"file_name":{"type":"string"},"alt":{"type":"string"},"channel":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["url"],"additionalProperties":false},"reply_to_message_id":{"type":"string","description":"Optional live transcript message id to reply to. Invalid or stale ids are ignored by the transcript owner."}},"anyOf":[{"required":["message"]},{"required":["attachment"]}],"additionalProperties":false}),
+        ),
+        function_tool(
+            "react_to_message",
+            "React to one canonical user message. A successful reaction is itself a user-visible delivery, so do not also call send_message unless the turn needs additional text.",
+            json!({"type":"object","properties":{"message_id":{"type":"string","minLength":1,"maxLength":256,"description":"Canonical message_id from the reaction targets in the current turn context."},"emoji":{"type":"string","minLength":1,"maxLength":16,"description":"Reaction emoji; runtime enforces at most 16 UTF-16 code units."}},"required":["message_id","emoji"],"additionalProperties":false}),
         ),
         function_tool(
             "request_box_help",
@@ -3430,7 +3526,7 @@ mod tests {
     }
 
     #[test]
-    fn conversation_fast_lane_uses_native_text_stream_without_tool_schema() {
+    fn conversation_fast_lane_keeps_only_reaction_delivery_tool() {
         let history = vec![json!({
             "role":"user",
             "content":"In one sentence, explain what a database index is for."
@@ -3442,27 +3538,102 @@ mod tests {
                 json!({"type":"object","properties":{}}),
             ),
             function_tool(
+                "react_to_message",
+                "reaction delivery",
+                json!({"type":"object","properties":{}}),
+            ),
+            function_tool(
                 "workspace_read",
                 "read workspace",
                 json!({"type":"object","properties":{}}),
             ),
         ];
-        let reduced = conversation_fast_lane_tools(&history).expect("simple turn fast lane");
-        assert!(reduced.is_empty(), "direct conversation fast lane must advertise no tool schema");
+        let reduced =
+            conversation_fast_lane_tools(&history, &tools).expect("simple turn fast lane");
+        assert_eq!(reduced.len(), 1);
+        assert_eq!(reduced[0]["name"], "react_to_message");
         assert_eq!(
-            model_turn_tools(ModelProviderMode::FirstPartyDacheng, true, &history, &tools).len(),
-            0
+            model_turn_tools(ModelProviderMode::FirstPartyDacheng, true, &history, &tools)
+                .iter()
+                .filter_map(|tool| tool.get("name").and_then(Value::as_str))
+                .collect::<Vec<_>>(),
+            vec!["react_to_message"],
         );
         assert_eq!(
             model_turn_tools(ModelProviderMode::FirstPartyDacheng, false, &history, &tools).len(),
-            2,
+            3,
             "hidden/recovery turns must keep the full tool schema",
         );
         assert_eq!(
             model_turn_tools(ModelProviderMode::UserConfiguredRemote, true, &history, &tools).len(),
-            2,
+            3,
             "non-first-party providers must keep the full tool schema",
         );
+    }
+
+    #[tokio::test]
+    async fn reaction_tool_is_terminal_delivery_without_forced_send_message() {
+        let model = Arc::new(FakeModel {
+            outputs: Mutex::new(VecDeque::from([
+                json!({
+                    "output": [{
+                        "type":"function_call",
+                        "call_id":"call-react",
+                        "name":"react_to_message",
+                        "arguments":"{\"message_id\":\"user-message-1\",\"emoji\":\"👍\"}"
+                    }]
+                }),
+                json!({
+                    "output": [{
+                        "type":"message",
+                        "content":[{"type":"output_text","text":"reaction complete"}]
+                    }]
+                }),
+            ])),
+        });
+        let engine =
+            NativeEngine::new(model, NativeEngineConfig::embedded("model")).expect("create engine");
+        let session = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                workspace_root: None,
+                model: None,
+                metadata: Value::Null,
+            })
+            .await
+            .expect("open session");
+        let events = Arc::new(Events::default());
+        engine
+            .run(
+                RunRequest {
+                    session_id: session,
+                    operation_id: OperationId::new(),
+                    input: "thanks".into(),
+                    policy: ExecutionPolicy::mobile_default(),
+                    required_capabilities: CapabilitySet::new([Capability::Model]),
+                    metadata: json!({
+                        "hidden": false,
+                        "reactionMessageRefs": [{
+                            "id":"user-message-1",
+                            "text":"thanks"
+                        }]
+                    }),
+                },
+                events.clone(),
+            )
+            .await
+            .expect("reaction-only delivery turn");
+        let events = events.0.lock().expect("events");
+        assert!(events.iter().any(|event| matches!(
+            event,
+            KernelEvent::ToolCompleted { tool, output, success: true, .. }
+                if tool == "react_to_message"
+                    && output.get("delivered").and_then(Value::as_bool) == Some(true)
+        )));
+        assert!(!events.iter().any(|event| matches!(
+            event,
+            KernelEvent::ToolCompleted { tool, success: true, .. } if tool == "send_message"
+        )));
     }
 
     #[test]

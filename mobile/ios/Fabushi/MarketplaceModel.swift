@@ -108,6 +108,45 @@ func projectMobileTranscriptReactions(_ raw: Any?) -> [MobileTranscriptReaction]
     }
 }
 
+struct MobileReactionPillProjection: Identifiable, Equatable {
+    var id: String { emoji }
+    let emoji: String
+    let count: Int
+    let reactors: [String]
+    let chosenByMe: Bool
+}
+
+func projectMobileReactionPills(
+    _ reactions: [MobileTranscriptReaction]
+) -> [MobileReactionPillProjection] {
+    var order: [String] = []
+    var reactorsByEmoji: [String: [String]] = [:]
+    for reaction in reactions {
+        if reactorsByEmoji[reaction.emoji] == nil {
+            order.append(reaction.emoji)
+            reactorsByEmoji[reaction.emoji] = []
+        }
+        if reactorsByEmoji[reaction.emoji]?.contains(reaction.by) == false {
+            reactorsByEmoji[reaction.emoji]?.append(reaction.by)
+        }
+    }
+    return order.map { emoji in
+        let reactors = reactorsByEmoji[emoji] ?? []
+        return MobileReactionPillProjection(
+            emoji: emoji,
+            count: reactors.count,
+            reactors: reactors,
+            chosenByMe: reactors.contains("me")
+        )
+    }
+}
+
+func normalizeMobileReactionInput(_ value: String) -> String? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed.utf16.count <= 16 else { return nil }
+    return trimmed
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
@@ -134,6 +173,38 @@ struct MobileChatMessage: Identifiable, Equatable {
     var branched = false
     var streaming = false
     var createdAt = Date()
+}
+
+@discardableResult
+func applyMobileTranscriptReactionEvent(
+    _ event: [String: Any],
+    agentId: String,
+    messages: inout [MobileChatMessage]
+) -> Bool {
+    guard event["type"] as? String == "host.transport",
+          event["channel"] as? String == "transcript.reaction",
+          let payload = event["payload"] as? [String: Any],
+          payload["agentId"] as? String == agentId,
+          let entryId = (payload["entryId"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+          !entryId.isEmpty,
+          let index = messages.firstIndex(where: {
+              ($0.canonicalMessageId ?? $0.id) == entryId
+          })
+    else { return false }
+
+    let canonical = projectMobileTranscriptReactions(payload["reactions"])
+    messages[index].reactions = canonical
+    if let rawMine = payload["myReactions"] as? [String] {
+        messages[index].myReactions = Set(
+            rawMine.compactMap(normalizeMobileReactionInput)
+        )
+    } else {
+        messages[index].myReactions = Set(
+            canonical.filter { $0.by == "me" }.map(\.emoji)
+        )
+    }
+    return true
 }
 
 private func normalizeMobileLinkURL(_ value: Any?) -> String? {
@@ -1711,6 +1782,12 @@ final class MarketplaceModel {
                         guard let requestID = event["requestId"] as? String else { return false }
                         return ownedHandoffRequestIDs.contains(requestID)
                     }
+                    if type == "host.transport" {
+                        guard event["channel"] as? String == "transcript.reaction",
+                              let payload = event["payload"] as? [String: Any]
+                        else { return false }
+                        return payload["agentId"] as? String == "mahayana-assistant"
+                    }
                     let acceptedTypes: Set<String> = [
                         "box.handoff.requested",
                         "model.routed",
@@ -1730,6 +1807,12 @@ final class MarketplaceModel {
                       let type = event["type"] as? String
                 else { continue }
                 switch type {
+                case "host.transport":
+                    _ = applyMobileTranscriptReactionEvent(
+                        event,
+                        agentId: "mahayana-assistant",
+                        messages: &chatMessages
+                    )
                 case "box.handoff.requested":
                     let eventOperationId = event["operationId"] as? String ?? operationId
                     guard eventOperationId == operationId,

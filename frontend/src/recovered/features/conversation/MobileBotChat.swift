@@ -107,6 +107,9 @@ internal struct MobileBotChat: View {
     @State private var transcribingVoice = false
     @State private var voiceInputGeneration = 0
     @State private var reactionGeneration = 0
+    @State private var reactionPickerPresented = false
+    @State private var reactionPickerTargetId: String?
+    @State private var reactionPickerDraft = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -133,6 +136,9 @@ internal struct MobileBotChat: View {
                 bridge: bridge,
                 onClose: { asyncTasksPresented = false }
             )
+        }
+        .sheet(isPresented: $reactionPickerPresented) {
+            reactionPickerSheet
         }
     }
 
@@ -628,28 +634,29 @@ internal struct MobileBotChat: View {
                 ForEach(Self.quickReactionEmojis, id: \.self) { emoji in
                     Button(emoji) { toggleReaction(entry, emoji: emoji) }
                 }
+                Divider()
+                Button("More Reactions…") { openReactionPicker(entry) }
             }
         }
     }
 
     @ViewBuilder
     private func reactionPills(_ entry: MobileChatMessage) -> some View {
-        let grouped = Dictionary(grouping: entry.reactions, by: \.emoji)
-        if !grouped.isEmpty {
+        let pills = projectMobileReactionPills(entry.reactions)
+        if !pills.isEmpty {
             HStack(spacing: 5) {
-                ForEach(grouped.keys.sorted(), id: \.self) { emoji in
-                    let count = grouped[emoji]?.count ?? 0
+                ForEach(pills) { pill in
                     Button {
-                        toggleReaction(entry, emoji: emoji)
+                        toggleReaction(entry, emoji: pill.emoji)
                     } label: {
                         HStack(spacing: 3) {
-                            Text(emoji)
-                            if count > 1 { Text("\(count)").font(.caption2) }
+                            Text(pill.emoji)
+                            if pill.count > 1 { Text("\(pill.count)").font(.caption2) }
                         }
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(
-                            entry.myReactions.contains(emoji)
+                            pill.chosenByMe
                                 ? Color.accentColor.opacity(0.16)
                                 : Color.black.opacity(0.06),
                             in: Capsule()
@@ -657,21 +664,83 @@ internal struct MobileBotChat: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(
-                        entry.myReactions.contains(emoji)
-                            ? "Remove reaction \(emoji)"
-                            : "React \(emoji)"
+                        "\(pill.emoji), \(pill.count) reaction\(pill.count == 1 ? "" : "s")"
+                            + (pill.chosenByMe ? ", selected by you" : "")
+                    )
+                    .accessibilityHint(
+                        pill.reactors.isEmpty
+                            ? "Toggle reaction"
+                            : "Reactors: \(pill.reactors.joined(separator: ", "))"
                     )
                     .accessibilityIdentifier(
-                        Self.semanticId("mobile-bot-reaction-\(entry.id)-\(emoji)")
+                        Self.semanticId("mobile-bot-reaction-\(entry.id)-\(pill.emoji)")
                     )
                 }
             }
         }
     }
 
+    private var reactionPickerSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Quick reactions") {
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible()), count: 3),
+                        spacing: 12
+                    ) {
+                        ForEach(Self.quickReactionEmojis, id: \.self) { emoji in
+                            Button(emoji) {
+                                reactionPickerDraft = emoji
+                                submitReactionPicker()
+                            }
+                            .font(.title2)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+                Section("Custom reaction") {
+                    TextField("Emoji", text: $reactionPickerDraft)
+                        .accessibilityIdentifier("mobile-bot-reaction-picker-input")
+                }
+            }
+            .navigationTitle("React")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { reactionPickerPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { submitReactionPicker() }
+                        .disabled(normalizeMobileReactionInput(reactionPickerDraft) == nil)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .accessibilityIdentifier("mobile-bot-reaction-picker")
+    }
+
     @MainActor
-    private func toggleReaction(_ entry: MobileChatMessage, emoji: String) {
-        guard entry.kind == .message, !entry.streaming,
+    private func openReactionPicker(_ entry: MobileChatMessage) {
+        reactionPickerTargetId = entry.id
+        reactionPickerDraft = ""
+        reactionPickerPresented = true
+    }
+
+    @MainActor
+    private func submitReactionPicker() {
+        guard let targetId = reactionPickerTargetId,
+              let emoji = normalizeMobileReactionInput(reactionPickerDraft),
+              let entry = entries.first(where: { $0.id == targetId })
+        else { return }
+        reactionPickerPresented = false
+        reactionPickerTargetId = nil
+        reactionPickerDraft = ""
+        toggleReaction(entry, emoji: emoji)
+    }
+
+    @MainActor
+    private func toggleReaction(_ entry: MobileChatMessage, emoji rawEmoji: String) {
+        guard let emoji = normalizeMobileReactionInput(rawEmoji),
+              entry.kind == .message, !entry.streaming,
               let index = entries.firstIndex(where: { $0.id == entry.id })
         else { return }
         let entryId = entry.canonicalMessageId ?? entry.id
@@ -1059,6 +1128,12 @@ internal struct MobileBotChat: View {
                         guard let requestID = event["requestId"] as? String else { return false }
                         return ownedHandoffRequestIDs.contains(requestID)
                     }
+                    if type == "host.transport" {
+                        guard event["channel"] as? String == "transcript.reaction",
+                              let payload = event["payload"] as? [String: Any]
+                        else { return false }
+                        return payload["agentId"] as? String == bot.id
+                    }
                     let acceptedTypes: Set<String> = [
                         "box.handoff.requested",
                         "chat.message",
@@ -1079,6 +1154,12 @@ internal struct MobileBotChat: View {
                 else { continue }
                 let eventOperationId = event["operationId"] as? String ?? operationId
                 switch type {
+                case "host.transport":
+                    _ = applyMobileTranscriptReactionEvent(
+                        event,
+                        agentId: bot.id,
+                        messages: &entries
+                    )
                 case "box.handoff.requested":
                     guard eventOperationId == operationId,
                           let requestId = event["requestId"] as? String,

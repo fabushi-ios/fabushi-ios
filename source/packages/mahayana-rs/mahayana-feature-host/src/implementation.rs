@@ -8711,6 +8711,46 @@ impl FeatureHostController {
                     }));
                 }
                 if kind == "tool" {
+                    if status == RuntimeActivityStatus::Completed
+                        && metadata
+                            .as_ref()
+                            .and_then(|value| value.get("tool"))
+                            .and_then(Value::as_str)
+                            == Some("react_to_message")
+                    {
+                        if let Some(output) = metadata
+                            .as_ref()
+                            .and_then(|value| value.get("output"))
+                            .filter(|output| {
+                                output.get("applied").and_then(Value::as_bool) == Some(true)
+                            })
+                        {
+                            let entry_id = output
+                                .get("messageId")
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|value| !value.is_empty())
+                                .ok_or_else(|| {
+                                    FeatureHostError::Contract(
+                                        "react_to_message completion is missing messageId".into(),
+                                    )
+                                })?
+                                .to_string();
+                            let reactions =
+                                output.get("reactions").cloned().unwrap_or_else(|| json!([]));
+                            let my_reactions =
+                                output.get("myReactions").cloned().unwrap_or_else(|| json!([]));
+                            self.state()?.events.push_back(HostEvent::TransportEvent {
+                                channel: "transcript.reaction".into(),
+                                payload: json!({
+                                    "agentId": agent_id.clone(),
+                                    "entryId": entry_id,
+                                    "reactions": reactions,
+                                    "myReactions": my_reactions,
+                                }),
+                            });
+                        }
+                    }
                     if let Some(tool_call_id) = metadata
                         .as_ref()
                         .and_then(|value| value.get("toolCallId"))
@@ -17600,6 +17640,59 @@ mod tests {
             .epoch()
             .to_string();
         assert_ne!(before_close_epoch, after_close_epoch);
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn model_reaction_tool_projects_existing_transcript_reaction_transport() {
+        let controller = FeatureHostController::create_with_host_config(
+            HostConfig {
+                profile_id: "production-model-reaction".into(),
+                mode: HostMode::Production,
+            },
+            SurfacePlatform::Electron,
+            isolated_host_config("production-model-reaction"),
+        )
+        .expect("create production Host");
+        let operation_id = OperationId("operation-model-reaction".into());
+        {
+            let mut state = controller.state().expect("feature state");
+            state.operations.insert(operation_id.to_string());
+            state
+                .operation_agents
+                .insert(operation_id.to_string(), "agent-reaction".into());
+            state.events.clear();
+        }
+        controller
+            .translate_runtime_event(RuntimeEvent::AgentActivity {
+                operation_id,
+                step_id: "tool:call-react".into(),
+                kind: "tool".into(),
+                title: "Completed react_to_message".into(),
+                detail: None,
+                status: RuntimeActivityStatus::Completed,
+                metadata: Some(json!({
+                    "tool":"react_to_message",
+                    "toolCallId":"call-react",
+                    "output":{
+                        "applied":true,
+                        "messageId":"user-reaction-1",
+                        "reactions":[{"emoji":"👍","by":"assistant"}],
+                        "myReactions":[]
+                    }
+                })),
+            })
+            .expect("translate reaction tool")
+            .expect("reaction agent step");
+        let state = controller.state().expect("feature state");
+        assert!(state.events.iter().any(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "transcript.reaction"
+                    && payload["agentId"] == "agent-reaction"
+                    && payload["entryId"] == "user-reaction-1"
+                    && payload["reactions"] == json!([{"emoji":"👍","by":"assistant"}])
+        )));
     }
 
     #[cfg(feature = "production")]
