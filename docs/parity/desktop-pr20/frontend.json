@@ -1061,13 +1061,13 @@
       "desktop_owner": "renderer avatar editor controller over file/generation and roster mutation bridges",
       "desktop_visible_effect": "Users can safely upload, generate, crop, clear or switch an Agent/group avatar without stale async writes crossing account/editor lifecycles.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/media/avatar-image.swift; frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
-      "ios_language": "Swift/SwiftUI",
-      "ios_platform_delta": "iOS currently carries only the 25 MB source policy. It has no PhotosPicker/file ingest controller, crop/zoom/pan owner, image-generation flow, avatar-byte mutation composition, character staging or generation-fenced editor lifecycle.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD GitHub Actions required",
-      "notes": "Production closure now includes individual Agent and group upload/crop/256px PNG persistence, character shape/color staging/reset for individual Agents, canonical bot.update/group.update persistence, authoritative roster reload and generation fencing. Keep mapped because Desktop Generate still requires a concrete Cursor AiService RunGenerateImage production client on iOS; the existing CursorGenerateImageService protocol/value port alone is not shipping wiring."
+      "ios_target_path": "frontend/src/production/MobileAvatarEditor.swift",
+      "ios_language": "Swift / SwiftUI + Rust Host",
+      "ios_platform_delta": "Native PhotosPicker replaces Electron file dialog; UIKit normalization/crop replaces DOM canvas; SwiftUI sheet replaces popover DOM. Agent/group avatar persistence remains in the single FeatureHost roster owner. Individual Agent generation reuses Coordinator-owned Cursor auth/machine-id and an exact AiService.RunGenerateImage protobuf client, returning the Desktop data-URL renderer contract before canonical save.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/model.ts",
@@ -1076,13 +1076,13 @@
       "desktop_owner": "renderer avatar image/model codec",
       "desktop_visible_effect": "Avatar images are bounded, normalized and cropped predictably before upload, while character avatars use the supported visual choices.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/media/avatar-image.swift",
-      "ios_language": "Swift",
-      "ios_platform_delta": "Only AVATAR_SOURCE_MAX_BYTES and extension/MIME policy have been ported. Native 1024px normalization, crop geometry, 256px PNG encoding and character shape/color model are still missing.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD GitHub Actions required",
-      "notes": "Production closure now includes individual Agent and group upload/crop/256px PNG persistence, character shape/color staging/reset for individual Agents, canonical bot.update/group.update persistence, authoritative roster reload and generation fencing. Keep mapped because Desktop Generate still requires a concrete Cursor AiService RunGenerateImage production client on iOS; the existing CursorGenerateImageService protocol/value port alone is not shipping wiring."
+      "ios_target_path": "frontend/src/production/MobileAvatarEditor.swift",
+      "ios_language": "Swift / SwiftUI + Rust Host",
+      "ios_platform_delta": "Native PhotosPicker replaces Electron file dialog; UIKit normalization/crop replaces DOM canvas; SwiftUI sheet replaces popover DOM. Agent/group avatar persistence remains in the single FeatureHost roster owner. Individual Agent generation reuses Coordinator-owned Cursor auth/machine-id and an exact AiService.RunGenerateImage protobuf client, returning the Desktop data-URL renderer contract before canonical save.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/production-adapter.ts",
@@ -1091,13 +1091,13 @@
       "desktop_owner": "renderer avatar production adapter",
       "desktop_visible_effect": "Avatar editing cannot leak across accounts or Agents and fails closed when the required shipping mutation/generation bridges are absent.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
-      "ios_language": "Swift",
-      "ios_platform_delta": "No equivalent scoped avatar editor production adapter is currently composed on iOS.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD GitHub Actions required",
-      "notes": "Production closure now includes individual Agent and group upload/crop/256px PNG persistence, character shape/color staging/reset for individual Agents, canonical bot.update/group.update persistence, authoritative roster reload and generation fencing. Keep mapped because Desktop Generate still requires a concrete Cursor AiService RunGenerateImage production client on iOS; the existing CursorGenerateImageService protocol/value port alone is not shipping wiring."
+      "ios_target_path": "frontend/src/production/MobileAvatarEditor.swift",
+      "ios_language": "Swift / SwiftUI + Rust Host",
+      "ios_platform_delta": "Native PhotosPicker replaces Electron file dialog; UIKit normalization/crop replaces DOM canvas; SwiftUI sheet replaces popover DOM. Agent/group avatar persistence remains in the single FeatureHost roster owner. Individual Agent generation reuses Coordinator-owned Cursor auth/machine-id and an exact AiService.RunGenerateImage protobuf client, returning the Desktop data-URL renderer contract before canonical save.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/view.tsx",
@@ -1106,13 +1106,13 @@
       "desktop_owner": "renderer avatar editor presentation",
       "desktop_visible_effect": "Users can edit Agent and group avatars from Agent Info using the complete shipping interaction surface.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/agent-info/ContentView+Agent.swift",
-      "ios_language": "SwiftUI",
-      "ios_platform_delta": "No native avatar editor view is currently wired. The existing ClothGhostAvatar renders identity but is not an editor.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/shared/media/avatar-image.swift; frontend/src/production/MobileAvatarEditor.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD GitHub Actions required",
-      "notes": "Production closure now includes individual Agent and group upload/crop/256px PNG persistence, character shape/color staging/reset for individual Agents, canonical bot.update/group.update persistence, authoritative roster reload and generation fencing. Keep mapped because Desktop Generate still requires a concrete Cursor AiService RunGenerateImage production client on iOS; the existing CursorGenerateImageService protocol/value port alone is not shipping wiring."
+      "ios_target_path": "frontend/src/production/MobileAvatarEditor.swift",
+      "ios_language": "Swift / SwiftUI + Rust Host",
+      "ios_platform_delta": "Native PhotosPicker replaces Electron file dialog; UIKit normalization/crop replaces DOM canvas; SwiftUI sheet replaces popover DOM. Agent/group avatar persistence remains in the single FeatureHost roster owner. Individual Agent generation reuses Coordinator-owned Cursor auth/machine-id and an exact AiService.RunGenerateImage protobuf client, returning the Desktop data-URL renderer contract before canonical save.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/channels/model.ts",

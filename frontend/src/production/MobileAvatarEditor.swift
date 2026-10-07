@@ -9,6 +9,7 @@ internal struct MobileAvatarEditorSheet: View {
     let onClose: () -> Void
 
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var generateDescription = ""
     @State private var sourceImage: UIImage?
     @State private var crop: MobileAvatarCrop?
     @State private var selectedShape: String?
@@ -68,6 +69,20 @@ internal struct MobileAvatarEditorSheet: View {
 
     private var uploadSection: some View {
         Section {
+            if !agent.isGroup {
+                TextField("描述要生成的头像", text: $generateDescription, axis: .vertical)
+                    .lineLimit(2...4)
+                    .disabled(busy)
+                    .accessibilityIdentifier("mobile-avatar-generate-description")
+                Button(busy ? "生成中…" : "生成头像") { generateImage() }
+                    .disabled(
+                        busy || generateDescription
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .isEmpty
+                    )
+                    .accessibilityIdentifier("mobile-avatar-generate")
+            }
+
             if let sourceImage, let crop {
                 avatarCropPreview(image: sourceImage, crop: crop)
                 Slider(
@@ -256,6 +271,41 @@ internal struct MobileAvatarEditorSheet: View {
                 guard token == generation else { return }
                 sourceImage = nil
                 crop = nil
+                failure = error.localizedDescription
+            }
+        }
+    }
+
+    @MainActor
+    private func generateImage() {
+        let description = generateDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !description.isEmpty, !busy else { return }
+        let token = beginMutation()
+        operationTask = Task { @MainActor in
+            defer { finishMutation(token) }
+            do {
+                let result = try await bridge.request(
+                    method: "generateAgentAvatarImage",
+                    params: ["description": description]
+                )
+                try Task.checkCancellation()
+                guard token == generation,
+                      let dataURL = result.value as? String,
+                      let data = AvatarImagePolicy.data(fromImageDataURL: dataURL)
+                else { throw AvatarImagePolicyError.invalidImage }
+                let image = try AvatarImagePolicy.normalizeSource(data: data)
+                guard token == generation else { return }
+                sourceImage = image
+                crop = AvatarImagePolicy.initialCrop(
+                    width: image.size.width,
+                    height: image.size.height
+                )
+                selectedShape = nil
+                selectedColor = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard token == generation else { return }
                 failure = error.localizedDescription
             }
         }

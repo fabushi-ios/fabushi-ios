@@ -638,17 +638,20 @@ final class CoordinatorMcpSurface {
     private let port: CoordinatorMcpHostPort
     private let cursorAuth: IOSCursorAuthService
     private let dashboard: IOSCursorDashboardClient
+    private let avatarImageGenerator: CursorGenerateImageService
 
     private init(
         manager: SandMcpManager,
         port: CoordinatorMcpHostPort,
         cursorAuth: IOSCursorAuthService,
-        dashboard: IOSCursorDashboardClient
+        dashboard: IOSCursorDashboardClient,
+        avatarImageGenerator: CursorGenerateImageService
     ) {
         self.manager = manager
         self.port = port
         self.cursorAuth = cursorAuth
         self.dashboard = dashboard
+        self.avatarImageGenerator = avatarImageGenerator
     }
 
     static func make(
@@ -669,6 +672,10 @@ final class CoordinatorMcpSurface {
             }
         )
         let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        let avatarImageGenerator = createCursorGenerateImageService(
+            client: IOSCursorGenerateImageClient(credentials: credentials),
+            modelId: SAND_DEFAULT_MODEL_ID
+        )
         let accountDependencies = AccountMcpDependencies(
             getAccessToken: { backendURL in
                 try await cursorAuth.getValidAccessToken(backendURL: backendURL)
@@ -737,7 +744,8 @@ final class CoordinatorMcpSurface {
             manager: SandMcpManager(deps: dependencies),
             port: port,
             cursorAuth: cursorAuth,
-            dashboard: dashboard
+            dashboard: dashboard,
+            avatarImageGenerator: avatarImageGenerator
         )
     }
 
@@ -812,6 +820,19 @@ final class CoordinatorMcpSurface {
         params: [String: Any]
     ) async throws -> CoordinatorDevControlRouting {
         switch method {
+        case "generateAgentAvatarImage":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw SandMcpConfigError("Avatar generation requires Cursor sign-in.")
+            }
+            guard let description = nonEmptyString(params["description"]) else {
+                throw SandMcpConfigError("Describe the avatar to generate first.")
+            }
+            let generated = try await avatarImageGenerator.generate(description: description)
+            guard !generated.imageData.isEmpty, generated.mimeType.hasPrefix("image/") else {
+                throw SandMcpConfigError("Avatar generation returned invalid image data.")
+            }
+            return .handled("data:\(generated.mimeType);base64,\(generated.imageData)")
+
         case "coordinator.skill.publishTargets":
             guard (await cursorAuth.status()).loggedIn else {
                 throw SandMcpConfigError("Skill publishing requires Cursor sign-in.")

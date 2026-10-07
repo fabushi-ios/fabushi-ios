@@ -56,6 +56,17 @@ enum AvatarImagePolicy {
         byteLength > sourceMaxBytes ? "Choose an image smaller than 25 MB." : nil
     }
 
+    static func data(fromImageDataURL value: String) -> Data? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("data:image/"),
+              let comma = trimmed.firstIndex(of: ","),
+              trimmed[..<comma].hasSuffix(";base64")
+        else { return nil }
+        let payload = String(trimmed[trimmed.index(after: comma)...])
+        guard !payload.isEmpty else { return nil }
+        return Data(base64Encoded: payload)
+    }
+
     static let extensionMime: [String: String] = [
         ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
         ".gif": "image/gif", ".bmp": "image/bmp", ".avif": "image/avif", ".svg": "image/svg+xml",
