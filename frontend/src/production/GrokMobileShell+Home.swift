@@ -177,7 +177,7 @@ extension GrokMobileShell {
                 access: accessCoverComposition.access,
                 isVisible: accessCoverComposition.isVisible,
                 onOpenAccess: {
-                    openExternalURL(ACCESS_ONBOARDING_URL)
+                    _ = openExternalURL(ACCESS_ONBOARDING_URL)
                 }
             )
         }
