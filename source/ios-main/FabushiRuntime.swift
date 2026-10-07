@@ -2,6 +2,184 @@ import Foundation
 import Observation
 import SwiftUI
 
+private let IOS_CLOUD_AGENT_POLL_INTERVAL_NS: UInt64 = 10_000_000_000
+private let IOS_CLOUD_AGENT_MAX_WAIT_MS: Int64 = 5 * 60 * 60 * 1_000
+private let IOS_CLOUD_AGENT_RESTART_GRACE_MS: Int64 = 3 * 60 * 1_000
+
+private struct IOSPendingCloudAgentWake: Equatable {
+    let agentId: String
+    let workId: String
+    let operationId: String
+    let title: String
+    let startedAtMs: Int64
+
+    init?(_ raw: Any) {
+        guard let object = raw as? [String: Any],
+              let agentId = object["agentId"] as? String,
+              !agentId.isEmpty,
+              let workId = object["workId"] as? String,
+              !workId.isEmpty,
+              let operationId = object["operationId"] as? String,
+              !operationId.isEmpty,
+              let title = object["title"] as? String
+        else { return nil }
+        self.agentId = agentId
+        self.workId = workId
+        self.operationId = operationId
+        self.title = title
+        self.startedAtMs = (object["startedAtMs"] as? NSNumber)?.int64Value ?? 0
+    }
+
+    var identity: String { "\(agentId)\u{1f}\(workId)" }
+}
+
+@MainActor
+private final class IOSCloudAgentWakeWatcher {
+    private let coordinator: MahayanaCoordinator
+    private var scanTask: Task<Void, Never>?
+    private var watches: [String: Task<Void, Never>] = [:]
+
+    init(coordinator: MahayanaCoordinator) {
+        self.coordinator = coordinator
+    }
+
+    func start() {
+        guard scanTask == nil else { return }
+        scanTask = Task { [weak self] in
+            guard let self else { return }
+            await self.refresh(waitForRestart: true)
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: IOS_CLOUD_AGENT_POLL_INTERVAL_NS)
+                } catch {
+                    return
+                }
+                await self.refresh(waitForRestart: false)
+            }
+        }
+    }
+
+    func refreshNow() async {
+        await refresh(waitForRestart: false)
+    }
+
+    private func refresh(waitForRestart: Bool) async {
+        let raw: Any
+        do {
+            raw = try await coordinator.request(method: "native.cloudAgent.pendingWakes").value
+        } catch {
+            return
+        }
+        guard let values = raw as? [Any] else { return }
+        let pending = values.compactMap(IOSPendingCloudAgentWake.init)
+        let liveKeys = Set(pending.map(\.identity))
+        let staleKeys = watches.keys.filter { !liveKeys.contains($0) }
+        for key in staleKeys {
+            watches.removeValue(forKey: key)?.cancel()
+        }
+        for wake in pending where watches[wake.identity] == nil {
+            arm(wake, waitForRestart: waitForRestart)
+        }
+    }
+
+    private func arm(_ wake: IOSPendingCloudAgentWake, waitForRestart: Bool) {
+        let key = wake.identity
+        watches[key] = Task { [weak self] in
+            guard let self else { return }
+            await self.watch(wake, waitForRestart: waitForRestart)
+            self.watches.removeValue(forKey: key)
+        }
+    }
+
+    private func watch(_ wake: IOSPendingCloudAgentWake, waitForRestart: Bool) async {
+        let startedAt = nowMs()
+        let deadline = startedAt.saturatingAdding(IOS_CLOUD_AGENT_MAX_WAIT_MS)
+        let restartDeadline = startedAt.saturatingAdding(IOS_CLOUD_AGENT_RESTART_GRACE_MS)
+        var awaitingRestart = waitForRestart
+
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(nanoseconds: IOS_CLOUD_AGENT_POLL_INTERVAL_NS)
+            } catch {
+                return
+            }
+            let now = nowMs()
+            if now >= deadline {
+                let text = "The Cursor agent (\(wake.workId)) is still running after 300 minutes. It keeps running remotely; check the cloud agents dashboard for the result."
+                if await settle(wake, status: "error", result: text) { return }
+                continue
+            }
+
+            let info: IOSCloudAgentComposerInfo
+            do {
+                info = try await coordinator.cloudAgentInfo(bcId: wake.workId)
+            } catch {
+                continue
+            }
+
+            if awaitingRestart {
+                if info.isActive || now >= restartDeadline {
+                    awaitingRestart = false
+                } else {
+                    continue
+                }
+            }
+
+            switch info.status {
+            case 1, 4:
+                continue
+            case 2:
+                let summary = info.summary?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let result = (summary?.isEmpty == false) ? summary! : "The Cursor agent finished."
+                if await settle(wake, status: "completed", result: result) { return }
+            case 3, 5:
+                let errorText = info.permanentError?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    ?? info.summary?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let result = (errorText?.isEmpty == false)
+                    ? errorText!
+                    : "The Cursor agent (\(wake.workId)) ended before finishing."
+                if await settle(wake, status: "error", result: result) { return }
+            default:
+                // Desktop normalizes unknown numeric statuses to Unspecified and keeps polling.
+                continue
+            }
+        }
+    }
+
+    private func settle(
+        _ wake: IOSPendingCloudAgentWake,
+        status: String,
+        result: String
+    ) async -> Bool {
+        do {
+            let reply = try await coordinator.request(
+                method: "native.cloudAgent.settleWake",
+                params: [
+                    "agentId": wake.agentId,
+                    "workId": wake.workId,
+                    "status": status,
+                    "result": result,
+                ]
+            ).value
+            guard let object = reply as? [String: Any] else { return false }
+            return (object["settled"] as? Bool) == true
+        } catch {
+            return false
+        }
+    }
+
+    private func nowMs() -> Int64 {
+        Int64(Date().timeIntervalSince1970 * 1_000)
+    }
+}
+
+private extension Int64 {
+    func saturatingAdding(_ other: Int64) -> Int64 {
+        let (value, overflow) = addingReportingOverflow(other)
+        return overflow ? Int64.max : value
+    }
+}
+
 /// Production composition root. FabushiApp only owns Scene/App lifecycle and
 /// forwards events here.
 @MainActor
@@ -17,6 +195,7 @@ final class FabushiRuntime {
     private(set) var reconnectGeneration = 0
 
     @ObservationIgnored private var deepLinkController: IOSDeepLinkController?
+    @ObservationIgnored private let cloudAgentWakeWatcher: IOSCloudAgentWakeWatcher
     @ObservationIgnored private var wasBackgrounded = false
     @ObservationIgnored private var resumeTask: Task<Void, Never>?
     #if DEBUG
@@ -41,6 +220,7 @@ final class FabushiRuntime {
             self.main = main
             self.bridge = bridge
             self.authCallbackRegistration = authCallbackRegistration
+            cloudAgentWakeWatcher = IOSCloudAgentWakeWatcher(coordinator: main.coordinator)
             #if DEBUG
             devControlsPreload = IOSDevControlsPreloadEntrypoint.installIfEnabled(
                 bridge: bridge,
@@ -72,6 +252,7 @@ final class FabushiRuntime {
         if marketplace.loggedIn {
             await messaging.refresh()
         }
+        cloudAgentWakeWatcher.start()
         deepLinkController?.markReady()
         if main.requiresColdStartResync {
             await resyncAfterLifecycleRecovery(reason: "cold-start")
@@ -148,6 +329,7 @@ final class FabushiRuntime {
         if marketplace.loggedIn {
             await messaging.refresh()
         }
+        await cloudAgentWakeWatcher.refreshNow()
         main.markResyncCompleted()
         reconnectGeneration &+= 1
         main.lifecycleReporter.report(
