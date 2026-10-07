@@ -101,6 +101,13 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertEqual(task.resourceId, "process-1")
     }
 
+    func testNativeAgentSectionMoveEligibilityMatchesDesktopAgentRowActions() {
+        XCTAssertTrue(MobileAgentSidebarSections.canAssign(isPinned: false, isHidden: false))
+        XCTAssertFalse(MobileAgentSidebarSections.canAssign(isPinned: true, isHidden: false))
+        XCTAssertFalse(MobileAgentSidebarSections.canAssign(isPinned: false, isHidden: true))
+        XCTAssertFalse(MobileAgentSidebarSections.canAssign(isPinned: true, isHidden: true))
+    }
+
     func testNativeAgentSectionsMoveMembershipWithoutDuplicateOwnership() throws {
         let initial = [
             MobileAgentSidebarSection(id: "one", name: "One", agentIds: ["agent-1", "agent-2"]),

@@ -227,27 +227,32 @@ extension GrokMobileShell {
                     } label: {
                         Label("设置", systemImage: "gearshape")
                     }
-                    Menu {
-                        Button {
-                            assignBot(bot, toSection: nil)
-                        } label: {
-                            Label("未分组", systemImage: "tray")
-                        }
-                        ForEach(agentSidebarSections) { section in
+                    if MobileAgentSidebarSections.canAssign(
+                        isPinned: pinnedBotIds.contains(bot.id),
+                        isHidden: bot.hidden
+                    ) {
+                        Menu {
                             Button {
-                                assignBot(bot, toSection: section.id)
+                                assignBot(bot, toSection: nil)
                             } label: {
-                                Label(section.name, systemImage: "folder")
+                                Label("未分组", systemImage: "tray")
                             }
-                        }
-                        Divider()
-                        Button {
-                            beginCreateAgentSidebarSection(for: bot)
+                            ForEach(agentSidebarSections) { section in
+                                Button {
+                                    assignBot(bot, toSection: section.id)
+                                } label: {
+                                    Label(section.name, systemImage: "folder")
+                                }
+                            }
+                            Divider()
+                            Button {
+                                beginCreateAgentSidebarSection(for: bot)
+                            } label: {
+                                Label("新建分组…", systemImage: "folder.badge.plus")
+                            }
                         } label: {
-                            Label("新建分组…", systemImage: "folder.badge.plus")
+                            Label("移到分组", systemImage: "folder")
                         }
-                    } label: {
-                        Label("移到分组", systemImage: "folder")
                     }
                     Button {
                         toggleBotPin(bot)

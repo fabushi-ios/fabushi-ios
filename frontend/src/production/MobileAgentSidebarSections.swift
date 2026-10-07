@@ -7,6 +7,10 @@ struct MobileAgentSidebarSection: Codable, Identifiable, Equatable {
 }
 
 enum MobileAgentSidebarSections {
+    static func canAssign(isPinned: Bool, isHidden: Bool) -> Bool {
+        !isPinned && !isHidden
+    }
+
     static func normalized(_ sections: [MobileAgentSidebarSection]) -> [MobileAgentSidebarSection] {
         var seenSections = Set<String>()
         var claimedAgents = Set<String>()

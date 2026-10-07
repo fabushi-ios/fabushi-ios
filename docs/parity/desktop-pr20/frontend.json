@@ -313,11 +313,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native Bot rows now ship rename/duplicate/delete through the existing Host lifecycle owner and surface the same actions to FabushiAppAgentSurface. Pin/hide/unread/copy/section/profile/full-conversation/async-task responsibilities still require source-grounded iOS mappings; no completion claim is made.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; current exact-head CI pending",
-      "notes": "Partial production overlap only; remains mapped."
+      "ios_platform_delta": "Native SwiftUI Bot-row menus preserve Desktop AgentRowActions semantics while keeping lifecycle truth in existing owners: profile/settings and async-task queries route through the Host bridge; full conversation uses the canonical Host conversationId; hide/unread/duplicate/delete mutate the canonical Rust Host; copy is presentation-only; section membership is account-scoped native presentation state; pinned or hidden Bots cannot be moved between sections, matching Desktop gating.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileAgentSidebarSections.swift; frontend/src/production/GrokMobileShell.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The native row now exposes profile/settings, full conversation, async tasks, section moves/new section, pin, unread, duplicate, copy conversation ID, hide/restore, and destructive delete. Section movement is suppressed for pinned/hidden Bots like Desktop. Keep below verified until this exact iOS HEAD obtains current ordinary/protected acceptance and artifact provenance."
     },
     {
       "desktop_path": "frontend/src/production/CommandPalette.tsx",
