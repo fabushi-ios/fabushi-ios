@@ -116,13 +116,13 @@
       "desktop_owner": "shared product experience contract",
       "desktop_visible_effect": "Users see the same core Fabushi modules, practice/library entry points, product language and high-level visual information architecture across supported clients.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/app-shell/ContentView.swift",
+      "ios_target_path": "frontend/src/production/FabushiProductExperience.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Applicable as product information architecture, not as a TypeScript data table. iOS already owns Global Dharma/Mini Apps/chat shell natively, but the full shared module set in this row (notably flashcards, sutra, meditation and faliu product surfaces) is not yet closed by one native owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/recovered/features/app-shell/ContentView.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
-      "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d. Keep mapped until every applicable module represented by this composite contract has a shipping iOS surface and acceptance evidence."
+      "ios_platform_delta": "iOS owns the shared Fabushi product information architecture as a native Product Hub on the shipping home. Global Dharma and Mahayana AI route into their existing owners; flashcards, sutra, meditation and faliu have native interactive surfaces with iOS-local state rather than a copied TypeScript table.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/FabushiProductExperience.swift; frontend/src/production/GrokMobileShell+Home.swift; mobile/ios/Fabushi/GlobalDharmaMiniAppBridge.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "test_evidence": "mobile/ios/FabushiTests/FabushiProductExperienceTests.swift; mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The six canonical modules are reachable from the shipping iOS home; same-head Actions and protected acceptance are still required before verified promotion."
     },
     {
       "desktop_path": "frontend/packages/shared/src/brand.ts",
