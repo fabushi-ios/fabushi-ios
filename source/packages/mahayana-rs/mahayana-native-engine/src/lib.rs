@@ -190,6 +190,8 @@ struct ApprovalWaiter {
 struct OperationControl {
     interrupted: AtomicBool,
     suspended: AtomicBool,
+    checkpoint_ready: AtomicBool,
+    checkpoint_ready_signal: Notify,
     suspension_persisted: AtomicBool,
     suspension_settled: Notify,
 }
@@ -1853,6 +1855,8 @@ impl EngineBackend for NativeEngine {
                 Self::start_attempt(&mut session, &request.operation_id, &prompt.id);
             session.updated_at_ms = now_ms();
             self.persist_session_state_if_configured(&request.session_id, &session)?;
+            control.checkpoint_ready.store(true, Ordering::SeqCst);
+            control.checkpoint_ready_signal.notify_one();
             self.execute_active_prompt(
                 &mut session,
                 &request.operation_id,
@@ -2012,21 +2016,25 @@ impl EngineBackend for NativeEngine {
         }
         control.suspended.store(true, Ordering::SeqCst);
         self.cancel_operation_approvals(&request.operation_id)?;
-        if control.suspension_persisted.load(Ordering::SeqCst) {
-            return Ok(());
+        if !control.checkpoint_ready.load(Ordering::SeqCst) {
+            let ready = control.checkpoint_ready_signal.notified();
+            if !control.checkpoint_ready.load(Ordering::SeqCst) {
+                tokio::time::timeout(Duration::from_secs(10), ready)
+                    .await
+                    .map_err(|_| KernelError::Backend("operation suspension checkpoint timed out".into()))?;
+            }
         }
-        let settled = control.suspension_settled.notified();
-        if control.suspension_persisted.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-        tokio::time::timeout(Duration::from_secs(10), settled)
-            .await
-            .map_err(|_| KernelError::Backend("operation suspension checkpoint timed out".into()))?;
-        if !control.suspension_persisted.load(Ordering::SeqCst) {
+        if !control.checkpoint_ready.load(Ordering::SeqCst) {
             return Err(KernelError::Backend(
                 "operation suspension did not reach a durable checkpoint".into(),
             ));
         }
+        // The active prompt and its attempt were persisted immediately before
+        // execution entered any model/tool await. A suspend request therefore
+        // has a real restart point even while an external inference is still
+        // outstanding; the old completion is fenced by this control.
+        control.suspension_persisted.store(true, Ordering::SeqCst);
+        control.suspension_settled.notify_one();
         Ok(())
     }
 
@@ -4463,9 +4471,11 @@ mod tests {
             }
             tokio::task::yield_now().await;
         }
-        release.notify_waiters();
-        suspend.await.expect("suspend task").expect("durable suspend");
-        run.await.expect("run task").expect("suspended run returns cleanly");
+        tokio::time::timeout(Duration::from_secs(1), suspend)
+            .await
+            .expect("suspend must acknowledge while inference remains blocked")
+            .expect("suspend task")
+            .expect("durable suspend");
 
         let bytes = std::fs::read(&persisted).expect("read suspended snapshot");
         let snapshot: KernelSessionSnapshot =
@@ -4477,6 +4487,8 @@ mod tests {
             Some("continue durable work")
         );
 
+        release.notify_waiters();
+        run.await.expect("run task").expect("suspended run returns cleanly");
         drop(engine);
         let resumed_model = Arc::new(FakeModel {
             outputs: Mutex::new(VecDeque::from([json!({
