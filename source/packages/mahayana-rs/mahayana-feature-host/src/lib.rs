@@ -4,6 +4,7 @@
 //! Clippy findings are tracked at module scope. The expectations are narrow:
 //! they do not disable warnings for the crate or skip any tests.
 
+mod channel_management;
 mod client_side_tool_v2;
 mod harness;
 mod product_harness;

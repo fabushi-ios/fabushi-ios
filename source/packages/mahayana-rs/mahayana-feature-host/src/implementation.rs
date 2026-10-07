@@ -15,6 +15,7 @@ use chrono::TimeZone;
 use chrono::Timelike;
 use chrono::Utc;
 
+use crate::channel_management::AgentChannelStore;
 use crate::client_side_tool_v2::{ClientSideToolV2Producer, FAMILY as CLIENT_SIDE_TOOL_V2_FAMILY};
 use fabushi_messaging_core::BlobId;
 use fabushi_messaging_core::ClientEnvelope as MessagingClientEnvelope;
@@ -760,6 +761,7 @@ pub struct FeatureHostController {
     settings_path: Option<PathBuf>,
     remote_device_state_path: Option<PathBuf>,
     async_tasks_path: Option<PathBuf>,
+    channel_store: AgentChannelStore,
     test_auth_state_path: Option<PathBuf>,
     memory_root_path: Option<PathBuf>,
     workflow_root_path: Option<PathBuf>,
@@ -814,6 +816,10 @@ impl FeatureHostController {
             config.profile_id,
             std::process::id()
         )));
+        let channel_store = AgentChannelStore::new(
+            test_data_dir,
+            test_data_dir.map(|_| "fabushi-test-channel-storage".to_string()),
+        );
         let info = HostInfo {
             runtime_version: "mahayana-test-backend".to_string(),
             protocol_version: HOST_PROTOCOL_VERSION.to_string(),
@@ -840,6 +846,7 @@ impl FeatureHostController {
             settings_path: None,
             remote_device_state_path: None,
             async_tasks_path: test_data_dir.map(|data_dir| data_dir.join("pending-async-tasks.json")),
+            channel_store,
             test_auth_state_path,
             memory_root_path,
             workflow_root_path,
@@ -914,6 +921,10 @@ impl FeatureHostController {
             .data_dir
             .as_ref()
             .map(|data_dir| data_dir.join("workflows"));
+        let channel_store = AgentChannelStore::new(
+            host_config.runtime.data_dir.as_deref(),
+            host_config.product_storage_passphrase.clone(),
+        );
         let runtime = MahayanaHost::create(host_config)?;
         let info = HostInfo {
             runtime_version: format!("mahayana-abi-{}", runtime.status().runtime_abi_version),
@@ -948,6 +959,7 @@ impl FeatureHostController {
             settings_path,
             remote_device_state_path,
             async_tasks_path,
+            channel_store,
             test_auth_state_path: None,
             memory_root_path,
             workflow_root_path,
@@ -7628,6 +7640,108 @@ impl FeatureHostController {
         self.memory_root_path
             .clone()
             .ok_or_else(|| FeatureHostError::Contract("messaging storage is unavailable".into()))
+    }
+
+
+    fn channel_account_id(&self) -> Result<String, FeatureHostError> {
+        if self.config.mode == HostMode::Test {
+            return Ok(format!("test:{}", self.config.profile_id));
+        }
+        #[cfg(feature = "production")]
+        {
+            self.active_account_id
+                .lock()
+                .map_err(|_| FeatureHostError::StatePoisoned)?
+                .clone()
+                .ok_or_else(|| {
+                    FeatureHostError::Contract(
+                        "channel management requires an authenticated Fabushi account".into(),
+                    )
+                })
+        }
+        #[cfg(not(feature = "production"))]
+        {
+            Err(FeatureHostError::ProductionUnavailable)
+        }
+    }
+
+    fn require_channel_agent(&self, agent_id: &str) -> Result<String, FeatureHostError> {
+        let agent_id = required(agent_id.to_string(), "channel agent id")?;
+        let state = self.state()?;
+        ensure_open(&state)?;
+        if !state.bots.contains_key(&agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unknown bot: {agent_id}"
+            )));
+        }
+        Ok(agent_id)
+    }
+
+    /// Return only UI-safe channel metadata. Connector credentials stay in the
+    /// encrypted Rust-owned channel secret store and are never serialized.
+    pub fn agent_channels(&self, agent_id: &str) -> Result<Value, FeatureHostError> {
+        let agent_id = self.require_channel_agent(agent_id)?;
+        let account_id = self.channel_account_id()?;
+        let connections = self
+            .channel_store
+            .list_connections(&account_id, &agent_id)
+            .map_err(FeatureHostError::Contract)?;
+        serde_json::to_value(connections)
+            .map_err(|error| FeatureHostError::Contract(format!("encode channel connections: {error}")))
+    }
+
+    pub fn connect_agent_channel(
+        &self,
+        agent_id: &str,
+        platform: &str,
+        token: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let agent_id = self.require_channel_agent(agent_id)?;
+        let platform = required(platform.to_string(), "channel platform")?;
+        if token.trim().is_empty() {
+            return Err(FeatureHostError::Contract(
+                "channel credential must not be empty".into(),
+            ));
+        }
+        let account_id = self.channel_account_id()?;
+        let connections = self
+            .channel_store
+            .connect(&account_id, &agent_id, &platform, token)
+            .map_err(FeatureHostError::Contract)?;
+        serde_json::to_value(connections)
+            .map_err(|error| FeatureHostError::Contract(format!("encode channel connections: {error}")))
+    }
+
+    pub fn disconnect_agent_channel(
+        &self,
+        agent_id: &str,
+        platform: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let agent_id = self.require_channel_agent(agent_id)?;
+        let platform = required(platform.to_string(), "channel platform")?;
+        let account_id = self.channel_account_id()?;
+        let connections = self
+            .channel_store
+            .disconnect(&account_id, &agent_id, &platform)
+            .map_err(FeatureHostError::Contract)?;
+        serde_json::to_value(connections)
+            .map_err(|error| FeatureHostError::Contract(format!("encode channel connections: {error}")))
+    }
+
+    pub fn refresh_agent_channel(
+        &self,
+        agent_id: &str,
+        platform: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let agent_id = self.require_channel_agent(agent_id)?;
+        let platform = required(platform.to_string(), "channel platform")?;
+        let account_id = self.channel_account_id()?;
+        let connections = self
+            .channel_store
+            .refresh(&account_id, &agent_id, &platform)
+            .map_err(FeatureHostError::Contract)?;
+        serde_json::to_value(connections)
+            .map_err(|error| FeatureHostError::Contract(format!("encode channel connections: {error}")))
     }
 
     #[cfg(feature = "production")]

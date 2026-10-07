@@ -19,6 +19,7 @@ internal struct MobileBotAgentSettingsSheet: View {
     @State private var pending: GrokMobileAgentSettingsModel.Pending?
     @State private var failure: String?
     @State private var avatarEditorPresented = false
+    @State private var channelsPresented = false
     @State private var generation = 0
     @State private var mutationTask: Task<Void, Never>?
 
@@ -95,6 +96,16 @@ internal struct MobileBotAgentSettingsSheet: View {
                     onRosterChanged(updated)
                 },
                 onClose: { avatarEditorPresented = false }
+            )
+        }
+        .sheet(isPresented: $channelsPresented) {
+            MobileAgentChannelsPanel(
+                agentId: currentAgent.id,
+                agentName: currentAgent.name,
+                bridge: bridge,
+                accountScopeKey: accountScopeKey,
+                reconnectGeneration: reconnectGeneration,
+                onClose: { channelsPresented = false }
             )
         }
         .onChange(of: agent.id) { _, _ in invalidatePending() }
@@ -190,6 +201,20 @@ internal struct MobileBotAgentSettingsSheet: View {
     @ViewBuilder
     private var agentOnlySections: some View {
         if !currentAgent.isGroup {
+            Section {
+                Button {
+                    channelsPresented = true
+                } label: {
+                    Label("Channels", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .disabled(pending != nil)
+                .accessibilityIdentifier("mobile-agent-settings-channels")
+            } header: {
+                Text("Channels")
+            } footer: {
+                Text("连接状态由 Rust Host 按账号与 Agent 持有；凭据加密保存且不会回传到界面。")
+            }
+
             MobileBotRoutinesSection(
                 agentId: currentAgent.id,
                 bridge: bridge,

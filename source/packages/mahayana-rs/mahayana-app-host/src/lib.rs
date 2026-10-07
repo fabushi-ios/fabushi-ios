@@ -248,6 +248,32 @@ impl AppHost {
                     string_param(&params, "emoji")?,
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "getAgentChannels" => self
+                .feature
+                .agent_channels(string_param(&params, "id")?)
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "connectChannel" => self
+                .feature
+                .connect_agent_channel(
+                    string_param(&params, "id")?,
+                    string_param(&params, "platform")?,
+                    string_param(&params, "token")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "disconnectChannel" => self
+                .feature
+                .disconnect_agent_channel(
+                    string_param(&params, "id")?,
+                    string_param(&params, "platform")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
+            "refreshChannel" => self
+                .feature
+                .refresh_agent_channel(
+                    string_param(&params, "id")?,
+                    string_param(&params, "platform")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "getAsyncTasks" => {
                 let agent_id = string_param(&params, "id")?;
                 let tasks = self
