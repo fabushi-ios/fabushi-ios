@@ -106,6 +106,7 @@ internal struct MobileBotChat: View {
     @State private var voiceTranscriber = OfflineSpeechTranscriber()
     @State private var transcribingVoice = false
     @State private var voiceInputGeneration = 0
+    @State private var reactionGeneration = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -384,7 +385,10 @@ internal struct MobileBotChat: View {
             let entryId: String = "\(entry.id)"
             let entryKind: String = "\(entry.kind.rawValue)"
             let entryRole: String = "\(entry.role.rawValue)"
-            return "\(entryId):\(entryKind):\(entryRole)"
+            let reactionFingerprint = entry.reactions
+                .map { "\($0.emoji):\($0.by)" }
+                .joined(separator: "|")
+            return "\(entryId):\(entryKind):\(entryRole):\(reactionFingerprint)"
         }
         let entriesFingerprint: String = entryFingerprints.joined(separator: ",")
 
@@ -579,6 +583,7 @@ internal struct MobileBotChat: View {
                 VStack(alignment: .leading, spacing: 7) {
                     messageTextContent(entry)
                     attachmentContent(entry)
+                    reactionPills(entry)
                 }
                 .foregroundStyle(.white)
                 .tint(.white)
@@ -587,6 +592,7 @@ internal struct MobileBotChat: View {
                 .contextMenu {
                     Button("Reply") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = false }
                     Button("Reply in Fork") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = true }
+                    reactionMenu(entry)
                 }
             }
         } else {
@@ -598,15 +604,113 @@ internal struct MobileBotChat: View {
                         messageTextContent(entry)
                             .foregroundStyle(.black)
                         attachmentContent(entry)
+                        reactionPills(entry)
                     }
                     .padding(.horizontal, 15).padding(.vertical, 10)
                     .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .contextMenu {
                         Button("Reply") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = false }
                         Button("Reply in Fork") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = true }
+                        reactionMenu(entry)
                     }
                     Spacer(minLength: 30)
                 }
+            }
+        }
+    }
+
+    private static let quickReactionEmojis = ["👍", "👎", "❤️", "😂", "🎉", "😮"]
+
+    @ViewBuilder
+    private func reactionMenu(_ entry: MobileChatMessage) -> some View {
+        if entry.kind == .message, !entry.streaming {
+            Menu("React") {
+                ForEach(Self.quickReactionEmojis, id: \.self) { emoji in
+                    Button(emoji) { toggleReaction(entry, emoji: emoji) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func reactionPills(_ entry: MobileChatMessage) -> some View {
+        let grouped = Dictionary(grouping: entry.reactions, by: \.emoji)
+        if !grouped.isEmpty {
+            HStack(spacing: 5) {
+                ForEach(grouped.keys.sorted(), id: \.self) { emoji in
+                    let count = grouped[emoji]?.count ?? 0
+                    Button {
+                        toggleReaction(entry, emoji: emoji)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(emoji)
+                            if count > 1 { Text("\(count)").font(.caption2) }
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            entry.myReactions.contains(emoji)
+                                ? Color.accentColor.opacity(0.16)
+                                : Color.black.opacity(0.06),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        entry.myReactions.contains(emoji)
+                            ? "Remove reaction \(emoji)"
+                            : "React \(emoji)"
+                    )
+                    .accessibilityIdentifier(
+                        Self.semanticId("mobile-bot-reaction-\(entry.id)-\(emoji)")
+                    )
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func toggleReaction(_ entry: MobileChatMessage, emoji: String) {
+        guard entry.kind == .message, !entry.streaming,
+              let index = entries.firstIndex(where: { $0.id == entry.id })
+        else { return }
+        let entryId = entry.canonicalMessageId ?? entry.id
+        let had = entries[index].myReactions.contains(emoji)
+        if had {
+            entries[index].reactions.removeAll { $0.emoji == emoji && $0.by == "me" }
+            entries[index].myReactions.remove(emoji)
+        } else {
+            entries[index].reactions.append(.init(emoji: emoji, by: "me"))
+            entries[index].myReactions.insert(emoji)
+        }
+
+        reactionGeneration &+= 1
+        let generation = reactionGeneration
+        let agentId = bot.id
+        Task { @MainActor in
+            do {
+                let response = try await bridge.request(
+                    method: "reactToMessage",
+                    params: [
+                        "entryId": entryId,
+                        "emoji": emoji,
+                        "agentId": agentId,
+                    ]
+                )
+                guard generation == reactionGeneration,
+                      agentId == bot.id,
+                      let object = response.value as? [String: Any],
+                      object["applied"] as? Bool == true,
+                      let currentIndex = entries.firstIndex(where: { $0.id == entry.id })
+                else { return }
+                let canonical = projectMobileTranscriptReactions(object["reactions"])
+                entries[currentIndex].reactions = canonical
+                entries[currentIndex].myReactions = Set(
+                    canonical.filter { $0.by == "me" }.map(\.emoji)
+                )
+            } catch {
+                // Desktop keeps the optimistic value until the authoritative transcript
+                // reconciles. Preserve that behavior rather than inventing a second error owner.
             }
         }
     }
