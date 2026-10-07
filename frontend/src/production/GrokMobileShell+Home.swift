@@ -41,6 +41,24 @@ extension GrokMobileShell {
                         commandPaletteContent
                     }
 
+                    if !searchOpen {
+                        FabushiProductHub(
+                            onOpenGlobalDharma: {
+                                legacySection = .miniapps
+                                legacyOpen = true
+                            },
+                            onOpenAI: {
+                                selectedBot = bots.first(where: { $0.id == "mahayana-assistant" })
+                                    ?? MobileBotSummary(
+                                        id: "mahayana-assistant",
+                                        name: "Mahayana",
+                                        description: "Ready to help"
+                                    )
+                            }
+                        )
+                        .padding(.bottom, 12)
+                    }
+
                     if let botActionError {
                         Text(botActionError)
                             .font(.footnote)
