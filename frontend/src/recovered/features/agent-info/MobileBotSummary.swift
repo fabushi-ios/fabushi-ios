@@ -1,5 +1,11 @@
 import SwiftUI
 
+internal enum MobileBotLastEntry: Equatable, Sendable {
+    case text(String)
+    case attachment(count: Int, kinds: [String: Int])
+    case link(String)
+}
+
 internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -9,6 +15,14 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let hidden: Bool
     let unread: Bool
     let conversationId: String?
+    let lastEntry: MobileBotLastEntry?
+    let lastMessageId: String?
+    let lastMessagePreview: String?
+    let updatedAtMs: Int64?
+    let isComposingMessage: Bool
+    let waitingReason: String?
+    let isRunning: Bool
+    let draftPrompt: String?
     let miniAppId: String?
     let menuButtonText: String?
     let isGroup: Bool
@@ -24,6 +38,14 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         hidden: Bool = false,
         unread: Bool = false,
         conversationId: String? = nil,
+        lastEntry: MobileBotLastEntry? = nil,
+        lastMessageId: String? = nil,
+        lastMessagePreview: String? = nil,
+        updatedAtMs: Int64? = nil,
+        isComposingMessage: Bool = false,
+        waitingReason: String? = nil,
+        isRunning: Bool = false,
+        draftPrompt: String? = nil,
         miniAppId: String? = nil,
         menuButtonText: String? = nil,
         isGroup: Bool = false,
@@ -38,6 +60,14 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         self.hidden = hidden
         self.unread = unread
         self.conversationId = conversationId
+        self.lastEntry = lastEntry
+        self.lastMessageId = lastMessageId
+        self.lastMessagePreview = lastMessagePreview
+        self.updatedAtMs = updatedAtMs
+        self.isComposingMessage = isComposingMessage
+        self.waitingReason = waitingReason
+        self.isRunning = isRunning
+        self.draftPrompt = draftPrompt
         self.miniAppId = miniAppId
         self.menuButtonText = menuButtonText
         self.isGroup = isGroup
