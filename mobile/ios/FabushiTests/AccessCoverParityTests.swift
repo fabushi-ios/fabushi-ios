@@ -152,4 +152,165 @@ final class AccessCoverParityTests: XCTestCase {
         XCTAssertFalse(state.isAwaitingFirstBox)
         XCTAssertEqual(FirstBoxGate.reset(), .initial)
     }
+    func testLiveAccessProjectionAcceptsWireAndNamedPayloadsFailClosed() {
+        XCTAssertEqual(
+            AccessCoverModel.project(
+                foundationValue: ["state": 3, "reason": 6]
+            ),
+            .init(state: .paymentRequired, reason: .freeTrialAvailable)
+        )
+        XCTAssertEqual(
+            AccessCoverModel.project(
+                foundationValue: [
+                    "access": [
+                        "state": "unavailable",
+                        "reason": "teamAccessRequired",
+                    ],
+                ]
+            ),
+            .init(state: .unavailable, reason: .teamAccessRequired)
+        )
+        XCTAssertEqual(
+            AccessCoverModel.project(foundationValue: ["unexpected": true]),
+            .unknown
+        )
+    }
+
+    func testRosterProjectionRestoresThenReplacesWithCompleteLiveRoster() {
+        let restoredBot = MobileBotSummary(
+            id: "restored",
+            name: "Restored",
+            description: "cached"
+        )
+        let liveBot = MobileBotSummary(
+            id: "live",
+            name: "Live",
+            description: "authoritative"
+        )
+
+        let restored = AccessRosterSnapshotProjection.restore([restoredBot])
+        XCTAssertEqual(restored.bots, [restoredBot])
+        XCTAssertTrue(restored.isShowingRestoredRoster)
+        XCTAssertFalse(restored.hasCompleteRoster)
+        XCTAssertEqual(restored.loadState, .ready)
+
+        let fetching = AccessRosterSnapshotProjection.beginFetch(restored)
+        XCTAssertTrue(fetching.isFetching)
+        XCTAssertEqual(fetching.loadState, .ready)
+
+        let complete = AccessRosterSnapshotProjection.complete(
+            [liveBot],
+            previous: fetching
+        )
+        XCTAssertEqual(complete.bots, [liveBot])
+        XCTAssertTrue(complete.hasCompleteRoster)
+        XCTAssertFalse(complete.isShowingRestoredRoster)
+        XCTAssertFalse(complete.isFetching)
+        XCTAssertEqual(complete.confirmedFetches, 1)
+        XCTAssertEqual(complete.transport, .connected)
+    }
+
+    func testRosterFailurePreservesRestoredRowsAndSeparatesNetworkFromAccessBlock() {
+        let cached = MobileBotSummary(
+            id: "cached",
+            name: "Cached",
+            description: "offline"
+        )
+        let restored = AccessRosterSnapshotProjection.restore([cached])
+        let network = AccessRosterFailureClassifier.failure(
+            for: URLError(.dnsLookupFailed),
+            access: .unknown
+        )
+        XCTAssertEqual(network.code, "dns")
+        XCTAssertEqual(network.transportKind, "dns")
+
+        let failed = AccessRosterSnapshotProjection.fail(network, previous: restored)
+        XCTAssertEqual(failed.bots, [cached])
+        XCTAssertTrue(failed.isShowingRestoredRoster)
+        XCTAssertEqual(failed.loadState, .ready)
+        XCTAssertEqual(failed.transport, .down)
+
+        let blocked = AccessRosterFailureClassifier.failure(
+            for: NSError(
+                domain: "Fabushi.AccessRoster",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "roster denied"]
+            ),
+            access: .init(state: .paymentRequired, reason: .paywallIndividual)
+        )
+        XCTAssertEqual(blocked.code, ACCESS_BLOCKED_FAILURE_CODE)
+        XCTAssertNil(blocked.transportKind)
+    }
+
+    func testRosterPersistenceIsAccountScopedAndRejectsCrossAccountReuse() throws {
+        let suite = "AccessCoverParityTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let bot = MobileBotSummary(
+            id: "agent-1",
+            name: "Agent One",
+            description: "Persisted",
+            unread: true,
+            lastMessagePreview: "hello",
+            updatedAtMs: 42,
+            isRunning: true,
+            memberIds: ["peer-1"]
+        )
+        AccessRosterPersistence.save(
+            [bot],
+            accountScopeKey: "account-a",
+            defaults: defaults
+        )
+
+        XCTAssertEqual(
+            AccessRosterPersistence.load(
+                accountScopeKey: "account-a",
+                defaults: defaults
+            ),
+            [bot]
+        )
+        XCTAssertTrue(
+            AccessRosterPersistence.load(
+                accountScopeKey: "account-b",
+                defaults: defaults
+            ).isEmpty
+        )
+    }
+
+    func testAccessCoverCompositionUsesStructuredRosterFailureAndSuppressors() {
+        let blocked = AccessRosterFailure(
+            code: ACCESS_BLOCKED_FAILURE_CODE,
+            message: "blocked",
+            transportKind: nil
+        )
+        let roster = AccessRosterSnapshot(
+            bots: [],
+            hasCompleteRoster: false,
+            isShowingRestoredRoster: false,
+            loadState: .error,
+            failure: blocked,
+            isFetching: false,
+            confirmedFetches: 0,
+            transport: .connected
+        )
+        let state = AccessCoverComposition.project(
+            access: .init(state: .paymentRequired, reason: .paywallIndividual),
+            roster: roster,
+            firstBox: .initial,
+            isComputerRebuildLocked: false
+        )
+        XCTAssertTrue(state.isVisible)
+        XCTAssertTrue(state.isError)
+
+        XCTAssertFalse(
+            AccessCoverComposition.project(
+                access: state.access,
+                roster: roster,
+                firstBox: .initial,
+                isComputerRebuildLocked: true
+            ).isVisible
+        )
+    }
+
 }
