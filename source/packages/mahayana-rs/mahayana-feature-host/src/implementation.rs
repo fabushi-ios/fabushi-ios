@@ -1041,6 +1041,152 @@ impl FeatureHostController {
         Ok(())
     }
 
+    pub fn react_to_message(
+        &self,
+        agent_id: &str,
+        entry_id: &str,
+        emoji: &str,
+    ) -> Result<Value, FeatureHostError> {
+        let agent_id = required(agent_id.to_string(), "reaction agent id")?;
+        let entry_id = required(entry_id.to_string(), "reaction entry id")?;
+        let emoji = emoji.trim().to_string();
+        if emoji.is_empty() {
+            return Ok(json!({"applied": false}));
+        }
+        #[cfg(feature = "production")]
+        {
+            self.require_authenticated_account()?;
+            let target = {
+                let state = self.state()?;
+                ensure_open(&state)?;
+                state
+                    .bots
+                    .get(&agent_id)
+                    .cloned()
+                    .ok_or_else(|| FeatureHostError::Contract(format!("unknown bot: {agent_id}")))?
+            };
+            let conversation_id = target.conversation_id.clone().ok_or_else(|| {
+                FeatureHostError::Contract(format!("bot has no conversation: {}", target.id))
+            })?;
+            let runtime = self.runtime()?;
+            let runtime_conversation_id = ConversationId(conversation_id.clone());
+            let mut message = runtime
+                .conversation_history(runtime_conversation_id.clone(), 500)?
+                .into_iter()
+                .find(|message| message.id.as_str() == entry_id)
+                .ok_or_else(|| {
+                    FeatureHostError::Contract(format!(
+                        "reaction entry is not in canonical transcript: {entry_id}"
+                    ))
+                })?;
+            let is_user_message = matches!(message.role, RuntimeMessageRole::User);
+            let mut reactions = message
+                .metadata
+                .get("reactions")
+                .and_then(Value::as_array)
+                .map(|rows| {
+                    rows.iter()
+                        .filter_map(|row| {
+                            let emoji = row.get("emoji")?.as_str()?.trim();
+                            let by = row.get("by")?.as_str()?.trim();
+                            (!emoji.is_empty() && !by.is_empty())
+                                .then(|| (emoji.to_string(), by.to_string()))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let had = reactions
+                .iter()
+                .any(|(candidate, by)| candidate == &emoji && by == "me");
+            if had {
+                reactions.retain(|(candidate, by)| !(candidate == &emoji && by == "me"));
+            } else {
+                reactions.push((emoji.clone(), "me".into()));
+            }
+
+            if !message.metadata.is_object() {
+                message.metadata = json!({});
+            }
+            let metadata = message
+                .metadata
+                .as_object_mut()
+                .expect("reaction metadata must be an object");
+            if reactions.is_empty() {
+                metadata.remove("reactions");
+            } else {
+                metadata.insert(
+                    "reactions".into(),
+                    Value::Array(
+                        reactions
+                            .iter()
+                            .map(|(emoji, by)| json!({"emoji": emoji, "by": by}))
+                            .collect(),
+                    ),
+                );
+            }
+            if !runtime.replace_conversation_message(runtime_conversation_id, message.clone())? {
+                return Ok(json!({"applied": false}));
+            }
+
+            let reaction_rows = reactions
+                .iter()
+                .map(|(emoji, by)| json!({"emoji": emoji, "by": by}))
+                .collect::<Vec<_>>();
+            let my_reactions = reactions
+                .iter()
+                .filter(|(_, by)| by == "me")
+                .map(|(emoji, _)| Value::String(emoji.clone()))
+                .collect::<Vec<_>>();
+            {
+                let mut state = self.state()?;
+                ensure_open(&state)?;
+                state.events.push_back(HostEvent::TransportEvent {
+                    channel: "transcript.reaction".into(),
+                    payload: json!({
+                        "agentId": agent_id,
+                        "entryId": entry_id,
+                        "reactions": reaction_rows,
+                        "myReactions": my_reactions,
+                    }),
+                });
+            }
+
+            let mut resume_operation_id = None;
+            if !had && !is_user_message {
+                let normalized = message.text.split_whitespace().collect::<Vec<_>>().join(" ");
+                let quote = if normalized.is_empty() {
+                    entry_id.clone()
+                } else if normalized.chars().count() > 80 {
+                    format!("{}…", normalized.chars().take(80).collect::<String>())
+                } else {
+                    normalized
+                };
+                let prompt = format!(
+                    "[The user reacted {emoji} to your message: \"{quote}\". You don't need to reply; act on it only if it's useful (e.g. acknowledge, adjust, or continue).]"
+                );
+                resume_operation_id = self.schedule_background_agent_turn(
+                    &target,
+                    "message-reaction",
+                    prompt,
+                    format!("reaction:{}:{}", entry_id, now_millis()),
+                    Vec::new(),
+                )?;
+            }
+            return Ok(json!({
+                "applied": true,
+                "isAdding": !had,
+                "reactions": reaction_rows,
+                "myReactions": my_reactions,
+                "resumeOperationId": resume_operation_id,
+            }));
+        }
+        #[cfg(not(feature = "production"))]
+        {
+            let _ = (agent_id, entry_id, emoji);
+            Err(FeatureHostError::ProductionUnavailable)
+        }
+    }
+
     pub fn pending_cloud_agent_wakes(
         &self,
     ) -> Result<Vec<NativeCloudAgentWake>, FeatureHostError> {
