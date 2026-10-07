@@ -481,14 +481,22 @@ fn persist_pending_async_tasks(
     std::fs::write(&part, bytes).map_err(|error| {
         FeatureHostError::Contract(format!("write pending async task store: {error}"))
     })?;
-    if path.exists() {
-        std::fs::remove_file(path).map_err(|error| {
-            FeatureHostError::Contract(format!("replace pending async task store: {error}"))
-        })?;
+    match std::fs::rename(&part, path) {
+        Ok(()) => Ok(()),
+        Err(first_error) if path.exists() => {
+            std::fs::remove_file(path).map_err(|error| {
+                FeatureHostError::Contract(format!("replace pending async task store: {error}"))
+            })?;
+            std::fs::rename(&part, path).map_err(|_| {
+                FeatureHostError::Contract(format!(
+                    "commit pending async task store: {first_error}"
+                ))
+            })
+        }
+        Err(error) => Err(FeatureHostError::Contract(format!(
+            "commit pending async task store: {error}"
+        ))),
     }
-    std::fs::rename(&part, path).map_err(|error| {
-        FeatureHostError::Contract(format!("commit pending async task store: {error}"))
-    })
 }
 
 #[derive(Debug)]
@@ -14328,6 +14336,129 @@ mod tests {
             SurfacePlatform::Electron,
         )
         .expect("create feature Host")
+    }
+
+    fn async_task_fixture(
+        id: &str,
+        agent_id: &str,
+        kind: AsyncTaskKind,
+        started_at_ms: i64,
+    ) -> AsyncTaskSummary {
+        AsyncTaskSummary {
+            kind,
+            id: id.into(),
+            parent_agent_id: agent_id.into(),
+            label: format!("task {id}"),
+            status: AsyncTaskStatus::Running,
+            started_at_ms,
+            detail: None,
+            subagent_type: (kind == AsyncTaskKind::Subagent).then(|| "task".into()),
+            resource_id: None,
+        }
+    }
+
+    #[test]
+    fn async_task_durability_rearms_recent_rows_and_prunes_rows_older_than_48h() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-async-task-durability-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        std::fs::create_dir_all(&root).expect("create async task test root");
+        let path = root.join("pending.json");
+        let now = 100_000_000_i64;
+        let mut tasks = BTreeMap::new();
+        tasks.insert(
+            "recent-shell".into(),
+            async_task_fixture(
+                "recent-shell",
+                "agent-a",
+                AsyncTaskKind::Shell,
+                now - ASYNC_TASK_STALE_MAX_AGE_MS,
+            ),
+        );
+        tasks.insert(
+            "stale-cloud".into(),
+            async_task_fixture(
+                "stale-cloud",
+                "agent-a",
+                AsyncTaskKind::CloudAgent,
+                now - ASYNC_TASK_STALE_MAX_AGE_MS - 1,
+            ),
+        );
+        persist_pending_async_tasks(Some(&path), &tasks).expect("persist pending tasks");
+
+        let restored = load_pending_async_tasks(&path, now);
+        assert_eq!(restored.len(), 1);
+        let shell = restored.get("recent-shell").expect("recent shell restored");
+        assert_eq!(shell.parent_agent_id, "agent-a");
+        assert!(
+            shell
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("rearmed after a Host restart"))
+        );
+
+        persist_pending_async_tasks(Some(&path), &restored).expect("prune durable store");
+        let raw = std::fs::read_to_string(&path).expect("read pruned pending store");
+        assert!(!raw.contains("stale-cloud"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn async_task_settlement_removes_durable_store_when_last_task_finishes() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-async-task-settlement-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        std::fs::create_dir_all(&root).expect("create async task settlement root");
+        let path = root.join("pending.json");
+        let mut tasks = BTreeMap::new();
+        tasks.insert(
+            "subagent-1".into(),
+            async_task_fixture("subagent-1", "agent-a", AsyncTaskKind::Subagent, 10),
+        );
+        persist_pending_async_tasks(Some(&path), &tasks).expect("persist one task");
+        assert!(path.is_file());
+
+        tasks.remove("subagent-1");
+        persist_pending_async_tasks(Some(&path), &tasks).expect("settle final task");
+        assert!(!path.exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn async_task_projection_is_agent_scoped_sorted_and_single_owner() {
+        let controller = controller();
+        {
+            let mut state = controller.state().expect("state");
+            state.async_tasks.insert(
+                "later".into(),
+                async_task_fixture("later", "agent-a", AsyncTaskKind::CloudAgent, 20),
+            );
+            state.async_tasks.insert(
+                "earlier".into(),
+                async_task_fixture("earlier", "agent-a", AsyncTaskKind::Shell, 10),
+            );
+            state.async_tasks.insert(
+                "other".into(),
+                async_task_fixture("other", "agent-b", AsyncTaskKind::Subagent, 5),
+            );
+        }
+
+        let projected = controller
+            .async_tasks_for_agent("agent-a")
+            .expect("project agent tasks");
+        assert_eq!(
+            projected.iter().map(|task| task.id.as_str()).collect::<Vec<_>>(),
+            vec!["earlier", "later"]
+        );
+        assert!(
+            projected
+                .iter()
+                .all(|task| task.parent_agent_id == "agent-a")
+        );
     }
 
     fn drain(controller: &FeatureHostController) -> Vec<HostEvent> {
