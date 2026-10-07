@@ -5335,14 +5335,14 @@
       "desktop_responsibility": "Canonical automation execution path owns the hidden automation wake identity, routed Runner execution, terminal event settlement, timeout/cancellation classification, and upgrade-quiesce carry semantics used by production automation fires.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Automation runs retain exact wake/run identity and settle once across success, failure, timeout, cancellation and upgrade quiesce.",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Revalidated against Desktop PR #20 9e0b1701d405ebd0b2707620c01781103562b39b. The 5ec257a->9e0b170 delta changes this exact source/contract identity. Any older implemented/verified or exact-head acceptance claim is invalidated; this row is intentionally mapped until iOS shipping composition and same-iOS-HEAD evidence prove the current responsibility."
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "iOS keeps the automation wake/run identity in the existing FeatureHost owner, routes hidden recoverable turns through Runtime/KernelConversation/NativeEngine, durably suspends and resumes the same operation across lifecycle recreation, fences account replacement/stale completions, and revives durable subordinate/process completions without replaying ambiguous side effects.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs; source/packages/mahayana-rs/mahayana-feature-host/src/background_recovery.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-runtime/src/lib.rs; source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs; source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
+      "test_evidence": "source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs; source/packages/mahayana-rs/mahayana-feature-host/src/background_recovery.rs; source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
+      "notes": "Implemented against Desktop PR #20 exact authority 798cf51d96cb1cb98cf657af212bb47274ccb701. The shipping path preserves hidden run identity, same-operation suspend/resume, authenticated session recreation, hidden-history behavior, account replacement fencing, terminal revival, and durable subagent/process completion revival. Ambiguous uncheckpointed external side effects remain fail-closed and are never blindly replayed. Keep below verified until this exact iOS HEAD obtains full ordinary + protected acceptance and artifact provenance."
     },
     {
       "desktop_path": "source/host/src/extensions/transcript/automation_runtime.rs",
