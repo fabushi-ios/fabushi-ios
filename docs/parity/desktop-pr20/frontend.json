@@ -283,11 +283,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "This tranche wires native Bot deletion confirmation to canonical Host bot.delete, whose owner persists Bot removal, marks its conversation session deleted and clears pending listener resumes. Desktop's group-specific deletion branch is still outstanding on iOS, so the row remains mapped.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; current exact-head CI pending",
-      "notes": "Bot half implemented against Desktop final HEAD 798cf51d; do not promote until group deletion semantics and same-head CI evidence are complete."
+      "ios_platform_delta": "SwiftUI sheet replaces the DOM alert-dialog while preserving distinct group/Bot destructive copy, cancel semantics, pending fencing, failure retention, and canonical async delete ownership.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
+      "notes": "Implemented on the shipping home. Delete confirmation remains visible and non-dismissible while the canonical delete mutation is pending; success closes it, failure stays visible with an error. Same-head Actions required before verified."
     },
     {
       "desktop_path": "frontend/src/production/AgentNameEditor.tsx",
@@ -298,11 +298,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native Bot rows now expose a rename sheet using the same trimmed/non-empty/changed commit rule and call canonical Host bot.update through IOSPreloadBridge. Equivalent group/other Agent-row rename coverage remains to be closed before full row parity.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; current exact-head CI pending",
-      "notes": "Bot rename is production-wired; row remains mapped because Desktop Agent row responsibility is broader than the Bot-only iOS surface."
+      "ios_platform_delta": "SwiftUI rename sheet replaces the inline desktop editor; it uses the same trim/non-empty/changed commit rule, cancellation without mutation, one async mutation owner and visible failure recovery.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
+      "notes": "Shipping rename behavior uses committedMobileBotName and canonical GrokMobileBotService.renameBot. Same-head Actions required before verified."
     },
     {
       "desktop_path": "frontend/src/production/AgentRowActions.tsx",
@@ -355,14 +355,14 @@
       "desktop_responsibility": "Pure rename commit rule trims draft input and returns a mutation only for non-empty names that differ from the current value.",
       "desktop_owner": "renderer-agent-roster",
       "desktop_visible_effect": "Blank and no-op Agent renames never reach canonical lifecycle mutation.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/production/GrokMobileShell+Home.swift",
+      "ios_disposition": "direct-port",
+      "ios_target_path": "frontend/src/production/GrokMobileShell+Bots.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "committedMobileBotName ports the rule for native Bot rename and is exercised by XCTest; broader Agent/group rename parity remains tied to AgentNameEditor.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; current exact-head CI pending",
-      "notes": "Bot rule implemented and tested; row remains mapped with its parent responsibility pending broader roster parity."
+      "ios_platform_delta": "Pure rename commit rule is directly expressed in Swift as committedMobileBotName.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/GrokMobileShell+Bots.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
+      "notes": "The pure trim/non-empty/changed-name rule matches Desktop PR #20; same-head Actions required before verified."
     },
     {
       "desktop_path": "frontend/src/production/agent-row-actions-model.ts",
