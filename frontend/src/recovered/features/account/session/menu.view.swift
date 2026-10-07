@@ -89,6 +89,8 @@ struct AccountMenuView: View {
     let onOpenMarketplace: () -> Void
     let onOpenSection: (MobileSection) -> Void
 
+    @State private var aboutPresented = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -127,6 +129,15 @@ struct AccountMenuView: View {
                     .accessibilityIdentifier("marketplace-entry")
                 }
 
+                Section("应用") {
+                    Button {
+                        aboutPresented = true
+                    } label: {
+                        Label("关于 Fabushi", systemImage: "info.circle")
+                    }
+                    .accessibilityIdentifier("about-entry")
+                }
+
                 Section("导航") {
                     ForEach(MobileSection.allCases) { section in
                         Button {
@@ -142,6 +153,7 @@ struct AccountMenuView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消", action: onClose)
+                        .accessibilityIdentifier("account-menu-close")
                 }
             }
             .task {
@@ -150,6 +162,9 @@ struct AccountMenuView: View {
             .refreshable {
                 await model.refreshAccountUsage()
             }
+        }
+        .sheet(isPresented: $aboutPresented) {
+            FabushiAboutOverlayView()
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-menu")

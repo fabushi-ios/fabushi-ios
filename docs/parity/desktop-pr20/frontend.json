@@ -631,8 +631,8 @@
       "ios_platform_delta": "Swift Observation replaces useSyncExternalStore subscriptions. A single native root controller owns the typed snapshot and scope-generation fence; SwiftUI owns timer expiry/manual dismissal. Existing MarketplaceModel message/privateSkillError/mcpError fields remain local compatibility presentation and are not a second root authority.",
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/settings-notice-controller.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/SettingsNoticeControllerParityTests.swift; new exact-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701, including recovered settings overlay notice.tsx. Do not count the prior a12d878 acceptance after this implementation commit moves HEAD."
+      "test_evidence": "mobile/ios/FabushiTests/SettingsNoticeControllerParityTests.swift; this commit changes the notice publication path so fresh exact-head ordinary/protected Actions are required before verified promotion.",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Root scope/presenter ownership is native and production-wired; SurfaceNoticePublisher now centralizes typed publication while exact-head CI remains the promotion gate."
     },
     {
       "desktop_path": "frontend/src/production/sidebar-model.ts",
@@ -751,23 +751,23 @@
       "ios_platform_delta": "Native enums preserve every Desktop Settings/Plugins operation raw value and success/error kind. RootSettingsNoticeEvent feeds the single SettingsNoticeController; MarketplaceModel's older string/error fields remain compatibility presentation rather than a second root notice authority.",
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/settings-notice-controller.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/SettingsNoticeControllerParityTests.swift; fresh exact-head ordinary/protected acceptance and artifact provenance are required before verified promotion.",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The operation vocabulary and typed/legacy publication responsibility are implemented; keep below verified until the new exact HEAD closes provenance."
+      "test_evidence": "mobile/ios/FabushiTests/SettingsNoticeControllerParityTests.swift covers all typed operation raw values and root plus legacy string publication; fresh exact-head Actions are required before verified promotion.",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The shipping Plugins path uses SurfaceNoticePublisher; Settings and Plugins operation vocabulary stays typed and the legacy status sink remains optional compatibility rather than a second root owner."
     },
     {
       "desktop_path": "frontend/src/recovered/features/about/overlay/view.tsx",
       "desktop_blob_sha": "b92b5a69b7e43acbf9dfba4f505ca976dc51e98c",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Own the About overlay lifecycle and product identity: load current version/update provenance; display app identity; close the overlay; copy version release-track and platform provenance; show copied confirmation for 1200ms; and suppress clipboard failure.",
+      "desktop_owner": "renderer About overlay over platform/update provenance",
+      "desktop_visible_effect": "Users can open About; see current Fabushi version provenance; copy deterministic version release-track and platform information; receive brief copy confirmation; and close the surface.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/recovered/features/about/overlay/view.view.swift",
+      "ios_language": "SwiftUI / UIKit",
+      "ios_platform_delta": "Bundle version/build and App Store receipt provenance replace Electron updater status. UIKit pasteboard replaces navigator.clipboard; native sheet close replaces Escape; Fabushi-native identity replaces historical Grok/Bennett copy.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/about/overlay/view.view.swift; frontend/src/recovered/features/account/session/menu.view.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AboutOverlayParityTests.swift; mobile/ios/FabushiUITests/FabushiUITests.swift; fresh exact-head ordinary/protected Actions are required before verified promotion.",
+      "notes": "Migrated from Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701 with a real Account-menu shipping entrypoint. Do not promote until the commit carrying this implementation passes exact-head acceptance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access-cover.contract.test.ts",
@@ -802,17 +802,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/composition.ts",
       "desktop_blob_sha": "4ad5c57db6e8db481427c2157932b500ad143d3b",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
+      "desktop_responsibility": "Compose account access state; roster load/failure state; first-box progress; and Computer rebuild locks into one loading/error/visibility decision for the access cover.",
+      "desktop_owner": "renderer access-cover composition",
+      "desktop_visible_effect": "The access/paywall cover appears only for canonical access-blocked failure before a usable/restored box exists and never covers an active Computer rebuild.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/ios-preload/main-rpc-runtime.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "iOS already has canonical main-RPC method names and a native Computer rebuild lock owner but does not yet have a shipping SandAccess/roster/first-box composition owner. A method-table entry alone is not production wiring.",
+      "implementation_status": "mapped",
+      "production_evidence": "source/ios-preload/main-rpc-runtime.swift lists getSandAccess/getSandAccessFresh; mobile/ios/Fabushi/RemoteComputerSurface.swift owns rebuild state. No shipping iOS SandAccess consumer was found at this exact HEAD.",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Real product gap at this exact HEAD: access entitlement plus roster/first-box gating is not yet composed into the shipping iOS root. Do not promote from RPC method presence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-box-store.ts",

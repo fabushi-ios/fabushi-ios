@@ -79,6 +79,23 @@ final class SettingsNoticeControllerParityTests: XCTestCase {
         )
     }
 
+    func testPublisherFeedsTypedRootAndLegacyStringSink() {
+        let controller = SettingsNoticeController()
+        controller.updateScope(accountKey: "account-a", surface: .plugins)
+        let fence = controller.makeFence()
+        var legacyStatus: String?
+
+        SurfaceNoticePublisher.publish(
+            event(.success, .install, "installed"),
+            controller: controller,
+            fence: fence,
+            legacyStatus: { legacyStatus = $0 }
+        )
+
+        XCTAssertEqual(controller.snapshot?.event, event(.success, .install, "installed"))
+        XCTAssertEqual(legacyStatus, "installed")
+    }
+
     func testTypedOperationSetsMatchDesktopSurfaceNoticeContract() {
         XCTAssertEqual(
             Set(SettingsNoticeOperation.allCases.map(\.rawValue)),

@@ -877,12 +877,13 @@ final class MarketplaceModel {
         message: String,
         fence: SettingsNoticeFence
     ) {
-        settingsNoticeController.publish(
+        SurfaceNoticePublisher.publish(
             RootSettingsNoticeEvent(
                 kind: kind,
                 operation: .plugins(operation),
                 message: message
             ),
+            controller: settingsNoticeController,
             fence: fence
         )
     }

@@ -43,6 +43,27 @@ final class FabushiUITests: XCTestCase {
             "Expected the contacts sheet to finish dismissing before interacting with the Home toolbar"
         )
 
+        app.buttons["profile-avatar"].tap()
+        let aboutEntry = app.buttons["about-entry"]
+        XCTAssertTrue(aboutEntry.waitForExistence(timeout: 5))
+        aboutEntry.tap()
+        let aboutSurface = app.descendants(matching: .any)["about-surface"]
+        XCTAssertTrue(aboutSurface.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["about-version"].exists)
+        let copyVersion = app.buttons["about-copy-version"]
+        XCTAssertTrue(copyVersion.exists)
+        copyVersion.tap()
+        let copied = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "已复制"),
+            object: copyVersion
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 2), .completed)
+        app.buttons["about-close"].tap()
+        XCTAssertTrue(aboutSurface.waitForNonExistence(timeout: 5))
+        let accountMenuClose = app.buttons["account-menu-close"]
+        XCTAssertTrue(accountMenuClose.waitForExistence(timeout: 5))
+        accountMenuClose.tap()
+
         openRemoteComputer(in: app)
         let remoteComputer = app.descendants(matching: .any)["remote-computer-surface"]
         XCTAssertTrue(remoteComputer.waitForExistence(timeout: 10))

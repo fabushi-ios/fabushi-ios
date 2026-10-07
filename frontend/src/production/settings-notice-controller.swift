@@ -58,6 +58,19 @@ struct RootSettingsNoticeEvent: Equatable, Hashable, Sendable {
     let message: String
 }
 
+@MainActor
+enum SurfaceNoticePublisher {
+    static func publish(
+        _ event: RootSettingsNoticeEvent,
+        controller: SettingsNoticeController,
+        fence: SettingsNoticeFence? = nil,
+        legacyStatus: ((String) -> Void)? = nil
+    ) {
+        controller.publish(event, fence: fence)
+        legacyStatus?(event.message)
+    }
+}
+
 enum SettingsNoticeSurface: String, Equatable, Hashable, Sendable {
     case none
     case settings
