@@ -162,6 +162,15 @@ struct InflightToolCheckpoint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct CompletedToolCheckpoint {
+    operation_id: String,
+    call_id: String,
+    tool: String,
+    output: Value,
+    success: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct NativeSession {
     workspace_root: Option<PathBuf>,
     history: Vec<Value>,
@@ -178,6 +187,8 @@ struct NativeSession {
     attempts: Vec<OperationAttempt>,
     #[serde(default)]
     inflight_tool: Option<InflightToolCheckpoint>,
+    #[serde(default)]
+    completed_tool_results: BTreeMap<String, CompletedToolCheckpoint>,
     #[serde(default)]
     completed_outputs: BTreeMap<String, String>,
     #[serde(default)]
@@ -862,6 +873,28 @@ impl NativeEngine {
                                 .and_then(Value::as_str)
                                 .map(str::to_owned);
                         }
+                        let completion_key = tool_completion_key(operation_id, &call.call_id);
+                        if tool_completion_revival_supported(&call.name) {
+                            session.completed_tool_results.insert(
+                                completion_key.clone(),
+                                CompletedToolCheckpoint {
+                                    operation_id: operation_id.as_str().to_string(),
+                                    call_id: call.call_id.clone(),
+                                    tool: call.name.clone(),
+                                    output: output.clone(),
+                                    success: true,
+                                },
+                            );
+                            while session.completed_tool_results.len() > 128 {
+                                if let Some(first) = session.completed_tool_results.keys().next().cloned() {
+                                    session.completed_tool_results.remove(&first);
+                                } else {
+                                    break;
+                                }
+                            }
+                            session.updated_at_ms = now_ms();
+                            self.persist_session_state_if_configured(session_id, session)?;
+                        }
                         self.telemetry.tool_completed(true);
                         events.emit(KernelEvent::ToolCompleted {
                             operation_id: operation_id.clone(),
@@ -877,6 +910,7 @@ impl NativeEngine {
                                 .unwrap_or_else(|_| "null".into()),
                         }));
                         session.inflight_tool = None;
+                        session.completed_tool_results.remove(&completion_key);
                         session.updated_at_ms = now_ms();
                         self.persist_session_state_if_configured(session_id, session)?;
                         if waiting_user {
@@ -884,22 +918,46 @@ impl NativeEngine {
                         }
                     }
                     Err(error) => {
-                        self.telemetry.tool_completed(false);
                         let message = error.to_string();
+                        let failure_output = json!({"error": message.clone()});
+                        let completion_key = tool_completion_key(operation_id, &call.call_id);
+                        if tool_completion_revival_supported(&call.name) {
+                            session.completed_tool_results.insert(
+                                completion_key.clone(),
+                                CompletedToolCheckpoint {
+                                    operation_id: operation_id.as_str().to_string(),
+                                    call_id: call.call_id.clone(),
+                                    tool: call.name.clone(),
+                                    output: failure_output.clone(),
+                                    success: false,
+                                },
+                            );
+                            while session.completed_tool_results.len() > 128 {
+                                if let Some(first) = session.completed_tool_results.keys().next().cloned() {
+                                    session.completed_tool_results.remove(&first);
+                                } else {
+                                    break;
+                                }
+                            }
+                            session.updated_at_ms = now_ms();
+                            self.persist_session_state_if_configured(session_id, session)?;
+                        }
+                        self.telemetry.tool_completed(false);
                         events.emit(KernelEvent::ToolCompleted {
                             operation_id: operation_id.clone(),
                             tool_call_id: call.call_id.clone(),
                             tool: call.name.clone(),
-                            output: json!({"error": message}),
+                            output: failure_output.clone(),
                             success: false,
                         })?;
                         session.history.push(json!({
                             "type": "function_call_output",
                             "call_id": call.call_id.clone(),
-                            "output": serde_json::to_string(&json!({"error": message}))
+                            "output": serde_json::to_string(&failure_output)
                                 .unwrap_or_else(|_| "null".into()),
                         }));
                         session.inflight_tool = None;
+                        session.completed_tool_results.remove(&completion_key);
                         session.updated_at_ms = now_ms();
                         self.persist_session_state_if_configured(session_id, session)?;
                     }
@@ -1826,6 +1884,7 @@ impl EngineBackend for NativeEngine {
                     loop_state: LoopState::default(),
                     attempts: Vec::new(),
                     inflight_tool: None,
+                    completed_tool_results: BTreeMap::new(),
                     completed_outputs: BTreeMap::new(),
                     updated_at_ms: request
                         .metadata
@@ -2098,25 +2157,43 @@ impl EngineBackend for NativeEngine {
                         inflight.call_id
                     )));
                 }
-                let interrupted_output = json!({
-                    "error": "tool execution was interrupted by Host recreation; external side effects are unknown and the tool will not be replayed",
-                    "recovery": "interrupted",
-                    "unknownSideEffects": true,
-                    "tool": inflight.tool,
-                });
+                let completion_key = tool_completion_key(&request.operation_id, &inflight.call_id);
+                let durable_completion = session
+                    .completed_tool_results
+                    .get(&completion_key)
+                    .cloned()
+                    .filter(|completion| {
+                        completion.operation_id == inflight.operation_id
+                            && completion.call_id == inflight.call_id
+                            && completion.tool == inflight.tool
+                    });
+                let (output, success) = if let Some(completion) = durable_completion {
+                    (completion.output, completion.success)
+                } else {
+                    (
+                        json!({
+                            "error": "tool execution was interrupted by Host recreation; external side effects are unknown and the tool will not be replayed",
+                            "recovery": "interrupted",
+                            "unknownSideEffects": true,
+                            "tool": inflight.tool,
+                        }),
+                        false,
+                    )
+                };
                 events.emit(KernelEvent::ToolCompleted {
                     operation_id: request.operation_id.clone(),
                     tool_call_id: inflight.call_id.clone(),
                     tool: inflight.tool.clone(),
-                    output: interrupted_output.clone(),
-                    success: false,
+                    output: output.clone(),
+                    success,
                 })?;
                 session.history.push(json!({
                     "type": "function_call_output",
                     "call_id": inflight.call_id,
-                    "output": serde_json::to_string(&interrupted_output).unwrap_or_else(|_| "null".into()),
+                    "output": serde_json::to_string(&output).unwrap_or_else(|_| "null".into()),
                 }));
                 session.inflight_tool = None;
+                session.completed_tool_results.remove(&completion_key);
                 session.updated_at_ms = now_ms();
                 self.persist_session_state_if_configured(&request.session_id, &session)?;
             }
@@ -2903,6 +2980,14 @@ fn permission_target(call: &FunctionCall) -> String {
 
 fn tool_fingerprint(call: &FunctionCall) -> String {
     format!("{}:{}", call.name, call.arguments)
+}
+
+fn tool_completion_key(operation_id: &OperationId, call_id: &str) -> String {
+    format!("{}:{call_id}", operation_id.as_str())
+}
+
+fn tool_completion_revival_supported(tool: &str) -> bool {
+    matches!(tool, "subagent_run" | "process_exec" | "git_status" | "git_diff")
 }
 
 fn permission_memory_from_metadata(
