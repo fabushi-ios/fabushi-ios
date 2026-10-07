@@ -34,6 +34,24 @@ pub struct SendMessageRequest {
 }
 
 #[derive(Debug, Clone)]
+pub struct SuspendConversationOperationRequest {
+    pub operation_id: OperationId,
+    pub reason: Option<String>,
+    pub cascade: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResumeConversationOperationRequest {
+    pub conversation_id: ConversationId,
+    pub operation_id: OperationId,
+    pub hidden: bool,
+    pub show_assistant_output: bool,
+    pub reply_to_message_id: Option<String>,
+    pub is_fork: bool,
+    pub attachment_batch_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ResolveApprovalRequest {
     pub approval_id: ApprovalId,
     pub decision: ApprovalDecision,
@@ -161,6 +179,30 @@ pub trait ConversationProvider: Send + Sync {
 
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), ConversationError>;
 
+    /// Cooperatively park one already-running operation without converting it
+    /// into a terminal interruption. Providers that cannot preserve an
+    /// unfinished operation fail closed.
+    async fn suspend_operation(
+        &self,
+        _request: SuspendConversationOperationRequest,
+    ) -> Result<(), ConversationError> {
+        Err(ConversationError::Provider(
+            "conversation provider does not support operation suspension".into(),
+        ))
+    }
+
+    /// Resume a previously suspended operation without enqueueing the original
+    /// user input a second time.
+    async fn resume_operation(
+        &self,
+        _request: ResumeConversationOperationRequest,
+        _events: SharedConversationEventSink,
+    ) -> Result<(), ConversationError> {
+        Err(ConversationError::Provider(
+            "conversation provider does not support operation resume".into(),
+        ))
+    }
+
     async fn resolve_approval(
         &self,
         request: ResolveApprovalRequest,
@@ -260,6 +302,8 @@ pub enum ConversationError {
     OperationNotFound(OperationId),
     #[error("operation interrupted: {0}")]
     Interrupted(String),
+    #[error("operation suspended")]
+    Suspended,
     #[error("approval was not found: {0}")]
     ApprovalNotFound(ApprovalId),
     #[error("model usage limit exceeded: {0}")]

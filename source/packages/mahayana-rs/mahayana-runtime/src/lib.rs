@@ -17,7 +17,9 @@ use mahayana_conversation::ConversationEventSink;
 use mahayana_conversation::ConversationProvider;
 use mahayana_conversation::ProviderRegistry;
 use mahayana_conversation::ResolveApprovalRequest;
+use mahayana_conversation::ResumeConversationOperationRequest;
 use mahayana_conversation::SendMessageRequest;
+use mahayana_conversation::SuspendConversationOperationRequest;
 use mahayana_conversation::SharedConversationEventSink;
 use mahayana_core::ApprovalId;
 use mahayana_core::CONVERSATION_SCHEMA_VERSION;
@@ -262,6 +264,93 @@ impl MahayanaRuntime {
         lock(&self.operations)?.clear();
         lock(&self.approvals)?.clear();
         while self.event_rx.try_recv().is_ok() {}
+        Ok(())
+    }
+
+    /// Cooperatively suspend a running conversation operation while retaining
+    /// its provider ownership so a later resume does not replay input.
+    pub fn suspend_operation(
+        &self,
+        operation_id: OperationId,
+        reason: Option<String>,
+    ) -> Result<(), RuntimeError> {
+        let provider_key = lock(&self.operations)?
+            .get(&operation_id)
+            .cloned()
+            .ok_or_else(|| ConversationError::OperationNotFound(operation_id.clone()))?;
+        let provider = self
+            .providers
+            .get(&provider_key)
+            .ok_or_else(|| ConversationError::ProviderUnavailable(provider_key.clone()))?;
+        self.async_runtime.block_on(provider.suspend_operation(
+            SuspendConversationOperationRequest {
+                operation_id,
+                reason,
+                cascade: true,
+            },
+        ))?;
+        Ok(())
+    }
+
+    /// Resume an already-suspended operation with the same operation identity.
+    /// This inserts provider ownership before spawning continuation so terminal
+    /// cleanup cannot race ahead of stale-event fencing in the Host.
+    pub fn resume_operation(
+        &self,
+        request: ResumeConversationOperationRequest,
+    ) -> Result<(), RuntimeError> {
+        let provider = self.providers.for_conversation(&request.conversation_id)?;
+        let provider_key = provider.key().to_string();
+        {
+            let mut operations = lock(&self.operations)?;
+            if let Some(existing) = operations.get(&request.operation_id)
+                && existing != &provider_key
+            {
+                return Err(RuntimeError::Synchronization(
+                    "operation resume provider ownership mismatch".into(),
+                ));
+            }
+            operations.insert(request.operation_id.clone(), provider_key.clone());
+        }
+        let sink: SharedConversationEventSink = Arc::new(RuntimeEventSink {
+            provider_key,
+            event_tx: self.event_tx.clone(),
+            approvals: Arc::clone(&self.approvals),
+        });
+        let event_tx = self.event_tx.clone();
+        let operations = Arc::clone(&self.operations);
+        let task_operation_id = request.operation_id.clone();
+        self.async_runtime.spawn(async move {
+            let result = provider.resume_operation(request, sink).await;
+            let event = match result {
+                Ok(()) => Some(RuntimeEvent::OperationCompleted {
+                    operation_id: task_operation_id.clone(),
+                }),
+                Err(ConversationError::Suspended) => None,
+                Err(ConversationError::Interrupted(reason)) => {
+                    Some(RuntimeEvent::OperationInterrupted {
+                        operation_id: task_operation_id.clone(),
+                        reason,
+                    })
+                }
+                Err(error) => Some(RuntimeEvent::OperationFailed {
+                    operation_id: task_operation_id.clone(),
+                    code: if matches!(error, ConversationError::UsageLimitExceeded(_)) {
+                        "usage_limit_exceeded"
+                    } else {
+                        "provider_error"
+                    }
+                    .to_string(),
+                    message: error.to_string(),
+                }),
+            };
+            if let Some(event) = event {
+                let _ = event_tx.send(event);
+                if let Ok(mut operations) = operations.lock() {
+                    operations.remove(&task_operation_id);
+                }
+            }
+        });
         Ok(())
     }
 
@@ -720,14 +809,17 @@ impl MahayanaRuntime {
         self.async_runtime.spawn(async move {
             let result = provider.send_message(request, sink).await;
             let event = match result {
-                Ok(()) => RuntimeEvent::OperationCompleted {
+                Ok(()) => Some(RuntimeEvent::OperationCompleted {
                     operation_id: task_operation_id.clone(),
-                },
-                Err(ConversationError::Interrupted(reason)) => RuntimeEvent::OperationInterrupted {
-                    operation_id: task_operation_id.clone(),
-                    reason,
-                },
-                Err(error) => RuntimeEvent::OperationFailed {
+                }),
+                Err(ConversationError::Suspended) => None,
+                Err(ConversationError::Interrupted(reason)) => {
+                    Some(RuntimeEvent::OperationInterrupted {
+                        operation_id: task_operation_id.clone(),
+                        reason,
+                    })
+                }
+                Err(error) => Some(RuntimeEvent::OperationFailed {
                     operation_id: task_operation_id.clone(),
                     code: if matches!(error, ConversationError::UsageLimitExceeded(_)) {
                         "usage_limit_exceeded"
@@ -736,11 +828,13 @@ impl MahayanaRuntime {
                     }
                     .to_string(),
                     message: error.to_string(),
-                },
+                }),
             };
-            let _ = event_tx.send(event);
-            if let Ok(mut operations) = operations.lock() {
-                operations.remove(&task_operation_id);
+            if let Some(event) = event {
+                let _ = event_tx.send(event);
+                if let Ok(mut operations) = operations.lock() {
+                    operations.remove(&task_operation_id);
+                }
             }
         });
         Ok(operation_id)

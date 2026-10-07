@@ -1671,8 +1671,12 @@ impl EngineBackend for NativeEngine {
             .metadata
             .get("conversationId")
             .and_then(Value::as_str)
-            .filter(|conversation_id| *conversation_id == MAIN_ASSISTANT_CONVERSATION_ID)
-            .and(self.config.session_state_path.clone());
+            .and_then(|conversation_id| {
+                self.config
+                    .session_state_path
+                    .as_deref()
+                    .map(|base| session_state_path_for_conversation(base, conversation_id))
+            });
         if let Some(path) = persisted_path.as_ref()
             && path.exists()
         {
@@ -2824,6 +2828,25 @@ fn ensure_operation_active(control: &OperationControl) -> Result<(), KernelError
         return Err(KernelError::Backend("operation interrupted".into()));
     }
     Ok(())
+}
+
+fn session_state_path_for_conversation(base: &Path, conversation_id: &str) -> PathBuf {
+    if conversation_id == MAIN_ASSISTANT_CONVERSATION_ID {
+        return base.to_path_buf();
+    }
+    // Stable FNV-1a suffix keeps arbitrary conversation identifiers out of the
+    // filesystem path while providing one durable native session per canonical
+    // conversation.
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in conversation_id.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    let file_name = base
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("mahayana-session.json");
+    base.with_file_name(format!("{file_name}.conversation-{hash:016x}"))
 }
 
 fn now_ms() -> i64 {

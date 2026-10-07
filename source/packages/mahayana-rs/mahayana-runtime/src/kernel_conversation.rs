@@ -1,8 +1,9 @@
 use async_trait::async_trait;
 use mahayana_conversation::select_history_window;
 use mahayana_conversation::{
-    ConversationError, ConversationProvider, MAHAYANA_AI_PROVIDER_KEY, ResolveApprovalRequest,
-    SendMessageRequest, SharedConversationEventSink,
+    ConversationError, ConversationProvider, MAHAYANA_AI_PROVIDER_KEY,
+    ResolveApprovalRequest, ResumeConversationOperationRequest, SendMessageRequest,
+    SharedConversationEventSink, SuspendConversationOperationRequest,
 };
 use mahayana_core::{
     ApprovalDecision, ApprovalId, BuildProfile, Conversation, ConversationId, Message, MessageId,
@@ -11,13 +12,15 @@ use mahayana_core::{
 };
 use mahayana_kernel::{
     ApprovalResolution, Capability, CapabilitySet, EngineBackend, ExecutionPolicy, KernelError,
-    KernelEvent, KernelEventSink, OpenSessionRequest, OperationId as KernelOperationId, RunRequest,
-    RuntimeProfile, SessionId, SharedKernelEventSink,
+    KernelEvent, KernelEventSink, OpenSessionRequest, OperationId as KernelOperationId,
+    ResumeOperationRequest, RunRequest, RuntimeProfile, SessionId, SharedKernelEventSink,
+    SuspendOperationRequest,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex as AsyncMutex, Notify};
@@ -187,7 +190,7 @@ pub struct KernelConversationProvider {
     profile: BuildProfile,
     workspace_root: Option<String>,
     model: Option<String>,
-    session_id: AsyncMutex<Option<SessionId>>,
+    session_ids: AsyncMutex<BTreeMap<String, SessionId>>,
     state: Arc<Mutex<ConversationState>>,
     history_path: Option<PathBuf>,
     direct_operations: AsyncMutex<BTreeMap<String, DirectOperationState>>,
@@ -211,7 +214,7 @@ impl KernelConversationProvider {
             profile,
             workspace_root,
             model,
-            session_id: AsyncMutex::new(None),
+            session_ids: AsyncMutex::new(BTreeMap::new()),
             state: Arc::new(Mutex::new(ConversationState::new(history))),
             history_path,
             direct_operations: AsyncMutex::new(BTreeMap::new()),
@@ -289,8 +292,9 @@ impl KernelConversationProvider {
         &self,
         conversation_id: &ConversationId,
     ) -> Result<SessionId, ConversationError> {
-        let mut session_id = self.session_id.lock().await;
-        if let Some(session_id) = session_id.as_ref() {
+        let conversation_key = conversation_id.as_str().to_string();
+        let mut session_ids = self.session_ids.lock().await;
+        if let Some(session_id) = session_ids.get(&conversation_key) {
             return Ok(session_id.clone());
         }
         let history = self
@@ -326,7 +330,7 @@ impl KernelConversationProvider {
             })
             .await
             .map_err(kernel_error)?;
-        *session_id = Some(created.clone());
+        session_ids.insert(conversation_key, created.clone());
         Ok(created)
     }
 }
@@ -483,7 +487,8 @@ impl ConversationProvider for KernelConversationProvider {
             .attachment_batch_id
             .clone()
             .unwrap_or_else(|| format!("attachment-batch:{}", request.operation_id.as_str()));
-        let sink: SharedKernelEventSink = Arc::new(RuntimeKernelEventBridge {
+        let suspended = Arc::new(AtomicBool::new(false));
+        let bridge = Arc::new(RuntimeKernelEventBridge {
             conversation_id: request.conversation_id,
             operation_id: request.operation_id,
             events,
@@ -494,7 +499,9 @@ impl ConversationProvider for KernelConversationProvider {
             is_fork: request.is_fork,
             attachment_batch_id: Some(turn_attachment_batch_id),
             streaming_assistant: Mutex::new(None),
+            suspended: Arc::clone(&suspended),
         });
+        let sink: SharedKernelEventSink = bridge;
         let result = self
             .backend
             .run(
@@ -538,6 +545,7 @@ impl ConversationProvider for KernelConversationProvider {
                 ))
             }
             Err(error) => Err(kernel_error(error)),
+            Ok(()) if suspended.load(Ordering::SeqCst) => Err(ConversationError::Suspended),
             Ok(()) => Ok(()),
         }
     }
@@ -560,9 +568,65 @@ impl ConversationProvider for KernelConversationProvider {
         }
     }
 
+    async fn suspend_operation(
+        &self,
+        request: SuspendConversationOperationRequest,
+    ) -> Result<(), ConversationError> {
+        self.backend
+            .suspend_operation(SuspendOperationRequest {
+                operation_id: KernelOperationId::from_string(request.operation_id.as_str()),
+                reason: request.reason,
+                metadata: json!({"cascade": request.cascade}),
+            })
+            .await
+            .map_err(kernel_error)
+    }
+
+    async fn resume_operation(
+        &self,
+        request: ResumeConversationOperationRequest,
+        events: SharedConversationEventSink,
+    ) -> Result<(), ConversationError> {
+        let session_id = self.session_id(&request.conversation_id).await?;
+        let kernel_operation_id = KernelOperationId::from_string(request.operation_id.as_str());
+        let suspended = Arc::new(AtomicBool::new(false));
+        let bridge = Arc::new(RuntimeKernelEventBridge {
+            conversation_id: request.conversation_id,
+            operation_id: request.operation_id,
+            events,
+            state: Arc::clone(&self.state),
+            history_path: self.history_path.clone(),
+            hide_assistant_output: request.hidden && !request.show_assistant_output,
+            reply_to_message_id: request.reply_to_message_id,
+            is_fork: request.is_fork,
+            attachment_batch_id: request.attachment_batch_id,
+            streaming_assistant: Mutex::new(None),
+            suspended: Arc::clone(&suspended),
+        });
+        let sink: SharedKernelEventSink = bridge;
+        let result = self
+            .backend
+            .resume_operation(
+                ResumeOperationRequest {
+                    session_id,
+                    operation_id: kernel_operation_id,
+                    policy: execution_policy(self.profile),
+                    required_capabilities: CapabilitySet::new([Capability::Model]),
+                    metadata: json!({"resumedBy": "conversation-provider"}),
+                },
+                sink,
+            )
+            .await;
+        match result {
+            Err(error) => Err(kernel_error(error)),
+            Ok(()) if suspended.load(Ordering::SeqCst) => Err(ConversationError::Suspended),
+            Ok(()) => Ok(()),
+        }
+    }
+
     async fn reset_session(&self) -> Result<(), ConversationError> {
         self.backend.reset_session().map_err(kernel_error)?;
-        *self.session_id.lock().await = None;
+        self.session_ids.lock().await.clear();
         self.direct_operations.lock().await.clear();
         self.interrupt_reasons.lock().await.clear();
         {
@@ -624,6 +688,7 @@ struct RuntimeKernelEventBridge {
     is_fork: bool,
     attachment_batch_id: Option<String>,
     streaming_assistant: Mutex<Option<Message>>,
+    suspended: Arc<AtomicBool>,
 }
 
 impl RuntimeKernelEventBridge {
@@ -777,6 +842,9 @@ impl KernelEventSink for RuntimeKernelEventBridge {
                 metadata,
                 ..
             } => {
+                if kind == "operation_suspended" {
+                    self.suspended.store(true, Ordering::SeqCst);
+                }
                 let step_id = metadata
                     .get("stepId")
                     .and_then(Value::as_str)
@@ -1148,6 +1216,7 @@ mod tests {
             is_fork: true,
             attachment_batch_id: None,
             streaming_assistant: Mutex::new(None),
+            suspended: Arc::new(AtomicBool::new(false)),
         };
         let kernel_operation_id = KernelOperationId::from_string("kernel-fast-lane");
 

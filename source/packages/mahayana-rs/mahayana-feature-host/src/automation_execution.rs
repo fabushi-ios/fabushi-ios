@@ -18,7 +18,7 @@ impl RoutineTrigger {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-enum RoutinePhase { Pending, Dispatching, Running, RecoveryRequired, TerminalPending, Terminal }
+enum RoutinePhase { Pending, Dispatching, Running, Suspended, RecoveryRequired, TerminalPending, Terminal }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -344,11 +344,16 @@ impl FeatureHostController {
         let next = {
             let state = self.state()?;
             if state.closed || state.routine_quiescing || (self.config.mode == HostMode::Production && !state.session_active) { return Ok(()); }
-            state.routine_executions.values().filter(|execution| matches!(execution.phase, RoutinePhase::Pending | RoutinePhase::TerminalPending)).min_by_key(|execution| (execution.admitted_at_ms, execution.run_id.clone())).cloned()
+            state.routine_executions.values().filter(|execution| matches!(execution.phase, RoutinePhase::Pending | RoutinePhase::Suspended | RoutinePhase::TerminalPending)).min_by_key(|execution| (execution.admitted_at_ms, execution.run_id.clone())).cloned()
         };
         if let Some(execution) = next {
-            if let Some(terminal) = execution.terminal { self.finish_automation_run(&execution.automation_id, &execution.run_id, terminal.status, terminal.detail, &terminal.action)?; }
-            else if let Err(error) = self.dispatch_pending_routine(&execution.run_id) { self.record_routine_dispatch_error(&execution.automation_id, &execution.run_id, &error)?; }
+            if let Some(terminal) = execution.terminal {
+                self.finish_automation_run(&execution.automation_id, &execution.run_id, terminal.status, terminal.detail, &terminal.action)?;
+            } else if execution.phase == RoutinePhase::Suspended {
+                self.resume_suspended_routine(&execution)?;
+            } else if let Err(error) = self.dispatch_pending_routine(&execution.run_id) {
+                self.record_routine_dispatch_error(&execution.automation_id, &execution.run_id, &error)?;
+            }
         }
         Ok(())
     }
@@ -364,23 +369,86 @@ impl FeatureHostController {
     fn set_routine_quiescing(&self, quiescing: bool) -> Result<(), FeatureHostError> {
         let _gate = self.routine_dispatch_lock.lock().map_err(|_| FeatureHostError::StatePoisoned)?;
         let operations = {
-            let mut state = self.state()?; if state.closed { return Ok(()); }
-            state.routine_quiescing = quiescing; let mut operations = Vec::new();
+            let mut state = self.state()?;
+            if state.closed { return Ok(()); }
+            state.routine_quiescing = quiescing;
+            self.persist_routine_executions(&state)?;
             if quiescing {
-                for execution in state.routine_executions.values_mut() {
-                    if execution.phase == RoutinePhase::Running { execution.phase = RoutinePhase::RecoveryRequired; if let Some(operation_id) = &execution.operation_id { operations.push(operation_id.clone()); } }
+                state.routine_executions.values()
+                    .filter(|execution| execution.phase == RoutinePhase::Running)
+                    .filter_map(|execution| execution.operation_id.clone().map(|operation_id| (execution.run_id.clone(), operation_id)))
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            }
+        };
+        if quiescing && self.config.mode == HostMode::Production {
+            #[cfg(feature = "production")]
+            for (run_id, operation_id) in operations {
+                self.runtime()?.suspend_operation(
+                    OperationId(operation_id.clone()),
+                    Some("product lifecycle quiesce".into()),
+                )?;
+                let mut state = self.state()?;
+                let Some(execution) = state.routine_executions.get_mut(&run_id) else { continue; };
+                if execution.phase == RoutinePhase::Running
+                    && execution.operation_id.as_deref() == Some(operation_id.as_str())
+                {
+                    execution.phase = RoutinePhase::Suspended;
+                    self.persist_routine_executions(&state)?;
                 }
             }
-            self.persist_routine_executions(&state)?; operations
-        };
-        if self.config.mode == HostMode::Production {
-            #[cfg(feature = "production")]
-            for operation_id in operations { self.runtime()?.interrupt(OperationId(operation_id))?; }
             #[cfg(not(feature = "production"))]
             return Err(FeatureHostError::ProductionUnavailable);
         }
         #[cfg(not(feature = "production"))]
         let _ = operations;
+        drop(_gate);
+        if !quiescing {
+            self.advance_pending_routine()?;
+        }
+        Ok(())
+    }
+
+    fn resume_suspended_routine(&self, execution: &RoutineExecution) -> Result<(), FeatureHostError> {
+        let Some(operation_id) = execution.operation_id.clone() else {
+            return Err(FeatureHostError::Contract("suspended routine is missing operation identity".into()));
+        };
+        if !routine_owner_matches(&self.state()?, execution, self.config.mode == HostMode::Test) {
+            return Err(FeatureHostError::Contract("suspended routine owner changed before resume".into()));
+        }
+        if self.config.mode == HostMode::Production {
+            #[cfg(feature = "production")]
+            {
+                self.validate_routine_runtime_session(execution)?;
+                self.runtime()?.resume_operation(mahayana_conversation::ResumeConversationOperationRequest {
+                    conversation_id: ConversationId(execution.conversation_id.clone()),
+                    operation_id: OperationId(operation_id.clone()),
+                    hidden: true,
+                    show_assistant_output: false,
+                    reply_to_message_id: None,
+                    is_fork: false,
+                    attachment_batch_id: None,
+                })?;
+            }
+            #[cfg(not(feature = "production"))]
+            return Err(FeatureHostError::ProductionUnavailable);
+        } else {
+            return Ok(());
+        }
+        let mut state = self.state()?;
+        let current = state.routine_executions.get_mut(&execution.run_id)
+            .ok_or_else(|| FeatureHostError::Contract("suspended routine disappeared before resume".into()))?;
+        if current.phase == RoutinePhase::Suspended
+            && current.operation_id.as_deref() == Some(operation_id.as_str())
+        {
+            current.phase = RoutinePhase::Running;
+            state.automation_operations.insert(operation_id.clone(), (execution.automation_id.clone(), execution.run_id.clone()));
+            state.routine_operation_epochs.insert(operation_id.clone(), execution.epoch);
+            state.operations.insert(operation_id.clone());
+            state.operation_agents.insert(operation_id, execution.agent_id.clone());
+            self.persist_routine_executions(&state)?;
+        }
         Ok(())
     }
 
@@ -402,7 +470,13 @@ impl FeatureHostController {
             if !seen.insert(execution.run_id.clone()) || !execution.run_id.starts_with("routine-run-") || execution.account_key != account_key || execution.automation_id.is_empty() { return Err(FeatureHostError::Contract("invalid or duplicate saved routine identity".into())); }
             execution.epoch = state.routine_epoch;
             if !routine_owner_matches(&state, &execution, self.config.mode == HostMode::Test) { continue; }
-            if matches!(execution.phase, RoutinePhase::Dispatching | RoutinePhase::Running) { execution.phase = RoutinePhase::RecoveryRequired; }
+            if execution.phase == RoutinePhase::Dispatching {
+                execution.phase = RoutinePhase::RecoveryRequired;
+            } else if execution.phase == RoutinePhase::Running {
+                // A running record without a preceding cooperative suspend can
+                // represent a process crash at an unknown side-effect boundary.
+                execution.phase = RoutinePhase::RecoveryRequired;
+            }
             if execution.phase == RoutinePhase::Pending && execution.operation_id.is_some() { return Err(FeatureHostError::Contract("pending routine already has a dispatched operation".into())); }
             if matches!(execution.phase, RoutinePhase::TerminalPending | RoutinePhase::Terminal) && execution.terminal.is_none() { return Err(FeatureHostError::Contract("terminal routine has no saved settlement".into())); }
             if execution.phase == RoutinePhase::Pending { let _ = routine_prompt(&execution)?; }
@@ -422,7 +496,18 @@ impl FeatureHostController {
                 if let Some(run) = automation.runs.iter_mut().find(|run| run.id == execution.run_id) { run.detail = Some("Checkpoint recovery required after lifecycle interruption; not replayed".into()); }
             }
         }
-        state.routine_executions = restored; Self::trim_routine_terminals(&mut state);
+        state.routine_executions = restored;
+        for execution in state.routine_executions.values() {
+            if execution.phase == RoutinePhase::Suspended {
+                if let Some(operation_id) = &execution.operation_id {
+                    state.automation_operations.insert(operation_id.clone(), (execution.automation_id.clone(), execution.run_id.clone()));
+                    state.routine_operation_epochs.insert(operation_id.clone(), execution.epoch);
+                    state.operations.insert(operation_id.clone());
+                    state.operation_agents.insert(operation_id.clone(), execution.agent_id.clone());
+                }
+            }
+        }
+        Self::trim_routine_terminals(&mut state);
         self.persist_automations(&state.automations)?; self.persist_routine_executions(&state)?; Ok(())
     }
 
@@ -506,6 +591,36 @@ mod routine_execution_tests {
         fixture.host.restore_routine_executions().expect("restore"); fixture.host.set_routine_quiescing(false).expect("resume scene"); fixture.host.advance_pending_routine().expect("advance");
         let state = fixture.host.state().expect("state"); assert_eq!(state.routine_executions[&run_id].phase, RoutinePhase::RecoveryRequired); assert!(state.operations.is_empty()); assert_eq!(state.automations["daily"].runs.len(), 1);
     }
+    #[test]
+    fn routine_cooperatively_suspended_recreate_keeps_same_operation_identity() {
+        let fixture = Fixture::new();
+        fixture.schedule("daily");
+        fixture.host.set_routine_quiescing(true).expect("quiesce");
+        fixture.host.execute_routine("wake".into(), "daily".into(), None, RoutineTrigger::Schedule).expect("pending");
+        let run_id = fixture.host.state().expect("state").automations["daily"].runs[0].id.clone();
+        {
+            let mut state = fixture.host.state().expect("state");
+            let epoch = state.routine_epoch;
+            let run = state.routine_executions.get_mut(&run_id).expect("run");
+            run.phase = RoutinePhase::Suspended;
+            run.operation_id = Some("stable-runtime-operation".into());
+            fixture.host.persist_routine_executions(&state).expect("save suspended identity");
+            state.routine_executions.clear();
+            state.automation_operations.clear();
+            state.routine_operation_epochs.clear();
+            state.operations.clear();
+            state.operation_agents.clear();
+            state.routine_epoch = epoch + 1;
+        }
+        fixture.host.restore_routine_executions().expect("restore suspended execution");
+        let state = fixture.host.state().expect("state");
+        let restored = &state.routine_executions[&run_id];
+        assert_eq!(restored.phase, RoutinePhase::Suspended);
+        assert_eq!(restored.operation_id.as_deref(), Some("stable-runtime-operation"));
+        assert_eq!(state.automation_operations["stable-runtime-operation"].1, run_id);
+        assert_eq!(state.routine_operation_epochs["stable-runtime-operation"], state.routine_epoch);
+    }
+
     #[test]
     fn routine_revoked_session_cannot_restore_queued_work() {
         let fixture = Fixture::new(); fixture.schedule("daily"); fixture.pending("daily"); fixture.host.retire_routines_for_account_change().expect("revoke durable work");
