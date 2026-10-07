@@ -4820,6 +4820,22 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    #[test]
+    fn durable_tool_completion_revival_covers_subordinate_and_process_owners_only() {
+        for tool in ["subagent_run", "process_exec", "git_status", "git_diff"] {
+            assert!(
+                tool_completion_revival_supported(tool),
+                "{tool} completion must be eligible for durable revival"
+            );
+        }
+        for tool in ["send_message", "workspace_write", "request_box_help", "web_fetch"] {
+            assert!(
+                !tool_completion_revival_supported(tool),
+                "{tool} must not be replay-classified as a durable subordinate/process completion"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn recreate_revives_durable_subordinate_completion_without_reexecution() {
         let root = std::env::temp_dir().join(format!(
