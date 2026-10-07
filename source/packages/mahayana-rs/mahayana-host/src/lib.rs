@@ -24,6 +24,7 @@ use mahayana_core::RuntimeEvent;
 use mahayana_core::RuntimeResponse;
 use mahayana_core::RuntimeStatus;
 use mahayana_conversation::ResumeConversationOperationRequest;
+use mahayana_conversation::SendMessageRequest;
 use mahayana_kernel::EngineBackend;
 use mahayana_mcp_runtime::NativeMcpRegistry;
 use mahayana_miniapp::EntitlementChecker;
@@ -247,6 +248,15 @@ impl MahayanaHost {
 
     pub fn interrupt(&self, operation_id: OperationId) -> Result<RuntimeResponse, HostError> {
         self.execute(RuntimeCommand::Interrupt { operation_id })
+    }
+
+    pub fn start_recoverable_message(
+        &self,
+        request: SendMessageRequest,
+    ) -> Result<OperationId, HostError> {
+        self.runtime
+            .start_recoverable_message(request)
+            .map_err(HostError::from)
     }
 
     pub fn suspend_operation(

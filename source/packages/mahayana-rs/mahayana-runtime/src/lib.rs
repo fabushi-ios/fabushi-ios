@@ -763,6 +763,18 @@ impl MahayanaRuntime {
         Ok(conversations)
     }
 
+    pub fn start_recoverable_message(
+        &self,
+        request: SendMessageRequest,
+    ) -> Result<OperationId, RuntimeError> {
+        if !request.recovery_eligible {
+            return Err(RuntimeError::Synchronization(
+                "preassigned operation identity requires recovery_eligible=true".into(),
+            ));
+        }
+        self.start_message_request(request)
+    }
+
     fn start_message(
         &self,
         conversation_id: ConversationId,
@@ -780,13 +792,10 @@ impl MahayanaRuntime {
         if text.trim().is_empty() {
             return Err(RuntimeError::EmptyMessage);
         }
-        let provider = self.providers.for_conversation(&conversation_id)?;
-        let provider_key = provider.key().to_string();
         let operation_id = OperationId::generated("operation");
-        lock(&self.operations)?.insert(operation_id.clone(), provider_key.clone());
-        let request = SendMessageRequest {
+        self.start_message_request(SendMessageRequest {
             conversation_id,
-            operation_id: operation_id.clone(),
+            operation_id,
             text,
             display_text,
             client_message_id,
@@ -797,7 +806,29 @@ impl MahayanaRuntime {
             is_fork,
             attachment_batch_id,
             selected_image_data_urls,
-        };
+        })
+    }
+
+    fn start_message_request(
+        &self,
+        request: SendMessageRequest,
+    ) -> Result<OperationId, RuntimeError> {
+        if request.text.trim().is_empty() {
+            return Err(RuntimeError::EmptyMessage);
+        }
+        let provider = self.providers.for_conversation(&request.conversation_id)?;
+        let provider_key = provider.key().to_string();
+        let operation_id = request.operation_id.clone();
+        {
+            let mut operations = lock(&self.operations)?;
+            if operations.contains_key(&operation_id) {
+                return Err(RuntimeError::Synchronization(format!(
+                    "operation identity already active: {}",
+                    operation_id.as_str()
+                )));
+            }
+            operations.insert(operation_id.clone(), provider_key.clone());
+        }
         let sink: SharedConversationEventSink = Arc::new(RuntimeEventSink {
             provider_key,
             event_tx: self.event_tx.clone(),

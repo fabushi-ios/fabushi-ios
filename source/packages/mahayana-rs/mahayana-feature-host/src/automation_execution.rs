@@ -92,12 +92,23 @@ fn routine_owner_matches(state: &FeatureState, execution: &RoutineExecution, tes
 }
 
 #[cfg(feature = "production")]
-fn routine_runtime_command(execution: &RoutineExecution, text: String) -> RuntimeCommand {
-    RuntimeCommand::SendMessage {
-        conversation_id: ConversationId(execution.conversation_id.clone()), text,
-        display_text: None, client_message_id: Some(execution.run_id.clone()),
-        hidden: true, show_assistant_output: false, recovery_eligible: true,
-        reply_to_message_id: None, is_fork: false, attachment_batch_id: None,
+fn routine_runtime_request(
+    execution: &RoutineExecution,
+    operation_id: String,
+    text: String,
+) -> mahayana_conversation::SendMessageRequest {
+    mahayana_conversation::SendMessageRequest {
+        conversation_id: ConversationId(execution.conversation_id.clone()),
+        operation_id: OperationId(operation_id),
+        text,
+        display_text: None,
+        client_message_id: Some(execution.run_id.clone()),
+        hidden: true,
+        show_assistant_output: false,
+        recovery_eligible: true,
+        reply_to_message_id: None,
+        is_fork: false,
+        attachment_batch_id: None,
         selected_image_data_urls: Vec::new(),
     }
 }
@@ -264,47 +275,60 @@ impl FeatureHostController {
                 if !catalog.is_empty() { text.push_str("\n\n[Available workflows]\n"); text.push_str(&catalog); }
             }
         }
-        let operation_id = {
+        let operation_id = match self.config.mode {
+            HostMode::Test => {
+                let mut state = self.state()?;
+                next_id(&mut state, "routine-operation")
+            }
+            HostMode::Production => format!("routine-operation:{}", Uuid::new_v4()),
+        };
+        {
             let mut state = self.state()?; ensure_open(&state)?;
-            if state.routine_quiescing || !routine_owner_matches(&state, &execution, self.config.mode == HostMode::Test) { return Err(FeatureHostError::Contract("routine lifecycle changed before dispatch".into())); }
+            if state.routine_quiescing || !routine_owner_matches(&state, &execution, self.config.mode == HostMode::Test) {
+                return Err(FeatureHostError::Contract("routine lifecycle changed before dispatch".into()));
+            }
             self.persist_automations(&state.automations)?;
-            state.routine_executions.get_mut(run_id).expect("admitted routine").phase = RoutinePhase::Dispatching;
-            self.persist_routine_executions(&state)?;
-            let operation_id = match self.config.mode {
-                HostMode::Test => next_id(&mut state, "routine-operation"),
-                HostMode::Production => {
-                    #[cfg(feature = "production")]
-                    {
-                        // Runtime admission is local; track the exact accepted
-                        // operation before allowing the Host event drain.
-                        match self.runtime()?.execute(routine_runtime_command(&execution, text.clone()))? {
-                            RuntimeResponse::Accepted { operation_id } => operation_id.to_string(),
-                            other => return Err(unexpected_response("routine.send", other)),
-                        }
-                    }
-                    #[cfg(not(feature = "production"))]
-                    { return Err(FeatureHostError::ProductionUnavailable); }
-                }
-            };
             let current = state.routine_executions.get_mut(run_id).expect("admitted routine");
-            current.phase = RoutinePhase::Running; current.operation_id = Some(operation_id.clone());
+            current.phase = RoutinePhase::Dispatching;
+            current.operation_id = Some(operation_id.clone());
             state.automation_operations.insert(operation_id.clone(), (execution.automation_id.clone(), run_id.to_string()));
             state.routine_operation_epochs.insert(operation_id.clone(), execution.epoch);
-            state.operations.insert(operation_id.clone()); state.operation_agents.insert(operation_id.clone(), execution.agent_id.clone());
+            self.persist_routine_executions(&state)?;
+        }
+        if self.config.mode == HostMode::Production {
+            #[cfg(feature = "production")]
+            {
+                let accepted = self.runtime()?.start_recoverable_message(
+                    routine_runtime_request(&execution, operation_id.clone(), text.clone()),
+                )?;
+                if accepted.as_str() != operation_id {
+                    return Err(FeatureHostError::Contract("runtime changed preassigned routine operation identity".into()));
+                }
+            }
+            #[cfg(not(feature = "production"))]
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        {
+            let mut state = self.state()?;
+            let current = state.routine_executions.get_mut(run_id).expect("admitted routine");
+            if current.operation_id.as_deref() != Some(operation_id.as_str()) {
+                return Err(FeatureHostError::Contract("routine operation identity changed during dispatch".into()));
+            }
+            current.phase = RoutinePhase::Running;
+            state.operations.insert(operation_id.clone());
+            state.operation_agents.insert(operation_id.clone(), execution.agent_id.clone());
             self.persist_routine_executions(&state)?;
             state.events.push_back(HostEvent::OperationStarted { timestamp: timestamp(), operation_id: operation_id.clone(), label: format!("routine:{}", execution.trigger.name()), interruptible: true });
             if let RoutineTrigger::Event(event) = &execution.trigger {
                 state.events.push_back(HostEvent::TranscriptCard { timestamp: timestamp(), entry_id: format!("event:{run_id}"), operation_id: Some(operation_id.clone()), card: TranscriptCard::Event { event: event.clone() } });
             }
-            // Deterministic Test backend only; never a production fallback.
             if self.config.mode == HostMode::Test {
                 state.events.push_back(HostEvent::ChatMessage {
                     timestamp: timestamp(), role: MessageRole::Assistant, text: format!("{}机器人收到：{}", execution.agent_id, execution.prompt),
                     operation_id: Some(operation_id.clone()), message_id: None, reply_to_message_id: None, attachment_batch_id: None, attachment: None, branched: false,
                 });
             }
-            operation_id
-        };
+        }
         if self.config.mode == HostMode::Test {
             self.finish_automation_operation(&operation_id, AutomationRunStatus::Ok, None, "completed")?;
             let mut state = self.state()?; state.operations.remove(&operation_id); state.operation_agents.remove(&operation_id);
@@ -474,12 +498,12 @@ impl FeatureHostController {
             if !seen.insert(execution.run_id.clone()) || !execution.run_id.starts_with("routine-run-") || execution.account_key != account_key || execution.automation_id.is_empty() { return Err(FeatureHostError::Contract("invalid or duplicate saved routine identity".into())); }
             execution.epoch = state.routine_epoch;
             if !routine_owner_matches(&state, &execution, self.config.mode == HostMode::Test) { continue; }
-            if execution.phase == RoutinePhase::Dispatching {
-                execution.phase = RoutinePhase::RecoveryRequired;
-            } else if execution.phase == RoutinePhase::Running {
-                // A running record without a preceding cooperative suspend can
-                // represent a process crash at an unknown side-effect boundary.
-                execution.phase = RoutinePhase::RecoveryRequired;
+            if matches!(execution.phase, RoutinePhase::Dispatching | RoutinePhase::Running) {
+                execution.phase = if execution.operation_id.is_some() {
+                    RoutinePhase::Suspended
+                } else {
+                    RoutinePhase::RecoveryRequired
+                };
             }
             if execution.phase == RoutinePhase::Pending && execution.operation_id.is_some() { return Err(FeatureHostError::Contract("pending routine already has a dispatched operation".into())); }
             if matches!(execution.phase, RoutinePhase::TerminalPending | RoutinePhase::Terminal) && execution.terminal.is_none() { return Err(FeatureHostError::Contract("terminal routine has no saved settlement".into())); }

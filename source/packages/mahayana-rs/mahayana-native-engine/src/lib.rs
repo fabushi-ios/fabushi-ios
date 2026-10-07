@@ -2057,13 +2057,39 @@ impl EngineBackend for NativeEngine {
         self.telemetry.operation_resumed();
         let result = async {
             let mut session = session.lock().await;
-            let prompt = session.active_prompt.clone().ok_or_else(|| {
-                KernelError::OperationNotFound(format!(
-                    "{} has no suspended prompt in session {}",
-                    request.operation_id.as_str(),
-                    request.session_id.as_str()
-                ))
-            })?;
+            let prompt = match session.active_prompt.clone() {
+                Some(prompt) => prompt,
+                None => {
+                    let terminal = session
+                        .attempts
+                        .iter()
+                        .rev()
+                        .find(|attempt| attempt.operation_id == request.operation_id.as_str())
+                        .map(|attempt| attempt.state);
+                    match terminal {
+                        Some(OperationAttemptState::Completed) => return Ok(()),
+                        Some(OperationAttemptState::Failed) => {
+                            return Err(KernelError::Backend(format!(
+                                "{} previously failed before Host settlement",
+                                request.operation_id.as_str()
+                            )));
+                        }
+                        Some(OperationAttemptState::Interrupted) => {
+                            return Err(KernelError::Interrupted(format!(
+                                "{} was interrupted before Host settlement",
+                                request.operation_id.as_str()
+                            )));
+                        }
+                        _ => {
+                            return Err(KernelError::OperationNotFound(format!(
+                                "{} has no suspended prompt in session {}",
+                                request.operation_id.as_str(),
+                                request.session_id.as_str()
+                            )));
+                        }
+                    }
+                }
+            };
             events.emit(KernelEvent::Activity {
                 operation_id: request.operation_id.clone(),
                 kind: "operation_resumed".into(),
