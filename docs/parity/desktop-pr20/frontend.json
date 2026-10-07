@@ -161,13 +161,13 @@
       "desktop_owner": "shared chat/product experience contract",
       "desktop_visible_effect": "Users can enter Dacheng through consistent prompts/tools, generate Global Dharma output, and use the RemNote-inspired flashcard flow with Again/Hard/Good/Easy review timing.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_target_path": "frontend/src/production/FabushiProductExperience.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native iOS already ships the governed Bot/Mini App chat and Global Dharma routing, but this composite Desktop row also owns flashcard creation/review and hero/home prompt semantics that are not yet present as complete shipping iOS product surfaces.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/GlobalDharmaMiniAppBridge.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Partial production overlap is evidence for the mapping, not completion of the composite responsibility."
+      "ios_platform_delta": "iOS ports the Dacheng home/chat product semantics into the native shipping home: hero prompts route into the existing Mahayana Bot draft, Global Dharma routes into the existing Mini App owner, and flashcard sentence splitting, cloze/bidirectional generation, review ratings/due labels, regions and checklist semantics are native Swift.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/FabushiProductExperience.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/GlobalDharmaMiniAppBridge.swift",
+      "test_evidence": "mobile/ios/FabushiTests/FabushiProductExperienceTests.swift; mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Same-head ordinary/protected Actions and artifact provenance are required before verified promotion."
     },
     {
       "desktop_path": "frontend/packages/shared/src/copy.ts",
