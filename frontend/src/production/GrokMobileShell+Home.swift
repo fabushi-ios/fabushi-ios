@@ -110,16 +110,7 @@ extension GrokMobileShell {
         }
         .sheet(isPresented: $createBotOpen) { createBotSheet }
         .sheet(item: $botRenameTarget) { bot in renameBotSheet(bot) }
-        .alert(item: $botDeleteTarget) { bot in
-            Alert(
-                title: Text("删除“\(bot.name)”？"),
-                message: Text("这会永久删除该 Bot 及其聊天记录，且无法撤销。"),
-                primaryButton: .destructive(Text("删除")) {
-                    Task { await deleteBot(bot) }
-                },
-                secondaryButton: .cancel(Text("取消"))
-            )
-        }
+        .sheet(item: $botDeleteTarget) { bot in botDeleteConfirmationSheet(bot) }
         .accessibilityIdentifier("grok-mobile-home")
     }
 
@@ -176,6 +167,12 @@ extension GrokMobileShell {
                             groupMembersTarget = bot
                         } label: {
                             Label("成员", systemImage: "person.2")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            requestBotDelete(bot)
+                        } label: {
+                            Label("删除群组", systemImage: "trash")
                         }
                     } else {
                         Button {
@@ -271,6 +268,60 @@ extension GrokMobileShell {
                 }
             }
         }
+    }
+
+    func botDeleteConfirmationSheet(_ bot: MobileBotSummary) -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(bot.isGroup ? "永久删除群组？" : "永久删除 Bot？")
+                    .font(.title2.weight(.semibold))
+                Text("“\(bot.name)”")
+                    .font(.headline)
+                Text(
+                    bot.isGroup
+                        ? "这会永久删除该群组及其聊天记录。群组中的 Bots 不会被删除，仍可单独使用。此操作无法撤销。"
+                        : "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
+                )
+                .foregroundStyle(.secondary)
+
+                if let botActionError {
+                    Text(botActionError)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
+                        .accessibilityIdentifier("delete-bot-error")
+                }
+
+                Spacer()
+
+                HStack {
+                    Button("取消") {
+                        guard !botActionBusy else { return }
+                        botDeleteTarget = nil
+                        botActionError = nil
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(botActionBusy)
+                    .accessibilityIdentifier("delete-bot-cancel")
+
+                    Spacer()
+
+                    Button(role: .destructive) {
+                        Task { await deleteBot(bot) }
+                    } label: {
+                        Text(botActionBusy ? "删除中…" : "删除")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(botActionBusy)
+                    .accessibilityIdentifier("delete-bot-confirm")
+                }
+            }
+            .padding(24)
+            .navigationTitle("删除确认")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .interactiveDismissDisabled(botActionBusy)
+        .presentationDetents([.medium])
+        .accessibilityIdentifier("delete-bot-confirmation")
     }
 
     var createBotSheet: some View {
