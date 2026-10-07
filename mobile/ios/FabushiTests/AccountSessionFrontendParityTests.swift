@@ -63,4 +63,10 @@ final class AccountSessionFrontendParityTests: XCTestCase {
             "unlimited": false,
         ]))
     }
+    func testAccountDisplayNameNormalizationMatchesDesktopMenuContract() {
+        XCTAssertEqual(MarketplaceModel.normalizedAccountDisplayName("  Ada   Lovelace  "), "Ada Lovelace")
+        XCTAssertEqual(MarketplaceModel.normalizedAccountDisplayName("\nFabushi\tUser\n"), "Fabushi User")
+        XCTAssertEqual(MarketplaceModel.normalizedAccountDisplayName("   "), "")
+    }
+
 }
