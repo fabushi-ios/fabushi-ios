@@ -175,16 +175,18 @@ extension GrokMobileShell {
     }
 
     @MainActor
-    func hideBot(_ bot: MobileBotSummary) async {
+    func setBotHidden(_ bot: MobileBotSummary, hidden: Bool) async {
         guard !bot.isGroup, bot.miniAppId == nil, !botActionBusy else { return }
         botActionBusy = true
         botActionError = nil
         defer { botActionBusy = false }
         do {
             bots = try await GrokMobileBotService(bridge: bridge)
-                .setBotHidden(id: bot.id, hidden: true)
+                .setBotHidden(id: bot.id, hidden: hidden)
         } catch {
-            botActionError = "隐藏 Bot 失败：\(error.localizedDescription)"
+            botActionError = hidden
+                ? "隐藏 Bot 失败：\(error.localizedDescription)"
+                : "恢复 Bot 失败：\(error.localizedDescription)"
         }
     }
 
