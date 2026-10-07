@@ -434,14 +434,16 @@ fn load_pending_async_tasks(path: &Path, now_ms: i64) -> BTreeMap<String, AsyncT
                 && now_ms.saturating_sub(task.started_at_ms) <= ASYNC_TASK_STALE_MAX_AGE_MS
         })
         .map(|mut task| {
-            let restart_detail = "rearmed after a Host restart";
-            task.detail = Some(match task.detail.as_deref().filter(|detail| !detail.is_empty()) {
-                Some(detail) if !detail.contains(restart_detail) => {
-                    format!("{detail} · {restart_detail}")
-                }
-                Some(detail) => detail.to_string(),
-                None => restart_detail.to_string(),
-            });
+            if task.kind == AsyncTaskKind::Shell {
+                let restart_detail = "reattached after a host restart";
+                task.detail = Some(match task.detail.as_deref().filter(|detail| !detail.is_empty()) {
+                    Some(detail) if !detail.contains(restart_detail) => {
+                        format!("{detail} · {restart_detail}")
+                    }
+                    Some(detail) => detail.to_string(),
+                    None => restart_detail.to_string(),
+                });
+            }
             (task.id.clone(), task)
         })
         .collect()
@@ -14396,7 +14398,7 @@ mod tests {
             shell
                 .detail
                 .as_deref()
-                .is_some_and(|detail| detail.contains("rearmed after a Host restart"))
+                .is_some_and(|detail| detail.contains("reattached after a host restart"))
         );
 
         persist_pending_async_tasks(Some(&path), &restored).expect("prune durable store");
