@@ -4189,6 +4189,95 @@ mod tests {
     }
 
     #[test]
+    fn account_menu_profile_update_uses_authenticated_fabushi_endpoint() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind profile test server");
+        let address = listener.local_addr().expect("profile test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept profile request");
+            let mut request = [0_u8; 8192];
+            let size = stream.read(&mut request).expect("read profile request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("POST /api/auth/update-profile "));
+            assert!(request.to_ascii_lowercase().contains("authorization: bearer test-token"));
+            assert!(request.contains(r#"\"displayName\":\"Ada Lovelace\""#));
+            let body = r#"{\"success\":true,\"user\":{\"nickname\":\"Ada Lovelace\"}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(), body
+            ).expect("write profile response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-account-menu-profile-test-{}-{}",
+            std::process::id(), surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let response = client.execute(
+            "mahayana.auth.profile.update",
+            &json!({"displayName":"Ada Lovelace","accessToken":"test-token"}),
+        ).expect("profile update");
+        assert_eq!(response["user"]["nickname"], "Ada Lovelace");
+        server.join().expect("join profile server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn account_menu_feedback_uses_authenticated_fabushi_endpoint() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind feedback test server");
+        let address = listener.local_addr().expect("feedback test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept feedback request");
+            let mut request = [0_u8; 8192];
+            let size = stream.read(&mut request).expect("read feedback request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("POST /api/feedback "));
+            assert!(request.to_ascii_lowercase().contains("authorization: bearer test-token"));
+            assert!(request.contains(r#"\"description\":\"The menu needs attention\""#));
+            assert!(request.contains(r#"\"submissionId\":\"550e8400-e29b-41d4-a716-446655440000\""#));
+            let body = r#"{\"success\":true,\"issueNumber\":42}"#;
+            write!(
+                stream,
+                "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(), body
+            ).expect("write feedback response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-account-menu-feedback-test-{}-{}",
+            std::process::id(), surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let response = client.execute(
+            "mahayana.feedback.submit",
+            &json!({
+                "message":"The menu needs attention",
+                "submissionId":"550e8400-e29b-41d4-a716-446655440000",
+                "accessToken":"test-token"
+            }),
+        ).expect("feedback submit");
+        assert_eq!(response["issueNumber"], 42);
+        server.join().expect("join feedback server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn terminal_session_errors_are_classified_for_local_eviction() {
         assert!(terminal_session_error(&ProductError::NotLoggedIn));
         assert!(terminal_session_error(&ProductError::SessionExpired));
