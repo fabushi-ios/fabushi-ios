@@ -1204,7 +1204,7 @@ mod tests {
     #[test]
     fn hidden_background_can_project_completion_without_persisting_chat_history() {
         let conversation_id = conversation("mahayana-ai:agent:background");
-        let state = Arc::new(Mutex::new(ConversationState::default()));
+        let state = Arc::new(Mutex::new(ConversationState::new(Vec::new())));
         let events = Arc::new(CapturedRuntimeEvents::default());
         let bridge = RuntimeKernelEventBridge {
             conversation_id: conversation_id.clone(),
