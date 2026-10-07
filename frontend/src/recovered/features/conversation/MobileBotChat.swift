@@ -1171,7 +1171,6 @@ internal struct MobileBotChat: View {
     }
 
     @MainActor
-    @MainActor
     private func resolveApproval(_ entry: MobileChatMessage, resolution: MobileAutoReviewResolution) async {
         guard let approvalId = entry.approvalId,
               let initialIndex = entries.firstIndex(where: { $0.approvalId == approvalId }),
