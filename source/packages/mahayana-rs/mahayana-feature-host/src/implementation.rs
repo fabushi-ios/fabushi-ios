@@ -410,13 +410,13 @@ fn bounded_conversation_window(
 
 const ASYNC_TASK_STALE_MAX_AGE_MS: i64 = 48 * 60 * 60 * 1_000;
 
-fn async_task_key(kind: AsyncTaskKind, id: &str) -> String {
+fn async_task_key(agent_id: &str, kind: AsyncTaskKind, id: &str) -> String {
     let kind = match kind {
         AsyncTaskKind::Subagent => "subagent",
         AsyncTaskKind::Shell => "shell",
         AsyncTaskKind::CloudAgent => "cloud-agent",
     };
-    format!("{kind}\u{1f}{id}")
+    format!("{agent_id}\u{1f}{kind}\u{1f}{id}")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -494,9 +494,9 @@ fn load_pending_async_tasks(
             .map(str::trim)
             .filter(|value| !value.is_empty())
         {
-            operation_ids.insert(async_task_key(task.kind, &task.id), operation_id.to_string());
+            operation_ids.insert(async_task_key(&task.parent_agent_id, task.kind, &task.id), operation_id.to_string());
         }
-        tasks.insert(async_task_key(task.kind, &task.id), task.clone());
+        tasks.insert(async_task_key(&task.parent_agent_id, task.kind, &task.id), task.clone());
     }
     (tasks, operation_ids)
 }
@@ -1088,7 +1088,7 @@ impl FeatureHostController {
                 )));
             }
         };
-        let task_key = async_task_key(AsyncTaskKind::CloudAgent, &work_id);
+        let task_key = async_task_key(&agent_id, AsyncTaskKind::CloudAgent, &work_id);
         let (task, target) = {
             let state = self.state()?;
             ensure_open(&state)?;
@@ -8614,11 +8614,12 @@ impl FeatureHostController {
                     for subagent in changed {
                         if subagent.status == SubagentStatus::Running {
                             state.async_task_operation_ids.insert(
-                                async_task_key(AsyncTaskKind::Subagent, &subagent.id),
+                                async_task_key(&subagent.parent_agent_id, AsyncTaskKind::Subagent, &subagent.id),
                                 operation_id.clone(),
                             );
                         } else {
                             state.async_task_operation_ids.remove(&async_task_key(
+                                &subagent.parent_agent_id,
                                 AsyncTaskKind::Subagent,
                                 &subagent.id,
                             ));
@@ -8673,7 +8674,7 @@ impl FeatureHostController {
                         AsyncTaskKind::Subagent => None,
                     };
                     if let Some(task_id) = task_id {
-                        let task_key = async_task_key(task_kind, &task_id);
+                        let task_key = async_task_key(&agent_id, task_kind, &task_id);
                         let mut state = self.state()?;
                         if status == RuntimeActivityStatus::Running {
                             state.async_tasks.insert(
@@ -13614,7 +13615,7 @@ fn update_subagents_from_activity(
     for subagent in &changed {
         if subagent.status == SubagentStatus::Running {
             state.async_tasks.insert(
-                async_task_key(AsyncTaskKind::Subagent, &subagent.id),
+                async_task_key(&subagent.parent_agent_id, AsyncTaskKind::Subagent, &subagent.id),
                 AsyncTaskSummary {
                     kind: AsyncTaskKind::Subagent,
                     id: subagent.id.clone(),
@@ -13630,7 +13631,7 @@ fn update_subagents_from_activity(
         } else {
             state
                 .async_tasks
-                .remove(&async_task_key(AsyncTaskKind::Subagent, &subagent.id));
+                .remove(&async_task_key(&subagent.parent_agent_id, AsyncTaskKind::Subagent, &subagent.id));
         }
     }
 
@@ -14654,7 +14655,7 @@ mod tests {
         let now = 100_000_000_i64;
         let mut tasks = BTreeMap::new();
         tasks.insert(
-            "recent-shell".into(),
+            async_task_key("agent-a", AsyncTaskKind::Shell, "recent-shell"),
             async_task_fixture(
                 "recent-shell",
                 "agent-a",
@@ -14663,7 +14664,7 @@ mod tests {
             ),
         );
         tasks.insert(
-            "stale-cloud".into(),
+            async_task_key("agent-a", AsyncTaskKind::CloudAgent, "stale-cloud"),
             async_task_fixture(
                 "stale-cloud",
                 "agent-a",
@@ -14672,8 +14673,14 @@ mod tests {
             ),
         );
         let operation_ids = BTreeMap::from([
-            ("recent-shell".to_string(), "operation-a".to_string()),
-            ("stale-cloud".to_string(), "operation-b".to_string()),
+            (
+                async_task_key("agent-a", AsyncTaskKind::Shell, "recent-shell"),
+                "operation-a".to_string(),
+            ),
+            (
+                async_task_key("agent-a", AsyncTaskKind::CloudAgent, "stale-cloud"),
+                "operation-b".to_string(),
+            ),
         ]);
         persist_pending_async_tasks(Some(&path), &tasks, &operation_ids)
             .expect("persist pending tasks");
@@ -14682,12 +14689,12 @@ mod tests {
         assert_eq!(restored.len(), 1);
         assert_eq!(
             restored_operations
-                .get(&async_task_key(AsyncTaskKind::Shell, "recent-shell"))
+                .get(&async_task_key("agent-a", AsyncTaskKind::Shell, "recent-shell"))
                 .map(String::as_str),
             Some("operation-a")
         );
         let shell = restored
-            .get(&async_task_key(AsyncTaskKind::Shell, "recent-shell"))
+            .get(&async_task_key("agent-a", AsyncTaskKind::Shell, "recent-shell"))
             .expect("recent shell restored");
         assert_eq!(shell.parent_agent_id, "agent-a");
         assert!(
@@ -14705,6 +14712,46 @@ mod tests {
     }
 
     #[test]
+    fn async_task_durable_identity_includes_parent_agent() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-async-task-agent-scope-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        std::fs::create_dir_all(&root).expect("create async task agent scope root");
+        let path = root.join("pending.json");
+        let shared_work_id = "shared-work";
+        let key_a = async_task_key("agent-a", AsyncTaskKind::CloudAgent, shared_work_id);
+        let key_b = async_task_key("agent-b", AsyncTaskKind::CloudAgent, shared_work_id);
+        assert_ne!(key_a, key_b);
+
+        let tasks = BTreeMap::from([
+            (
+                key_a.clone(),
+                async_task_fixture(shared_work_id, "agent-a", AsyncTaskKind::CloudAgent, 10),
+            ),
+            (
+                key_b.clone(),
+                async_task_fixture(shared_work_id, "agent-b", AsyncTaskKind::CloudAgent, 20),
+            ),
+        ]);
+        let operation_ids = BTreeMap::from([
+            (key_a.clone(), "operation-a".to_string()),
+            (key_b.clone(), "operation-b".to_string()),
+        ]);
+        persist_pending_async_tasks(Some(&path), &tasks, &operation_ids)
+            .expect("persist agent-scoped tasks");
+
+        let (restored, restored_operations) = load_pending_async_tasks(&path, 30);
+        assert_eq!(restored.len(), 2);
+        assert_eq!(restored.get(&key_a).map(|task| task.parent_agent_id.as_str()), Some("agent-a"));
+        assert_eq!(restored.get(&key_b).map(|task| task.parent_agent_id.as_str()), Some("agent-b"));
+        assert_eq!(restored_operations.get(&key_a).map(String::as_str), Some("operation-a"));
+        assert_eq!(restored_operations.get(&key_b).map(String::as_str), Some("operation-b"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn async_task_settlement_removes_durable_store_when_last_task_finishes() {
         let root = std::env::temp_dir().join(format!(
             "fabushi-async-task-settlement-{}-{}",
@@ -14714,18 +14761,19 @@ mod tests {
         std::fs::create_dir_all(&root).expect("create async task settlement root");
         let path = root.join("pending.json");
         let mut tasks = BTreeMap::new();
+        let task_key = async_task_key("agent-a", AsyncTaskKind::Subagent, "subagent-1");
         tasks.insert(
-            "subagent-1".into(),
+            task_key.clone(),
             async_task_fixture("subagent-1", "agent-a", AsyncTaskKind::Subagent, 10),
         );
         let mut operation_ids =
-            BTreeMap::from([("subagent-1".to_string(), "operation-a".to_string())]);
+            BTreeMap::from([(task_key.clone(), "operation-a".to_string())]);
         persist_pending_async_tasks(Some(&path), &tasks, &operation_ids)
             .expect("persist one task");
         assert!(path.is_file());
 
-        tasks.remove("subagent-1");
-        operation_ids.remove("subagent-1");
+        tasks.remove(&task_key);
+        operation_ids.remove(&task_key);
         persist_pending_async_tasks(Some(&path), &tasks, &operation_ids)
             .expect("settle final task");
         assert!(!path.exists());
