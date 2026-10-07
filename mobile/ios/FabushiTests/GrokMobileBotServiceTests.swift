@@ -56,12 +56,94 @@ final class GrokMobileBotServiceTests: XCTestCase {
             "name": "Research",
             "description": "Verify",
             "hidden": true,
-            "unread": true,
+            "unread": false,
+            "hasUnread": true,
             "conversationId": "conversation:agent-1",
+            "lastEntry": ["kind": "text", "text": "Latest answer"],
+            "lastMessageId": "message-9",
+            "lastMessagePreview": "stale preview",
+            "updatedAt": 1_797_777_123_456 as Int64,
+            "isComposingMessage": true,
+            "isRunning": true,
+            "draftPrompt": "continue",
+            "awaitingUserResponse": ["reason": "Needs approval"],
         ]))
         XCTAssertTrue(bot.hidden)
         XCTAssertTrue(bot.unread)
         XCTAssertEqual(bot.conversationId, "conversation:agent-1")
+        XCTAssertEqual(bot.lastEntry, .text("Latest answer"))
+        XCTAssertEqual(bot.lastMessageId, "message-9")
+        XCTAssertEqual(bot.lastMessagePreview, "Latest answer")
+        XCTAssertEqual(bot.updatedAtMs, 1_797_777_123_456)
+        XCTAssertTrue(bot.isComposingMessage)
+        XCTAssertTrue(bot.isRunning)
+        XCTAssertEqual(bot.draftPrompt, "continue")
+        XCTAssertEqual(bot.waitingReason, "Needs approval")
+        XCTAssertEqual(mobileBotHomeSubtitle(bot), "正在输入…")
+    }
+
+    @MainActor
+    func testAgentSummaryProjectionCoversAttachmentLinkAndFallbackSemantics() throws {
+        let attachment = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-files",
+            "name": "Files",
+            "lastEntry": [
+                "kind": "attachment",
+                "count": 2,
+                "kinds": ["image": 1, "pdf": 1],
+            ],
+        ]))
+        XCTAssertEqual(attachment.lastEntry, .attachment(count: 2, kinds: ["image": 1, "pdf": 1]))
+        XCTAssertEqual(attachment.lastMessagePreview, "Sent 2 files")
+
+        let link = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-link",
+            "name": "Links",
+            "lastEntry": ["kind": "link", "url": "https://example.invalid"],
+            "lastMessagePreview": "Canonical link preview",
+        ]))
+        XCTAssertEqual(link.lastEntry, .link("https://example.invalid"))
+        XCTAssertEqual(link.lastMessagePreview, "Canonical link preview")
+
+        let legacy = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-legacy",
+            "name": "Legacy",
+            "lastEntry": ["message": ["content": "Legacy host text"]],
+        ]))
+        XCTAssertEqual(legacy.lastEntry, .text("Legacy host text"))
+        XCTAssertEqual(legacy.lastMessagePreview, "Legacy host text")
+    }
+
+    func testAgentHomeSubtitleUsesDesktopActivityPrecedence() {
+        XCTAssertEqual(
+            mobileBotHomeSubtitle(MobileBotSummary(
+                id: "waiting",
+                name: "Waiting",
+                description: "Description",
+                lastMessagePreview: "Last message",
+                waitingReason: "Needs confirmation"
+            )),
+            "Needs confirmation"
+        )
+        XCTAssertEqual(
+            mobileBotHomeSubtitle(MobileBotSummary(
+                id: "preview",
+                name: "Preview",
+                description: "Description",
+                lastMessagePreview: "Last message",
+                isRunning: true
+            )),
+            "Last message"
+        )
+        XCTAssertEqual(
+            mobileBotHomeSubtitle(MobileBotSummary(
+                id: "running",
+                name: "Running",
+                description: "Description",
+                isRunning: true
+            )),
+            "正在运行…"
+        )
     }
 
     func testPinnedBotProjectionPreservesCanonicalHostOrderAndFailsClosed() {
@@ -373,7 +455,15 @@ final class GrokMobileBotServiceTests: XCTestCase {
             name: "Host name",
             description: "Host description",
             title: "Canonical title",
-            notifyOnUpdatesEnabled: false
+            notifyOnUpdatesEnabled: false,
+            lastEntry: .text("Canonical last message"),
+            lastMessageId: "message-1",
+            lastMessagePreview: "Canonical last message",
+            updatedAtMs: 1_797_777_100_000,
+            isComposingMessage: true,
+            waitingReason: "Waiting",
+            isRunning: true,
+            draftPrompt: "Draft"
         )
         let installed = MobileBotSummary(
             id: "global-dharma-bot",
@@ -387,6 +477,14 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertEqual(merged.name, "全球法布施")
         XCTAssertEqual(merged.title, "Canonical title")
         XCTAssertFalse(merged.notifyOnUpdatesEnabled)
+        XCTAssertEqual(merged.lastEntry, .text("Canonical last message"))
+        XCTAssertEqual(merged.lastMessageId, "message-1")
+        XCTAssertEqual(merged.lastMessagePreview, "Canonical last message")
+        XCTAssertEqual(merged.updatedAtMs, 1_797_777_100_000)
+        XCTAssertTrue(merged.isComposingMessage)
+        XCTAssertEqual(merged.waitingReason, "Waiting")
+        XCTAssertTrue(merged.isRunning)
+        XCTAssertEqual(merged.draftPrompt, "Draft")
         XCTAssertEqual(merged.miniAppId, GlobalDharmaMiniAppBridge.globalDharmaId)
     }
 
