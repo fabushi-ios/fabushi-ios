@@ -603,6 +603,11 @@ pub struct FeatureHostController {
     /// This is deliberately not a credential; it is only an identity marker
     /// used to prevent transcript/state reuse across account boundaries.
     active_account_id: Mutex<Option<String>>,
+    // Startup is not an account replacement: the native Runtime may already
+    // own a durable same-account checkpoint that must survive Host recreation.
+    // Once the first persisted auth boundary is installed, later identity
+    // changes use the destructive reset path.
+    account_boundary_initialized: Mutex<bool>,
     client_side_tool_v2: Mutex<ClientSideToolV2Producer>,
     // Serializes routine admission with account replacement and native quiesce.
     routine_dispatch_lock: Mutex<()>,
@@ -674,6 +679,7 @@ impl FeatureHostController {
             workflow_root_path,
             teach_recording: Mutex::new(None),
             active_account_id: Mutex::new(None),
+            account_boundary_initialized: Mutex::new(false),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
             routine_dispatch_lock: Mutex::new(()),
             state: Mutex::new(state),
@@ -775,6 +781,7 @@ impl FeatureHostController {
             workflow_root_path,
             teach_recording: Mutex::new(None),
             active_account_id: Mutex::new(None),
+            account_boundary_initialized: Mutex::new(false),
             client_side_tool_v2: Mutex::new(ClientSideToolV2Producer::new()),
             routine_dispatch_lock: Mutex::new(()),
             state: Mutex::new(state),
@@ -7083,6 +7090,10 @@ impl FeatureHostController {
         let auth = auth_payload(response);
         let logged_in = auth.get("loggedIn").and_then(Value::as_bool) == Some(true);
         let next_account_id = logged_in.then(|| auth_account_id(auth)).flatten();
+        let first_boundary = !*self
+            .account_boundary_initialized
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?;
         let changed = {
             let active = self
                 .active_account_id
@@ -7091,9 +7102,11 @@ impl FeatureHostController {
             *active != next_account_id
         };
         if changed {
-            self.retire_routines_for_account_change()?;
-            self.retire_background_recoveries_for_account_change()?;
-            self.runtime()?.reset_session()?;
+            if !first_boundary {
+                self.retire_routines_for_account_change()?;
+                self.retire_background_recoveries_for_account_change()?;
+                self.runtime()?.reset_session()?;
+            }
             let account_id = next_account_id.as_deref();
             let automations = self
                 .automation_path
@@ -7178,6 +7191,10 @@ impl FeatureHostController {
                 None
             };
         }
+        *self
+            .account_boundary_initialized
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)? = true;
         if logged_in {
             // A signed-in Host is not ready for chat until the real Mahayana
             // provider session exists. This runs on restored sessions and on
