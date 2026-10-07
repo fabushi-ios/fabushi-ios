@@ -107,16 +107,18 @@ extension GrokMobileShell {
     @MainActor
     func deleteBot(_ bot: MobileBotSummary) async {
         guard bot.miniAppId == nil, !botActionBusy else { return }
-        botDeleteTarget = nil
         botActionBusy = true
         botActionError = nil
         defer { botActionBusy = false }
 
         do {
             bots = try await GrokMobileBotService(bridge: bridge).deleteBot(id: bot.id)
+            botDeleteTarget = nil
             await messaging.refresh()
         } catch {
-            botActionError = "删除 Bot 失败：\(error.localizedDescription)"
+            botActionError = bot.isGroup
+                ? "删除群组失败：\(error.localizedDescription)"
+                : "删除 Bot 失败：\(error.localizedDescription)"
         }
     }
 }
