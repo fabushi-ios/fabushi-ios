@@ -55,6 +55,7 @@ final class MahayanaCoordinator {
     private let webAuthnSigner: CoordinatorWebAuthnSigner?
     private let devControlAdapter: (any CoordinatorDevControlAdapting)?
     private let clientSideToolV2Relay = ClientSideToolV2Relay()
+    private let nativeLocalCapabilities = IOSNativeLocalCapabilityBackend()
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
     private(set) var lifecycleState: LifecycleState = .starting
     private var inFlight = Set<String>()
@@ -69,6 +70,19 @@ final class MahayanaCoordinator {
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
+        if method == "openExternal" {
+            do {
+                let payload = try CoordinatorPayload.fromFoundation(params)
+                let result = try await nativeLocalCapabilities.execute(
+                    capability: .openExternalURL,
+                    params: payload
+                )
+                return JSONResult(value: result.foundationValue)
+            } catch {
+                throw CoordinatorError.requestFailed(error.localizedDescription)
+            }
+        }
+
         if let mcpSurface {
             self.mcpSurface = mcpSurface
         } else if let settingsStore {
