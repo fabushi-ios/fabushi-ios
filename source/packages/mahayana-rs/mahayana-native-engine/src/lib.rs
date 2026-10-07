@@ -47,7 +47,7 @@ use web_research::{WebResearchClient, WebResearchConfig};
 
 const MAIN_ASSISTANT_CONVERSATION_ID: &str = "mahayana-ai:agent:assistant";
 const CONVERSATION_FAST_LANE_MAX_CHARS: usize = 280;
-const CONVERSATION_FAST_LANE_INSTRUCTION: &str = "CHAT-013 direct conversation fast lane: answer this simple conversational turn directly in plain text. Do not attempt a send_message call; the native Host streams provider text into the canonical user-visible transcript. The react_to_message tool remains available when a reaction alone is the appropriate user-visible response.";
+const CONVERSATION_FAST_LANE_INSTRUCTION: &str = "CHAT-013 direct conversation fast lane: answer this simple conversational turn directly in plain text. Do not attempt any tool call. The native Host streams provider text into the canonical user-visible transcript and records delivery through the Host path.";
 const MAX_TOOL_OUTPUT_BYTES: usize = 64 * 1024;
 const DEFAULT_MAX_MODEL_TURNS: usize = 16;
 const MAX_REPLY_NUDGES: usize = 3;
@@ -3291,14 +3291,8 @@ fn is_conversation_fast_lane(history: &[Value]) -> bool {
     !ACTION_MARKERS.iter().any(|marker| padded.contains(marker))
 }
 
-fn conversation_fast_lane_tools(history: &[Value], tools: &[Value]) -> Option<Vec<Value>> {
-    is_conversation_fast_lane(history).then(|| {
-        tools
-            .iter()
-            .filter(|tool| tool.get("name").and_then(Value::as_str) == Some("react_to_message"))
-            .cloned()
-            .collect()
-    })
+fn conversation_fast_lane_tools(history: &[Value], _tools: &[Value]) -> Option<Vec<Value>> {
+    is_conversation_fast_lane(history).then(Vec::new)
 }
 
 fn model_turn_tools(
@@ -3526,7 +3520,7 @@ mod tests {
     }
 
     #[test]
-    fn conversation_fast_lane_keeps_only_reaction_delivery_tool() {
+    fn conversation_fast_lane_exposes_zero_tools() {
         let history = vec![json!({
             "role":"user",
             "content":"In one sentence, explain what a database index is for."
@@ -3550,14 +3544,14 @@ mod tests {
         ];
         let reduced =
             conversation_fast_lane_tools(&history, &tools).expect("simple turn fast lane");
-        assert_eq!(reduced.len(), 1);
-        assert_eq!(reduced[0]["name"], "react_to_message");
-        assert_eq!(
+        assert!(
+            reduced.is_empty(),
+            "simple first-party conversation must expose zero provider tools",
+        );
+        assert!(
             model_turn_tools(ModelProviderMode::FirstPartyDacheng, true, &history, &tools)
-                .iter()
-                .filter_map(|tool| tool.get("name").and_then(Value::as_str))
-                .collect::<Vec<_>>(),
-            vec!["react_to_message"],
+                .is_empty(),
+            "visible first-party fast lane must expose zero provider tools",
         );
         assert_eq!(
             model_turn_tools(ModelProviderMode::FirstPartyDacheng, false, &history, &tools).len(),
@@ -4052,6 +4046,12 @@ mod tests {
             requests[0]["instructions"]
                 .as_str()
                 .is_some_and(|value| value.contains("CHAT-013 direct conversation fast lane")),
+        );
+        assert!(
+            requests[0]["instructions"]
+                .as_str()
+                .is_some_and(|value| !value.contains("react_to_message")),
+            "fast-lane instruction must not advertise a reaction tool that is absent from the schema",
         );
         drop(requests);
 
