@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum FabushiProductModule: String, CaseIterable, Identifiable {
@@ -125,10 +126,8 @@ func makeFabushiFlashcards(
     createID: () -> String = { UUID().uuidString }
 ) -> [FabushiGeneratedFlashcard] {
     splitFabushiSentences(text).flatMap { sentence in
-        let removable = CharacterSet(charactersIn: "，、：, \t\r\n")
-        let plainCharacters = sentence.unicodeScalars
-            .filter { !removable.contains($0) }
-            .map(Character.init)
+        let removable = "，、：, \t\r\n"
+        let plainCharacters = Array(sentence.filter { !removable.contains($0) })
         let start = max(0, plainCharacters.count / 3 - 1)
         let end = min(plainCharacters.count, start + 4)
         let term = start < end ? String(plainCharacters[start..<end]) : ""
