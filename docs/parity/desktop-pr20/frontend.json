@@ -626,7 +626,7 @@
       "desktop_owner": "production renderer root over Settings and Plugins surfaces",
       "desktop_visible_effect": "Settings/plugin operations surface one scoped success/error notice at the product root; changing account or leaving the owning surface clears the notice, stale async completions are rejected, success notices expire after 3.5 seconds, errors after 6 seconds, and users can dismiss immediately.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/production/settings-notice-controller.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
+      "ios_target_path": "frontend/src/production/settings-notice-controller.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "Swift Observation replaces useSyncExternalStore subscriptions. A single native root controller owns the typed snapshot and scope-generation fence; SwiftUI owns timer expiry/manual dismissal. Existing MarketplaceModel message/privateSkillError/mcpError fields remain local compatibility presentation and are not a second root authority.",
       "implementation_status": "implemented",
