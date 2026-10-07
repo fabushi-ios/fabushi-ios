@@ -20,6 +20,37 @@ extension GrokMobileShell {
     }
 
     @MainActor
+    func runAccessRosterLifecycle() async {
+        await refreshAccessRoster()
+        while !Task.isCancelled {
+            do {
+                _ = try await bridge.receiveFeatureEvent(
+                    deadlineMilliseconds: 2_560
+                ) { event in
+                    guard let type = event["type"] as? String else { return false }
+                    return type == "bot.changed"
+                        || type == "group.changed"
+                        || type == "group.delta"
+                }
+                try Task.checkCancellation()
+                await refreshAccessRoster()
+            } catch IOSFeatureEventBrokerError.timedOut {
+                continue
+            } catch is CancellationError {
+                return
+            } catch {
+                if Task.isCancelled { return }
+                do {
+                    try await Task.sleep(for: .milliseconds(320))
+                } catch {
+                    return
+                }
+                await refreshAccessRoster()
+            }
+        }
+    }
+
+    @MainActor
     func refreshAccessRoster() async {
         accessRosterGeneration = accessRosterGeneration == Int.max ? 1 : accessRosterGeneration + 1
         let expectedGeneration = accessRosterGeneration
