@@ -47,7 +47,10 @@ extension GrokMobileShell {
                                 legacySection = .miniapps
                                 legacyOpen = true
                             },
-                            onOpenAI: {
+                            onOpenAI: { prompt in
+                                if let prompt, !prompt.isEmpty {
+                                    botDrafts["mahayana-assistant"] = prompt
+                                }
                                 selectedBot = bots.first(where: { $0.id == "mahayana-assistant" })
                                     ?? MobileBotSummary(
                                         id: "mahayana-assistant",
