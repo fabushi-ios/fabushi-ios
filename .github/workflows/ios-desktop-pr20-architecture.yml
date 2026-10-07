@@ -10,6 +10,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+
 jobs:
   architecture:
     runs-on: ubuntu-latest
@@ -17,6 +20,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
       - name: Verify Desktop PR20 authority and full source inventory
         run: python3 scripts/check-desktop-pr20-ios-architecture.py
       - name: Verify App Store readiness gate script
@@ -31,6 +40,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
       - name: Install Linux dependencies for Rust Host graph
         run: |
           sudo apt-get update
@@ -58,6 +73,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
       - name: Detect iOS-owned Rust source
         id: source
         shell: bash
@@ -126,6 +147,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
       - name: Install device build tools
         run: |
           command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
@@ -154,11 +181,40 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+          test "$SOURCE_SHA" = "$IOS_EXPECTED_HEAD"
+          DESKTOP_HEAD_SHA="$(sed -n 's/^- Pinned source commit: //p' MIGRATION_SOURCE.md)"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DESKTOP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
           mkdir -p device-archive-evidence
+          # GITHUB_SHA is the PR merge ref, not the exact source we checked out.
+          ARCHIVE_NAME="Fabushi-unsigned-${SOURCE_SHA}.xcarchive.zip"
           ditto -c -k --sequesterRsrc --keepParent \
             "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" \
-            device-archive-evidence/Fabushi-unsigned-${GITHUB_SHA}.xcarchive.zip
-          shasum -a 256 device-archive-evidence/*.zip > device-archive-evidence/SHA256SUMS.txt
+            "device-archive-evidence/$ARCHIVE_NAME"
+          {
+            printf 'IOS_HEAD_SHA=%s\n' "$SOURCE_SHA"
+            printf 'IOS_EXPECTED_HEAD_SHA=%s\n' "$IOS_EXPECTED_HEAD"
+            printf 'IOS_TREE_SHA=%s\n' "$SOURCE_TREE"
+            printf 'DESKTOP_HEAD_SHA=%s\n' "$DESKTOP_HEAD_SHA"
+            printf 'RUN_ID=%s\n' "$GITHUB_RUN_ID"
+            printf 'RUN_ATTEMPT=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'WORKFLOW_EVENT_SHA=%s\n' "$GITHUB_SHA"
+            printf 'REPOSITORY=%s\n' "$GITHUB_REPOSITORY"
+            printf 'ARTIFACT_NAME=fabushi-ios-device-archive-%s\n' "$SOURCE_SHA"
+            printf 'ARCHIVE_FILE=%s\n' "$ARCHIVE_NAME"
+            printf 'EVIDENCE_KIND=unsigned-generic-ios-device-archive\n'
+            printf 'INSTALL_UPGRADE_EXPORT_NOT_PROVEN=true\n'
+          } > device-archive-evidence/source.env
+          (
+            cd device-archive-evidence
+            shasum -a 256 "$ARCHIVE_NAME" source.env > SHA256SUMS.txt
+            shasum -a 256 -c SHA256SUMS.txt
+          )
       - name: Upload device archive evidence
         uses: actions/upload-artifact@v7
         with:
