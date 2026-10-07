@@ -4209,8 +4209,13 @@ mod tests {
             let request = String::from_utf8_lossy(&request[..size]);
             assert!(request.starts_with("POST /api/auth/update-profile "));
             assert!(request.to_ascii_lowercase().contains("authorization: bearer test-token"));
-            assert!(request.contains(r#"\"displayName\":\"Ada Lovelace\""#));
-            let body = r#"{\"success\":true,\"user\":{\"nickname\":\"Ada Lovelace\"}}"#;
+            let (_, request_body) = request
+                .split_once("\r\n\r\n")
+                .expect("profile request body separator");
+            let request_body: Value =
+                serde_json::from_str(request_body).expect("valid profile request json");
+            assert_eq!(request_body["displayName"], "Ada Lovelace");
+            let body = r#"{"success":true,"user":{"nickname":"Ada Lovelace"}}"#;
             write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -4270,9 +4275,17 @@ mod tests {
             let request = String::from_utf8_lossy(&request[..size]);
             assert!(request.starts_with("POST /api/feedback "));
             assert!(request.to_ascii_lowercase().contains("authorization: bearer test-token"));
-            assert!(request.contains(r#"\"description\":\"The menu needs attention\""#));
-            assert!(request.contains(r#"\"submissionId\":\"550e8400-e29b-41d4-a716-446655440000\""#));
-            let body = r#"{\"success\":true,\"issueNumber\":42}"#;
+            let (_, request_body) = request
+                .split_once("\r\n\r\n")
+                .expect("feedback request body separator");
+            let request_body: Value =
+                serde_json::from_str(request_body).expect("valid feedback request json");
+            assert_eq!(request_body["description"], "The menu needs attention");
+            assert_eq!(
+                request_body["diagnostics"]["submissionId"],
+                "550e8400-e29b-41d4-a716-446655440000"
+            );
+            let body = r#"{"success":true,"issueNumber":42}"#;
             write!(
                 stream,
                 "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
