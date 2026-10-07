@@ -104,7 +104,7 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
                     "application/connect+proto"
                 )
                 let requestBody = try XCTUnwrap(request.httpBody)
-                XCTAssertEqual(requestBody.prefix(5), Data([0, 0, 0, 0, 11]))
+                XCTAssertEqual(requestBody.prefix(5), Data([0, 0, 0, 0, 12]))
                 XCTAssertEqual(
                     Data(requestBody.dropFirst(5)),
                     lifecycleBytesField(1, "offset-1") + Data([0x10, 0x01])
