@@ -789,12 +789,13 @@ mod tests {
 
     fn temp_dir() -> PathBuf {
         let path = std::env::temp_dir().join(format!(
-            "fabushi-transcript-journal-{}-{}",
+            "fabushi-transcript-journal-{}-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_nanos()
+                .as_nanos(),
+            TEMP_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&path).unwrap();
         path
