@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum FabushiProductModule: String, CaseIterable, Identifiable {
+enum FabushiProductModule: String, CaseIterable, Identifiable, Equatable {
     case globalDharma
     case flashcards
     case sutra
