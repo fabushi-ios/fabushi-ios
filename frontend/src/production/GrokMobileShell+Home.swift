@@ -77,13 +77,37 @@ extension GrokMobileShell {
                         botRow(MobileBotSummary(id: "mahayana-assistant", name: "Mahayana", description: "Ready to help"), subtitle: "that's the only new one.", badge: "Board")
 
                         if !bots.isEmpty {
-                            sectionTitle("Bots  \(bots.count)")
+                            sectionTitle("Bots  \(filteredBots.count)")
                             ForEach(filteredBots) { bot in
                                 botRow(
                                     bot,
                                     subtitle: bot.description.isEmpty ? "Ready" : bot.description,
                                     badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
                                 )
+                            }
+
+                            let hiddenBots = bots.filter { $0.hidden }
+                            if !hiddenBots.isEmpty {
+                                Menu {
+                                    ForEach(hiddenBots) { bot in
+                                        Button {
+                                            Task { await setBotHidden(bot, hidden: false) }
+                                        } label: {
+                                            Label("恢复 \(bot.name)", systemImage: "eye")
+                                        }
+                                    }
+                                } label: {
+                                    Label(
+                                        "隐藏的 Bots  \(hiddenBots.count)",
+                                        systemImage: "eye.slash"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 10)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(botActionBusy)
+                                .accessibilityIdentifier("grok-hidden-bots")
                             }
                         }
 
@@ -232,7 +256,7 @@ extension GrokMobileShell {
                             Label("复制", systemImage: "square.on.square")
                         }
                         Button {
-                            Task { await hideBot(bot) }
+                            Task { await setBotHidden(bot, hidden: true) }
                         } label: {
                             Label("从首页隐藏", systemImage: "eye.slash")
                         }
