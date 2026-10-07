@@ -592,17 +592,17 @@
     {
       "desktop_path": "frontend/src/production/reaction-root.ts",
       "desktop_blob_sha": "b3b72b1d0abc570833ac5d6fa2f1197073a0e38a",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Own one scoped reaction projection over canonical transcript state: apply immediate optimistic toggles for eligible messages, dispatch the canonical reaction mutation, and reconcile/clear through the authoritative feed without creating a second transcript owner.",
+      "desktop_owner": "renderer reaction adapter over canonical conversation feed",
+      "desktop_visible_effect": "Reaction pills toggle immediately, a user can remove their own reaction, and authoritative transcript state remains the final source of truth.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "mobile/ios/Fabushi/MessagingModel.swift",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "The native MessagingModel already owns the canonical hydrated message collection, so iOS applies the optimistic toggle directly to that collection rather than creating a second reaction feed adapter. Each mutation is generation-fenced for rollback, dispatches the existing setReaction Host command, and later canonical message refresh/event hydration overwrites the optimistic projection. Reaction pills are tappable to toggle the user's own reaction.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/MessagingModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
+      "test_evidence": "mobile/ios/FabushiTests/SharedMessagingCoreParityTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. No alternate transcript/reaction owner is introduced; rollback only applies to the latest matching optimistic mutation. Keep below verified pending current-head acceptance."
     },
     {
       "desktop_path": "frontend/src/production/runtime-assets.ts",

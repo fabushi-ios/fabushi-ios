@@ -19,6 +19,38 @@ final class SharedMessagingCoreParityTests: XCTestCase {
         XCTAssertEqual(SendMessagePreview.text(for: .connectors(["Slack", "GitHub"])), "Connect Slack, GitHub")
     }
 
+    func testOptimisticReactionToggleMatchesDesktopReactionRootSemantics() {
+        let original = [
+            ChatReaction(reaction: "👍", count: 2, chosenByMe: false),
+            ChatReaction(reaction: "❤️", count: 1, chosenByMe: true),
+        ]
+
+        let added = projectChatReactionToggle(original, reaction: "👍", enabled: true)
+        XCTAssertEqual(
+            added,
+            [
+                ChatReaction(reaction: "👍", count: 3, chosenByMe: true),
+                ChatReaction(reaction: "❤️", count: 1, chosenByMe: true),
+            ]
+        )
+
+        let removed = projectChatReactionToggle(added, reaction: "👍", enabled: false)
+        XCTAssertEqual(removed, original)
+
+        XCTAssertEqual(
+            projectChatReactionToggle(
+                [ChatReaction(reaction: "❤️", count: 1, chosenByMe: true)],
+                reaction: "❤️",
+                enabled: false
+            ),
+            []
+        )
+        XCTAssertEqual(
+            projectChatReactionToggle(original, reaction: "😂", enabled: false),
+            original
+        )
+    }
+
     func testSidebarNormalizationAndFolds() {
         let normalized = SidebarSections.normalize([
             .init(id: " one ", name: "One", agentIDs: ["a", "a", ""]),

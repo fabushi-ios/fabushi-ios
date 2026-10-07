@@ -88,6 +88,33 @@ internal struct ChatReaction: Equatable, Sendable {
     let chosenByMe: Bool
 }
 
+internal func projectChatReactionToggle(
+    _ reactions: [ChatReaction],
+    reaction: String,
+    enabled: Bool
+) -> [ChatReaction] {
+    guard !reaction.isEmpty else { return reactions }
+    var next = reactions
+    if let index = next.firstIndex(where: { $0.reaction == reaction }) {
+        let current = next[index]
+        if current.chosenByMe == enabled { return reactions }
+        let count = max(0, current.count + (enabled ? 1 : -1))
+        if count == 0 {
+            next.remove(at: index)
+        } else {
+            next[index] = ChatReaction(
+                reaction: current.reaction,
+                count: count,
+                chosenByMe: enabled
+            )
+        }
+        return next
+    }
+    guard enabled else { return reactions }
+    next.append(ChatReaction(reaction: reaction, count: 1, chosenByMe: true))
+    return next
+}
+
 internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let id: String
     let conversationId: String
@@ -107,7 +134,7 @@ internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let time: String
     let replyToMessageId: String?
     let forwardOrigin: String?
-    let reactions: [ChatReaction]
+    var reactions: [ChatReaction]
     let deliveryState: String
     let isEdited: Bool
     let isPinned: Bool
@@ -130,6 +157,7 @@ final class MessagingModel {
     private var displayName = "当前用户"
     private let deviceId = "ios:native"
     private let sessionId = "account-session:ios-native"
+    private var reactionMutationGeneration: [String: Int] = [:]
 
     init(bridge: IOSPreloadBridge) {
         self.bridge = bridge
@@ -397,13 +425,50 @@ final class MessagingModel {
     }
 
     func setReaction(conversationId: String, messageId: String, reaction: String, enabled: Bool) async {
-        try? await ensureIdentity()
-        try? await execute(command: [
-            "type": "setReaction",
-            "conversationId": conversationId,
-            "messageId": messageId,
-            "reaction": ["reaction": reaction, "count": enabled ? 1 : 0, "chosenByMe": enabled, "recentActorIds": enabled ? [actorId] : []],
-        ])
+        do {
+            try await ensureIdentity()
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+
+        guard let messageIndex = messagesByConversation[conversationId]?.firstIndex(where: { $0.id == messageId }),
+              let previous = messagesByConversation[conversationId]?[messageIndex].reactions
+        else { return }
+
+        let optimistic = projectChatReactionToggle(
+            previous,
+            reaction: reaction,
+            enabled: enabled
+        )
+        guard optimistic != previous else { return }
+
+        let key = "\(conversationId)\u{1f}\(messageId)\u{1f}\(reaction)"
+        let generation = (reactionMutationGeneration[key] ?? 0) + 1
+        reactionMutationGeneration[key] = generation
+        messagesByConversation[conversationId]?[messageIndex].reactions = optimistic
+
+        do {
+            try await execute(command: [
+                "type": "setReaction",
+                "conversationId": conversationId,
+                "messageId": messageId,
+                "reaction": [
+                    "reaction": reaction,
+                    "count": enabled ? 1 : 0,
+                    "chosenByMe": enabled,
+                    "recentActorIds": enabled ? [actorId] : [],
+                ],
+            ])
+        } catch {
+            if reactionMutationGeneration[key] == generation,
+               let currentIndex = messagesByConversation[conversationId]?.firstIndex(where: { $0.id == messageId }),
+               messagesByConversation[conversationId]?[currentIndex].reactions == optimistic
+            {
+                messagesByConversation[conversationId]?[currentIndex].reactions = previous
+            }
+            errorMessage = error.localizedDescription
+        }
     }
 
     func forwardMessage(sourceConversationId: String, messageId: String, destinationConversationId: String) async {

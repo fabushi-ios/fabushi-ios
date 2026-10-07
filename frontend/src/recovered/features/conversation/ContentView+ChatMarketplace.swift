@@ -107,8 +107,33 @@ extension ContentView {
                                             if !message.reactions.isEmpty {
                                                 HStack(spacing: 5) {
                                                     ForEach(Array(message.reactions.enumerated()), id: \.offset) { _, reaction in
-                                                        Text("\(reaction.reaction) \(reaction.count)").font(.caption2).padding(.horizontal, 7).padding(.vertical, 3)
-                                                            .background(reaction.chosenByMe ? Color.accentColor.opacity(0.25) : Color.white.opacity(0.08), in: Capsule())
+                                                        Button {
+                                                            Task {
+                                                                await messaging.setReaction(
+                                                                    conversationId: conversation.id,
+                                                                    messageId: message.id,
+                                                                    reaction: reaction.reaction,
+                                                                    enabled: !reaction.chosenByMe
+                                                                )
+                                                            }
+                                                        } label: {
+                                                            Text("\(reaction.reaction) \(reaction.count)")
+                                                                .font(.caption2)
+                                                                .padding(.horizontal, 7)
+                                                                .padding(.vertical, 3)
+                                                                .background(
+                                                                    reaction.chosenByMe
+                                                                        ? Color.accentColor.opacity(0.25)
+                                                                        : Color.white.opacity(0.08),
+                                                                    in: Capsule()
+                                                                )
+                                                        }
+                                                        .buttonStyle(.plain)
+                                                        .accessibilityLabel(
+                                                            reaction.chosenByMe
+                                                                ? "取消表情 \(reaction.reaction)"
+                                                                : "添加表情 \(reaction.reaction)"
+                                                        )
                                                     }
                                                 }.frame(maxWidth: .infinity, alignment: .leading)
                                             }
@@ -135,7 +160,22 @@ extension ContentView {
                                         .contextMenu {
                                             Button("回复", systemImage: "arrowshape.turn.up.left") { replyTarget = message; editingMessage = nil }
                                             Button("转发", systemImage: "arrowshape.turn.up.right") { forwardMessage = message }
-                                            Button("👍", systemImage: "hand.thumbsup") { Task { await messaging.setReaction(conversationId: conversation.id, messageId: message.id, reaction: "👍", enabled: true) } }
+                                            let hasOwnThumbsUp = message.reactions.contains {
+                                                $0.reaction == "👍" && $0.chosenByMe
+                                            }
+                                            Button(
+                                                hasOwnThumbsUp ? "取消 👍" : "👍",
+                                                systemImage: hasOwnThumbsUp ? "hand.thumbsup.slash" : "hand.thumbsup"
+                                            ) {
+                                                Task {
+                                                    await messaging.setReaction(
+                                                        conversationId: conversation.id,
+                                                        messageId: message.id,
+                                                        reaction: "👍",
+                                                        enabled: !hasOwnThumbsUp
+                                                    )
+                                                }
+                                            }
                                             if message.isOutgoing {
                                                 Button("编辑", systemImage: "pencil") { editingMessage = message; replyTarget = nil; messageDraft = message.text }
                                             }
