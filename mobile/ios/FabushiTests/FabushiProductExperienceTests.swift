@@ -2,6 +2,14 @@ import XCTest
 @testable import Fabushi
 
 final class FabushiProductExperienceTests: XCTestCase {
+    func testCanonicalBrandContractMatchesDesktopAuthority() {
+        XCTAssertEqual(FabushiBrand.name, "法布施")
+        XCTAssertEqual(FabushiBrand.englishName, "大乘")
+        XCTAssertEqual(FabushiBrand.tagline, "经文、禅修、法流与全球法布施，一处安静开始。")
+        XCTAssertEqual(FabushiBrand.mission, "用现代产品体验承接佛法传播、修行记录、禅修冥想与同行连接。")
+        XCTAssertEqual(FabushiBrand.domain, "ombhrum.com")
+    }
+
     func testCanonicalProductModulesRemainAvailableOnIOS() {
         XCTAssertEqual(
             FabushiProductModule.allCases.map(\.rawValue),
