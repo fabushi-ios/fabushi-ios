@@ -193,6 +193,25 @@ impl AppHost {
                 .product
                 .execute("mahayana.platform.request", &params)
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "updateCursorAccountName" => {
+                let name = string_param(&params, "name")?;
+                self.product
+                    .execute("mahayana.auth.profile.update", &json!({"displayName": name}))
+                    .map_err(|error| AppHostError::Operation(error.to_string()))
+            }
+            "submitFeedback" => {
+                let message = string_param(&params, "message")?;
+                let submission_id = string_param(&params, "submissionId")?;
+                self.product
+                    .execute(
+                        "mahayana.feedback.submit",
+                        &json!({
+                            "message": message,
+                            "submissionId": submission_id,
+                        }),
+                    )
+                    .map_err(|error| AppHostError::Operation(error.to_string()))
+            }
             "getForeverBoxStatus" => self
                 .product
                 .status_agent_box(string_param(&params, "id")?)
