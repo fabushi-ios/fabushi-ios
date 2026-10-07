@@ -77,13 +77,41 @@ extension GrokMobileShell {
                         botRow(MobileBotSummary(id: "mahayana-assistant", name: "Mahayana", description: "Ready to help"), subtitle: "that's the only new one.", badge: "Board")
 
                         if !bots.isEmpty {
-                            sectionTitle("Bots  \(filteredBots.count)")
-                            ForEach(filteredBots) { bot in
-                                botRow(
-                                    bot,
-                                    subtitle: bot.description.isEmpty ? "Ready" : bot.description,
-                                    badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
-                                )
+                            if agentSidebarSections.isEmpty {
+                                sectionTitle("Bots  \(filteredBots.count)")
+                                ForEach(filteredBots) { bot in
+                                    botRow(
+                                        bot,
+                                        subtitle: bot.description.isEmpty ? "Ready" : bot.description,
+                                        badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
+                                    )
+                                }
+                            } else {
+                                ForEach(agentSidebarSections) { section in
+                                    let sectionBots = filteredBots.filter { section.agentIds.contains($0.id) }
+                                    if !sectionBots.isEmpty {
+                                        sectionTitle("\(section.name)  \(sectionBots.count)")
+                                        ForEach(sectionBots) { bot in
+                                            botRow(
+                                                bot,
+                                                subtitle: bot.description.isEmpty ? "Ready" : bot.description,
+                                                badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
+                                            )
+                                        }
+                                    }
+                                }
+                                let assignedIds = Set(agentSidebarSections.flatMap(\.agentIds))
+                                let unassignedBots = filteredBots.filter { !assignedIds.contains($0.id) }
+                                if !unassignedBots.isEmpty {
+                                    sectionTitle("未分组  \(unassignedBots.count)")
+                                    ForEach(unassignedBots) { bot in
+                                        botRow(
+                                            bot,
+                                            subtitle: bot.description.isEmpty ? "Ready" : bot.description,
+                                            badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
+                                        )
+                                    }
+                                }
                             }
 
                             let hiddenBots = bots.filter { $0.hidden }
@@ -199,6 +227,36 @@ extension GrokMobileShell {
                     } label: {
                         Label("设置", systemImage: "gearshape")
                     }
+                    Menu {
+                        Button {
+                            assignBot(bot, toSection: nil)
+                        } label: {
+                            Label("未分组", systemImage: "tray")
+                        }
+                        ForEach(agentSidebarSections) { section in
+                            Button {
+                                assignBot(bot, toSection: section.id)
+                            } label: {
+                                Label(section.name, systemImage: "folder")
+                            }
+                        }
+                        Divider()
+                        Button {
+                            beginCreateAgentSidebarSection(for: bot)
+                        } label: {
+                            Label("新建分组…", systemImage: "folder.badge.plus")
+                        }
+                    } label: {
+                        Label("移到分组", systemImage: "folder")
+                    }
+                    Button {
+                        toggleBotPin(bot)
+                    } label: {
+                        Label(
+                            pinnedBotIds.contains(bot.id) ? "取消置顶" : "置顶",
+                            systemImage: pinnedBotIds.contains(bot.id) ? "pin.slash" : "pin"
+                        )
+                    }
                     if bot.isGroup {
                         Button {
                             groupMembersTarget = bot
@@ -233,14 +291,6 @@ extension GrokMobileShell {
                             Task { await showAsyncTasks(bot) }
                         } label: {
                             Label("异步任务", systemImage: "clock")
-                        }
-                        Button {
-                            toggleBotPin(bot)
-                        } label: {
-                            Label(
-                                pinnedBotIds.contains(bot.id) ? "取消置顶" : "置顶",
-                                systemImage: pinnedBotIds.contains(bot.id) ? "pin.slash" : "pin"
-                            )
                         }
                         Button {
                             Task { await setBotUnread(bot, unread: !bot.unread) }
