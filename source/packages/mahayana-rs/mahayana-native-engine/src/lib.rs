@@ -39,7 +39,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::sync::{Mutex as AsyncMutex, oneshot};
+use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot};
 use uuid::Uuid;
 
 mod web_research;
@@ -190,6 +190,8 @@ struct ApprovalWaiter {
 struct OperationControl {
     interrupted: AtomicBool,
     suspended: AtomicBool,
+    suspension_persisted: AtomicBool,
+    suspension_settled: Notify,
 }
 
 pub struct NativeEngine {
@@ -1864,13 +1866,19 @@ impl EngineBackend for NativeEngine {
             .await
         }
         .await;
-        self.finish_operation(&request.operation_id)?;
         self.session(&request.session_id)?
             .lock()
             .await
             .updated_at_ms = now_ms();
-        self.persist_session_if_configured(&request.session_id)
-            .await?;
+        let persist_result = self.persist_session_if_configured(&request.session_id).await;
+        if control.suspended.load(Ordering::SeqCst) && result.is_ok() {
+            if persist_result.is_ok() {
+                control.suspension_persisted.store(true, Ordering::SeqCst);
+            }
+            control.suspension_settled.notify_waiters();
+        }
+        self.finish_operation(&request.operation_id)?;
+        persist_result?;
         result
     }
 
@@ -2004,6 +2012,21 @@ impl EngineBackend for NativeEngine {
         }
         control.suspended.store(true, Ordering::SeqCst);
         self.cancel_operation_approvals(&request.operation_id)?;
+        if control.suspension_persisted.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        let settled = control.suspension_settled.notified();
+        if control.suspension_persisted.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        tokio::time::timeout(Duration::from_secs(10), settled)
+            .await
+            .map_err(|_| KernelError::Backend("operation suspension checkpoint timed out".into()))?;
+        if !control.suspension_persisted.load(Ordering::SeqCst) {
+            return Err(KernelError::Backend(
+                "operation suspension did not reach a durable checkpoint".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -2053,7 +2076,19 @@ impl EngineBackend for NativeEngine {
             .await
         }
         .await;
+        self.session(&request.session_id)?
+            .lock()
+            .await
+            .updated_at_ms = now_ms();
+        let persist_result = self.persist_session_if_configured(&request.session_id).await;
+        if control.suspended.load(Ordering::SeqCst) && result.is_ok() {
+            if persist_result.is_ok() {
+                control.suspension_persisted.store(true, Ordering::SeqCst);
+            }
+            control.suspension_settled.notify_waiters();
+        }
         self.finish_operation(&request.operation_id)?;
+        persist_result?;
         result
     }
 }
@@ -3365,6 +3400,33 @@ mod tests {
         }
     }
 
+    struct BlockingModel {
+        entered: Arc<Notify>,
+        release: Arc<Notify>,
+        calls: AtomicUsize,
+        output: Value,
+    }
+
+    #[async_trait]
+    impl ModelRuntime for BlockingModel {
+        async fn infer(
+            &self,
+            _request: ModelRequest,
+            events: SharedModelEventSink,
+        ) -> Result<(), ModelError> {
+            self.calls.fetch_add(1, AtomicOrdering::SeqCst);
+            self.entered.notify_waiters();
+            self.release.notified().await;
+            events.emit(ModelEvent::Completed {
+                output: self.output.clone(),
+            })
+        }
+
+        fn provider_mode(&self) -> ModelProviderMode {
+            ModelProviderMode::LocalModel
+        }
+    }
+
     struct FirstPartyStreamingModel {
         requests: Mutex<Vec<Value>>,
     }
@@ -4322,6 +4384,140 @@ mod tests {
         assert!(!agent.exists());
         assert!(!other.exists());
         assert!(root.join("unrelated.json").exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn suspend_ack_waits_for_durable_prompt_and_resume_clears_checkpoint() {
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-native-suspend-resume-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).expect("create temp root");
+        let base = root.join("session.json");
+        let conversation_id = "mahayana-ai:agent:resume-test";
+        let persisted = session_state_path_for_conversation(&base, conversation_id);
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let blocking = Arc::new(BlockingModel {
+            entered: Arc::clone(&entered),
+            release: Arc::clone(&release),
+            calls: AtomicUsize::new(0),
+            output: json!({
+                "output": [{"type":"message","content":[{"type":"output_text","text":"first pass"}]}]
+            }),
+        });
+        let mut config = NativeEngineConfig::embedded("model");
+        config.session_state_path = Some(base.clone());
+        let engine = Arc::new(NativeEngine::new(blocking, config.clone()).expect("create engine"));
+        let session = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::Headless,
+                workspace_root: None,
+                model: None,
+                metadata: json!({"conversationId": conversation_id}),
+            })
+            .await
+            .expect("open persisted session");
+        let operation_id = OperationId::from_string("resume-same-operation");
+        let run_engine = Arc::clone(&engine);
+        let run_session = session.clone();
+        let run_operation = operation_id.clone();
+        let run = tokio::spawn(async move {
+            run_engine
+                .run(
+                    RunRequest {
+                        session_id: run_session,
+                        operation_id: run_operation,
+                        input: "continue durable work".into(),
+                        policy: ExecutionPolicy::background_default(),
+                        required_capabilities: CapabilitySet::new([Capability::Model]),
+                        metadata: json!({"conversationId": conversation_id, "hidden": true}),
+                    },
+                    Arc::new(Events::default()),
+                )
+                .await
+        });
+        entered.notified().await;
+
+        let suspend_engine = Arc::clone(&engine);
+        let suspend_operation = operation_id.clone();
+        let suspend = tokio::spawn(async move {
+            suspend_engine
+                .suspend_operation(SuspendOperationRequest {
+                    operation_id: suspend_operation,
+                    reason: Some("lifecycle".into()),
+                    metadata: json!({"cascade": true}),
+                })
+                .await
+        });
+        loop {
+            let suspended = engine
+                .active_operations
+                .lock()
+                .expect("operation registry")
+                .get(operation_id.as_str())
+                .is_some_and(|control| control.suspended.load(Ordering::SeqCst));
+            if suspended {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        release.notify_waiters();
+        suspend.await.expect("suspend task").expect("durable suspend");
+        run.await.expect("run task").expect("suspended run returns cleanly");
+
+        let bytes = std::fs::read(&persisted).expect("read suspended snapshot");
+        let snapshot: KernelSessionSnapshot =
+            serde_json::from_slice(&bytes).expect("decode suspended snapshot");
+        let state: NativeSnapshotState =
+            serde_json::from_value(snapshot.state).expect("decode suspended state");
+        assert_eq!(
+            state.session.active_prompt.as_ref().map(|prompt| prompt.input.as_str()),
+            Some("continue durable work")
+        );
+
+        drop(engine);
+        let resumed_model = Arc::new(FakeModel {
+            outputs: Mutex::new(VecDeque::from([json!({
+                "output": [{"type":"message","content":[{"type":"output_text","text":"resumed once"}]}]
+            })])),
+        });
+        let resumed = NativeEngine::new(resumed_model, config).expect("recreate engine");
+        let restored_session = resumed
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::Headless,
+                workspace_root: None,
+                model: None,
+                metadata: json!({"conversationId": conversation_id}),
+            })
+            .await
+            .expect("restore session");
+        resumed
+            .resume_operation(
+                ResumeOperationRequest {
+                    session_id: restored_session,
+                    operation_id: operation_id.clone(),
+                    policy: ExecutionPolicy::background_default(),
+                    required_capabilities: CapabilitySet::new([Capability::Model]),
+                    metadata: json!({"resumedBy": "test"}),
+                },
+                Arc::new(Events::default()),
+            )
+            .await
+            .expect("resume same operation");
+
+        let bytes = std::fs::read(&persisted).expect("read completed snapshot");
+        let snapshot: KernelSessionSnapshot =
+            serde_json::from_slice(&bytes).expect("decode completed snapshot");
+        let state: NativeSnapshotState =
+            serde_json::from_value(snapshot.state).expect("decode completed state");
+        assert!(state.session.active_prompt.is_none());
+        assert!(state.session.prompt_queue.is_empty());
+        assert!(state.session.attempts.iter().any(|attempt| {
+            attempt.operation_id == operation_id.as_str()
+                && attempt.state == OperationAttemptState::Completed
+        }));
         let _ = std::fs::remove_dir_all(root);
     }
 
