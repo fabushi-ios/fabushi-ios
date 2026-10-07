@@ -90,6 +90,9 @@ struct AccountMenuView: View {
     let onOpenSection: (MobileSection) -> Void
 
     @State private var aboutPresented = false
+    @State private var settingsPresented = false
+    @State private var feedbackPresented = false
+    @State private var actionError: String?
 
     var body: some View {
         NavigationStack {
@@ -131,6 +134,30 @@ struct AccountMenuView: View {
 
                 Section("应用") {
                     Button {
+                        settingsPresented = true
+                    } label: {
+                        Label("设置", systemImage: "gearshape")
+                    }
+                    .accessibilityIdentifier("account-settings-entry")
+
+                    Button {
+                        Task {
+                            do { try await model.openAccountHelp() }
+                            catch { actionError = error.localizedDescription }
+                        }
+                    } label: {
+                        Label("帮助中心", systemImage: "questionmark.circle")
+                    }
+                    .accessibilityIdentifier("account-help-entry")
+
+                    Button {
+                        feedbackPresented = true
+                    } label: {
+                        Label("发送反馈", systemImage: "exclamationmark.bubble")
+                    }
+                    .accessibilityIdentifier("account-feedback-entry")
+
+                    Button {
                         aboutPresented = true
                     } label: {
                         Label("关于 Fabushi", systemImage: "info.circle")
@@ -165,6 +192,24 @@ struct AccountMenuView: View {
         }
         .sheet(isPresented: $aboutPresented) {
             FabushiAboutOverlayView()
+        }
+        .sheet(isPresented: $settingsPresented) {
+            AccountSettingsView(model: model) {
+                settingsPresented = false
+            }
+        }
+        .sheet(isPresented: $feedbackPresented) {
+            AccountFeedbackView(model: model) {
+                feedbackPresented = false
+            }
+        }
+        .alert("操作失败", isPresented: Binding(
+            get: { actionError != nil },
+            set: { if !$0 { actionError = nil } }
+        )) {
+            Button("好") { actionError = nil }
+        } message: {
+            Text(actionError ?? "")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-menu")
@@ -209,6 +254,222 @@ struct AccountMenuView: View {
                 Label("重新加载用量", systemImage: "arrow.clockwise")
             }
             .accessibilityIdentifier("account-usage-retry")
+        }
+    }
+}
+
+
+/// Native iOS replacement for the Desktop account-menu Settings route.
+/// It keeps account identity and mutations behind MarketplaceModel's canonical
+/// preload bridge rather than introducing a renderer-owned account store.
+struct AccountSettingsView: View {
+    @Bindable var model: MarketplaceModel
+    let onDone: () -> Void
+
+    @State private var nameDraft = ""
+    @State private var nameSaving = false
+    @State private var saveGeneration = 0
+    @State private var feedbackPresented = false
+    @State private var aboutPresented = false
+    @State private var actionError: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("账号") {
+                    TextField("显示名称", text: $nameDraft)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("account-display-name-field")
+
+                    Button(nameSaving ? "正在保存…" : "保存显示名称") {
+                        saveDisplayName()
+                    }
+                    .disabled(nameSaving || MarketplaceModel.normalizedAccountDisplayName(nameDraft).isEmpty)
+                    .accessibilityIdentifier("account-display-name-save")
+
+                    if !model.accountEmail.isEmpty {
+                        LabeledContent("邮箱", value: model.accountEmail)
+                    }
+                }
+
+                Section("用量") {
+                    if let usage = model.accountUsage {
+                        LabeledContent("当前周期", value: usage.unlimited ? "不限量" : "\(usage.usagePercent ?? 0)%")
+                        if !usage.unlimited {
+                            ProgressView(value: usage.usageFraction ?? 0)
+                                .accessibilityIdentifier("settings-account-usage-progress")
+                            LabeledContent("剩余", value: "\(usage.remainingTokens.formatted()) tokens")
+                        }
+                        LabeledContent(
+                            "周期结束",
+                            value: Date(timeIntervalSince1970: TimeInterval(usage.windowEnd))
+                                .formatted(date: .abbreviated, time: .shortened)
+                        )
+                    } else if model.accountUsageLoading {
+                        ProgressView("正在加载用量…")
+                    } else {
+                        Button("重新加载用量") {
+                            Task { await model.refreshAccountUsage() }
+                        }
+                    }
+                }
+
+                Section("支持") {
+                    Button {
+                        Task {
+                            do { try await model.openAccountHelp() }
+                            catch { actionError = error.localizedDescription }
+                        }
+                    } label: {
+                        Label("帮助中心", systemImage: "questionmark.circle")
+                    }
+                    .accessibilityIdentifier("settings-help-entry")
+
+                    Button {
+                        feedbackPresented = true
+                    } label: {
+                        Label("发送反馈", systemImage: "exclamationmark.bubble")
+                    }
+                    .accessibilityIdentifier("settings-feedback-entry")
+
+                    Button {
+                        aboutPresented = true
+                    } label: {
+                        Label("关于 Fabushi", systemImage: "info.circle")
+                    }
+                    .accessibilityIdentifier("settings-about-entry")
+                }
+
+                Section("iOS") {
+                    Label("当前设备已安装 Fabushi iOS", systemImage: "checkmark.seal.fill")
+                    Text("Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-ios-self-reference-disposition")
+                }
+            }
+            .navigationTitle("设置")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成", action: onDone)
+                }
+            }
+            .onAppear {
+                if nameDraft.isEmpty { nameDraft = model.accountName }
+            }
+            .task {
+                await model.refreshAccountUsage()
+            }
+        }
+        .sheet(isPresented: $feedbackPresented) {
+            AccountFeedbackView(model: model) { feedbackPresented = false }
+        }
+        .sheet(isPresented: $aboutPresented) {
+            FabushiAboutOverlayView()
+        }
+        .alert("操作失败", isPresented: Binding(
+            get: { actionError != nil },
+            set: { if !$0 { actionError = nil } }
+        )) {
+            Button("好") { actionError = nil }
+        } message: {
+            Text(actionError ?? "")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("account-settings")
+    }
+
+    private func saveDisplayName() {
+        let normalized = MarketplaceModel.normalizedAccountDisplayName(nameDraft)
+        guard !normalized.isEmpty, normalized.count <= 200 else {
+            actionError = "名称必须为 1–200 个字符。"
+            return
+        }
+        saveGeneration = saveGeneration == Int.max ? 1 : saveGeneration + 1
+        let generation = saveGeneration
+        nameSaving = true
+        Task {
+            do {
+                try await model.updateAccountDisplayName(normalized)
+                guard generation == saveGeneration else { return }
+                nameDraft = model.accountName
+                nameSaving = false
+            } catch {
+                guard generation == saveGeneration else { return }
+                nameSaving = false
+                actionError = error.localizedDescription
+            }
+        }
+    }
+}
+
+struct AccountFeedbackView: View {
+    @Bindable var model: MarketplaceModel
+    let onDone: () -> Void
+
+    @State private var message = ""
+    @State private var submitting = false
+    @State private var submitGeneration = 0
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("反馈内容") {
+                    TextEditor(text: $message)
+                        .frame(minHeight: 180)
+                        .accessibilityIdentifier("account-feedback-message")
+                    Text("\(message.count) / 10,000")
+                        .font(.caption)
+                        .foregroundStyle(message.count > 10_000 ? .red : .secondary)
+                }
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("account-feedback-error")
+                    }
+                }
+            }
+            .navigationTitle("发送反馈")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消", action: onDone)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(submitting ? "正在发送…" : "发送") {
+                        submit()
+                    }
+                    .disabled(
+                        submitting
+                            || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || message.count > 10_000
+                    )
+                    .accessibilityIdentifier("account-feedback-submit")
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("account-feedback")
+    }
+
+    private func submit() {
+        submitGeneration = submitGeneration == Int.max ? 1 : submitGeneration + 1
+        let generation = submitGeneration
+        submitting = true
+        errorMessage = nil
+        Task {
+            do {
+                try await model.submitAccountFeedback(message)
+                guard generation == submitGeneration else { return }
+                submitting = false
+                onDone()
+            } catch {
+                guard generation == submitGeneration else { return }
+                submitting = false
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }
