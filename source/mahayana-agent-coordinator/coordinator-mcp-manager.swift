@@ -639,6 +639,13 @@ final class CoordinatorMcpSurface {
     private let cursorAuth: IOSCursorAuthService
     private let dashboard: IOSCursorDashboardClient
     private let avatarImageGenerator: CursorGenerateImageService
+    private var computerMigrationWatchTask: Task<Void, Never>?
+    private var computerMigrationResumeOffsetKey = ""
+    private var computerMigrationStatus: [String: Any]?
+    private var computerMigrationLastTerminal: [String: Any]?
+    private var computerMigrationOwedOperationId: String?
+    private var computerMigrationGeneration: UInt64 = 0
+    private var accountScope: String?
 
     private init(
         manager: SandMcpManager,
@@ -750,7 +757,125 @@ final class CoordinatorMcpSurface {
     }
 
     func updateAccountScope(_ scope: String?) {
-        port.updateAccountScope(scope)
+        let normalized = scope?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let next = normalized?.isEmpty == false ? normalized : nil
+        if next != accountScope {
+            accountScope = next
+            stopComputerMigrationWatch(clearState: true)
+        }
+        port.updateAccountScope(next)
+    }
+
+    private func stopComputerMigrationWatch(clearState: Bool) {
+        computerMigrationGeneration &+= 1
+        computerMigrationWatchTask?.cancel()
+        computerMigrationWatchTask = nil
+        if clearState {
+            computerMigrationResumeOffsetKey = ""
+            computerMigrationStatus = nil
+            computerMigrationLastTerminal = nil
+            computerMigrationOwedOperationId = nil
+        }
+    }
+
+    private func ensureComputerMigrationWatch() {
+        guard computerMigrationWatchTask == nil else { return }
+        computerMigrationGeneration &+= 1
+        let generation = computerMigrationGeneration
+        computerMigrationWatchTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.computerMigrationGeneration == generation {
+                    self.computerMigrationWatchTask = nil
+                }
+            }
+            while !Task.isCancelled, self.computerMigrationGeneration == generation {
+                let fromOffset = self.computerMigrationResumeOffsetKey
+                var received = false
+                do {
+                    for try await event in self.dashboard.watchSandBoxMigration(
+                        fromOffsetKey: fromOffset,
+                        includeFinished: true
+                    ) {
+                        guard !Task.isCancelled,
+                              self.computerMigrationGeneration == generation
+                        else { return }
+                        received = true
+                        self.ingestComputerMigration(event)
+                    }
+                } catch {
+                    if !received && !fromOffset.isEmpty {
+                        self.computerMigrationResumeOffsetKey = ""
+                    }
+                }
+                guard !Task.isCancelled,
+                      self.computerMigrationGeneration == generation
+                else { return }
+                do {
+                    try await Task.sleep(for: .seconds(3))
+                } catch {
+                    return
+                }
+                self.computerMigrationStatus = nil
+            }
+        }
+    }
+
+    private func ingestComputerMigration(_ event: IOSCursorSandBoxMigrationEvent) {
+        guard let phase = event.phaseName else { return }
+        if !event.offsetKey.isEmpty {
+            computerMigrationResumeOffsetKey = event.offsetKey
+        }
+        var projected: [String: Any] = [
+            "phase": phase,
+            "detail": event.detail,
+        ]
+        if !event.operationId.isEmpty {
+            projected["operationId"] = event.operationId
+        }
+        computerMigrationStatus = projected
+        if event.isTerminal {
+            if let owed = computerMigrationOwedOperationId,
+               !event.operationId.isEmpty,
+               event.operationId != owed {
+                return
+            }
+            computerMigrationLastTerminal = projected
+            computerMigrationOwedOperationId = nil
+        } else if let terminalOperation = computerMigrationLastTerminal?["operationId"] as? String,
+                  !event.operationId.isEmpty,
+                  terminalOperation != event.operationId {
+            computerMigrationLastTerminal = nil
+        }
+    }
+
+    private func projectRecreate(
+        _ result: IOSCursorSandBoxRecreateResult
+    ) -> [String: Any] {
+        guard result.started else {
+            return [
+                "status": "rejected",
+                "reason": result.reason.isEmpty
+                    ? "Computer recreation was rejected by the backend."
+                    : result.reason,
+            ]
+        }
+        if !result.operationId.isEmpty {
+            computerMigrationOwedOperationId = result.operationId
+            return [
+                "status": "started",
+                "operationId": result.operationId,
+            ]
+        }
+        computerMigrationOwedOperationId = nil
+        return ["status": "started-untrackable"]
+    }
+
+    private func requireCursorComputerLifecycle() async throws {
+        guard (await cursorAuth.status()).loggedIn else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        ensureComputerMigrationWatch()
     }
 
     func cloudAgentInfo(bcId: String) async throws -> IOSCloudAgentComposerInfo {
@@ -820,6 +945,25 @@ final class CoordinatorMcpSurface {
         params: [String: Any]
     ) async throws -> CoordinatorDevControlRouting {
         switch method {
+        case "getBoxMigrationStatus":
+            try await requireCursorComputerLifecycle()
+            return .handled(computerMigrationStatus ?? computerMigrationLastTerminal ?? NSNull())
+
+        case "updateComputer":
+            try await requireCursorComputerLifecycle()
+            guard nonEmptyString(params["id"]) != nil else {
+                throw SandMcpConfigError("A computer update requires an agent id.")
+            }
+            let result = try await dashboard.recreateSandBox(
+                preserveData: true,
+                force: params["force"] as? Bool == true
+            )
+            return .handled(projectRecreate(result))
+
+        case "forceRecreateComputer":
+            try await requireCursorComputerLifecycle()
+            return .handled(projectRecreate(try await dashboard.forceRecreateSandBox()))
+
         case "generateAgentAvatarImage":
             guard (await cursorAuth.status()).loggedIn else {
                 throw SandMcpConfigError("Avatar generation requires Cursor sign-in.")

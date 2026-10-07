@@ -737,11 +737,10 @@ final class IOSRemoteComputerRebuildSource: RemoteComputerRebuildSource {
 
     private let bridge: IOSPreloadBridge?
 
-    /// The current Rust Product/Host graph does not yet serve the Desktop
-    /// Cursor-box lifecycle methods. Keep the UI fail-closed until that owner is
-    /// ported; otherwise every visible update/reset action deterministically
-    /// falls through to "unknown method".
-    let supportsManagedLifecycle = false
+    /// CoordinatorMcpSurface owns the authenticated Cursor/GrokBotService
+    /// lifecycle client and intercepts these Desktop-derived main RPC methods
+    /// before Host, so visible controls have one real production serving path.
+    let supportsManagedLifecycle = true
 
     init(bridge: IOSPreloadBridge?) {
         self.bridge = bridge

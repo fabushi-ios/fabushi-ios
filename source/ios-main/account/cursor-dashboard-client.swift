@@ -81,6 +81,81 @@ private enum IOSCursorDashboardProto {
         }
     }
 
+    static func recreateSandBoxRequest(preserveData: Bool, force: Bool) -> Data {
+        var data = Data()
+        appendVarintField(1, preserveData ? 1 : 0, to: &data)
+        appendVarintField(2, force ? 1 : 0, to: &data)
+        return data
+    }
+
+    static func forceRecreateSandBoxRequest() -> Data {
+        Data()
+    }
+
+    static func watchSandBoxMigrationRequest(
+        fromOffsetKey: String,
+        includeFinished: Bool
+    ) -> Data {
+        var data = Data()
+        if !fromOffsetKey.isEmpty {
+            appendBytesField(1, Data(fromOffsetKey.utf8), to: &data)
+        }
+        appendVarintField(2, includeFinished ? 1 : 0, to: &data)
+        return data
+    }
+
+    static func decodeRecreateSandBoxResponse(_ data: Data) throws -> IOSCursorSandBoxRecreateResult {
+        var reader = Reader(data)
+        var started = false
+        var reason = ""
+        var operationId = ""
+        for (field, value) in try reader.readFields() {
+            switch (field, value) {
+            case (1, .varint(let value)):
+                started = value != 0
+            case (2, .bytes(let bytes)):
+                reason = String(data: bytes, encoding: .utf8) ?? ""
+            case (3, .bytes(let bytes)):
+                operationId = String(data: bytes, encoding: .utf8) ?? ""
+            default:
+                break
+            }
+        }
+        return .init(started: started, reason: reason, operationId: operationId)
+    }
+
+    static func decodeSandBoxMigrationEvent(_ data: Data) throws -> IOSCursorSandBoxMigrationEvent {
+        var reader = Reader(data)
+        var phase: Int32 = 0
+        var detail = ""
+        var atMs: Int64 = 0
+        var offsetKey = ""
+        var operationId = ""
+        for (field, value) in try reader.readFields() {
+            switch (field, value) {
+            case (1, .varint(let value)):
+                phase = Int32(truncatingIfNeeded: value)
+            case (2, .bytes(let bytes)):
+                detail = String(data: bytes, encoding: .utf8) ?? ""
+            case (3, .varint(let value)):
+                atMs = Int64(bitPattern: value)
+            case (4, .bytes(let bytes)):
+                offsetKey = String(data: bytes, encoding: .utf8) ?? ""
+            case (5, .bytes(let bytes)):
+                operationId = String(data: bytes, encoding: .utf8) ?? ""
+            default:
+                break
+            }
+        }
+        return .init(
+            phase: phase,
+            detail: detail,
+            atMs: atMs,
+            offsetKey: offsetKey,
+            operationId: operationId
+        )
+    }
+
     static func getTeamsRequest(activeOnly: Bool) -> Data {
         var data = Data()
         appendVarintField(1, activeOnly ? 1 : 0, to: &data)
@@ -298,6 +373,88 @@ struct IOSCloudAgentComposerInfo: Equatable, Sendable {
     var isError: Bool { status == 3 || status == 5 || permanentError != nil }
 }
 
+struct IOSCursorSandBoxRecreateResult: Equatable, Sendable {
+    let started: Bool
+    let reason: String
+    let operationId: String
+}
+
+struct IOSCursorSandBoxMigrationEvent: Equatable, Sendable {
+    let phase: Int32
+    let detail: String
+    let atMs: Int64
+    let offsetKey: String
+    let operationId: String
+
+    var phaseName: String? {
+        switch phase {
+        case 1: "backing-up"
+        case 2: "creating"
+        case 3: "moving"
+        case 4: "cleaning-up"
+        case 5: "wiping"
+        case 6: "done"
+        case 7: "failed"
+        default: nil
+        }
+    }
+
+    var isTerminal: Bool { phase == 6 || phase == 7 }
+}
+
+struct IOSCursorConnectEnvelope: Equatable, Sendable {
+    let flags: UInt8
+    let payload: Data
+
+    var isEndStream: Bool { flags & 0x02 != 0 }
+}
+
+struct IOSCursorConnectEnvelopeDecoder: Sendable {
+    private var buffer: [UInt8] = []
+
+    mutating func append(_ byte: UInt8) throws -> [IOSCursorConnectEnvelope] {
+        buffer.append(byte)
+        return try drain()
+    }
+
+    mutating func append(_ data: Data) throws -> [IOSCursorConnectEnvelope] {
+        buffer.append(contentsOf: data)
+        return try drain()
+    }
+
+    private mutating func drain() throws -> [IOSCursorConnectEnvelope] {
+        var envelopes: [IOSCursorConnectEnvelope] = []
+        while buffer.count >= 5 {
+            let flags = buffer[0]
+            guard flags & 0xfc == 0 else {
+                throw IOSCursorDashboardError(message: "Connect stream used reserved envelope flags.")
+            }
+            guard flags & 0x01 == 0 else {
+                throw IOSCursorDashboardError(message: "Compressed Connect migration envelopes are unsupported.")
+            }
+            let length =
+                (UInt32(buffer[1]) << 24) |
+                (UInt32(buffer[2]) << 16) |
+                (UInt32(buffer[3]) << 8) |
+                UInt32(buffer[4])
+            let total = 5 + Int(length)
+            guard buffer.count >= total else { break }
+            envelopes.append(.init(
+                flags: flags,
+                payload: Data(buffer[5..<total])
+            ))
+            buffer.removeFirst(total)
+        }
+        return envelopes
+    }
+
+    func requireEmptyAtEOF() throws {
+        guard buffer.isEmpty else {
+            throw IOSCursorDashboardError(message: "Connect migration stream ended inside an envelope.")
+        }
+    }
+}
+
 final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient {
     typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
@@ -413,6 +570,177 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             )
         }
         return data
+    }
+
+    private func cursorHeaders() async throws -> [String: String] {
+        try await createSandInferenceHeaders(
+            backendUrl: backendURL.absoluteString,
+            getAccessToken: { value in
+                try await self.credentials.getAccessToken(value)
+            },
+            getMachineId: credentials.getMachineId,
+            resolveGhostMode: { _ in "true" }
+        ).headers
+    }
+
+    private func grokBotRequest(
+        method: String,
+        body: Data,
+        contentType: String,
+        timeoutMs: Int
+    ) async throws -> URLRequest {
+        let url = backendURL
+            .appendingPathComponent("aiserver.v1.GrokBotService")
+            .appendingPathComponent(method)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = TimeInterval(max(1, timeoutMs)) / 1_000
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.setValue("1", forHTTPHeaderField: "Connect-Protocol-Version")
+        for (name, value) in try await cursorHeaders() {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        request.httpBody = body
+        return request
+    }
+
+    private func validateConnectHTTP(
+        _ response: URLResponse,
+        method: String
+    ) throws {
+        guard let http = response as? HTTPURLResponse else {
+            throw IOSCursorDashboardError(message: "GrokBot Connect RPC returned no HTTP response.")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw IOSCursorDashboardError(
+                message: "GrokBot Connect RPC \(method) failed with HTTP \(http.statusCode)."
+            )
+        }
+    }
+
+    private func connectEnvelope(_ message: Data, flags: UInt8 = 0) throws -> Data {
+        guard message.count <= Int(UInt32.max) else {
+            throw IOSCursorDashboardError(message: "Connect request envelope is too large.")
+        }
+        let length = UInt32(message.count)
+        return Data([
+            flags,
+            UInt8((length >> 24) & 0xff),
+            UInt8((length >> 16) & 0xff),
+            UInt8((length >> 8) & 0xff),
+            UInt8(length & 0xff),
+        ]) + message
+    }
+
+    private func consumeMigrationEnvelope(
+        _ envelope: IOSCursorConnectEnvelope,
+        continuation: AsyncThrowingStream<IOSCursorSandBoxMigrationEvent, Error>.Continuation
+    ) throws -> Bool {
+        if envelope.isEndStream {
+            guard let object = try JSONSerialization.jsonObject(with: envelope.payload) as? [String: Any] else {
+                throw IOSCursorDashboardError(message: "Connect migration end-stream frame was invalid JSON.")
+            }
+            if let error = object["error"] as? [String: Any] {
+                let code = error["code"] as? String ?? "unknown"
+                let message = error["message"] as? String ?? "migration stream failed"
+                throw IOSCursorDashboardError(message: "GrokBot migration stream \(code): \(message)")
+            }
+            return true
+        }
+        continuation.yield(try IOSCursorDashboardProto.decodeSandBoxMigrationEvent(envelope.payload))
+        return false
+    }
+
+    func recreateSandBox(
+        preserveData: Bool,
+        force: Bool,
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCursorSandBoxRecreateResult {
+        let request = try await grokBotRequest(
+            method: "RecreateSandBox",
+            body: IOSCursorDashboardProto.recreateSandBoxRequest(
+                preserveData: preserveData,
+                force: force
+            ),
+            contentType: "application/proto",
+            timeoutMs: timeoutMs
+        )
+        let (data, response) = try await perform(request)
+        try validateConnectHTTP(response, method: "RecreateSandBox")
+        return try IOSCursorDashboardProto.decodeRecreateSandBoxResponse(data)
+    }
+
+    func forceRecreateSandBox(
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCursorSandBoxRecreateResult {
+        let request = try await grokBotRequest(
+            method: "ForceRecreateSandBox",
+            body: IOSCursorDashboardProto.forceRecreateSandBoxRequest(),
+            contentType: "application/proto",
+            timeoutMs: timeoutMs
+        )
+        let (data, response) = try await perform(request)
+        try validateConnectHTTP(response, method: "ForceRecreateSandBox")
+        return try IOSCursorDashboardProto.decodeRecreateSandBoxResponse(data)
+    }
+
+    func watchSandBoxMigration(
+        fromOffsetKey: String,
+        includeFinished: Bool = true,
+        timeoutMs: Int = 86_400_000
+    ) -> AsyncThrowingStream<IOSCursorSandBoxMigrationEvent, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task { [self] in
+                do {
+                    let payload = IOSCursorDashboardProto.watchSandBoxMigrationRequest(
+                        fromOffsetKey: fromOffsetKey,
+                        includeFinished: includeFinished
+                    )
+                    let request = try await grokBotRequest(
+                        method: "WatchSandBoxMigration",
+                        body: try connectEnvelope(payload),
+                        contentType: "application/connect+proto",
+                        timeoutMs: timeoutMs
+                    )
+                    var decoder = IOSCursorConnectEnvelopeDecoder()
+                    var sawEndStream = false
+
+                    if let requestExecutor {
+                        let (data, response) = try await requestExecutor(request)
+                        try validateConnectHTTP(response, method: "WatchSandBoxMigration")
+                        for envelope in try decoder.append(data) {
+                            if try consumeMigrationEnvelope(envelope, continuation: continuation) {
+                                sawEndStream = true
+                                break
+                            }
+                        }
+                    } else {
+                        let (bytes, response) = try await session.bytes(for: request)
+                        try validateConnectHTTP(response, method: "WatchSandBoxMigration")
+                        for try await byte in bytes {
+                            try Task.checkCancellation()
+                            for envelope in try decoder.append(byte) {
+                                if try consumeMigrationEnvelope(envelope, continuation: continuation) {
+                                    sawEndStream = true
+                                    break
+                                }
+                            }
+                            if sawEndStream { break }
+                        }
+                    }
+                    try decoder.requireEmptyAtEOF()
+                    guard sawEndStream else {
+                        throw IOSCursorDashboardError(message: "GrokBot migration stream ended without EndStream.")
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
     }
 
     func getBackgroundComposerInfo(
