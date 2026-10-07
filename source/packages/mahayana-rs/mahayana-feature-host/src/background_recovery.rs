@@ -160,7 +160,11 @@ impl FeatureHostController {
             .cloned()
             .collect::<Vec<_>>();
         for execution in pending {
-            if !background_recovery_owner_matches(&self.state()?, &execution) {
+            let owner_matches = {
+                let state = self.state()?;
+                background_recovery_owner_matches(&state, &execution)
+            };
+            if !owner_matches {
                 continue;
             }
             if self.config.mode == HostMode::Production {
