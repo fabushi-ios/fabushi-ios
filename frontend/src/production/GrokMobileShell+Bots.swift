@@ -57,10 +57,12 @@ extension GrokMobileShell {
         let expectedScope = mobileAccountScopeKey
         let expectedReconnect = reconnectGeneration
 
+        restoreRosterSelectionIfNeeded()
         let restored = AccessRosterPersistence.load(accountScopeKey: expectedScope)
         if !restored.isEmpty {
             bots = restored
             accessRosterSnapshot = AccessRosterSnapshotProjection.restore(restored)
+            reconcileRosterSelection(with: restored, isComplete: false)
             accessCoverFirstBox = FirstBoxGate.project(
                 previous: accessCoverFirstBox,
                 roster: firstBoxSnapshot(from: accessRosterSnapshot)
@@ -86,6 +88,7 @@ extension GrokMobileShell {
                 live,
                 previous: accessRosterSnapshot
             )
+            reconcileRosterSelection(with: live, isComplete: true)
             accessCoverAccess = .init(state: .granted, reason: .none)
             accessCoverFirstBox = FirstBoxGate.project(
                 previous: accessCoverFirstBox,
