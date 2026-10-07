@@ -1179,6 +1179,76 @@ final class MarketplaceModel {
         accountEmail = user["email"] as? String ?? ""
     }
 
+    static func normalizedAccountDisplayName(_ value: String) -> String {
+        value
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func updateAccountDisplayName(_ value: String) async throws {
+        let normalized = Self.normalizedAccountDisplayName(value)
+        guard !normalized.isEmpty, normalized.count <= 200 else {
+            throw NSError(
+                domain: "Fabushi.AccountMenu",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "名称必须为 1–200 个字符。"]
+            )
+        }
+        _ = try await bridge.request(
+            method: "updateCursorAccountName",
+            params: ["name": normalized]
+        )
+        let status = try await bridge.request(method: "feature.auth.status")
+        applyAuth(status.value as? [String: Any], defaultLoggedIn: true)
+        if accountName == "Fabushi" || accountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            accountName = normalized
+        }
+    }
+
+    func openAccountHelp() async throws {
+        _ = try await bridge.request(
+            method: "openExternal",
+            params: ["url": "https://cursor.com/help"]
+        )
+    }
+
+    func submitAccountFeedback(_ value: String) async throws {
+        let message = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty, message.count <= 10_000 else {
+            throw NSError(
+                domain: "Fabushi.AccountMenu",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "反馈内容必须为 1–10,000 个字符。"]
+            )
+        }
+        let slot = (globalDharmaAccountScope ?? accountEmail)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !slot.isEmpty, slot.count <= 512 else {
+            throw NSError(
+                domain: "Fabushi.AccountMenu",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "当前账号缺少可用于提交反馈的稳定身份。"]
+            )
+        }
+        let result = try await bridge.request(
+            method: "submitFeedback",
+            params: [
+                "accountSlot": slot,
+                "message": message,
+                "submissionId": UUID().uuidString.lowercased(),
+            ]
+        )
+        if let response = result.value as? [String: Any], response["ok"] as? Bool == false {
+            let code = response["code"] as? String ?? "unavailable"
+            throw NSError(
+                domain: "Fabushi.AccountMenu",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "反馈提交失败：\(code)"]
+            )
+        }
+    }
+
     func advanceOnboarding() {
         onboardingStep = min(3, onboardingStep + 1)
         if onboardingStep == 3 { UserDefaults.standard.set(true, forKey: onboardingKey) }
