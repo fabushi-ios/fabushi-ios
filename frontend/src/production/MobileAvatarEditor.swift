@@ -37,7 +37,9 @@ internal struct MobileAvatarEditorSheet: View {
         NavigationStack {
             Form {
                 uploadSection
-                characterSection
+                if !agent.isGroup {
+                    characterSection
+                }
                 if let failure {
                     Section {
                         Text(failure)
@@ -267,8 +269,9 @@ internal struct MobileAvatarEditorSheet: View {
             defer { finishMutation(token) }
             do {
                 let dataURL = try AvatarImagePolicy.pngDataURL(image: sourceImage, crop: crop)
-                let updated = try await GrokMobileBotService(bridge: bridge).updateBotAvatar(
+                let updated = try await GrokMobileBotService(bridge: bridge).updateAgentAvatar(
                     id: agent.id,
+                    isGroup: agent.isGroup,
                     avatarDataURL: dataURL
                 )
                 try Task.checkCancellation()
@@ -291,8 +294,9 @@ internal struct MobileAvatarEditorSheet: View {
         operationTask = Task { @MainActor in
             defer { finishMutation(token) }
             do {
-                let updated = try await GrokMobileBotService(bridge: bridge).updateBotAvatar(
+                let updated = try await GrokMobileBotService(bridge: bridge).updateAgentAvatar(
                     id: agent.id,
+                    isGroup: agent.isGroup,
                     clearAvatar: true
                 )
                 try Task.checkCancellation()
@@ -315,8 +319,9 @@ internal struct MobileAvatarEditorSheet: View {
         operationTask = Task { @MainActor in
             defer { finishMutation(token) }
             do {
-                let updated = try await GrokMobileBotService(bridge: bridge).updateBotAvatar(
+                let updated = try await GrokMobileBotService(bridge: bridge).updateAgentAvatar(
                     id: agent.id,
+                    isGroup: agent.isGroup,
                     clearAvatar: true,
                     avatarShape: shape,
                     avatarColor: color

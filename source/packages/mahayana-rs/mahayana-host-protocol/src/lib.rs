@@ -303,6 +303,12 @@ pub struct GroupSummary {
     pub name: String,
     #[serde(default)]
     pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar_shape: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar_color: Option<String>,
     pub member_ids: Vec<String>,
     #[serde(default)]
     pub messages: Vec<GroupMessage>,
@@ -1414,6 +1420,20 @@ pub enum FeatureCommand {
         name: String,
         #[serde(default)]
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        avatar: Option<String>,
+        #[serde(
+            rename = "avatarShape",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        avatar_shape: Option<String>,
+        #[serde(
+            rename = "avatarColor",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        avatar_color: Option<String>,
         #[serde(rename = "memberIds")]
         member_ids: Vec<String>,
     },
@@ -1426,6 +1446,20 @@ pub enum FeatureCommand {
         name: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         description: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        avatar: Option<String>,
+        #[serde(
+            rename = "avatarShape",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        avatar_shape: Option<String>,
+        #[serde(
+            rename = "avatarColor",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        avatar_color: Option<String>,
         #[serde(rename = "memberIds", default, skip_serializing_if = "Option::is_none")]
         member_ids: Option<Vec<String>>,
     },

@@ -46,8 +46,9 @@ final class AvatarEditorParityTests: XCTestCase {
     }
 
     func testAvatarUpdateCommandPreservesCanonicalHostOwner() {
-        let image = GrokMobileBotService.botAvatarUpdateCommand(
+        let image = GrokMobileBotService.avatarUpdateCommand(
             id: "agent-1",
+            isGroup: false,
             avatarDataURL: "data:image/png;base64,AAAA",
             clearAvatar: false,
             avatarShape: nil,
@@ -59,8 +60,9 @@ final class AvatarEditorParityTests: XCTestCase {
         XCTAssertEqual(image["avatar"] as? String, "data:image/png;base64,AAAA")
         XCTAssertNil(image["avatarShape"])
 
-        let character = GrokMobileBotService.botAvatarUpdateCommand(
+        let character = GrokMobileBotService.avatarUpdateCommand(
             id: "agent-1",
+            isGroup: false,
             avatarDataURL: nil,
             clearAvatar: true,
             avatarShape: "cloud",
@@ -70,6 +72,28 @@ final class AvatarEditorParityTests: XCTestCase {
         XCTAssertEqual(character["avatar"] as? String, "")
         XCTAssertEqual(character["avatarShape"] as? String, "cloud")
         XCTAssertEqual(character["avatarColor"] as? String, "violet")
+    }
+
+    func testGroupAvatarCommandAndProjectionUseCanonicalGroupOwner() throws {
+        let command = GrokMobileBotService.avatarUpdateCommand(
+            id: "group-1",
+            isGroup: true,
+            avatarDataURL: "data:image/png;base64,AAAA",
+            clearAvatar: false,
+            avatarShape: nil,
+            avatarColor: nil,
+            requestId: "group-avatar"
+        )
+        XCTAssertEqual(command["type"] as? String, "group.update")
+        let parsed = try XCTUnwrap(GrokMobileBotService.parseGroup([
+            "id": "group-1",
+            "name": "Group",
+            "description": "",
+            "memberIds": ["agent-a"],
+            "avatar": "data:image/png;base64,AAAA",
+        ]))
+        XCTAssertEqual(parsed.avatarDataURL, "data:image/png;base64,AAAA")
+        XCTAssertTrue(parsed.isGroup)
     }
 
     func testBotProjectionRetainsAuthoritativeAvatarFields() throws {

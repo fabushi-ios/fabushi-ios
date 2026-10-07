@@ -3036,6 +3036,9 @@ impl FeatureHostController {
             FeatureCommand::GroupCreate {
                 name,
                 description,
+                avatar,
+                avatar_shape,
+                avatar_color,
                 member_ids,
                 ..
             } => {
@@ -3052,6 +3055,9 @@ impl FeatureHostController {
                     id: id.clone(),
                     name,
                     description: clamp_block(&description, 2000),
+                    avatar: sanitize_avatar_data_url(avatar)?,
+                    avatar_shape: clean_optional_string(avatar_shape),
+                    avatar_color: clean_optional_string(avatar_color),
                     member_ids,
                     messages: Vec::new(),
                     created_at_ms: now,
@@ -3069,6 +3075,9 @@ impl FeatureHostController {
                 id,
                 name,
                 description,
+                avatar,
+                avatar_shape,
+                avatar_color,
                 member_ids,
                 ..
             } => {
@@ -3090,6 +3099,15 @@ impl FeatureHostController {
                 }
                 if let Some(description) = description {
                     group.description = clamp_block(&description, 2000);
+                }
+                if avatar.is_some() {
+                    group.avatar = sanitize_avatar_data_url(avatar)?;
+                }
+                if avatar_shape.is_some() {
+                    group.avatar_shape = clean_optional_string(avatar_shape);
+                }
+                if avatar_color.is_some() {
+                    group.avatar_color = clean_optional_string(avatar_color);
                 }
                 if let Some(member_ids) = validated_members {
                     group.member_ids = member_ids;
@@ -15315,6 +15333,9 @@ mod tests {
                 request_id: "single-owner-group".into(),
                 name: "Single owner room".into(),
                 description: "Transcript owner contract".into(),
+                avatar: None,
+                avatar_shape: None,
+                avatar_color: None,
                 member_ids: vec!["mahayana-assistant".into(), "research-bot".into()],
             })
             .expect("create group through canonical Host");
@@ -15375,6 +15396,9 @@ mod tests {
             id: "group-1".into(),
             name: "Ops Room".into(),
             description: String::new(),
+            avatar: None,
+            avatar_shape: None,
+            avatar_color: None,
             member_ids: vec!["research-bot".into(), "incident-bot".into()],
             messages: vec![GroupMessage {
                 id: "message-1".into(),
@@ -15417,6 +15441,9 @@ mod tests {
                 request_id: "group-create".into(),
                 name: "Research room".into(),
                 description: "Cross-check sources".into(),
+                avatar: None,
+                avatar_shape: None,
+                avatar_color: None,
                 member_ids: vec!["mahayana-assistant".into(), "research-bot".into()],
             })
             .expect("create group");
@@ -15443,6 +15470,9 @@ mod tests {
             request_id: "nested-group".into(),
             name: "Nested".into(),
             description: String::new(),
+            avatar: None,
+            avatar_shape: None,
+            avatar_color: None,
             member_ids: vec![group.id.clone()],
         });
         assert!(nested.is_err());
@@ -15462,6 +15492,9 @@ mod tests {
             request_id: "over-capacity-group".into(),
             name: "Too many".into(),
             description: String::new(),
+            avatar: None,
+            avatar_shape: None,
+            avatar_color: None,
             member_ids: (0..7).map(|index| format!("capacity-bot-{index}")).collect(),
         });
         assert!(matches!(
@@ -15479,6 +15512,70 @@ mod tests {
             event,
             HostEvent::GroupChanged { action, .. } if action == "deleted"
         )));
+    }
+
+    #[test]
+    fn group_avatar_update_uses_same_canonical_host_sanitizer() {
+        let controller = controller();
+        drain(&controller);
+        controller
+            .execute(FeatureCommand::GroupCreate {
+                request_id: "group-avatar-create".into(),
+                name: "Avatar room".into(),
+                description: String::new(),
+                avatar: None,
+                avatar_shape: None,
+                avatar_color: None,
+                member_ids: vec!["mahayana-assistant".into(), "research-bot".into()],
+            })
+            .expect("create group");
+        let group = drain(&controller)
+            .into_iter()
+            .find_map(|event| match event {
+                HostEvent::GroupChanged { action, group, .. } if action == "created" => Some(group),
+                _ => None,
+            })
+            .expect("created group");
+        controller
+            .execute(FeatureCommand::GroupUpdate {
+                request_id: "group-avatar-update".into(),
+                id: group.id.clone(),
+                name: None,
+                description: None,
+                avatar: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+                avatar_shape: None,
+                avatar_color: None,
+                member_ids: None,
+            })
+            .expect("update group avatar");
+        let updated = drain(&controller)
+            .into_iter()
+            .find_map(|event| match event {
+                HostEvent::GroupChanged { action, group, .. } if action == "updated" => Some(group),
+                _ => None,
+            })
+            .expect("updated group");
+        assert!(updated.avatar.as_deref().is_some_and(|value| value.starts_with("data:image/png;base64,")));
+        controller
+            .execute(FeatureCommand::GroupUpdate {
+                request_id: "group-avatar-clear".into(),
+                id: group.id,
+                name: None,
+                description: None,
+                avatar: Some(String::new()),
+                avatar_shape: None,
+                avatar_color: None,
+                member_ids: None,
+            })
+            .expect("clear group avatar");
+        let cleared = drain(&controller)
+            .into_iter()
+            .find_map(|event| match event {
+                HostEvent::GroupChanged { action, group, .. } if action == "updated" => Some(group),
+                _ => None,
+            })
+            .expect("cleared group");
+        assert!(cleared.avatar.is_none());
     }
 
     #[test]

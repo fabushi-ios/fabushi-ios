@@ -7,6 +7,12 @@ struct MobileAvatarCrop: Equatable, Sendable {
     var centerY: Double
 }
 
+struct MobileAvatarColor: Hashable, Sendable {
+    let id: String
+    let label: String
+    let value: String
+}
+
 enum AvatarImagePolicyError: LocalizedError, Equatable {
     case sourceTooLarge
     case invalidImage
@@ -29,18 +35,18 @@ enum AvatarImagePolicy {
     static let minZoom = 1.0
     static let maxZoom = 5.0
 
-    static let colors: [(id: String, label: String, value: String)] = [
-        ("black", "Black", "#000000"),
-        ("brown", "Brown", "#936439"),
-        ("red", "Red", "#FF263C"),
-        ("orange", "Orange", "#FF6700"),
-        ("yellow", "Yellow", "#FF9800"),
-        ("green", "Green", "#00C972"),
-        ("cyan", "Cyan", "#00BCA6"),
-        ("blue", "Blue", "#1084FE"),
-        ("violet", "Violet", "#9159FE"),
-        ("magenta", "Magenta", "#FF309B"),
-        ("gray", "Gray", "#777777"),
+    static let colors: [MobileAvatarColor] = [
+        .init(id: "black", label: "Black", value: "#000000"),
+        .init(id: "brown", label: "Brown", value: "#936439"),
+        .init(id: "red", label: "Red", value: "#FF263C"),
+        .init(id: "orange", label: "Orange", value: "#FF6700"),
+        .init(id: "yellow", label: "Yellow", value: "#FF9800"),
+        .init(id: "green", label: "Green", value: "#00C972"),
+        .init(id: "cyan", label: "Cyan", value: "#00BCA6"),
+        .init(id: "blue", label: "Blue", value: "#1084FE"),
+        .init(id: "violet", label: "Violet", value: "#9159FE"),
+        .init(id: "magenta", label: "Magenta", value: "#FF309B"),
+        .init(id: "gray", label: "Gray", value: "#777777"),
     ]
     static let shapes = [
         "blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop",

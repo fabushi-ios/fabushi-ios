@@ -117,20 +117,18 @@ internal struct MobileBotAgentSettingsSheet: View {
 
     private var profileSection: some View {
         Section("资料") {
-            if !currentAgent.isGroup {
-                Button {
-                    avatarEditorPresented = true
-                } label: {
-                    Label(
-                        currentAgent.avatarDataURL == nil
-                            ? "设置头像与角色"
-                            : "编辑头像与角色",
-                        systemImage: "person.crop.circle"
-                    )
-                }
-                .disabled(pending != nil)
-                .accessibilityIdentifier("mobile-agent-settings-avatar")
+            Button {
+                avatarEditorPresented = true
+            } label: {
+                Label(
+                    currentAgent.avatarDataURL == nil
+                        ? (currentAgent.isGroup ? "设置群组头像" : "设置头像与角色")
+                        : (currentAgent.isGroup ? "编辑群组头像" : "编辑头像与角色"),
+                    systemImage: currentAgent.isGroup ? "person.2.crop.square.stack" : "person.crop.circle"
+                )
             }
+            .disabled(pending != nil)
+            .accessibilityIdentifier("mobile-agent-settings-avatar")
 
             TextField("名称", text: $nameDraft)
                 .textInputAutocapitalization(.never)

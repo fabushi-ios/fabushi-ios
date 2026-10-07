@@ -265,8 +265,9 @@ struct GrokMobileBotService {
         return updated
     }
 
-    func updateBotAvatar(
+    func updateAgentAvatar(
         id: String,
+        isGroup: Bool,
         avatarDataURL: String? = nil,
         clearAvatar: Bool = false,
         avatarShape: String? = nil,
@@ -275,8 +276,9 @@ struct GrokMobileBotService {
         _ = try await bridge.request(
             method: "feature.execute",
             params: [
-                "command": Self.botAvatarUpdateCommand(
+                "command": Self.avatarUpdateCommand(
                     id: id,
+                    isGroup: isGroup,
                     avatarDataURL: avatarDataURL,
                     clearAvatar: clearAvatar,
                     avatarShape: avatarShape,
@@ -368,8 +370,9 @@ struct GrokMobileBotService {
         return command
     }
 
-    static func botAvatarUpdateCommand(
+    static func avatarUpdateCommand(
         id: String,
+        isGroup: Bool,
         avatarDataURL: String?,
         clearAvatar: Bool,
         avatarShape: String?,
@@ -377,7 +380,7 @@ struct GrokMobileBotService {
         requestId: String
     ) -> [String: Any] {
         var command: [String: Any] = [
-            "type": "bot.update",
+            "type": isGroup ? "group.update" : "bot.update",
             "requestId": requestId,
             "id": id,
         ]
@@ -750,6 +753,9 @@ struct GrokMobileBotService {
             id: id,
             name: (row["name"] as? String) ?? id,
             description: row["description"] as? String ?? "",
+            avatarDataURL: row["avatar"] as? String,
+            avatarShape: row["avatarShape"] as? String,
+            avatarColor: row["avatarColor"] as? String,
             unread: (row["hasUnread"] as? Bool) ?? (row["unread"] as? Bool) ?? false,
             conversationId: row["conversationId"] as? String,
             lastEntry: summary.lastEntry,
