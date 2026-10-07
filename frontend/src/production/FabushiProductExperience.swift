@@ -90,11 +90,11 @@ struct FabushiProductHub: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Fabushi")
+                Text(FabushiBrand.name)
                     .font(.system(size: 16))
                     .foregroundStyle(Color.black.opacity(0.42))
                 Spacer()
-                Text("修学与法布施")
+                Text(FabushiBrand.tagline)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
