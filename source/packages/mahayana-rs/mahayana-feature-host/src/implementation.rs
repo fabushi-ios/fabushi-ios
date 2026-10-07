@@ -988,6 +988,9 @@ impl FeatureHostController {
                 let Some(task) = state.async_tasks.get(task_id) else {
                     continue;
                 };
+                if task.kind == AsyncTaskKind::CloudAgent {
+                    continue;
+                }
                 let conversation_id = state
                     .bots
                     .get(&task.parent_agent_id)
