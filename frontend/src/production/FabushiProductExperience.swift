@@ -75,10 +75,14 @@ func flashcardNextIntervalDays(
 ) -> Int {
     let current = max(1, currentIntervalDays)
     switch rating {
-    case .again: 1
-    case .hard: max(2, Int((Double(current) * 1.2).rounded(.up)))
-    case .good: max(3, Int((Double(current) * 2.5).rounded(.up)))
-    case .easy: max(5, Int((Double(current) * 4.0).rounded(.up)))
+    case .again:
+        return 1
+    case .hard:
+        return max(2, Int((Double(current) * 1.2).rounded(.up)))
+    case .good:
+        return max(3, Int((Double(current) * 2.5).rounded(.up)))
+    case .easy:
+        return max(5, Int((Double(current) * 4.0).rounded(.up)))
     }
 }
 
@@ -113,12 +117,11 @@ struct FabushiGeneratedFlashcard: Identifiable, Equatable {
 }
 
 func splitFabushiSentences(_ text: String) -> [String] {
-    text
+    let sentences: [String] = text
         .components(separatedBy: CharacterSet(charactersIn: "。！？!?；;\n"))
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { $0.count > 5 }
-        .prefix(6)
-        .map(String.init)
+    return Array(sentences.prefix(6))
 }
 
 func makeFabushiFlashcards(
