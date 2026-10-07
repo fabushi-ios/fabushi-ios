@@ -806,13 +806,13 @@
       "desktop_owner": "renderer access-cover composition",
       "desktop_visible_effect": "The access/paywall cover appears only for canonical access-blocked failure before a usable/restored box exists and never covers an active Computer rebuild.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-preload/main-rpc-runtime.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "ios_target_path": "frontend/src/recovered/features/access/cover/composition.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "iOS already has canonical main-RPC method names and a native Computer rebuild lock owner but does not yet have a shipping SandAccess/roster/first-box composition owner. A method-table entry alone is not production wiring.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/ios-preload/main-rpc-runtime.swift lists getSandAccess/getSandAccessFresh; mobile/ios/Fabushi/RemoteComputerSurface.swift owns rebuild state. No shipping iOS SandAccess consumer was found at this exact HEAD.",
-      "test_evidence": "",
-      "notes": "Real product gap at this exact HEAD: access entitlement plus roster/first-box gating is not yet composed into the shipping iOS root. Do not promote from RPC method presence."
+      "ios_platform_delta": "Native composition mirrors Desktop access/roster/first-box/rebuild suppression. The Computer lock is the shipping full-screen Computer presentation state; iOS does not create a second rebuild owner.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/access/cover/composition.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift",
+      "notes": "Production root wiring exists. Fresh exact-HEAD Actions are required before verified promotion."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-box-store.ts",
@@ -926,13 +926,13 @@
       "desktop_owner": "renderer roster snapshot store backed by Coordinator plus client persistence",
       "desktop_visible_effect": "The shell can immediately show a valid restored roster while reconnecting, distinguish restored/live/failed states, preserve structured access-blocked failures, and prevent stale account or transport results from overwriting the active roster.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/production/GrokMobileBotService.swift; frontend/src/production/GrokMobileShell.swift",
+      "ios_target_path": "frontend/src/recovered/features/access/cover/roster-snapshot-store.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Bots.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "The iOS shell uses canonical Rust Host bot.list/group.list and has an account scope key, but loadIndividualBots/loadGroups swallow every error to []; there is no account-scoped persisted roster restore, structured failure/transport projection, incremental upsert subscription, generation-fenced fetch owner, or reconnect roster refetch.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/production/GrokMobileBotService.swift; frontend/src/production/GrokMobileShell.swift",
-      "test_evidence": "",
-      "notes": "Real production gap. AccessCoverView must not be root-wired until the canonical roster owner preserves sand-access-blocked versus network/DNS failure, restored state, scope/generation fencing and reconnect semantics."
+      "ios_platform_delta": "iOS restores a schema-v2 account-scoped native snapshot, then performs a strict complete Rust Host bot.list/group.list fetch. Bot/group change events trigger a complete refetch instead of maintaining a second incremental roster owner. Account scope plus reconnect generation fence stale work.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/access/cover/roster-snapshot-store.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Bots.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift",
+      "notes": "Structured failure preserves sand-access-blocked separately from network/DNS and restored rows remain visible while a fresh fetch is pending. Fresh exact-HEAD Actions are required before verified promotion."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/view.tsx",
@@ -945,9 +945,9 @@
       "ios_language": "SwiftUI",
       "ios_platform_delta": "SwiftUI replaces the DOM and uses Fabushi branding. Visibility remains an injected composition decision; the view does not invent entitlement or roster state.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/access/cover/view.swift",
+      "production_evidence": "frontend/src/recovered/features/access/cover/view.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift",
-      "notes": "Presentation is implemented but intentionally not root-wired until roster-snapshot-store/composition own the canonical structured failure and restored/first-box/rebuild suppressors."
+      "notes": "Presentation is root-wired from canonical AccessCoverComposition and remains hidden for eligible/restored/first-box/rebuild-suppressed states. Fresh exact-HEAD Actions are required before verified promotion."
     },
     {
       "desktop_path": "frontend/src/recovered/features/account/session/menu.tsx",
