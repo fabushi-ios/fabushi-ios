@@ -745,6 +745,13 @@ final class CoordinatorMcpSurface {
         port.updateAccountScope(scope)
     }
 
+    func cloudAgentInfo(bcId: String) async throws -> IOSCloudAgentComposerInfo {
+        guard (await cursorAuth.status()).loggedIn else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        return try await dashboard.getBackgroundComposerInfo(bcId: bcId)
+    }
+
     private func refreshAuthoritativePluginFacts(
         agentId: String
     ) async throws -> [[String: Any]] {
