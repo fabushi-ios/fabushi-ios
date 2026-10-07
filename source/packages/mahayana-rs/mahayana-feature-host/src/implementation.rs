@@ -7302,7 +7302,19 @@ impl FeatureHostController {
             state.remote_computer_sessions.clear();
             state.group_runs.clear();
             state.group_operations.clear();
-            let operation_ids = state.operations.iter().cloned().collect::<Vec<_>>();
+            let suspended_routine_operations = state
+                .routine_executions
+                .values()
+                .filter(|execution| execution.phase == RoutinePhase::Suspended)
+                .filter_map(|execution| execution.operation_id.as_ref())
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            let operation_ids = state
+                .operations
+                .iter()
+                .filter(|operation_id| !suspended_routine_operations.contains(*operation_id))
+                .cloned()
+                .collect::<Vec<_>>();
             state.operations.clear();
             state.operation_agents.clear();
             *self
@@ -14164,6 +14176,44 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn close_does_not_reclassify_suspended_routine_as_interrupt_candidate() {
+        let mut state = FeatureState::default();
+        state.operations.insert("routine-operation".into());
+        state.operations.insert("interactive-operation".into());
+        state.routine_executions.insert(
+            "routine-run-close".into(),
+            RoutineExecution {
+                run_id: "routine-run-close".into(),
+                automation_id: "daily".into(),
+                agent_id: "mahayana-assistant".into(),
+                conversation_id: "mahayana-ai:agent:assistant".into(),
+                account_key: "test-account".into(),
+                epoch: state.routine_epoch,
+                trigger: RoutineTrigger::Schedule,
+                admitted_at_ms: 1,
+                phase: RoutinePhase::Suspended,
+                operation_id: Some("routine-operation".into()),
+                terminal: None,
+                event: None,
+            },
+        );
+        let suspended = state
+            .routine_executions
+            .values()
+            .filter(|execution| execution.phase == RoutinePhase::Suspended)
+            .filter_map(|execution| execution.operation_id.as_ref())
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let interrupt_candidates = state
+            .operations
+            .iter()
+            .filter(|operation_id| !suspended.contains(*operation_id))
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(interrupt_candidates, vec!["interactive-operation".to_string()]);
     }
 
     #[test]
