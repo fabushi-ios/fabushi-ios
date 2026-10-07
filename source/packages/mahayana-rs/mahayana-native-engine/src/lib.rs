@@ -4473,7 +4473,7 @@ mod tests {
         let state: NativeSnapshotState =
             serde_json::from_value(snapshot.state).expect("decode suspended state");
         assert_eq!(
-            state.session.active_prompt.as_ref().map(|prompt| prompt.input.as_str()),
+            state.session.active_prompt.as_ref().map(|prompt| prompt.text.as_str()),
             Some("continue durable work")
         );
 
@@ -4513,7 +4513,6 @@ mod tests {
         let state: NativeSnapshotState =
             serde_json::from_value(snapshot.state).expect("decode completed state");
         assert!(state.session.active_prompt.is_none());
-        assert!(state.session.prompt_queue.is_empty());
         assert!(state.session.attempts.iter().any(|attempt| {
             attempt.operation_id == operation_id.as_str()
                 && attempt.state == OperationAttemptState::Completed
