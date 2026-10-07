@@ -350,7 +350,7 @@ internal struct GrokMobileShell: View {
 
     private var homeContent: some View {
         home
-            .task(id: accessRosterTaskKey) { await refreshAccessRoster() }
+            .task(id: accessRosterTaskKey) { await runAccessRosterLifecycle() }
             .task(id: mobileAccountScopeKey) {
                 await loadAgentSidebarSections()
                 await loadPinnedBotIds()
