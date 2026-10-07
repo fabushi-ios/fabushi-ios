@@ -27,6 +27,8 @@ internal struct GrokMobileShell: View {
     @State var accessCoverFirstBox = FirstBoxGateState.initial
     @State var accessCoverAccess = AccessCoverSandAccess.checking
     @State var accessRosterGeneration = 0
+    @State var rosterSelection = AccessRosterSelectionState.empty
+    @State var rosterSelectionScopeKey = ""
     @State var pinnedBotIdOrder: [String] = []
     @State var asyncTasksTarget: MobileBotSummary?
     @State var asyncTasks: [MobileAgentAsyncTask] = []
@@ -254,6 +256,7 @@ internal struct GrokMobileShell: View {
     @MainActor
     func applyBotRosterUpdate(_ updated: [MobileBotSummary]) {
         bots = updated
+        reconcileRosterSelection(with: updated, isComplete: accessRosterSnapshot.hasCompleteRoster)
         if let selectedBot,
            let refreshed = updated.first(where: { $0.id == selectedBot.id }) {
             self.selectedBot = refreshed
@@ -265,6 +268,76 @@ internal struct GrokMobileShell: View {
         if let remoteComputerAgentTarget,
            let refreshed = updated.first(where: { $0.id == remoteComputerAgentTarget.id }) {
             self.remoteComputerAgentTarget = refreshed
+        }
+    }
+
+    @MainActor
+    func restoreRosterSelectionIfNeeded() {
+        let scope = mobileAccountScopeKey
+        guard rosterSelectionScopeKey != scope else { return }
+        rosterSelectionScopeKey = scope
+        rosterSelection = AccessRosterSelectionPersistence.load(accountScopeKey: scope)
+        selectedBot = rosterSelection.currentAgentID.flatMap { id in
+            bots.first(where: { $0.id == id })
+        }
+    }
+
+    @MainActor
+    func selectBotForConversation(_ bot: MobileBotSummary) {
+        let next = AccessRosterSelectionProjection.select(bot.id, previous: rosterSelection)
+        rosterSelection = next
+        AccessRosterSelectionPersistence.save(next, accountScopeKey: mobileAccountScopeKey)
+        selectedBot = bot
+
+        if accessRosterSnapshot.hasCompleteRoster {
+            let settled = AccessRosterSelectionProjection.settle(
+                next,
+                attemptedAgentID: bot.id,
+                completeAgentIDs: bots.map(\.id)
+            )
+            rosterSelection = settled
+            AccessRosterSelectionPersistence.save(settled, accountScopeKey: mobileAccountScopeKey)
+            if settled.currentAgentID != bot.id {
+                selectedBot = settled.currentAgentID.flatMap { id in
+                    bots.first(where: { $0.id == id })
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func clearRosterSelection() {
+        rosterSelection = .empty
+        selectedBot = nil
+        AccessRosterSelectionPersistence.clear(accountScopeKey: mobileAccountScopeKey)
+    }
+
+    @MainActor
+    func reconcileRosterSelection(
+        with roster: [MobileBotSummary],
+        isComplete: Bool
+    ) {
+        let previous = rosterSelection
+        let next = AccessRosterSelectionProjection.reconcile(
+            previous,
+            agentIDs: roster.map(\.id),
+            isRosterComplete: isComplete
+        )
+        guard next != previous else {
+            if let id = next.currentAgentID,
+               let selectedBot,
+               selectedBot.id == id,
+               let refreshed = roster.first(where: { $0.id == id }) {
+                self.selectedBot = refreshed
+            }
+            return
+        }
+        rosterSelection = next
+        AccessRosterSelectionPersistence.save(next, accountScopeKey: mobileAccountScopeKey)
+        if previous.currentAgentID != nil {
+            selectedBot = next.currentAgentID.flatMap { id in
+                roster.first(where: { $0.id == id })
+            }
         }
     }
 
@@ -284,7 +357,7 @@ internal struct GrokMobileShell: View {
             bridge: bridge,
             model: model,
             appAgentSurface: appAgentSurface,
-            onClose: { self.selectedBot = nil },
+            onClose: { clearRosterSelection() },
             onOpenSettings: {
                 self.botSettingsRoutineID = nil
                 self.botSettingsTarget = self.bots.first(where: { $0.id == bot.id }) ?? bot
@@ -352,6 +425,7 @@ internal struct GrokMobileShell: View {
         home
             .task(id: accessRosterTaskKey) { await runAccessRosterLifecycle() }
             .task(id: mobileAccountScopeKey) {
+                restoreRosterSelectionIfNeeded()
                 await loadAgentSidebarSections()
                 await loadPinnedBotIds()
             }
