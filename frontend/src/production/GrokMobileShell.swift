@@ -23,6 +23,11 @@ internal struct GrokMobileShell: View {
     @State var botActionBusy = false
     @State var botActionError: String?
     @State var bots: [MobileBotSummary] = []
+    @AppStorage("fabushi.mobile.pinnedBotIds") var pinnedBotIdsStorage = "[]"
+    @State var asyncTasksTarget: MobileBotSummary?
+    @State var asyncTasks: [MobileAgentAsyncTask] = []
+    @State var asyncTasksBusy = false
+    @State var asyncTasksError: String?
     @State var selectedBot: MobileBotSummary?
     @State var groupMembersTarget: MobileBotSummary?
     @State var botSettingsTarget: MobileBotSummary?
@@ -64,6 +69,46 @@ internal struct GrokMobileShell: View {
                 },
                 onClose: { groupMembersTarget = nil }
             )
+        }
+        .sheet(item: $asyncTasksTarget) { agent in
+            NavigationStack {
+                List {
+                    if asyncTasksBusy {
+                        ProgressView("正在加载异步任务…")
+                    } else if let asyncTasksError {
+                        Text(asyncTasksError)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("agent-async-tasks-error")
+                    } else if asyncTasks.isEmpty {
+                        Text("当前没有运行中的异步任务")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(asyncTasks) { task in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(task.label).font(.headline)
+                                    Spacer()
+                                    Text(task.kind).font(.caption).foregroundStyle(.secondary)
+                                }
+                                if let detail = task.detail, !detail.isEmpty {
+                                    Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                                }
+                                if let resourceId = task.resourceId, !resourceId.isEmpty {
+                                    Text(resourceId).font(.caption2).foregroundStyle(.tertiary)
+                                }
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("\(agent.name) · 异步任务")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("关闭") { asyncTasksTarget = nil }
+                    }
+                }
+            }
+            .accessibilityIdentifier("agent-async-tasks")
         }
         .sheet(item: $botSettingsTarget) { agent in
             MobileBotAgentSettingsSheet(
