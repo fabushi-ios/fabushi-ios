@@ -999,6 +999,69 @@ impl FeatureHostController {
         }))
     }
 
+    pub fn confirm_published_workflow_resync(
+        &self,
+        agent_id: &str,
+        workflow_id: &str,
+        plugin_id: &str,
+        commit_sha: &str,
+    ) -> Result<Value, FeatureHostError> {
+        if !is_safe_memory_agent_id(agent_id)
+            || plugin_id.trim().is_empty()
+            || !is_exact_skill_publish_version(commit_sha)
+        {
+            return Err(FeatureHostError::Contract(
+                "unsafe skill resync confirmation identity".into(),
+            ));
+        }
+        let workflow_root = self
+            .workflow_root_path
+            .as_deref()
+            .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
+        let snapshot = {
+            let state = self.state()?;
+            state
+                .published_plugins_by_agent
+                .get(agent_id)
+                .and_then(|plugins| plugins.iter().find(|plugin| {
+                    plugin.plugin_id == plugin_id
+                        && plugin.plugin_version.eq_ignore_ascii_case(commit_sha)
+                        && plugin.published_by_current_user
+                }))
+                .cloned()
+        };
+        let Some(snapshot) = snapshot else {
+            return Ok(json!({"confirmed": false}));
+        };
+        let cache_root = published_workflow_cache_root(workflow_root, plugin_id)?;
+        let mut metadata = read_published_workflow_cache(&cache_root)
+            .ok_or_else(|| FeatureHostError::Contract(
+                "That published skill's local cache is unavailable.".into()
+            ))?;
+        if metadata.agent_id != agent_id
+            || metadata.promoted_workflow_id != workflow_id
+            || metadata.plugin_id != plugin_id
+        {
+            return Err(FeatureHostError::Contract(
+                "Published skill identity changed while syncing.".into(),
+            ));
+        }
+        let team_id = snapshot.marketplace_team_id.ok_or_else(|| {
+            FeatureHostError::Contract(
+                "Published skill confirmation has no team marketplace identity.".into(),
+            )
+        })?;
+        metadata.plugin_version = commit_sha.to_ascii_lowercase();
+        metadata.marketplace_team_id = team_id;
+        write_published_workflow_cache(&cache_root, &metadata)?;
+        Ok(json!({
+            "confirmed": true,
+            "workflowId": workflow_id,
+            "pluginId": plugin_id,
+            "commitSha": metadata.plugin_version,
+        }))
+    }
+
     pub fn export_published_workflow_publish_package(
         &self,
         agent_id: &str,
@@ -17123,6 +17186,37 @@ mod tests {
         assert_eq!(projected[0].source, WorkflowSource::Plugin);
         assert_eq!(projected[0].plugin_id.as_deref(), Some(plugin_id));
         assert!(projected[0].published_by_current_user);
+
+        let next_sha = "2222222222222222222222222222222222222222";
+        let not_yet_resynced = controller
+            .confirm_published_workflow_resync(agent_id, &promoted_id, plugin_id, next_sha)
+            .expect("unconfirmed resync remains pending");
+        assert_eq!(not_yet_resynced["confirmed"], false);
+        let before_resync = read_published_workflow_cache(&cache_root)
+            .expect("published cache before resync");
+        assert_eq!(before_resync.plugin_version, commit_sha);
+
+        controller
+            .sync_workflow_plugin_facts(
+                agent_id,
+                json!([{
+                    "pluginId": plugin_id,
+                    "pluginVersion": next_sha,
+                    "name": "release-check",
+                    "displayName": "Release check",
+                    "publishedByCurrentUser": true,
+                    "marketplaceTeamId": 7,
+                    "isEnabledForAgent": true
+                }]),
+            )
+            .expect("sync next authoritative plugin version");
+        let resynced = controller
+            .confirm_published_workflow_resync(agent_id, &promoted_id, plugin_id, next_sha)
+            .expect("confirm resync");
+        assert_eq!(resynced["confirmed"], true);
+        let after_resync = read_published_workflow_cache(&cache_root)
+            .expect("published cache after resync");
+        assert_eq!(after_resync.plugin_version, next_sha);
 
         let prepared = controller
             .prepare_workflow_unpublish(agent_id, &promoted_id)

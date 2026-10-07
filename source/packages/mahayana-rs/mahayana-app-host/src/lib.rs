@@ -444,6 +444,15 @@ impl AppHost {
                     string_param(&params, "commitSha")?,
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.resyncConfirm" => self
+                .feature
+                .confirm_published_workflow_resync(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "workflowId")?,
+                    string_param(&params, "pluginId")?,
+                    string_param(&params, "commitSha")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "feature.workflow.resyncPackage" => self
                 .feature
                 .export_published_workflow_publish_package(

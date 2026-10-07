@@ -230,6 +230,27 @@ private final class CoordinatorMcpHostPort {
         return value
     }
 
+    func confirmPublishedWorkflowResync(
+        agentId: String,
+        workflowId: String,
+        pluginId: String,
+        commitSha: String
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.workflow.resyncConfirm",
+            params: [
+                "agentId": agentId,
+                "workflowId": workflowId,
+                "pluginId": pluginId,
+                "commitSha": commitSha,
+            ]
+        )
+        guard let value = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Skill resync confirmation response is invalid.")
+        }
+        return value
+    }
+
     func exportPublishedWorkflowPublishPackage(
         agentId: String,
         workflowId: String
@@ -903,12 +924,25 @@ final class CoordinatorMcpSurface {
                     "Skill sync returned a different plugin id; local published state was preserved."
                 )
             }
-            _ = try? await refreshAuthoritativePluginFacts(agentId: agentId)
+            var confirmed = false
+            for _ in 0..<SKILL_PUBLISH_CONFIRM_MAX_ATTEMPTS {
+                _ = try? await refreshAuthoritativePluginFacts(agentId: agentId)
+                let confirmation = try await port.confirmPublishedWorkflowResync(
+                    agentId: agentId,
+                    workflowId: workflowId,
+                    pluginId: published.pluginId,
+                    commitSha: published.commitSha
+                )
+                if confirmation["confirmed"] as? Bool == true {
+                    confirmed = true
+                    break
+                }
+            }
             return .handled([
                 "workflowId": workflowId,
                 "pluginId": published.pluginId,
                 "commitSha": published.commitSha,
-                "confirmed": true,
+                "confirmed": confirmed,
             ])
 
         case "coordinator.skill.unpublish":
