@@ -502,17 +502,17 @@
     {
       "desktop_path": "frontend/src/production/coordinator-client.ts",
       "desktop_blob_sha": "f120b9f600861560409d9a9cac6487cb5ec79e63",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Owns the renderer-side Coordinator RPC client lifecycle: protocol-version handshake, request/reply correlation, validated replies, event and transport-state subscriptions, disconnect/replacement settlement, and deterministic disposal.",
+      "desktop_owner": "renderer / Coordinator transport client",
+      "desktop_visible_effect": "Shipping UI can call Coordinator-owned product methods over one versioned transport, receives typed failures/events, and does not leak pending calls or stale replies across Coordinator replacement.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/ios-preload/coordinator-port-bridge.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS replaces Electron transferred MessagePort claim/reclaim with a native typed Coordinator port. IOSCoordinatorPortClient/CoordinatorControlPortClient provide versioned hello/ready, request correlation, cancellation, event delivery and fail-closed settlement; IOSCoordinatorRuntime owns whole-port replacement and generation fencing after restart instead of asking a preload bridge to reclaim an Electron port.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-preload/coordinator-port-bridge.swift; source/mahayana-agent-coordinator/control-port-client.swift; source/ios-main/coordinator/coordinator-runtime.swift; source/ios-main/coordinator/coordinator-launcher.swift; source/ios-main/coordinator/coordinator-main-port-client.swift",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift",
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Native lifecycle replacement is generation-fenced and now has an explicit restart/old-port test. Keep below verified until current exact-head ordinary/protected acceptance and release evidence complete."
     },
     {
       "desktop_path": "frontend/src/production/evidence.ts",
