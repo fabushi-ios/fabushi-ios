@@ -410,48 +410,82 @@ fn bounded_conversation_window(
 
 const ASYNC_TASK_STALE_MAX_AGE_MS: i64 = 48 * 60 * 60 * 1_000;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PendingAsyncTaskEntry {
+    task: AsyncTaskSummary,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    operation_id: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PendingAsyncTasksFile {
     version: u8,
     #[serde(default)]
+    entries: Vec<PendingAsyncTaskEntry>,
+    #[serde(default)]
     tasks: Vec<AsyncTaskSummary>,
 }
 
-fn load_pending_async_tasks(path: &Path, now_ms: i64) -> BTreeMap<String, AsyncTaskSummary> {
+fn load_pending_async_tasks(
+    path: &Path,
+    now_ms: i64,
+) -> (
+    BTreeMap<String, AsyncTaskSummary>,
+    BTreeMap<String, String>,
+) {
     let Ok(raw) = std::fs::read_to_string(path) else {
-        return BTreeMap::new();
+        return (BTreeMap::new(), BTreeMap::new());
     };
     let Ok(file) = serde_json::from_str::<PendingAsyncTasksFile>(&raw) else {
-        return BTreeMap::new();
+        return (BTreeMap::new(), BTreeMap::new());
     };
-    file.tasks
-        .into_iter()
-        .filter(|task| {
-            task.status == AsyncTaskStatus::Running
-                && !task.id.trim().is_empty()
-                && !task.parent_agent_id.trim().is_empty()
-                && now_ms.saturating_sub(task.started_at_ms) <= ASYNC_TASK_STALE_MAX_AGE_MS
-        })
-        .map(|mut task| {
-            if task.kind == AsyncTaskKind::Shell {
-                let restart_detail = "reattached after a host restart";
-                task.detail = Some(match task.detail.as_deref().filter(|detail| !detail.is_empty()) {
-                    Some(detail) if !detail.contains(restart_detail) => {
-                        format!("{detail} · {restart_detail}")
-                    }
-                    Some(detail) => detail.to_string(),
-                    None => restart_detail.to_string(),
-                });
-            }
-            (task.id.clone(), task)
-        })
-        .collect()
+    let mut entries = file.entries;
+    if entries.is_empty() {
+        entries.extend(file.tasks.into_iter().map(|task| PendingAsyncTaskEntry {
+            task,
+            operation_id: None,
+        }));
+    }
+    let mut tasks = BTreeMap::new();
+    let mut operation_ids = BTreeMap::new();
+    for mut entry in entries {
+        let task = &mut entry.task;
+        if task.status != AsyncTaskStatus::Running
+            || task.id.trim().is_empty()
+            || task.parent_agent_id.trim().is_empty()
+            || now_ms.saturating_sub(task.started_at_ms) > ASYNC_TASK_STALE_MAX_AGE_MS
+        {
+            continue;
+        }
+        if task.kind == AsyncTaskKind::Shell {
+            let restart_detail = "reattached after a host restart";
+            task.detail = Some(match task.detail.as_deref().filter(|detail| !detail.is_empty()) {
+                Some(detail) if !detail.contains(restart_detail) => {
+                    format!("{detail} · {restart_detail}")
+                }
+                Some(detail) => detail.to_string(),
+                None => restart_detail.to_string(),
+            });
+        }
+        if let Some(operation_id) = entry
+            .operation_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            operation_ids.insert(task.id.clone(), operation_id.to_string());
+        }
+        tasks.insert(task.id.clone(), task.clone());
+    }
+    (tasks, operation_ids)
 }
 
 fn persist_pending_async_tasks(
     path: Option<&Path>,
     tasks: &BTreeMap<String, AsyncTaskSummary>,
+    operation_ids: &BTreeMap<String, String>,
 ) -> Result<(), FeatureHostError> {
     let Some(path) = path else {
         return Ok(());
@@ -473,8 +507,16 @@ fn persist_pending_async_tasks(
         })?;
     }
     let file = PendingAsyncTasksFile {
-        version: 1,
-        tasks: tasks.values().cloned().collect(),
+        version: 2,
+        entries: tasks
+            .values()
+            .cloned()
+            .map(|task| PendingAsyncTaskEntry {
+                operation_id: operation_ids.get(&task.id).cloned(),
+                task,
+            })
+            .collect(),
+        tasks: Vec::new(),
     };
     let bytes = serde_json::to_vec(&file).map_err(|error| {
         FeatureHostError::Contract(format!("serialize pending async tasks: {error}"))
@@ -523,6 +565,7 @@ struct FeatureState {
     remote_computer_device_secrets: BTreeMap<String, String>,
     subagents: BTreeMap<String, SubagentSummary>,
     async_tasks: BTreeMap<String, AsyncTaskSummary>,
+    async_task_operation_ids: BTreeMap<String, String>,
     peer_messages: Vec<AgentPeerMessage>,
     settings: ProductHostSettings,
     trays: Vec<ErrorTray>,
@@ -566,6 +609,7 @@ impl Default for FeatureState {
             remote_computer_device_secrets: BTreeMap::new(),
             subagents: BTreeMap::new(),
             async_tasks: BTreeMap::new(),
+            async_task_operation_ids: BTreeMap::new(),
             peer_messages: Vec::new(),
             settings: ProductHostSettings::default(),
             trays: Vec::new(),
