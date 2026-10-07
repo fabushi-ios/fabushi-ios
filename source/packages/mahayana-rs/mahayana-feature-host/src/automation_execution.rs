@@ -705,12 +705,22 @@ mod routine_execution_tests {
     #[test]
     fn routine_shipping_runtime_command_hides_input_and_keeps_original_conversation() {
         let fixture = Fixture::new(); fixture.schedule("daily"); fixture.pending("daily"); let execution = fixture.host.state().expect("state").routine_executions.values().next().expect("run").clone();
-        match routine_runtime_command(&execution, routine_prompt(&execution).expect("prompt")) {
-            RuntimeCommand::SendMessage { conversation_id, client_message_id, hidden, show_assistant_output, display_text, text, is_fork, reply_to_message_id, selected_image_data_urls, .. } => {
-                assert_eq!(conversation_id.to_string(), execution.conversation_id); assert_eq!(client_message_id.as_deref(), Some(execution.run_id.as_str())); assert!(hidden); assert!(!show_assistant_output); assert!(display_text.is_none()); assert!(text.starts_with("[routine]")); assert!(!is_fork); assert!(reply_to_message_id.is_none()); assert!(selected_image_data_urls.is_empty());
-            }
-            _ => panic!("routine must use canonical SendMessage"),
-        }
+        let request = routine_runtime_request(
+            &execution,
+            "stable-runtime-operation".into(),
+            routine_prompt(&execution).expect("prompt"),
+        );
+        assert_eq!(request.conversation_id.to_string(), execution.conversation_id);
+        assert_eq!(request.operation_id.as_str(), "stable-runtime-operation");
+        assert_eq!(request.client_message_id.as_deref(), Some(execution.run_id.as_str()));
+        assert!(request.hidden);
+        assert!(!request.show_assistant_output);
+        assert!(request.display_text.is_none());
+        assert!(request.text.starts_with("[routine]"));
+        assert!(request.recovery_eligible);
+        assert!(!request.is_fork);
+        assert!(request.reply_to_message_id.is_none());
+        assert!(request.selected_image_data_urls.is_empty());
     }
     #[test]
     fn routine_event_ingress_and_manual_event_definition_use_distinct_real_triggers() {
