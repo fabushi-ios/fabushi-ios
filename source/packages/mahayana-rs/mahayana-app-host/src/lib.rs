@@ -240,6 +240,25 @@ impl AppHost {
                 .map_err(|error| AppHostError::Operation(error.to_string())),
             method if method.starts_with("sharing.") => self.handle_sharing(method, params),
             "getLinkMetadata" => self.get_link_metadata(params),
+            "getAsyncTasks" => {
+                let agent_id = string_param(&params, "id")?;
+                let tasks = self
+                    .feature
+                    .async_tasks_for_agent(agent_id)
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?
+                    .into_iter()
+                    .map(|task| {
+                        let mut value = serde_json::to_value(task)
+                            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                        if let Value::Object(object) = &mut value {
+                            object.remove("parentAgentId");
+                            object.remove("resourceId");
+                        }
+                        Ok(value)
+                    })
+                    .collect::<Result<Vec<_>, AppHostError>>()?;
+                Ok(Value::Array(tasks))
+            }
             "listAllAutomations" => self.list_all_automations(),
             "plugin.permissions" => self.plugin_permissions(params),
             "plugin.permission.grant" => self.set_permission(params, true),
