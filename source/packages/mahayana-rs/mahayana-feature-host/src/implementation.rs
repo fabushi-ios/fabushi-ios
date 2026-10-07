@@ -14186,18 +14186,20 @@ mod tests {
         state.routine_executions.insert(
             "routine-run-close".into(),
             RoutineExecution {
+                request_id: "close-test".into(),
                 run_id: "routine-run-close".into(),
                 automation_id: "daily".into(),
                 agent_id: "mahayana-assistant".into(),
                 conversation_id: "mahayana-ai:agent:assistant".into(),
-                account_key: "test-account".into(),
+                account_key: Some("test-account".into()),
                 epoch: state.routine_epoch,
                 trigger: RoutineTrigger::Schedule,
+                name: "Daily".into(),
+                prompt: "continue".into(),
                 admitted_at_ms: 1,
                 phase: RoutinePhase::Suspended,
                 operation_id: Some("routine-operation".into()),
                 terminal: None,
-                event: None,
             },
         );
         let suspended = state
