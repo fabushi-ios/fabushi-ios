@@ -313,4 +313,106 @@ final class AccessCoverParityTests: XCTestCase {
         )
     }
 
+    func testRosterSelectionPersistenceIsAccountScoped() throws {
+        let suite = "AccessRosterSelectionTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let selected = AccessRosterSelectionState(
+            currentAgentID: "agent-2",
+            isLoadPending: false
+        )
+        AccessRosterSelectionPersistence.save(
+            selected,
+            accountScopeKey: "account-a",
+            defaults: defaults
+        )
+
+        XCTAssertEqual(
+            AccessRosterSelectionPersistence.load(
+                accountScopeKey: "account-a",
+                defaults: defaults
+            ),
+            selected
+        )
+        XCTAssertEqual(
+            AccessRosterSelectionPersistence.load(
+                accountScopeKey: "account-b",
+                defaults: defaults
+            ),
+            .empty
+        )
+
+        AccessRosterSelectionPersistence.clear(
+            accountScopeKey: "account-a",
+            defaults: defaults
+        )
+        XCTAssertEqual(
+            AccessRosterSelectionPersistence.load(
+                accountScopeKey: "account-a",
+                defaults: defaults
+            ),
+            .empty
+        )
+    }
+
+    func testRosterSelectionFencesMissingPendingAgentUntilSettle() {
+        let selected = AccessRosterSelectionProjection.select(
+            "missing",
+            previous: .empty
+        )
+        XCTAssertEqual(
+            selected,
+            .init(currentAgentID: "missing", isLoadPending: true)
+        )
+
+        let reconciledWhilePending = AccessRosterSelectionProjection.reconcile(
+            selected,
+            agentIDs: ["agent-1", "agent-2"],
+            isRosterComplete: true
+        )
+        XCTAssertEqual(reconciledWhilePending, selected)
+
+        let settled = AccessRosterSelectionProjection.settle(
+            reconciledWhilePending,
+            attemptedAgentID: "missing",
+            completeAgentIDs: ["agent-1", "agent-2"]
+        )
+        XCTAssertEqual(
+            settled,
+            .init(currentAgentID: "agent-1", isLoadPending: false)
+        )
+    }
+
+    func testRosterSelectionRestoreAndCompleteRosterReconciliation() {
+        let restored = AccessRosterSelectionState(
+            currentAgentID: "agent-2",
+            isLoadPending: false
+        )
+        XCTAssertEqual(
+            AccessRosterSelectionProjection.reconcile(
+                restored,
+                agentIDs: ["agent-1", "agent-2"],
+                isRosterComplete: true
+            ),
+            restored
+        )
+        XCTAssertEqual(
+            AccessRosterSelectionProjection.reconcile(
+                restored,
+                agentIDs: ["agent-1"],
+                isRosterComplete: true
+            ),
+            .init(currentAgentID: "agent-1", isLoadPending: false)
+        )
+        XCTAssertEqual(
+            AccessRosterSelectionProjection.reconcile(
+                restored,
+                agentIDs: ["agent-1"],
+                isRosterComplete: false
+            ),
+            restored
+        )
+    }
+
 }
