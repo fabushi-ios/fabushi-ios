@@ -1875,7 +1875,7 @@ impl EngineBackend for NativeEngine {
             if persist_result.is_ok() {
                 control.suspension_persisted.store(true, Ordering::SeqCst);
             }
-            control.suspension_settled.notify_waiters();
+            control.suspension_settled.notify_one();
         }
         self.finish_operation(&request.operation_id)?;
         persist_result?;
@@ -2085,7 +2085,7 @@ impl EngineBackend for NativeEngine {
             if persist_result.is_ok() {
                 control.suspension_persisted.store(true, Ordering::SeqCst);
             }
-            control.suspension_settled.notify_waiters();
+            control.suspension_settled.notify_one();
         }
         self.finish_operation(&request.operation_id)?;
         persist_result?;
