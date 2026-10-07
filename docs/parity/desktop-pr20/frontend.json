@@ -787,17 +787,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/access-roster-state.contract.test.ts",
       "desktop_blob_sha": "b90d0f184dda30379506dfd1801dabbcebf4e7eb",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Focused renderer contract for Computer rebuild lock/transport lifecycle, access-cover suppression during rebuild, and account-scoped roster selection persistence with restore/reconcile/settlement fencing.",
+      "desktop_owner": "renderer access/computer/roster state contracts",
+      "desktop_visible_effect": "Access gating stays hidden during Computer rebuild transitions, transport recovery is reflected without stale state, and the last selected Agent is restored per account without cross-account reuse or premature fallback while a selected Agent is still loading.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/recovered/features/access/cover/roster-snapshot-store.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS splits the Desktop contract across native owners while preserving one state chain: AccessCoverComposition consumes the canonical access/roster/Computer lock state; RemoteComputer rebuild tests cover disconnect/reconnect and scoped teardown behavior; AccessRosterPersistence owns account-scoped roster fallback; and AccessRosterSelectionPersistence/Projection now owns the account-scoped last-Agent selection with pending-load fencing, complete-roster reconciliation, settlement fallback, and clear-on-close. GrokMobileShell routes shipping Agent opens/closes and authoritative roster refreshes through that selection owner rather than raw @State mutation.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/access/cover/composition.swift; frontend/src/recovered/features/access/cover/roster-snapshot-store.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; mobile/ios/Fabushi/RemoteComputerStatusStore.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift (access suppression, account-scoped roster cache, selection persistence/reconcile/settle); mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; exact-HEAD GitHub Actions pending",
+      "notes": "Production wiring and focused contracts are implemented on the current source tree. Keep below verified until this exact iOS HEAD passes ordinary Swift/Rust/UI/device evidence and applicable protected acceptance; do not inherit earlier-head runs."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/composition.ts",
