@@ -154,6 +154,43 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertFalse(unassigned.flatMap(\.agentIds).contains("agent-1"))
     }
 
+    func testNativeAgentSectionsCanonicalHostProjectionRejectsMalformedRows() {
+        let rows: [[String: Any]] = [
+            ["id": "one", "name": "One", "agentIds": ["a", "b"], "isCollapsed": true],
+            ["id": "__agents__", "name": "Unassigned", "agentIds": []],
+            ["id": "two", "name": "Two", "agentIds": ["b", "c"]],
+        ]
+        let canonical = MobileAgentSidebarSections.canonical(from: rows)
+        XCTAssertEqual(canonical?.map(\.id), ["one", "two"])
+        XCTAssertEqual(canonical?.first?.agentIds, ["a", "b"])
+        XCTAssertEqual(canonical?.last?.agentIds, ["c"])
+        XCTAssertEqual(canonical?.first?.isCollapsed, true)
+        XCTAssertNil(MobileAgentSidebarSections.canonical(from: [
+            ["id": "broken", "name": "Broken", "agentIds": 42]
+        ] as [[String: Any]]))
+    }
+
+    func testNativeAgentSectionRenameRemoveAndReorderMatchDesktopStateModel() throws {
+        let base = [
+            MobileAgentSidebarSection(id: "one", name: "One", agentIds: ["a"]),
+            MobileAgentSidebarSection(id: "two", name: "Two", agentIds: ["b"]),
+        ]
+        let renamed = try XCTUnwrap(MobileAgentSidebarSections.renamed(
+            base,
+            sectionId: "one",
+            name: "  Research  "
+        ))
+        XCTAssertEqual(renamed[0].name, "Research")
+        XCTAssertEqual(
+            MobileAgentSidebarSections.moving(renamed, sectionId: "one", offset: 1).map(\.id),
+            ["two", "one"]
+        )
+        XCTAssertEqual(
+            MobileAgentSidebarSections.removing(renamed, sectionId: "one").map(\.id),
+            ["two"]
+        )
+    }
+
     func testNativeAgentSectionsCreateAndNormalizeLikeDesktopSidebar() throws {
         let created = try XCTUnwrap(MobileAgentSidebarSections.creating(
             name: "  Research  ",

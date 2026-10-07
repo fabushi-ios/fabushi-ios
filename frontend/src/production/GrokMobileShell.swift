@@ -31,6 +31,9 @@ internal struct GrokMobileShell: View {
     @State var agentSidebarSections: [MobileAgentSidebarSection] = []
     @State var newSectionBot: MobileBotSummary?
     @State var newSectionName = ""
+    @State var sectionRenameTarget: MobileAgentSidebarSection?
+    @State var sectionRenameDraft = ""
+    @State var sectionDeleteTarget: MobileAgentSidebarSection?
     @State var selectedBot: MobileBotSummary?
     @State var groupMembersTarget: MobileBotSummary?
     @State var botSettingsTarget: MobileBotSummary?
@@ -92,7 +95,7 @@ internal struct GrokMobileShell: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("创建并移动") {
-                            createAgentSidebarSection(for: bot)
+                            Task { await createAgentSidebarSection(for: bot) }
                         }
                         .disabled(newSectionName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .accessibilityIdentifier("agent-new-section-submit")
@@ -100,6 +103,49 @@ internal struct GrokMobileShell: View {
                 }
             }
             .accessibilityIdentifier("agent-new-section")
+        }
+        .sheet(item: $sectionRenameTarget) { section in
+            NavigationStack {
+                Form {
+                    Section("分组名称") {
+                        TextField("分组名称", text: $sectionRenameDraft)
+                            .accessibilityIdentifier("agent-section-rename-name")
+                    }
+                }
+                .navigationTitle("重命名分组")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("取消") {
+                            sectionRenameTarget = nil
+                            sectionRenameDraft = ""
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("保存") {
+                            Task { await commitAgentSidebarSectionRename(section) }
+                        }
+                        .disabled(sectionRenameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            }
+            .accessibilityIdentifier("agent-section-rename")
+        }
+        .confirmationDialog(
+            sectionDeleteTarget.map { "删除“\($0.name)”" } ?? "删除分组",
+            isPresented: Binding(
+                get: { sectionDeleteTarget != nil },
+                set: { if !$0 { sectionDeleteTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let section = sectionDeleteTarget {
+                Button("删除", role: .destructive) {
+                    Task { await deleteAgentSidebarSection(section) }
+                }
+            }
+            Button("取消", role: .cancel) { sectionDeleteTarget = nil }
+        } message: {
+            Text("其中的 Bots 会移到“未分组”，不会删除任何 Bot。")
         }
         .sheet(item: $asyncTasksTarget) { agent in
             NavigationStack {
@@ -289,9 +335,7 @@ internal struct GrokMobileShell: View {
         home
             .task { await loadBots() }
             .task(id: mobileAccountScopeKey) {
-                agentSidebarSections = MobileAgentSidebarSections.load(
-                    accountScopeKey: mobileAccountScopeKey
-                )
+                await loadAgentSidebarSections()
                 await loadPinnedBotIds()
             }
             .task { await messaging.refresh() }

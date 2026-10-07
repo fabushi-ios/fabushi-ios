@@ -90,7 +90,10 @@ extension GrokMobileShell {
                                 ForEach(agentSidebarSections) { section in
                                     let sectionBots = filteredBots.filter { section.agentIds.contains($0.id) }
                                     if !sectionBots.isEmpty {
-                                        sectionTitle("\(section.name)  \(sectionBots.count)")
+                                        agentSidebarSectionHeader(
+                                            section,
+                                            count: sectionBots.count
+                                        )
                                         ForEach(sectionBots) { bot in
                                             botRow(
                                                 bot,
@@ -202,6 +205,53 @@ extension GrokMobileShell {
         Text(text).font(.system(size: 16)).foregroundStyle(Color.black.opacity(0.42)).padding(.horizontal, 18).padding(.top, 13).padding(.bottom, 7)
     }
 
+    func agentSidebarSectionHeader(
+        _ section: MobileAgentSidebarSection,
+        count: Int
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text("\(section.name)  \(count)")
+                .font(.system(size: 16))
+                .foregroundStyle(Color.black.opacity(0.42))
+            Spacer()
+            Menu {
+                Button {
+                    sectionRenameDraft = section.name
+                    sectionRenameTarget = section
+                } label: {
+                    Label("重命名分组", systemImage: "pencil")
+                }
+                Button {
+                    Task { await moveAgentSidebarSection(section, offset: -1) }
+                } label: {
+                    Label("上移分组", systemImage: "arrow.up")
+                }
+                .disabled(agentSidebarSections.first?.id == section.id)
+                Button {
+                    Task { await moveAgentSidebarSection(section, offset: 1) }
+                } label: {
+                    Label("下移分组", systemImage: "arrow.down")
+                }
+                .disabled(agentSidebarSections.last?.id == section.id)
+                Divider()
+                Button(role: .destructive) {
+                    sectionDeleteTarget = section
+                } label: {
+                    Label("删除分组", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+            }
+            .accessibilityIdentifier("agent-section-actions-\(section.id)")
+        }
+        .padding(.leading, 18)
+        .padding(.trailing, 10)
+        .padding(.top, 13)
+        .padding(.bottom, 7)
+    }
+
     func botRow(_ bot: MobileBotSummary, subtitle: String, badge: String) -> some View {
         HStack(spacing: 0) {
             Button {
@@ -241,13 +291,13 @@ extension GrokMobileShell {
                     ) {
                         Menu {
                             Button {
-                                assignBot(bot, toSection: nil)
+                                Task { await assignBot(bot, toSection: nil) }
                             } label: {
                                 Label("未分组", systemImage: "tray")
                             }
                             ForEach(agentSidebarSections) { section in
                                 Button {
-                                    assignBot(bot, toSection: section.id)
+                                    Task { await assignBot(bot, toSection: section.id) }
                                 } label: {
                                     Label(section.name, systemImage: "folder")
                                 }

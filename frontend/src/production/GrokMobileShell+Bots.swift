@@ -235,16 +235,83 @@ extension GrokMobileShell {
     }
 
     @MainActor
-    func assignBot(_ bot: MobileBotSummary, toSection sectionId: String?) {
-        agentSidebarSections = MobileAgentSidebarSections.assigning(
+    func loadAgentSidebarSections() async {
+        agentSidebarSections = []
+        let fallback = MobileAgentSidebarSections.loadFallback(
+            accountScopeKey: mobileAccountScopeKey
+        )
+        agentSidebarSections = fallback
+        do {
+            let result = try await bridge.request(method: "getHostSidebarSections")
+            try Task.checkCancellation()
+            guard let authoritative = MobileAgentSidebarSections.canonical(from: result.value) else {
+                throw NSError(
+                    domain: "Fabushi.MobileAgentSidebarSections",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Host 返回了无效的分组状态"]
+                )
+            }
+            agentSidebarSections = authoritative
+            MobileAgentSidebarSections.persistFallback(
+                authoritative,
+                accountScopeKey: mobileAccountScopeKey
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            // Account-scoped durable fallback remains visible until Host reconnect.
+        }
+    }
+
+    @MainActor
+    func applyAgentSidebarSections(
+        _ proposed: [MobileAgentSidebarSection]
+    ) async -> Bool {
+        guard !botActionBusy else { return false }
+        let previous = agentSidebarSections
+        let normalized = MobileAgentSidebarSections.normalized(proposed)
+        agentSidebarSections = normalized
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+        do {
+            let result = try await bridge.request(
+                method: "setHostSidebarSections",
+                params: ["sections": MobileAgentSidebarSections.foundationValue(normalized)]
+            )
+            try Task.checkCancellation()
+            guard let authoritative = MobileAgentSidebarSections.canonical(from: result.value) else {
+                throw NSError(
+                    domain: "Fabushi.MobileAgentSidebarSections",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Host 返回了无效的分组状态"]
+                )
+            }
+            agentSidebarSections = authoritative
+            MobileAgentSidebarSections.persistFallback(
+                authoritative,
+                accountScopeKey: mobileAccountScopeKey
+            )
+            return true
+        } catch is CancellationError {
+            agentSidebarSections = previous
+            return false
+        } catch {
+            agentSidebarSections = previous
+            botActionError = "更新分组失败：\(error.localizedDescription)"
+            Task { await loadAgentSidebarSections() }
+            return false
+        }
+    }
+
+    @MainActor
+    func assignBot(_ bot: MobileBotSummary, toSection sectionId: String?) async {
+        let next = MobileAgentSidebarSections.assigning(
             agentId: bot.id,
             to: sectionId,
             in: agentSidebarSections
         )
-        MobileAgentSidebarSections.persist(
-            agentSidebarSections,
-            accountScopeKey: mobileAccountScopeKey
-        )
+        _ = await applyAgentSidebarSections(next)
     }
 
     @MainActor
@@ -254,19 +321,58 @@ extension GrokMobileShell {
     }
 
     @MainActor
-    func createAgentSidebarSection(for bot: MobileBotSummary) {
+    func createAgentSidebarSection(for bot: MobileBotSummary) async {
         guard let next = MobileAgentSidebarSections.creating(
             name: newSectionName,
             with: bot.id,
             in: agentSidebarSections
         ) else { return }
-        agentSidebarSections = next
-        MobileAgentSidebarSections.persist(
-            next,
-            accountScopeKey: mobileAccountScopeKey
+        if await applyAgentSidebarSections(next) {
+            newSectionBot = nil
+            newSectionName = ""
+        }
+    }
+
+    @MainActor
+    func commitAgentSidebarSectionRename(
+        _ section: MobileAgentSidebarSection
+    ) async {
+        guard let next = MobileAgentSidebarSections.renamed(
+            agentSidebarSections,
+            sectionId: section.id,
+            name: sectionRenameDraft
+        ) else { return }
+        if await applyAgentSidebarSections(next) {
+            sectionRenameTarget = nil
+            sectionRenameDraft = ""
+        }
+    }
+
+    @MainActor
+    func deleteAgentSidebarSection(
+        _ section: MobileAgentSidebarSection
+    ) async {
+        let next = MobileAgentSidebarSections.removing(
+            agentSidebarSections,
+            sectionId: section.id
         )
-        newSectionBot = nil
-        newSectionName = ""
+        if await applyAgentSidebarSections(next) {
+            sectionDeleteTarget = nil
+        }
+    }
+
+    @MainActor
+    func moveAgentSidebarSection(
+        _ section: MobileAgentSidebarSection,
+        offset: Int
+    ) async {
+        let next = MobileAgentSidebarSections.moving(
+            agentSidebarSections,
+            sectionId: section.id,
+            offset: offset
+        )
+        guard next != agentSidebarSections else { return }
+        _ = await applyAgentSidebarSections(next)
     }
 
     @MainActor
