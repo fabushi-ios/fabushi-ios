@@ -5,6 +5,13 @@ internal func committedMobileBotName(initialValue: String, draftValue: String) -
     return trimmed.isEmpty || trimmed == initialValue ? nil : trimmed
 }
 
+internal func mobileBotDeleteDescription(_ bot: MobileBotSummary) -> String {
+    if bot.isGroup {
+        return "这会永久删除该群组及其聊天记录。群组中的 Bots 不会被删除，仍可单独使用。此操作无法撤销。"
+    }
+    return "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
+}
+
 extension GrokMobileShell {
     @MainActor
     func loadBots() async {
