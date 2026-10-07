@@ -40,7 +40,8 @@ struct GrokMobileBotService {
     func loadCanonicalRoster() async throws -> [MobileBotSummary] {
         async let individuals = loadIndividualBotsStrict()
         async let groups = loadGroupsStrict()
-        let surface = try await individuals + groups
+        let (individualBots, groupBots) = try await (individuals, groups)
+        let surface = individualBots + groupBots
         let installed = (try? await GlobalDharmaMiniAppBridge(bridge: bridge).installedMiniAppBots()) ?? []
         let installedBots = installed.map {
             MobileBotSummary(
