@@ -340,7 +340,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             resolveGhostMode: { _ in "true" }
         )
         let url = backendURL
-            .appendingPathComponent("aiserver.v1.DashboardService")
+            .appendingPathComponent("aiserver.v1.\(service)")
             .appendingPathComponent(method)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -374,6 +374,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
 
     private func protoRPC(
         _ method: String,
+        service: String = "DashboardService",
         body: Data,
         timeoutMs: Int
     ) async throws -> Data {
@@ -412,6 +413,19 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             )
         }
         return data
+    }
+
+    func getBackgroundComposerInfo(
+        bcId: String,
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCloudAgentComposerInfo {
+        let response = try await protoRPC(
+            "GetBackgroundComposerInfo",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.getBackgroundComposerInfoRequest(bcId: bcId),
+            timeoutMs: timeoutMs
+        )
+        return try IOSCursorDashboardProto.decodeBackgroundComposerInfo(response)
     }
 
     func getSkillPublishTeams(timeoutMs: Int = 10_000) async throws -> [IOSCursorSkillPublishTeam] {
