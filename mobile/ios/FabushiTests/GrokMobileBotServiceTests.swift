@@ -54,6 +54,26 @@ final class GrokMobileBotServiceTests: XCTestCase {
         XCTAssertNil(GrokMobileBotService.parseBot(["name": "Missing id"]))
     }
     @MainActor
+    func testDeleteConfirmationCopyDistinguishesBotAndGroupDestruction() {
+        let bot = MobileBotSummary(id: "bot-1", name: "Research", description: "")
+        let group = MobileBotSummary(
+            id: "group-1",
+            name: "Study Group",
+            description: "",
+            isGroup: true,
+            memberIds: ["bot-1"]
+        )
+
+        XCTAssertEqual(
+            mobileBotDeleteDescription(bot),
+            "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
+        )
+        XCTAssertEqual(
+            mobileBotDeleteDescription(group),
+            "这会永久删除该群组及其聊天记录。群组中的 Bots 不会被删除，仍可单独使用。此操作无法撤销。"
+        )
+    }
+
     func testCommittedMobileBotNameMatchesDesktopRenameRule() {
         XCTAssertNil(committedMobileBotName(initialValue: "Research", draftValue: " Research "))
         XCTAssertNil(committedMobileBotName(initialValue: "Research", draftValue: "   "))
