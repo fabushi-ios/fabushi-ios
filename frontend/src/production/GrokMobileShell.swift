@@ -23,6 +23,10 @@ internal struct GrokMobileShell: View {
     @State var botActionBusy = false
     @State var botActionError: String?
     @State var bots: [MobileBotSummary] = []
+    @State var accessRosterSnapshot = AccessRosterSnapshot.initial
+    @State var accessCoverFirstBox = FirstBoxGateState.initial
+    @State var accessCoverAccess = AccessCoverSandAccess.checking
+    @State var accessRosterGeneration = 0
     @State var pinnedBotIdOrder: [String] = []
     @State var asyncTasksTarget: MobileBotSummary?
     @State var asyncTasks: [MobileAgentAsyncTask] = []
@@ -234,6 +238,19 @@ internal struct GrokMobileShell: View {
         ].joined(separator: ":")
     }
 
+    var accessRosterTaskKey: String {
+        "\(mobileAccountScopeKey):\(reconnectGeneration)"
+    }
+
+    var accessCoverComposition: AccessCoverCompositionState {
+        AccessCoverComposition.project(
+            access: accessCoverAccess,
+            roster: accessRosterSnapshot,
+            firstBox: accessCoverFirstBox,
+            isComputerRebuildLocked: remoteComputerAgentTarget != nil
+        )
+    }
+
     @MainActor
     func applyBotRosterUpdate(_ updated: [MobileBotSummary]) {
         bots = updated
@@ -333,7 +350,7 @@ internal struct GrokMobileShell: View {
 
     private var homeContent: some View {
         home
-            .task { await loadBots() }
+            .task(id: accessRosterTaskKey) { await refreshAccessRoster() }
             .task(id: mobileAccountScopeKey) {
                 await loadAgentSidebarSections()
                 await loadPinnedBotIds()
