@@ -99,6 +99,7 @@ internal struct MobileBotChat: View {
     @State private var activeOperationId: String?
     @State private var errorText: String?
     @State private var openedMiniApp = false
+    @State private var asyncTasksPresented = false
     @State private var replyTargetId: String?
     @State private var replyIsFork = false
     @State private var voiceRecorder = VoiceRecorder()
@@ -123,6 +124,14 @@ internal struct MobileBotChat: View {
         .onDisappear { cancelVoiceInput() }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
+        }
+        .sheet(isPresented: $asyncTasksPresented) {
+            MobileAsyncTasksPanel(
+                agentId: bot.id,
+                agentName: bot.name,
+                bridge: bridge,
+                onClose: { asyncTasksPresented = false }
+            )
         }
     }
 
@@ -149,10 +158,17 @@ internal struct MobileBotChat: View {
             .accessibilityLabel("Bot settings")
             .accessibilityIdentifier("mobile-bot-settings")
             Spacer()
-            Image(systemName: "desktopcomputer")
-                .font(.system(size: 16, weight: .medium))
-                .frame(width: 38, height: 38)
-                .background(Color.black.opacity(0.045), in: Circle())
+            Button {
+                asyncTasksPresented = true
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 38, height: 38)
+                    .background(Color.black.opacity(0.045), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Async tasks")
+            .accessibilityIdentifier("mobile-bot-async-tasks")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .background(Color.white.opacity(0.97))
@@ -396,6 +412,7 @@ internal struct MobileBotChat: View {
             .init(agentId: "mobile-bot-chat", role: "application", name: "Bot \(String(bot.name.prefix(160)))"),
             .init(agentId: "mobile-bot-close", role: "button", name: "关闭 Bot 对话"),
             .init(agentId: "mobile-bot-settings", role: "button", name: "Bot 设置"),
+            .init(agentId: "mobile-bot-async-tasks", role: "button", name: "Async tasks"),
             .init(agentId: "mobile-bot-draft", role: "textbox", name: "Bot 消息"),
         ]
         let sendId = busy ? "mobile-bot-stop" : "mobile-bot-send"
@@ -437,6 +454,7 @@ internal struct MobileBotChat: View {
         var actions: [String: FabushiAppAgentSurface.Action] = [
             "mobile-bot-close": .init(allowed: ["invoke"]) { _ in onClose() },
             "mobile-bot-settings": .init(allowed: ["invoke"]) { _ in onOpenSettings() },
+            "mobile-bot-async-tasks": .init(allowed: ["invoke"]) { _ in asyncTasksPresented = true },
             "mobile-bot-draft": .init(allowed: ["setValue"]) { value in draft = value ?? "" },
         ]
         actions[sendId] = .init(allowed: ["invoke"]) { _ in
