@@ -97,8 +97,7 @@ internal struct MobileAsyncTasksPanel: View {
                     }
                 }
             }
-            .navigationTitle("Async tasks")
-            .navigationSubtitle(agentName)
+            .navigationTitle("Async tasks · \(agentName)")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close", action: onClose)
