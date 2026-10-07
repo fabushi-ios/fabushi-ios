@@ -3415,7 +3415,7 @@ mod tests {
             events: SharedModelEventSink,
         ) -> Result<(), ModelError> {
             self.calls.fetch_add(1, AtomicOrdering::SeqCst);
-            self.entered.notify_waiters();
+            self.entered.notify_one();
             self.release.notified().await;
             events.emit(ModelEvent::Completed {
                 output: self.output.clone(),
@@ -4430,7 +4430,7 @@ mod tests {
                         session_id: run_session,
                         operation_id: run_operation,
                         input: "continue durable work".into(),
-                        policy: ExecutionPolicy::background_default(),
+                        policy: ExecutionPolicy::mobile_default(),
                         required_capabilities: CapabilitySet::new([Capability::Model]),
                         metadata: json!({"conversationId": conversation_id, "hidden": true}),
                     },
@@ -4498,7 +4498,7 @@ mod tests {
                 ResumeOperationRequest {
                     session_id: restored_session,
                     operation_id: operation_id.clone(),
-                    policy: ExecutionPolicy::background_default(),
+                    policy: ExecutionPolicy::mobile_default(),
                     required_capabilities: CapabilitySet::new([Capability::Model]),
                     metadata: json!({"resumedBy": "test"}),
                 },
