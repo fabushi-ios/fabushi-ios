@@ -210,6 +210,36 @@ final class CoordinatorContractTests: XCTestCase {
     }
 
     @MainActor
+    func testIOSCoordinatorRestartReplacesPortAndFencesStaleGeneration() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let main = try IOSMainRuntime(
+            appDataDirectory: directory,
+            featureHostTest: true
+        )
+        let runtime = IOSCoordinatorRuntime(main: main)
+        let first = runtime.start()
+
+        XCTAssertEqual(runtime.state, .running(generation: 1))
+        XCTAssertTrue(runtime.accepts(generation: 1))
+
+        runtime.restart()
+        let second = runtime.start()
+
+        XCTAssertFalse(first === second)
+        XCTAssertTrue(first.clientPort.isClosed)
+        XCTAssertEqual(runtime.state, .running(generation: 2))
+        XCTAssertFalse(runtime.accepts(generation: 1))
+        XCTAssertTrue(runtime.accepts(generation: 2))
+
+        runtime.dispose()
+        XCTAssertEqual(runtime.state, .disposed)
+        XCTAssertTrue(second.clientPort.isClosed)
+    }
+
+    @MainActor
     func testIOSPreloadPortClientUsesRendererCoordinatorBoundary() async throws {
         let pair = InProcessCoordinatorPort.makePair(bootstrap: try validatedTestCoordinatorBootstrap())
         let server = RendererPortServer(port: pair.server) { method, args in
