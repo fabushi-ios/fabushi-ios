@@ -956,13 +956,13 @@
       "desktop_owner": "renderer account/session menu over canonical account bridge",
       "desktop_visible_effect": "Users can inspect and manage account identity, usage, navigation/help surfaces and safe login/logout from one menu.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/account/session/menu.view.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
+      "ios_target_path": "frontend/src/recovered/features/account/session/menu.view.swift",
       "ios_language": "SwiftUI/Swift",
       "ios_platform_delta": "Native List and Settings sheets reuse the canonical IOSPreloadBridge instead of creating a second account owner. Missing display-name editing now normalizes Desktop-style whitespace, enforces the 200-character bound and calls updateCursorAccountName; Help uses the canonical openExternal route for https://cursor.com/help; Feedback uses the canonical submitFeedback route with a bounded 10,000-character message, stable account slot and UUID submission id; Settings presents account identity, usage, support and About in one native surface. Desktop's 'Get iOS' route is self-referential on iOS and is replaced by the installed Fabushi iOS app plus App Store install/update lifecycle.",
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/account/session/menu.view.swift; mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; source/ios-preload/preload.swift; source/ios-preload/main-rpc-runtime.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccountSessionFrontendParityTests.swift; fresh exact-head ordinary/protected GitHub Actions and applicable bridge/UI evidence are required before verified promotion.",
-      "notes": "Deterministic account-menu responsibility implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The Desktop iOS-download action is platform-self-referential on iOS and therefore has an explicit native replacement disposition rather than a duplicate download button. Keep implemented until this exact iOS HEAD passes its own acceptance and the menu bridge/UI behaviors are evidenced."
+      "notes": "Deterministic account-menu responsibility implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. menu.view.swift is the single canonical native presentation owner; MarketplaceModel/HomeAuth/preload paths are wiring evidence only. The Desktop iOS-download action is platform-self-referential on iOS and therefore has an explicit native replacement disposition rather than a duplicate download button. Keep implemented until this exact iOS HEAD passes its own acceptance and the menu bridge/UI behaviors are evidenced."
     },
     {
       "desktop_path": "frontend/src/recovered/features/account/session/sign-in-status.tsx",
