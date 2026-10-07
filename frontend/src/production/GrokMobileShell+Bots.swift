@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 internal func committedMobileBotName(initialValue: String, draftValue: String) -> String? {
@@ -121,11 +122,85 @@ extension GrokMobileShell {
         do {
             bots = try await GrokMobileBotService(bridge: bridge).deleteBot(id: bot.id)
             botDeleteTarget = nil
+            var pinned = pinnedBotIds
+            pinned.remove(bot.id)
+            persistPinnedBotIds(pinned)
             await messaging.refresh()
         } catch {
             botActionError = bot.isGroup
                 ? "删除群组失败：\(error.localizedDescription)"
                 : "删除 Bot 失败：\(error.localizedDescription)"
+        }
+    }
+
+    var pinnedBotIds: Set<String> {
+        guard let data = pinnedBotIdsStorage.data(using: .utf8),
+              let values = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return Set(values)
+    }
+
+    @MainActor
+    func toggleBotPin(_ bot: MobileBotSummary) {
+        var pinned = pinnedBotIds
+        if pinned.contains(bot.id) {
+            pinned.remove(bot.id)
+        } else {
+            pinned.insert(bot.id)
+        }
+        persistPinnedBotIds(pinned)
+    }
+
+    @MainActor
+    func persistPinnedBotIds(_ ids: Set<String>) {
+        let ordered = ids.sorted()
+        guard let data = try? JSONEncoder().encode(ordered),
+              let value = String(data: data, encoding: .utf8)
+        else { return }
+        pinnedBotIdsStorage = value
+    }
+
+    @MainActor
+    func setBotUnread(_ bot: MobileBotSummary, unread: Bool) async {
+        guard !bot.isGroup, bot.miniAppId == nil, !botActionBusy else { return }
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+        do {
+            bots = try await GrokMobileBotService(bridge: bridge)
+                .setBotUnread(id: bot.id, unread: unread)
+        } catch {
+            botActionError = "更新未读状态失败：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    func hideBot(_ bot: MobileBotSummary) async {
+        guard !bot.isGroup, bot.miniAppId == nil, !botActionBusy else { return }
+        botActionBusy = true
+        botActionError = nil
+        defer { botActionBusy = false }
+        do {
+            bots = try await GrokMobileBotService(bridge: bridge)
+                .setBotHidden(id: bot.id, hidden: true)
+        } catch {
+            botActionError = "隐藏 Bot 失败：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    func showAsyncTasks(_ bot: MobileBotSummary) async {
+        guard !bot.isGroup, bot.miniAppId == nil else { return }
+        asyncTasksTarget = bot
+        asyncTasks = []
+        asyncTasksError = nil
+        asyncTasksBusy = true
+        defer { asyncTasksBusy = false }
+        do {
+            asyncTasks = try await GrokMobileBotService(bridge: bridge)
+                .asyncTasks(agentId: bot.id)
+        } catch {
+            asyncTasksError = "加载异步任务失败：\(error.localizedDescription)"
         }
     }
 }
