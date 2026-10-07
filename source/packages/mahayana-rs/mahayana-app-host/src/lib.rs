@@ -240,6 +240,14 @@ impl AppHost {
                 .map_err(|error| AppHostError::Operation(error.to_string())),
             method if method.starts_with("sharing.") => self.handle_sharing(method, params),
             "getLinkMetadata" => self.get_link_metadata(params),
+            "reactToMessage" => self
+                .feature
+                .react_to_message(
+                    string_param(&params, "agentId")?,
+                    string_param(&params, "entryId")?,
+                    string_param(&params, "emoji")?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "getAsyncTasks" => {
                 let agent_id = string_param(&params, "id")?;
                 let tasks = self
