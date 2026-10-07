@@ -924,6 +924,7 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("消息") { destination = .home }
+                        .accessibilityIdentifier("marketplace-back")
                 }
             }
             .refreshable {
