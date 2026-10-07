@@ -144,3 +144,49 @@ final class CoordinatorSkillPublishTargetProjectionTests: XCTestCase {
         )
     }
 }
+
+
+final class CoordinatorSkillPublishAuthoritativeProjectionTests: XCTestCase {
+    func testAuthoritativeProjectionRequiresExactCommitAndPreservesPublisherTeamFacts() {
+        let plugins = [
+            EffectiveUserPlugin(
+                pluginId: "41",
+                name: "release-check",
+                displayName: "Release check",
+                installMode: .user,
+                isEnabled: true,
+                versionRef: "abcdef0123456789abcdef0123456789abcdef01",
+                publisherUserId: 99,
+                marketplaceTeamId: 7
+            ),
+            EffectiveUserPlugin(
+                pluginId: "42",
+                name: "branch-ref",
+                displayName: "Branch ref",
+                installMode: .user,
+                isEnabled: true,
+                versionRef: "main",
+                publisherUserId: 99,
+                marketplaceTeamId: 7
+            ),
+        ]
+        let rows = projectAuthoritativePublishedPlugins(plugins, currentUserId: 99)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows[0]["pluginId"] as? String, "41")
+        XCTAssertEqual(
+            rows[0]["pluginVersion"] as? String,
+            "abcdef0123456789abcdef0123456789abcdef01"
+        )
+        XCTAssertEqual(rows[0]["publishedByCurrentUser"] as? Bool, true)
+        XCTAssertEqual((rows[0]["marketplaceTeamId"] as? NSNumber)?.intValue, 7)
+    }
+
+    func testVersionNormalizerRejectsNonAuthoritativeRefs() {
+        XCTAssertNil(normalizedSkillPublishVersion("main"))
+        XCTAssertNil(normalizedSkillPublishVersion("abc123"))
+        XCTAssertEqual(
+            normalizedSkillPublishVersion("ABCDEF0123456789ABCDEF0123456789ABCDEF01"),
+            "abcdef0123456789abcdef0123456789abcdef01"
+        )
+    }
+}

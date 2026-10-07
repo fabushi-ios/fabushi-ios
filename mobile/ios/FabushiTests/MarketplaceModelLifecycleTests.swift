@@ -102,6 +102,25 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         ]))
     }
 
+    @MainActor
+    func testPublishedCurrentUserPluginProjectsIntoYoursAsReadOnlyLifecycleItem() throws {
+        let skill = try XCTUnwrap(MarketplaceModel.marketplacePrivateSkill(from: [
+            "id": "plugin-91-release-check",
+            "name": "Release check",
+            "description": "Verify release evidence",
+            "body": "Inspect production evidence.",
+            "source": "plugin",
+            "pluginId": "91",
+            "publishedByCurrentUser": true,
+            "isEnabledForAgent": true,
+        ]))
+        XCTAssertEqual(skill.pluginId, "91")
+        XCTAssertTrue(skill.publishedByCurrentUser)
+        XCTAssertFalse(skill.canEdit)
+        XCTAssertFalse(skill.canToggle)
+        XCTAssertEqual(skill.sourceLabel, "Shared with your team")
+    }
+
     func testPrivateSkillOwnershipAndSearchFilteringMatchDesktopYoursSemantics() {
         let privateSkill = MarketplacePrivateSkill(
             id: "private",

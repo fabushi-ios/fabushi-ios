@@ -520,6 +520,43 @@ extension ContentView {
                         .pickerStyle(.segmented)
                         .accessibilityIdentifier("plugin-yours-ownership-filter")
 
+                        if model.hasPrivateSkillAgentScope {
+                            HStack(spacing: 8) {
+                                if model.skillPublishTargetsLoading {
+                                    ProgressView()
+                                }
+                                if !model.skillPublishTargets.isEmpty {
+                                    Picker(
+                                        "发布到",
+                                        selection: Binding(
+                                            get: {
+                                                model.selectedSkillPublishTeamId
+                                                    ?? model.skillPublishTargets.first?.teamId
+                                                    ?? 0
+                                            },
+                                            set: { model.selectedSkillPublishTeamId = $0 }
+                                        )
+                                    ) {
+                                        ForEach(model.skillPublishTargets) { target in
+                                            Text(target.name).tag(target.teamId)
+                                        }
+                                    }
+                                    .accessibilityIdentifier("plugin-yours-publish-target")
+                                }
+                                Spacer()
+                                Button(
+                                    model.skillPublishTargets.isEmpty ? "加载发布团队" : "刷新发布团队"
+                                ) {
+                                    Task { await model.refreshSkillPublishTargets() }
+                                }
+                                .disabled(
+                                    model.skillPublishTargetsLoading
+                                        || model.privateSkillPublishingId != nil
+                                )
+                                .accessibilityIdentifier("plugin-yours-publish-target-refresh")
+                            }
+                        }
+
                         if model.privateSkillsLoading {
                             ProgressView("正在读取 authoritative workflow state…")
                         }
@@ -571,15 +608,51 @@ extension ContentView {
                                             Button("保存") {
                                                 Task { await model.savePrivateSkill(skill) }
                                             }
-                                            .disabled(model.privateSkillMutatingId != nil)
+                                            .disabled(
+                                                model.privateSkillMutatingId != nil
+                                                    || model.privateSkillPublishingId != nil
+                                            )
                                             .accessibilityIdentifier("plugin-skill-save-\(skill.id)")
+
+                                            Button("发布到团队") {
+                                                Task { await model.publishPrivateSkill(skill) }
+                                            }
+                                            .disabled(
+                                                model.privateSkillMutatingId != nil
+                                                    || model.privateSkillPublishingId != nil
+                                            )
+                                            .accessibilityIdentifier("plugin-skill-publish-\(skill.id)")
 
                                             Button("删除", role: .destructive) {
                                                 Task { await model.deletePrivateSkill(skill) }
                                             }
-                                            .disabled(model.privateSkillMutatingId != nil)
+                                            .disabled(
+                                                model.privateSkillMutatingId != nil
+                                                    || model.privateSkillPublishingId != nil
+                                            )
                                             .accessibilityIdentifier("plugin-skill-delete-\(skill.id)")
                                         }
+                                    }
+
+                                    if skill.source == "plugin", skill.publishedByCurrentUser {
+                                        HStack(spacing: 8) {
+                                            Button("同步更新") {
+                                                Task { await model.resyncPublishedSkill(skill) }
+                                            }
+                                            .disabled(model.privateSkillPublishingId != nil)
+                                            .accessibilityIdentifier("plugin-skill-sync-\(skill.id)")
+
+                                            Button("取消发布", role: .destructive) {
+                                                Task { await model.unpublishPublishedSkill(skill) }
+                                            }
+                                            .disabled(model.privateSkillPublishingId != nil)
+                                            .accessibilityIdentifier("plugin-skill-unpublish-\(skill.id)")
+                                        }
+                                    }
+
+                                    if model.privateSkillPublishingId == skill.id {
+                                        ProgressView("正在核对 authoritative 发布状态…")
+                                            .font(.caption)
                                     }
 
                                     if skill.source == "plugin", let pluginId = skill.pluginId {
@@ -621,9 +694,10 @@ extension ContentView {
                             .accessibilityIdentifier("plugin-skill-\(skill.id)")
                         }
 
-                        Text("Publish / Sync / Unpublish 仍需接入 Desktop 等价的团队发布 owner；在该 production contract 闭合前不会把这部分标记为完成。")
+                        Text("Publish / Sync / Unpublish 由 Host-owned lifecycle 管理：发布只有在 authoritative pluginId + commit SHA 确认后才移除 private copy；取消发布会先恢复 private copy，再执行远端 unpublish。")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("plugin-yours-publish-lifecycle-note")
                         }
                     }
 

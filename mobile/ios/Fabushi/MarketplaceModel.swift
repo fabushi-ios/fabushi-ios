@@ -703,6 +703,12 @@ enum MarketplaceSkillOwnershipFilter: String, CaseIterable, Identifiable, Sendab
     var id: String { rawValue }
 }
 
+struct MarketplaceSkillPublishTarget: Identifiable, Equatable, Sendable {
+    let teamId: Int
+    let name: String
+    var id: Int { teamId }
+}
+
 struct MarketplacePrivateSkill: Identifiable {
     let id: String
     let name: String
@@ -788,7 +794,11 @@ final class MarketplaceModel {
     var privateSkills: [MarketplacePrivateSkill] = []
     var privateSkillsLoading = false
     var privateSkillMutatingId: String?
+    var privateSkillPublishingId: String?
     var privateSkillError: String?
+    var skillPublishTargets: [MarketplaceSkillPublishTarget] = []
+    var selectedSkillPublishTeamId: Int?
+    var skillPublishTargetsLoading = false
     var privateSkillNameDrafts: [String: String] = [:]
     var privateSkillDescriptionDrafts: [String: String] = [:]
     var privateSkillBodyDrafts: [String: String] = [:]
@@ -2321,7 +2331,11 @@ final class MarketplaceModel {
         privateSkills = []
         privateSkillsLoading = false
         privateSkillMutatingId = nil
+        privateSkillPublishingId = nil
         privateSkillError = nil
+        skillPublishTargets = []
+        selectedSkillPublishTeamId = nil
+        skillPublishTargetsLoading = false
         privateSkillNameDrafts = [:]
         privateSkillDescriptionDrafts = [:]
         privateSkillBodyDrafts = [:]
@@ -2340,6 +2354,13 @@ final class MarketplaceModel {
         let serial = privateSkillRequestSerial
         let scopeGeneration = privateSkillScopeGeneration
         do {
+            // Refresh the external installed-plugin projection first. This is
+            // best-effort so private workflows remain available when Cursor
+            // publishing auth is not connected.
+            _ = try? await bridge.request(
+                method: "coordinator.skill.pluginFactsSync",
+                params: ["agentId": agentId]
+            )
             _ = try await executeFeatureCommand(
                 type: "workflow.list",
                 requestId: "ios-plugin-skills-list-\(UUID().uuidString.lowercased())",
@@ -2386,6 +2407,132 @@ final class MarketplaceModel {
            scopeGeneration == privateSkillScopeGeneration,
            privateSkillAgentId == agentId {
             privateSkillsLoading = false
+        }
+    }
+
+    func refreshSkillPublishTargets() async {
+        guard !skillPublishTargetsLoading else { return }
+        skillPublishTargetsLoading = true
+        privateSkillError = nil
+        defer { skillPublishTargetsLoading = false }
+        do {
+            let response = try await bridge.request(method: "coordinator.skill.publishTargets")
+            guard let object = response.value as? [String: Any],
+                  let rows = object["teams"] as? [[String: Any]]
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            let targets = rows.compactMap { row -> MarketplaceSkillPublishTarget? in
+                guard let number = row["teamId"] as? NSNumber,
+                      number.intValue > 0,
+                      let rawName = row["name"] as? String
+                else { return nil }
+                let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty else { return nil }
+                return .init(teamId: number.intValue, name: name)
+            }
+            skillPublishTargets = targets
+            if let selectedSkillPublishTeamId,
+               targets.contains(where: { $0.teamId == selectedSkillPublishTeamId }) {
+                return
+            }
+            selectedSkillPublishTeamId = targets.first?.teamId
+        } catch {
+            privateSkillError = error.localizedDescription
+        }
+    }
+
+    func publishPrivateSkill(_ skill: MarketplacePrivateSkill) async {
+        guard skill.source == "workflow",
+              privateSkillPublishingId == nil,
+              privateSkillMutatingId == nil,
+              let agentId = privateSkillAgentId,
+              !agentId.isEmpty
+        else { return }
+        if skillPublishTargets.isEmpty {
+            await refreshSkillPublishTargets()
+        }
+        guard let teamId = selectedSkillPublishTeamId else {
+            privateSkillError = "没有可发布的团队目标。请确认 Cursor 账号属于至少一个可发布团队。"
+            return
+        }
+        await runSkillPublishLifecycle(
+            skillId: skill.id,
+            method: "coordinator.skill.publish",
+            params: [
+                "agentId": agentId,
+                "workflowId": skill.id,
+                "teamId": NSNumber(value: teamId),
+            ],
+            requireConfirmed: true
+        )
+    }
+
+    func resyncPublishedSkill(_ skill: MarketplacePrivateSkill) async {
+        guard skill.source == "plugin",
+              skill.publishedByCurrentUser,
+              privateSkillPublishingId == nil,
+              let agentId = privateSkillAgentId,
+              !agentId.isEmpty
+        else { return }
+        await runSkillPublishLifecycle(
+            skillId: skill.id,
+            method: "coordinator.skill.resync",
+            params: ["agentId": agentId, "workflowId": skill.id],
+            requireConfirmed: true
+        )
+    }
+
+    func unpublishPublishedSkill(_ skill: MarketplacePrivateSkill) async {
+        guard skill.source == "plugin",
+              skill.publishedByCurrentUser,
+              privateSkillPublishingId == nil,
+              let agentId = privateSkillAgentId,
+              !agentId.isEmpty
+        else { return }
+        await runSkillPublishLifecycle(
+            skillId: skill.id,
+            method: "coordinator.skill.unpublish",
+            params: ["agentId": agentId, "workflowId": skill.id],
+            requireConfirmed: false
+        )
+    }
+
+    private func runSkillPublishLifecycle(
+        skillId: String,
+        method: String,
+        params: [String: Any],
+        requireConfirmed: Bool
+    ) async {
+        guard let agentId = privateSkillAgentId else { return }
+        let scopeGeneration = privateSkillScopeGeneration
+        privateSkillPublishingId = skillId
+        privateSkillError = nil
+        defer {
+            if privateSkillPublishingId == skillId,
+               scopeGeneration == privateSkillScopeGeneration,
+               privateSkillAgentId == agentId {
+                privateSkillPublishingId = nil
+            }
+        }
+        do {
+            let response = try await bridge.request(method: method, params: params)
+            guard scopeGeneration == privateSkillScopeGeneration,
+                  privateSkillAgentId == agentId,
+                  let object = response.value as? [String: Any]
+            else { return }
+            if requireConfirmed, object["confirmed"] as? Bool != true {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "发布已上传，但 authoritative plugin state 尚未确认；本地 private copy 已保留。"
+                )
+            }
+            await refreshPrivateSkills()
+        } catch {
+            guard scopeGeneration == privateSkillScopeGeneration,
+                  privateSkillAgentId == agentId
+            else { return }
+            privateSkillError = error.localizedDescription
+            await refreshPrivateSkills()
         }
     }
 
