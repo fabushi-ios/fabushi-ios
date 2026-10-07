@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension GrokMobileShell {
     var home: some View {
@@ -115,8 +116,20 @@ extension GrokMobileShell {
     }
 
     var filteredBots: [MobileBotSummary] {
-        guard !query.isEmpty else { return bots }
-        return bots.filter { $0.name.localizedCaseInsensitiveContains(query) || $0.description.localizedCaseInsensitiveContains(query) }
+        let visible = bots.filter { !$0.hidden }
+        let filtered = query.isEmpty
+            ? visible
+            : visible.filter {
+                $0.name.localizedCaseInsensitiveContains(query)
+                    || $0.description.localizedCaseInsensitiveContains(query)
+            }
+        let pinned = pinnedBotIds
+        return filtered.sorted {
+            let lhsPinned = pinned.contains($0.id)
+            let rhsPinned = pinned.contains($1.id)
+            if lhsPinned != rhsPinned { return lhsPinned }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
     }
 
     var filteredConversations: [ConversationSummary] {
@@ -180,10 +193,48 @@ extension GrokMobileShell {
                         } label: {
                             Label("重命名", systemImage: "pencil")
                         }
+                        if let conversationId = bot.conversationId, !conversationId.isEmpty {
+                            Button {
+                                openLegacyConversation(conversationId)
+                            } label: {
+                                Label("显示完整会话", systemImage: "list.bullet.rectangle")
+                            }
+                            Button {
+                                UIPasteboard.general.string = conversationId
+                            } label: {
+                                Label("复制会话 ID", systemImage: "doc.on.doc")
+                            }
+                        }
+                        Button {
+                            Task { await showAsyncTasks(bot) }
+                        } label: {
+                            Label("异步任务", systemImage: "clock")
+                        }
+                        Button {
+                            toggleBotPin(bot)
+                        } label: {
+                            Label(
+                                pinnedBotIds.contains(bot.id) ? "取消置顶" : "置顶",
+                                systemImage: pinnedBotIds.contains(bot.id) ? "pin.slash" : "pin"
+                            )
+                        }
+                        Button {
+                            Task { await setBotUnread(bot, unread: !bot.unread) }
+                        } label: {
+                            Label(
+                                bot.unread ? "标记已读" : "标记未读",
+                                systemImage: bot.unread ? "envelope.open" : "envelope.badge"
+                            )
+                        }
                         Button {
                             Task { await duplicateBot(bot) }
                         } label: {
-                            Label("复制", systemImage: "doc.on.doc")
+                            Label("复制", systemImage: "square.on.square")
+                        }
+                        Button {
+                            Task { await hideBot(bot) }
+                        } label: {
+                            Label("从首页隐藏", systemImage: "eye.slash")
                         }
                         Divider()
                         Button(role: .destructive) {
