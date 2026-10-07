@@ -4635,6 +4635,175 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn recreate_converts_inflight_tool_to_interrupted_output_without_replay() {
+        let root = std::env::temp_dir().join(format!("mahayana-inflight-tool-recovery-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).expect("create temp root");
+        let base = root.join("session.json");
+        let conversation_id = "mahayana-ai:agent:tool-recovery";
+        let mut config = NativeEngineConfig::embedded("model");
+        config.session_state_path = Some(base.clone());
+        let first = NativeEngine::new(
+            Arc::new(FakeModel { outputs: Mutex::new(VecDeque::new()) }),
+            config.clone(),
+        ).expect("first engine");
+        let session_id = first.open_session(OpenSessionRequest {
+            profile: mahayana_kernel::RuntimeProfile::Headless,
+            workspace_root: None,
+            model: None,
+            metadata: json!({"conversationId": conversation_id}),
+        }).await.expect("open session");
+        let operation_id = OperationId::from_string("recover-inflight-tool");
+        {
+            let session = first.session(&session_id).expect("session");
+            let mut session = session.lock().await;
+            let prompt = PromptEntry {
+                id: "prompt:recover-inflight-tool".into(),
+                text: "continue after interrupted subordinate".into(),
+                priority: PromptPriority::Background,
+                state: mahayana_orchestrator::PromptState::Running,
+                created_at_ms: now_ms(),
+                dedupe_key: None,
+                metadata: json!({"hidden": true}),
+            };
+            session.active_prompt = Some(prompt.clone());
+            session.history.push(json!({
+                "type": "function_call",
+                "call_id": "call-interrupted",
+                "name": "subagent_run",
+                "arguments": "{\"prompt\":\"child work\"}"
+            }));
+            session.inflight_tool = Some(InflightToolCheckpoint {
+                operation_id: operation_id.as_str().to_string(),
+                call_id: "call-interrupted".into(),
+                tool: "subagent_run".into(),
+                arguments: json!({"prompt":"child work"}),
+            });
+            session.attempts.push(OperationAttempt {
+                id: "attempt:recover-inflight-tool".into(),
+                operation_id: operation_id.as_str().to_string(),
+                prompt_id: prompt.id,
+                started_at_ms: now_ms(),
+                finished_at_ms: None,
+                state: OperationAttemptState::Running,
+            });
+            session.updated_at_ms = now_ms();
+            first.persist_session_state_if_configured(&session_id, &session).expect("persist inflight checkpoint");
+        }
+        drop(first);
+
+        let second = NativeEngine::new(
+            Arc::new(FakeModel {
+                outputs: Mutex::new(VecDeque::from([json!({
+                    "output": [{"type":"message","content":[{"type":"output_text","text":"parent continued safely"}]}]
+                })])),
+            }),
+            config,
+        ).expect("second engine");
+        let restored = second.open_session(OpenSessionRequest {
+            profile: mahayana_kernel::RuntimeProfile::Headless,
+            workspace_root: None,
+            model: None,
+            metadata: json!({"conversationId": conversation_id}),
+        }).await.expect("restore session");
+        let events = Arc::new(Events::default());
+        second.resume_operation(
+            ResumeOperationRequest {
+                session_id: restored,
+                operation_id: operation_id.clone(),
+                policy: ExecutionPolicy::mobile_default(),
+                required_capabilities: CapabilitySet::new([Capability::Model]),
+                metadata: json!({"resumedBy":"test"}),
+            },
+            events.clone(),
+        ).await.expect("resume parent after interrupted tool");
+
+        let bytes = std::fs::read(session_state_path_for_conversation(&base, conversation_id))
+            .expect("read restored snapshot");
+        let snapshot: KernelSessionSnapshot = serde_json::from_slice(&bytes).expect("decode snapshot");
+        let state: NativeSnapshotState = serde_json::from_value(snapshot.state).expect("decode state");
+        assert!(state.session.inflight_tool.is_none());
+        assert!(state.session.history.iter().any(|item| {
+            item.to_string().contains("unknownSideEffects")
+                && item.to_string().contains("call-interrupted")
+        }));
+        assert!(events.0.lock().expect("events").iter().any(|event| matches!(
+            event,
+            KernelEvent::ToolCompleted { tool, success: false, output, .. }
+                if tool == "subagent_run"
+                    && output.get("unknownSideEffects").and_then(Value::as_bool) == Some(true)
+        )));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn recreate_replays_completed_output_for_unsettled_host_terminal() {
+        let root = std::env::temp_dir().join(format!("mahayana-terminal-revival-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).expect("create temp root");
+        let base = root.join("session.json");
+        let conversation_id = "mahayana-ai:agent:terminal-revival";
+        let mut config = NativeEngineConfig::embedded("model");
+        config.session_state_path = Some(base.clone());
+        let first = NativeEngine::new(
+            Arc::new(FakeModel { outputs: Mutex::new(VecDeque::new()) }),
+            config.clone(),
+        ).expect("first engine");
+        let session_id = first.open_session(OpenSessionRequest {
+            profile: mahayana_kernel::RuntimeProfile::Headless,
+            workspace_root: None,
+            model: None,
+            metadata: json!({"conversationId": conversation_id}),
+        }).await.expect("open session");
+        let operation_id = OperationId::from_string("recover-completed-terminal");
+        {
+            let session = first.session(&session_id).expect("session");
+            let mut session = session.lock().await;
+            session.attempts.push(OperationAttempt {
+                id: "attempt:recover-completed-terminal".into(),
+                operation_id: operation_id.as_str().to_string(),
+                prompt_id: "prompt:done".into(),
+                started_at_ms: now_ms(),
+                finished_at_ms: Some(now_ms()),
+                state: OperationAttemptState::Completed,
+            });
+            session.completed_outputs.insert(
+                operation_id.as_str().to_string(),
+                "durable final background result".into(),
+            );
+            session.updated_at_ms = now_ms();
+            first.persist_session_state_if_configured(&session_id, &session).expect("persist completed terminal");
+        }
+        drop(first);
+
+        let second = NativeEngine::new(
+            Arc::new(FakeModel { outputs: Mutex::new(VecDeque::new()) }),
+            config,
+        ).expect("second engine");
+        let restored = second.open_session(OpenSessionRequest {
+            profile: mahayana_kernel::RuntimeProfile::Headless,
+            workspace_root: None,
+            model: None,
+            metadata: json!({"conversationId": conversation_id}),
+        }).await.expect("restore session");
+        let events = Arc::new(Events::default());
+        second.resume_operation(
+            ResumeOperationRequest {
+                session_id: restored,
+                operation_id,
+                policy: ExecutionPolicy::mobile_default(),
+                required_capabilities: CapabilitySet::new([Capability::Model]),
+                metadata: json!({"resumedBy":"test"}),
+            },
+            events.clone(),
+        ).await.expect("revive completed terminal");
+        assert!(events.0.lock().expect("events").iter().any(|event| matches!(
+            event,
+            KernelEvent::MessageCompleted { text, .. }
+                if text == "durable final background result"
+        )));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
     async fn snapshot_round_trip_preserves_native_orchestration_state() {
         let model = Arc::new(FakeModel {
             outputs: Mutex::new(VecDeque::from([json!({
