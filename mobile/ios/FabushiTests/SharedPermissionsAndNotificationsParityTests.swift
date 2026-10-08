@@ -236,4 +236,28 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         XCTAssertTrue(project.contains("APS_ENVIRONMENT: production"))
     }
 
+    func testHumanCallVoIPRegistrationIsStrictAndLogoutRevokesEndpoint() {
+        let defaults = UserDefaults(suiteName: "fabushi-human-call-voip-test")!
+        defaults.removePersistentDomain(forName: "fabushi-human-call-voip-test")
+        defer { defaults.removePersistentDomain(forName: "fabushi-human-call-voip-test") }
+
+        defaults.set(String(repeating: "AB", count: 16), forKey: HumanCallSystemCoordinator.voIPTokenDefaultsKey)
+        XCTAssertEqual(
+            FabushiRemoteDeviceGateway.currentVoIPToken(defaults: defaults),
+            String(repeating: "ab", count: 16)
+        )
+
+        defaults.set(String(repeating: "a", count: 33), forKey: HumanCallSystemCoordinator.voIPTokenDefaultsKey)
+        XCTAssertNil(FabushiRemoteDeviceGateway.currentVoIPToken(defaults: defaults))
+
+        defaults.set("not-hex-token", forKey: HumanCallSystemCoordinator.voIPTokenDefaultsKey)
+        XCTAssertNil(FabushiRemoteDeviceGateway.currentVoIPToken(defaults: defaults))
+
+        XCTAssertEqual(
+            FabushiRemoteDeviceGateway.logoutRegistrationMessage(),
+            ["type": "unregister", "reason": "logout"]
+        )
+    }
+
+
 }
