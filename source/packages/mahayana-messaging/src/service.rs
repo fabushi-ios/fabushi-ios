@@ -8,7 +8,7 @@ use crate::conversation::{
 use crate::engine::topic_id_from_root;
 use crate::engine::{Command, EngineError, Event, MessagingEngine};
 use crate::message::{
-    ClientMessageId, DeliveryState, ForwardPrivacy, Message, MessageContent, MessageId,
+    ClientMessageId, DeliveryState, Message, MessageContent, MessageId,
 };
 use crate::payment::Money;
 use crate::protocol::{
@@ -505,7 +505,12 @@ impl<S: MessagingStateStore> MessagingService<S> {
         server_time_ms: i64,
     ) -> Result<ServerEnvelope, MessagingServiceError> {
         let source_message =
-            self.forward_source_message(actor_id, &source_conversation_id, &message_id)?;
+            self.forward_source_message(
+                actor_id,
+                &source_conversation_id,
+                &message_id,
+                server_time_ms,
+            )?;
         let normalized_query = query.trim().to_lowercase();
         let bounded_limit = limit.clamp(1, 100) as usize;
         let mut recipients = self
