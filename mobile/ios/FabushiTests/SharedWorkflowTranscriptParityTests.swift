@@ -503,4 +503,123 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(messages[0].myReactions, Set(["❤️"]))
     }
 
+
+    func testConversationWindowProjectionUsesCanonicalMessageIdentity() throws {
+        let message = try XCTUnwrap(projectMobileConversationWindowMessage([
+            "id": "message-42",
+            "role": "assistant",
+            "text": "Persisted answer",
+            "createdAtMs": 1_700_000_000_000,
+            "reactions": [
+                ["emoji": "👍", "by": "me"],
+            ],
+        ]))
+        XCTAssertEqual(message.id, "history:message-42")
+        XCTAssertEqual(message.canonicalMessageId, "message-42")
+        XCTAssertEqual(message.role, .assistant)
+        XCTAssertEqual(message.text, "Persisted answer")
+        XCTAssertEqual(message.reactions, [.init(emoji: "👍", by: "me")])
+        XCTAssertEqual(message.createdAt.timeIntervalSince1970, 1_700_000_000, accuracy: 0.001)
+
+        XCTAssertNil(projectMobileConversationWindowMessage([
+            "id": "message-bad-role",
+            "role": "system",
+            "text": "nope",
+            "createdAtMs": 1,
+        ]))
+        XCTAssertNil(projectMobileConversationWindowMessage([
+            "id": "message-bad-time",
+            "role": "user",
+            "text": "nope",
+            "createdAtMs": "now",
+        ]))
+    }
+
+    func testLateConversationBaselinePreservesLiveAndOptimisticEntries() throws {
+        let oldBaseline = MobileChatMessage(
+            id: "history:old-1",
+            role: .assistant,
+            text: "old",
+            canonicalMessageId: "old-1",
+            createdAt: Date(timeIntervalSince1970: 1)
+        )
+        let staleCached = MobileChatMessage(
+            id: "history:stale-cache",
+            role: .assistant,
+            text: "stale",
+            canonicalMessageId: "stale-cache",
+            createdAt: Date(timeIntervalSince1970: 2)
+        )
+        let liveAfterRequest = MobileChatMessage(
+            id: "assistant:op-live",
+            role: .assistant,
+            text: "live",
+            operationId: "op-live",
+            canonicalMessageId: "live-2",
+            createdAt: Date(timeIntervalSince1970: 4)
+        )
+        let optimistic = MobileChatMessage(
+            id: "ios-mobile-bot-chat-request-7",
+            role: .user,
+            text: "pending",
+            canonicalMessageId: "ios-mobile-bot-chat-request-7",
+            createdAt: Date(timeIntervalSince1970: 5)
+        )
+        let authoritativeOld = MobileChatMessage(
+            id: "history:old-1",
+            role: .assistant,
+            text: "authoritative old",
+            canonicalMessageId: "old-1",
+            createdAt: Date(timeIntervalSince1970: 1)
+        )
+        let authoritativeNew = MobileChatMessage(
+            id: "history:baseline-2",
+            role: .user,
+            text: "baseline",
+            canonicalMessageId: "baseline-2",
+            createdAt: Date(timeIntervalSince1970: 3)
+        )
+
+        let reconciled = reconcileMobileConversationBaseline(
+            baseline: [authoritativeOld, authoritativeNew],
+            current: [oldBaseline, staleCached, liveAfterRequest, optimistic],
+            identitiesAtRequestStart: Set(["old-1", "stale-cache"])
+        )
+
+        XCTAssertEqual(
+            reconciled.map { $0.canonicalMessageId ?? $0.id },
+            ["old-1", "baseline-2", "live-2", "ios-mobile-bot-chat-request-7"]
+        )
+        XCTAssertEqual(reconciled[0].text, "authoritative old")
+        XCTAssertFalse(reconciled.contains(where: { $0.canonicalMessageId == "stale-cache" }))
+        XCTAssertTrue(reconciled.contains(where: { $0.canonicalMessageId == "live-2" }))
+        XCTAssertTrue(reconciled.contains(where: { $0.id == "ios-mobile-bot-chat-request-7" }))
+    }
+
+    func testConversationBaselineDoesNotDuplicateCanonicalLiveMessage() {
+        let live = MobileChatMessage(
+            id: "assistant:op-1",
+            role: .assistant,
+            text: "live version",
+            operationId: "op-1",
+            canonicalMessageId: "canonical-1",
+            createdAt: Date(timeIntervalSince1970: 2)
+        )
+        let baseline = MobileChatMessage(
+            id: "history:canonical-1",
+            role: .assistant,
+            text: "persisted version",
+            canonicalMessageId: "canonical-1",
+            createdAt: Date(timeIntervalSince1970: 1)
+        )
+        let reconciled = reconcileMobileConversationBaseline(
+            baseline: [baseline],
+            current: [live],
+            identitiesAtRequestStart: []
+        )
+        XCTAssertEqual(reconciled.count, 1)
+        XCTAssertEqual(reconciled[0].canonicalMessageId, "canonical-1")
+        XCTAssertEqual(reconciled[0].text, "persisted version")
+    }
+
 }
