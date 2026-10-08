@@ -236,6 +236,7 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         XCTAssertTrue(project.contains("APS_ENVIRONMENT: production"))
     }
 
+    @MainActor
     func testHumanCallVoIPRegistrationIsStrictAndLogoutRevokesEndpoint() {
         let defaults = UserDefaults(suiteName: "fabushi-human-call-voip-test")!
         defaults.removePersistentDomain(forName: "fabushi-human-call-voip-test")
