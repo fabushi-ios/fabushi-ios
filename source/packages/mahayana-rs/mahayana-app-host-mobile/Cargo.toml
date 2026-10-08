@@ -14,6 +14,7 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 mahayana-app-host.workspace = true
 mahayana-unified-app-host.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 rusqlite = { version = "0.39", features = ["bundled"] }
