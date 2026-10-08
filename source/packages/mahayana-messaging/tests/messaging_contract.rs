@@ -266,7 +266,11 @@ fn forwarding_preserves_origin_and_rejects_protected_content() {
             local_message_id: MessageId::new("forward:1"),
             client_message_id: ClientMessageId("client:forward".into()),
             sender_id: ActorId::new("human:forwarder"),
+            thread_root_message_id: None,
             created_at_ms: 3,
+            scheduled_at_ms: None,
+            silent: false,
+            privacy: ForwardPrivacy::default(),
         })
         .unwrap();
     let forwarded = &engine.state().messages[&ConversationId::new("chat:destination")]
@@ -302,7 +306,11 @@ fn forwarding_preserves_origin_and_rejects_protected_content() {
             local_message_id: MessageId::new("forward:protected"),
             client_message_id: ClientMessageId("client:forward-protected".into()),
             sender_id: ActorId::new("human:forwarder"),
+            thread_root_message_id: None,
             created_at_ms: 5,
+            scheduled_at_ms: None,
+            silent: false,
+            privacy: ForwardPrivacy::default(),
         })
         .unwrap_err();
     assert_eq!(error, EngineError::ProtectedContent);
@@ -394,7 +402,11 @@ fn secret_conversations_reject_plaintext_and_protect_encrypted_messages() {
             local_message_id: MessageId::new("secret:forward"),
             client_message_id: ClientMessageId("client:forward-secret".into()),
             sender_id: ActorId::new("human:alice"),
+            thread_root_message_id: None,
             created_at_ms: 4,
+            scheduled_at_ms: None,
+            silent: false,
+            privacy: ForwardPrivacy::default(),
         })
         .unwrap_err();
     assert!(matches!(forward_error, EngineError::ProtectedContent));
