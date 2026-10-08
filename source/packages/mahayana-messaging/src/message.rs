@@ -131,6 +131,24 @@ pub struct ReplyMarkup {
     pub rows: Vec<Vec<InlineButton>>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForwardPrivacy {
+    #[serde(default)]
+    pub drop_sender_names: bool,
+    #[serde(default)]
+    pub drop_captions: bool,
+}
+
+impl ForwardPrivacy {
+    pub fn normalized(self) -> Self {
+        Self {
+            drop_sender_names: self.drop_sender_names || self.drop_captions,
+            drop_captions: self.drop_captions,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(
     rename_all = "camelCase",
@@ -225,6 +243,21 @@ pub enum MessageContent {
         action: String,
         text: Option<String>,
     },
+}
+
+impl MessageContent {
+    pub fn clear_caption(&mut self) {
+        let caption = match self {
+            Self::Photo { caption, .. }
+            | Self::Video { caption, .. }
+            | Self::Animation { caption, .. }
+            | Self::Audio { caption, .. }
+            | Self::Voice { caption, .. }
+            | Self::Document { caption, .. } => caption,
+            _ => return,
+        };
+        *caption = FormattedText::plain("");
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -7,7 +7,9 @@ use crate::conversation::{
 };
 use crate::engine::topic_id_from_root;
 use crate::engine::{Command, EngineError, Event, MessagingEngine};
-use crate::message::{ClientMessageId, DeliveryState, Message, MessageContent, MessageId};
+use crate::message::{
+    ClientMessageId, DeliveryState, ForwardPrivacy, Message, MessageContent, MessageId,
+};
 use crate::payment::Money;
 use crate::protocol::{
     ClientCommand, ClientEnvelope, ServerEnvelope, ServerEvent, FABUSHI_MESSAGING_PROTOCOL_VERSION,
@@ -87,25 +89,6 @@ fn forward_content_uses_media(content: &MessageContent) -> bool {
             | MessageContent::Document { .. }
             | MessageContent::Sticker { .. }
     )
-}
-
-fn projected_forward_content(content: &MessageContent, drop_captions: bool) -> MessageContent {
-    let mut projected = content.clone();
-    if drop_captions {
-        match &mut projected {
-            MessageContent::Photo { caption, .. }
-            | MessageContent::Video { caption, .. }
-            | MessageContent::Animation { caption, .. }
-            | MessageContent::Audio { caption, .. }
-            | MessageContent::Voice { caption, .. }
-            | MessageContent::Document { caption, .. } => {
-                caption.text.clear();
-                caption.entities.clear();
-            }
-            _ => {}
-        }
-    }
-    projected
 }
 
 pub struct MessagingService<S: MessagingStateStore> {
@@ -688,12 +671,15 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 message_id,
                 destination_conversation_id,
                 client_message_id,
-                drop_sender_names,
-                drop_captions,
+                thread_root_message_id,
+                scheduled_at_ms,
+                silent,
+                privacy,
             } => {
                 let original =
                     self.forward_source_message(actor_id, source_conversation_id, message_id)?;
-                let origin = if *drop_sender_names {
+                let privacy = privacy.normalized();
+                let origin = if privacy.drop_sender_names {
                     None
                 } else {
                     Some(
@@ -705,15 +691,19 @@ impl<S: MessagingStateStore> MessagingService<S> {
                             }),
                     )
                 };
+                let mut content = original.content.clone();
+                if privacy.drop_captions {
+                    content.clear_caption();
+                }
                 (
                     destination_conversation_id,
                     client_message_id,
                     (
-                        projected_forward_content(&original.content, *drop_captions),
+                        content,
                         None,
-                        None,
-                        None,
-                        false,
+                        thread_root_message_id.clone(),
+                        *scheduled_at_ms,
+                        *silent,
                         false,
                         origin,
                     ),
@@ -1832,8 +1822,10 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 message_id,
                 destination_conversation_id,
                 client_message_id,
-                drop_sender_names,
-                drop_captions,
+                thread_root_message_id,
+                scheduled_at_ms,
+                silent,
+                privacy,
             } => {
                 let local_message_id = stable_message_id(actor_id, &client_message_id);
                 vec![
@@ -1844,9 +1836,11 @@ impl<S: MessagingStateStore> MessagingService<S> {
                         local_message_id: local_message_id.clone(),
                         client_message_id,
                         sender_id: actor_id.clone(),
+                        thread_root_message_id,
                         created_at_ms: now_ms,
-                        drop_sender_names,
-                        drop_captions,
+                        scheduled_at_ms,
+                        silent,
+                        privacy,
                     },
                     Command::AcknowledgeMessage {
                         conversation_id: destination_conversation_id,

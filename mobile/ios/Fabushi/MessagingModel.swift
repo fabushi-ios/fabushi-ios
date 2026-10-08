@@ -521,8 +521,11 @@ final class MessagingModel {
             "messageId": messageId,
             "destinationConversationId": destination.conversationId,
             "clientMessageId": destination.clientMessageId,
-            "dropSenderNames": dropSenderNames,
-            "dropCaptions": dropCaptions,
+            "silent": false,
+            "privacy": [
+                "dropSenderNames": dropSenderNames || dropCaptions,
+                "dropCaptions": dropCaptions,
+            ],
         ])
     }
 

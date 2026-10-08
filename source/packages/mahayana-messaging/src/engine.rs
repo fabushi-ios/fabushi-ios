@@ -9,7 +9,8 @@ use crate::conversation::{
     NotificationSettings, TopicDraft,
 };
 use crate::message::{
-    ClientMessageId, DeliveryState, Message, MessageContent, MessageId, ReactionSummary,
+    ClientMessageId, DeliveryState, ForwardPrivacy, Message, MessageContent, MessageId,
+    ReactionSummary,
 };
 use crate::miniapp::{
     MiniAppGrant, MiniAppManifest, MiniAppPermission, MiniAppRequest, MiniAppResponse,
@@ -98,9 +99,11 @@ pub enum Command {
         local_message_id: MessageId,
         client_message_id: ClientMessageId,
         sender_id: ActorId,
+        thread_root_message_id: Option<MessageId>,
         created_at_ms: i64,
-        drop_sender_names: bool,
-        drop_captions: bool,
+        scheduled_at_ms: Option<i64>,
+        silent: bool,
+        privacy: ForwardPrivacy,
     },
     AcknowledgeMessage {
         conversation_id: ConversationId,
@@ -689,21 +692,6 @@ fn message_content_uses_media(content: &MessageContent) -> bool {
     )
 }
 
-fn clear_forward_caption(content: &mut MessageContent) {
-    match content {
-        MessageContent::Photo { caption, .. }
-        | MessageContent::Video { caption, .. }
-        | MessageContent::Animation { caption, .. }
-        | MessageContent::Audio { caption, .. }
-        | MessageContent::Voice { caption, .. }
-        | MessageContent::Document { caption, .. } => {
-            caption.text.clear();
-            caption.entities.clear();
-        }
-        _ => {}
-    }
-}
-
 fn wallet_account_id(actor_id: &ActorId) -> WalletAccountId {
     WalletAccountId(format!("wallet:{}", actor_id.0))
 }
@@ -1175,9 +1163,11 @@ impl MessagingEngine {
                 local_message_id,
                 client_message_id,
                 sender_id,
+                thread_root_message_id,
                 created_at_ms,
-                drop_sender_names,
-                drop_captions,
+                scheduled_at_ms,
+                silent,
+                privacy,
             } => {
                 let destination = self.require_conversation(&destination_conversation_id)?.clone();
                 self.require_actor(&sender_id)?;
@@ -1324,10 +1314,35 @@ impl MessagingEngine {
                         }
                     }
                 }
-                if matches!(destination.kind, ConversationKind::Secret) {
+                if let Some(community) = self.state.communities.get(&destination_conversation_id) {
+                    if let Some(thread_root) = &thread_root_message_id {
+                        if let Some(topic_id) = topic_id_from_root(thread_root) {
+                            let topic = community.topics.get(topic_id).ok_or_else(|| {
+                                EngineError::ForumTopicNotFound {
+                                    conversation_id: destination_conversation_id.clone(),
+                                    topic_id: topic_id.to_string(),
+                                }
+                            })?;
+                            if topic.closed || topic.hidden {
+                                return Err(EngineError::ForumTopicClosed {
+                                    conversation_id: destination_conversation_id.clone(),
+                                    topic_id: topic_id.to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+                let is_secret_conversation = matches!(destination.kind, ConversationKind::Secret);
+                let is_secret_content = matches!(&original.content, MessageContent::Secret { .. });
+                let is_service_content = matches!(&original.content, MessageContent::Service { .. });
+                if is_secret_conversation && !is_secret_content && !is_service_content {
                     return Err(EngineError::SecretPlaintextRejected);
                 }
-                let forward_origin = if drop_sender_names {
+                if !is_secret_conversation && is_secret_content {
+                    return Err(EngineError::SecretContentOutsideSecretConversation);
+                }
+                let privacy = privacy.normalized();
+                let forward_origin = if privacy.drop_sender_names {
                     None
                 } else {
                     Some(
@@ -1340,8 +1355,8 @@ impl MessagingEngine {
                     )
                 };
                 let mut content = original.content;
-                if drop_captions {
-                    clear_forward_caption(&mut content);
+                if privacy.drop_captions {
+                    content.clear_caption();
                 }
                 let message = Message {
                     id: local_message_id,
@@ -1349,16 +1364,16 @@ impl MessagingEngine {
                     sender_id,
                     content,
                     reply_to_message_id: None,
-                    thread_root_message_id: None,
+                    thread_root_message_id,
                     forward_origin,
                     reply_markup: original.reply_markup,
                     reactions: Vec::new(),
                     delivery_state: DeliveryState::Pending { client_message_id },
                     created_at_ms,
                     edited_at_ms: None,
-                    scheduled_at_ms: None,
-                    silent: false,
-                    protected_content: false,
+                    scheduled_at_ms,
+                    silent,
+                    protected_content: original.protected_content,
                     pinned: false,
                     deleted: false,
                 };
@@ -3104,9 +3119,11 @@ mod forward_parity_tests {
                 local_message_id: MessageId::new("forwarded"),
                 client_message_id: ClientMessageId("forward-client".into()),
                 sender_id: actor_id,
+                thread_root_message_id: None,
                 created_at_ms: 3,
-                drop_sender_names: false,
-                drop_captions: false,
+                scheduled_at_ms: None,
+                silent: false,
+                privacy: ForwardPrivacy::default(),
             })
             .unwrap_err();
 
@@ -3132,9 +3149,14 @@ mod forward_parity_tests {
                 local_message_id: MessageId::new("forwarded"),
                 client_message_id: ClientMessageId("forward-client".into()),
                 sender_id: actor_id,
+                thread_root_message_id: None,
                 created_at_ms: 3,
-                drop_sender_names: true,
-                drop_captions: true,
+                scheduled_at_ms: None,
+                silent: false,
+                privacy: ForwardPrivacy {
+                    drop_sender_names: false,
+                    drop_captions: true,
+                },
             })
             .unwrap();
 
