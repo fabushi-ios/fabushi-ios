@@ -142,13 +142,13 @@ internal final class HumanCallSystemCoordinator: NSObject,
                 completionTransfer.value()
                 return
             }
-            self.reportIncoming(descriptor, completion: completionTransfer.value)
+            self.reportIncoming(descriptor, completion: completionTransfer)
         }
     }
 
     private func reportIncoming(
         _ descriptor: HumanCallPushDescriptor,
-        completion: @escaping () -> Void
+        completion: HumanCallSystemUncheckedTransfer<() -> Void>
     ) {
         let uuid = UUID(uuidString: descriptor.callId)
             ?? uuidsByCallID[descriptor.callId]
@@ -166,9 +166,10 @@ internal final class HumanCallSystemCoordinator: NSObject,
         update.supportsDTMF = false
 
         provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
-            Task { @MainActor [weak self, descriptor] in
-                defer { completion() }
-                guard error == nil, let self else { return }
+            let succeeded = error == nil
+            Task { @MainActor [weak self, descriptor, completion] in
+                defer { completion.value() }
+                guard succeeded, let self else { return }
                 try? await self.actionHandler?(.incoming(descriptor))
             }
         }
