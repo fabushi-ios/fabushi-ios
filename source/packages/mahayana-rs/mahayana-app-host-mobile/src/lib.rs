@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{Arc, mpsc};
 use std::thread::{self, JoinHandle};
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
 #[path = "../../../../internal/host-extensions.rs"]
 mod host_extensions;
 #[path = "../../../../internal/scheduling.rs"]
@@ -904,6 +906,350 @@ impl MobileAppHost {
             return output;
         }
         self.host.dispatch_json(input)
+    }
+
+    fn call_transport_identity(&self) -> Result<(String, String), String> {
+        let identity = self
+            .host
+            .human_call(MobileHumanCallTransportCommand::Identity)?;
+        let user_id = json_identity_text(
+            identity
+                .get("userId")
+                .ok_or_else(|| "Human call transport identity omitted userId".to_string())?,
+        )?;
+        let device_id = identity
+            .get("deviceId")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| "Human call transport identity omitted deviceId".to_string())?
+            .to_string();
+        Ok((user_id, device_id))
+    }
+
+    fn local_call_peer(
+        &self,
+        participant_ids: &[String],
+        local_human_id: &str,
+    ) -> Result<String, String> {
+        let mut peers = participant_ids
+            .iter()
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty() && *value != local_human_id)
+            .collect::<Vec<_>>();
+        peers.sort_unstable();
+        peers.dedup();
+        if peers.len() != 1 {
+            return Err("shipping Human call transport currently requires exactly one peer".into());
+        }
+        Ok(peers[0].to_string())
+    }
+
+    fn authorized_call_session(
+        &self,
+        call_id: &str,
+        local_human_id: &str,
+    ) -> Result<call_session::CallSession, String> {
+        let call = self
+            .call_sessions
+            .get(call_id)?
+            .ok_or_else(|| "call session not found".to_string())?;
+        if !call
+            .participant_ids
+            .iter()
+            .any(|participant| participant == local_human_id)
+        {
+            return Err("call session does not belong to the authenticated Human identity".into());
+        }
+        Ok(call)
+    }
+
+    fn create_shipping_call_session(
+        &self,
+        scope_id: &str,
+        participant_ids: &[String],
+    ) -> Result<call_session::CallSession, String> {
+        let (local_human_id, _) = self.call_transport_identity()?;
+        if !participant_ids.iter().any(|value| value == &local_human_id) {
+            return Err("authenticated Human identity must be a call participant".into());
+        }
+        let peer = self.local_call_peer(participant_ids, &local_human_id)?;
+        let call_id = Uuid::new_v4().to_string();
+        let response = self.host.human_call(MobileHumanCallTransportCommand::Create {
+            call_id: call_id.clone(),
+            peer_human_id: peer.clone(),
+        })?;
+        let remote = required_remote_call(&response)?;
+        validate_remote_call_identity(
+            remote,
+            &call_id,
+            &local_human_id,
+            &peer,
+            "invited",
+            0,
+        )?;
+        let event_seq = remote
+            .get("eventSeq")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| "remote Human call omitted eventSeq".to_string())?;
+        if event_seq != 0 {
+            return Err("new remote Human call must start at eventSeq 0".into());
+        }
+        let call = self.call_sessions.create_with_id(
+            &call_id,
+            scope_id,
+            &local_human_id,
+            participant_ids,
+        )?;
+        self.call_sessions.set_remote_event_seq(&call_id, event_seq)?;
+        Ok(call)
+    }
+
+    fn sync_call_session_from_remote(
+        &self,
+        call_id: &str,
+    ) -> Result<call_session::CallSession, String> {
+        let (local_human_id, _) = self.call_transport_identity()?;
+        let local = self.authorized_call_session(call_id, &local_human_id)?;
+        let peer = self.local_call_peer(&local.participant_ids, &local_human_id)?;
+        let mut cursor = self.call_sessions.remote_event_seq(call_id)?;
+
+        for _ in 0..8 {
+            let response = self.host.human_call(MobileHumanCallTransportCommand::Get {
+                call_id: call_id.to_string(),
+                after_seq: cursor,
+                limit: 200,
+            })?;
+            let remote = required_remote_call(&response)?;
+            validate_remote_call_identity(
+                remote,
+                call_id,
+                &local.creator_id,
+                &peer,
+                remote
+                    .get("state")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default(),
+                remote
+                    .get("generation")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(local.generation),
+            )?;
+            let remote_head = remote
+                .get("eventSeq")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| "remote Human call omitted eventSeq".to_string())?;
+            if remote_head < cursor {
+                return Err("remote Human call event cursor regressed".into());
+            }
+
+            let events = response
+                .get("events")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| "remote Human call sync omitted events".to_string())?;
+            for event in events {
+                let seq = event
+                    .get("seq")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| "remote Human call event omitted seq".to_string())?;
+                if seq <= cursor {
+                    continue;
+                }
+                if seq != cursor + 1 {
+                    return Err(format!(
+                        "remote Human call event sequence gap: expected {}, received {}",
+                        cursor + 1,
+                        seq
+                    ));
+                }
+                self.apply_remote_call_event(call_id, event)?;
+                self.call_sessions.set_remote_event_seq(call_id, seq)?;
+                cursor = seq;
+            }
+
+            if cursor >= remote_head {
+                let synced = self.authorized_call_session(call_id, &local_human_id)?;
+                let remote_state = remote
+                    .get("state")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| "remote Human call omitted state".to_string())?;
+                let remote_generation = remote
+                    .get("generation")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| "remote Human call omitted generation".to_string())?;
+                if synced.state != remote_state || synced.generation != remote_generation {
+                    return Err("remote Human call head disagrees with canonical local state".into());
+                }
+                return Ok(synced);
+            }
+
+            let next_after_seq = response
+                .get("nextAfterSeq")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(cursor);
+            if next_after_seq <= cursor {
+                return Err("remote Human call sync made no progress".into());
+            }
+        }
+        Err("remote Human call sync exceeded bounded replay window".into())
+    }
+
+    fn apply_remote_call_event(
+        &self,
+        call_id: &str,
+        event: &serde_json::Value,
+    ) -> Result<(), String> {
+        let event_call_id = event
+            .get("callId")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "remote Human call event omitted callId".to_string())?;
+        if event_call_id != call_id {
+            return Err("remote Human call event callId mismatch".into());
+        }
+        let generation = event
+            .get("generation")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| "remote Human call event omitted generation".to_string())?;
+        let kind = event
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "remote Human call event omitted kind".to_string())?;
+        let payload = event
+            .get("payload")
+            .filter(|value| value.is_object())
+            .ok_or_else(|| "remote Human call event omitted payload".to_string())?;
+        match kind {
+            "transition" => {
+                let action = payload
+                    .get("action")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| "remote call transition omitted action".to_string())?;
+                let target_state = payload
+                    .get("state")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| "remote call transition omitted state".to_string())?;
+                let current = self
+                    .call_sessions
+                    .get(call_id)?
+                    .ok_or_else(|| "call session not found".to_string())?;
+                if current.state == target_state && current.generation == generation {
+                    return Ok(());
+                }
+                let terminal_reason = payload
+                    .get("terminalReason")
+                    .and_then(serde_json::Value::as_str);
+                let (projected_state, projected_generation, _, _) =
+                    call_session::transition_target(&current, action, terminal_reason)?;
+                if projected_state != target_state || projected_generation != generation {
+                    return Err("remote transition disagrees with canonical CallSession state machine".into());
+                }
+                self.call_sessions
+                    .transition(call_id, current.generation, action, terminal_reason)?;
+            }
+            "media" => {
+                let current = self
+                    .call_sessions
+                    .get(call_id)?
+                    .ok_or_else(|| "call session not found".to_string())?;
+                if current.generation != generation {
+                    return Err("remote call media event has stale generation".into());
+                }
+                let media = payload
+                    .get("mediaCapabilities")
+                    .ok_or_else(|| "remote call media event omitted mediaCapabilities".to_string())?;
+                let devices = payload
+                    .get("deviceSelection")
+                    .ok_or_else(|| "remote call media event omitted deviceSelection".to_string())?;
+                if current.media_capabilities != *media || current.device_selection != *devices {
+                    self.call_sessions
+                        .update_media(call_id, generation, Some(media), Some(devices))?;
+                }
+            }
+            "signal" => {
+                let seq = event
+                    .get("seq")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| "remote Human call signal omitted seq".to_string())?;
+                let sender_device_id = payload
+                    .get("senderDeviceId")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| "remote Human call signal omitted senderDeviceId".to_string())?;
+                let signal_kind = payload
+                    .get("signalKind")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| "remote Human call signal omitted signalKind".to_string())?;
+                let signal = payload
+                    .get("signal")
+                    .filter(|value| value.is_object())
+                    .ok_or_else(|| "remote Human call signal omitted signal payload".to_string())?;
+                self.call_sessions.append_remote_signal(
+                    call_id,
+                    generation,
+                    seq,
+                    sender_device_id,
+                    signal_kind,
+                    signal,
+                )?;
+            }
+            other => {
+                return Err(format!("unsupported remote Human call event kind {other}"));
+            }
+        }
+        Ok(())
+    }
+
+    fn append_shipping_call_event(
+        &self,
+        call_id: &str,
+        generation: u64,
+        kind: &str,
+        payload: serde_json::Value,
+        client_event_id: String,
+    ) -> Result<serde_json::Value, String> {
+        let response = self.host.human_call(MobileHumanCallTransportCommand::AppendEvent {
+            call_id: call_id.to_string(),
+            client_event_id: client_event_id.clone(),
+            generation,
+            kind: kind.to_string(),
+            payload: payload.clone(),
+        })?;
+        let event = response
+            .get("event")
+            .filter(|value| value.is_object())
+            .ok_or_else(|| "remote Human call append omitted event".to_string())?;
+        if event
+            .get("callId")
+            .and_then(serde_json::Value::as_str)
+            != Some(call_id)
+            || event
+                .get("clientEventId")
+                .and_then(serde_json::Value::as_str)
+                != Some(client_event_id.as_str())
+            || event
+                .get("generation")
+                .and_then(serde_json::Value::as_u64)
+                != Some(generation)
+            || event.get("kind").and_then(serde_json::Value::as_str) != Some(kind)
+            || event.get("payload") != Some(&payload)
+        {
+            return Err("remote Human call backend returned a mismatched canonical event".into());
+        }
+        Ok(response)
+    }
+
+    fn stable_call_event_id(
+        prefix: &str,
+        generation: u64,
+        payload: &serde_json::Value,
+    ) -> Result<String, String> {
+        let bytes = serde_json::to_vec(payload).map_err(|error| error.to_string())?;
+        let digest = Sha256::digest(bytes);
+        let suffix = digest
+            .iter()
+            .take(16)
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        Ok(format!("{prefix}:{generation}:{suffix}"))
     }
 
     fn dispatch_call_session_json(&self, input: &str) -> Option<String> {
