@@ -793,6 +793,86 @@ impl turn_execution_service::TurnExecutor for MobileTurnExecutor {
     }
 }
 
+fn json_identity_text(value: &serde_json::Value) -> Result<String, String> {
+    match value {
+        serde_json::Value::String(value) => {
+            let value = value.trim();
+            if value.is_empty() {
+                Err("Human identity is empty".into())
+            } else {
+                Ok(value.to_string())
+            }
+        }
+        serde_json::Value::Number(value) => Ok(value.to_string()),
+        _ => Err("Human identity must be a string or number".into()),
+    }
+}
+
+fn required_remote_call(
+    response: &serde_json::Value,
+) -> Result<&serde_json::Map<String, serde_json::Value>, String> {
+    response
+        .get("call")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "remote Human call response omitted call".to_string())
+}
+
+fn validate_remote_call_identity(
+    remote: &serde_json::Map<String, serde_json::Value>,
+    call_id: &str,
+    local_human_id: &str,
+    peer_human_id: &str,
+    expected_creator_id: &str,
+    expected_state: &str,
+    expected_generation: u64,
+) -> Result<(), String> {
+    let remote_call_id = remote
+        .get("callId")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "remote Human call omitted callId".to_string())?;
+    if remote_call_id != call_id {
+        return Err("remote Human call id does not match canonical CallSession owner".into());
+    }
+    let creator = json_identity_text(
+        remote
+            .get("creatorUserId")
+            .ok_or_else(|| "remote Human call omitted creatorUserId".to_string())?,
+    )?;
+    let peer = json_identity_text(
+        remote
+            .get("peerUserId")
+            .ok_or_else(|| "remote Human call omitted peerUserId".to_string())?,
+    )?;
+    if creator != expected_creator_id {
+        return Err("remote Human call creator does not match canonical CallSession owner".into());
+    }
+    let mut remote_participants = vec![creator, peer];
+    remote_participants.sort();
+    remote_participants.dedup();
+    let mut expected_participants =
+        vec![local_human_id.to_string(), peer_human_id.to_string()];
+    expected_participants.sort();
+    expected_participants.dedup();
+    if remote_participants != expected_participants {
+        return Err("remote Human call participants do not match canonical CallSession owner".into());
+    }
+    let state = remote
+        .get("state")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "remote Human call omitted state".to_string())?;
+    if state != expected_state {
+        return Err("remote Human call state does not match canonical CallSession owner".into());
+    }
+    let generation = remote
+        .get("generation")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "remote Human call omitted generation".to_string())?;
+    if generation != expected_generation {
+        return Err("remote Human call generation does not match canonical CallSession owner".into());
+    }
+    Ok(())
+}
+
 fn required_json_string(
     params: &serde_json::Map<String, serde_json::Value>,
     key: &str,
