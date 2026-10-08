@@ -99,27 +99,27 @@ Failure classification: production defect, contract/data defect, test oracle def
 
 ## 8. Release Definition of Done (IOS-MAIN-AC-01..21)
 
-AC-01 current live Desktop main exact commit/tree confirmed before and after acceptance; lock consistent.
-AC-02 all tracked files and submodule/dependency boundaries accounted; no partial/truncated inventory.
-AC-03 selected frontend/**+source/** 100% file and responsibility ledger with current source blob identity.
-AC-04 requirements-only upstream work distinguished from implemented shipping behavior and tracked to closure.
-AC-05 entire applicable Desktop product migrated; all mandatory responsibilities verified or legitimate N/A-with-replacement.
-AC-06 canonical existing-owner-first composition; single shell/root per product concept; no duplicate Human/Agent stores.
-AC-07 native Coordinator/Host/Runner typed boundaries; real routing/cancel/checkpoint/recovery.
-AC-08 complete iOS-owned source/build inputs, no shared Fabushi runtime repository.
-AC-09 login/session/credential/messaging/communication/identity/security continuity tested.
-AC-10 media/offline ASR/call/background/platform capability parity tested.
-AC-11 MCP/Marketplace/WebMCP/billing/entitlement/restore protected real-account journey passed.
-AC-12 real API/service-side dependencies and provisioning completed; blocked dependencies not counted as verified.
-AC-13 real UI functional/visual/accessibility/localization and iPhone/iPad flows covered.
-AC-14 Rust unit/integration/contracts, Swift unit/UI, fault/temporal/regression and required performance/soak verified.
-AC-15 app lifecycle cold/foreground/background/termination/relaunch/upgrade data recovery proven.
-AC-16 signed device archive/export and clean physical-device installation/launch passed.
-AC-17 update from previous accepted install and data migration rollback strategy/evidence passed.
-AC-18 TestFlight distribution/install and App Store identity/signing/entitlement/privacy readiness passed.
-AC-19 license/provenance/notices/rights inventory resolved for release.
-AC-20 independent reviewer checked exact source SHA, real CI job/step logs, artifacts and compliance ledger.
-AC-21 final PR merge into canonical iOS main, final main exact HEAD and necessary main/release CI revalidated.
+IOS-MAIN-AC-01 current live Desktop main exact commit/tree confirmed before and after acceptance; lock consistent.
+IOS-MAIN-AC-02 all tracked files and submodule/dependency boundaries accounted; no partial/truncated inventory.
+IOS-MAIN-AC-03 selected frontend/**+source/** 100% file and responsibility ledger with current source blob identity.
+IOS-MAIN-AC-04 requirements-only upstream work distinguished from implemented shipping behavior and tracked to closure.
+IOS-MAIN-AC-05 entire applicable Desktop product migrated; all mandatory responsibilities verified or legitimate N/A-with-replacement.
+IOS-MAIN-AC-06 canonical existing-owner-first composition; single shell/root per product concept; no duplicate Human/Agent stores.
+IOS-MAIN-AC-07 native Coordinator/Host/Runner typed boundaries; real routing/cancel/checkpoint/recovery.
+IOS-MAIN-AC-08 complete iOS-owned source/build inputs, no shared Fabushi runtime repository.
+IOS-MAIN-AC-09 login/session/credential/messaging/communication/identity/security continuity tested.
+IOS-MAIN-AC-10 media/offline ASR/call/background/platform capability parity tested.
+IOS-MAIN-AC-11 MCP/Marketplace/WebMCP/billing/entitlement/restore protected real-account journey passed.
+IOS-MAIN-AC-12 real API/service-side dependencies and provisioning completed; blocked dependencies not counted as verified.
+IOS-MAIN-AC-13 real UI functional/visual/accessibility/localization and iPhone/iPad flows covered.
+IOS-MAIN-AC-14 Rust unit/integration/contracts, Swift unit/UI, fault/temporal/regression and required performance/soak verified.
+IOS-MAIN-AC-15 app lifecycle cold/foreground/background/termination/relaunch/upgrade data recovery proven.
+IOS-MAIN-AC-16 signed device archive/export and clean physical-device installation/launch passed.
+IOS-MAIN-AC-17 update from previous accepted install and data migration rollback strategy/evidence passed.
+IOS-MAIN-AC-18 TestFlight distribution/install and App Store identity/signing/entitlement/privacy readiness passed.
+IOS-MAIN-AC-19 license/provenance/notices/rights inventory resolved for release.
+IOS-MAIN-AC-20 independent reviewer checked exact source SHA, real CI job/step logs, artifacts and compliance ledger.
+IOS-MAIN-AC-21 final PR merge into canonical iOS main, final main exact HEAD and necessary main/release CI revalidated.
 
 There is no completion while a mandatory criterion or an upstream source-completeness dependency is unverified, blocked, skipped, or not-configured.
 
