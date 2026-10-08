@@ -459,6 +459,8 @@ mod send_not_persisted_error;
 mod agent_state;
 #[path = "../../../../host/extensions/session/conversation-blobs-path.rs"]
 mod conversation_blobs_path;
+#[path = "../../../../host/extensions/session/call-session.rs"]
+mod call_session;
 #[path = "../../../../host/automations/automation-id.rs"]
 mod automation_id;
 #[path = "../../../../host/attachment-paths.rs"]
