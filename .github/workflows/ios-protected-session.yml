@@ -46,9 +46,11 @@ jobs:
           } >> "$GITHUB_ENV"
           mkdir -p ios-protected-session-evidence/screenshots
           SOURCE_TREE="$(git rev-parse HEAD^{tree})"
-          DESKTOP_HEAD_SHA="$(sed -n 's/^- Pinned source commit: //p' MIGRATION_SOURCE.md)"
+          DESKTOP_HEAD_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["commit"])')"
+          DESKTOP_TREE_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["rootTreeSha"])')"
           [[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]]
           [[ "$DESKTOP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DESKTOP_TREE_SHA" =~ ^[0-9a-f]{40}$ ]]
           ARTIFACT_NAME="fabushi-ios-protected-session-${actual}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           {
             echo "source_sha=$actual"
@@ -58,6 +60,7 @@ jobs:
             echo "IOS_EXPECTED_HEAD_SHA=$EXPECTED_SHA"
             echo "IOS_TREE_SHA=$SOURCE_TREE"
             echo "DESKTOP_HEAD_SHA=$DESKTOP_HEAD_SHA"
+            echo "DESKTOP_TREE_SHA=$DESKTOP_TREE_SHA"
             echo "WORKFLOW_HEAD_SHA=$EXPECTED_SHA"
             echo "WORKFLOW_EVENT_SHA=$GITHUB_SHA"
             echo "REPOSITORY=$GITHUB_REPOSITORY"
@@ -67,6 +70,9 @@ jobs:
             echo "REAL_DEVICE_JOURNEY_NOT_PROVEN=true"
             echo "PERFORMANCE_ACCEPTANCE_NOT_PROVEN=true"
           } > ios-protected-session-evidence/source.env
+
+      - name: Verify live Desktop main before protected acceptance
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
 
       - name: Require protected Fabushi CI account
         shell: bash
@@ -343,3 +349,7 @@ jobs:
             xcrun simctl shutdown "$UDID" || true
             xcrun simctl erase "$UDID" || true
           fi
+
+      - name: Verify Desktop main remained unchanged through protected acceptance
+        if: always()
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
