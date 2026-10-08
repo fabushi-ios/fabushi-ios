@@ -655,6 +655,7 @@ final class HumanCallPeerConnection: NSObject {
                     case .external(let activeSessionID) = self.screenCaptureKind,
                     activeSessionID == normalizedSessionID
                 else { return }
+                HumanCallBroadcastIPC.endSession(activeSessionID)
                 self.restoreCameraAfterScreenShare()
             }
         )
