@@ -11,11 +11,17 @@ import Foundation
 @MainActor
 final class IOSAccountAuthorizer {
     typealias ApplyAccountScope = @MainActor (_ slot: String?) -> Void
+    typealias ApplyLocalHumanIdentity = @MainActor (_ slot: String?) -> Void
 
     private let applyAccountScope: ApplyAccountScope
+    private let applyLocalHumanIdentity: ApplyLocalHumanIdentity
 
-    init(applyAccountScope: @escaping ApplyAccountScope) {
+    init(
+        applyAccountScope: @escaping ApplyAccountScope,
+        applyLocalHumanIdentity: @escaping ApplyLocalHumanIdentity = { _ in }
+    ) {
         self.applyAccountScope = applyAccountScope
+        self.applyLocalHumanIdentity = applyLocalHumanIdentity
     }
 
     func authorizeSettledHostSlot(
@@ -23,6 +29,7 @@ final class IOSAccountAuthorizer {
         previousSlot _: String?
     ) -> CoordinatorAccountRuntime.Authorization {
         applyAccountScope(slot)
+        applyLocalHumanIdentity(slot)
         return .ready(slot: slot)
     }
 }
