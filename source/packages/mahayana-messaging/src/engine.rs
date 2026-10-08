@@ -1364,7 +1364,7 @@ impl MessagingEngine {
                 };
                 Ok(vec![Event::MessageQueued { message }])
             }
-            Command::AcknowledgeMessage {            Command::AcknowledgeMessage {
+            Command::AcknowledgeMessage {
                 conversation_id,
                 local_message_id,
                 server_message_id,
