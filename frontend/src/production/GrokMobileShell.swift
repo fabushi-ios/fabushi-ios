@@ -15,6 +15,8 @@ internal struct GrokMobileShell: View {
     @State var createBotOpen = false
     @State var botName = ""
     @State var botDescription = ""
+    @State var botAvatarShape = "wedge"
+    @State var botAvatarColor = "cyan"
     @State var botBusy = false
     @State var botError: String?
     @State var botRenameTarget: MobileBotSummary?
