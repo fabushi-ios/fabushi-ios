@@ -64,6 +64,7 @@ final class FabushiRemoteDeviceGateway {
     func setLoggedIn(_ loggedIn: Bool) async {
         desiredLoggedIn = loggedIn
         if !loggedIn {
+            await revokeVoIPRegistrationBeforeLogout()
             stopConnection(reason: "logged-out")
             monitorTask?.cancel()
             monitorTask = nil
@@ -162,6 +163,23 @@ final class FabushiRemoteDeviceGateway {
                 }
             }
         }
+    }
+
+    private func revokeVoIPRegistrationBeforeLogout() async {
+        guard let socket, socket.state == .running, activeSession != nil else { return }
+        do {
+            try await send(Self.logoutRegistrationMessage(), over: socket)
+            appendTrace(["phase": "voip-registration-revoked"])
+        } catch {
+            appendTrace([
+                "phase": "voip-registration-revoke-failed",
+                "error": Self.safeErrorCode(error),
+            ])
+        }
+    }
+
+    static func logoutRegistrationMessage() -> [String: String] {
+        ["type": "unregister", "reason": "logout"]
     }
 
     private func stopConnection(reason: String) {
@@ -428,7 +446,7 @@ final class FabushiRemoteDeviceGateway {
             return nil
         }
         let token = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard token.count >= 32, token.count <= 512,
+        guard token.count >= 32, token.count <= 512, token.count.isMultiple(of: 2),
               token.range(of: #"^[0-9a-f]+$"#, options: .regularExpression) != nil
         else { return nil }
         return token
