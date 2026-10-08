@@ -1277,6 +1277,75 @@ mod mobile_turn_execution_composition_tests {
         drop(host);
         let _ = fs::remove_dir_all(root);
     }
+
+    #[test]
+    fn shipping_mobile_host_routes_human_call_state_through_host_owner() {
+        let root = temp_dir();
+        let host = MobileAppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test).unwrap();
+        let create = serde_json::json!({
+            "id": "call-create",
+            "method": "createCallSession",
+            "params": {
+                "scopeId": "conversation-1",
+                "creatorId": "alice",
+                "participantIds": ["alice", "bob"]
+            }
+        });
+        let created: serde_json::Value =
+            serde_json::from_str(&host.dispatch_json(&create.to_string())).unwrap();
+        assert_eq!(created["ok"], true);
+        assert_eq!(created["result"]["state"], "invited");
+        let call_id = created["result"]["id"].as_str().unwrap().to_string();
+
+        let ring = serde_json::json!({
+            "id": "call-ring",
+            "method": "transitionCallSession",
+            "params": {
+                "callId": call_id,
+                "generation": 0,
+                "action": "ring"
+            }
+        });
+        let ringing: serde_json::Value =
+            serde_json::from_str(&host.dispatch_json(&ring.to_string())).unwrap();
+        assert_eq!(ringing["ok"], true);
+        assert_eq!(ringing["result"]["state"], "ringing");
+
+        let signal = serde_json::json!({
+            "id": "call-signal",
+            "method": "sendCallSignal",
+            "params": {
+                "callId": call_id,
+                "generation": 0,
+                "seq": 1,
+                "senderDeviceId": "device-a",
+                "kind": "offer",
+                "payload": {"sdp": "offer"}
+            }
+        });
+        let signaled: serde_json::Value =
+            serde_json::from_str(&host.dispatch_json(&signal.to_string())).unwrap();
+        assert_eq!(signaled["ok"], true);
+        assert_eq!(signaled["result"]["seq"], 1);
+
+        let list = serde_json::json!({
+            "id": "call-list-signals",
+            "method": "listCallSignals",
+            "params": {
+                "callId": call_id,
+                "generation": 0,
+                "afterSeq": 0,
+                "limit": 100
+            }
+        });
+        let signals: serde_json::Value =
+            serde_json::from_str(&host.dispatch_json(&list.to_string())).unwrap();
+        assert_eq!(signals["ok"], true);
+        assert_eq!(signals["result"].as_array().unwrap().len(), 1);
+
+        drop(host);
+        let _ = fs::remove_dir_all(root);
+    }
 }
 
 #[cfg(target_os = "android")]
