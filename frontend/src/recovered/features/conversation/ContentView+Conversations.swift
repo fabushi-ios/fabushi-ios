@@ -148,6 +148,12 @@ extension ContentView {
                 .navigationTitle(section.label)
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("完成") { activeSection = nil } } }
             }
+        } else if section == .calls {
+            HumanCallsView(
+                conversations: messaging.conversations,
+                bridge: bridge,
+                onClose: { activeSection = nil }
+            )
         } else if section == .groups || section == .channels || section == .archive || section == .saved {
             NavigationStack {
                 List {
