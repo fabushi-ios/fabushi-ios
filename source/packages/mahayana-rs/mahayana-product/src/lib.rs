@@ -4556,6 +4556,91 @@ mod tests {
     }
 
     #[test]
+    fn human_call_transport_keeps_account_token_in_rust_and_binds_device_header() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind Human call test server");
+        let address = listener.local_addr().expect("Human call test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept Human call request");
+            let mut request = [0_u8; 8192];
+            let size = stream.read(&mut request).expect("read Human call request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("POST /api/social/calls "));
+            let lower = request.to_ascii_lowercase();
+            assert!(lower.contains("authorization: bearer test-token"));
+            assert!(lower.contains("x-fabushi-device-id: device-1"));
+            let (_, body) = request
+                .split_once("\r\n\r\n")
+                .expect("Human call request body separator");
+            let body: Value = serde_json::from_str(body).expect("valid Human call body");
+            assert_eq!(body["callId"], "call-1");
+            assert_eq!(body["targetUserId"], "peer-2");
+
+            let response = r#"{"success":true,"call":{"callId":"call-1"}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.len(),
+                response
+            )
+            .expect("write Human call response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-human-call-transport-test-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let response = client
+            .execute(
+                "mahayana.calls.create",
+                &json!({
+                    "callId": "call-1",
+                    "peerHumanId": "peer-2",
+                    "accessToken": "test-token",
+                    "deviceId": "device-1",
+                }),
+            )
+            .expect("create Human call");
+        assert_eq!(response["call"]["callId"], "call-1");
+        server.join().expect("join Human call test server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn human_call_transport_rejects_mismatched_backend_identity() {
+        assert!(ensure_call_identity(
+            &json!({"call":{"callId":"other"}}),
+            "call-1"
+        )
+        .is_err());
+        assert!(ensure_call_event_identity(
+            &json!({
+                "call":{"callId":"call-1"},
+                "event":{
+                    "callId":"call-1",
+                    "clientEventId":"event-2",
+                    "generation":3,
+                    "kind":"offer"
+                }
+            }),
+            "call-1",
+            "event-1",
+            3,
+            "offer"
+        )
+        .is_err());
+    }
+
+    #[test]
     fn terminal_session_errors_are_classified_for_local_eviction() {
         assert!(terminal_session_error(&ProductError::NotLoggedIn));
         assert!(terminal_session_error(&ProductError::SessionExpired));
