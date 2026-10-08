@@ -54,9 +54,12 @@ private struct ForwardMessageSheet: View {
 
                 Section("选项") {
                     Toggle("隐藏原发送者", isOn: $dropSenderNames)
-                        .disabled(optionsLocked || sending)
+                        .disabled(optionsLocked || sending || dropCaptions)
                     Toggle("移除媒体说明文字", isOn: $dropCaptions)
                         .disabled(optionsLocked || sending)
+                        .onChange(of: dropCaptions) { _, enabled in
+                            if enabled { dropSenderNames = true }
+                        }
                 }
 
                 Section("会话") {
@@ -236,6 +239,8 @@ private struct ForwardMessageSheet: View {
         sending = false
         if results.isEmpty {
             errorText = "没有可发送的目标会话。"
+        } else if results.allSatisfy(\.sent) {
+            onDismiss()
         }
     }
 }
