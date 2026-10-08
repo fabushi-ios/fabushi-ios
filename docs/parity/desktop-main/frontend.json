@@ -341,14 +341,15 @@
       "desktop_owner": "renderer / ForwardMessageDialog over canonical Human messaging RPC",
       "desktop_visible_effect": "Users can safely forward one message to multiple eligible conversations, choose whether sender attribution or media captions are retained, see partial failures, and retry only failed targets.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MessagingModel.swift; source/packages/mahayana-messaging/src/{protocol.rs,service.rs,engine.rs}",
+      "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "Swift / SwiftUI + Rust",
       "ios_platform_delta": "SwiftUI sheet replaces the Desktop dialog while canonical fabushi-messaging-core owns eligibility, authorization, stable replay identity and message mutation. The iOS sheet keeps per-destination client IDs across failed-only retries and never uses the local conversation list as an authorization source.",
-      "implementation_status": "implemented",
+      "implementation_status": "mapped",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift (ForwardMessageSheet); mobile/ios/Fabushi/MessagingModel.swift (searchForwardRecipients/forwardMessageBatch); source/packages/mahayana-messaging/src/protocol.rs (ListForwardRecipients/ForwardRecipients + forward options); source/packages/mahayana-messaging/src/service.rs (authorized discovery/idempotent replay); source/packages/mahayana-messaging/src/engine.rs (destination policy + forward projection)",
       "test_evidence": "source/packages/mahayana-messaging/src/engine.rs::forward_parity_tests; exact-HEAD GitHub Actions required before verified promotion",
-      "notes": "IOS-MAIN-FORWARD-DIALOG-001 reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 blob 45b4031d4e9a9081ec3e3987d77b7128add050c5. Production implementation is present on the iOS PR branch; remains below verified until current-head Rust/Swift/protected acceptance completes.",
-      "authority_review_state": "reviewed"
+      "notes": "IOS-MAIN-FORWARD-DIALOG-001: current Desktop-main behavior/owner review completed and production implementation exists on the iOS PR branch, but the live-main impact gate deliberately keeps every added/blob-changed row re-review-fenced below implemented until the aggregate current-main review is accepted. Exact source: 3bc92400826cc4ca7ac665b467708e22261edc61 / blob 45b4031d4e9a9081ec3e3987d77b7128add050c5. Current-head Actions still required.",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/production/ProductionRenderer.tsx",
@@ -564,14 +565,15 @@
       "desktop_owner": "renderer / forward recipient navigation policy",
       "desktop_visible_effect": "Forward-recipient selection remains predictable while search results change and cannot target an ineligible or hidden conversation.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MessagingModel.swift; source/packages/mahayana-messaging/src/service.rs",
+      "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "Swift / SwiftUI + Rust",
       "ios_platform_delta": "Native SwiftUI List/search replaces Desktop keyboard-index helpers. Selection identity is conversation-ID based, persists independently of query reordering, and recipient rows originate only from server-filtered ForwardRecipients results.",
-      "implementation_status": "implemented",
+      "implementation_status": "mapped",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift (selectedRecipients/clientMessageIds/settlements); mobile/ios/Fabushi/MessagingModel.swift (searchForwardRecipients); source/packages/mahayana-messaging/src/service.rs (forward_recipients_envelope/can_forward_to)",
       "test_evidence": "source/packages/mahayana-messaging/src/engine.rs::forward_parity_tests; exact-HEAD GitHub Actions required before verified promotion",
-      "notes": "IOS-MAIN-FORWARD-NAV-001 reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 blob aba269a9dd687747e4d53fd1d971f74451a8542c. Native navigation uses identity-based SwiftUI selection rather than copying DOM arrow-index code; remains below verified pending current-head Actions.",
-      "authority_review_state": "reviewed"
+      "notes": "IOS-MAIN-FORWARD-NAV-001: current Desktop-main behavior/owner review completed and native identity-based selection is wired, but this added source remains re-review-fenced below implemented by the aggregate live-main impact gate until full current-main review acceptance. Exact source: 3bc92400826cc4ca7ac665b467708e22261edc61 / blob aba269a9dd687747e4d53fd1d971f74451a8542c. Current-head Actions still required.",
+      "authority_review_state": "requires-current-main-review",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/production/group-members-root.ts",
