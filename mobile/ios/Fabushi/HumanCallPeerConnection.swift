@@ -253,7 +253,7 @@ final class HumanCallPeerConnection: NSObject {
         try audioSession.setCategory(
             .playAndRecord,
             mode: .videoChat,
-            options: [.defaultToSpeaker, .allowBluetoothHFP]
+            options: [.defaultToSpeaker, .allowBluetooth]
         )
         try audioSession.setActive(true)
     }
