@@ -24,7 +24,7 @@ internal actor HumanCallBroadcastFrameReceiver {
             guard let self else { return }
             var lastSequence: UInt64 = 0
             while !Task.isCancelled {
-                if let snapshot = self.readSnapshot(
+                if let snapshot = await self.readSnapshot(
                     sessionID: sessionID,
                     afterSequence: lastSequence
                 ) {
