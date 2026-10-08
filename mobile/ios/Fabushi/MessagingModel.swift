@@ -140,6 +140,19 @@ internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let isPinned: Bool
 }
 
+internal struct ForwardDestinationRequest: Identifiable, Equatable, Sendable {
+    var id: String { conversationId }
+    let conversationId: String
+    let clientMessageId: String
+}
+
+internal struct ForwardSettlement: Identifiable, Equatable, Sendable {
+    var id: String { conversationId }
+    let conversationId: String
+    let sent: Bool
+    let error: String?
+}
+
 @MainActor
 @Observable
 final class MessagingModel {
@@ -471,14 +484,83 @@ final class MessagingModel {
         }
     }
 
-    func forwardMessage(sourceConversationId: String, messageId: String, destinationConversationId: String) async {
-        try? await executeAfterIdentity([
+    func searchForwardRecipients(
+        sourceConversationId: String,
+        messageId: String,
+        query: String,
+        limit: Int = 100
+    ) async throws -> [ConversationSummary] {
+        try await ensureIdentity()
+        let envelopes = try await execute(command: [
+            "type": "listForwardRecipients",
+            "sourceConversationId": sourceConversationId,
+            "messageId": messageId,
+            "query": query,
+            "limit": max(1, min(limit, 100)),
+        ])
+        for envelope in envelopes {
+            guard let event = envelope["event"] as? [String: Any],
+                  event["type"] as? String == "forwardRecipients",
+                  let rows = event["recipients"] as? [[String: Any]]
+            else { continue }
+            return rows.compactMap(parseConversation)
+        }
+        return []
+    }
+
+    func forwardMessage(
+        sourceConversationId: String,
+        messageId: String,
+        destination: ForwardDestinationRequest,
+        dropSenderNames: Bool,
+        dropCaptions: Bool
+    ) async throws {
+        try await executeAfterIdentity([
             "type": "forwardMessage",
             "sourceConversationId": sourceConversationId,
             "messageId": messageId,
-            "destinationConversationId": destinationConversationId,
-            "clientMessageId": "ios:\(UUID().uuidString.lowercased())",
+            "destinationConversationId": destination.conversationId,
+            "clientMessageId": destination.clientMessageId,
+            "dropSenderNames": dropSenderNames,
+            "dropCaptions": dropCaptions,
         ])
+    }
+
+    func forwardMessageBatch(
+        sourceConversationId: String,
+        messageId: String,
+        destinations: [ForwardDestinationRequest],
+        dropSenderNames: Bool,
+        dropCaptions: Bool
+    ) async -> [ForwardSettlement] {
+        var settlements: [ForwardSettlement] = []
+        for destination in destinations {
+            do {
+                try await forwardMessage(
+                    sourceConversationId: sourceConversationId,
+                    messageId: messageId,
+                    destination: destination,
+                    dropSenderNames: dropSenderNames,
+                    dropCaptions: dropCaptions
+                )
+                settlements.append(
+                    ForwardSettlement(
+                        conversationId: destination.conversationId,
+                        sent: true,
+                        error: nil
+                    )
+                )
+            } catch {
+                settlements.append(
+                    ForwardSettlement(
+                        conversationId: destination.conversationId,
+                        sent: false,
+                        error: error.localizedDescription
+                    )
+                )
+            }
+        }
+        return settlements
     }
 
     func startTyping(_ conversationId: String) async {
