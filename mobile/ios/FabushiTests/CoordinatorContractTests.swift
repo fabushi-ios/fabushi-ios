@@ -6,7 +6,8 @@ private func validatedTestCoordinatorBootstrap() throws -> ValidatedCoordinatorB
         processConfig: .init(
             appVersion: "1.0-test",
             isPackaged: false,
-            dataDir: "/tmp/fabushi-coordinator-tests"
+            dataDir: "/tmp/fabushi-coordinator-tests",
+            localHumanId: "human-test"
         )
     ).validatedForCarrier()
 }
@@ -220,23 +221,106 @@ final class CoordinatorContractTests: XCTestCase {
             featureHostTest: true
         )
         let runtime = IOSCoordinatorRuntime(main: main)
-        let first = runtime.start()
 
+        XCTAssertThrowsError(try runtime.start()) { error in
+            XCTAssertEqual(error as? CoordinatorCarrierError, .missingLocalHumanIdentity)
+        }
+
+        main.applySettledHostLocalHumanIdentity("human-1")
+        let first = try runtime.start()
+        XCTAssertEqual(first.clientPort.bootstrap.value.processConfig.localHumanId, "human-1")
         XCTAssertEqual(runtime.state, .running(generation: 1))
         XCTAssertTrue(runtime.accepts(generation: 1))
 
-        runtime.restart()
-        let second = runtime.start()
+        try runtime.restart()
+        let second = try runtime.start()
 
         XCTAssertFalse(first === second)
         XCTAssertTrue(first.clientPort.isClosed)
+        XCTAssertEqual(second.clientPort.bootstrap.value.processConfig.localHumanId, "human-1")
         XCTAssertEqual(runtime.state, .running(generation: 2))
         XCTAssertFalse(runtime.accepts(generation: 1))
         XCTAssertTrue(runtime.accepts(generation: 2))
 
+        main.applySettledHostLocalHumanIdentity(nil)
+        XCTAssertThrowsError(try runtime.restart()) { error in
+            XCTAssertEqual(error as? CoordinatorCarrierError, .missingLocalHumanIdentity)
+        }
+        XCTAssertEqual(runtime.state, .stopped)
+        XCTAssertTrue(second.clientPort.isClosed)
+
+        main.applySettledHostLocalHumanIdentity("human-2")
+        let replacement = try runtime.start()
+        XCTAssertEqual(replacement.clientPort.bootstrap.value.processConfig.localHumanId, "human-2")
+        XCTAssertEqual(runtime.state, .running(generation: 4))
+
         runtime.dispose()
         XCTAssertEqual(runtime.state, .disposed)
-        XCTAssertTrue(second.clientPort.isClosed)
+        XCTAssertTrue(replacement.clientPort.isClosed)
+    }
+
+    @MainActor
+    func testCoordinatorAccountTransitionClearsIdentityBeforeReplacementAuthorization() async {
+        var events: [String] = []
+        var localHumanId: String? = "human-1"
+        let cleanup = ProductionAccountTransitionCleanup(
+            dependencies: .init(
+                clearAccountScope: {
+                    localHumanId = nil
+                    events.append("clear")
+                },
+                didClearAccountScope: { previous, next in
+                    events.append("cleared:\(previous)->\(next ?? "nil")")
+                }
+            )
+        )
+        let runtime = CoordinatorAccountRuntime(
+            activeSlot: "human-1",
+            cleanup: cleanup,
+            authorize: { slot, _ in
+                XCTAssertNil(localHumanId)
+                events.append("authorize:\(slot ?? "nil")")
+                localHumanId = slot
+                return .ready(slot: slot)
+            }
+        )
+
+        let result = await runtime.transition(to: "human-2")
+
+        XCTAssertEqual(result, .ready(slot: "human-2"))
+        XCTAssertEqual(localHumanId, "human-2")
+        XCTAssertEqual(
+            events,
+            ["clear", "cleared:human-1->human-2", "authorize:human-2"]
+        )
+    }
+
+    func testCoordinatorBootstrapCodablePreservesLocalHumanIdentity() throws {
+        let bootstrap = CoordinatorBootstrap(
+            processConfig: .init(
+                appVersion: "1.0",
+                isPackaged: true,
+                dataDir: "/tmp/fabushi",
+                localHumanId: "human-42"
+            )
+        )
+        let encoded = try JSONEncoder().encode(bootstrap)
+        let decoded = try JSONDecoder().decode(CoordinatorBootstrap.self, from: encoded)
+        XCTAssertEqual(decoded.processConfig.localHumanId, "human-42")
+        XCTAssertNoThrow(try decoded.validatedForCarrier().requiringLocalHumanIdentity())
+
+        let unscoped = CoordinatorBootstrap(
+            processConfig: .init(
+                appVersion: "1.0",
+                isPackaged: true,
+                dataDir: "/tmp/fabushi"
+            )
+        )
+        XCTAssertThrowsError(
+            try unscoped.validatedForCarrier().requiringLocalHumanIdentity()
+        ) { error in
+            XCTAssertEqual(error as? CoordinatorCarrierError, .missingLocalHumanIdentity)
+        }
     }
 
     @MainActor
