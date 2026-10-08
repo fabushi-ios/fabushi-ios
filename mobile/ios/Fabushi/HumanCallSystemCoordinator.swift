@@ -16,15 +16,21 @@ internal struct HumanCallPushDescriptor: Equatable, Sendable {
         else {
             return nil
         }
-        let generation = (payload["generation"] as? NSNumber)?.intValue ?? 0
-        guard generation >= 0 else { return nil }
-        let displayName = (payload["displayName"] as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            let generationNumber = payload["generation"] as? NSNumber,
+            let displayNameValue = payload["displayName"] as? String,
+            let hasVideo = payload["hasVideo"] as? Bool
+        else {
+            return nil
+        }
+        let generation = generationNumber.intValue
+        let displayName = displayNameValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard generation >= 0, !displayName.isEmpty else { return nil }
         return HumanCallPushDescriptor(
             callId: callId,
             generation: generation,
-            displayName: displayName?.isEmpty == false ? displayName! : "Fabushi 通话",
-            hasVideo: (payload["hasVideo"] as? Bool) ?? false
+            displayName: displayName,
+            hasVideo: hasVideo
         )
     }
 }
