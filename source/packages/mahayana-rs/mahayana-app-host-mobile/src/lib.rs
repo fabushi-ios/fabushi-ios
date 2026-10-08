@@ -1404,13 +1404,16 @@ impl MobileAppHost {
                 let claimed_device_id = claimed_device_id
                     .and_then(serde_json::Value::as_str)
                     .map(str::to_string);
+                let is_owner =
+                    claimed_device_id.as_deref() == Some(device_id.as_str());
+                let claim_available = claimed_device_id.is_none();
                 Ok(serde_json::json!({
                     "userId": local_human_id,
                     "deviceId": device_id,
                     "role": role,
                     "claimedDeviceId": claimed_device_id,
-                    "isOwner": claimed_device_id.as_deref() == Some(device_id.as_str()),
-                    "claimAvailable": claimed_device_id.is_none(),
+                    "isOwner": is_owner,
+                    "claimAvailable": claim_available,
                     "creatorDeviceId": remote.get("creatorDeviceId").cloned().unwrap_or(serde_json::Value::Null),
                     "peerDeviceId": remote.get("peerDeviceId").cloned().unwrap_or(serde_json::Value::Null),
                     "state": local.state,
