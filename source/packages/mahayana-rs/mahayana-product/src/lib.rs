@@ -1947,6 +1947,7 @@ impl MahayanaProductClient {
                 if let Some(reply_to_message_id) = optional_string(request, "replyToMessageId") {
                     body["replyToMessageId"] = Value::String(reply_to_message_id.to_string());
                 }
+                apply_direct_message_delivery_options(request, &mut body)?;
                 self.authorized_social_post(request, "/api/social/messages", body)
             }
             "mahayana.messages.reaction.set" => {
@@ -3913,6 +3914,37 @@ fn decode_value<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T, Product
     serde_json::from_value(value).map_err(|error| ProductError::Response(error.to_string()))
 }
 
+const JAVASCRIPT_MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+
+fn apply_direct_message_delivery_options(
+    request: &Value,
+    body: &mut Value,
+) -> Result<(), ProductError> {
+    if let Some(value) = request.get("silent") {
+        match value {
+            Value::Null => {}
+            Value::Bool(silent) => body["silent"] = Value::Bool(*silent),
+            _ => return Err(ProductError::InvalidParameter("silent")),
+        }
+    }
+
+    if let Some(value) = request.get("scheduledAtMs") {
+        match value {
+            Value::Null => {}
+            Value::Number(_) => {
+                let scheduled_at_ms = value
+                    .as_u64()
+                    .filter(|value| *value > 0 && *value <= JAVASCRIPT_MAX_SAFE_INTEGER)
+                    .ok_or(ProductError::InvalidParameter("scheduledAtMs"))?;
+                body["scheduledAtMs"] = Value::from(scheduled_at_ms);
+            }
+            _ => return Err(ProductError::InvalidParameter("scheduledAtMs")),
+        }
+    }
+
+    Ok(())
+}
+
 fn optional_string<'a>(request: &'a Value, name: &str) -> Option<&'a str> {
     request
         .get(name)
@@ -4552,6 +4584,99 @@ mod tests {
         ).expect("feedback submit");
         assert_eq!(response["issueNumber"], 42);
         server.join().expect("join feedback server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn direct_message_delivery_options_match_server_scheduling_contract() {
+        let mut body = json!({"text":"scheduled"});
+        apply_direct_message_delivery_options(
+            &json!({
+                "silent": true,
+                "scheduledAtMs": 2_000_000_000_000_u64,
+            }),
+            &mut body,
+        )
+        .expect("valid delivery options");
+        assert_eq!(body["silent"], true);
+        assert_eq!(body["scheduledAtMs"], 2_000_000_000_000_u64);
+
+        let mut defaults = json!({});
+        apply_direct_message_delivery_options(
+            &json!({"silent": null, "scheduledAtMs": null}),
+            &mut defaults,
+        )
+        .expect("null delivery options use server defaults");
+        assert!(defaults.get("silent").is_none());
+        assert!(defaults.get("scheduledAtMs").is_none());
+
+        for invalid in [
+            json!({"silent":"yes"}),
+            json!({"scheduledAtMs":0}),
+            json!({"scheduledAtMs":1.5}),
+            json!({"scheduledAtMs":JAVASCRIPT_MAX_SAFE_INTEGER + 1}),
+        ] {
+            let mut body = json!({});
+            assert!(apply_direct_message_delivery_options(&invalid, &mut body).is_err());
+        }
+    }
+
+    #[test]
+    fn direct_message_transport_forwards_silent_and_scheduled_delivery() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind direct message test server");
+        let address = listener.local_addr().expect("direct message test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept direct message request");
+            let mut request = [0_u8; 8192];
+            let size = stream.read(&mut request).expect("read direct message request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("POST /api/social/messages "));
+            let lower = request.to_ascii_lowercase();
+            assert!(lower.contains("authorization: bearer test-token"));
+            assert!(lower.contains("x-fabushi-device-id: device-1"));
+            assert!(request.contains("\"silent\":true"));
+            assert!(request.contains("\"scheduledAtMs\":2000000000000"));
+
+            let response = r#"{"success":true,"message":{"id":1}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.len(),
+                response
+            )
+            .expect("write direct message response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-direct-message-delivery-test-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let response = client
+            .execute(
+                "mahayana.messages.send",
+                &json!({
+                    "contact": "peer-2",
+                    "text": "scheduled",
+                    "clientRequestId": "message-1",
+                    "silent": true,
+                    "scheduledAtMs": 2_000_000_000_000_u64,
+                    "accessToken": "test-token",
+                    "deviceId": "device-1",
+                }),
+            )
+            .expect("send scheduled direct message");
+        assert_eq!(response["success"], true);
+        server.join().expect("join direct message test server");
         let _ = std::fs::remove_dir_all(root);
     }
 
