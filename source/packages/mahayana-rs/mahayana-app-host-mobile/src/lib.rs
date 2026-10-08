@@ -652,7 +652,7 @@ impl MobileHostBridge {
                                 Ok(output) => output,
                                 Err(fault) => Err(format!(
                                     "host_fault[{}]: {}",
-                                    fault.kind, fault.message
+                                    fault.scope, fault.message
                                 )),
                             };
                             let _ = reply.send(output);
