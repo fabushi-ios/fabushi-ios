@@ -947,7 +947,10 @@ final class CoordinatorMcpSurface {
         switch method {
         case "getBoxMigrationStatus":
             try await requireCursorComputerLifecycle()
-            return .handled(computerMigrationStatus ?? computerMigrationLastTerminal ?? NSNull())
+            if let status = computerMigrationStatus ?? computerMigrationLastTerminal {
+                return .handled(status)
+            }
+            return .handled(NSNull())
 
         case "updateComputer":
             try await requireCursorComputerLifecycle()
