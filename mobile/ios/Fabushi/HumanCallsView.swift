@@ -151,7 +151,7 @@ internal struct HumanCallsView: View {
                         .font(.headline)
                     Text(call.stateLabel)
                         .font(.caption)
-                        .foregroundStyle(call.isTerminal ? .secondary : Color.accentColor)
+                        .foregroundStyle(call.isTerminal ? Color.secondary : Color.accentColor)
                 }
                 Spacer()
                 if actionCallId == call.id {
