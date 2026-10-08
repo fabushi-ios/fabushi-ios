@@ -217,4 +217,23 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         XCTAssertEqual(windowsTitleBarOverlayHeight(true), 43)
         XCTAssertEqual(windowsTitleBarOverlayHeight(false), 51)
     }
+    func testAPNsEntitlementFollowsBuildConfiguration() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let entitlements = try String(
+            contentsOf: iosRoot.appendingPathComponent("Fabushi/Fabushi.entitlements"),
+            encoding: .utf8
+        )
+        let project = try String(
+            contentsOf: iosRoot.appendingPathComponent("project.yml"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(entitlements.contains("<string>$(APS_ENVIRONMENT)</string>"))
+        XCTAssertFalse(entitlements.contains("<string>development</string>"))
+        XCTAssertTrue(project.contains("APS_ENVIRONMENT: development"))
+        XCTAssertTrue(project.contains("APS_ENVIRONMENT: production"))
+    }
+
 }
