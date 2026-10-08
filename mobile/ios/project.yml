@@ -28,6 +28,8 @@ targets:
     dependencies:
       - package: LiveKitWebRTC
         product: LiveKitWebRTC
+      - target: FabushiBroadcastUpload
+        embed: true
     sources:
       - path: Fabushi
         excludes:
@@ -105,6 +107,25 @@ targets:
         - FabushiTests
         - FabushiUITests
       gatherCoverageData: true
+  FabushiBroadcastUpload:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: FabushiBroadcastUpload
+      - path: Fabushi/HumanCallBroadcastIPC.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ombhrum.fabushi.broadcast
+        CODE_SIGN_ENTITLEMENTS: FabushiBroadcastUpload/FabushiBroadcastUpload.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+    info:
+      path: FabushiBroadcastUpload/Info.plist
+      properties:
+        CFBundleDisplayName: Fabushi 屏幕共享
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
   FabushiTests:
     type: bundle.unit-test
     platform: iOS
