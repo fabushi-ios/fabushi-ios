@@ -419,7 +419,15 @@ extension ContentView {
     func chatView(_ conversation: ConversationSummary) -> some View {
         let messages = messaging.messagesByConversation[conversation.id] ?? []
         let searchMatches = chatSearchMatches(
-            messages.map { ChatSearchEntry(id: $0.id, text: chatSearchText(for: $0)) },
+            messages.map {
+                ChatSearchEntry(
+                    id: $0.id,
+                    text: chatSearchText(
+                        for: $0,
+                        author: messaging.searchAuthorByMessageId[$0.id]
+                    )
+                )
+            },
             query: chatSearchQuery
         )
         return NavigationStack {

@@ -10,8 +10,8 @@ internal struct ChatSearchMatch: Equatable, Sendable {
     let occurrence: Int
 }
 
-internal func chatSearchText(for message: ChatMessage) -> String {
-    [message.text, message.mediaFileName, message.contactName, message.pollQuestion, message.pollOptions.isEmpty ? nil : message.pollOptions.map(\.text).joined(separator: "\n"), message.forwardOrigin]
+internal func chatSearchText(for message: ChatMessage, author: String? = nil) -> String {
+    [message.text, author, message.mediaFileName, message.contactName, message.pollQuestion, message.pollOptions.isEmpty ? nil : message.pollOptions.map(\.text).joined(separator: "\n"), message.forwardOrigin]
         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty }
         .joined(separator: "\n")

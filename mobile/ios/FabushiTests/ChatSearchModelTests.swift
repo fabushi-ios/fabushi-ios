@@ -20,6 +20,35 @@ final class ChatSearchModelTests: XCTestCase {
         )
     }
 
+    func testCanonicalMessageAuthorProjectionUsesSelfAndContactsWithoutGuessingUnknownActors() {
+        let contacts = [
+            MessagingContact(id: "peer-1", displayName: "Alice", username: nil, kind: "human"),
+        ]
+        XCTAssertEqual(
+            MessagingModel.searchAuthorName(
+                senderId: "self",
+                currentActorId: "self",
+                contacts: contacts
+            ),
+            "You"
+        )
+        XCTAssertEqual(
+            MessagingModel.searchAuthorName(
+                senderId: "peer-1",
+                currentActorId: "self",
+                contacts: contacts
+            ),
+            "Alice"
+        )
+        XCTAssertNil(
+            MessagingModel.searchAuthorName(
+                senderId: "unknown",
+                currentActorId: "self",
+                contacts: contacts
+            )
+        )
+    }
+
     func testSearchNavigationWrapsBothDirections() {
         XCTAssertEqual(nextChatSearchIndex(current: nil, count: 3, delta: 1), 0)
         XCTAssertEqual(nextChatSearchIndex(current: nil, count: 3, delta: -1), 2)

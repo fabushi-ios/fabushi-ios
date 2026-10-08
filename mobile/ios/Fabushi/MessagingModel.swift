@@ -161,6 +161,7 @@ final class MessagingModel {
     private(set) var folders: [MessagingFolder] = []
     private(set) var draftsByConversation: [String: MessagingDraft] = [:]
     private(set) var messagesByConversation: [String: [ChatMessage]] = [:]
+    private(set) var searchAuthorByMessageId: [String: String] = [:]
     private(set) var typingActorByConversation: [String: String] = [:]
     private(set) var loading = false
     private(set) var errorMessage: String?
@@ -646,13 +647,31 @@ final class MessagingModel {
                 contacts = (event["actors"] as? [[String: Any]] ?? []).compactMap(parseContact)
                 folders = (event["folders"] as? [[String: Any]] ?? []).compactMap(parseFolder)
                 draftsByConversation = Dictionary(uniqueKeysWithValues: (event["drafts"] as? [[String: Any]] ?? []).compactMap(parseDraft).map { ($0.conversationId, $0) })
-                let messages = (event["messages"] as? [[String: Any]] ?? []).compactMap(parseMessage)
+                let rawMessages = event["messages"] as? [[String: Any]] ?? []
+                let messages = rawMessages.compactMap(parseMessage)
                 messagesByConversation = Dictionary(grouping: messages, by: \.conversationId)
+                searchAuthorByMessageId = Dictionary(
+                    uniqueKeysWithValues: rawMessages.compactMap { raw -> (String, String)? in
+                        guard let id = raw["id"] as? String,
+                              let senderId = raw["senderId"] as? String,
+                              let author = Self.searchAuthorName(
+                                senderId: senderId,
+                                currentActorId: actorId,
+                                contacts: contacts
+                              )
+                        else { return nil }
+                        return (id, author)
+                    }
+                )
             case "conversationChanged":
                 if let raw = event["conversation"] as? [String: Any], let conversation = parseConversation(raw) { upsert(conversation) }
             case "conversationParticipantChanged":
                 if let removedActorId = event["removedActorId"] as? String, removedActorId == actorId, let raw = event["conversation"] as? [String: Any], let id = raw["id"] as? String {
-                    conversations.removeAll { $0.id == id }; messagesByConversation.removeValue(forKey: id); draftsByConversation.removeValue(forKey: id)
+                    conversations.removeAll { $0.id == id }
+                    let removedMessageIds = Set(messagesByConversation[id, default: []].map(\.id))
+                    searchAuthorByMessageId = searchAuthorByMessageId.filter { !removedMessageIds.contains($0.key) }
+                    messagesByConversation.removeValue(forKey: id)
+                    draftsByConversation.removeValue(forKey: id)
                 } else if let raw = event["conversation"] as? [String: Any], let conversation = parseConversation(raw) { upsert(conversation) }
             case "markedUnreadChanged":
                 guard let conversationId = event["conversationId"] as? String else { continue }
@@ -673,10 +692,24 @@ final class MessagingModel {
                     var list = messagesByConversation[message.conversationId] ?? []
                     if let index = list.firstIndex(where: { $0.id == message.id }) { list[index] = message } else { list.append(message) }
                     messagesByConversation[message.conversationId] = list.sorted { $0.time < $1.time }
+                    if let senderId = raw["senderId"] as? String,
+                       let author = Self.searchAuthorName(
+                        senderId: senderId,
+                        currentActorId: actorId,
+                        contacts: contacts
+                       )
+                    {
+                        searchAuthorByMessageId[message.id] = author
+                    } else {
+                        searchAuthorByMessageId.removeValue(forKey: message.id)
+                    }
                 }
             case "messagesDeleted":
                 guard let id = event["conversationId"] as? String, let ids = event["messageIds"] as? [String] else { continue }
                 messagesByConversation[id]?.removeAll { ids.contains($0.id) }
+                for messageId in ids {
+                    searchAuthorByMessageId.removeValue(forKey: messageId)
+                }
             case "typingChanged":
                 guard let conversationId = event["conversationId"] as? String, let typingActorId = event["actorId"] as? String else { continue }
                 if typingActorId == actorId || event["action"] is NSNull || event["action"] == nil {
@@ -721,6 +754,15 @@ final class MessagingModel {
             "historyVisibility": "allMembers", "topics": [], "folderIds": [], "archived": false, "pinned": false, "markedUnread": false,
             "createdAtMs": now, "updatedAtMs": now,
         ]
+    }
+
+    static func searchAuthorName(
+        senderId: String,
+        currentActorId: String,
+        contacts: [MessagingContact]
+    ) -> String? {
+        if senderId == currentActorId { return "You" }
+        return contacts.first(where: { $0.id == senderId })?.displayName
     }
 
     private func parseContact(_ raw: [String: Any]) -> MessagingContact? {
