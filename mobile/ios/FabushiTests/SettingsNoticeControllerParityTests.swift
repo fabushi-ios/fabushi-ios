@@ -107,6 +107,8 @@ final class SettingsNoticeControllerParityTests: XCTestCase {
                 "settings-local-tool-permission",
                 "settings-security-key",
                 "settings-time-zone",
+                "settings-ui-preferences",
+                "settings-call-media",
                 "settings-router-provider",
                 "settings-usage-cancel-trial",
                 "settings-update-check",

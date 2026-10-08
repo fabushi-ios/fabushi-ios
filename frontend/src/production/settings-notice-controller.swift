@@ -14,6 +14,8 @@ enum SettingsNoticeOperation: String, CaseIterable, Equatable, Hashable, Sendabl
     case localToolPermission = "settings-local-tool-permission"
     case securityKey = "settings-security-key"
     case timeZone = "settings-time-zone"
+    case uiPreferences = "settings-ui-preferences"
+    case callMedia = "settings-call-media"
     case routerProvider = "settings-router-provider"
     case usageCancelTrial = "settings-usage-cancel-trial"
     case updateCheck = "settings-update-check"
