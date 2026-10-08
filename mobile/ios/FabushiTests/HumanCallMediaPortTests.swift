@@ -3,6 +3,7 @@ import XCTest
 @testable import Fabushi
 
 final class HumanCallMediaPortTests: XCTestCase {
+    @MainActor
     func testPermissionMappingMatchesDesktopCallMediaContract() {
         XCTAssertEqual(HumanCallMediaPort.permission(for: .authorized), .granted)
         XCTAssertEqual(HumanCallMediaPort.permission(for: .denied), .denied)
