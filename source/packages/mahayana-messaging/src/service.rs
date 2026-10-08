@@ -148,7 +148,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
 
         let actor_id = envelope.context.actor_id;
         let command = envelope.command;
-        self.validate_command_authorization(&actor_id, &command)?;
+        self.validate_command_authorization(&actor_id, &command, server_time_ms)?;
         match command {
             ClientCommand::BeginBlobUpload { metadata } => {
                 let status = self.blob_store()?.begin_upload(&metadata)?;
@@ -333,7 +333,10 @@ impl<S: MessagingStateStore> MessagingService<S> {
             .iter()
             .filter_map(|conversation_id| state.messages.get(conversation_id))
             .flat_map(|messages| messages.values())
-            .filter(|message| !message.deleted)
+            .filter(|message| {
+                !message.deleted
+                    && Self::message_visible_to_actor(actor_id, message, server_time_ms)
+            })
             .cloned()
         {
             index.index_message(message);
@@ -347,11 +350,45 @@ impl<S: MessagingStateStore> MessagingService<S> {
         }
     }
 
+    fn message_visible_to_actor(
+        actor_id: &ActorId,
+        message: &Message,
+        server_time_ms: i64,
+    ) -> bool {
+        &message.sender_id == actor_id
+            || message
+                .scheduled_at_ms
+                .is_none_or(|scheduled_at_ms| scheduled_at_ms <= server_time_ms)
+    }
+
+    fn require_visible_message<'a>(
+        &'a self,
+        actor_id: &ActorId,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+        server_time_ms: i64,
+        purpose: &str,
+    ) -> Result<&'a Message, MessagingServiceError> {
+        let denied = |reason: String| MessagingServiceError::UnauthorizedCommand(reason);
+        let message = self
+            .engine
+            .state()
+            .messages
+            .get(conversation_id)
+            .and_then(|messages| messages.get(message_id))
+            .ok_or_else(|| denied(format!("{purpose} message does not exist")))?;
+        if message.deleted || !Self::message_visible_to_actor(actor_id, message, server_time_ms) {
+            return Err(denied(format!("{purpose} message is not visible")));
+        }
+        Ok(message)
+    }
+
     fn forward_source_message(
         &self,
         actor_id: &ActorId,
         source_conversation_id: &ConversationId,
         message_id: &MessageId,
+        server_time_ms: i64,
     ) -> Result<&Message, MessagingServiceError> {
         let denied = |reason: &str| MessagingServiceError::UnauthorizedCommand(reason.into());
         let source = self
@@ -374,16 +411,13 @@ impl<S: MessagingStateStore> MessagingService<S> {
         if !source_access {
             return Err(denied("forward source requires conversation access"));
         }
-        let message = self
-            .engine
-            .state()
-            .messages
-            .get(source_conversation_id)
-            .and_then(|messages| messages.get(message_id))
-            .ok_or_else(|| denied("forward source message does not exist"))?;
-        if message.deleted {
-            return Err(denied("forward source message was deleted"));
-        }
+        let message = self.require_visible_message(
+            actor_id,
+            source_conversation_id,
+            message_id,
+            server_time_ms,
+            "forward source",
+        )?;
         if message.protected_content {
             return Err(denied("forward source message is protected"));
         }
@@ -677,7 +711,12 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 privacy,
             } => {
                 let original =
-                    self.forward_source_message(actor_id, source_conversation_id, message_id)?;
+                    self.forward_source_message(
+                    actor_id,
+                    source_conversation_id,
+                    message_id,
+                    server_time_ms,
+                )?;
                 let privacy = privacy.normalized();
                 let origin = if privacy.drop_sender_names {
                     None
@@ -823,6 +862,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
         &self,
         actor_id: &ActorId,
         command: &ClientCommand,
+        server_time_ms: i64,
     ) -> Result<(), MessagingServiceError> {
         let denied = |reason: &str| MessagingServiceError::UnauthorizedCommand(reason.into());
         match command {
@@ -1048,12 +1088,77 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     return Err(denied("conversation update requires owner/admin role"));
                 }
             }
+            ClientCommand::SendMessage {
+                conversation_id,
+                reply_to_message_id: Some(message_id),
+                ..
+            } => {
+                self.require_visible_message(
+                    actor_id,
+                    conversation_id,
+                    message_id,
+                    server_time_ms,
+                    "reply target",
+                )?;
+            }
+            ClientCommand::SetReaction {
+                conversation_id,
+                message_id,
+                ..
+            }
+            | ClientCommand::MarkRead {
+                conversation_id,
+                message_id,
+            }
+            | ClientCommand::PinMessage {
+                conversation_id,
+                message_id,
+                ..
+            }
+            | ClientCommand::VotePoll {
+                conversation_id,
+                message_id,
+                ..
+            }
+            | ClientCommand::EditMessage {
+                conversation_id,
+                message_id,
+                ..
+            } => {
+                self.require_visible_message(
+                    actor_id,
+                    conversation_id,
+                    message_id,
+                    server_time_ms,
+                    "message operation",
+                )?;
+            }
+            ClientCommand::DeleteMessages {
+                conversation_id,
+                message_ids,
+                ..
+            } => {
+                for message_id in message_ids {
+                    self.require_visible_message(
+                        actor_id,
+                        conversation_id,
+                        message_id,
+                        server_time_ms,
+                        "message delete",
+                    )?;
+                }
+            }
             ClientCommand::ListForwardRecipients {
                 source_conversation_id,
                 message_id,
                 ..
             } => {
-                self.forward_source_message(actor_id, source_conversation_id, message_id)?;
+                self.forward_source_message(
+                    actor_id,
+                    source_conversation_id,
+                    message_id,
+                    server_time_ms,
+                )?;
             }
             ClientCommand::ForwardMessage {
                 source_conversation_id,
@@ -1065,7 +1170,12 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     return Err(denied("forward destination must differ from source conversation"));
                 }
                 let source_message =
-                    self.forward_source_message(actor_id, source_conversation_id, message_id)?;
+                    self.forward_source_message(
+                    actor_id,
+                    source_conversation_id,
+                    message_id,
+                    server_time_ms,
+                )?;
                 let destination = self
                     .engine
                     .state()
@@ -1230,6 +1340,13 @@ impl<S: MessagingStateStore> MessagingService<S> {
             .entries
             .into_iter()
             .filter(|entry| entry.audience.iter().any(|candidate| candidate == actor_id))
+            .filter(|entry| {
+                Self::journal_event_visible_to_actor(
+                    actor_id,
+                    &entry.envelope.event,
+                    server_time_ms,
+                )
+            })
             .filter(|entry| match &entry.envelope.event {
                 ServerEvent::TypingChanged {
                     expires_at_ms: Some(expires_at_ms),
@@ -1539,6 +1656,9 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     .iter()
                     .filter_map(|id| state.messages.get(id))
                     .flat_map(|messages| messages.values())
+                    .filter(|message| {
+                        Self::message_visible_to_actor(actor_id, message, server_time_ms)
+                    })
                     .take(max_items)
                     .map(|message| self.project_message_for_actor(actor_id, message))
                     .collect(),
@@ -1659,6 +1779,11 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     .filter(|message| {
                         &message.sender_id != actor_id
                             && message.delivery_state == DeliveryState::Sent
+                            && Self::message_visible_to_actor(
+                                actor_id,
+                                message,
+                                server_time_ms,
+                            )
                     })
                     .map(|message| (conversation.id.clone(), message.id.clone()))
                     .collect::<Vec<_>>()
@@ -2358,7 +2483,11 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     }
                     _ => self.public_journal_envelope(response),
                 },
-                audience: self.event_audience(initiator, &response.event),
+                audience: self.event_audience(
+                    initiator,
+                    &response.event,
+                    response.server_time_ms,
+                ),
             })
             .collect()
     }
@@ -2379,6 +2508,19 @@ impl<S: MessagingStateStore> MessagingService<S> {
             }
         }
         envelope
+    }
+
+    fn journal_event_visible_to_actor(
+        actor_id: &ActorId,
+        event: &ServerEvent,
+        server_time_ms: i64,
+    ) -> bool {
+        match event {
+            ServerEvent::MessageAdded { message } | ServerEvent::MessageChanged { message } => {
+                Self::message_visible_to_actor(actor_id, message, server_time_ms)
+            }
+            _ => true,
+        }
     }
 
     fn project_journal_envelope_for_actor(
@@ -2404,7 +2546,12 @@ impl<S: MessagingStateStore> MessagingService<S> {
         self.public_journal_envelope(envelope)
     }
 
-    fn event_audience(&self, initiator: &ActorId, event: &ServerEvent) -> Vec<ActorId> {
+    fn event_audience(
+        &self,
+        initiator: &ActorId,
+        event: &ServerEvent,
+        server_time_ms: i64,
+    ) -> Vec<ActorId> {
         let mut audience = BTreeSet::from([initiator.clone()]);
         match event {
             ServerEvent::ActorChanged { actor } => {
@@ -2466,7 +2613,15 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 audience.insert(draft.actor_id.clone());
             }
             ServerEvent::MessageAdded { message } | ServerEvent::MessageChanged { message } => {
-                self.extend_conversation_id_audience(&mut audience, &message.conversation_id);
+                if message
+                    .scheduled_at_ms
+                    .is_none_or(|scheduled_at_ms| scheduled_at_ms <= server_time_ms)
+                {
+                    self.extend_conversation_id_audience(&mut audience, &message.conversation_id);
+                } else {
+                    audience.clear();
+                    audience.insert(message.sender_id.clone());
+                }
             }
             ServerEvent::MessagesDeleted {
                 conversation_id, ..

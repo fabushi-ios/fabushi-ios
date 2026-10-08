@@ -397,6 +397,157 @@ fn recipient_sync_marks_direct_message_delivered_and_mark_read_moves_it_to_read(
 }
 
 #[test]
+fn scheduled_direct_message_is_sender_private_until_due_across_snapshot_and_delta() {
+    let mut service = MessagingService::load(MemoryStateStore::default()).expect("load service");
+    setup_direct_conversation(&mut service);
+
+    let bob_baseline = service
+        .handle(
+            envelope(
+                "human:bob",
+                "sync:bob:scheduled-baseline",
+                ClientCommand::Sync {
+                    cursor: None,
+                    limit: 100,
+                },
+            ),
+            20,
+        )
+        .expect("bob baseline");
+    let bob_cursor = sync_cursor(&bob_baseline);
+
+    let sent = service
+        .handle(
+            envelope(
+                "human:alice",
+                "send:scheduled",
+                ClientCommand::SendMessage {
+                    conversation_id: ConversationId::new("chat:direct"),
+                    client_message_id: ClientMessageId("client:scheduled".into()),
+                    content: MessageContent::Text {
+                        text: FormattedText::plain("visible only when due"),
+                    },
+                    reply_to_message_id: None,
+                    thread_root_message_id: None,
+                    scheduled_at_ms: Some(100),
+                    silent: true,
+                    protected_content: false,
+                },
+            ),
+            30,
+        )
+        .expect("schedule message");
+    let message_id = message_from_events(&sent).id;
+
+    let alice_snapshot = service
+        .handle(
+            envelope(
+                "human:alice",
+                "sync:alice:scheduled",
+                ClientCommand::Sync {
+                    cursor: None,
+                    limit: 100,
+                },
+            ),
+            40,
+        )
+        .expect("sender snapshot");
+    assert!(alice_snapshot.iter().any(|event| matches!(
+        &event.event,
+        ServerEvent::SyncBatch { messages, .. }
+            if messages.iter().any(|message| message.id == message_id)
+    )));
+
+    let bob_snapshot = service
+        .handle(
+            envelope(
+                "human:bob",
+                "sync:bob:scheduled-hidden",
+                ClientCommand::Sync {
+                    cursor: None,
+                    limit: 100,
+                },
+            ),
+            40,
+        )
+        .expect("recipient snapshot before due");
+    assert!(bob_snapshot.iter().all(|event| !matches!(
+        &event.event,
+        ServerEvent::SyncBatch { messages, .. }
+            if messages.iter().any(|message| message.id == message_id)
+    )));
+    assert_eq!(
+        service.engine().state().messages[&ConversationId::new("chat:direct")][&message_id]
+            .delivery_state,
+        DeliveryState::Sent
+    );
+
+    let bob_early_delta = service
+        .handle(
+            second_device_envelope(
+                "human:bob",
+                "sync:bob:scheduled-delta-hidden",
+                ClientCommand::Sync {
+                    cursor: Some(bob_cursor),
+                    limit: 100,
+                },
+            ),
+            50,
+        )
+        .expect("recipient delta before due");
+    assert!(bob_early_delta.iter().all(|event| !matches!(
+        &event.event,
+        ServerEvent::MessageAdded { message } | ServerEvent::MessageChanged { message }
+            if message.id == message_id
+    )));
+    let bob_checkpoint = sync_cursor(&bob_early_delta);
+
+    let hidden_forward = service
+        .handle(
+            envelope(
+                "human:bob",
+                "forward:scheduled-hidden",
+                ClientCommand::ListForwardRecipients {
+                    source_conversation_id: ConversationId::new("chat:direct"),
+                    message_id: message_id.clone(),
+                    query: String::new(),
+                    limit: 20,
+                },
+            ),
+            60,
+        )
+        .expect_err("recipient cannot address future scheduled message");
+    assert!(matches!(
+        hidden_forward,
+        MessagingServiceError::UnauthorizedCommand(_)
+    ));
+
+    let bob_due_delta = service
+        .handle(
+            second_device_envelope(
+                "human:bob",
+                "sync:bob:scheduled-due",
+                ClientCommand::Sync {
+                    cursor: Some(bob_checkpoint),
+                    limit: 100,
+                },
+            ),
+            100,
+        )
+        .expect("recipient delta at due time");
+    assert!(bob_due_delta.iter().any(|event| matches!(
+        &event.event,
+        ServerEvent::MessageChanged { message }
+            if message.id == message_id && message.delivery_state == DeliveryState::Delivered
+    )));
+    assert_eq!(
+        service.engine().state().messages[&ConversationId::new("chat:direct")][&message_id]
+            .delivery_state,
+        DeliveryState::Delivered
+    );
+}
+
+#[test]
 fn durable_delta_sync_survives_restart_and_is_audience_scoped() {
     let path = temporary_db("restart");
     let mut service =
