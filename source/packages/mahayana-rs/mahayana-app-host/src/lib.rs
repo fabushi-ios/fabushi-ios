@@ -167,6 +167,118 @@ impl AppHost {
         })
     }
 
+    /// Trusted native Human-call transport identity. Credentials remain inside
+    /// the Rust product owner; callers receive only the stable user/device IDs
+    /// needed for lease and signaling fences.
+    pub fn human_call_transport_identity(&self) -> Result<Value, AppHostError> {
+        let session = self
+            .product
+            .device_agent_session()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let user_id = session
+            .get("userId")
+            .cloned()
+            .ok_or_else(|| AppHostError::Operation("account session is missing userId".into()))?;
+        let device_id = session
+            .get("deviceId")
+            .cloned()
+            .ok_or_else(|| AppHostError::Operation("account session is missing deviceId".into()))?;
+        Ok(json!({
+            "userId": user_id,
+            "deviceId": device_id,
+        }))
+    }
+
+    pub fn human_call_ice_servers(&self) -> Result<Value, AppHostError> {
+        self.human_call_product_execute("mahayana.calls.ice", json!({}))
+    }
+
+    pub fn human_call_remote_list(&self, limit: usize) -> Result<Value, AppHostError> {
+        self.human_call_product_execute(
+            "mahayana.calls.list",
+            json!({"limit": limit.clamp(1, 200)}),
+        )
+    }
+
+    pub fn human_call_remote_create(
+        &self,
+        call_id: &str,
+        peer_human_id: &str,
+    ) -> Result<Value, AppHostError> {
+        self.human_call_product_execute(
+            "mahayana.calls.create",
+            json!({
+                "callId": call_id,
+                "peerHumanId": peer_human_id,
+            }),
+        )
+    }
+
+    pub fn human_call_remote_get(
+        &self,
+        call_id: &str,
+        after_seq: u64,
+        limit: usize,
+    ) -> Result<Value, AppHostError> {
+        self.human_call_product_execute(
+            "mahayana.calls.get",
+            json!({
+                "callId": call_id,
+                "afterSeq": after_seq,
+                "limit": limit.clamp(1, 200),
+            }),
+        )
+    }
+
+    pub fn human_call_remote_append_event(
+        &self,
+        call_id: &str,
+        client_event_id: &str,
+        generation: u64,
+        kind: &str,
+        payload: Value,
+    ) -> Result<Value, AppHostError> {
+        self.human_call_product_execute(
+            "mahayana.calls.event.append",
+            json!({
+                "callId": call_id,
+                "clientEventId": client_event_id,
+                "generation": generation,
+                "kind": kind,
+                "payload": payload,
+            }),
+        )
+    }
+
+    fn human_call_product_execute(
+        &self,
+        method: &str,
+        mut params: Value,
+    ) -> Result<Value, AppHostError> {
+        let session = self
+            .product
+            .device_agent_session()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let access_token = session
+            .get("accessToken")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| AppHostError::Operation("account session is missing accessToken".into()))?;
+        let device_id = session
+            .get("deviceId")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| AppHostError::Operation("account session is missing deviceId".into()))?;
+        let object = params
+            .as_object_mut()
+            .ok_or_else(|| AppHostError::InvalidRequest("Human-call params must be an object".into()))?;
+        object.insert("accessToken".into(), Value::String(access_token.to_string()));
+        object.insert("deviceId".into(), Value::String(device_id.to_string()));
+        self.product
+            .execute(method, &params)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
     pub fn dispatch(&self, request: HostRequest) -> HostResponse {
         let id = request.id.clone();
         match self.handle(&request.method, request.params) {
