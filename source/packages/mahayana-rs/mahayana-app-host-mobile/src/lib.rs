@@ -985,6 +985,7 @@ impl MobileAppHost {
             &call_id,
             &local_human_id,
             &peer,
+            &local_human_id,
             "invited",
             0,
         )?;
@@ -1024,8 +1025,9 @@ impl MobileAppHost {
             validate_remote_call_identity(
                 remote,
                 call_id,
-                &local.creator_id,
+                &local_human_id,
                 &peer,
+                &local.creator_id,
                 remote
                     .get("state")
                     .and_then(serde_json::Value::as_str)
