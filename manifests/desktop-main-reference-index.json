@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 2,
+  "authority": {
+    "repository": "bhrumom/fabushi-desktop",
+    "branch": "main",
+    "commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+    "tree": "3d2a0ad250ca82d0cf3b7bd917d8eca7400e5c31",
+    "mode": "live-main",
+    "observedAt": "2026-10-08"
+  },
+  "roots": [
+    "frontend/**",
+    "source/**"
+  ],
+  "fileCount": 7950,
+  "selectedTreeSha256": "38a5a6c5086b57ff2518165dcab8d4ab7c02fe5c1f7b163c78ce419de4481045",
+  "groups": [
+    {
+      "name": "frontend",
+      "path": "manifests/desktop-main/frontend.json",
+      "fileCount": 344
+    },
+    {
+      "name": "source-box-exec-daemon",
+      "path": "manifests/desktop-main/source-box-exec-daemon.json",
+      "fileCount": 5
+    },
+    {
+      "name": "source-electron-dev-controls",
+      "path": "manifests/desktop-main/source-electron-dev-controls.json",
+      "fileCount": 1
+    },
+    {
+      "name": "source-electron-main",
+      "path": "manifests/desktop-main/source-electron-main.json",
+      "fileCount": 196
+    },
+    {
+      "name": "source-electron-preload",
+      "path": "manifests/desktop-main/source-electron-preload.json",
+      "fileCount": 18
+    },
+    {
+      "name": "source-host",
+      "path": "manifests/desktop-main/source-host.json",
+      "fileCount": 969
+    },
+    {
+      "name": "source-internal",
+      "path": "manifests/desktop-main/source-internal.json",
+      "fileCount": 2
+    },
+    {
+      "name": "source-local-exec-daemon",
+      "path": "manifests/desktop-main/source-local-exec-daemon.json",
+      "fileCount": 3
+    },
+    {
+      "name": "source-mahayana",
+      "path": "manifests/desktop-main/source-mahayana.json",
+      "fileCount": 5329
+    },
+    {
+      "name": "source-mime-types.d.ts",
+      "path": "manifests/desktop-main/source-mime-types.d.ts.json",
+      "fileCount": 1
+    },
+    {
+      "name": "source-node-agent-coordinator",
+      "path": "manifests/desktop-main/source-node-agent-coordinator.json",
+      "fileCount": 53
+    },
+    {
+      "name": "source-packages",
+      "path": "manifests/desktop-main/source-packages.json",
+      "fileCount": 852
+    },
+    {
+      "name": "source-product",
+      "path": "manifests/desktop-main/source-product.json",
+      "fileCount": 5
+    },
+    {
+      "name": "source-packaging",
+      "path": "manifests/desktop-main/source-packaging.json",
+      "fileCount": 1
+    },
+    {
+      "name": "source-shared",
+      "path": "manifests/desktop-main/source-shared.json",
+      "fileCount": 170
+    },
+    {
+      "name": "source-tsconfig.json",
+      "path": "manifests/desktop-main/source-tsconfig.json.json",
+      "fileCount": 1
+    }
+  ],
+  "sourceCommitSemantics": "per-chunk snapshot; path/blob validated against authoritative main Git tree"
+}

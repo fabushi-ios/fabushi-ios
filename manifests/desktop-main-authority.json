@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "authorityMode": "live-main",
+  "repository": "bhrumom/fabushi-desktop",
+  "branch": "main",
+  "commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "rootTreeSha": "3d2a0ad250ca82d0cf3b7bd917d8eca7400e5c31",
+  "observedAt": "2026-10-08",
+  "previousSourceCommit": "798cf51d96cb1cb98cf657af212bb47274ccb701",
+  "inventory": {
+    "selectedRoots": [
+      "frontend/**",
+      "source/**"
+    ],
+    "selectedFileCount": 7950,
+    "fullTrackedCount": 8172,
+    "gitlinkCount": 0,
+    "nonselectedCount": 222,
+    "fullTreeSha256": "86f6cf63b2f0d2186669d7c04423c7f16ee05df8d1cb741f2a29a141bc183201",
+    "selectedTreeSha256": "38a5a6c5086b57ff2518165dcab8d4ab7c02fe5c1f7b163c78ce419de4481045",
+    "manifestIndex": "manifests/desktop-main-reference-index.json",
+    "ledgerIndex": "docs/parity/desktop-main-index.json",
+    "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
+    "impactRegister": "docs/parity/desktop-main-impact.json"
+  },
+  "baselineReady": false,
+  "dependenciesReviewed": false,
+  "completenessAccepted": false,
+  "acceptanceAccepted": false,
+  "notes": "All tracked Git identities recorded, but affected responsibility/owner/contract review, external dependencies and product release acceptance are not complete."
+}

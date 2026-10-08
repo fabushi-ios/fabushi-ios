@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 2,
+  "source": {
+    "repository": "bhrumom/fabushi-desktop",
+    "branch": "main",
+    "commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+    "tree": "3d2a0ad250ca82d0cf3b7bd917d8eca7400e5c31",
+    "mode": "live-main"
+  },
+  "rowCount": 7950,
+  "carryForwardStatusesAreHistorical": true,
+  "readiness": "main-rebaseline-snapshot-not-responsibility-closure",
+  "statusPolicy": {
+    "initial": "unreviewed",
+    "notes": "No prior PR20 implemented/verified accepted without current main source owner and composition revalidation"
+  },
+  "chunks": [
+    {
+      "name": "frontend",
+      "path": "docs/parity/desktop-main/frontend.json",
+      "rowCount": 344
+    },
+    {
+      "name": "source-box-exec-daemon",
+      "path": "docs/parity/desktop-main/source-box-exec-daemon.json",
+      "rowCount": 5
+    },
+    {
+      "name": "source-electron-dev-controls",
+      "path": "docs/parity/desktop-main/source-electron-dev-controls.json",
+      "rowCount": 1
+    },
+    {
+      "name": "source-electron-main",
+      "path": "docs/parity/desktop-main/source-electron-main.json",
+      "rowCount": 196
+    },
+    {
+      "name": "source-electron-preload",
+      "path": "docs/parity/desktop-main/source-electron-preload.json",
+      "rowCount": 18
+    },
+    {
+      "name": "source-host",
+      "path": "docs/parity/desktop-main/source-host.json",
+      "rowCount": 969
+    },
+    {
+      "name": "source-internal",
+      "path": "docs/parity/desktop-main/source-internal.json",
+      "rowCount": 2
+    },
+    {
+      "name": "source-local-exec-daemon",
+      "path": "docs/parity/desktop-main/source-local-exec-daemon.json",
+      "rowCount": 3
+    },
+    {
+      "name": "source-mahayana",
+      "path": "docs/parity/desktop-main/source-mahayana.json",
+      "rowCount": 5329
+    },
+    {
+      "name": "source-mime-types.d.ts",
+      "path": "docs/parity/desktop-main/source-mime-types.d.ts.json",
+      "rowCount": 1
+    },
+    {
+      "name": "source-node-agent-coordinator",
+      "path": "docs/parity/desktop-main/source-node-agent-coordinator.json",
+      "rowCount": 53
+    },
+    {
+      "name": "source-packages",
+      "path": "docs/parity/desktop-main/source-packages.json",
+      "rowCount": 852
+    },
+    {
+      "name": "source-product",
+      "path": "docs/parity/desktop-main/source-product.json",
+      "rowCount": 5
+    },
+    {
+      "name": "source-packaging",
+      "path": "docs/parity/desktop-main/source-packaging.json",
+      "rowCount": 1
+    },
+    {
+      "name": "source-shared",
+      "path": "docs/parity/desktop-main/source-shared.json",
+      "rowCount": 170
+    },
+    {
+      "name": "source-tsconfig.json",
+      "path": "docs/parity/desktop-main/source-tsconfig.json.json",
+      "rowCount": 1
+    }
+  ]
+}
