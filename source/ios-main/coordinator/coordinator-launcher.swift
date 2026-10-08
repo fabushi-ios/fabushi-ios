@@ -7,8 +7,10 @@ final class IOSCoordinatorLaunchHandle {
     let clientPort: InProcessCoordinatorPort
     let serverPort: InProcessCoordinatorPort
 
-    init(main: IOSMainRuntime) {
-        let pair = InProcessCoordinatorPort.makePair(bootstrap: main.coordinatorBootstrap)
+    init(main: IOSMainRuntime) throws {
+        let pair = InProcessCoordinatorPort.makePair(
+            bootstrap: try main.humanScopedCoordinatorBootstrap()
+        )
         let server = main.makeRendererPortServer(port: pair.server)
         let client = CoordinatorControlPortClient(port: pair.client, autoStart: false)
 
@@ -31,7 +33,7 @@ final class IOSCoordinatorLaunchHandle {
 
 enum IOSCoordinatorLauncher {
     @MainActor
-    static func launch(main: IOSMainRuntime) -> IOSCoordinatorLaunchHandle {
-        IOSCoordinatorLaunchHandle(main: main)
+    static func launch(main: IOSMainRuntime) throws -> IOSCoordinatorLaunchHandle {
+        try IOSCoordinatorLaunchHandle(main: main)
     }
 }
