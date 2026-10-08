@@ -398,8 +398,19 @@ internal enum GrokMobileCommandPaletteModel {
     }
 
     private static func deduplicatedBots(_ bots: [MobileBotSummary]) -> [MobileBotSummary] {
-        var seen = Set<String>()
-        return bots.filter { seen.insert($0.id).inserted }
+        var deduplicated: [MobileBotSummary] = []
+        var indexById: [String: Int] = [:]
+        for bot in bots {
+            if let existingIndex = indexById[bot.id] {
+                // Desktop current-main preserves the original palette slot while
+                // replacing a stale roster object with the newest canonical row.
+                deduplicated[existingIndex] = bot
+            } else {
+                indexById[bot.id] = deduplicated.count
+                deduplicated.append(bot)
+            }
+        }
+        return deduplicated
     }
 
     private static func matches(tab: MobileCommandPaletteTab, entry: MobileCommandPaletteEntry) -> Bool {

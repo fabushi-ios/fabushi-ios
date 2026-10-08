@@ -219,6 +219,40 @@ final class GrokMobileCommandPaletteTests: XCTestCase {
         XCTAssertTrue(rows.isEmpty)
     }
 
+    func testDuplicateBotRosterKeepsOriginalSlotButUsesNewestCanonicalRow() {
+        let stale = MobileBotSummary(
+            id: "bot-1",
+            name: "Old name",
+            description: "Old description"
+        )
+        let other = MobileBotSummary(
+            id: "bot-2",
+            name: "Other",
+            description: ""
+        )
+        let replacement = MobileBotSummary(
+            id: "bot-1",
+            name: "New name",
+            description: "New description"
+        )
+
+        let rows = GrokMobileCommandPaletteModel.entries(
+            bots: [stale, other, replacement],
+            conversations: [],
+            messagesByConversation: [:],
+            actions: [],
+            query: "",
+            tab: .agents
+        )
+
+        XCTAssertEqual(rows.map(\.id), ["bot:bot-1", "bot:bot-2"])
+        guard case .bot(let projected) = rows[0] else {
+            return XCTFail("Expected canonical bot row")
+        }
+        XCTAssertEqual(projected.name, "New name")
+        XCTAssertEqual(projected.description, "New description")
+    }
+
     private func conversation(
         id: String,
         title: String,
