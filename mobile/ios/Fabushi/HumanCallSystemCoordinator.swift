@@ -64,6 +64,7 @@ internal final class HumanCallSystemCoordinator: NSObject,
     @preconcurrency CXProviderDelegate
 {
     typealias ActionHandler = @MainActor (HumanCallSystemAction) async throws -> Void
+    typealias VoIPTokenChangeHandler = @MainActor () async -> Void
 
     static let shared = HumanCallSystemCoordinator()
 
@@ -73,6 +74,7 @@ internal final class HumanCallSystemCoordinator: NSObject,
     private let provider: CXProvider
     private var pushRegistry: PKPushRegistry?
     private var actionHandler: ActionHandler?
+    private var voIPTokenChangeHandler: VoIPTokenChangeHandler?
     private var callsByUUID: [UUID: HumanCallPushDescriptor] = [:]
     private var uuidsByCallID: [String: UUID] = [:]
 
@@ -100,8 +102,13 @@ internal final class HumanCallSystemCoordinator: NSObject,
         self.actionHandler = actionHandler
     }
 
+    func bindVoIPTokenChangeHandler(_ handler: @escaping VoIPTokenChangeHandler) {
+        voIPTokenChangeHandler = handler
+    }
+
     func unbind() {
         actionHandler = nil
+        voIPTokenChangeHandler = nil
     }
 
     nonisolated static func hexadecimalToken(_ data: Data) -> String {
@@ -115,9 +122,10 @@ internal final class HumanCallSystemCoordinator: NSObject,
     ) {
         guard type == .voIP else { return }
         let token = Self.hexadecimalToken(pushCredentials.token)
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
             UserDefaults.standard.set(token, forKey: Self.voIPTokenDefaultsKey)
             NotificationCenter.default.post(name: Self.voIPTokenDidChange, object: token)
+            await self?.voIPTokenChangeHandler?()
         }
     }
 
@@ -126,9 +134,10 @@ internal final class HumanCallSystemCoordinator: NSObject,
         didInvalidatePushTokenFor type: PKPushType
     ) {
         guard type == .voIP else { return }
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
             UserDefaults.standard.removeObject(forKey: Self.voIPTokenDefaultsKey)
             NotificationCenter.default.post(name: Self.voIPTokenDidChange, object: nil)
+            await self?.voIPTokenChangeHandler?()
         }
     }
 
