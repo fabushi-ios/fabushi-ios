@@ -15,12 +15,13 @@ use mahayana_plugin_runtime::{
 use mahayana_product::MahayanaProductClient;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppHostFeatureMode {
@@ -248,6 +249,201 @@ impl AppHost {
                 "payload": payload,
             }),
         )
+    }
+
+    /// Resolve an incoming Human call onto the one canonical messaging
+    /// conversation owned by FeatureHost. Existing iOS direct conversations are
+    /// reused by participant identity; only missing conversations use the
+    /// Desktop-compatible deterministic Human-direct id.
+    pub fn human_call_ensure_messaging_conversation(
+        &self,
+        peer_user_id: &str,
+        title: &str,
+    ) -> Result<Value, AppHostError> {
+        let peer_user_id = peer_user_id.trim();
+        if peer_user_id.is_empty() {
+            return Err(AppHostError::InvalidRequest(
+                "Human call peer user id is required".into(),
+            ));
+        }
+        let session = self
+            .product
+            .device_agent_session()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let local_user_id = session
+            .get("userId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppHostError::Operation(
+                "account session is missing userId".into(),
+            ))?;
+        if local_user_id == peer_user_id {
+            return Err(AppHostError::InvalidRequest(
+                "Human call participants must be distinct".into(),
+            ));
+        }
+        let device_id = session
+            .get("deviceId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppHostError::Operation(
+                "account session is missing deviceId".into(),
+            ))?;
+        let local_actor_id = messaging_actor_id_for_user(local_user_id);
+        let peer_actor_id = messaging_actor_id_for_user(peer_user_id);
+        let request_id = format!("human-call-sync:{}", uuid::Uuid::new_v4().simple());
+        let context = json!({
+            "requestId": request_id,
+            "deviceId": device_id,
+            "actorId": local_actor_id,
+            "sessionId": "account-session:human-call-host",
+            "sentAtMs": app_host_now_ms(),
+        });
+        let sync = self.feature_messaging_execute(json!({
+            "requestId": request_id,
+            "envelope": {
+                "protocolVersion": 2,
+                "context": context,
+                "command": {"type": "sync", "cursor": Value::Null, "limit": 1000},
+            },
+        }))?;
+        if let Some(existing) = find_direct_conversation_for_actors(
+            &sync,
+            &local_actor_id,
+            &peer_actor_id,
+        ) {
+            return Ok(existing);
+        }
+
+        let peer_title = title.trim();
+        let peer_title = if peer_title.is_empty() {
+            peer_user_id
+        } else {
+            peer_title
+        };
+        let local_profile_request = format!(
+            "human-call-local-profile:{}",
+            uuid::Uuid::new_v4().simple()
+        );
+        self.feature_messaging_execute(json!({
+            "requestId": local_profile_request,
+            "envelope": {
+                "protocolVersion": 2,
+                "context": {
+                    "requestId": local_profile_request,
+                    "deviceId": device_id,
+                    "actorId": local_actor_id,
+                    "sessionId": "account-session:human-call-host",
+                    "sentAtMs": app_host_now_ms(),
+                },
+                "command": {
+                    "type": "upsertProfile",
+                    "actor": human_messaging_actor(&local_actor_id, "当前用户"),
+                },
+            },
+        }))?;
+
+        let peer_profile_request = format!(
+            "human-call-peer-profile:{}",
+            uuid::Uuid::new_v4().simple()
+        );
+        self.feature_messaging_execute(json!({
+            "requestId": peer_profile_request,
+            "envelope": {
+                "protocolVersion": 2,
+                "context": {
+                    "requestId": peer_profile_request,
+                    "deviceId": device_id,
+                    "actorId": local_actor_id,
+                    "sessionId": "account-session:human-call-host",
+                    "sentAtMs": app_host_now_ms(),
+                },
+                "command": {
+                    "type": "upsertProfile",
+                    "actor": human_messaging_actor(&peer_actor_id, peer_title),
+                },
+            },
+        }))?;
+
+        let conversation_id = deterministic_human_conversation_id(
+            local_user_id,
+            peer_user_id,
+        );
+        let now = app_host_now_ms();
+        let conversation = json!({
+            "id": conversation_id,
+            "kind": "direct",
+            "title": peer_title,
+            "description": Value::Null,
+            "avatarUrl": Value::Null,
+            "participants": [
+                {
+                    "actorId": local_actor_id,
+                    "role": "owner",
+                    "joinedAtMs": now,
+                    "mutedUntilMs": Value::Null,
+                },
+                {
+                    "actorId": peer_actor_id,
+                    "role": "member",
+                    "joinedAtMs": now,
+                    "mutedUntilMs": Value::Null,
+                },
+            ],
+            "ownerId": local_actor_id,
+            "lastMessageId": Value::Null,
+            "lastReadMessageId": Value::Null,
+            "unreadCount": 0,
+            "mentionCount": 0,
+            "pinnedMessageIds": [],
+            "notificationSettings": {
+                "mutedUntilMs": Value::Null,
+                "sound": Value::Null,
+                "showPreview": true,
+                "notifyMentions": true,
+            },
+            "permissions": {
+                "canSendMessages": true,
+                "canSendMedia": true,
+                "canSendPolls": true,
+                "canAddMembers": true,
+                "canPinMessages": true,
+                "canManageTopics": true,
+                "canManageCalls": true,
+            },
+            "historyVisibility": "allMembers",
+            "topics": [],
+            "folderIds": [],
+            "archived": false,
+            "pinned": false,
+            "markedUnread": false,
+            "createdAtMs": now,
+            "updatedAtMs": now,
+        });
+        let create_request = format!(
+            "human-call-create-conversation:{}",
+            uuid::Uuid::new_v4().simple()
+        );
+        self.feature_messaging_execute(json!({
+            "requestId": create_request,
+            "envelope": {
+                "protocolVersion": 2,
+                "context": {
+                    "requestId": create_request,
+                    "deviceId": device_id,
+                    "actorId": local_actor_id,
+                    "sessionId": "account-session:human-call-host",
+                    "sentAtMs": now,
+                },
+                "command": {
+                    "type": "createConversation",
+                    "conversation": conversation,
+                },
+            },
+        }))?;
+        Ok(conversation)
     }
 
     fn human_call_product_execute(
@@ -1993,7 +2189,89 @@ fn surface_platform() -> SurfacePlatform {
     }
 }
 
-pub fn host_platform() -> &'static str {
+pub fn messaging_actor_id_for_user(user_id: &str) -> String {
+    let digest = Sha256::digest(user_id.trim().as_bytes());
+    let fingerprint = digest[..16]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    format!("human:account:{fingerprint}")
+}
+
+fn deterministic_human_conversation_id(local_user_id: &str, peer_user_id: &str) -> String {
+    let mut participant_ids = [
+        local_user_id.trim().to_string(),
+        peer_user_id.trim().to_string(),
+    ];
+    participant_ids.sort();
+    let mut digest = Sha256::new();
+    for participant_id in participant_ids {
+        digest.update((participant_id.len() as u64).to_be_bytes());
+        digest.update(participant_id.as_bytes());
+    }
+    format!("human-direct-{:x}", digest.finalize())
+}
+
+fn human_messaging_actor(actor_id: &str, display_name: &str) -> Value {
+    json!({
+        "id": actor_id,
+        "kind": "human",
+        "displayName": display_name,
+        "username": Value::Null,
+        "avatarUrl": Value::Null,
+        "bio": Value::Null,
+        "capabilities": ["messages", "groups", "channels", "calls", "payments", "miniApps"],
+        "presence": {
+            "status": "online",
+            "lastSeenAtMs": app_host_now_ms(),
+            "statusText": Value::Null,
+        },
+        "verified": false,
+    })
+}
+
+fn find_direct_conversation_for_actors(
+    sync_result: &Value,
+    local_actor_id: &str,
+    peer_actor_id: &str,
+) -> Option<Value> {
+    let envelopes = sync_result.get("envelopes")?.as_array()?;
+    for envelope in envelopes {
+        let event = envelope.get("event")?;
+        if event.get("type")?.as_str()? != "syncBatch" {
+            continue;
+        }
+        let conversations = event.get("conversations")?.as_array()?;
+        for conversation in conversations {
+            if conversation.get("kind").and_then(Value::as_str) != Some("direct") {
+                continue;
+            }
+            let participants = conversation.get("participants")?.as_array()?;
+            let mut ids = participants
+                .iter()
+                .filter_map(|participant| participant.get("actorId").and_then(Value::as_str))
+                .collect::<Vec<_>>();
+            ids.sort_unstable();
+            ids.dedup();
+            let mut expected = vec![local_actor_id, peer_actor_id];
+            expected.sort_unstable();
+            expected.dedup();
+            if ids == expected {
+                return Some(conversation.clone());
+            }
+        }
+    }
+    None
+}
+
+fn app_host_now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
+}
+
+fn host_platform() -> &'static str {
     if cfg!(target_os = "ios") {
         "ios"
     } else if cfg!(target_os = "android") {
