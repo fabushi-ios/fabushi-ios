@@ -537,6 +537,9 @@ enum MobileHumanCallTransportCommand {
         peer_user_id: String,
         title: String,
     },
+    ResolvePeer {
+        conversation_id: String,
+    },
     List {
         limit: usize,
     },
@@ -627,6 +630,13 @@ impl MobileHostBridge {
                                         &peer_user_id,
                                         &title,
                                     ),
+                                    MobileHumanCallTransportCommand::ResolvePeer {
+                                        conversation_id,
+                                    } => host
+                                        .human_call_peer_for_messaging_conversation(
+                                            &conversation_id,
+                                        )
+                                        .map(serde_json::Value::String),
                                     MobileHumanCallTransportCommand::List { limit } => {
                                         host.human_call_remote_list(limit)
                                     }
@@ -1519,6 +1529,7 @@ impl MobileAppHost {
             }
             "createCallSession" => {
                 let scope_id = required_json_string(&params, "scopeId")?;
+                #[cfg(test)]
                 let participant_ids = params
                     .get("participantIds")
                     .and_then(serde_json::Value::as_array)
@@ -1546,6 +1557,19 @@ impl MobileAppHost {
                         .map_err(|error| error.to_string());
                     }
                 }
+                let (local_human_id, _) = self.call_transport_identity()?;
+                let peer = self
+                    .host
+                    .human_call(MobileHumanCallTransportCommand::ResolvePeer {
+                        conversation_id: scope_id.clone(),
+                    })?
+                    .as_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| {
+                        "Human call conversation peer resolver returned an invalid identity"
+                            .to_string()
+                    })?;
+                let participant_ids = vec![local_human_id, peer];
                 serde_json::to_value(
                     self.create_shipping_call_session(&scope_id, &participant_ids)?,
                 )
