@@ -6,6 +6,7 @@ private struct ForwardMessageSheet: View {
     let sourceConversationId: String
     let message: ChatMessage
     let messaging: MessagingModel
+    let appAgentSurface: FabushiAppAgentSurface
     let onDismiss: () -> Void
 
     @State private var query = ""
@@ -167,7 +168,176 @@ private struct ForwardMessageSheet: View {
             .task(id: query) {
                 await reloadRecipients()
             }
+            .task(id: semanticFingerprint) {
+                await MainActor.run {
+                    publishSemanticSurface()
+                }
+            }
         }
+    }
+
+    private var semanticFingerprint: String {
+        let recipientState = recipients.map { recipient in
+            let settlement = settlements[recipient.id]
+            return [
+                recipient.id,
+                recipient.title,
+                selectedRecipients[recipient.id] == nil ? "0" : "1",
+                settlement?.sent == true ? "sent" : settlement == nil ? "pending" : "failed",
+                settlement?.error ?? "",
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+        return [
+            sourceConversationId,
+            message.id,
+            query,
+            recipientState,
+            String(dropSenderNames),
+            String(dropCaptions),
+            String(loading),
+            String(sending),
+            String(sentCount),
+            String(failedCount),
+            errorText ?? "",
+        ].joined(separator: "||")
+    }
+
+    @MainActor
+    private func publishSemanticSurface() {
+        var elements: [FabushiAppAgentSurface.Element] = []
+        var actions: [String: FabushiAppAgentSurface.Action] = [:]
+
+        func semanticId(_ value: String) -> String {
+            String(value.map { character in
+                character.isASCII && (character.isLetter || character.isNumber || "._:/@-".contains(character))
+                    ? character
+                    : "-"
+            }.prefix(160))
+        }
+
+        func add(
+            _ id: String,
+            role: String,
+            name: String,
+            enabled: Bool = true,
+            action: FabushiAppAgentSurface.Action? = nil
+        ) {
+            let normalizedId = semanticId(id)
+            elements.append(.init(
+                agentId: normalizedId,
+                role: String(role.prefix(80)),
+                name: String(name.prefix(240)),
+                visible: true,
+                enabled: enabled
+            ))
+            if let action {
+                actions[normalizedId] = action
+            }
+        }
+
+        add("forward-dialog", role: "dialog", name: "转发消息")
+        add(
+            "forward-search",
+            role: "textbox",
+            name: query.isEmpty ? "搜索可转发会话" : "搜索可转发会话：\(query)",
+            enabled: !sending,
+            action: .init(allowed: ["setValue"]) { value in
+                query = value ?? ""
+            }
+        )
+        if loading {
+            add("forward-loading", role: "status", name: "正在加载可转发会话")
+        }
+        if let errorText {
+            add("forward-error", role: "status", name: errorText)
+        }
+        if recipients.isEmpty && !loading {
+            add(
+                "forward-empty",
+                role: "status",
+                name: query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? "没有可转发的会话"
+                    : "没有匹配的可转发会话"
+            )
+        }
+
+        for recipient in recipients.prefix(100) {
+            let selected = selectedRecipients[recipient.id] != nil
+            let settlement = settlements[recipient.id]
+            let state = settlement?.sent == true ? "已发送" : settlement == nil ? (selected ? "已选择" : "未选择") : "失败"
+            add(
+                "forward-recipient-\(recipient.id)",
+                role: "checkbox",
+                name: "\(recipient.title) · \(state)",
+                enabled: !sending && settlement?.sent != true,
+                action: .init(allowed: ["toggle", "invoke"]) { _ in
+                    toggleRecipient(recipient)
+                }
+            )
+        }
+
+        add(
+            "forward-hide-sender",
+            role: "checkbox",
+            name: dropSenderNames ? "隐藏原发送者：已开启" : "隐藏原发送者：已关闭",
+            enabled: !optionsLocked && !sending && !dropCaptions,
+            action: .init(allowed: ["toggle", "invoke"]) { _ in
+                guard !optionsLocked, !sending, !dropCaptions else { return }
+                dropSenderNames.toggle()
+            }
+        )
+        add(
+            "forward-drop-captions",
+            role: "checkbox",
+            name: dropCaptions ? "移除媒体说明文字：已开启" : "移除媒体说明文字：已关闭",
+            enabled: !optionsLocked && !sending,
+            action: .init(allowed: ["toggle", "invoke"]) { _ in
+                guard !optionsLocked, !sending else { return }
+                dropCaptions.toggle()
+                if dropCaptions {
+                    dropSenderNames = true
+                }
+            }
+        )
+        add(
+            "forward-selection-status",
+            role: "status",
+            name: "\(selectedRecipients.count) 个会话已选择，\(sentCount) 个已发送，\(failedCount) 个失败"
+        )
+        for settlement in settlements.values.filter({ !$0.sent }).prefix(100) {
+            let title = selectedRecipients[settlement.conversationId]?.title ?? settlement.conversationId
+            add(
+                "forward-failure-\(settlement.conversationId)",
+                role: "status",
+                name: "\(title)：\(settlement.error ?? "转发失败")"
+            )
+        }
+        add(
+            "forward-cancel",
+            role: "button",
+            name: sentCount > 0 && failedCount == 0 ? "完成" : "取消",
+            enabled: !sending,
+            action: .init(allowed: ["invoke"]) { _ in
+                guard !sending else { return }
+                onDismiss()
+            }
+        )
+        add(
+            "forward-submit",
+            role: "button",
+            name: actionTitle,
+            enabled: !pendingRecipients.isEmpty && !sending,
+            action: .init(allowed: ["invoke"]) { _ in
+                guard !pendingRecipients.isEmpty, !sending else { return }
+                Task { await submit() }
+            }
+        )
+
+        try? appAgentSurface.publish(
+            screen: "forward-message",
+            elements: elements,
+            actions: actions
+        )
     }
 
     private var actionTitle: String {
@@ -594,7 +764,8 @@ extension ContentView {
             ForwardMessageSheet(
                 sourceConversationId: conversation.id,
                 message: message,
-                messaging: messaging
+                messaging: messaging,
+                appAgentSurface: appAgentSurface
             ) {
                 forwardMessage = nil
             }
