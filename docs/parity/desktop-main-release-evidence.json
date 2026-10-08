@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 1,
+  "desktopSourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "desktopRootTree": "3d2a0ad250ca82d0cf3b7bd917d8eca7400e5c31",
+  "status": "in-progress",
+  "finalAcceptance": false,
+  "finalIosCommit": null,
+  "acceptanceCriteria": [
+    {
+      "id": "IOS-MAIN-AC-01",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-02",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-03",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-04",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-05",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-06",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-07",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-08",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-09",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-10",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-11",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-12",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-13",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-14",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-15",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-16",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-17",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-18",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-19",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-20",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    },
+    {
+      "id": "IOS-MAIN-AC-21",
+      "status": "pending",
+      "evidence": [],
+      "independentReviewer": null,
+      "iosCommit": null
+    }
+  ],
+  "releaseGates": {
+    "rust-host-and-coordinator": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "swift-unit-and-ui": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "native-lifecycle-restart-recovery": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "protected-global-dharma-real-account": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "signed-device-archive-export": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "physical-device-install-launch": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "installed-app-upgrade-data-migration": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "testflight-install-and-app-store-validation": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "accessibility-localization-iPhone-iPad": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "security-privacy-credential-isolation": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "performance-fault-soak": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "licensing-provenance-legal-review": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    },
+    "post-merge-main-exact-head-verification": {
+      "status": "pending",
+      "iosCommit": null,
+      "desktopCommit": null,
+      "workflowRun": null,
+      "runAttempt": null,
+      "job": null,
+      "requiredSteps": [],
+      "artifactId": null,
+      "artifactDigest": null,
+      "independentReviewer": null,
+      "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
+    }
+  },
+  "note": "This matrix is intentionally pending. It is not evidence that product migration or App Store release is complete."
+}

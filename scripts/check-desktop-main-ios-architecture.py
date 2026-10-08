@@ -269,6 +269,47 @@ def verify_files(lock, manifest_index, ledger_index, errors, warnings, complete,
             got=real.get(path)
             if not got or got != (row.get("mode"), row.get("type"), row.get("sha"), row.get("size")):
                 errors.append(f"{path}: nonselected Git identity differs from live main")
+    release_path = ROOT / "docs/parity/desktop-main-release-evidence.json"
+    if not release_path.is_file():
+        errors.append("missing durable current-main release acceptance/evidence matrix")
+        release = {}
+    else:
+        release = document(release_path)
+        if release.get("desktopSourceCommit") != source_sha or release.get("desktopRootTree") != lock.get("rootTreeSha"):
+            errors.append("release acceptance matrix is not bound to current Desktop main")
+        expected_ac={f"IOS-MAIN-AC-{i:02d}" for i in range(1,22)}
+        entries=release.get("acceptanceCriteria", [])
+        actual_ac=[r.get("id") for r in entries]
+        if len(actual_ac)!=21 or set(actual_ac)!=expected_ac:
+            errors.append("release matrix must contain exactly 21 stable acceptance criterion IDs")
+        for r in entries:
+            if r.get("status")=="passed":
+                if not r.get("evidence") or not r.get("independentReviewer"):
+                    errors.append(f"{r.get('id')}: passed claim lacks evidence or independent reviewer")
+                if r.get("iosCommit") != os.environ.get("IOS_EXPECTED_HEAD"):
+                    errors.append(f"{r.get('id')}: passed claim not tied to current iOS exact head")
+        for key,gate in release.get("releaseGates", {}).items():
+            if gate.get("status")=="passed":
+                required=["iosCommit","desktopCommit","workflowRun","runAttempt","job","requiredSteps","artifactId","artifactDigest","independentReviewer"]
+                for field in required:
+                    if not gate.get(field):
+                        errors.append(f"{key}: passed release gate lacks {field}")
+                if gate.get("desktopCommit") != source_sha or gate.get("iosCommit") != os.environ.get("IOS_EXPECTED_HEAD"):
+                    errors.append(f"{key}: passed release gate source identity mismatch")
+                if not re.fullmatch(r"sha256:[0-9a-f]{64}",gate.get("artifactDigest") or ""):
+                    errors.append(f"{key}: passed release artifact digest not sha256")
+                if gate.get("requiredSteps") and any(step.get("conclusion")!="success" or step.get("status")!="completed" for step in gate["requiredSteps"]):
+                    errors.append(f"{key}: passed release gate has missing, skipped or failed required step")
+        if complete:
+            if release.get("finalAcceptance") is not True:
+                errors.append("final independent iOS release acceptance not recorded")
+            for r in entries:
+                if r.get("status")!="passed":
+                    errors.append(f"{r.get('id')}: mandatory release criterion not accepted")
+            for name,gate in release.get("releaseGates", {}).items():
+                if gate.get("status")!="passed":
+                    errors.append(f"release gate pending/blocked: {name}")
+
     if complete:
         for key in ("baselineReady", "dependenciesReviewed", "completenessAccepted", "acceptanceAccepted"):
             if lock.get(key) is not True:
