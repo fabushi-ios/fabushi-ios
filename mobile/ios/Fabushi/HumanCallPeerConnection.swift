@@ -97,7 +97,14 @@ final class HumanCallPeerConnection: NSObject {
     private var cameraCapturer: LKRTCCameraVideoCapturer?
     private var screenTrack: LKRTCVideoTrack?
     private var screenSource: LKRTCVideoSource?
+    private enum ScreenCaptureKind {
+        case inApp
+        case external(sessionID: String)
+    }
+
     private var screenCapturer: LKRTCVideoCapturer?
+    private var screenCaptureKind: ScreenCaptureKind?
+    private var broadcastFrameReceiver: HumanCallBroadcastFrameReceiver?
     private var requestedCameraEnabled = false
     private var lifecycleGeneration: UInt64 = 0
     private var cameraOperationGeneration: UInt64 = 0
@@ -244,6 +251,36 @@ final class HumanCallPeerConnection: NSObject {
         }
     }
 
+    func setExternalScreenShareEnabled(
+        _ enabled: Bool,
+        sessionID: String
+    ) async throws {
+        guard !screenShareTransitionInFlight else {
+            throw Failure.mediaOperationInProgress
+        }
+        screenShareTransitionInFlight = true
+        screenOperationGeneration &+= 1
+        let operationGeneration = screenOperationGeneration
+        let expectedLifecycle = lifecycleGeneration
+        defer {
+            if screenOperationGeneration == operationGeneration {
+                screenShareTransitionInFlight = false
+            }
+        }
+        if enabled {
+            try await startExternalScreenShare(
+                sessionID: sessionID,
+                expectedLifecycle: expectedLifecycle,
+                operationGeneration: operationGeneration
+            )
+        } else {
+            await stopScreenShare(
+                expectedLifecycle: expectedLifecycle,
+                operationGeneration: operationGeneration
+            )
+        }
+    }
+
     func makeOffer(iceRestart: Bool = false) async throws -> [String: Any] {
         guard let connection else { throw Failure.peerConnectionCreation }
         let constraints: LKRTCMediaConstraints
@@ -309,10 +346,20 @@ final class HumanCallPeerConnection: NSObject {
         if let cameraCapturer {
             cameraCapturer.stopCapture { }
         }
-        if isScreenSharing || screenTrack != nil {
+        switch screenCaptureKind {
+        case .inApp:
             screenRecorder.stopCapture { _ in }
+        case .external(let sessionID):
+            HumanCallBroadcastIPC.endSession(sessionID)
+            if let broadcastFrameReceiver {
+                Task { await broadcastFrameReceiver.stop() }
+            }
+        case nil:
+            break
         }
         cameraCapturer = nil
+        broadcastFrameReceiver = nil
+        screenCaptureKind = nil
         screenCapturer = nil
         screenTrack = nil
         screenSource = nil
@@ -461,6 +508,7 @@ final class HumanCallPeerConnection: NSObject {
         screenSource = source
         screenCapturer = capturer
         screenTrack = track
+        screenCaptureKind = .inApp
 
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -503,6 +551,7 @@ final class HumanCallPeerConnection: NSObject {
             screenSource = nil
             screenCapturer = nil
             screenTrack = nil
+            screenCaptureKind = nil
             throw error
         }
 
@@ -526,13 +575,104 @@ final class HumanCallPeerConnection: NSObject {
         operationGeneration: UInt64
     ) async {
         guard isScreenSharing || screenTrack != nil else { return }
-        await stopReplayKitCapture()
+        switch screenCaptureKind {
+        case .inApp:
+            await stopReplayKitCapture()
+        case .external(let sessionID):
+            HumanCallBroadcastIPC.endSession(sessionID)
+            if let broadcastFrameReceiver {
+                await broadcastFrameReceiver.stop()
+            }
+            self.broadcastFrameReceiver = nil
+        case nil:
+            break
+        }
         guard
             lifecycleGeneration == expectedLifecycle,
             screenOperationGeneration == operationGeneration,
             connection != nil
         else { return }
         restoreCameraAfterScreenShare()
+    }
+
+    private func startExternalScreenShare(
+        sessionID: String,
+        expectedLifecycle: UInt64,
+        operationGeneration: UInt64
+    ) async throws {
+        guard !isScreenSharing else { return }
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            screenOperationGeneration == operationGeneration,
+            let videoSender
+        else {
+            throw Failure.staleOperation
+        }
+        let normalizedSessionID = sessionID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedSessionID.isEmpty else {
+            throw Failure.screenShareUnavailable
+        }
+
+        let source = Self.factory.videoSource(forScreenCast: true)
+        let capturer = LKRTCVideoCapturer(delegate: source)
+        let track = Self.factory.videoTrack(with: source, trackId: "fabushi-human-call-broadcast-screen")
+        track.isEnabled = true
+        let sourceTransfer = HumanCallUncheckedTransfer(value: source)
+        let capturerTransfer = HumanCallUncheckedTransfer(value: capturer)
+
+        let receiver = HumanCallBroadcastFrameReceiver()
+        HumanCallBroadcastIPC.beginSession(normalizedSessionID)
+        screenSource = source
+        screenCapturer = capturer
+        screenTrack = track
+        screenCaptureKind = .external(sessionID: normalizedSessionID)
+        broadcastFrameReceiver = receiver
+
+        await receiver.start(
+            sessionID: normalizedSessionID,
+            onFrame: { [weak self, sourceTransfer, capturerTransfer] frame in
+                guard
+                    let self,
+                    self.lifecycleGeneration == expectedLifecycle,
+                    self.screenOperationGeneration == operationGeneration,
+                    self.screenCapturer === capturerTransfer.value,
+                    case .external(let activeSessionID) = self.screenCaptureKind,
+                    activeSessionID == normalizedSessionID
+                else { return }
+                let rtcBuffer = LKRTCCVPixelBuffer(pixelBuffer: frame.pixelBuffer)
+                let rtcFrame = LKRTCVideoFrame(
+                    buffer: rtcBuffer,
+                    rotation: Self.rotation(forOrientationValue: frame.orientation),
+                    timeStampNs: frame.timestampNanoseconds
+                )
+                sourceTransfer.value.capturer(capturerTransfer.value, didCapture: rtcFrame)
+            },
+            onFinished: { [weak self] in
+                guard
+                    let self,
+                    self.lifecycleGeneration == expectedLifecycle,
+                    self.screenOperationGeneration == operationGeneration,
+                    case .external(let activeSessionID) = self.screenCaptureKind,
+                    activeSessionID == normalizedSessionID
+                else { return }
+                self.restoreCameraAfterScreenShare()
+            }
+        )
+
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            screenOperationGeneration == operationGeneration,
+            connection != nil,
+            screenCapturer === capturer
+        else {
+            HumanCallBroadcastIPC.endSession(normalizedSessionID)
+            await receiver.stop()
+            throw Failure.staleOperation
+        }
+        videoSender.track = track
+        isScreenSharing = true
+        onLocalVideoTrack?(track)
+        onScreenShareChange?(true)
     }
 
     private func handleScreenCaptureFailure(
@@ -574,6 +714,8 @@ final class HumanCallPeerConnection: NSObject {
         screenTrack = nil
         screenSource = nil
         screenCapturer = nil
+        screenCaptureKind = nil
+        broadcastFrameReceiver = nil
         isScreenSharing = false
         videoSender?.track = videoTrack
         videoTrack?.isEnabled = requestedCameraEnabled
@@ -600,15 +742,8 @@ final class HumanCallPeerConnection: NSObject {
         return Int64(ProcessInfo.processInfo.systemUptime * Double(NSEC_PER_SEC))
     }
 
-    nonisolated private static func rotation(for sampleBuffer: CMSampleBuffer) -> LKRTCVideoRotation {
-        guard
-            let value = CMGetAttachment(
-                sampleBuffer,
-                key: RPVideoSampleOrientationKey as CFString,
-                attachmentModeOut: nil
-            ) as? NSNumber
-        else { return ._0 }
-        switch value.uint32Value {
+    nonisolated private static func rotation(forOrientationValue value: UInt32) -> LKRTCVideoRotation {
+        switch value {
         case 3:
             return ._180
         case 6:
@@ -618,6 +753,17 @@ final class HumanCallPeerConnection: NSObject {
         default:
             return ._0
         }
+    }
+
+    nonisolated private static func rotation(for sampleBuffer: CMSampleBuffer) -> LKRTCVideoRotation {
+        guard
+            let value = CMGetAttachment(
+                sampleBuffer,
+                key: RPVideoSampleOrientationKey as CFString,
+                attachmentModeOut: nil
+            ) as? NSNumber
+        else { return ._0 }
+        return rotation(forOrientationValue: value.uint32Value)
     }
 }
 
