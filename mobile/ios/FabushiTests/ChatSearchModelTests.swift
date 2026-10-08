@@ -20,6 +20,7 @@ final class ChatSearchModelTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testCanonicalMessageAuthorProjectionUsesSelfAndContactsWithoutGuessingUnknownActors() {
         let contacts = [
             MessagingContact(id: "peer-1", displayName: "Alice", username: nil, kind: "human"),
