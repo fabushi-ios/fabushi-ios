@@ -554,10 +554,10 @@
       "implementation_status": "not-applicable",
       "production_evidence": "MIGRATION_SOURCE.md; manifests/desktop-main-authority.json; docs/parity/desktop-main-impact.json; docs/parity/desktop-main/**; .github/workflows/ios-desktop-pr20-parity.yml; .github/workflows/ios-protected-session.yml",
       "test_evidence": "scripts/check-desktop-main-ios-architecture.py fail-closed authority/ledger checks; exact-source architecture workflow; protected native UI acceptance; archive provenance checks",
-      "notes": "Current-main exact diff 798cf51d96cb1cb98cf657af212bb47274ccb701 -> 3bc92400826cc4ca7ac665b467708e22261edc61 is only the explicit distinction between immutable PRODUCTION_UI_EVIDENCE anchors and active Fabushi copy plus four branding substitutions (copyright, feedback introduction, sign-out description, title). That strengthens rather than changes the iOS replacement: native iOS must not reproduce Electron reconstruction anchors. This source responsibility is therefore current-main reviewed as not-applicable-with-replacement; aggregate dependency/shared-contract/main-active-spec gates remain independently open.",
+      "notes": "Current-main exact diff 798cf51d96cb1cb98cf657af212bb47274ccb701 -> 3bc92400826cc4ca7ac665b467708e22261edc61 is only the explicit distinction between immutable PRODUCTION_UI_EVIDENCE anchors and active Fabushi copy plus four branding substitutions (copyright, feedback introduction, sign-out description, title). That strengthens rather than changes the iOS replacement: native iOS must not reproduce Electron reconstruction anchors. This source responsibility is therefore current-main reviewed as not-applicable-with-replacement; aggregate dependency/shared-contract/main-active-spec gates remain independently open. Validator run 37836845827 confirmed every direct-changed source must remain behind the current-main re-review fence while aggregate review is incomplete; retain the audited disposition/evidence but do not mark authority review closed yet.",
       "historical_implementation_status": "not-applicable",
       "historical_ios_disposition": "not-applicable-with-replacement",
-      "authority_review_state": "current-main-reviewed",
+      "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -655,10 +655,10 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "mobile/ios/FabushiUITests/FabushiUITests.swift plus child-responsibility focused tests; final physical-device accessibility/UI acceptance remains separately gated",
-      "notes": "Current-main diff adds Desktop-only CSS mechanics for font fallbacks/accessibility data attributes, new-Agent identity controls, transcript bubble sizing and Forward dialog. These mechanisms are not copied into native iOS; their product effects are owned by SwiftUI/UIKit and independently tracked child rows. This row is current-main reviewed as not-applicable-with-replacement only for the CSS mechanism, not as acceptance of those child behaviors.",
+      "notes": "Current-main diff adds Desktop-only CSS mechanics for font fallbacks/accessibility data attributes, new-Agent identity controls, transcript bubble sizing and Forward dialog. These mechanisms are not copied into native iOS; their product effects are owned by SwiftUI/UIKit and independently tracked child rows. This row is current-main reviewed as not-applicable-with-replacement only for the CSS mechanism, not as acceptance of those child behaviors. Validator run 37836845827 confirmed every direct-changed source must remain behind the current-main re-review fence while aggregate review is incomplete; retain the audited disposition/evidence but do not mark authority review closed yet.",
       "historical_implementation_status": "not-applicable",
       "historical_ios_disposition": "not-applicable-with-replacement",
-      "authority_review_state": "current-main-reviewed",
+      "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -1046,10 +1046,10 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/account/session/menu.view.swift (native account menu and iOS self-reference disposition); App Store update lifecycle",
       "test_evidence": "account/menu native UI coverage plus final App Store/TestFlight acceptance remains separately gated",
-      "notes": "Current-main exact diff deletes experimentsSnapshot/onOpenIos/labels.ios/isIosLinkEnabled and the conditional iOS menu item. On the target iOS platform that Desktop-only entry is intrinsically non-applicable; native settings already documents the self-reference replacement. This disposition is only for the removed `Get iOS` entry, not the broader account menu.",
+      "notes": "Current-main exact diff deletes experimentsSnapshot/onOpenIos/labels.ios/isIosLinkEnabled and the conditional iOS menu item. On the target iOS platform that Desktop-only entry is intrinsically non-applicable; native settings already documents the self-reference replacement. This disposition is only for the removed `Get iOS` entry, not the broader account menu. Validator run 37836845827 confirmed every direct-changed source must remain behind the current-main re-review fence while aggregate review is incomplete; retain the audited disposition/evidence but do not mark authority review closed yet.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "current-main-reviewed",
+      "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
