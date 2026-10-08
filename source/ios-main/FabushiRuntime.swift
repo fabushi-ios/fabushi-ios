@@ -246,6 +246,9 @@ final class FabushiRuntime {
                 }
                 try await self.handleHumanCallSystemAction(action)
             }
+            HumanCallSystemCoordinator.shared.bindVoIPTokenChangeHandler { [weak self] in
+                await self?.remoteDeviceGateway.voIPTokenDidChange()
+            }
         } catch {
             fatalError("Failed to initialize iOS runtime: \(error)")
         }
