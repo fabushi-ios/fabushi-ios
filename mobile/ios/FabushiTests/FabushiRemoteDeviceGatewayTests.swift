@@ -44,4 +44,22 @@ final class FabushiRemoteDeviceGatewayTests: XCTestCase {
             "deviceId": "bad device id",
         ]))
     }
+    @MainActor
+    func testGatewayNormalizesAndValidatesVoIPRegistrationToken() {
+        let suiteName = "FabushiRemoteDeviceGatewayTests.voip.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertNil(FabushiRemoteDeviceGateway.currentVoIPToken(defaults: defaults))
+
+        defaults.set("  AABBCCDDEEFF00112233445566778899  ", forKey: HumanCallSystemCoordinator.voIPTokenDefaultsKey)
+        XCTAssertEqual(
+            FabushiRemoteDeviceGateway.currentVoIPToken(defaults: defaults),
+            "aabbccddeeff00112233445566778899"
+        )
+
+        defaults.set("not-a-hex-token", forKey: HumanCallSystemCoordinator.voIPTokenDefaultsKey)
+        XCTAssertNil(FabushiRemoteDeviceGateway.currentVoIPToken(defaults: defaults))
+    }
+
 }
