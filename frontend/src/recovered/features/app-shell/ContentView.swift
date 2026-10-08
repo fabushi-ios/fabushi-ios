@@ -113,6 +113,8 @@ struct ContentView: View {
     @State var conversationInfoPresented = false
     @State var chatSearchPresented = false
     @State var chatSearchQuery = ""
+    @State var chatSearchMatchIndex: Int?
+    @State var chatSearchTargetID: String?
     @State var attachmentPickerPresented = false
     @State var locationSharePresented = false
     @State var locationService = LocationService()

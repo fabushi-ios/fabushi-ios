@@ -247,6 +247,11 @@ private struct ForwardMessageSheet: View {
 
 extension ContentView {
     func chatView(_ conversation: ConversationSummary) -> some View {
+        let messages = messaging.messagesByConversation[conversation.id] ?? []
+        let searchMatches = chatSearchMatches(
+            messages.map { ChatSearchEntry(id: $0.id, text: chatSearchText(for: $0)) },
+            query: chatSearchQuery
+        )
         NavigationStack {
             ZStack {
                 Color(red: 0.055, green: 0.06, blue: 0.07).ignoresSafeArea()
@@ -254,8 +259,23 @@ extension ContentView {
                     if chatSearchPresented {
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                            TextField("搜索此聊天", text: $chatSearchQuery).textInputAutocapitalization(.never).autocorrectionDisabled()
-                            if !chatSearchQuery.isEmpty { Button { chatSearchQuery = "" } label: { Image(systemName: "xmark.circle.fill") } }
+                            TextField("搜索此聊天", text: $chatSearchQuery)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .onChange(of: chatSearchQuery) { _, _ in
+                                    chatSearchMatchIndex = nil
+                                    chatSearchTargetID = nil
+                                }
+                            if !chatSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text(searchMatches.isEmpty ? "0 / 0" : "\((chatSearchMatchIndex ?? -1) + 1) / \(searchMatches.count)")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                                Button { navigateChatSearch(matches: searchMatches, delta: -1) } label: { Image(systemName: "chevron.up") }
+                                    .disabled(searchMatches.isEmpty)
+                                Button { navigateChatSearch(matches: searchMatches, delta: 1) } label: { Image(systemName: "chevron.down") }
+                                    .disabled(searchMatches.isEmpty)
+                                Button { chatSearchQuery = "" } label: { Image(systemName: "xmark.circle.fill") }
+                            }
                         }
                         .padding(.horizontal, 12).frame(height: 40).background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12)).padding(8)
                     }
@@ -275,9 +295,7 @@ extension ContentView {
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(spacing: 8) {
-                                ForEach((messaging.messagesByConversation[conversation.id] ?? []).filter { message in
-                                    chatSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.text.localizedCaseInsensitiveContains(chatSearchQuery)
-                                }) { message in
+                                ForEach(messages) { message in
                                     HStack {
                                         if message.isOutgoing { Spacer(minLength: 56) }
                                         VStack(alignment: .trailing, spacing: 4) {
@@ -391,6 +409,11 @@ extension ContentView {
                                         }
                                         .padding(.horizontal, 11).padding(.vertical, 7)
                                         .background(message.isOutgoing ? Color.accentColor.opacity(0.20) : Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
+                                        .overlay {
+                                            if chatSearchTargetID == message.id {
+                                                RoundedRectangle(cornerRadius: 16).stroke(Color.accentColor, lineWidth: 2)
+                                            }
+                                        }
                                         .simultaneousGesture(
                                             DragGesture(minimumDistance: 18)
                                                 .onEnded { value in
@@ -436,6 +459,10 @@ extension ContentView {
                             else { return }
                             pendingInitialMessageID = nil
                             DispatchQueue.main.async { withAnimation { proxy.scrollTo(target, anchor: .center) } }
+                        }
+                        .onChange(of: chatSearchTargetID) { _, target in
+                            guard let target else { return }
+                            withAnimation { proxy.scrollTo(target, anchor: .center) }
                         }
                         .onChange(of: messaging.messagesByConversation[conversation.id]?.count ?? 0) { _, _ in
                             if let target = pendingInitialMessageID,
@@ -531,10 +558,17 @@ extension ContentView {
                         VStack(spacing: 1) { Text(conversation.title).font(.headline); Text("\(conversation.participants.count) 位成员").font(.caption2).foregroundStyle(.secondary) }
                     }.buttonStyle(.plain)
                 }
-                ToolbarItem(placement: .topBarLeading) { Button { chatSearchPresented = false; chatSearchQuery = ""; selectedConversation = nil } label: { Image(systemName: "chevron.left") } }
+                ToolbarItem(placement: .topBarLeading) { Button { chatSearchPresented = false; chatSearchQuery = ""; chatSearchMatchIndex = nil; chatSearchTargetID = nil; selectedConversation = nil } label: { Image(systemName: "chevron.left") } }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button(chatSearchPresented ? "关闭搜索" : "搜索", systemImage: "magnifyingglass") { chatSearchPresented.toggle(); if !chatSearchPresented { chatSearchQuery = "" } }
+                        Button(chatSearchPresented ? "关闭搜索" : "搜索", systemImage: "magnifyingglass") {
+                            chatSearchPresented.toggle()
+                            if !chatSearchPresented {
+                                chatSearchQuery = ""
+                                chatSearchMatchIndex = nil
+                                chatSearchTargetID = nil
+                            }
+                        }
                         Button(conversation.isMuted ? "取消静音" : "静音", systemImage: "speaker.slash") { Task { await messaging.setMuted(conversation.id, muted: !conversation.isMuted) } }
                         Button(conversation.isPinned ? "取消置顶" : "置顶", systemImage: "pin") { Task { await messaging.setPinned(conversation.id, pinned: !conversation.isPinned) } }
                         Button("标为未读", systemImage: "circle.fill") { Task { await messaging.setMarkedUnread(conversation.id, markedUnread: true) }; selectedConversation = nil }
@@ -544,6 +578,8 @@ extension ContentView {
             }
         }
         .task(id: conversation.id) {
+            chatSearchMatchIndex = nil
+            chatSearchTargetID = nil
             let draft = messaging.draftsByConversation[conversation.id]
             messageDraft = draft?.text ?? ""
             replyTarget = draft?.replyToMessageId.flatMap { replyId in messaging.messagesByConversation[conversation.id]?.first(where: { $0.id == replyId }) }
@@ -638,6 +674,16 @@ extension ContentView {
                 }
             }
         }
+    }
+
+    func navigateChatSearch(matches: [ChatSearchMatch], delta: Int) {
+        guard let next = nextChatSearchIndex(current: chatSearchMatchIndex, count: matches.count, delta: delta) else {
+            chatSearchMatchIndex = nil
+            chatSearchTargetID = nil
+            return
+        }
+        chatSearchMatchIndex = next
+        chatSearchTargetID = matches[next].entryId
     }
 
     func sendMessage(in conversation: ConversationSummary, silent: Bool = false, scheduledAtMs: Int64? = nil) {
