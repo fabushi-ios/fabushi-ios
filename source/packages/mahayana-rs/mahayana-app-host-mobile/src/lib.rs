@@ -1508,24 +1508,121 @@ impl MobileAppHost {
                 let generation = required_json_u64(&params, "generation")?;
                 let action = required_json_string(&params, "action")?;
                 let terminal_reason = params.get("terminalReason").and_then(serde_json::Value::as_str);
-                serde_json::to_value(
-                    self.call_sessions
-                        .transition(&call_id, generation, &action, terminal_reason)?,
-                )
-                .map_err(|error| error.to_string())
+                #[cfg(test)]
+                {
+                    return serde_json::to_value(
+                        self.call_sessions
+                            .transition(&call_id, generation, &action, terminal_reason)?,
+                    )
+                    .map_err(|error| error.to_string());
+                }
+                #[cfg(not(test))]
+                {
+                    let current = self.sync_call_session_from_remote(&call_id)?;
+                    if current.generation != generation {
+                        return Err(format!(
+                            "stale call generation: expected {}, current {}",
+                            generation, current.generation
+                        ));
+                    }
+                    let (next_state, next_generation, _, normalized_reason) =
+                        call_session::transition_target(&current, &action, terminal_reason)?;
+                    let mut payload = serde_json::json!({
+                        "action": action,
+                        "state": next_state,
+                    });
+                    if let Some(reason) = normalized_reason {
+                        payload["terminalReason"] = serde_json::json!(reason);
+                    }
+                    let client_event_id = format!(
+                        "transition:{}:{}",
+                        generation,
+                        payload["action"].as_str().unwrap_or_default()
+                    );
+                    let response = self.append_shipping_call_event(
+                        &call_id,
+                        next_generation,
+                        "transition",
+                        payload,
+                        client_event_id,
+                    )?;
+                    let event = response
+                        .get("event")
+                        .ok_or_else(|| "remote Human call transition omitted event".to_string())?;
+                    self.apply_remote_call_event(&call_id, event)?;
+                    let seq = event
+                        .get("seq")
+                        .and_then(serde_json::Value::as_u64)
+                        .ok_or_else(|| "remote Human call transition omitted seq".to_string())?;
+                    self.call_sessions.set_remote_event_seq(&call_id, seq)?;
+                    serde_json::to_value(self.sync_call_session_from_remote(&call_id)?)
+                        .map_err(|error| error.to_string())
+                }
             }
             "updateCallMedia" => {
                 let call_id = required_json_string(&params, "callId")?;
                 let generation = required_json_u64(&params, "generation")?;
                 let media_capabilities = params.get("mediaCapabilities");
                 let device_selection = params.get("deviceSelection");
-                serde_json::to_value(self.call_sessions.update_media(
-                    &call_id,
-                    generation,
-                    media_capabilities,
-                    device_selection,
-                )?)
-                .map_err(|error| error.to_string())
+                #[cfg(test)]
+                {
+                    return serde_json::to_value(self.call_sessions.update_media(
+                        &call_id,
+                        generation,
+                        media_capabilities,
+                        device_selection,
+                    )?)
+                    .map_err(|error| error.to_string());
+                }
+                #[cfg(not(test))]
+                {
+                    let current = self.sync_call_session_from_remote(&call_id)?;
+                    if current.generation != generation {
+                        return Err(format!(
+                            "stale call generation: expected {}, current {}",
+                            generation, current.generation
+                        ));
+                    }
+                    if matches!(current.state.as_str(), "ended" | "failed") {
+                        return Err("terminal call session cannot update media state".into());
+                    }
+                    if media_capabilities.is_none() && device_selection.is_none() {
+                        return Err("call media update requires capabilities or device selection".into());
+                    }
+                    let media = media_capabilities
+                        .cloned()
+                        .unwrap_or_else(|| current.media_capabilities.clone());
+                    let devices = device_selection
+                        .cloned()
+                        .unwrap_or_else(|| current.device_selection.clone());
+                    if !media.is_object() || !devices.is_object() {
+                        return Err("call media capabilities and device selection must be objects".into());
+                    }
+                    let payload = serde_json::json!({
+                        "mediaCapabilities": media,
+                        "deviceSelection": devices,
+                    });
+                    let client_event_id =
+                        Self::stable_call_event_id("media", generation, &payload)?;
+                    let response = self.append_shipping_call_event(
+                        &call_id,
+                        generation,
+                        "media",
+                        payload,
+                        client_event_id,
+                    )?;
+                    let event = response
+                        .get("event")
+                        .ok_or_else(|| "remote Human call media update omitted event".to_string())?;
+                    self.apply_remote_call_event(&call_id, event)?;
+                    let seq = event
+                        .get("seq")
+                        .and_then(serde_json::Value::as_u64)
+                        .ok_or_else(|| "remote Human call media update omitted seq".to_string())?;
+                    self.call_sessions.set_remote_event_seq(&call_id, seq)?;
+                    serde_json::to_value(self.sync_call_session_from_remote(&call_id)?)
+                        .map_err(|error| error.to_string())
+                }
             }
             "sendCallSignal" => {
                 let call_id = required_json_string(&params, "callId")?;
@@ -1535,16 +1632,83 @@ impl MobileAppHost {
                 let kind = required_json_string(&params, "kind")?;
                 let payload = params
                     .get("payload")
-                    .ok_or_else(|| "payload is required".to_string())?;
-                serde_json::to_value(self.call_sessions.append_signal(
-                    &call_id,
-                    generation,
-                    seq,
-                    &sender_device_id,
-                    &kind,
-                    payload,
-                )?)
-                .map_err(|error| error.to_string())
+                    .filter(|value| value.is_object())
+                    .ok_or_else(|| "payload is required and must be an object".to_string())?;
+                #[cfg(test)]
+                {
+                    return serde_json::to_value(self.call_sessions.append_signal(
+                        &call_id,
+                        generation,
+                        seq,
+                        &sender_device_id,
+                        &kind,
+                        payload,
+                    )?)
+                    .map_err(|error| error.to_string());
+                }
+                #[cfg(not(test))]
+                {
+                    let current = self.sync_call_session_from_remote(&call_id)?;
+                    if current.generation != generation {
+                        return Err(format!(
+                            "stale call generation: expected {}, current {}",
+                            generation, current.generation
+                        ));
+                    }
+                    if matches!(current.state.as_str(), "ended" | "failed") {
+                        return Err("terminal call session cannot accept signaling".into());
+                    }
+                    let (_, authenticated_device_id) = self.call_transport_identity()?;
+                    if sender_device_id != authenticated_device_id {
+                        return Err(
+                            "call signal senderDeviceId must match the authenticated Host device".into()
+                        );
+                    }
+                    let remote_payload = serde_json::json!({
+                        "senderDeviceId": authenticated_device_id,
+                        "signalKind": kind,
+                        "signal": payload,
+                    });
+                    let id_payload = serde_json::json!({
+                        "deviceId": sender_device_id,
+                        "kind": remote_payload["signalKind"].clone(),
+                        "signal": payload,
+                    });
+                    let client_event_id =
+                        Self::stable_call_event_id("signal", generation, &id_payload)?;
+                    let response = self.append_shipping_call_event(
+                        &call_id,
+                        generation,
+                        "signal",
+                        remote_payload,
+                        client_event_id,
+                    )?;
+                    let event = response
+                        .get("event")
+                        .ok_or_else(|| "remote Human call signal omitted event".to_string())?;
+                    self.apply_remote_call_event(&call_id, event)?;
+                    let accepted_seq = event
+                        .get("seq")
+                        .and_then(serde_json::Value::as_u64)
+                        .ok_or_else(|| "remote Human call signal omitted seq".to_string())?;
+                    self.call_sessions.set_remote_event_seq(&call_id, accepted_seq)?;
+                    self.call_sessions
+                        .list_signals(
+                            &call_id,
+                            generation,
+                            accepted_seq.saturating_sub(1),
+                            1,
+                        )?
+                        .into_iter()
+                        .find(|signal| signal.seq == accepted_seq)
+                        .ok_or_else(|| {
+                            "remote call signal did not materialize in canonical CallSession owner"
+                                .to_string()
+                        })
+                        .and_then(|signal| {
+                            serde_json::to_value(signal).map_err(|error| error.to_string())
+                        })
+                }
             }
             "listCallSignals" => {
                 let call_id = required_json_string(&params, "callId")?;
@@ -1557,6 +1721,10 @@ impl MobileAppHost {
                     .get("limit")
                     .and_then(serde_json::Value::as_u64)
                     .unwrap_or(100) as usize;
+                #[cfg(not(test))]
+                {
+                    let _ = self.sync_call_session_from_remote(&call_id)?;
+                }
                 serde_json::to_value(
                     self.call_sessions
                         .list_signals(&call_id, generation, after_seq, limit)?,
