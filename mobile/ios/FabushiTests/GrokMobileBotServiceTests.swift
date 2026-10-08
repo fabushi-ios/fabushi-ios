@@ -332,6 +332,38 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
     @MainActor
+    func testAgentCreateCommandCommitsDesktopAvatarIdentityAtomically() throws {
+        let command = try GrokMobileBotService.createCommand(
+            name: "  New chat  ",
+            description: "  Research assistant  ",
+            avatarShape: "wedge",
+            avatarColor: "cyan",
+            requestId: "create-1"
+        )
+        XCTAssertEqual(command["type"] as? String, "bot.create")
+        XCTAssertEqual(command["requestId"] as? String, "create-1")
+        XCTAssertEqual(command["name"] as? String, "New chat")
+        XCTAssertEqual(command["description"] as? String, "Research assistant")
+        XCTAssertEqual(command["avatarShape"] as? String, "wedge")
+        XCTAssertEqual(command["avatarColor"] as? String, "cyan")
+
+        XCTAssertThrowsError(try GrokMobileBotService.createCommand(
+            name: "Agent",
+            description: "",
+            avatarShape: "not-a-shape",
+            avatarColor: "cyan",
+            requestId: "create-bad-shape"
+        ))
+        XCTAssertThrowsError(try GrokMobileBotService.createCommand(
+            name: "Agent",
+            description: "",
+            avatarShape: "wedge",
+            avatarColor: "not-a-color",
+            requestId: "create-bad-color"
+        ))
+    }
+
+    @MainActor
     func testBotMutationCommandsUseCanonicalFeatureHostContracts() {
         let longName = String(repeating: "a", count: 90)
         let rename = GrokMobileBotService.renameCommand(
