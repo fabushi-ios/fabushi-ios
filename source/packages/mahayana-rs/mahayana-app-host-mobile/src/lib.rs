@@ -1433,6 +1433,7 @@ impl MobileAppHost {
                 }))
             }
             "syncHumanCalls" => {
+                let (local_human_id, _) = self.call_transport_identity()?;
                 let response = self
                     .host
                     .human_call(MobileHumanCallTransportCommand::List { limit: 200 })?;
@@ -1440,14 +1441,79 @@ impl MobileAppHost {
                     .get("calls")
                     .and_then(serde_json::Value::as_array)
                     .ok_or_else(|| "remote Human call discovery omitted calls".to_string())?;
-                let mut synced = Vec::new();
+                let mut synced = Vec::with_capacity(remote_calls.len());
                 for remote in remote_calls {
-                    let Some(call_id) = remote.get("callId").and_then(serde_json::Value::as_str) else {
-                        return Err("remote Human call omitted callId".into());
+                    let call_id = remote
+                        .get("callId")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| "remote Human call omitted callId".to_string())?;
+                    let creator = json_identity_text(
+                        remote
+                            .get("creatorUserId")
+                            .ok_or_else(|| "remote Human call omitted creatorUserId".to_string())?,
+                    )?;
+                    let declared_peer = json_identity_text(
+                        remote
+                            .get("peerUserId")
+                            .ok_or_else(|| "remote Human call omitted peerUserId".to_string())?,
+                    )?;
+                    let peer = if creator == local_human_id {
+                        declared_peer.clone()
+                    } else if declared_peer == local_human_id {
+                        creator.clone()
+                    } else {
+                        return Err(
+                            "remote Human call does not contain the authenticated identity".into(),
+                        );
                     };
-                    if self.call_sessions.get(call_id)?.is_some() {
-                        synced.push(self.sync_call_session_from_remote(call_id)?);
+                    let conversation = self.host.human_call(
+                        MobileHumanCallTransportCommand::EnsureConversation {
+                            peer_user_id: peer.clone(),
+                            title: peer.clone(),
+                        },
+                    )?;
+                    let scope_id = conversation
+                        .get("id")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| {
+                            "Human call discovery could not resolve canonical conversation scope"
+                                .to_string()
+                        })?;
+                    if let Some(existing) = self.call_sessions.get(call_id)? {
+                        if existing.scope_id != scope_id {
+                            return Err(
+                                "remote Human call resolved to a different canonical conversation scope"
+                                    .into(),
+                            );
+                        }
+                    } else {
+                        let participants = vec![local_human_id.clone(), peer.clone()];
+                        self.call_sessions.create_with_id(
+                            call_id,
+                            scope_id,
+                            &creator,
+                            &participants,
+                        )?;
                     }
+                    let local = self.authorized_call_session(call_id, &local_human_id)?;
+                    validate_remote_call_identity(
+                        remote
+                            .as_object()
+                            .ok_or_else(|| "remote Human call must be an object".to_string())?,
+                        call_id,
+                        &local_human_id,
+                        &peer,
+                        &local.creator_id,
+                        remote
+                            .get("state")
+                            .and_then(serde_json::Value::as_str)
+                            .ok_or_else(|| "remote Human call omitted state".to_string())?,
+                        remote
+                            .get("generation")
+                            .and_then(serde_json::Value::as_u64)
+                            .ok_or_else(|| "remote Human call omitted generation".to_string())?,
+                    )?;
+                    synced.push(self.sync_call_session_from_remote(call_id)?);
                 }
                 serde_json::to_value(synced).map_err(|error| error.to_string())
             }
