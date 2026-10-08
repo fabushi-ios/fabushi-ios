@@ -124,11 +124,21 @@ pub enum ClientCommand {
         silent: bool,
         protected_content: bool,
     },
+    ListForwardRecipients {
+        source_conversation_id: ConversationId,
+        message_id: MessageId,
+        query: String,
+        limit: u32,
+    },
     ForwardMessage {
         source_conversation_id: ConversationId,
         message_id: MessageId,
         destination_conversation_id: ConversationId,
         client_message_id: ClientMessageId,
+        #[serde(default)]
+        drop_sender_names: bool,
+        #[serde(default)]
+        drop_captions: bool,
     },
     BeginBlobUpload {
         metadata: BlobMetadata,
@@ -334,6 +344,11 @@ pub enum ServerEvent {
     SearchResults {
         query: SearchQuery,
         results: Vec<SearchResult>,
+    },
+    ForwardRecipients {
+        source_conversation_id: ConversationId,
+        message_id: MessageId,
+        recipients: Vec<Conversation>,
     },
     ActorChanged {
         actor: Actor,
