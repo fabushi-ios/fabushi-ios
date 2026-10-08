@@ -250,6 +250,14 @@ impl UnifiedAppHost {
             .human_call_ensure_messaging_conversation(peer_user_id, title)
     }
 
+    pub fn human_call_peer_for_messaging_conversation(
+        &self,
+        conversation_id: &str,
+    ) -> Result<String, AppHostError> {
+        self.app
+            .human_call_peer_for_messaging_conversation(conversation_id)
+    }
+
     pub fn dispatch(&self, request: HostRequest) -> HostResponse {
         if !request.method.starts_with("harness.") {
             return self.app.dispatch(request);
