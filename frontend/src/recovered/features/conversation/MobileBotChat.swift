@@ -12,6 +12,58 @@ internal func isMobileBotVisibleAssistantCompletion(
     return !text.isEmpty || attachment != nil
 }
 
+internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> MobileChatMessage? {
+    guard
+        let id = (row["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !id.isEmpty,
+        let roleRaw = row["role"] as? String,
+        let role = MobileChatRole(rawValue: roleRaw),
+        let text = row["text"] as? String,
+        let createdAtMs = GrokMobileBotService.int64Value(row["createdAtMs"])
+    else {
+        return nil
+    }
+    var message = MobileChatMessage(
+        id: "history:\(id)",
+        role: role,
+        text: text,
+        canonicalMessageId: id,
+        reactions: projectMobileTranscriptReactions(row["reactions"])
+    )
+    message.createdAt = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1_000)
+    return message
+}
+
+internal func reconcileMobileConversationBaseline(
+    baseline: [MobileChatMessage],
+    current: [MobileChatMessage],
+    identitiesAtRequestStart: Set<String>
+) -> [MobileChatMessage] {
+    func identity(_ message: MobileChatMessage) -> String {
+        message.canonicalMessageId ?? message.id
+    }
+
+    var merged = baseline
+    var seen = Set(baseline.map(identity))
+    for message in current {
+        let key = identity(message)
+        guard !seen.contains(key) else { continue }
+
+        let arrivedAfterRequestStarted = !identitiesAtRequestStart.contains(key)
+        let unresolvedOptimistic = message.id.hasPrefix("ios-mobile-bot-chat-")
+            || (message.kind == .message && message.canonicalMessageId == message.id)
+        let activeEphemeral = message.kind != .message || message.streaming
+        guard arrivedAfterRequestStarted || unresolvedOptimistic || activeEphemeral else { continue }
+
+        merged.append(message)
+        seen.insert(key)
+    }
+    return merged.sorted {
+        if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+        return $0.id < $1.id
+    }
+}
+
 private struct MobileLinkMetadataCard: View {
     let url: String
     let model: MarketplaceModel
@@ -111,6 +163,7 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerTargetId: String?
     @State private var reactionPickerDraft = ""
     @State private var approvalGeneration = 0
+    @State private var transcriptBaselineGeneration = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -125,13 +178,18 @@ internal struct MobileBotChat: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mobile-bot-chat")
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
+        .task(id: "\(bot.id):\(bot.conversationId ?? "")") {
+            await loadInitialConversationTail()
+        }
         .onChange(of: bot.id) { _, _ in
             cancelVoiceInput()
             approvalGeneration &+= 1
+            transcriptBaselineGeneration &+= 1
         }
         .onDisappear {
             cancelVoiceInput()
             approvalGeneration &+= 1
+            transcriptBaselineGeneration &+= 1
         }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
@@ -1015,6 +1073,65 @@ internal struct MobileBotChat: View {
         voiceRecorder.cancel()
         voiceTranscriber.cancel()
         transcribingVoice = false
+    }
+
+    @MainActor
+    private func loadInitialConversationTail() async {
+        guard bot.miniAppId == nil,
+              let conversationId = bot.conversationId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !conversationId.isEmpty
+        else { return }
+
+        transcriptBaselineGeneration &+= 1
+        let generation = transcriptBaselineGeneration
+        let ownedBotID = bot.id
+        let identitiesAtRequestStart = Set(entries.map { $0.canonicalMessageId ?? $0.id })
+        let requestId = "ios-mobile-conversation-tail-\(UUID().uuidString.lowercased())"
+
+        do {
+            _ = try await bridge.request(
+                method: "feature.execute",
+                params: [
+                    "command": [
+                        "type": "conversation.openTail",
+                        "requestId": requestId,
+                        "conversationId": conversationId,
+                        "limit": 200,
+                    ],
+                ]
+            )
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 8_000
+            ) { event in
+                event["type"] as? String == "conversation.windowOpened"
+                    && event["conversationId"] as? String == conversationId
+            }
+            guard
+                generation == transcriptBaselineGeneration,
+                bot.id == ownedBotID,
+                let event = result.value as? [String: Any],
+                let rows = event["messages"] as? [[String: Any]]
+            else { return }
+
+            let baseline = rows.compactMap(projectMobileConversationWindowMessage)
+            guard baseline.count == rows.count else {
+                throw NSError(
+                    domain: "Fabushi.MobileBotChat",
+                    code: 41,
+                    userInfo: [NSLocalizedDescriptionKey: "Host returned a malformed conversation baseline"]
+                )
+            }
+            entries = reconcileMobileConversationBaseline(
+                baseline: baseline,
+                current: entries,
+                identitiesAtRequestStart: identitiesAtRequestStart
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            guard generation == transcriptBaselineGeneration, bot.id == ownedBotID else { return }
+            errorText = error.localizedDescription
+        }
     }
 
     @MainActor
