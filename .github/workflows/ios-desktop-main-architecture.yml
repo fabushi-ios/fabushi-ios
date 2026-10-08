@@ -80,10 +80,11 @@ jobs:
           sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
       - name: Test canonical Rust Host Runner composition
         run: cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-host --lib --profile ci --features mobile-embedded
-      - name: Test iOS-owned Rust Host modules
+      - name: Test iOS-owned Rust Host modules and canonical messaging core
         run: |
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-feature-host --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host-mobile --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-messaging/Cargo.toml --profile ci
       - name: Test native MCP, persistence telemetry, Runtime projection, and protected account contracts
         run: |
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-kernel --lib --profile ci
