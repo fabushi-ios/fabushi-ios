@@ -84,14 +84,14 @@ final class SampleHandler: RPBroadcastSampleHandler {
         guard let jpeg = context.jpegRepresentation(
             of: image,
             colorSpace: CGColorSpaceCreateDeviceRGB(),
-            options: [.lossyCompressionQuality: 0.58]
+            options: [:]
         ) else { return }
 
         sequence &+= 1
-        let filename = "human-call-broadcast-frame-(sequence).jpg"
+        let filename = "human-call-broadcast-frame-\(sequence).jpg"
         let frameURL = container.appendingPathComponent(filename)
         do {
-            try jpeg.write(to: frameURL, options: .atomic)
+            try jpeg.write(to: frameURL, options: Data.WritingOptions.atomic)
             let orientation = (
                 CMGetAttachment(
                     sampleBuffer,
