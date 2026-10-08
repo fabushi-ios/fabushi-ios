@@ -151,10 +151,14 @@ extension GrokMobileShell {
         do {
             bots = try await GrokMobileBotService(bridge: bridge).createBot(
                 name: name,
-                description: description
+                description: description,
+                avatarShape: botAvatarShape,
+                avatarColor: botAvatarColor
             )
             botName = ""
             botDescription = ""
+            botAvatarShape = "wedge"
+            botAvatarColor = "cyan"
             createBotOpen = false
             await messaging.refresh()
         } catch {
