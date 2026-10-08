@@ -528,10 +528,38 @@ mod experiments_diagnostic_telemetry;
 #[path = "../../../../host/runner/tool-call-identity.rs"]
 mod tool_call_identity;
 
+enum MobileHumanCallTransportCommand {
+    Identity,
+    IceServers,
+    List {
+        limit: usize,
+    },
+    Create {
+        call_id: String,
+        peer_human_id: String,
+    },
+    Get {
+        call_id: String,
+        after_seq: u64,
+        limit: usize,
+    },
+    AppendEvent {
+        call_id: String,
+        client_event_id: String,
+        generation: u64,
+        kind: String,
+        payload: serde_json::Value,
+    },
+}
+
 enum MobileHostCommand {
     Dispatch {
         input: String,
         reply: mpsc::SyncSender<String>,
+    },
+    HumanCall {
+        command: MobileHumanCallTransportCommand,
+        reply: mpsc::SyncSender<Result<serde_json::Value, String>>,
     },
     Shutdown {
         reply: mpsc::SyncSender<Result<(), String>>,
@@ -576,6 +604,59 @@ impl MobileHostBridge {
                             };
                             let _ = reply.send(output);
                         }
+                        MobileHostCommand::HumanCall { command, reply } => {
+                            let output = match process_crash_guard::catch_host_fault(
+                                "mahayana-app-host-human-call",
+                                || match command {
+                                    MobileHumanCallTransportCommand::Identity => {
+                                        host.human_call_transport_identity()
+                                    }
+                                    MobileHumanCallTransportCommand::IceServers => {
+                                        host.human_call_ice_servers()
+                                    }
+                                    MobileHumanCallTransportCommand::List { limit } => {
+                                        host.human_call_remote_list(limit)
+                                    }
+                                    MobileHumanCallTransportCommand::Create {
+                                        call_id,
+                                        peer_human_id,
+                                    } => host.human_call_remote_create(
+                                        &call_id,
+                                        &peer_human_id,
+                                    ),
+                                    MobileHumanCallTransportCommand::Get {
+                                        call_id,
+                                        after_seq,
+                                        limit,
+                                    } => host.human_call_remote_get(
+                                        &call_id,
+                                        after_seq,
+                                        limit,
+                                    ),
+                                    MobileHumanCallTransportCommand::AppendEvent {
+                                        call_id,
+                                        client_event_id,
+                                        generation,
+                                        kind,
+                                        payload,
+                                    } => host.human_call_remote_append_event(
+                                        &call_id,
+                                        &client_event_id,
+                                        generation,
+                                        &kind,
+                                        payload,
+                                    ),
+                                }
+                                .map_err(|error| error.to_string()),
+                            ) {
+                                Ok(output) => output,
+                                Err(fault) => Err(format!(
+                                    "host_fault[{}]: {}",
+                                    fault.kind, fault.message
+                                )),
+                            };
+                            let _ = reply.send(output);
+                        }
                         MobileHostCommand::Shutdown { reply } => {
                             let result = host.close().map_err(|error| error.to_string());
                             let _ = reply.send(result);
@@ -614,6 +695,19 @@ impl MobileHostBridge {
         receiver.recv().unwrap_or_else(|_| {
             "{\"ok\":false,\"error\":\"mobile Host reply unavailable\"}".to_owned()
         })
+    }
+
+    fn human_call(
+        &self,
+        command: MobileHumanCallTransportCommand,
+    ) -> Result<serde_json::Value, String> {
+        let (reply, receiver) = mpsc::sync_channel(1);
+        self.commands
+            .send(MobileHostCommand::HumanCall { command, reply })
+            .map_err(|_| "mobile Host thread unavailable during Human call transport".to_string())?;
+        receiver
+            .recv()
+            .map_err(|_| "mobile Host Human call transport reply unavailable".to_string())?
     }
 
     fn request_ok(&self, method: &str) -> bool {
