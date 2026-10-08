@@ -49,6 +49,7 @@ final class FabushiRemoteDeviceGateway {
     private var desiredLoggedIn = false
     private var activeSession: AgentSession?
     private var registered = false
+    private var registeredVoIPToken: String?
 
     init(bridge: IOSPreloadBridge, surface: FabushiAppAgentSurface, traceURL: URL) {
         self.bridge = bridge
@@ -101,6 +102,7 @@ final class FabushiRemoteDeviceGateway {
                activeSession.sessionId == candidate.sessionId,
                activeSession.accessToken == candidate.accessToken,
                registered,
+               registeredVoIPToken == Self.currentVoIPToken(),
                socket?.state == .running {
                 return
             }
@@ -123,6 +125,7 @@ final class FabushiRemoteDeviceGateway {
         socket = task
         activeSession = agentSession
         registered = false
+        registeredVoIPToken = Self.currentVoIPToken()
         task.resume()
 
         let registration: [String: Any] = [
@@ -175,6 +178,7 @@ final class FabushiRemoteDeviceGateway {
             appendTrace(["phase": "disconnected", "reason": String(reason.prefix(80))])
         }
         registered = false
+        registeredVoIPToken = nil
     }
 
     private func receiveLoop(_ task: URLSessionWebSocketTask) async {
@@ -418,11 +422,25 @@ final class FabushiRemoteDeviceGateway {
         return ["type": "object", "properties": properties]
     }
 
+
+    static func currentVoIPToken(defaults: UserDefaults = .standard) -> String? {
+        guard let raw = defaults.string(forKey: HumanCallSystemCoordinator.voIPTokenDefaultsKey) else {
+            return nil
+        }
+        let token = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard token.count >= 32, token.count <= 512,
+              token.range(of: #"^[0-9a-f]+$"#, options: .regularExpression) != nil
+        else { return nil }
+        return token
+    }
     private static func gatewayMetadata() -> [String: Any] {
         let environment = ProcessInfo.processInfo.environment
         var metadata: [String: Any] = [
             "kind": environment["GITHUB_ACTIONS"] == "true" ? "github-actions-ios-app" : "fabushi-ios",
         ]
+        if let token = currentVoIPToken() {
+            metadata["humanCallVoIPToken"] = token
+        }
         let mapping = [
             "GITHUB_REPOSITORY": "repository",
             "GITHUB_WORKFLOW": "workflow",
