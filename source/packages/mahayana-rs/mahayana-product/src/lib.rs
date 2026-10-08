@@ -66,6 +66,7 @@ const GITHUB_ACTIONS_ENV: &str = "GITHUB_ACTIONS";
 const CI_ACCOUNT_SESSION_MAX_BYTES: u64 = 64 * 1024;
 const CI_ACCOUNT_SESSION_MAX_BASE64_BYTES: usize = ((CI_ACCOUNT_SESSION_MAX_BYTES as usize + 2) / 3) * 4;
 const ACCESS_TOKEN_REFRESH_SKEW_SECONDS: i64 = 60;
+const MAX_DIRECT_MESSAGE_RESOURCE_BYTES: usize = 32 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1905,6 +1906,35 @@ impl MahayanaProductClient {
                     json!({}),
                 )
             }
+            "mahayana.messages.resource.upload" => {
+                let name = required_string(request, "name")?;
+                if name.chars().count() > 255 {
+                    return Err(ProductError::InvalidParameter("name"));
+                }
+                let content_type = optional_string(request, "contentType")
+                    .unwrap_or("application/octet-stream");
+                if content_type.len() > 255 || content_type.contains(['\r', '\n']) {
+                    return Err(ProductError::InvalidParameter("contentType"));
+                }
+                let encoded = required_string(request, "dataBase64")?;
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(encoded)
+                    .map_err(|_| ProductError::InvalidParameter("dataBase64"))?;
+                if bytes.is_empty() || bytes.len() > MAX_DIRECT_MESSAGE_RESOURCE_BYTES {
+                    return Err(ProductError::InvalidParameter("dataBase64"));
+                }
+                self.authorized_social_message_resource_upload(
+                    request,
+                    name,
+                    content_type,
+                    bytes,
+                )
+            }
+            "mahayana.messages.resource.download" => {
+                let resource_id = required_identifier(request, "resourceId")?;
+                let resource_id = safe_path_identifier(&resource_id, "resourceId")?;
+                self.authorized_social_message_resource_download(request, resource_id)
+            }
             "mahayana.messages.list" => {
                 let contact = required_string(request, "contact")?;
                 let limit = request
@@ -2730,6 +2760,80 @@ impl MahayanaProductClient {
     ) -> Result<Value, ProductError> {
         let (token, device_id) = self.social_authorization(command)?;
         self.post_json_with_device(path, body, &token, &device_id)
+    }
+
+    fn authorized_social_message_resource_upload(
+        &self,
+        command: &Value,
+        name: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> Result<Value, ProductError> {
+        let (token, device_id) = self.social_authorization(command)?;
+        let url = format!("{}{}", self.api_base_url, "/api/social/message-resources");
+        let name = name.to_string();
+        let content_type = content_type.to_string();
+        let response = send_with_ipv4_fallback(|client| {
+            let part = reqwest::blocking::multipart::Part::bytes(bytes.clone())
+                .file_name(name.clone())
+                .mime_str(&content_type)?;
+            let form = reqwest::blocking::multipart::Form::new().part("file", part);
+            client
+                .post(&url)
+                .header("Accept", "application/json")
+                .header("x-fabushi-device-id", &device_id)
+                .bearer_auth(&token)
+                .multipart(form)
+                .send()
+        })?;
+        decode_response(Ok(response))
+    }
+
+    fn authorized_social_message_resource_download(
+        &self,
+        command: &Value,
+        resource_id: &str,
+    ) -> Result<Value, ProductError> {
+        let (token, device_id) = self.social_authorization(command)?;
+        let url = format!(
+            "{}{}",
+            self.api_base_url,
+            format!("/api/social/message-resources/{resource_id}")
+        );
+        let response = send_with_ipv4_fallback(|client| {
+            client
+                .get(&url)
+                .header("Accept", "application/octet-stream")
+                .header("x-fabushi-device-id", &device_id)
+                .bearer_auth(&token)
+                .send()
+        })?;
+        if !response.status().is_success() {
+            return decode_response(Ok(response));
+        }
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+        let bytes = response
+            .bytes()
+            .map_err(|error| ProductError::Transport(error.to_string()))?;
+        if bytes.is_empty() || bytes.len() > MAX_DIRECT_MESSAGE_RESOURCE_BYTES {
+            return Err(ProductError::Response(
+                "Fabushi Human attachment response had an invalid size".into(),
+            ));
+        }
+        Ok(json!({
+            "success": true,
+            "resource": {
+                "resourceId": resource_id,
+                "contentType": content_type,
+                "size": bytes.len(),
+                "dataBase64": base64::engine::general_purpose::STANDARD.encode(bytes.as_ref()),
+            }
+        }))
     }
 
     fn social_authorization(&self, command: &Value) -> Result<(String, String), ProductError> {
@@ -4677,6 +4781,123 @@ mod tests {
             .expect("send scheduled direct message");
         assert_eq!(response["success"], true);
         server.join().expect("join direct message test server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn direct_message_resource_upload_binds_account_device_and_multipart_file() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind attachment upload test server");
+        let address = listener.local_addr().expect("attachment upload test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept attachment upload request");
+            let mut request = [0_u8; 16384];
+            let size = stream.read(&mut request).expect("read attachment upload request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("POST /api/social/message-resources "));
+            let lower = request.to_ascii_lowercase();
+            assert!(lower.contains("authorization: bearer test-token"));
+            assert!(lower.contains("x-fabushi-device-id: device-1"));
+            assert!(lower.contains("content-type: multipart/form-data; boundary="));
+            assert!(request.contains("name=\"file\""));
+            assert!(request.contains("filename=\"hello.txt\""));
+            assert!(request.contains("hello attachment"));
+
+            let response = r#"{"success":true,"resource":{"resourceId":"resource-1","name":"hello.txt","contentType":"text/plain","size":16}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.len(),
+                response
+            )
+            .expect("write attachment upload response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-message-resource-upload-test-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let response = client
+            .execute(
+                "mahayana.messages.resource.upload",
+                &json!({
+                    "name": "hello.txt",
+                    "contentType": "text/plain",
+                    "dataBase64": base64::engine::general_purpose::STANDARD.encode(b"hello attachment"),
+                    "accessToken": "test-token",
+                    "deviceId": "device-1",
+                }),
+            )
+            .expect("upload direct message resource");
+        assert_eq!(response["resource"]["resourceId"], "resource-1");
+        server.join().expect("join attachment upload server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn direct_message_resource_download_returns_bounded_base64_bytes() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind attachment download test server");
+        let address = listener.local_addr().expect("attachment download test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept attachment download request");
+            let mut request = [0_u8; 8192];
+            let size = stream.read(&mut request).expect("read attachment download request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("GET /api/social/message-resources/resource-1 "));
+            let lower = request.to_ascii_lowercase();
+            assert!(lower.contains("authorization: bearer test-token"));
+            assert!(lower.contains("x-fabushi-device-id: device-1"));
+
+            let body = b"hello attachment";
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            )
+            .expect("write attachment download headers");
+            stream.write_all(body).expect("write attachment download body");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-message-resource-download-test-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let response = client
+            .execute(
+                "mahayana.messages.resource.download",
+                &json!({
+                    "resourceId": "resource-1",
+                    "accessToken": "test-token",
+                    "deviceId": "device-1",
+                }),
+            )
+            .expect("download direct message resource");
+        assert_eq!(response["resource"]["contentType"], "text/plain");
+        assert_eq!(response["resource"]["size"], 16);
+        assert_eq!(
+            response["resource"]["dataBase64"],
+            base64::engine::general_purpose::STANDARD.encode(b"hello attachment")
+        );
+        server.join().expect("join attachment download server");
         let _ = std::fs::remove_dir_all(root);
     }
 
