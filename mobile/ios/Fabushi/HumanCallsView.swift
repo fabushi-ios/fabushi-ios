@@ -6,6 +6,7 @@ internal struct HumanCallSessionRecord: Identifiable, Equatable, Sendable {
     let creatorId: String
     let state: String
     let generation: Int
+    let signalSeq: Int
     let participantIds: [String]
     let mediaCapabilities: [String: String]
     let terminalReason: String?
@@ -28,6 +29,7 @@ internal struct HumanCallSessionRecord: Identifiable, Equatable, Sendable {
         self.creatorId = creatorId
         self.state = state
         self.generation = (raw["generation"] as? NSNumber)?.intValue ?? 0
+        self.signalSeq = (raw["signalSeq"] as? NSNumber)?.intValue ?? 0
         self.participantIds = raw["participantIds"] as? [String] ?? []
         self.mediaCapabilities = (raw["mediaCapabilities"] as? [String: Any] ?? [:])
             .reduce(into: [:]) { result, pair in
