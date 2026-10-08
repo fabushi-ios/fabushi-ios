@@ -9,6 +9,7 @@ enum CoordinatorCarrierChannel: String, CaseIterable, Equatable, Sendable {
 enum CoordinatorCarrierError: Error, Equatable, Sendable {
     case emptyAppVersion
     case emptyDataDirectory
+    case missingLocalHumanIdentity
     case unknownChannel(String)
     case closed
 }
@@ -26,6 +27,17 @@ extension CoordinatorBootstrap {
             throw CoordinatorCarrierError.emptyDataDirectory
         }
         return ValidatedCoordinatorBootstrap(value: self)
+    }
+}
+
+extension ValidatedCoordinatorBootstrap {
+    func requiringLocalHumanIdentity() throws -> ValidatedCoordinatorBootstrap {
+        guard let localHumanId = value.processConfig.localHumanId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !localHumanId.isEmpty
+        else {
+            throw CoordinatorCarrierError.missingLocalHumanIdentity
+        }
+        return self
     }
 }
 
