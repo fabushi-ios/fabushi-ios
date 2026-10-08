@@ -184,7 +184,14 @@ extension GrokMobileShell {
             )
         }
         .confirmationDialog("Create", isPresented: $composeOpen, titleVisibility: .visible) {
-            Button("New Bot") { createBotOpen = true }
+            Button("New Bot") {
+                botName = "New chat"
+                botDescription = ""
+                botAvatarShape = "wedge"
+                botAvatarColor = "cyan"
+                botError = nil
+                createBotOpen = true
+            }
             Button("New message") { legacyOpen = true }
             Button("New group") { legacyOpen = true }
             Button("New channel") { legacyOpen = true }
@@ -572,13 +579,71 @@ extension GrokMobileShell {
                 Section {
                     HStack { Spacer(); ClothGhostAvatar(botId: botName.isEmpty ? "new-bot" : botName, size: 82, active: botBusy); Spacer() }
                 }
-                Section("Name") { TextField("Bot name", text: $botName).accessibilityIdentifier("new-bot-name") }
-                Section("Description") { TextField("What does this Bot do?", text: $botDescription, axis: .vertical).lineLimit(2...5) }
+                Section("Name") {
+                    TextField("Bot name", text: $botName)
+                        .accessibilityIdentifier("new-bot-name")
+                }
+                Section("Description") {
+                    TextField("What does this Bot do?", text: $botDescription, axis: .vertical)
+                        .lineLimit(2...5)
+                        .accessibilityIdentifier("new-bot-description")
+                }
+                Section("Avatar shape") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
+                        ForEach(AvatarImagePolicy.shapes, id: \.self) { shape in
+                            Button {
+                                botAvatarShape = shape
+                            } label: {
+                                Text(shape.capitalized)
+                                    .font(.caption.weight(botAvatarShape == shape ? .bold : .regular))
+                                    .frame(maxWidth: .infinity, minHeight: 36)
+                                    .background(
+                                        botAvatarShape == shape
+                                            ? Color.accentColor.opacity(0.2)
+                                            : Color.secondary.opacity(0.10),
+                                        in: RoundedRectangle(cornerRadius: 9)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Avatar shape \(shape)")
+                            .accessibilityValue(botAvatarShape == shape ? "Selected" : "Not selected")
+                            .accessibilityIdentifier("new-bot-avatar-shape-\(shape)")
+                        }
+                    }
+                }
+                Section("Avatar color") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
+                        ForEach(AvatarImagePolicy.colors, id: \.id) { color in
+                            Button {
+                                botAvatarColor = color.id
+                            } label: {
+                                Text(color.label)
+                                    .font(.caption.weight(botAvatarColor == color.id ? .bold : .regular))
+                                    .frame(maxWidth: .infinity, minHeight: 36)
+                                    .background(
+                                        botAvatarColor == color.id
+                                            ? Color.accentColor.opacity(0.2)
+                                            : Color.secondary.opacity(0.10),
+                                        in: RoundedRectangle(cornerRadius: 9)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Avatar color \(color.label)")
+                            .accessibilityValue(botAvatarColor == color.id ? "Selected" : "Not selected")
+                            .accessibilityIdentifier("new-bot-avatar-color-\(color.id)")
+                        }
+                    }
+                }
                 if let botError { Section { Text(botError).foregroundStyle(.red).font(.footnote) } }
             }
             .navigationTitle("New Bot")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { createBotOpen = false } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        createBotOpen = false
+                        botError = nil
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(botBusy ? "Creating…" : "Create") { Task { await createBot() } }
                         .disabled(botBusy || botName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
