@@ -308,7 +308,7 @@ final class HumanCallPeerConnection: NSObject {
         let range = format.videoSupportedFrameRateRanges.first
         let fps = Int(min(30, max(1, range?.maxFrameRate ?? 30)))
 
-        cameraCapturer?.stopCapture()
+        await cameraCapturer?.stopCapture()
         let capturer = LKRTCCameraVideoCapturer(delegate: videoSource)
         cameraCapturer = capturer
         do {
