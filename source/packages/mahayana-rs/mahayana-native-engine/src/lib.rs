@@ -700,9 +700,9 @@ impl NativeEngine {
                 if let Some(dsml_calls) =
                     dsml_compat_function_calls(compatibility_text, &declared_tools, turn)
                 {
-                    session
-                        .history
-                        .extend(dsml_calls.iter().map(function_call_history_item));
+                    // Do not append all normalized calls up front. Each executable
+                    // call is recorded immediately before its own result so the next
+                    // model turn always sees balanced call/result pairs.
                     calls = dsml_calls;
                     normalized_dsml = true;
                 }
@@ -826,6 +826,10 @@ impl NativeEngine {
                     }
                 }
 
+                // Record only the call that is actually about to execute. Keeping
+                // this adjacent to its result prevents parallel provider output from
+                // becoming [call1, call2, result1, result2] in replay history.
+                append_function_call_history(&mut session.history, &call);
                 session.inflight_tool = Some(InflightToolCheckpoint {
                     operation_id: operation_id.as_str().to_string(),
                     call_id: call.call_id.clone(),
@@ -911,12 +915,11 @@ impl NativeEngine {
                             output: output.clone(),
                             success: true,
                         })?;
-                        session.history.push(json!({
-                            "type": "function_call_output",
-                            "call_id": call.call_id.clone(),
-                            "output": serde_json::to_string(&output)
-                                .unwrap_or_else(|_| "null".into()),
-                        }));
+                        append_function_call_output_history(
+                            &mut session.history,
+                            &call.call_id,
+                            &output,
+                        );
                         session.inflight_tool = None;
                         session.completed_tool_results.remove(&completion_key);
                         session.updated_at_ms = now_ms();
@@ -958,12 +961,11 @@ impl NativeEngine {
                             output: failure_output.clone(),
                             success: false,
                         })?;
-                        session.history.push(json!({
-                            "type": "function_call_output",
-                            "call_id": call.call_id.clone(),
-                            "output": serde_json::to_string(&failure_output)
-                                .unwrap_or_else(|_| "null".into()),
-                        }));
+                        append_function_call_output_history(
+                            &mut session.history,
+                            &call.call_id,
+                            &failure_output,
+                        );
                         session.inflight_tool = None;
                         session.completed_tool_results.remove(&completion_key);
                         session.updated_at_ms = now_ms();
@@ -2551,6 +2553,18 @@ fn function_call_history_item(call: &FunctionCall) -> Value {
     })
 }
 
+fn append_function_call_history(history: &mut Vec<Value>, call: &FunctionCall) {
+    history.push(function_call_history_item(call));
+}
+
+fn append_function_call_output_history(history: &mut Vec<Value>, call_id: &str, output: &Value) {
+    history.push(json!({
+        "type": "function_call_output",
+        "call_id": call_id,
+        "output": serde_json::to_string(output).unwrap_or_else(|_| "null".into()),
+    }));
+}
+
 fn extract_function_calls(payload: &Value) -> Result<Vec<FunctionCall>, KernelError> {
     let mut calls = Vec::new();
     for item in payload
@@ -2568,12 +2582,19 @@ fn extract_function_calls(payload: &Value) -> Result<Vec<FunctionCall>, KernelEr
             .or_else(|| item.pointer("/function/name"))
             .and_then(Value::as_str)
             .ok_or_else(|| KernelError::Backend("tool call is missing a name".into()))?;
-        let call_id = item
+        let Some(call_id) = item
             .get("call_id")
             .or_else(|| item.get("id"))
             .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
             .map(str::to_owned)
-            .unwrap_or_else(|| format!("call:{}", Uuid::new_v4()));
+        else {
+            // A provider function_call without a stable id cannot be paired with
+            // a function_call_output on replay. Treat it as incomplete output
+            // instead of inventing an id and executing an orphan tool request.
+            continue;
+        };
         let arguments = match item
             .get("arguments")
             .or_else(|| item.pointer("/function/arguments"))
@@ -2660,7 +2681,10 @@ fn reaction_message_reference_context(metadata: &Value) -> Option<String> {
 
 fn append_model_output(history: &mut Vec<Value>, payload: &Value) {
     if let Some(output) = payload.get("output").and_then(Value::as_array) {
-        history.extend(output.iter().cloned());
+        history.extend(output.iter().filter_map(|item| {
+            let item_type = item.get("type").and_then(Value::as_str).unwrap_or_default();
+            (!matches!(item_type, "function_call" | "tool_call")).then(|| item.clone())
+        }));
     } else if let Some(text) = mahayana_model::responses::extract_output_text(payload) {
         history.push(json!({"role": "assistant", "content": text}));
     }
@@ -3708,6 +3732,92 @@ mod tests {
                 "mixed or undeclared DSML must remain ordinary model text"
             );
         }
+    }
+
+    #[test]
+    fn provider_tool_calls_require_stable_ids_and_are_not_replayed_up_front() {
+        let payload = json!({
+            "output": [
+                {
+                    "type": "reasoning",
+                    "encrypted_content": "opaque"
+                },
+                {
+                    "type": "function_call",
+                    "name": "read_file",
+                    "arguments": "{}"
+                },
+                {
+                    "type": "function_call",
+                    "call_id": "call-complete",
+                    "name": "read_file",
+                    "arguments": "{}"
+                }
+            ]
+        });
+
+        let calls = extract_function_calls(&payload).expect("extract provider calls");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].call_id, "call-complete");
+
+        let mut history = Vec::new();
+        append_model_output(&mut history, &payload);
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0]["type"], "reasoning");
+        assert!(
+            history.iter().all(|item| {
+                !matches!(
+                    item.get("type").and_then(Value::as_str),
+                    Some("function_call" | "tool_call")
+                )
+            }),
+            "provider tool calls must be recorded only when they actually execute"
+        );
+    }
+
+    #[test]
+    fn parallel_tool_replay_history_keeps_each_call_adjacent_to_its_result() {
+        let calls = [
+            FunctionCall {
+                call_id: "call-a".into(),
+                name: "read_file".into(),
+                arguments: json!({"path":"a.txt"}),
+            },
+            FunctionCall {
+                call_id: "call-b".into(),
+                name: "read_file".into(),
+                arguments: json!({"path":"b.txt"}),
+            },
+        ];
+        let mut history = vec![json!({"type":"reasoning","encrypted_content":"opaque"})];
+        for call in &calls {
+            append_function_call_history(&mut history, call);
+            append_function_call_output_history(
+                &mut history,
+                &call.call_id,
+                &json!({"ok": true, "path": call.arguments["path"]}),
+            );
+        }
+
+        let replay = history
+            .iter()
+            .map(|item| {
+                (
+                    item.get("type").and_then(Value::as_str),
+                    item.get("call_id").and_then(Value::as_str),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            replay,
+            vec![
+                (Some("reasoning"), None),
+                (Some("function_call"), Some("call-a")),
+                (Some("function_call_output"), Some("call-a")),
+                (Some("function_call"), Some("call-b")),
+                (Some("function_call_output"), Some("call-b")),
+            ]
+        );
     }
 
     #[test]
