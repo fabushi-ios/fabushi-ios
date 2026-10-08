@@ -4,6 +4,14 @@ import Foundation
 import ReplayKit
 @preconcurrency import LiveKitWebRTC
 
+/// LiveKitWebRTC delegate callbacks are nonisolated Objective-C callbacks. The
+/// SDK track objects are thread-safe reference objects, but the imported API
+/// does not declare Sendable. Keep the unchecked boundary narrow and transfer
+/// only the immutable reference into the MainActor-owned presentation state.
+private struct HumanCallUncheckedTransfer<Value>: @unchecked Sendable {
+    let value: Value
+}
+
 @MainActor
 final class HumanCallPeerConnection: NSObject {
     enum Failure: LocalizedError {
@@ -693,8 +701,9 @@ extension HumanCallPeerConnection: LKRTCPeerConnectionDelegate {
     nonisolated func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {}
 
     nonisolated private func publishRemoteVideoTrack(_ track: LKRTCVideoTrack?) {
-        Task { @MainActor [weak self] in
-            self?.onRemoteVideoTrack?(track)
+        let transfer = HumanCallUncheckedTransfer(value: track)
+        Task { @MainActor [weak self, transfer] in
+            self?.onRemoteVideoTrack?(transfer.value)
         }
     }
 }
