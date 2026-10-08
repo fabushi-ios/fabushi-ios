@@ -1,41 +1,81 @@
-# Fabushi Desktop PR #20 -> Fabushi iOS Standalone Architecture & Product Parity — Specification
+# Fabushi Desktop `main` -> Fabushi iOS Standalone Architecture & Product Parity — Specification
 
 Status: active  
 Owner: Fabushi iOS  
-Last updated: 2026-10-05
-Related PR: `bhrumom/fabushi-ios#3`
+Last updated: 2026-10-08  
+Related PR: `fabushi-ios/fabushi-ios#3`  
+Legacy path note: this file keeps its historical PR20 filename so existing links and automation do not break; the **active authority is Desktop `main`**, not PR #20.
 
 ## 1. Decision and authority
 
-Fabushi iOS is a **standalone downstream iOS implementation of Fabushi Desktop PR #20**.
+Fabushi iOS is a **standalone native iOS downstream implementation of the current canonical `bhrumom/fabushi-desktop@main` product**.
 
-The direct migration source and product/architecture authority for this work is:
+The live migration and product/architecture authority is:
 
 - source repository: `bhrumom/fabushi-desktop`
-- source pull request: `#20`
-- source branch: `refactor/grok-018-architecture-rebuild`
-- pinned source commit for this baseline: `798cf51d96cb1cb98cf657af212bb47274ccb701`
-- source specification: `docs/specs/grok-bot-018-runtime-product-parity-recovery.md`
+- authoritative branch: `main`
+- authority mode: **live branch authority, re-resolved before every migration and acceptance cycle**
+- current observed Desktop `main` exact HEAD at this Spec update: `3bc92400826cc4ca7ac665b467708e22261edc61`
+- target repository: `fabushi-ios/fabushi-ios`
+- target workstream: PR #3 and its successors until migration is complete
 
-The previous direct iOS baseline, `b-nnett/grok-bot-0.18-reconstructed@a9f633e09d49a85829b8236331b9e21f7e612634`, is **no longer the direct iOS migration authority**. Grok Bot 0.18 remains historical architecture/provenance context because Desktop PR #20 itself derives from that work, but iOS parity, implementation status, completion, and acceptance are judged against the pinned Desktop PR #20 source and product behavior.
+A commit SHA recorded in this document is a **snapshot for provenance**, never a permanent frozen authority. If Desktop `main` advances, the newer `main` HEAD immediately becomes the source that must be understood and migrated. No historical PR head, merge commit, ledger count, inventory count, CI run, or acceptance artifact may override the current Desktop `main` branch.
+
+Desktop PR #20 and Grok Bot 0.18 remain historical architecture/provenance milestones only. They can explain why an owner or contract exists, but they are **not** allowed to freeze iOS on an obsolete Desktop architecture once `main` changes.
 
 Authority chain:
 
 ```
-Grok Bot 0.18
-    |
-    | historical architecture / provenance
-    v
-Fabushi Desktop PR #20
-    |
-    | direct iOS migration authority
-    v
-Fabushi iOS PR #3
+historical Grok / Desktop PR milestones
+              |
+              | provenance only
+              v
+bhrumom/fabushi-desktop@main
+              |
+              | current product + architecture authority
+              v
+fabushi-ios/fabushi-ios
 ```
 
-If Desktop PR #20 moves to a new exact HEAD, all Desktop-bound source inventory, blob identities, stale implementation-status claims, and acceptance evidence tied to the old SHA must be revalidated before they can be used for the new baseline.
+### 1.0 Live-main tracking rule
 
-### 1.0 Current exact-HEAD authority: 2026-10-05 / `798cf51d96cb1cb98cf657af212bb47274ccb701`
+Before **every substantial migration slice**, every independent acceptance pass, and every claim that a responsibility is `verified`:
+
+1. resolve the current exact HEAD of `bhrumom/fabushi-desktop@main`;
+2. compare it with the Desktop source SHA recorded by the iOS inventory/ledger;
+3. read the changed Desktop production sources, contracts, product-defining scripts/specs, and ownership boundaries;
+4. regenerate or rebind the Desktop inventory and blob identities to the current `main` HEAD;
+5. re-evaluate affected responsibilities, owners, state machines, failure semantics, dependency direction, and visible product effects;
+6. invalidate stale iOS `mapped`/`implemented`/`verified` claims when their supporting Desktop responsibility changed;
+7. only carry a previous row/status forward when the relevant Desktop blob/responsibility is unchanged **and** that carry-forward is explicitly revalidated;
+8. obtain fresh exact-iOS-HEAD GitHub Actions evidence after the rebaseline before promoting changed responsibilities to `verified`.
+
+A Desktop `main` HEAD change does **not** mean work must stop until every prior row is re-audited. Work should continue in parallel on unaffected responsibilities, but no stale baseline may be represented as current.
+
+### 1.1 Architecture migration rule
+
+The migration unit is **responsibility / owner / protocol boundary / state machine / product effect**, not a filename.
+
+For each responsibility, iOS must follow the architecture that exists on the **current Desktop `main`**:
+
+- canonical owner and ownership boundary;
+- Coordinator / Host / Runner separation;
+- protocol and typed identity boundaries;
+- lifecycle and cancellation semantics;
+- ordering and settlement rules;
+- durable state and persistence ownership;
+- dependency direction;
+- failure normalization and recovery;
+- security/credential boundaries;
+- observable product behavior.
+
+iOS may replace Desktop mechanisms with Apple-native mechanisms, but it must not preserve an obsolete PR #20 owner when Desktop `main` has moved the responsibility, and it must not invent a parallel owner merely to make the port easier.
+
+### 1.2 Historical frozen PR #20 baseline
+
+The sections below that describe Desktop PR #20 exact HEADs, the former 7,943-row inventory, and earlier rebaseline history are retained as provenance and diagnostic history. **Where any historical wording conflicts with Sections 1.0-1.1, the live Desktop `main` rule wins.**
+
+### 1.2.1 Historical exact-HEAD authority: 2026-10-05 / `798cf51d96cb1cb98cf657af212bb47274ccb701`
 
 Desktop PR #20 is merged into `main` as `ee66bacdf47f36af2ae96c0a8a8ec401460426e7`; its final PR head `798cf51d96cb1cb98cf657af212bb47274ccb701` remains the frozen direct iOS migration authority. Relative to the previously pinned `d18de3f688859946ddf80526e366328fae2de718`, that final exact HEAD is one commit ahead and changes exactly one selected Coordinator production file: `source/node-agent-coordinator/src/main.rs`. No selected path is added or removed, so the authoritative `frontend/** + source/**` inventory remains **7,943** rows. The current blob is `58b61e7ae0ecd2e74a7a9ea3c0e7442884f850d9` (112849 bytes).
 
@@ -495,15 +535,13 @@ The iOS-adapted production contract for this slice is:
 
 ## 2. Product goal
 
-The goal is not to make an iOS app that separately reinterprets Grok Bot.
+The goal is to make the **native iOS edition of the Fabushi product currently defined by Desktop `main`**, not an iOS reinterpretation frozen at Grok Bot or Desktop PR #20.
 
-The goal is to make the **native iOS edition of the Fabushi product defined by Desktop PR #20**, preserving the same product capabilities, architecture ownership, runtime semantics, state machines, dependency direction, failure behavior, and durable lifecycle wherever they are applicable to iOS.
-
-Desktop remains the upstream product/architecture implementation. iOS is a native platform port.
+Desktop `main` remains the upstream product/architecture implementation. iOS is a native platform port that must preserve the current Desktop product capabilities, architecture ownership, runtime semantics, state machines, dependency direction, failure behavior, and durable lifecycle wherever they are applicable to iOS.
 
 The iOS implementation may:
 
-- directly reuse source from Desktop PR #20;
+- directly reuse current Desktop `main` source;
 - port Rust source into iOS-owned Rust modules;
 - translate TypeScript/React behavior into Swift/SwiftUI;
 - adapt desktop platform mechanisms to Apple-native equivalents;
@@ -512,8 +550,8 @@ The iOS implementation may:
 The iOS implementation must not:
 
 - depend on a checkout of `fabushi-desktop` at build or runtime;
-- depend on `fabushi-platform-core` or another shared Fabushi runtime repository merely to deduplicate Desktop/iOS code;
-- move common Desktop/iOS production implementation into a new shared library as part of this migration;
+- depend on a new shared Fabushi runtime repository merely to deduplicate Desktop/iOS code;
+- preserve an older PR #20 architecture after Desktop `main` changes it;
 - preserve Grok as a parallel direct iOS source of truth;
 - claim parity from file names, stubs, ledger strings, or tests that do not exercise the shipping path.
 
@@ -547,9 +585,11 @@ A clean iOS checkout must not require another Fabushi source repository.
 
 ## 4. Architecture correspondence
 
-Desktop PR #20 architecture is normative. iOS may substitute platform mechanisms, not ownership.
+The architecture in the **current Desktop `main` exact HEAD is normative**. iOS may substitute platform mechanisms, not ownership or product responsibility.
 
-| Desktop PR #20 | Fabushi iOS |
+The correspondence below is a default mapping, not permission to ignore later Desktop `main` refactors. If `main` moves a responsibility to a different owner, the ledger and iOS architecture must be re-evaluated against the new owner.
+
+| Current Desktop `main` area | Fabushi iOS |
 | --- | --- |
 | `frontend/**` | `frontend/**`, native Swift/SwiftUI projection |
 | `source/electron-main/**` | `source/ios-main/**` |
@@ -564,10 +604,10 @@ Desktop PR #20 architecture is normative. iOS may substitute platform mechanisms
 | `source/shared/**` | `source/shared/**` |
 | `source/mahayana/**` | iOS-owned Mahayana/Rust source under the iOS repository |
 | `contracts/**` | iOS-owned versioned contracts where applicable |
-| `scripts/**` | iOS-specific build/verification scripts |
+| relevant `scripts/**` | iOS-specific build/verification scripts |
 | `.github/workflows/**` | iOS-specific exact-HEAD CI/release workflows |
 
-The dependency direction is:
+Expected dependency direction remains derived from current Desktop `main`; where the current architecture retains the canonical chain it is:
 
 ```
 SwiftUI renderer
@@ -588,7 +628,7 @@ Host
 Runner / Provider / MCP / Capability adapters
 ```
 
-Renderer/UI state is a projection. It is not the canonical owner of operation/run truth, retry state, transcript truth, provider lifecycle, connector truth, or recovery state.
+Renderer/UI state is a projection. It is not the canonical owner of operation/run truth, retry state, transcript truth, provider lifecycle, connector truth, or recovery state unless current Desktop `main` explicitly changes that architectural responsibility and the iOS ledger records the corresponding rebaseline.
 
 ## 5. Process-boundary adaptation on iOS
 
@@ -617,34 +657,18 @@ This migration intentionally permits source reuse **without a shared source repo
 Allowed:
 
 ```
-fabushi-desktop/source/host/x.rs
+fabushi-desktop@main/source/...
           |
           | copy / port / adapt
           v
-fabushi-ios/source/host/x.rs
+fabushi-ios/source/...
 ```
 
-Allowed:
+Allowed: semantic translation from current Desktop TypeScript/React into native Swift/SwiftUI.
 
-```
-Desktop TypeScript behavior
-          |
-          | semantic translation
-          v
-iOS Swift implementation
-```
+Allowed: porting current Desktop Rust modules into iOS-owned Rust modules with documented platform adaptation.
 
-Allowed:
-
-```
-Desktop Rust module
-          |
-          | iOS platform adaptation
-          v
-iOS-owned Rust module
-```
-
-Forbidden for this migration:
+Forbidden:
 
 ```
 Desktop ---+
@@ -652,16 +676,15 @@ Desktop ---+
 iOS -------+
 ```
 
-Source copied or ported from Desktop PR #20 must be reviewed for licensing/provenance requirements and then maintained by the iOS repository.
+Source copied or ported from Desktop must be taken from the **current `main` baseline being audited**, reviewed for licensing/provenance requirements, and then maintained by the iOS repository.
 
 ## 7. Desktop-to-iOS parity ledger
 
-The old 2,046-row Grok-direct ledger is historical evidence only. Its `mapped`, `implemented`, `verified`, and N/A statuses are not completion evidence for this Spec.
+The active ledger is a **Desktop `main` -> iOS responsibility ledger**. Historical Grok-direct and PR #20 row counts/statuses are provenance only and are not completion evidence by themselves.
 
-A new Desktop PR #20 parity ledger is authoritative.
+Every source-bearing Desktop file in the selected migration roots must be inventoried against the current Desktop `main` exact HEAD with at least:
 
-Every source-bearing Desktop file in the selected migration roots must be inventoried with at least:
-
+- `desktop_source_sha`;
 - `desktop_path`;
 - `desktop_blob_sha`;
 - `desktop_responsibility`;
@@ -678,9 +701,9 @@ Every source-bearing Desktop file in the selected migration roots must be invent
 
 Allowed disposition classes:
 
-- `direct-port`: source/responsibility can be substantially reused in iOS;
-- `ios-adapted`: same responsibility/effect, implemented with an iOS-native mechanism;
-- `not-applicable-with-replacement`: the desktop mechanism is prohibited/inapplicable, with an explicit replacement for any still-required product effect.
+- `direct-port`;
+- `ios-adapted`;
+- `not-applicable-with-replacement`.
 
 Allowed work statuses:
 
@@ -692,18 +715,22 @@ Allowed work statuses:
 
 Only `verified` and reviewed `not-applicable` may satisfy the final completion gate.
 
-A status from the previous Grok-direct ledger may not be copied forward without re-reading the corresponding Desktop PR #20 implementation and validating the current iOS shipping path against it.
+No row may inherit completion merely because it was verified against PR #20 or another older Desktop SHA. A previous status may be carried forward only after the current Desktop `main` path/blob/responsibility has been compared and explicitly revalidated.
 
 ## 8. Inventory roots
 
-The baseline inventory is generated from Desktop PR #20 exact HEAD and includes source-bearing files under:
+The baseline inventory is generated from the **current Desktop `main` exact HEAD**, not from a permanently pinned historical count.
+
+It includes source-bearing files under:
 
 - `frontend/**`;
 - `source/**`.
 
-Additional product-defining Desktop files under `contracts/**`, relevant `scripts/**`, and the authoritative Desktop Spec must be tracked separately when they define iOS-applicable contracts or behavior.
+Additional product-defining files under `contracts/**`, relevant `scripts/**`, active Desktop specifications/instructions, and release/acceptance workflows must be tracked when they define iOS-applicable contracts or product behavior.
 
-Generated build output, caches, vendored artifacts that do not define source responsibility, and platform packaging artifacts may be excluded only by an explicit inventory rule.
+Inventory size is allowed to grow or shrink with Desktop `main`. A historical count such as 7,943 is not a completion target after `main` has changed.
+
+Generated build output, caches, and vendored artifacts that do not define source responsibility may be excluded only by an explicit inventory rule.
 
 ## 9. Platform substitutions
 
@@ -993,137 +1020,141 @@ No previous Grok-ledger count is a completion metric under this Spec.
 
 ## 14. Rebaseline protocol
 
-Before any substantial new migration slice:
+Before every substantial migration slice **and before every acceptance/completion judgment**:
 
-1. read Desktop PR #20 current exact HEAD;
-2. compare it with the pinned SHA in this Spec and reference manifest;
-3. if unchanged, continue against the existing baseline;
+1. resolve `bhrumom/fabushi-desktop@main` to its current exact HEAD;
+2. compare that SHA with the source SHA recorded by the iOS manifest/ledger;
+3. if unchanged, continue against that exact source;
 4. if changed:
-   - record the new exact HEAD;
-   - regenerate Desktop source inventory/blob identities;
-   - diff added/removed/changed upstream paths;
-   - invalidate stale row/evidence claims affected by the diff;
-   - update this Spec/reference metadata;
-   - only then continue implementation.
+   - record the new exact HEAD as the current observed baseline;
+   - compare the prior Desktop baseline to new `main`;
+   - regenerate/rebind source inventory and blob identities;
+   - read added/removed/changed production paths plus affected contracts/specs/workflows;
+   - re-evaluate responsibility ownership and platform applicability;
+   - invalidate stale row/evidence claims affected by the delta;
+   - preserve unchanged statuses only after explicit revalidation;
+   - continue implementation from the new architecture.
 
-A green workflow for an older Desktop baseline does not prove parity with a newer PR #20 HEAD.
+Do not wait for a future PR or release branch to become the authority. **Desktop `main` is already the authority.**
+
+A green workflow for an older Desktop SHA is historical evidence only; it does not prove parity with the current Desktop `main`.
 
 ## 15. Implementation phases
 
-### Phase 0 — Authority cutover
+### Phase 0 — Live-main authority
 
-- replace Grok-direct authority with Desktop PR #20;
-- pin Desktop exact HEAD;
-- supersede the old Grok-direct Spec as an active authority;
-- generate Desktop source manifest;
-- create Desktop->iOS ledger with all rows initially unreviewed unless revalidated;
-- change architecture CI to validate the Desktop-based baseline.
+- use `bhrumom/fabushi-desktop@main` as the active product/architecture authority;
+- resolve and record its current exact HEAD at the start of each work cycle;
+- supersede Grok-direct and frozen PR #20 authority as active completion sources;
+- generate/rebind the Desktop source manifest and ledger to current `main`;
+- make architecture CI fail closed on stale Desktop-main authority.
 
-Exit: no active completion gate claims Grok-direct row counts as iOS parity.
+Exit: no active completion gate claims an older PR/commit or historical row count as current iOS parity.
 
 ### Phase 1 — Re-audit existing iOS architecture
 
-Audit current `frontend/**`, `source/ios-main/**`, `source/ios-preload/**`, Coordinator, Host, Runner, shared/packages, and mobile bootstrap against Desktop PR #20.
+Audit current iOS frontend/platform/Coordinator/Host/Runner/shared/packages/mobile owners against the current Desktop `main` architecture.
 
-Exit: every upstream source responsibility has a disposition and no inherited `implemented` status exists without Desktop comparison.
+Exit: every reviewed upstream responsibility has a disposition tied to the current Desktop source SHA; no inherited status survives an upstream change without revalidation.
 
 ### Phase 2 — Runtime and contract parity
 
-Port Desktop Coordinator/Host/Runner/shared/packages behavior required by iOS. Reuse Rust source directly when appropriate; otherwise use semantically equivalent iOS-owned implementations.
-
-Exit: canonical send/stream/tool/cancel/retry/recovery paths match Desktop contracts.
+Port the current Desktop Coordinator/Host/Runner/shared/packages behavior required by iOS, preserving current ownership and product effects.
 
 ### Phase 3 — iOS platform-main parity
 
-Port Electron-main/preload responsibilities into iOS main/preload owners with native adapters.
-
-Exit: no presentation layer owns platform/runtime orchestration.
+Port current Desktop platform-main/preload responsibilities into iOS owners with native adapters.
 
 ### Phase 4 — Frontend/product parity
 
-Port Desktop frontend product behavior to native SwiftUI, including iPhone/iPad layout adaptations.
-
-Exit: product flows are driven by canonical Coordinator projections.
+Port current Desktop product behavior to native SwiftUI, including iPhone/iPad adaptations.
 
 ### Phase 5 — Communication/connectors/full product closure
 
-Close all applicable Desktop PR #20 communication, MCP/connectors, automations, remote-computer, media, and product responsibilities.
+Close all applicable current Desktop-main communication, messaging, MCP/connectors, automations, remote-computer, media, commerce, and other product responsibilities.
 
 ### Phase 6 — Legacy removal
 
-Delete Grok-direct compatibility paths and previous iOS bypass/fallback implementations that are not part of the Desktop-derived architecture.
+Remove Grok-direct, frozen-PR20, and iOS bypass/fallback paths that are not part of the current Desktop-derived architecture.
 
-### Phase 7 — Exact-HEAD acceptance
+### Phase 7 — Current-authority exact-HEAD acceptance
 
-Run exact-HEAD GitHub Actions and packaged iOS acceptance, including archive/install and lifecycle recovery evidence.
+Immediately before final acceptance, resolve Desktop `main` again. Acceptance is valid only when the iOS exact HEAD is evaluated against that current Desktop authority and all required GitHub Actions/archive/install/release gates succeed.
 
 ## 16. Verification
 
-All build/test work for this migration runs in GitHub Actions or the designated remote runtime. Do not use a local developer-machine build as acceptance evidence.
+All build/test work for this migration runs in GitHub Actions or the designated remote runtime. Local developer-machine builds are not acceptance evidence.
 
 Architecture CI must fail when:
 
+- the recorded Desktop source SHA is not the current `main` SHA at the start of the validation cycle;
 - Desktop source manifest and ledger differ;
 - duplicate `desktop_path` rows exist;
+- a changed Desktop-main responsibility is carried forward without revalidation;
 - a row claims `implemented`/`verified` but its target is missing;
 - a verified row lacks production/test evidence;
 - a not-applicable row lacks an explicit platform reason/replacement;
-- renderer bypasses Coordinator/Host ownership;
+- renderer bypasses current Coordinator/Host ownership;
 - another Fabushi source repository becomes required to build/run iOS;
 - a shared Desktop/iOS runtime dependency is introduced contrary to this Spec;
-- a stale Desktop exact HEAD is represented as current.
+- a historical PR #20 or older Desktop SHA is represented as the live authority.
 
-Final completion additionally requires all mandatory rows `verified` or reviewed `not-applicable`.
+Final completion additionally requires all mandatory current-main responsibilities to be `verified` or reviewed `not-applicable`.
 
 ## 17. Acceptance criteria
 
-- **AC-1**: Desktop PR #20 exact HEAD is explicitly pinned and provenance recorded.
-- **AC-2**: 100% of selected Desktop `frontend/**` and `source/**` source-bearing files are present in the Desktop-based inventory and ledger.
-- **AC-3**: Grok Bot 0.18 is no longer a direct iOS completion authority.
+- **AC-1**: `bhrumom/fabushi-desktop@main` is the active authority, and its exact HEAD is freshly resolved and recorded for the acceptance cycle.
+- **AC-2**: 100% of selected source-bearing files from the current Desktop `main` are present in the current inventory/ledger; no historical fixed row count is assumed.
+- **AC-3**: Grok Bot and Desktop PR #20 are historical provenance, not direct current completion authorities.
 - **AC-4**: No shared Fabushi runtime repository is required for Desktop/iOS code reuse.
 - **AC-5**: A clean iOS checkout owns all source/build inputs required by the iOS product.
-- **AC-6**: Desktop -> iOS architectural correspondence in Section 4 is enforced.
-- **AC-7**: Coordinator, Host, and Runner remain separate ownership boundaries on iOS even when implemented in one OS process.
-- **AC-8**: Renderer does not own canonical operation/run/retry/transcript truth.
-- **AC-9**: Electron-specific mechanisms are replaced by documented iOS-native adapters without silently dropping applicable product effects.
-- **AC-10**: Existing PR #3 code is revalidated rather than grandfathered from the old Grok ledger.
-- **AC-11**: Applicable Desktop Agent/chat lifecycle semantics are ported and verified.
-- **AC-12**: Applicable MCP/connectors/tools behavior is ported and verified.
-- **AC-13**: Applicable communication/messaging behavior in Desktop PR #20 is ported and verified.
+- **AC-6**: Current Desktop-main architectural correspondence and current responsibility ownership are enforced.
+- **AC-7**: Coordinator, Host, and Runner remain separate ownership boundaries where current Desktop `main` requires them, even when iOS implements them in one OS process.
+- **AC-8**: Renderer does not own canonical operation/run/retry/transcript truth contrary to current Desktop architecture.
+- **AC-9**: Desktop-specific mechanisms are replaced by documented iOS-native adapters without silently dropping applicable product effects.
+- **AC-10**: Existing PR #3 code is revalidated against current Desktop `main`; no grandfathering from Grok/PR20 ledgers.
+- **AC-11**: Applicable current Desktop Agent/chat lifecycle semantics are ported and verified.
+- **AC-12**: Applicable current Desktop MCP/connectors/tools behavior is ported and verified.
+- **AC-13**: Applicable current Desktop communication/messaging behavior is ported and verified.
 - **AC-14**: iOS lifecycle/background/relaunch recovery preserves canonical durable state without duplicate execution.
 - **AC-15**: Old bypass/fallback architectures are removed after cutover.
-- **AC-16**: Architecture CI is based on the Desktop PR #20 source manifest/ledger.
-- **AC-17**: Exact-HEAD compile/unit/contract/architecture/UI/lifecycle workflows pass on one final iOS SHA.
-- **AC-18**: Exact-HEAD archive/export/install acceptance succeeds on the final accepted SHA.
+- **AC-16**: Architecture CI validates current Desktop-main authority, inventory, ledger, and ownership.
+- **AC-17**: Exact-HEAD compile/unit/contract/architecture/UI/lifecycle workflows pass on one final iOS SHA after the final Desktop-main rebaseline.
+- **AC-18**: Exact-HEAD archive/export/install acceptance succeeds on the final accepted iOS SHA.
 - **AC-19**: Required rights/provenance review for reused source has no unresolved release-blocking item.
 - **AC-20**: App Store/TestFlight delivery constraints have no unresolved release-blocking issue.
-- **AC-21**: Final compliance table records every requirement/AC as passed, blocked, or not-applicable; mandatory completion requires all mandatory items passed.
+- **AC-21**: Final compliance records every requirement/AC as passed, blocked, or not-applicable; mandatory completion requires all mandatory items passed.
 
 ## 18. Current compliance record
 
-The authority cutover begins from iOS PR #3 exact HEAD `cdcbfd4344377b592ed882e049dfb1a36a534aa6`.
+As of this Spec update, the live authority is Desktop `main`, observed at `3bc92400826cc4ca7ac665b467708e22261edc61`. This SHA is a provenance snapshot only; the next work/acceptance cycle must resolve `main` again rather than assuming it is still current.
 
-All implementation counts/statuses from the prior Grok-direct ledger are **historical only** until revalidated against Desktop PR #20 `84dbe458a8f14307bbdeaff469388734e6ce8879`. The current baseline contains 7,925 source-bearing `frontend/**` + `source/**` files. Relative to the immediately previous iOS baseline `95995bdf36a9687788e106c8544d292b2bb0877f`, Desktop advanced to `dcb19a94383833fc1ec5074f10c4bbbd28c09036` with exactly two source-bearing changes under the authoritative roots: `source/host/src/selected_image_inputs.rs` and `source/host/tests/transcript_send_echo_contract.rs`. Desktop then advanced from `bbc7b34a5f6dad46e3d4ca88fe21cc4f7932ce09` to `dcb19a94383833fc1ec5074f10c4bbbd28c09036` only by accepting the send-message-shaping architecture row; no `frontend/**` or `source/**` blob changed. The full 7,925-row source inventory was revalidated against the dcb19a tree with zero missing paths and zero blob mismatches. The newly accepted Desktop responsibility does not transfer status to iOS: send_message_shaping.rs, selected_image_inputs.rs, and agent_to_agent_messaging.rs are explicitly re-audited independently. The iOS port may advance a row only after its own Host-owned production path exists. The production change adds native ISO-BMFF HEIC/HEIF/AVIF primary-image dimension extraction with rotation handling; the test change adds focused contract coverage. All other 7,923 source-bearing blob identities are unchanged. Previously reviewed Coordinator `carrier.rs` and `client_side_tool_v2_relay.rs` blobs are unchanged, so their `implemented` status is preserved, but neither may be promoted to `verified` without exact-HEAD iOS CI and the relay's adjacent Host producer closure described above.
+The former PR #20 7,943-row ledger/inventory and all statuses/evidence tied only to `798cf51d...` or another historical Desktop SHA are **historical seed evidence**. They must be regenerated or explicitly revalidated against current Desktop `main` before they can satisfy completeness.
 
 | Item | Status | Evidence / reason |
 | --- | --- | --- |
-| AC-1 | passed | Desktop PR #20 repository/PR/branch/exact HEAD are pinned in this Spec. |
-| AC-2 | passed | All 7,925 selected Desktop source paths/blob identities were revalidated against the pinned dcb19a tree with zero missing paths and zero blob mismatches; manifest and ledger sourceCommit metadata are rebound to this authority. |
-| AC-3 | passed | This Spec explicitly demotes Grok to historical provenance and supersedes the old direct authority. |
-| AC-4 | passed-by-design | Standalone source ownership and no-shared-runtime rule are normative; repository audit still guards regression. |
-| AC-5 | pending | Existing PR #3 is designed standalone; exact-HEAD clean-checkout acceptance must be rerun after rebaseline. |
-| AC-6..AC-16 | pending | Existing implementation requires Desktop-based re-audit. |
-| AC-17 | pending | New exact-HEAD CI evidence required after authority-cutover commits. |
-| AC-18 | pending | Packaged acceptance required after implementation closure. |
-| AC-19 | blocked | Reused-source provenance/right review must be updated for Desktop PR #20 source reuse. |
-| AC-20 | pending | Final delivery evidence required. |
+| AC-1 | passed-policy / dynamic | This Spec establishes Desktop `main` as live authority; each cycle must resolve its exact HEAD. |
+| AC-2 | pending | Current-main inventory/ledger must be regenerated/rebound and then fully reviewed. |
+| AC-3 | passed | Grok and PR #20 are explicitly historical only. |
+| AC-4 | passed-by-design | Standalone source ownership and no-shared-runtime rule remain normative. |
+| AC-5 | pending | Must be evidenced on the final accepted iOS exact HEAD. |
+| AC-6..AC-16 | pending | Existing implementation must continue re-audit against current Desktop `main`. |
+| AC-17 | pending | Fresh exact-iOS-HEAD workflows required after current-main rebaseline and implementation closure. |
+| AC-18 | pending | Archive/export/install acceptance required on final accepted iOS SHA. |
+| AC-19 | pending/blocking if unresolved | Current-main reused-source provenance/right review must be complete before release. |
+| AC-20 | pending | Final TestFlight/App Store delivery evidence required. |
 | AC-21 | pending | Final compliance review not yet complete. |
 
 ## 19. Superseded authority
 
-`docs/specs/grok-bot-0.18-ios-architecture-parity.md` is retained only as historical migration context after this Spec lands. Where it conflicts with this document, this document wins.
+The following are **superseded as live migration authorities** but retained for provenance/history:
 
-The old Grok reference manifest and Grok parity ledger may remain temporarily for audit/history, but must not be used as the active architecture-completion gate after the Desktop-based gate is enabled.
+- the direct Grok Bot 0.18 iOS specification and ledger;
+- Desktop PR #20 as a frozen branch/head authority;
+- every historical Desktop exact SHA recorded below;
+- every fixed historical inventory count used by those baselines.
+
+Historical evidence may be reused diagnostically and unchanged rows may be carried forward only after explicit comparison with the current Desktop `main`. Where any historical section conflicts with Sections 1.0-1.1, **current Desktop `main` wins**.
 
 ### 11.10 Rebaseline: 0941e6b -> c81d95b (current)
 
