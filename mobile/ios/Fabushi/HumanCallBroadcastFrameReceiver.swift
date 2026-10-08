@@ -1,3 +1,4 @@
+import CoreGraphics
 import CoreImage
 import CoreVideo
 import Foundation
@@ -93,17 +94,17 @@ internal actor HumanCallBroadcastFrameReceiver {
         let bounds = image.extent.integral
         guard bounds.width > 0, bounds.height > 0 else { return nil }
         var pixelBuffer: CVPixelBuffer?
-        let attributes = [
+        let attributes: [CFString: Any] = [
             kCVPixelBufferCGImageCompatibilityKey: true,
             kCVPixelBufferCGBitmapContextCompatibilityKey: true,
             kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary,
-        ] as CFDictionary
+        ]
         let status = CVPixelBufferCreate(
             kCFAllocatorDefault,
             Int(bounds.width),
             Int(bounds.height),
             kCVPixelFormatType_32BGRA,
-            attributes,
+            attributes as CFDictionary,
             &pixelBuffer
         )
         guard status == kCVReturnSuccess, let pixelBuffer else { return nil }
