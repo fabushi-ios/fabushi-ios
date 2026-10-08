@@ -72,3 +72,56 @@ extension HumanCallMediaPortTests {
         XCTAssertEqual(ended?.terminalReason, "hangup")
     }
 }
+
+extension HumanCallMediaPortTests {
+    func testCallTransportLeaseProjectionFailsClosedAndKeepsOwnership() {
+        let lease = HumanCallTransportLease(raw: [
+            "userId": "alice",
+            "deviceId": "ios-device",
+            "role": "peer",
+            "isOwner": true,
+            "claimAvailable": false,
+            "generation": 7,
+        ])
+        XCTAssertEqual(lease?.deviceId, "ios-device")
+        XCTAssertEqual(lease?.role, "peer")
+        XCTAssertEqual(lease?.isOwner, true)
+        XCTAssertEqual(lease?.generation, 7)
+
+        XCTAssertNil(HumanCallTransportLease(raw: [
+            "userId": "alice",
+            "deviceId": "ios-device",
+            "role": "unexpected",
+            "isOwner": true,
+            "claimAvailable": false,
+        ]))
+    }
+
+    func testCallSignalProjectionPreservesSequenceAndRejectsUnknownKinds() {
+        let signal = HumanCallSignalRecord(raw: [
+            "callId": "call-1",
+            "generation": 3,
+            "seq": 11,
+            "senderDeviceId": "peer-device",
+            "kind": "candidate",
+            "payload": [
+                "candidate": "candidate:1",
+                "sdpMLineIndex": 0,
+            ],
+        ])
+        XCTAssertEqual(signal?.callId, "call-1")
+        XCTAssertEqual(signal?.generation, 3)
+        XCTAssertEqual(signal?.seq, 11)
+        XCTAssertEqual(signal?.senderDeviceId, "peer-device")
+        XCTAssertEqual(signal?.payload["candidate"] as? String, "candidate:1")
+
+        XCTAssertNil(HumanCallSignalRecord(raw: [
+            "callId": "call-1",
+            "generation": 3,
+            "seq": 12,
+            "senderDeviceId": "peer-device",
+            "kind": "unknown",
+            "payload": [:],
+        ]))
+    }
+}
