@@ -620,7 +620,11 @@ impl NativeEngine {
                 &session.history,
                 &full_declared_tools,
             );
-            let mut model_instructions = self.config.system_instructions.clone();
+            let mut model_instructions = runtime_model_instructions(
+                &self.config.system_instructions,
+                self.model.provider_mode(),
+                &self.config.model,
+            );
             if let Some(reaction_context) =
                 reaction_message_reference_context(prompt_metadata)
             {
@@ -3468,8 +3472,25 @@ fn function_tool(name: &str, description: &str, parameters: Value) -> Value {
     })
 }
 
+fn runtime_model_instructions(
+    base: &str,
+    provider_mode: ModelProviderMode,
+    model: &str,
+) -> String {
+    let mut instructions = base.to_string();
+    if provider_mode == ModelProviderMode::FirstPartyDacheng {
+        if !instructions.trim().is_empty() {
+            instructions.push_str("\n\n");
+        }
+        instructions.push_str(&format!(
+            "Runtime inference metadata: provider=Fabushi first-party Responses API; model={model}. If the user asks which provider or model is active, answer from this runtime metadata and do not infer a different vendor identity."
+        ));
+    }
+    instructions
+}
+
 fn default_system_instructions() -> String {
-    "You are Mahayana, a product-owned coding and automation Agent. Inspect before editing; prefer minimal, reversible changes; use checkpoints before risky workspace mutations; use workflows for dependent tasks; delegate focused analysis to subagents; use web_search when live or external information is needed and web_fetch to inspect strong sources before drawing conclusions. When the user names an available tool or requests a verifiable multi-step operation, make the actual function call, wait for its result, and continue the Agent loop until the requested work is complete; do not replace an executable tool call with a prose claim. For a multi-step task, use send_message to publish short, human-readable milestone updates and the final answer as separate user-visible messages; keep internal reasoning private, never fabricate progress, and do not merge all milestones into one long response. Never claim a tool succeeded unless its result says so; respect Mahayana approval and platform policy."
+    "You are Fabushi, the product-owned coding and automation Agent running inside Fabushi. The tools supplied with this request are Fabushi's already-connected native capabilities, plugins, and accounts; use them whenever they are relevant instead of claiming they are unavailable or asking the user to reconnect them. Inspect before editing; prefer minimal, reversible changes; use checkpoints before risky workspace mutations; use workflows for dependent tasks; delegate focused analysis to subagents; use web_search when live or external information is needed and web_fetch to inspect strong sources before drawing conclusions. When the user names an available tool or requests a verifiable multi-step operation, make the actual function call, wait for its result, and continue the Agent loop until the requested work is complete; do not replace an executable tool call with a prose claim. For a multi-step task, use send_message to publish short, human-readable milestone updates and the final answer as separate user-visible messages; keep internal reasoning private, never fabricate progress, and do not merge all milestones into one long response. Never claim a tool succeeded unless its result says so; respect Fabushi approval and platform policy."
         .to_string()
 }
 
@@ -3479,6 +3500,33 @@ mod tests {
     use mahayana_model::ModelProviderMode;
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    #[test]
+    fn shipping_system_prompt_declares_fabushi_product_identity() {
+        let instructions = default_system_instructions();
+        assert!(instructions.contains("You are Fabushi"));
+        assert!(instructions.contains("running inside Fabushi"));
+        assert!(instructions.contains("Fabushi's already-connected"));
+        assert!(!instructions.contains("You are Mahayana"));
+    }
+
+    #[test]
+    fn first_party_runtime_instructions_disclose_provider_and_model() {
+        let instructions = runtime_model_instructions(
+            "base",
+            ModelProviderMode::FirstPartyDacheng,
+            "deepseek-chat",
+        );
+        assert!(instructions.contains("provider=Fabushi first-party Responses API"));
+        assert!(instructions.contains("model=deepseek-chat"));
+
+        let local = runtime_model_instructions(
+            "base",
+            ModelProviderMode::LocalModel,
+            "local-model",
+        );
+        assert_eq!(local, "base");
+    }
 
     #[test]
     fn selected_images_project_into_the_current_user_turn() {
