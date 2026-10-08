@@ -20,10 +20,10 @@ final class IOSCoordinatorRuntime {
     }
 
     @discardableResult
-    func start() -> IOSCoordinatorLaunchHandle {
+    func start() throws -> IOSCoordinatorLaunchHandle {
         if let handle { return handle }
+        let launched = try IOSCoordinatorLauncher.launch(main: main)
         highestAcceptedGeneration &+= 1
-        let launched = IOSCoordinatorLauncher.launch(main: main)
         main.coordinatorDidLaunchForDevControls()
         handle = launched
         state = .running(generation: highestAcceptedGeneration)
@@ -36,14 +36,20 @@ final class IOSCoordinatorRuntime {
         return true
     }
 
-    func restart() {
+    func restart() throws {
         guard state != .disposed else { return }
         highestAcceptedGeneration &+= 1
         state = .restarting(generation: highestAcceptedGeneration)
         handle?.dispose()
-        handle = IOSCoordinatorLauncher.launch(main: main)
-        main.coordinatorDidLaunchForDevControls()
-        state = .running(generation: highestAcceptedGeneration)
+        handle = nil
+        do {
+            handle = try IOSCoordinatorLauncher.launch(main: main)
+            main.coordinatorDidLaunchForDevControls()
+            state = .running(generation: highestAcceptedGeneration)
+        } catch {
+            state = .stopped
+            throw error
+        }
     }
 
     func dispose() {
