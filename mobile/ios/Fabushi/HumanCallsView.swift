@@ -161,6 +161,8 @@ internal struct HumanCallsView: View {
     @State private var cameraEnabled = false
     @State private var screenSharing = false
     @State private var screenShareAvailable = false
+    @State private var externalBroadcastSessionID: String?
+    @State private var externalBroadcastPickerVisible = false
     @State private var localVideoTrack: LKRTCVideoTrack?
     @State private var remoteVideoTrack: LKRTCVideoTrack?
     @State private var mediaDevices: [HumanCallMediaDevice] = []
@@ -371,17 +373,42 @@ internal struct HumanCallsView: View {
                         .buttonStyle(.bordered)
                         .accessibilityIdentifier("human-call-camera-\(call.id)")
 
-                        Button(screenSharing ? "停止共享" : "共享屏幕") {
-                            Task { await setScreenSharing(!screenSharing, call: call) }
+                        if screenSharing {
+                            Button("停止共享") {
+                                Task { await setScreenSharing(false, call: call) }
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("human-call-screen-share-\(call.id)")
+                        } else {
+                            Menu("共享屏幕") {
+                                Button("应用内共享") {
+                                    Task { await setScreenSharing(true, call: call) }
+                                }
+                                .disabled(!screenShareAvailable)
+                                Button("跨应用共享") {
+                                    Task { await prepareExternalScreenSharing(call: call) }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("human-call-screen-share-\(call.id)")
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(!screenSharing && !screenShareAvailable)
-                        .accessibilityIdentifier("human-call-screen-share-\(call.id)")
 
                         Spacer(minLength: 4)
                         Text(mediaState)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                    }
+
+                    if externalBroadcastPickerVisible, externalBroadcastSessionID != nil {
+                        HStack(spacing: 10) {
+                            Text("点击系统录制按钮开始跨应用共享；停止共享会使旧 Broadcast session 失效。")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            HumanCallBroadcastPicker()
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityIdentifier("human-call-broadcast-controls-\(call.id)")
                     }
 
                     let microphones = mediaDevices.filter { $0.kind == .microphone }
@@ -727,6 +754,10 @@ internal struct HumanCallsView: View {
         peer.onScreenShareChange = { active in
             guard peerConnection === peer, activeMediaCallId == call.id else { return }
             screenSharing = active
+            if !active {
+                externalBroadcastSessionID = nil
+                externalBroadcastPickerVisible = false
+            }
         }
         peer.onScreenShareFailure = { message in
             Task { @MainActor in
@@ -747,6 +778,8 @@ internal struct HumanCallsView: View {
         muted = false
         cameraEnabled = enableVideo
         screenSharing = false
+        externalBroadcastSessionID = nil
+        externalBroadcastPickerVisible = false
         localVideoTrack = nil
         remoteVideoTrack = nil
         screenShareAvailable = mediaPort.screenShareCapability().available
@@ -1076,6 +1109,37 @@ internal struct HumanCallsView: View {
         } catch {
             guard peerConnection === peer, activeMediaCallId == call.id else { return }
             errorText = "摄像头切换失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func prepareExternalScreenSharing(call: HumanCallSessionRecord) async {
+        guard let peer = peerConnection, activeMediaCallId == call.id else { return }
+        let generation = activeMediaGeneration ?? call.generation
+        let sessionID = "\(call.id):\(generation):\(UUID().uuidString)"
+        do {
+            try await peer.setExternalScreenShareEnabled(true, sessionID: sessionID)
+            guard peerConnection === peer, activeMediaCallId == call.id else {
+                HumanCallBroadcastIPC.endSession(sessionID)
+                return
+            }
+            externalBroadcastSessionID = sessionID
+            externalBroadcastPickerVisible = true
+            screenSharing = peer.isScreenSharing
+            if !next {
+                externalBroadcastSessionID = nil
+                externalBroadcastPickerVisible = false
+            }
+            await updateMediaState(call: call)
+        } catch HumanCallPeerConnection.Failure.staleOperation {
+            HumanCallBroadcastIPC.endSession(sessionID)
+        } catch {
+            HumanCallBroadcastIPC.endSession(sessionID)
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
+            externalBroadcastSessionID = nil
+            externalBroadcastPickerVisible = false
+            screenSharing = peer.isScreenSharing
+            errorText = "跨应用屏幕共享准备失败：\(error.localizedDescription)"
+            await updateMediaState(call: call)
         }
     }
 
