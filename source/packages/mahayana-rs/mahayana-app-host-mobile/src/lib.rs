@@ -697,17 +697,44 @@ impl turn_execution_service::TurnExecutor for MobileTurnExecutor {
     }
 }
 
+fn required_json_string(
+    params: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<String, String> {
+    params
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| format!("{key} is required"))
+}
+
+fn required_json_u64(
+    params: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<u64, String> {
+    params
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| format!("{key} must be an unsigned integer"))
+}
+
 struct MobileAppHost {
     host: MobileHostBridge,
     host_thread: Option<JoinHandle<()>>,
     extension_runtime: tokio::runtime::Runtime,
     extensions: Option<host_extensions::StartedHostExtensions>,
+    call_sessions: call_session::CallSessionStore,
 }
 
 impl MobileAppHost {
     fn new(app_data_dir: impl Into<PathBuf>) -> Result<Self, String> {
         let path = app_data_dir.into();
-        Self::from_factory(move || UnifiedAppHost::new(path).map_err(|error| error.to_string()))
+        let host_path = path.clone();
+        Self::from_factory(path, move || {
+            UnifiedAppHost::new(host_path).map_err(|error| error.to_string())
+        })
     }
 
     fn new_with_feature_mode(
@@ -715,8 +742,9 @@ impl MobileAppHost {
         feature_mode: AppHostFeatureMode,
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
-        Self::from_factory(move || {
-            UnifiedAppHost::new_with_feature_mode(path, feature_mode)
+        let host_path = path.clone();
+        Self::from_factory(path, move || {
+            UnifiedAppHost::new_with_feature_mode(host_path, feature_mode)
                 .map_err(|error| error.to_string())
         })
     }
@@ -727,9 +755,10 @@ impl MobileAppHost {
         storage_passphrase: String,
     ) -> Result<Self, String> {
         let path = app_data_dir.into();
-        Self::from_factory(move || {
+        let host_path = path.clone();
+        Self::from_factory(path, move || {
             UnifiedAppHost::new_with_feature_mode_and_storage_passphrase(
-                path,
+                host_path,
                 feature_mode,
                 storage_passphrase,
             )
@@ -737,10 +766,11 @@ impl MobileAppHost {
         })
     }
 
-    fn from_factory<Factory>(factory: Factory) -> Result<Self, String>
+    fn from_factory<Factory>(app_data_dir: PathBuf, factory: Factory) -> Result<Self, String>
     where
         Factory: FnOnce() -> Result<UnifiedAppHost, String> + Send + 'static,
     {
+        let call_sessions = call_session::CallSessionStore::open(&app_data_dir, 5_000)?;
         let (host, host_thread) = MobileHostBridge::spawn(factory)?;
         let extension_runtime = match tokio::runtime::Builder::new_current_thread().build() {
             Ok(runtime) => runtime,
@@ -771,11 +801,155 @@ impl MobileAppHost {
             host_thread: Some(host_thread),
             extension_runtime,
             extensions: Some(extensions),
+            call_sessions,
         })
     }
 
     fn dispatch_json(&self, input: &str) -> String {
+        if let Some(output) = self.dispatch_call_session_json(input) {
+            return output;
+        }
         self.host.dispatch_json(input)
+    }
+
+    fn dispatch_call_session_json(&self, input: &str) -> Option<String> {
+        let request = match serde_json::from_str::<serde_json::Value>(input) {
+            Ok(value) => value,
+            Err(_) => return None,
+        };
+        let method = request.get("method")?.as_str()?;
+        if !matches!(
+            method,
+            "createCallSession"
+                | "getCallSession"
+                | "listCallSessions"
+                | "transitionCallSession"
+                | "updateCallMedia"
+                | "sendCallSignal"
+                | "listCallSignals"
+        ) {
+            return None;
+        }
+        let id = request.get("id").cloned().unwrap_or(serde_json::Value::Null);
+        let params = request
+            .get("params")
+            .and_then(serde_json::Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        let result: Result<serde_json::Value, String> = (|| match method {
+            "createCallSession" => {
+                let scope_id = required_json_string(&params, "scopeId")?;
+                let creator_id = required_json_string(&params, "creatorId")?;
+                let participant_ids = params
+                    .get("participantIds")
+                    .and_then(serde_json::Value::as_array)
+                    .ok_or_else(|| "participantIds must be an array".to_string())?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_str()
+                            .map(str::to_string)
+                            .ok_or_else(|| "participantIds must contain strings".to_string())
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                serde_json::to_value(
+                    self.call_sessions
+                        .create(&scope_id, &creator_id, &participant_ids)?,
+                )
+                .map_err(|error| error.to_string())
+            }
+            "getCallSession" => {
+                let call_id = required_json_string(&params, "callId")?;
+                serde_json::to_value(self.call_sessions.get(&call_id)?)
+                    .map_err(|error| error.to_string())
+            }
+            "listCallSessions" => {
+                let scope_id = required_json_string(&params, "scopeId")?;
+                let limit = params
+                    .get("limit")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(20) as usize;
+                serde_json::to_value(self.call_sessions.list_for_scope(&scope_id, limit)?)
+                    .map_err(|error| error.to_string())
+            }
+            "transitionCallSession" => {
+                let call_id = required_json_string(&params, "callId")?;
+                let generation = required_json_u64(&params, "generation")?;
+                let action = required_json_string(&params, "action")?;
+                let terminal_reason = params.get("terminalReason").and_then(serde_json::Value::as_str);
+                serde_json::to_value(
+                    self.call_sessions
+                        .transition(&call_id, generation, &action, terminal_reason)?,
+                )
+                .map_err(|error| error.to_string())
+            }
+            "updateCallMedia" => {
+                let call_id = required_json_string(&params, "callId")?;
+                let generation = required_json_u64(&params, "generation")?;
+                let media_capabilities = params.get("mediaCapabilities");
+                let device_selection = params.get("deviceSelection");
+                serde_json::to_value(self.call_sessions.update_media(
+                    &call_id,
+                    generation,
+                    media_capabilities,
+                    device_selection,
+                )?)
+                .map_err(|error| error.to_string())
+            }
+            "sendCallSignal" => {
+                let call_id = required_json_string(&params, "callId")?;
+                let generation = required_json_u64(&params, "generation")?;
+                let seq = required_json_u64(&params, "seq")?;
+                let sender_device_id = required_json_string(&params, "senderDeviceId")?;
+                let kind = required_json_string(&params, "kind")?;
+                let payload = params
+                    .get("payload")
+                    .ok_or_else(|| "payload is required".to_string())?;
+                serde_json::to_value(self.call_sessions.append_signal(
+                    &call_id,
+                    generation,
+                    seq,
+                    &sender_device_id,
+                    &kind,
+                    payload,
+                )?)
+                .map_err(|error| error.to_string())
+            }
+            "listCallSignals" => {
+                let call_id = required_json_string(&params, "callId")?;
+                let generation = required_json_u64(&params, "generation")?;
+                let after_seq = params
+                    .get("afterSeq")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
+                let limit = params
+                    .get("limit")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(100) as usize;
+                serde_json::to_value(
+                    self.call_sessions
+                        .list_signals(&call_id, generation, after_seq, limit)?,
+                )
+                .map_err(|error| error.to_string())
+            }
+            _ => unreachable!(),
+        })();
+
+        let response = match result {
+            Ok(value) => serde_json::json!({
+                "id": id,
+                "ok": true,
+                "result": value,
+                "error": serde_json::Value::Null,
+            }),
+            Err(error) => serde_json::json!({
+                "id": id,
+                "ok": false,
+                "result": serde_json::Value::Null,
+                "error": error,
+            }),
+        };
+        Some(response.to_string())
     }
 
     #[cfg(test)]
