@@ -195,6 +195,52 @@ impl UnifiedAppHost {
         })
     }
 
+    pub fn human_call_transport_identity(&self) -> Result<Value, AppHostError> {
+        self.app.human_call_transport_identity()
+    }
+
+    pub fn human_call_ice_servers(&self) -> Result<Value, AppHostError> {
+        self.app.human_call_ice_servers()
+    }
+
+    pub fn human_call_remote_list(&self, limit: usize) -> Result<Value, AppHostError> {
+        self.app.human_call_remote_list(limit)
+    }
+
+    pub fn human_call_remote_create(
+        &self,
+        call_id: &str,
+        peer_human_id: &str,
+    ) -> Result<Value, AppHostError> {
+        self.app.human_call_remote_create(call_id, peer_human_id)
+    }
+
+    pub fn human_call_remote_get(
+        &self,
+        call_id: &str,
+        after_seq: u64,
+        limit: usize,
+    ) -> Result<Value, AppHostError> {
+        self.app.human_call_remote_get(call_id, after_seq, limit)
+    }
+
+    pub fn human_call_remote_append_event(
+        &self,
+        call_id: &str,
+        client_event_id: &str,
+        generation: u64,
+        kind: &str,
+        payload: Value,
+    ) -> Result<Value, AppHostError> {
+        self.app.human_call_remote_append_event(
+            call_id,
+            client_event_id,
+            generation,
+            kind,
+            payload,
+        )
+    }
+
     pub fn dispatch(&self, request: HostRequest) -> HostResponse {
         if !request.method.starts_with("harness.") {
             return self.app.dispatch(request);
