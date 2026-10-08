@@ -1125,10 +1125,6 @@ internal struct HumanCallsView: View {
             externalBroadcastSessionID = sessionID
             externalBroadcastPickerVisible = true
             screenSharing = peer.isScreenSharing
-            if !next {
-                externalBroadcastSessionID = nil
-                externalBroadcastPickerVisible = false
-            }
             await updateMediaState(call: call)
         } catch HumanCallPeerConnection.Failure.staleOperation {
             HumanCallBroadcastIPC.endSession(sessionID)
