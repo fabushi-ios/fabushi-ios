@@ -280,6 +280,7 @@ struct CoordinatorBootstrap: Codable, Equatable, Sendable {
         let appVersion: String
         let isPackaged: Bool
         let dataDir: String
+        let localHumanId: String?
     }
 
     let processConfig: ProcessConfig
