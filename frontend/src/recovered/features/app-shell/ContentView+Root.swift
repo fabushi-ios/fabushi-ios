@@ -233,6 +233,14 @@ return fingerprintParts.joined(separator: "|")
             messaging.conversations.first(where: { $0.id == fallback.id }) ?? fallback
         }
 
+        // ForwardMessageSheet owns the forwarding interaction and its semantic
+        // surface while presented. Do not publish a second local-list forwarding
+        // implementation from the root; when the sheet closes, the fingerprint
+        // changes and this root surface is published again.
+        if forwardMessage != nil {
+            return
+        }
+
         if let onShellBack {
             add(
                 "grok-mobile-back",
@@ -283,35 +291,6 @@ return fingerprintParts.joined(separator: "|")
         if let selected = selectedConversation {
             let conversation = currentConversation(selected)
             let messages = messaging.messagesByConversation[conversation.id] ?? []
-
-            if let forwarding = forwardMessage {
-                add("forward-dialog", role: "dialog", name: "转发消息")
-                for destination in messaging.conversations.filter({ $0.id != conversation.id && !$0.isArchived }).prefix(100) {
-                    add(
-                        "forward-destination-\(destination.id)",
-                        role: "button",
-                        name: destination.title,
-                        action: .init(allowed: ["invoke"]) { _ in
-                            Task {
-                                try? await messaging.forwardMessage(
-                                    sourceConversationId: conversation.id,
-                                    messageId: forwarding.id,
-                                    destination: ForwardDestinationRequest(
-                                        conversationId: destination.id,
-                                        clientMessageId: "ios:\(UUID().uuidString.lowercased())"
-                                    ),
-                                    dropSenderNames: false,
-                                    dropCaptions: false
-                                )
-                            }
-                            forwardMessage = nil
-                        }
-                    )
-                }
-                add("forward-cancel", role: "button", name: "取消转发", action: .init(allowed: ["invoke"]) { _ in forwardMessage = nil })
-                publish("forward-message")
-                return
-            }
 
             if pollComposerPresented {
                 add("poll-compose", role: "dialog", name: "新建投票")
