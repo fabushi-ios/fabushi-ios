@@ -12,6 +12,8 @@ final class HumanCallPeerConnection: NSObject {
         case microphoneUnavailable
         case cameraUnavailable
         case screenShareUnavailable
+        case mediaOperationInProgress
+        case staleOperation
         case malformedSignal
 
         var errorDescription: String? {
@@ -26,6 +28,10 @@ final class HumanCallPeerConnection: NSObject {
                 return "无法建立摄像头音轨。"
             case .screenShareUnavailable:
                 return "当前设备无法开始屏幕共享。"
+            case .mediaOperationInProgress:
+                return "通话媒体切换正在进行。"
+            case .staleOperation:
+                return "通话媒体操作已失效。"
             case .malformedSignal:
                 return "通话信令格式无效。"
             }
@@ -85,6 +91,10 @@ final class HumanCallPeerConnection: NSObject {
     private var screenSource: LKRTCVideoSource?
     private var screenCapturer: LKRTCVideoCapturer?
     private var requestedCameraEnabled = false
+    private var lifecycleGeneration: UInt64 = 0
+    private var cameraOperationGeneration: UInt64 = 0
+    private var screenOperationGeneration: UInt64 = 0
+    private var screenShareTransitionInFlight = false
 
     private(set) var activeCameraDeviceId: String?
     private(set) var isScreenSharing = false
@@ -97,6 +107,8 @@ final class HumanCallPeerConnection: NSObject {
         if connection != nil {
             close()
         }
+        lifecycleGeneration &+= 1
+        let configuredGeneration = lifecycleGeneration
 
         let configuration = LKRTCConfiguration()
         configuration.sdpSemantics = .unifiedPlan
@@ -133,6 +145,9 @@ final class HumanCallPeerConnection: NSObject {
         if enableVideo {
             try await setCameraEnabled(true, preferredCameraId: preferredCameraId)
         }
+        guard lifecycleGeneration == configuredGeneration, self.connection === connection else {
+            throw Failure.staleOperation
+        }
 
         try configureAudioSession()
     }
@@ -142,16 +157,44 @@ final class HumanCallPeerConnection: NSObject {
     }
 
     func setCameraEnabled(_ enabled: Bool, preferredCameraId: String? = nil) async throws {
+        cameraOperationGeneration &+= 1
+        let operationGeneration = cameraOperationGeneration
+        let expectedLifecycle = lifecycleGeneration
         requestedCameraEnabled = enabled
         guard enabled else {
+            if let capturer = cameraCapturer {
+                await stopCameraCapture(capturer)
+                guard
+                    lifecycleGeneration == expectedLifecycle,
+                    cameraOperationGeneration == operationGeneration,
+                    connection != nil
+                else {
+                    throw Failure.staleOperation
+                }
+                if cameraCapturer === capturer {
+                    cameraCapturer = nil
+                }
+            }
             videoTrack?.isEnabled = false
+            activeCameraDeviceId = preferredCameraId ?? activeCameraDeviceId
             if !isScreenSharing {
                 onLocalVideoTrack?(nil)
             }
             return
         }
 
-        try await startCamera(preferredCameraId: preferredCameraId)
+        try await startCamera(
+            preferredCameraId: preferredCameraId,
+            expectedLifecycle: expectedLifecycle,
+            operationGeneration: operationGeneration
+        )
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            cameraOperationGeneration == operationGeneration,
+            connection != nil
+        else {
+            throw Failure.staleOperation
+        }
         videoTrack?.isEnabled = true
         if !isScreenSharing {
             videoSender?.track = videoTrack
@@ -164,18 +207,32 @@ final class HumanCallPeerConnection: NSObject {
             activeCameraDeviceId = deviceId
             return
         }
-        try await startCamera(preferredCameraId: deviceId)
-        if !isScreenSharing {
-            videoSender?.track = videoTrack
-            onLocalVideoTrack?(videoTrack)
-        }
+        try await setCameraEnabled(true, preferredCameraId: deviceId)
     }
 
     func setScreenShareEnabled(_ enabled: Bool) async throws {
+        guard !screenShareTransitionInFlight else {
+            throw Failure.mediaOperationInProgress
+        }
+        screenShareTransitionInFlight = true
+        screenOperationGeneration &+= 1
+        let operationGeneration = screenOperationGeneration
+        let expectedLifecycle = lifecycleGeneration
+        defer {
+            if screenOperationGeneration == operationGeneration {
+                screenShareTransitionInFlight = false
+            }
+        }
         if enabled {
-            try await startScreenShare()
+            try await startScreenShare(
+                expectedLifecycle: expectedLifecycle,
+                operationGeneration: operationGeneration
+            )
         } else {
-            await stopScreenShare()
+            await stopScreenShare(
+                expectedLifecycle: expectedLifecycle,
+                operationGeneration: operationGeneration
+            )
         }
     }
 
@@ -237,11 +294,15 @@ final class HumanCallPeerConnection: NSObject {
     }
 
     func close() {
+        lifecycleGeneration &+= 1
+        cameraOperationGeneration &+= 1
+        screenOperationGeneration &+= 1
+        screenShareTransitionInFlight = false
         if let cameraCapturer {
-            cameraCapturer.stopCapture()
+            cameraCapturer.stopCapture { }
         }
         if isScreenSharing || screenTrack != nil {
-            screenRecorder.stopCapture()
+            screenRecorder.stopCapture { _ in }
         }
         cameraCapturer = nil
         screenCapturer = nil
@@ -265,6 +326,12 @@ final class HumanCallPeerConnection: NSObject {
             options: .notifyOthersOnDeactivation
         )
         onStateChange?(.closed)
+        onLocalCandidate = nil
+        onStateChange = nil
+        onLocalVideoTrack = nil
+        onRemoteVideoTrack = nil
+        onScreenShareChange = nil
+        onScreenShareFailure = nil
     }
 
     private func prepareStableVideoSender(on connection: LKRTCPeerConnection) throws {
@@ -279,7 +346,18 @@ final class HumanCallPeerConnection: NSObject {
         videoSender = sender
     }
 
-    private func startCamera(preferredCameraId: String?) async throws {
+    private func startCamera(
+        preferredCameraId: String?,
+        expectedLifecycle: UInt64,
+        operationGeneration: UInt64
+    ) async throws {
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            cameraOperationGeneration == operationGeneration,
+            connection != nil
+        else {
+            throw Failure.staleOperation
+        }
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
             throw Failure.cameraUnavailable
         }
@@ -308,7 +386,19 @@ final class HumanCallPeerConnection: NSObject {
         let range = format.videoSupportedFrameRateRanges.first
         let fps = Int(min(30, max(1, range?.maxFrameRate ?? 30)))
 
-        await cameraCapturer?.stopCapture()
+        if let previousCapturer = cameraCapturer {
+            await stopCameraCapture(previousCapturer)
+            guard
+                lifecycleGeneration == expectedLifecycle,
+                cameraOperationGeneration == operationGeneration,
+                connection != nil
+            else {
+                throw Failure.staleOperation
+            }
+            if cameraCapturer === previousCapturer {
+                cameraCapturer = nil
+            }
+        }
         let capturer = LKRTCCameraVideoCapturer(delegate: videoSource)
         cameraCapturer = capturer
         do {
@@ -327,12 +417,31 @@ final class HumanCallPeerConnection: NSObject {
             }
             throw error
         }
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            cameraOperationGeneration == operationGeneration,
+            connection != nil,
+            cameraCapturer === capturer
+        else {
+            await stopCameraCapture(capturer)
+            throw Failure.staleOperation
+        }
         activeCameraDeviceId = device.uniqueID
         videoTrack.isEnabled = requestedCameraEnabled
     }
 
-    private func startScreenShare() async throws {
+    private func startScreenShare(
+        expectedLifecycle: UInt64,
+        operationGeneration: UInt64
+    ) async throws {
         guard !isScreenSharing else { return }
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            screenOperationGeneration == operationGeneration,
+            connection != nil
+        else {
+            throw Failure.staleOperation
+        }
         guard screenRecorder.isAvailable, let videoSender else {
             throw Failure.screenShareUnavailable
         }
@@ -350,8 +459,14 @@ final class HumanCallPeerConnection: NSObject {
                 screenRecorder.startCapture { [weak self, weak source, weak capturer] sampleBuffer, type, error in
                     if let error {
                         let message = error.localizedDescription
-                        Task { @MainActor [weak self] in
-                            self?.handleScreenCaptureFailure(message)
+                        Task { @MainActor [weak self, weak capturer] in
+                            guard let capturer else { return }
+                            self?.handleScreenCaptureFailure(
+                                message,
+                                expectedLifecycle: expectedLifecycle,
+                                operationGeneration: operationGeneration,
+                                capturer: capturer
+                            )
                         }
                         return
                     }
@@ -383,26 +498,67 @@ final class HumanCallPeerConnection: NSObject {
             throw error
         }
 
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            screenOperationGeneration == operationGeneration,
+            connection != nil,
+            screenCapturer === capturer
+        else {
+            await stopReplayKitCapture()
+            throw Failure.staleOperation
+        }
         videoSender.track = track
         isScreenSharing = true
         onLocalVideoTrack?(track)
         onScreenShareChange?(true)
     }
 
-    private func stopScreenShare() async {
+    private func stopScreenShare(
+        expectedLifecycle: UInt64,
+        operationGeneration: UInt64
+    ) async {
         guard isScreenSharing || screenTrack != nil else { return }
+        await stopReplayKitCapture()
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            screenOperationGeneration == operationGeneration,
+            connection != nil
+        else { return }
+        restoreCameraAfterScreenShare()
+    }
+
+    private func handleScreenCaptureFailure(
+        _ message: String,
+        expectedLifecycle: UInt64,
+        operationGeneration: UInt64,
+        capturer: LKRTCVideoCapturer
+    ) {
+        guard
+            lifecycleGeneration == expectedLifecycle,
+            screenOperationGeneration == operationGeneration,
+            screenCapturer === capturer
+        else { return }
+        screenOperationGeneration &+= 1
+        screenShareTransitionInFlight = false
+        screenRecorder.stopCapture { _ in }
+        restoreCameraAfterScreenShare()
+        onScreenShareFailure?(message)
+    }
+
+    private func stopCameraCapture(_ capturer: LKRTCCameraVideoCapturer) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            capturer.stopCapture {
+                continuation.resume()
+            }
+        }
+    }
+
+    private func stopReplayKitCapture() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             screenRecorder.stopCapture { _ in
                 continuation.resume()
             }
         }
-        restoreCameraAfterScreenShare()
-    }
-
-    private func handleScreenCaptureFailure(_ message: String) {
-        screenRecorder.stopCapture()
-        restoreCameraAfterScreenShare()
-        onScreenShareFailure?(message)
     }
 
     private func restoreCameraAfterScreenShare() {

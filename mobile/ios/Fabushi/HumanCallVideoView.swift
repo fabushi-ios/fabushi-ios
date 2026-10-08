@@ -67,7 +67,7 @@ internal struct HumanCallVideoStage: View {
                     VStack(spacing: 8) {
                         Image(systemName: "person.crop.rectangle")
                             .font(.system(size: 34, weight: .medium))
-                        Text(mediaState == "connected" ? "等待对方视频" : "正在建立媒体连接")
+                        Text(mediaState == "通话中" ? "等待对方视频" : "正在建立媒体连接")
                             .font(.caption)
                     }
                     .foregroundStyle(.white.opacity(0.8))

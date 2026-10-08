@@ -685,11 +685,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/HumanCallMediaPort.swift",
       "ios_language": "Swift / AVFoundation / AVAudioSession / ReplayKit",
-      "ios_platform_delta": "AVCaptureDevice and AVAudioSession replace Electron systemPreferences/desktopCapturer. iOS does not enumerate desktop windows; ReplayKit reports native screen-capture availability and the eventual call surface must present the iOS system screen-sharing flow.",
+      "ios_platform_delta": "AVCaptureDevice and AVAudioSession replace Electron systemPreferences/desktopCapturer. iOS does not enumerate desktop windows; the shipping Calls surface uses ReplayKit for in-app screen capture, while capture of other applications through a Broadcast Upload Extension remains a separately tracked native lifecycle responsibility.",
       "implementation_status": "mapped",
       "production_evidence": "mobile/ios/Fabushi/HumanCallMediaPort.swift; mobile/ios/project.yml NSCameraUsageDescription",
       "test_evidence": "mobile/ios/FabushiTests/HumanCallMediaPortTests.swift; exact-head GitHub Actions required before verified promotion",
-      "notes": "IOS-MAIN-HUMAN-CALL-MEDIA-001 reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 blob 451d53d5e08b12b63b867e0e481c93780a091f9b. Native platform media owner is implemented, but this live-main row remains re-review-fenced below implemented until aggregate current-main review acceptance and current-head Actions evidence.",
+      "notes": "IOS-MAIN-HUMAN-CALL-MEDIA-001 reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 blob 451d53d5e08b12b63b867e0e481c93780a091f9b. Native permission, deterministic device enumeration/preference fallback and ReplayKit in-app capability ownership are shipping-composed, but this live-main row remains re-review-fenced below implemented until aggregate current-main review acceptance and current-head Actions evidence.",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },

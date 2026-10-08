@@ -152,6 +152,8 @@ internal struct HumanCallsView: View {
     @State private var mediaPort = HumanCallMediaPort()
     @State private var peerConnection: HumanCallPeerConnection?
     @State private var activeMediaCallId: String?
+    @State private var activeMediaGeneration: Int?
+    @State private var activeMediaSession: HumanCallSessionRecord?
     @State private var activeLease: HumanCallTransportLease?
     @State private var appliedSignalSeq = 0
     @State private var mediaState = "idle"
@@ -259,21 +261,29 @@ internal struct HumanCallsView: View {
             .task(id: refreshGeneration) {
                 refreshMediaDevices()
                 await reload()
-            }
-            .task(id: activeMediaCallId) {
-                guard activeMediaCallId != nil else { return }
-                while !Task.isCancelled, activeMediaCallId != nil {
-                    await pollActiveMedia()
+                while !Task.isCancelled {
                     do {
                         try await Task.sleep(for: .seconds(1))
                     } catch {
                         break
                     }
+                    await pollRemoteCalls()
                 }
             }
         }
         .onDisappear {
+            let callId = activeMediaCallId
+            let generation = activeMediaGeneration
             closeActiveMedia()
+            if let callId, let generation {
+                Task {
+                    await transitionSilently(
+                        callId: callId,
+                        generation: generation,
+                        action: "hangup"
+                    )
+                }
+            }
         }
         .accessibilityIdentifier("human-calls-surface")
     }
@@ -531,6 +541,7 @@ internal struct HumanCallsView: View {
 
         actionCallId = "start:\(conversation.id)"
         defer { actionCallId = nil }
+        var callToFail: HumanCallSessionRecord?
 
         do {
             let permissions = await mediaPort.requestPermissions(audio: true, video: video)
@@ -558,6 +569,7 @@ internal struct HumanCallsView: View {
                     userInfo: [NSLocalizedDescriptionKey: "通话服务返回了无效的会话。"]
                 )
             }
+            callToFail = created
 
             let ringingResult = try await bridge.request(
                 method: "transitionCallSession",
@@ -569,13 +581,19 @@ internal struct HumanCallsView: View {
             )
             let ringing = (ringingResult.value as? [String: Any])
                 .flatMap(HumanCallSessionRecord.init(raw:)) ?? created
+            callToFail = ringing
 
             try await configureMedia(for: ringing, enableVideo: video)
             errorText = nil
             await reload()
         } catch {
             closeActiveMedia()
-            errorText = "发起通话失败：\(error.localizedDescription)"
+            if !(error is CancellationError), let callToFail {
+                await failCallSilently(callToFail, reason: "media-setup-failed")
+            }
+            if !(error is CancellationError) {
+                errorText = "发起通话失败：\(error.localizedDescription)"
+            }
         }
     }
 
@@ -583,6 +601,7 @@ internal struct HumanCallsView: View {
         guard let bridge else { return }
         actionCallId = call.id
         defer { actionCallId = nil }
+        var callToFail: HumanCallSessionRecord? = call
 
         do {
             let permissions = await mediaPort.requestPermissions(audio: true, video: video)
@@ -603,13 +622,19 @@ internal struct HumanCallsView: View {
             )
             let accepted = (transitionResult.value as? [String: Any])
                 .flatMap(HumanCallSessionRecord.init(raw:)) ?? call
+            callToFail = accepted
 
             try await configureMedia(for: accepted, enableVideo: video)
             errorText = nil
             await reload()
         } catch {
             closeActiveMedia()
-            errorText = "接听失败：\(error.localizedDescription)"
+            if !(error is CancellationError), let callToFail {
+                await failCallSilently(callToFail, reason: "media-setup-failed")
+            }
+            if !(error is CancellationError) {
+                errorText = "接听失败：\(error.localizedDescription)"
+            }
         }
     }
 
@@ -714,6 +739,8 @@ internal struct HumanCallsView: View {
 
         peerConnection = peer
         activeMediaCallId = call.id
+        activeMediaGeneration = call.generation
+        activeMediaSession = call
         activeLease = lease
         appliedSignalSeq = 0
         mediaState = "准备中"
@@ -729,6 +756,10 @@ internal struct HumanCallsView: View {
             enableVideo: enableVideo,
             preferredCameraId: preferences.cameraId
         )
+        guard peerConnection === peer, activeMediaCallId == call.id else {
+            peer.close()
+            throw CancellationError()
+        }
         refreshMediaDevices()
         if let microphone = try mediaPort.applyPreferredMicrophone() {
             selectedMicrophoneId = microphone.id
@@ -738,10 +769,16 @@ internal struct HumanCallsView: View {
             mediaPort.setPreferredDeviceId(cameraId, kind: .camera)
         }
         try await updateMediaStateOrThrow(call: call)
+        guard peerConnection === peer, activeMediaCallId == call.id else {
+            throw CancellationError()
+        }
         mediaState = "正在连接"
 
         if lease.role == "creator" {
             let offer = try await peer.makeOffer(iceRestart: iceRestart)
+            guard peerConnection === peer, activeMediaCallId == call.id else {
+                throw CancellationError()
+            }
             await sendSignal(call: call, lease: lease, kind: "offer", payload: offer)
         }
         await consumeSignals(for: call)
@@ -760,6 +797,7 @@ internal struct HumanCallsView: View {
         let restoreMuted = muted
         let restoreVideo = cameraEnabled
         let restoreScreenShare = screenSharing
+        var failureCall = call
         do {
             let reconnectResult = try await bridge.request(
                 method: "transitionCallSession",
@@ -771,6 +809,7 @@ internal struct HumanCallsView: View {
             )
             let reconnecting = (reconnectResult.value as? [String: Any])
                 .flatMap(HumanCallSessionRecord.init(raw:)) ?? call
+            failureCall = reconnecting
             let resumeResult = try await bridge.request(
                 method: "transitionCallSession",
                 params: [
@@ -781,12 +820,14 @@ internal struct HumanCallsView: View {
             )
             let resumed = (resumeResult.value as? [String: Any])
                 .flatMap(HumanCallSessionRecord.init(raw:)) ?? reconnecting
+            failureCall = resumed
 
             try await configureMedia(
                 for: resumed,
                 enableVideo: restoreVideo,
                 iceRestart: true
             )
+            guard activeMediaCallId == resumed.id else { return }
             if restoreMuted {
                 peerConnection?.setMuted(true)
                 muted = true
@@ -798,38 +839,123 @@ internal struct HumanCallsView: View {
             await updateMediaState(call: resumed)
             mediaState = "正在重连"
             await reload()
+        } catch is CancellationError {
+            return
         } catch {
+            guard activeMediaCallId == call.id else { return }
             mediaState = "连接失败"
             errorText = "通话重连失败：\(error.localizedDescription)"
-            _ = try? await bridge.request(
-                method: "transitionCallSession",
-                params: [
-                    "callId": call.id,
-                    "generation": call.generation,
-                    "action": "fail",
-                    "terminalReason": "media-reconnect-failed",
-                ]
-            )
+            await failCallSilently(failureCall, reason: "media-reconnect-failed")
             closeActiveMedia()
         }
     }
 
-    private func pollActiveMedia() async {
-        guard
-            let callId = activeMediaCallId,
-            let call = calls.first(where: { $0.id == callId }),
-            !call.isTerminal
-        else {
-            if activeMediaCallId != nil {
-                closeActiveMedia()
+    private func pollRemoteCalls() async {
+        guard let bridge else { return }
+        do {
+            var refreshedCalls: [HumanCallSessionRecord] = []
+            let syncResult = try await bridge.request(
+                method: "syncHumanCalls",
+                params: [:]
+            )
+            if let rows = syncResult.value as? [[String: Any]] {
+                refreshedCalls.append(contentsOf: rows.compactMap(HumanCallSessionRecord.init(raw:)))
             }
+
+            if let active = activeMediaSession {
+                let scopedResult = try await bridge.request(
+                    method: "listCallSessions",
+                    params: [
+                        "scopeId": active.scopeId,
+                        "limit": 50,
+                    ]
+                )
+                if let rows = scopedResult.value as? [[String: Any]] {
+                    refreshedCalls.append(contentsOf: rows.compactMap(HumanCallSessionRecord.init(raw:)))
+                }
+            }
+            mergeCallSessions(refreshedCalls)
+
+            guard
+                let callId = activeMediaCallId,
+                var activeCall = activeMediaSession,
+                activeCall.id == callId
+            else { return }
+
+            if let refreshed = refreshedCalls
+                .filter({ $0.id == callId })
+                .max(by: { $0.updatedAtMs < $1.updatedAtMs })
+            {
+                if refreshed.isTerminal {
+                    closeActiveMedia()
+                    return
+                }
+                if refreshed.generation > activeCall.generation {
+                    appliedSignalSeq = 0
+                    mediaState = "正在重连"
+                }
+                if refreshed.generation >= activeCall.generation {
+                    activeCall = refreshed
+                    activeMediaSession = refreshed
+                    activeMediaGeneration = refreshed.generation
+                }
+            }
+
+            let leaseResult = try await bridge.request(
+                method: "getCallTransportLease",
+                params: ["callId": activeCall.id]
+            )
+            guard
+                let leaseRaw = leaseResult.value as? [String: Any],
+                let refreshedLease = HumanCallTransportLease(raw: leaseRaw)
+            else {
+                throw NSError(
+                    domain: "Fabushi.HumanCall",
+                    code: 3,
+                    userInfo: [NSLocalizedDescriptionKey: "通话设备租约格式无效。"]
+                )
+            }
+            guard refreshedLease.isOwner else {
+                closeActiveMedia()
+                errorText = "此通话已切换到另一台设备。"
+                return
+            }
+            guard refreshedLease.generation == activeCall.generation else {
+                return
+            }
+            activeLease = refreshedLease
+            await consumeSignals(for: activeCall)
+        } catch is CancellationError {
             return
+        } catch {
+            guard activeMediaCallId != nil || calls.isEmpty else { return }
+            errorText = "通话同步失败：\(error.localizedDescription)"
         }
-        await consumeSignals(for: call)
+    }
+
+    private func mergeCallSessions(_ incoming: [HumanCallSessionRecord]) {
+        guard !incoming.isEmpty else { return }
+        var merged = Dictionary(uniqueKeysWithValues: calls.map { ($0.id, $0) })
+        for call in incoming {
+            if let existing = merged[call.id], existing.updatedAtMs > call.updatedAtMs {
+                continue
+            }
+            merged[call.id] = call
+        }
+        calls = merged.values.sorted {
+            if $0.updatedAtMs == $1.updatedAtMs { return $0.id > $1.id }
+            return $0.updatedAtMs > $1.updatedAtMs
+        }
     }
 
     private func consumeSignals(for call: HumanCallSessionRecord) async {
-        guard let bridge, let peerConnection, let lease = activeLease else { return }
+        guard
+            let bridge,
+            let peer = peerConnection,
+            let lease = activeLease,
+            activeMediaCallId == call.id,
+            activeMediaGeneration == call.generation
+        else { return }
         do {
             let result = try await bridge.request(
                 method: "listCallSignals",
@@ -840,8 +966,14 @@ internal struct HumanCallsView: View {
                     "limit": 100,
                 ]
             )
-            guard let rows = result.value as? [[String: Any]] else { return }
+            guard
+                peerConnection === peer,
+                activeMediaCallId == call.id,
+                activeMediaGeneration == call.generation,
+                let rows = result.value as? [[String: Any]]
+            else { return }
             for raw in rows {
+                guard peerConnection === peer, activeMediaCallId == call.id else { return }
                 guard
                     let signal = HumanCallSignalRecord(raw: raw),
                     signal.generation == call.generation
@@ -851,17 +983,19 @@ internal struct HumanCallsView: View {
 
                 switch signal.kind {
                 case "offer":
-                    let answer = try await peerConnection.applyOffer(signal.payload)
+                    let answer = try await peer.applyOffer(signal.payload)
+                    guard peerConnection === peer else { return }
                     await sendSignal(call: call, lease: lease, kind: "answer", payload: answer)
                 case "answer":
-                    try await peerConnection.applyAnswer(signal.payload)
+                    try await peer.applyAnswer(signal.payload)
                 case "candidate":
-                    try await peerConnection.applyCandidate(signal.payload)
+                    try await peer.applyCandidate(signal.payload)
                 default:
                     break
                 }
             }
         } catch {
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
             errorText = "通话信令失败：\(error.localizedDescription)"
         }
     }
@@ -872,7 +1006,12 @@ internal struct HumanCallsView: View {
         kind: String,
         payload: [String: Any]
     ) async {
-        guard let bridge else { return }
+        guard
+            let bridge,
+            activeMediaCallId == call.id,
+            activeMediaGeneration == call.generation,
+            activeLease?.deviceId == lease.deviceId
+        else { return }
         do {
             let result = try await bridge.request(
                 method: "sendCallSignal",
@@ -885,23 +1024,35 @@ internal struct HumanCallsView: View {
                     "payload": payload,
                 ]
             )
+            guard
+                activeMediaCallId == call.id,
+                activeMediaGeneration == call.generation,
+                activeLease?.deviceId == lease.deviceId
+            else { return }
             if let raw = result.value as? [String: Any],
                let signal = HumanCallSignalRecord(raw: raw)
             {
                 appliedSignalSeq = max(appliedSignalSeq, signal.seq)
             }
         } catch {
+            guard
+                activeMediaCallId == call.id,
+                activeMediaGeneration == call.generation,
+                activeLease?.deviceId == lease.deviceId
+            else { return }
             errorText = "通话信令发送失败：\(error.localizedDescription)"
         }
     }
 
     private func setMuted(_ next: Bool, call: HumanCallSessionRecord) async {
-        peerConnection?.setMuted(next)
+        guard let peer = peerConnection, activeMediaCallId == call.id else { return }
+        peer.setMuted(next)
         muted = next
         await updateMediaState(call: call)
     }
 
     private func setCameraEnabled(_ next: Bool, call: HumanCallSessionRecord) async {
+        guard let peer = peerConnection, activeMediaCallId == call.id else { return }
         do {
             if next {
                 let permissions = await mediaPort.requestPermissions(audio: false, video: true)
@@ -909,31 +1060,40 @@ internal struct HumanCallsView: View {
                     throw HumanCallPeerConnection.Failure.cameraUnavailable
                 }
             }
-            try await peerConnection?.setCameraEnabled(
+            try await peer.setCameraEnabled(
                 next,
                 preferredCameraId: selectedCameraId
             )
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
             cameraEnabled = next
-            if let activeCameraId = peerConnection?.activeCameraDeviceId {
+            if let activeCameraId = peer.activeCameraDeviceId {
                 selectedCameraId = activeCameraId
                 mediaPort.setPreferredDeviceId(activeCameraId, kind: .camera)
             }
             await updateMediaState(call: call)
+        } catch HumanCallPeerConnection.Failure.staleOperation {
+            return
         } catch {
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
             errorText = "摄像头切换失败：\(error.localizedDescription)"
         }
     }
 
     private func setScreenSharing(_ next: Bool, call: HumanCallSessionRecord) async {
+        guard let peer = peerConnection, activeMediaCallId == call.id else { return }
         do {
             guard next == false || screenShareAvailable else {
                 throw HumanCallPeerConnection.Failure.screenShareUnavailable
             }
-            try await peerConnection?.setScreenShareEnabled(next)
-            screenSharing = peerConnection?.isScreenSharing == true
+            try await peer.setScreenShareEnabled(next)
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
+            screenSharing = peer.isScreenSharing
             await updateMediaState(call: call)
+        } catch HumanCallPeerConnection.Failure.staleOperation {
+            return
         } catch {
-            screenSharing = peerConnection?.isScreenSharing == true
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
+            screenSharing = peer.isScreenSharing
             errorText = "屏幕共享切换失败：\(error.localizedDescription)"
             await updateMediaState(call: call)
         }
@@ -943,11 +1103,14 @@ internal struct HumanCallsView: View {
         _ device: HumanCallMediaDevice,
         call: HumanCallSessionRecord
     ) async {
+        guard peerConnection != nil, activeMediaCallId == call.id else { return }
         do {
             let selected = try mediaPort.selectMicrophone(deviceId: device.id)
+            guard activeMediaCallId == call.id else { return }
             selectedMicrophoneId = selected.id
             await updateMediaState(call: call)
         } catch {
+            guard activeMediaCallId == call.id else { return }
             errorText = "麦克风切换失败：\(error.localizedDescription)"
         }
     }
@@ -956,12 +1119,17 @@ internal struct HumanCallsView: View {
         _ device: HumanCallMediaDevice,
         call: HumanCallSessionRecord
     ) async {
+        guard let peer = peerConnection, activeMediaCallId == call.id else { return }
         do {
             let selected = try mediaPort.selectCamera(deviceId: device.id)
             selectedCameraId = selected.id
-            try await peerConnection?.selectCamera(deviceId: selected.id)
+            try await peer.selectCamera(deviceId: selected.id)
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
             await updateMediaState(call: call)
+        } catch HumanCallPeerConnection.Failure.staleOperation {
+            return
         } catch {
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
             errorText = "摄像头设备切换失败：\(error.localizedDescription)"
         }
     }
@@ -970,6 +1138,7 @@ internal struct HumanCallsView: View {
         do {
             try await updateMediaStateOrThrow(call: call)
         } catch {
+            guard activeMediaCallId == call.id else { return }
             errorText = "通话媒体状态同步失败：\(error.localizedDescription)"
         }
     }
@@ -983,11 +1152,14 @@ internal struct HumanCallsView: View {
         if let selectedCameraId, !selectedCameraId.isEmpty {
             deviceSelection["cameraId"] = selectedCameraId
         }
+        let generation = activeMediaCallId == call.id
+            ? (activeMediaGeneration ?? call.generation)
+            : call.generation
         _ = try await bridge.request(
             method: "updateCallMedia",
             params: [
                 "callId": call.id,
-                "generation": call.generation,
+                "generation": generation,
                 "mediaCapabilities": [
                     "audio": !muted,
                     "video": cameraEnabled,
@@ -999,14 +1171,43 @@ internal struct HumanCallsView: View {
     }
 
     private func transitionSilently(_ call: HumanCallSessionRecord, action: String) async {
+        await transitionSilently(
+            callId: call.id,
+            generation: call.generation,
+            action: action
+        )
+    }
+
+    private func transitionSilently(
+        callId: String,
+        generation: Int,
+        action: String,
+        terminalReason: String? = nil
+    ) async {
         guard let bridge else { return }
+        var params: [String: Any] = [
+            "callId": callId,
+            "generation": generation,
+            "action": action,
+        ]
+        if let terminalReason, !terminalReason.isEmpty {
+            params["terminalReason"] = terminalReason
+        }
         _ = try? await bridge.request(
             method: "transitionCallSession",
-            params: [
-                "callId": call.id,
-                "generation": call.generation,
-                "action": action,
-            ]
+            params: params
+        )
+    }
+
+    private func failCallSilently(
+        _ call: HumanCallSessionRecord,
+        reason: String
+    ) async {
+        await transitionSilently(
+            callId: call.id,
+            generation: call.generation,
+            action: "fail",
+            terminalReason: reason
         )
     }
 
@@ -1014,6 +1215,8 @@ internal struct HumanCallsView: View {
         let closingPeer = peerConnection
         peerConnection = nil
         activeMediaCallId = nil
+        activeMediaGeneration = nil
+        activeMediaSession = nil
         activeLease = nil
         closingPeer?.close()
         appliedSignalSeq = 0

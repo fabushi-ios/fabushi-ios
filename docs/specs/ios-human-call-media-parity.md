@@ -47,9 +47,9 @@ Extend the existing native Human Call owners so a user can conduct a voice or vi
 
 **IOS-CALL-FR-06 - Media controls.** Mute, camera and screen-share controls are accessible, reflect actual local state, and update Host media capabilities including selected device IDs. A denied permission or unavailable capture device fails closed and remains user visible.
 
-**IOS-CALL-FR-07 - Recovery.** ICE disconnected/failed transitions drive the existing Host `reconnect` then `resume` state machine and create a new offer with ICE restart. Mute, requested camera state, screen-share intent and selected device preferences are restored when possible. A failed recovery transitions the call to terminal failure and tears media down.
+**IOS-CALL-FR-07 - Recovery and remote convergence.** While the Calls surface is active, it performs the existing remote call sync, refreshes the active scope session and transport lease, then consumes generation-fenced ordered signals. ICE disconnected/failed transitions drive the existing Host `reconnect` then `resume` state machine and create a new offer with ICE restart. Mute, requested camera state, screen-share intent and selected device preferences are restored when possible. Lease loss closes local media without stealing ownership; setup or recovery failure transitions the current generation to terminal failure and tears media down.
 
-**IOS-CALL-FR-08 - Lifecycle fencing.** Call ID, generation, transport device ID and ordered signal sequence remain mandatory. Switching calls, dismissing the surface, terminal call state, or application teardown stops camera and ReplayKit capture, closes the peer connection, deactivates the audio session and clears callbacks/renderers.
+**IOS-CALL-FR-08 - Lifecycle fencing.** Call ID, generation, transport device ID and ordered signal sequence remain mandatory. Camera and ReplayKit operations carry lifecycle and operation generations; a completion from a closed or superseded operation cannot publish a track, overwrite state, send a signal or report an error into a newer call. Screen-share transitions are serialized. Switching calls, dismissing the surface, terminal call state, lease loss or application teardown stops capture, closes the peer connection, deactivates the audio session, clears callbacks/renderers and writes the appropriate canonical terminal transition when this device still owns the call.
 
 **IOS-CALL-FR-09 - Product and accessibility.** Media is presented inside the existing Calls capability surface with deterministic accessibility identifiers and labels. The user can always return to the unified Fabushi shell without losing canonical call-session truth.
 
@@ -58,10 +58,10 @@ Extend the existing native Human Call owners so a user can conduct a voice or vi
 1. `HumanCallsView` requests permissions and resolves persisted device preferences through `HumanCallMediaPort`.
 2. The view obtains the Host transport lease and ICE configuration for the current call generation.
 3. `HumanCallPeerConnection` prepares audio and a stable video sender, optionally starts the selected camera, and publishes local/remote track callbacks.
-4. Offers, answers and candidates travel only through Host `sendCallSignal`/`listCallSignals`, fenced by call ID, generation, sender device and sequence.
-5. Camera or ReplayKit changes replace the sender track and then update canonical Host media capability state.
-6. Disconnect recovery reuses the Host lifecycle, recreates the peer connection with the same preferences and issues an ICE-restart offer.
-7. Teardown clears native capture, renderer and audio-session ownership before the view or call is released.
+4. A one-second refresh loop invokes `syncHumanCalls`, merges active-scope sessions, refreshes the transport lease, and only then consumes Host `listCallSignals`; offers, answers and candidates travel back only through `sendCallSignal`, fenced by call ID, generation, sender device and sequence.
+5. Camera or ReplayKit changes replace the sender track and then update canonical Host media capability and device-selection state.
+6. Disconnect recovery reuses the Host lifecycle, recreates the peer connection with the same preferences and issues an ICE-restart offer; initial setup and recovery failures terminalize the latest known generation.
+7. Teardown invalidates operation generations before clearing native capture, renderer and audio-session ownership, so delayed callbacks cannot revive a released call.
 
 ## Failure modes
 
