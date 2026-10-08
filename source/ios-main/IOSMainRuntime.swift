@@ -1,14 +1,26 @@
 import Foundation
 import SwiftUI
 
+@MainActor
+private final class CoordinatorLocalHumanIdentityState {
+    private(set) var value: String?
+
+    func replace(with slot: String?) {
+        let normalized = slot?.trimmingCharacters(in: .whitespacesAndNewlines)
+        value = normalized?.isEmpty == false ? normalized : nil
+    }
+}
+
 /// iOS platform-main counterpart of Grok's Electron main process.
 ///
 /// Owns lifecycle forwarding and the coordinator. It does not expose Host.
 @MainActor
 final class IOSMainRuntime {
     let coordinator: MahayanaCoordinator
-    let coordinatorBootstrap: ValidatedCoordinatorBootstrap
     let lifecycleReporter: IOSLifecycleReporter
+    private let coordinatorAppVersion: String
+    private let coordinatorDataDirectory: String
+    private let coordinatorLocalHumanIdentity: CoordinatorLocalHumanIdentityState
     private let lifecycleRecovery: IOSLifecycleRecoveryStore
     private let passkeyProvider: IOSAuthenticationServicesPasskeyProvider
     private let accountRuntime: CoordinatorAccountRuntime
@@ -23,13 +35,10 @@ final class IOSMainRuntime {
         devControlsGate: IOSDevControlsGate = .live()
     ) throws {
         let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "development"
-        coordinatorBootstrap = try CoordinatorBootstrap(
-            processConfig: .init(
-                appVersion: appVersion,
-                isPackaged: true,
-                dataDir: appDataDirectory.path
-            )
-        ).validatedForCarrier()
+        coordinatorAppVersion = appVersion
+        coordinatorDataDirectory = appDataDirectory.path
+        let coordinatorLocalHumanIdentity = CoordinatorLocalHumanIdentityState()
+        self.coordinatorLocalHumanIdentity = coordinatorLocalHumanIdentity
 
         self.devCapability = devCapability
         devControlAdapter = IOSNativeDevControlAdapter(gate: devControlsGate)
@@ -52,6 +61,7 @@ final class IOSMainRuntime {
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: {
+                    coordinatorLocalHumanIdentity.replace(with: nil)
                     coordinator.updateAccountSettingsScope(nil)
                 },
                 didClearAccountScope: { _, nextSlot in
@@ -68,6 +78,9 @@ final class IOSMainRuntime {
         let accountAuthorizer = IOSAccountAuthorizer(
             applyAccountScope: { slot in
                 coordinator.updateAccountSettingsScope(slot)
+            },
+            applyLocalHumanIdentity: { slot in
+                coordinatorLocalHumanIdentity.replace(with: slot)
             }
         )
         accountRuntime = CoordinatorAccountRuntime(
@@ -97,6 +110,28 @@ final class IOSMainRuntime {
                 "session_id": lifecycleRecovery.currentCheckpoint.sessionID,
             ]
         )
+    }
+
+    var coordinatorBootstrap: ValidatedCoordinatorBootstrap {
+        // The preload/auth carrier must exist before login so it can obtain the
+        // canonical Host auth reply. Human-scoped Coordinator process launch is
+        // separately fenced by humanScopedCoordinatorBootstrap().
+        try! CoordinatorBootstrap(
+            processConfig: .init(
+                appVersion: coordinatorAppVersion,
+                isPackaged: true,
+                dataDir: coordinatorDataDirectory,
+                localHumanId: coordinatorLocalHumanIdentity.value
+            )
+        ).validatedForCarrier()
+    }
+
+    func humanScopedCoordinatorBootstrap() throws -> ValidatedCoordinatorBootstrap {
+        try coordinatorBootstrap.requiringLocalHumanIdentity()
+    }
+
+    var localHumanId: String? {
+        coordinatorLocalHumanIdentity.value
     }
 
     var devControlsEnabled: Bool {
@@ -252,6 +287,7 @@ final class IOSMainRuntime {
             metadata: ["phase": "shutting-down"]
         )
         accountRuntime.reset()
+        coordinatorLocalHumanIdentity.replace(with: nil)
         coordinator.updateAccountSettingsScope(nil)
         reportSessionActivity(active: false)
         coordinator.beginShutdown()
