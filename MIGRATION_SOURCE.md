@@ -2,20 +2,31 @@
 
 ## Active iOS migration authority
 
-- Source repository: bhrumom/fabushi-desktop
-- Source pull request: #20
-- Source branch: refactor/grok-018-architecture-rebuild
-- Pinned source commit: 798cf51d96cb1cb98cf657af212bb47274ccb701
-- Source PR status: merged at 2026-10-04T23:24:27Z; canonical merge commit: ee66bacdf47f36af2ae96c0a8a8ec401460426e7
-- Target repository: fabushi-ios/fabushi-ios
-- Target pull request: #3
-- Active Spec: docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md
+- Source repository: `bhrumom/fabushi-desktop`
+- Source branch: **`main`**
+- Authority mode: **live branch authority**
+- Current observed Desktop `main` exact HEAD at this update: `3bc92400826cc4ca7ac665b467708e22261edc61`
+- Target repository: `fabushi-ios/fabushi-ios`
+- Target pull request/workstream: `#3`
+- Active Spec: `docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md`
 
-Fabushi iOS is a standalone downstream port of Desktop PR #20. Source may be reused, ported, translated, or adapted into this repository, but the iOS product must not require another Fabushi source checkout or a new shared Desktop/iOS runtime repository.
+Fabushi iOS is a standalone downstream native port of the **current canonical Desktop `main` product and architecture**.
 
-Grok Bot 0.18 is historical architecture/provenance context through Desktop PR #20. It is no longer the direct iOS migration authority.
+The exact SHA above is a provenance snapshot, not a frozen migration target. Before every substantial migration slice and every acceptance/completion judgment, resolve `bhrumom/fabushi-desktop@main` again. If it changed, rebaseline the source inventory/ledger and affected responsibilities before treating any previous Desktop-bound status or evidence as current.
 
-The current Desktop `frontend/** + source/**` inventory contains 7,943 source-bearing paths at the pinned exact HEAD.
+The migration must follow the current Desktop `main` responsibility owners, protocol boundaries, state machines, dependency direction, failure/recovery semantics, security boundaries, and visible product effects. iOS may use Apple-native platform mechanisms, but it must not preserve an obsolete PR #20 architecture after Desktop `main` has changed it.
+
+Desktop PR #20 and Grok Bot 0.18 are historical architecture/provenance milestones only. They are no longer direct live migration authorities.
+
+Historical fixed inventory counts, including the former 7,943-row PR #20 inventory, are not current completion targets after Desktop `main` changes. The current inventory must be regenerated/rebound from the live Desktop `main` exact HEAD.
+
+A previous ledger row/status may carry forward only when the relevant Desktop path/blob/responsibility is unchanged and that carry-forward is explicitly revalidated. Changed, added, removed, or ownership-moved responsibilities must be reviewed against the new `main` baseline.
+
+Source may be reused, ported, translated, or adapted into this repository, but the iOS product must not require another Fabushi source checkout or a new shared Desktop/iOS runtime repository.
+
+## Historical PR #20 authority record
+
+Everything below this heading is retained for provenance and diagnostics. It must not override the live Desktop `main` authority defined above.
 
 The current `d18de3f688859946ddf80526e366328fae2de718 -> 798cf51d96cb1cb98cf657af212bb47274ccb701` authority move is **1 commit across exactly 1 selected Coordinator production file**, `source/node-agent-coordinator/src/main.rs`. Desktop removes an obsolete fixed 1.2-second presentation sleep between durable inference admission and `wait_for_runner_event_stream`, so routed first-party Fabushi execution is gated only by the live Runner event stream instead of an artificial delay. The iOS native Coordinator/Host path has no equivalent fixed post-admission delay in `CoordinatorInferenceRouter` or the Rust AppHost; the responsibility is therefore revalidated as already adapted, with no new platform mechanism or parallel owner introduced. All ordinary/protected acceptance tied to the previous Desktop authority is historical only.
 
