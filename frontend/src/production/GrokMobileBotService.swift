@@ -54,20 +54,60 @@ struct GrokMobileBotService {
         return Self.mergeBots(installedBots, surface)
     }
 
-    func createBot(name: String, description: String) async throws -> [MobileBotSummary] {
+    func createBot(
+        name: String,
+        description: String,
+        avatarShape: String,
+        avatarColor: String
+    ) async throws -> [MobileBotSummary] {
         let requestId = "ios-mobile-bot-create-\(UUID().uuidString.lowercased())"
+        let command = try Self.createCommand(
+            name: name,
+            description: description,
+            avatarShape: avatarShape,
+            avatarColor: avatarColor,
+            requestId: requestId
+        )
         _ = try await bridge.request(
             method: "feature.execute",
-            params: [
-                "command": [
-                    "type": "bot.create",
-                    "requestId": requestId,
-                    "name": String(name.prefix(72)),
-                    "description": String(description.prefix(240)),
-                ],
-            ]
+            params: ["command": command]
         )
         return await loadBots()
+    }
+
+    static func createCommand(
+        name: String,
+        description: String,
+        avatarShape: String,
+        avatarColor: String,
+        requestId: String
+    ) throws -> [String: Any] {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 9,
+                userInfo: [NSLocalizedDescriptionKey: "Bot 名称不能为空"]
+            )
+        }
+        guard AvatarImagePolicy.shapes.contains(avatarShape),
+              AvatarImagePolicy.colors.contains(where: { $0.id == avatarColor })
+        else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 10,
+                userInfo: [NSLocalizedDescriptionKey: "Agent 角色无效"]
+            )
+        }
+        return [
+            "type": "bot.create",
+            "requestId": requestId,
+            "name": String(trimmedName.prefix(72)),
+            "description": String(trimmedDescription.prefix(240)),
+            "avatarShape": avatarShape,
+            "avatarColor": avatarColor,
+        ]
     }
 
     func renameBot(id: String, name: String) async throws -> [MobileBotSummary] {
