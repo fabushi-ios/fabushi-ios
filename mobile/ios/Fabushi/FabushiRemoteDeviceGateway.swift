@@ -86,6 +86,11 @@ final class FabushiRemoteDeviceGateway {
         await refreshConnection()
     }
 
+    func voIPTokenDidChange() async {
+        guard desiredLoggedIn else { return }
+        await refreshConnection()
+    }
+
     func stop() {
         desiredLoggedIn = false
         monitorTask?.cancel()
