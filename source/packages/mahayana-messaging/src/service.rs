@@ -75,6 +75,39 @@ fn stable_message_id(actor_id: &ActorId, client_message_id: &ClientMessageId) ->
     MessageId::new(format!("msg:{encoded}"))
 }
 
+fn forward_content_uses_media(content: &MessageContent) -> bool {
+    matches!(
+        content,
+        MessageContent::Photo { .. }
+            | MessageContent::Video { .. }
+            | MessageContent::Animation { .. }
+            | MessageContent::Audio { .. }
+            | MessageContent::Voice { .. }
+            | MessageContent::VideoNote { .. }
+            | MessageContent::Document { .. }
+            | MessageContent::Sticker { .. }
+    )
+}
+
+fn projected_forward_content(content: &MessageContent, drop_captions: bool) -> MessageContent {
+    let mut projected = content.clone();
+    if drop_captions {
+        match &mut projected {
+            MessageContent::Photo { caption, .. }
+            | MessageContent::Video { caption, .. }
+            | MessageContent::Animation { caption, .. }
+            | MessageContent::Audio { caption, .. }
+            | MessageContent::Voice { caption, .. }
+            | MessageContent::Document { caption, .. } => {
+                caption.text.clear();
+                caption.entities.clear();
+            }
+            _ => {}
+        }
+    }
+    projected
+}
+
 pub struct MessagingService<S: MessagingStateStore> {
     engine: MessagingEngine,
     store: S,
@@ -180,6 +213,19 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 self.mark_direct_messages_delivered(&actor_id, server_time_ms)?;
                 self.sync_response(&actor_id, cursor.as_deref(), limit, server_time_ms)
             }
+            ClientCommand::ListForwardRecipients {
+                source_conversation_id,
+                message_id,
+                query,
+                limit,
+            } => Ok(vec![self.forward_recipients_envelope(
+                &actor_id,
+                source_conversation_id,
+                message_id,
+                &query,
+                limit,
+                server_time_ms,
+            )?]),
             ClientCommand::Search { query } => {
                 Ok(vec![self.search_envelope(&actor_id, query, server_time_ms)])
             }
@@ -316,6 +362,165 @@ impl<S: MessagingStateStore> MessagingService<S> {
             server_time_ms,
             event: ServerEvent::SearchResults { query, results },
         }
+    }
+
+    fn forward_source_message(
+        &self,
+        actor_id: &ActorId,
+        source_conversation_id: &ConversationId,
+        message_id: &MessageId,
+    ) -> Result<&Message, MessagingServiceError> {
+        let denied = |reason: &str| MessagingServiceError::UnauthorizedCommand(reason.into());
+        let source = self
+            .engine
+            .state()
+            .conversations
+            .get(source_conversation_id)
+            .ok_or_else(|| denied("forward source conversation does not exist"))?;
+        let source_access = source
+            .participants
+            .iter()
+            .any(|participant| &participant.actor_id == actor_id)
+            || source.owner_id.as_ref() == Some(actor_id)
+            || self
+                .engine
+                .state()
+                .communities
+                .get(source_conversation_id)
+                .is_some_and(|community| community.is_subscriber(actor_id));
+        if !source_access {
+            return Err(denied("forward source requires conversation access"));
+        }
+        let message = self
+            .engine
+            .state()
+            .messages
+            .get(source_conversation_id)
+            .and_then(|messages| messages.get(message_id))
+            .ok_or_else(|| denied("forward source message does not exist"))?;
+        if message.deleted {
+            return Err(denied("forward source message was deleted"));
+        }
+        if message.protected_content {
+            return Err(denied("forward source message is protected"));
+        }
+        Ok(message)
+    }
+
+    fn can_forward_to(
+        &self,
+        actor_id: &ActorId,
+        destination: &Conversation,
+        content: &MessageContent,
+    ) -> bool {
+        if destination.archived || matches!(destination.kind, ConversationKind::Secret) {
+            return false;
+        }
+        let sender_is_participant = destination
+            .participants
+            .iter()
+            .any(|participant| &participant.actor_id == actor_id)
+            || destination.owner_id.as_ref() == Some(actor_id);
+        if !sender_is_participant || !destination.permissions.can_send_messages {
+            return false;
+        }
+        if forward_content_uses_media(content) && !destination.permissions.can_send_media {
+            return false;
+        }
+        if matches!(content, MessageContent::Poll { .. }) && !destination.permissions.can_send_polls {
+            return false;
+        }
+        if let Some(member) = self
+            .engine
+            .state()
+            .communities
+            .get(&destination.id)
+            .and_then(|community| community.members.get(actor_id))
+        {
+            if matches!(member.status, MemberStatus::Left | MemberStatus::Banned)
+                || (matches!(member.status, MemberStatus::Restricted)
+                    && member.restrictions.send_messages)
+                || (forward_content_uses_media(content)
+                    && matches!(member.status, MemberStatus::Restricted)
+                    && member.restrictions.send_media)
+                || (matches!(content, MessageContent::Poll { .. })
+                    && matches!(member.status, MemberStatus::Restricted)
+                    && member.restrictions.send_polls)
+            {
+                return false;
+            }
+        }
+        if matches!(destination.kind, ConversationKind::Channel) {
+            let can_post = destination.owner_id.as_ref() == Some(actor_id)
+                || destination.participants.iter().any(|participant| {
+                    &participant.actor_id == actor_id
+                        && matches!(
+                            participant.role,
+                            crate::actor::ParticipantRole::Owner
+                                | crate::actor::ParticipantRole::Admin
+                        )
+                })
+                || self
+                    .engine
+                    .state()
+                    .communities
+                    .get(&destination.id)
+                    .is_some_and(|community| {
+                        community.members.get(actor_id).is_some_and(|member| {
+                            matches!(member.status, MemberStatus::Administrator)
+                                && member.admin_rights.post_messages
+                        })
+                    });
+            if !can_post {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn forward_recipients_envelope(
+        &self,
+        actor_id: &ActorId,
+        source_conversation_id: ConversationId,
+        message_id: MessageId,
+        query: &str,
+        limit: u32,
+        server_time_ms: i64,
+    ) -> Result<ServerEnvelope, MessagingServiceError> {
+        let source_message =
+            self.forward_source_message(actor_id, &source_conversation_id, &message_id)?;
+        let normalized_query = query.trim().to_lowercase();
+        let bounded_limit = limit.clamp(1, 100) as usize;
+        let mut recipients = self
+            .engine
+            .state()
+            .conversations
+            .values()
+            .filter(|conversation| conversation.id != source_conversation_id)
+            .filter(|conversation| self.can_forward_to(actor_id, conversation, &source_message.content))
+            .filter(|conversation| {
+                normalized_query.is_empty()
+                    || conversation.title.to_lowercase().contains(&normalized_query)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        recipients.sort_by(|left, right| {
+            right
+                .updated_at_ms
+                .cmp(&left.updated_at_ms)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        recipients.truncate(bounded_limit);
+        Ok(ServerEnvelope {
+            protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
+            cursor: Some(self.cursor.to_string()),
+            server_time_ms,
+            event: ServerEvent::ForwardRecipients {
+                source_conversation_id,
+                message_id,
+                recipients,
+            },
+        })
     }
 
     fn community_members_page(
@@ -455,18 +660,66 @@ impl<S: MessagingStateStore> MessagingService<S> {
         command: &ClientCommand,
         server_time_ms: i64,
     ) -> Result<Option<Vec<ServerEnvelope>>, MessagingServiceError> {
-        let ClientCommand::SendMessage {
-            conversation_id,
-            client_message_id,
-            content,
-            reply_to_message_id,
-            thread_root_message_id,
-            scheduled_at_ms,
-            silent,
-            protected_content,
-        } = command
-        else {
-            return Ok(None);
+        let (conversation_id, client_message_id, expected) = match command {
+            ClientCommand::SendMessage {
+                conversation_id,
+                client_message_id,
+                content,
+                reply_to_message_id,
+                thread_root_message_id,
+                scheduled_at_ms,
+                silent,
+                protected_content,
+            } => (
+                conversation_id,
+                client_message_id,
+                (
+                    content.clone(),
+                    reply_to_message_id.clone(),
+                    thread_root_message_id.clone(),
+                    *scheduled_at_ms,
+                    *silent,
+                    *protected_content,
+                    None,
+                ),
+            ),
+            ClientCommand::ForwardMessage {
+                source_conversation_id,
+                message_id,
+                destination_conversation_id,
+                client_message_id,
+                drop_sender_names,
+                drop_captions,
+            } => {
+                let original =
+                    self.forward_source_message(actor_id, source_conversation_id, message_id)?;
+                let origin = if *drop_sender_names {
+                    None
+                } else {
+                    Some(
+                        original
+                            .forward_origin
+                            .clone()
+                            .unwrap_or_else(|| {
+                                format!("{}:{}", original.conversation_id.0, original.id.0)
+                            }),
+                    )
+                };
+                (
+                    destination_conversation_id,
+                    client_message_id,
+                    (
+                        projected_forward_content(&original.content, *drop_captions),
+                        None,
+                        None,
+                        None,
+                        false,
+                        false,
+                        origin,
+                    ),
+                )
+            }
+            _ => return Ok(None),
         };
         let stable_id = stable_message_id(actor_id, client_message_id);
         let legacy_id = MessageId::new(format!("local:{}", client_message_id.0));
@@ -475,23 +728,27 @@ impl<S: MessagingStateStore> MessagingService<S> {
             .state()
             .messages
             .get(conversation_id)
-            .and_then(|messages| {
-                messages
-                    .get(&stable_id)
-                    .or_else(|| messages.get(&legacy_id))
-            });
+            .and_then(|messages| messages.get(&stable_id).or_else(|| messages.get(&legacy_id)));
         let Some(existing) = existing else {
             return Ok(None);
         };
-        // The stable/legacy lookup key already binds this replay to the authenticated
-        // actor + client_message_id, without extending the canonical Message schema.
+        let (
+            expected_content,
+            expected_reply,
+            expected_thread,
+            expected_schedule,
+            expected_silent,
+            expected_protected,
+            expected_forward_origin,
+        ) = expected;
         if &existing.sender_id != actor_id
-            || &existing.content != content
-            || &existing.reply_to_message_id != reply_to_message_id
-            || &existing.thread_root_message_id != thread_root_message_id
-            || &existing.scheduled_at_ms != scheduled_at_ms
-            || &existing.silent != silent
-            || &existing.protected_content != protected_content
+            || existing.content != expected_content
+            || existing.reply_to_message_id != expected_reply
+            || existing.thread_root_message_id != expected_thread
+            || existing.scheduled_at_ms != expected_schedule
+            || existing.silent != expected_silent
+            || existing.protected_content != expected_protected
+            || existing.forward_origin != expected_forward_origin
         {
             return Err(MessagingServiceError::IdempotencyConflict(
                 client_message_id.0.clone(),
@@ -799,6 +1056,34 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     crate::actor::ParticipantRole::Owner | crate::actor::ParticipantRole::Admin
                 ) {
                     return Err(denied("conversation update requires owner/admin role"));
+                }
+            }
+            ClientCommand::ListForwardRecipients {
+                source_conversation_id,
+                message_id,
+                ..
+            } => {
+                self.forward_source_message(actor_id, source_conversation_id, message_id)?;
+            }
+            ClientCommand::ForwardMessage {
+                source_conversation_id,
+                message_id,
+                destination_conversation_id,
+                ..
+            } => {
+                if source_conversation_id == destination_conversation_id {
+                    return Err(denied("forward destination must differ from source conversation"));
+                }
+                let source_message =
+                    self.forward_source_message(actor_id, source_conversation_id, message_id)?;
+                let destination = self
+                    .engine
+                    .state()
+                    .conversations
+                    .get(destination_conversation_id)
+                    .ok_or_else(|| denied("forward destination does not exist"))?;
+                if !self.can_forward_to(actor_id, destination, &source_message.content) {
+                    return Err(denied("forward destination is not eligible for this actor/message"));
                 }
             }
             ClientCommand::CreateInvoice { invoice } if &invoice.seller_id != actor_id => {
@@ -1547,15 +1832,30 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 message_id,
                 destination_conversation_id,
                 client_message_id,
-            } => vec![Command::ForwardMessage {
-                source_conversation_id,
-                message_id,
-                destination_conversation_id,
-                local_message_id: MessageId::new(format!("local:{}", client_message_id.0)),
-                client_message_id,
-                sender_id: actor_id.clone(),
-                created_at_ms: now_ms,
-            }],
+                drop_sender_names,
+                drop_captions,
+            } => {
+                let local_message_id = stable_message_id(actor_id, &client_message_id);
+                vec![
+                    Command::ForwardMessage {
+                        source_conversation_id,
+                        message_id,
+                        destination_conversation_id: destination_conversation_id.clone(),
+                        local_message_id: local_message_id.clone(),
+                        client_message_id,
+                        sender_id: actor_id.clone(),
+                        created_at_ms: now_ms,
+                        drop_sender_names,
+                        drop_captions,
+                    },
+                    Command::AcknowledgeMessage {
+                        conversation_id: destination_conversation_id,
+                        local_message_id: local_message_id.clone(),
+                        server_message_id: local_message_id,
+                        accepted_at_ms: now_ms,
+                    },
+                ]
+            }
             ClientCommand::EditMessage {
                 conversation_id,
                 message_id,
@@ -1664,6 +1964,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 option_ids,
             }],
             ClientCommand::Search { .. }
+            | ClientCommand::ListForwardRecipients { .. }
             | ClientCommand::ListCommunityMembers { .. }
             | ClientCommand::ListCommunityAuditLog { .. }
             | ClientCommand::StartTyping { .. }
@@ -2226,6 +2527,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
             }
             ServerEvent::SyncBatch { .. }
             | ServerEvent::SearchResults { .. }
+            | ServerEvent::ForwardRecipients { .. }
             | ServerEvent::FolderChanged { .. }
             | ServerEvent::FolderDeleted { .. }
             | ServerEvent::BlobUploadChanged { .. }
