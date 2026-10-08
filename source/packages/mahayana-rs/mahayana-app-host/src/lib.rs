@@ -2645,4 +2645,54 @@ mod fabushi_shipping_inference_tests {
         .is_ok());
     }
 
+    #[test]
+    fn human_call_identity_projection_is_stable_and_order_independent() {
+        let alice_actor = messaging_actor_id_for_user("alice");
+        assert_eq!(alice_actor, messaging_actor_id_for_user(" alice "));
+        assert!(alice_actor.starts_with("human:account:"));
+        assert_eq!(alice_actor.len(), "human:account:".len() + 32);
+
+        let forward = deterministic_human_conversation_id("alice", "bob");
+        let reverse = deterministic_human_conversation_id("bob", "alice");
+        assert_eq!(forward, reverse);
+        assert!(forward.starts_with("human-direct-"));
+        assert_eq!(forward.len(), "human-direct-".len() + 64);
+    }
+
+    #[test]
+    fn human_call_conversation_lookup_reuses_exact_existing_direct_participants() {
+        let local = messaging_actor_id_for_user("alice");
+        let peer = messaging_actor_id_for_user("bob");
+        let other = messaging_actor_id_for_user("carol");
+        let sync = json!({
+            "envelopes": [{
+                "event": {
+                    "type": "syncBatch",
+                    "conversations": [
+                        {
+                            "id": "wrong",
+                            "kind": "direct",
+                            "participants": [
+                                {"actorId": local},
+                                {"actorId": other}
+                            ]
+                        },
+                        {
+                            "id": "existing",
+                            "kind": "direct",
+                            "participants": [
+                                {"actorId": peer},
+                                {"actorId": local}
+                            ]
+                        }
+                    ]
+                }
+            }]
+        });
+        let found = find_direct_conversation_for_actors(&sync, &local, &peer)
+            .expect("existing direct conversation");
+        assert_eq!(found["id"], "existing");
+        assert!(find_direct_conversation_for_actors(&sync, &local, "missing").is_none());
+    }
+
 }
