@@ -1,5 +1,5 @@
 pub const BOX_MCP_UNSUPPORTED_MESSAGE: &str =
-    "Grok Bot's computer is running an older image without MCP support — update it from Settings → Updates → Update Grok Bot's Computer.";
+    "Fabushi's computer is running an older image without MCP support — update it from Settings → Updates → Update Fabushi's Computer.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConnectErrorCode {
