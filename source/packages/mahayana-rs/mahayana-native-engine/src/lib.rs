@@ -826,10 +826,6 @@ impl NativeEngine {
                     }
                 }
 
-                // Record only the call that is actually about to execute. Keeping
-                // this adjacent to its result prevents parallel provider output from
-                // becoming [call1, call2, result1, result2] in replay history.
-                append_function_call_history(&mut session.history, &call);
                 session.inflight_tool = Some(InflightToolCheckpoint {
                     operation_id: operation_id.as_str().to_string(),
                     call_id: call.call_id.clone(),
@@ -915,6 +911,11 @@ impl NativeEngine {
                             output: output.clone(),
                             success: true,
                         })?;
+                        // Commit the executable call and its result atomically in
+                        // replay order. Policy/hooks/events may fail before this point;
+                        // those failures must never leave an orphan function_call in
+                        // model history.
+                        append_function_call_history(&mut session.history, &call);
                         append_function_call_output_history(
                             &mut session.history,
                             &call.call_id,
@@ -961,6 +962,7 @@ impl NativeEngine {
                             output: failure_output.clone(),
                             success: false,
                         })?;
+                        append_function_call_history(&mut session.history, &call);
                         append_function_call_output_history(
                             &mut session.history,
                             &call.call_id,
