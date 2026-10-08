@@ -260,4 +260,32 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
     }
 
 
+    func testPushKitTokenLifecycleUsesShippingGatewayOwner() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let runtime = try String(
+            contentsOf: iosRoot
+                .appendingPathComponent("../../source/ios-main/FabushiRuntime.swift")
+                .standardizedFileURL,
+            encoding: .utf8
+        )
+        let gateway = try String(
+            contentsOf: iosRoot.appendingPathComponent("Fabushi/FabushiRemoteDeviceGateway.swift"),
+            encoding: .utf8
+        )
+        let coordinator = try String(
+            contentsOf: iosRoot.appendingPathComponent("Fabushi/HumanCallSystemCoordinator.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(runtime.contains("let remoteDeviceGateway: FabushiRemoteDeviceGateway"))
+        XCTAssertTrue(runtime.contains("bindVoIPTokenChangeHandler"))
+        XCTAssertTrue(runtime.contains("remoteDeviceGateway.voIPTokenDidChange()"))
+        XCTAssertTrue(gateway.contains("func voIPTokenDidChange() async"))
+        XCTAssertTrue(gateway.contains("await refreshConnection()"))
+        XCTAssertTrue(coordinator.contains("await self?.voIPTokenChangeHandler?()"))
+    }
+
+
 }
