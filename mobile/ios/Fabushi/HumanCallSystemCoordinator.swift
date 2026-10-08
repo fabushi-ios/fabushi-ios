@@ -98,7 +98,7 @@ internal final class HumanCallSystemCoordinator: NSObject,
         actionHandler = nil
     }
 
-    static func hexadecimalToken(_ data: Data) -> String {
+    nonisolated static func hexadecimalToken(_ data: Data) -> String {
         data.map { String(format: "%02x", $0) }.joined()
     }
 
