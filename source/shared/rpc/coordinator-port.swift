@@ -281,6 +281,18 @@ struct CoordinatorBootstrap: Codable, Equatable, Sendable {
         let isPackaged: Bool
         let dataDir: String
         let localHumanId: String?
+
+        init(
+            appVersion: String,
+            isPackaged: Bool,
+            dataDir: String,
+            localHumanId: String? = nil
+        ) {
+            self.appVersion = appVersion
+            self.isPackaged = isPackaged
+            self.dataDir = dataDir
+            self.localHumanId = localHumanId
+        }
     }
 
     let processConfig: ProcessConfig
