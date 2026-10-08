@@ -240,6 +240,12 @@ final class FabushiRuntime {
                     self?.dispatchGrokDeepLink(parsed)
                 }
             )
+            HumanCallSystemCoordinator.shared.bind { [weak self] action in
+                guard let self else {
+                    throw HumanCallSystemCoordinatorError.runtimeUnavailable
+                }
+                try await self.handleHumanCallSystemAction(action)
+            }
         } catch {
             fatalError("Failed to initialize iOS runtime: \(error)")
         }
@@ -301,6 +307,34 @@ final class FabushiRuntime {
             url.absoluteString,
             origin: "scene-open-url"
         )
+    }
+
+    private func handleHumanCallSystemAction(_ action: HumanCallSystemAction) async throws {
+        switch action {
+        case .incoming:
+            _ = try await bridge.request(method: "syncHumanCalls", params: [:])
+            await messaging.refresh()
+        case .answer(let descriptor):
+            _ = try await bridge.request(
+                method: "transitionCallSession",
+                params: [
+                    "callId": descriptor.callId,
+                    "generation": descriptor.generation,
+                    "action": "accept",
+                ]
+            )
+            await messaging.refresh()
+        case .end(let descriptor):
+            _ = try await bridge.request(
+                method: "transitionCallSession",
+                params: [
+                    "callId": descriptor.callId,
+                    "generation": descriptor.generation,
+                    "action": "hangup",
+                ]
+            )
+            await messaging.refresh()
+        }
     }
 
     private func dispatchGrokDeepLink(_ parsed: ParsedFabushiDeepLink) {

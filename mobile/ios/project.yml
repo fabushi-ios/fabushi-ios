@@ -71,6 +71,7 @@ targets:
         CURRENT_PROJECT_VERSION: 34
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: '1,2'
+        CODE_SIGN_ENTITLEMENTS: Fabushi/Fabushi.entitlements
     info:
       path: Fabushi/Info.plist
       properties:
@@ -84,6 +85,10 @@ targets:
         NSCameraUsageDescription: 用于你主动发起或接听视频通话时采集相机画面。
         NSSpeechRecognitionUsageDescription: 用于在设备本地把你的语音输入转成可编辑文字，不使用网络转写回退。
         CFBundleIconName: AppIcon
+        UIBackgroundModes:
+          - audio
+          - voip
+          - remote-notification
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
