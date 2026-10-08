@@ -2,6 +2,244 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+private struct ForwardMessageSheet: View {
+    let sourceConversationId: String
+    let message: ChatMessage
+    let messaging: MessagingModel
+    let onDismiss: () -> Void
+
+    @State private var query = ""
+    @State private var recipients: [ConversationSummary] = []
+    @State private var selectedRecipients: [String: ConversationSummary] = [:]
+    @State private var clientMessageIds: [String: String] = [:]
+    @State private var settlements: [String: ForwardSettlement] = [:]
+    @State private var dropSenderNames = false
+    @State private var dropCaptions = false
+    @State private var loading = false
+    @State private var sending = false
+    @State private var errorText: String?
+
+    private var selectedInOrder: [ConversationSummary] {
+        selectedRecipients.values.sorted {
+            if $0.title == $1.title { return $0.id < $1.id }
+            return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+    }
+
+    private var pendingRecipients: [ConversationSummary] {
+        selectedInOrder.filter { settlements[$0.id]?.sent != true }
+    }
+
+    private var sentCount: Int {
+        settlements.values.filter(\.sent).count
+    }
+
+    private var failedCount: Int {
+        settlements.values.filter { !$0.sent }.count
+    }
+
+    private var optionsLocked: Bool {
+        sentCount > 0
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let errorText {
+                    Section {
+                        Label(errorText, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                Section("选项") {
+                    Toggle("隐藏原发送者", isOn: $dropSenderNames)
+                        .disabled(optionsLocked || sending)
+                    Toggle("移除媒体说明文字", isOn: $dropCaptions)
+                        .disabled(optionsLocked || sending)
+                }
+
+                Section("会话") {
+                    if loading && recipients.isEmpty {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    } else if recipients.isEmpty {
+                        ContentUnavailableView(
+                            query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? "没有可转发的会话"
+                                : "没有匹配的会话",
+                            systemImage: "arrowshape.turn.up.right"
+                        )
+                    } else {
+                        ForEach(recipients) { recipient in
+                            Button {
+                                toggleRecipient(recipient)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(
+                                        systemName: selectedRecipients[recipient.id] == nil
+                                            ? "circle"
+                                            : "checkmark.circle.fill"
+                                    )
+                                    .foregroundStyle(
+                                        selectedRecipients[recipient.id] == nil
+                                            ? Color.secondary
+                                            : Color.accentColor
+                                    )
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(recipient.title)
+                                            .foregroundStyle(.primary)
+                                        Text(recipient.kind.label)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if let settlement = settlements[recipient.id] {
+                                        if settlement.sent {
+                                            Label("已发送", systemImage: "checkmark.circle.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.green)
+                                        } else {
+                                            Label("失败", systemImage: "exclamationmark.circle.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.red)
+                                        }
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(sending || settlements[recipient.id]?.sent == true)
+                        }
+                    }
+                }
+
+                if sentCount > 0 || failedCount > 0 {
+                    Section("结果") {
+                        if sentCount > 0 {
+                            Text("已成功转发到 \(sentCount) 个会话。")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(
+                            settlements.values
+                                .filter { !$0.sent }
+                                .sorted { $0.conversationId < $1.conversationId }
+                        ) { settlement in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(selectedRecipients[settlement.conversationId]?.title ?? settlement.conversationId)
+                                    .fontWeight(.semibold)
+                                Text(settlement.error ?? "转发失败")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
+                }
+            }
+            .searchable(text: $query, prompt: "搜索会话")
+            .navigationTitle("转发到")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(sentCount > 0 && failedCount == 0 ? "完成" : "取消") {
+                        onDismiss()
+                    }
+                    .disabled(sending)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(actionTitle) {
+                        Task { await submit() }
+                    }
+                    .disabled(pendingRecipients.isEmpty || sending)
+                }
+            }
+            .overlay {
+                if sending {
+                    ProgressView("正在转发…")
+                        .padding()
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                }
+            }
+            .task(id: query) {
+                await reloadRecipients()
+            }
+        }
+    }
+
+    private var actionTitle: String {
+        if sending { return "发送中" }
+        if failedCount > 0 { return "重试失败项" }
+        if sentCount > 0 && pendingRecipients.isEmpty { return "已完成" }
+        return selectedRecipients.count > 1 ? "转发（\(selectedRecipients.count)）" : "转发"
+    }
+
+    private func toggleRecipient(_ recipient: ConversationSummary) {
+        guard settlements[recipient.id]?.sent != true else { return }
+        if selectedRecipients[recipient.id] == nil {
+            selectedRecipients[recipient.id] = recipient
+            if clientMessageIds[recipient.id] == nil {
+                clientMessageIds[recipient.id] = "ios-forward:\(UUID().uuidString.lowercased())"
+            }
+        } else {
+            selectedRecipients.removeValue(forKey: recipient.id)
+            settlements.removeValue(forKey: recipient.id)
+        }
+    }
+
+    private func reloadRecipients() async {
+        do {
+            try await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled else { return }
+            loading = true
+            defer { loading = false }
+            recipients = try await messaging.searchForwardRecipients(
+                sourceConversationId: sourceConversationId,
+                messageId: message.id,
+                query: query,
+                limit: 100
+            )
+            errorText = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            loading = false
+            errorText = "无法加载可转发会话：\(error.localizedDescription)"
+        }
+    }
+
+    private func submit() async {
+        let targets = pendingRecipients
+        guard !targets.isEmpty else { return }
+        sending = true
+        errorText = nil
+        for target in targets where clientMessageIds[target.id] == nil {
+            clientMessageIds[target.id] = "ios-forward:\(UUID().uuidString.lowercased())"
+        }
+        let requests = targets.compactMap { target -> ForwardDestinationRequest? in
+            guard let clientMessageId = clientMessageIds[target.id] else { return nil }
+            return ForwardDestinationRequest(
+                conversationId: target.id,
+                clientMessageId: clientMessageId
+            )
+        }
+        let results = await messaging.forwardMessageBatch(
+            sourceConversationId: sourceConversationId,
+            messageId: message.id,
+            destinations: requests,
+            dropSenderNames: dropSenderNames,
+            dropCaptions: dropCaptions
+        )
+        for settlement in results {
+            settlements[settlement.conversationId] = settlement
+        }
+        sending = false
+        if results.isEmpty {
+            errorText = "没有可发送的目标会话。"
+        }
+    }
+}
+
 extension ContentView {
     func chatView(_ conversation: ConversationSummary) -> some View {
         NavigationStack {
@@ -312,15 +550,12 @@ extension ContentView {
             MediaViewer(message: message, messaging: messaging) { mediaViewerMessage = nil }
         }
         .sheet(item: $forwardMessage) { message in
-            NavigationStack {
-                List(messaging.conversations.filter { $0.id != conversation.id && !$0.isArchived }) { destination in
-                    Button {
-                        Task { await messaging.forwardMessage(sourceConversationId: conversation.id, messageId: message.id, destinationConversationId: destination.id) }
-                        forwardMessage = nil
-                    } label: { Text(destination.title) }
-                }
-                .navigationTitle("转发到")
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { forwardMessage = nil } } }
+            ForwardMessageSheet(
+                sourceConversationId: conversation.id,
+                message: message,
+                messaging: messaging
+            ) {
+                forwardMessage = nil
             }
         }
         .fileImporter(isPresented: $attachmentPickerPresented, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
