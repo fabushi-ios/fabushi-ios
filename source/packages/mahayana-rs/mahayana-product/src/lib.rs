@@ -1881,10 +1881,10 @@ impl MahayanaProductClient {
             "mahayana.usage.status" => serde_json::to_value(self.model_usage()?)
                 .map_err(|error| ProductError::Response(error.to_string())),
             "mahayana.platform.request" => self.platform_request(request),
-            "mahayana.contacts.list" => self.authorized_get(request, "/api/social/friends", &[]),
+            "mahayana.contacts.list" => self.authorized_social_get(request, "/api/social/friends", &[]),
             "mahayana.contacts.search" => {
                 let query = required_string(request, "query")?;
-                self.authorized_get(request, "/api/social/users/search", &[("q", query)])
+                self.authorized_social_get(request, "/api/social/users/search", &[("q", query)])
             }
             "mahayana.contacts.add" => {
                 let contact = required_string(request, "contact")?;
@@ -1892,14 +1892,14 @@ impl MahayanaProductClient {
                 if let Some(message) = optional_string(request, "message") {
                     body["message"] = Value::String(message.to_string());
                 }
-                self.authorized_post(request, "/api/social/friend-requests", body)
+                self.authorized_social_post(request, "/api/social/friend-requests", body)
             }
             "mahayana.contacts.requests" => {
-                self.authorized_get(request, "/api/social/friend-requests/incoming", &[])
+                self.authorized_social_get(request, "/api/social/friend-requests/incoming", &[])
             }
             "mahayana.contacts.accept" => {
                 let request_id = required_identifier(request, "requestId")?;
-                self.authorized_post(
+                self.authorized_social_post(
                     request,
                     &format!("/api/social/friend-requests/{request_id}/accept"),
                     json!({}),
@@ -1913,20 +1913,141 @@ impl MahayanaProductClient {
                     .unwrap_or(50)
                     .clamp(1, 200)
                     .to_string();
-                self.authorized_get(
-                    request,
-                    "/api/social/messages",
-                    &[("contactId", contact), ("limit", &limit)],
-                )
+                let before = optional_string(request, "before");
+                let mut query = vec![("contactId", contact), ("limit", limit.as_str())];
+                if let Some(before) = before {
+                    query.push(("before", before));
+                }
+                self.authorized_social_get(request, "/api/social/messages", &query)
             }
             "mahayana.messages.send" => {
                 let contact = required_string(request, "contact")?;
-                let text = required_string(request, "text")?;
-                let mut body = json!({"contactId": contact, "text": text});
+                let text = request
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .unwrap_or_default();
+                let attachments = request
+                    .get("attachments")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                if text.is_empty() && attachments.is_empty() {
+                    return Err(ProductError::InvalidParameter("text"));
+                }
+                let mut body = json!({
+                    "targetUserId": contact,
+                    "contactId": contact,
+                    "text": text,
+                    "attachments": attachments,
+                });
                 if let Some(client_request_id) = optional_string(request, "clientRequestId") {
                     body["clientRequestId"] = Value::String(client_request_id.to_string());
                 }
-                self.authorized_post(request, "/api/social/messages", body)
+                if let Some(reply_to_message_id) = optional_string(request, "replyToMessageId") {
+                    body["replyToMessageId"] = Value::String(reply_to_message_id.to_string());
+                }
+                self.authorized_social_post(request, "/api/social/messages", body)
+            }
+            "mahayana.messages.reaction.set" => {
+                let message_id = required_identifier(request, "messageId")?;
+                let canonical_message_id = message_id
+                    .parse::<u64>()
+                    .ok()
+                    .filter(|value| *value > 0)
+                    .ok_or(ProductError::InvalidParameter("messageId"))?;
+                let emoji = required_string(request, "emoji")?;
+                if emoji.as_bytes().len() > 32 {
+                    return Err(ProductError::InvalidParameter("emoji"));
+                }
+                let active = request
+                    .get("active")
+                    .and_then(Value::as_bool)
+                    .ok_or(ProductError::InvalidParameter("active"))?;
+                self.authorized_social_post(
+                    request,
+                    &format!("/api/social/messages/{canonical_message_id}/reactions"),
+                    json!({"emoji": emoji, "active": active}),
+                )
+            }
+            "mahayana.calls.ice" => {
+                self.authorized_social_get(request, "/api/social/calls/ice", &[])
+            }
+            "mahayana.calls.list" => {
+                let limit = request
+                    .get("limit")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(50)
+                    .clamp(1, 200)
+                    .to_string();
+                self.authorized_social_get(
+                    request,
+                    "/api/social/calls",
+                    &[("limit", limit.as_str())],
+                )
+            }
+            "mahayana.calls.create" => {
+                let call_id = required_identifier(request, "callId")?;
+                let call_id = safe_path_identifier(&call_id, "callId")?;
+                let peer_human_id = required_string(request, "peerHumanId")?;
+                let response = self.authorized_social_post(
+                    request,
+                    "/api/social/calls",
+                    json!({"callId": call_id, "targetUserId": peer_human_id}),
+                )?;
+                ensure_call_identity(&response, call_id)?;
+                Ok(response)
+            }
+            "mahayana.calls.get" => {
+                let call_id = required_identifier(request, "callId")?;
+                let call_id = safe_path_identifier(&call_id, "callId")?;
+                let after_seq = request.get("afterSeq").and_then(Value::as_u64).unwrap_or(0).to_string();
+                let limit = request
+                    .get("limit")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(100)
+                    .clamp(1, 200)
+                    .to_string();
+                let response = self.authorized_social_get(
+                    request,
+                    &format!("/api/social/calls/{call_id}"),
+                    &[("afterSeq", after_seq.as_str()), ("limit", limit.as_str())],
+                )?;
+                ensure_call_identity(&response, call_id)?;
+                Ok(response)
+            }
+            "mahayana.calls.event.append" => {
+                let call_id = required_identifier(request, "callId")?;
+                let call_id = safe_path_identifier(&call_id, "callId")?;
+                let client_event_id = required_identifier(request, "clientEventId")?;
+                let generation = request
+                    .get("generation")
+                    .and_then(Value::as_u64)
+                    .ok_or(ProductError::InvalidParameter("generation"))?;
+                let kind = required_string(request, "kind")?;
+                let payload = request
+                    .get("payload")
+                    .filter(|value| value.is_object())
+                    .cloned()
+                    .ok_or(ProductError::InvalidParameter("payload"))?;
+                let response = self.authorized_social_post(
+                    request,
+                    &format!("/api/social/calls/{call_id}/events"),
+                    json!({
+                        "clientEventId": client_event_id,
+                        "generation": generation,
+                        "kind": kind,
+                        "payload": payload,
+                    }),
+                )?;
+                ensure_call_event_identity(
+                    &response,
+                    call_id,
+                    &client_event_id,
+                    generation,
+                    kind,
+                )?;
+                Ok(response)
             }
             "mahayana.remote.computers.list" => self.authorized_get(request, "/v1/computers", &[]),
             "mahayana.remote.computer.register" => {
@@ -2588,6 +2709,82 @@ impl MahayanaProductClient {
     ) -> Result<Value, ProductError> {
         let token = self.authorization_token(command)?;
         self.post_json(path, body, Some(&token))
+    }
+
+    fn authorized_social_get(
+        &self,
+        command: &Value,
+        path: &str,
+        query: &[(&str, &str)],
+    ) -> Result<Value, ProductError> {
+        let (token, device_id) = self.social_authorization(command)?;
+        self.get_json_with_device(path, query, &token, &device_id)
+    }
+
+    fn authorized_social_post(
+        &self,
+        command: &Value,
+        path: &str,
+        body: Value,
+    ) -> Result<Value, ProductError> {
+        let (token, device_id) = self.social_authorization(command)?;
+        self.post_json_with_device(path, body, &token, &device_id)
+    }
+
+    fn social_authorization(&self, command: &Value) -> Result<(String, String), ProductError> {
+        let token = self.authorization_token(command)?;
+        let device_id = optional_string(command, "deviceId")
+            .map(str::to_string)
+            .or_else(|| {
+                self.load_session()
+                    .ok()
+                    .flatten()
+                    .and_then(|session| optional_string(&session, "deviceId").map(str::to_string))
+            })
+            .filter(|value| !value.trim().is_empty())
+            .ok_or(ProductError::InvalidParameter("deviceId"))?;
+        Ok((token, device_id))
+    }
+
+    fn get_json_with_device(
+        &self,
+        path: &str,
+        query: &[(&str, &str)],
+        token: &str,
+        device_id: &str,
+    ) -> Result<Value, ProductError> {
+        let mut url = url::Url::parse(&format!("{}{}", self.api_base_url, path))
+            .map_err(|error| ProductError::Configuration(error.to_string()))?;
+        url.query_pairs_mut().extend_pairs(query.iter().copied());
+        let response = send_with_ipv4_fallback(|client| {
+            client
+                .get(url.clone())
+                .header("Accept", "application/json")
+                .header("x-fabushi-device-id", device_id)
+                .bearer_auth(token)
+                .send()
+        })?;
+        decode_response(Ok(response))
+    }
+
+    fn post_json_with_device(
+        &self,
+        path: &str,
+        body: Value,
+        token: &str,
+        device_id: &str,
+    ) -> Result<Value, ProductError> {
+        let url = format!("{}{}", self.api_base_url, path);
+        let response = send_with_ipv4_fallback(|client| {
+            client
+                .post(&url)
+                .header("Accept", "application/json")
+                .header("x-fabushi-device-id", device_id)
+                .bearer_auth(token)
+                .json(&body)
+                .send()
+        })?;
+        decode_response(Ok(response))
     }
 
     fn authorization_token(&self, command: &Value) -> Result<String, ProductError> {
@@ -3481,6 +3678,49 @@ fn safe_path_identifier<'a>(value: &'a str, name: &'static str) -> Result<&'a st
         .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
         .then_some(value)
         .ok_or(ProductError::InvalidParameter(name))
+}
+
+fn ensure_call_identity(response: &Value, expected_call_id: &str) -> Result<(), ProductError> {
+    let returned = response
+        .get("call")
+        .and_then(Value::as_object)
+        .and_then(|call| call.get("callId"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| ProductError::Response("Fabushi Human call response omitted callId".into()))?;
+    if returned != expected_call_id {
+        return Err(ProductError::Response(
+            "Fabushi Human call backend returned a mismatched call id".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_call_event_identity(
+    response: &Value,
+    expected_call_id: &str,
+    expected_client_event_id: &str,
+    expected_generation: u64,
+    expected_kind: &str,
+) -> Result<(), ProductError> {
+    ensure_call_identity(response, expected_call_id)?;
+    let event = response
+        .get("event")
+        .and_then(Value::as_object)
+        .ok_or_else(|| ProductError::Response("Fabushi Human call response omitted event".into()))?;
+    let call_id = event.get("callId").and_then(Value::as_str);
+    let client_event_id = event.get("clientEventId").and_then(Value::as_str);
+    let generation = event.get("generation").and_then(Value::as_u64);
+    let kind = event.get("kind").and_then(Value::as_str);
+    if call_id != Some(expected_call_id)
+        || client_event_id != Some(expected_client_event_id)
+        || generation != Some(expected_generation)
+        || kind != Some(expected_kind)
+    {
+        return Err(ProductError::Response(
+            "Fabushi Human call backend returned a mismatched canonical event".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn platform_control_plane_fallback_base(
