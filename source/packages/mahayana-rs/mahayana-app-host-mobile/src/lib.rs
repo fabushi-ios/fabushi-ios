@@ -914,7 +914,9 @@ impl MobileAppHost {
         let method = request.get("method")?.as_str()?;
         if !matches!(
             method,
-            "createCallSession"
+            "getCallTransportIdentity"
+                | "getCallIceServers"
+                | "createCallSession"
                 | "getCallSession"
                 | "listCallSessions"
                 | "transitionCallSession"
@@ -931,9 +933,36 @@ impl MobileAppHost {
             .cloned()
             .unwrap_or_default();
         let result: Result<serde_json::Value, String> = (|| match method {
+            "getCallTransportIdentity" => self
+                .host
+                .human_call(MobileHumanCallTransportCommand::Identity),
+            "getCallIceServers" => self
+                .host
+                .human_call(MobileHumanCallTransportCommand::IceServers),
             "createCallSession" => {
                 let scope_id = required_json_string(&params, "scopeId")?;
-                let creator_id = required_json_string(&params, "creatorId")?;
+                let identity = self
+                    .host
+                    .human_call(MobileHumanCallTransportCommand::Identity)?;
+                let creator_id = identity
+                    .get("userId")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| "Human call transport identity omitted userId".to_string())?
+                    .to_string();
+                if let Some(requested_creator) = params
+                    .get("creatorId")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
+                    if requested_creator != creator_id {
+                        return Err(
+                            "creatorId must match the authenticated Human call identity".into()
+                        );
+                    }
+                }
                 let participant_ids = params
                     .get("participantIds")
                     .and_then(serde_json::Value::as_array)
