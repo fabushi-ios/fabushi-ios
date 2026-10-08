@@ -417,6 +417,34 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(live.batchId, "batch-9")
     }
 
+    func testUnknownCanonicalTranscriptCardGetsStableFabushiFallback() throws {
+        let fallback = try XCTUnwrap(projectMobileTranscriptCardWithFallback(
+            event: [
+                "entryId": "unknown-card-1",
+                "card": ["kind": "future-card"],
+            ],
+            operationId: "op-fallback"
+        ))
+        XCTAssertEqual(fallback.id, "transcript-card-fallback:unknown-card-1")
+        XCTAssertEqual(fallback.canonicalMessageId, "unknown-card-1")
+        XCTAssertEqual(fallback.role, .assistant)
+        XCTAssertEqual(fallback.kind, .notice)
+        XCTAssertEqual(
+            fallback.text,
+            "This message can’t be shown in this version of Fabushi"
+        )
+        XCTAssertEqual(fallback.operationId, "op-fallback")
+
+        XCTAssertNil(projectMobileTranscriptCardWithFallback(
+            event: ["card": ["kind": "future-card"]],
+            operationId: nil
+        ))
+        XCTAssertNil(projectMobileTranscriptCardWithFallback(
+            event: ["entryId": "unknown-card-2"],
+            operationId: nil
+        ))
+    }
+
     func testNativeTranscriptCardsRejectMalformedOrUnknownRecoveredCards() {
         XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "notice"]], operationId: nil))
         XCTAssertNil(projectMobileTranscriptCard(event: ["card": ["kind": "permission-request", "permission": [:]]], operationId: nil))

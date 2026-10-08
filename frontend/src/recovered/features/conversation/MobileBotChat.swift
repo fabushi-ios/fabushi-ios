@@ -12,6 +12,31 @@ internal func isMobileBotVisibleAssistantCompletion(
     return !text.isEmpty || attachment != nil
 }
 
+internal func projectMobileTranscriptCardWithFallback(
+    event: [String: Any],
+    operationId: String?
+) -> MobileChatMessage? {
+    if let projected = projectMobileTranscriptCard(event: event, operationId: operationId) {
+        return projected
+    }
+    guard
+        event["card"] is [String: Any],
+        let rawEntryId = event["entryId"] as? String
+    else {
+        return nil
+    }
+    let entryId = rawEntryId.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !entryId.isEmpty else { return nil }
+    return MobileChatMessage(
+        id: "transcript-card-fallback:\(entryId)",
+        role: .assistant,
+        text: "This message can’t be shown in this version of Fabushi",
+        kind: .notice,
+        operationId: operationId,
+        canonicalMessageId: entryId
+    )
+}
+
 internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> MobileChatMessage? {
     guard
         let id = (row["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -1465,7 +1490,10 @@ internal struct MobileBotChat: View {
                     let row = MobileChatMessage(id: id, role: .assistant, text: "", kind: .action, operationId: operationId, actionTitle: "Model", actionDetail: [provider, model].filter { !$0.isEmpty }.joined(separator: " · "), actionStatus: "completed")
                     if let index = entries.firstIndex(where: { $0.id == id }) { entries[index] = row } else { entries.append(row) }
                 case "transcript.card":
-                    guard let row = projectMobileTranscriptCard(event: event, operationId: eventOperationId) else { continue }
+                    guard let row = projectMobileTranscriptCardWithFallback(
+                        event: event,
+                        operationId: eventOperationId
+                    ) else { continue }
                     if let index = entries.firstIndex(where: { $0.id == row.id }) { entries[index] = row } else { entries.append(row) }
                 case "operation.completed", "operation.interrupted":
                     removeThinking(operationId)
