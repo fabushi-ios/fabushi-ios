@@ -71,9 +71,13 @@ final class IOSPlatformMainParityTests: XCTestCase {
     }
 
     func testProcessNameRedactionPreservesOnlyKnownHelperLabels() {
-        let helper = sanitizeProcessName("/Applications/Grok Bot Helper (GPU)")
-        XCTAssertEqual(helper.name, "Grok Bot Helper (GPU)")
-        XCTAssertEqual(helper.nameHash.count, 64)
+        let fabushiHelper = sanitizeProcessName("/Applications/Fabushi Helper (GPU)")
+        XCTAssertEqual(fabushiHelper.name, "Fabushi Helper (GPU)")
+        XCTAssertEqual(fabushiHelper.nameHash.count, 64)
+
+        let legacyHelper = sanitizeProcessName("/Applications/Grok Bot Helper (GPU)")
+        XCTAssertEqual(legacyHelper.name, "Grok Bot Helper (GPU)")
+        XCTAssertEqual(legacyHelper.nameHash.count, 64)
 
         let unknown = sanitizeProcessName("/Users/person/Secret Process --token abc")
         XCTAssertEqual(unknown.name, "Secret")
