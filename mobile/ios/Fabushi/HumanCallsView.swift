@@ -73,8 +73,10 @@ internal struct HumanCallSessionRecord: Identifiable, Equatable, Sendable {
 
 @MainActor
 internal struct HumanCallsView: View {
-    let conversations: [ConversationSummary]
+    let messaging: MessagingModel
     let bridge: IOSPreloadBridge?
+
+    private var conversations: [ConversationSummary] { messaging.conversations }
     let onClose: () -> Void
 
     @State private var calls: [HumanCallSessionRecord] = []
@@ -220,6 +222,21 @@ internal struct HumanCallsView: View {
 
         var collected: [HumanCallSessionRecord] = []
         var failures: [String] = []
+
+        do {
+            let result = try await bridge.request(
+                method: "syncHumanCalls",
+                params: [:]
+            )
+            if let rawCalls = result.value as? [[String: Any]] {
+                collected.append(contentsOf: rawCalls.compactMap(HumanCallSessionRecord.init(raw:)))
+            }
+            await messaging.refresh()
+        } catch is CancellationError {
+            return
+        } catch {
+            failures.append("remote-call-sync")
+        }
 
         for conversation in conversations {
             do {
