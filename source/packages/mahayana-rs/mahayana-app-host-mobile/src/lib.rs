@@ -1343,7 +1343,9 @@ impl MobileAppHost {
         if !matches!(
             method,
             "getCallTransportIdentity"
+                | "getCallTransportLease"
                 | "getCallIceServers"
+                | "syncHumanCalls"
                 | "createCallSession"
                 | "getCallSession"
                 | "listCallSessions"
@@ -1367,48 +1369,76 @@ impl MobileAppHost {
             "getCallIceServers" => self
                 .host
                 .human_call(MobileHumanCallTransportCommand::IceServers),
-            "createCallSession" => {
-                let scope_id = required_json_string(&params, "scopeId")?;
-                let creator_id = match self
-                    .host
-                    .human_call(MobileHumanCallTransportCommand::Identity)
-                {
-                    Ok(identity) => identity
-                        .get("userId")
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::trim)
-                        .filter(|value| !value.is_empty())
-                        .ok_or_else(|| "Human call transport identity omitted userId".to_string())?
-                        .to_string(),
-                    Err(identity_error) => {
-                        #[cfg(test)]
-                        {
-                            params
-                                .get("creatorId")
-                                .and_then(serde_json::Value::as_str)
-                                .map(str::trim)
-                                .filter(|value| !value.is_empty())
-                                .map(str::to_string)
-                                .ok_or(identity_error)?
-                        }
-                        #[cfg(not(test))]
-                        {
-                            return Err(identity_error);
-                        }
-                    }
+            "getCallTransportLease" => {
+                let call_id = required_json_string(&params, "callId")?;
+                let (local_human_id, device_id) = self.call_transport_identity()?;
+                let local = self.sync_call_session_from_remote(&call_id)?;
+                let peer = self.local_call_peer(&local.participant_ids, &local_human_id)?;
+                let cursor = self.call_sessions.remote_event_seq(&call_id)?;
+                let response = self.host.human_call(MobileHumanCallTransportCommand::Get {
+                    call_id: call_id.clone(),
+                    after_seq: cursor,
+                    limit: 1,
+                })?;
+                let remote = required_remote_call(&response)?;
+                validate_remote_call_identity(
+                    remote,
+                    &call_id,
+                    &local_human_id,
+                    &peer,
+                    &local.creator_id,
+                    &local.state,
+                    local.generation,
+                )?;
+                let creator = json_identity_text(
+                    remote
+                        .get("creatorUserId")
+                        .ok_or_else(|| "remote Human call omitted creatorUserId".to_string())?,
+                )?;
+                let role = if creator == local_human_id { "creator" } else { "peer" };
+                let claimed_device_id = if role == "creator" {
+                    remote.get("creatorDeviceId")
+                } else {
+                    remote.get("peerDeviceId")
                 };
-                if let Some(requested_creator) = params
-                    .get("creatorId")
+                let claimed_device_id = claimed_device_id
                     .and_then(serde_json::Value::as_str)
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                {
-                    if requested_creator != creator_id {
-                        return Err(
-                            "creatorId must match the authenticated Human call identity".into()
-                        );
+                    .map(str::to_string);
+                Ok(serde_json::json!({
+                    "userId": local_human_id,
+                    "deviceId": device_id,
+                    "role": role,
+                    "claimedDeviceId": claimed_device_id,
+                    "isOwner": claimed_device_id.as_deref() == Some(device_id.as_str()),
+                    "claimAvailable": claimed_device_id.is_none(),
+                    "creatorDeviceId": remote.get("creatorDeviceId").cloned().unwrap_or(serde_json::Value::Null),
+                    "peerDeviceId": remote.get("peerDeviceId").cloned().unwrap_or(serde_json::Value::Null),
+                    "state": local.state,
+                    "generation": local.generation,
+                    "eventSeq": remote.get("eventSeq").cloned().unwrap_or(serde_json::json!(cursor)),
+                }))
+            }
+            "syncHumanCalls" => {
+                let response = self
+                    .host
+                    .human_call(MobileHumanCallTransportCommand::List { limit: 200 })?;
+                let remote_calls = response
+                    .get("calls")
+                    .and_then(serde_json::Value::as_array)
+                    .ok_or_else(|| "remote Human call discovery omitted calls".to_string())?;
+                let mut synced = Vec::new();
+                for remote in remote_calls {
+                    let Some(call_id) = remote.get("callId").and_then(serde_json::Value::as_str) else {
+                        return Err("remote Human call omitted callId".into());
+                    };
+                    if self.call_sessions.get(call_id)?.is_some() {
+                        synced.push(self.sync_call_session_from_remote(call_id)?);
                     }
                 }
+                serde_json::to_value(synced).map_err(|error| error.to_string())
+            }
+            "createCallSession" => {
+                let scope_id = required_json_string(&params, "scopeId")?;
                 let participant_ids = params
                     .get("participantIds")
                     .and_then(serde_json::Value::as_array)
@@ -1421,16 +1451,41 @@ impl MobileAppHost {
                             .ok_or_else(|| "participantIds must contain strings".to_string())
                     })
                     .collect::<Result<Vec<_>, _>>()?;
+                #[cfg(test)]
+                {
+                    if let Some(creator_id) = params
+                        .get("creatorId")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                    {
+                        return serde_json::to_value(
+                            self.call_sessions
+                                .create(&scope_id, creator_id, &participant_ids)?,
+                        )
+                        .map_err(|error| error.to_string());
+                    }
+                }
                 serde_json::to_value(
-                    self.call_sessions
-                        .create(&scope_id, &creator_id, &participant_ids)?,
+                    self.create_shipping_call_session(&scope_id, &participant_ids)?,
                 )
                 .map_err(|error| error.to_string())
             }
             "getCallSession" => {
                 let call_id = required_json_string(&params, "callId")?;
-                serde_json::to_value(self.call_sessions.get(&call_id)?)
-                    .map_err(|error| error.to_string())
+                #[cfg(test)]
+                {
+                    return serde_json::to_value(self.call_sessions.get(&call_id)?)
+                        .map_err(|error| error.to_string());
+                }
+                #[cfg(not(test))]
+                {
+                    match self.call_sessions.get(&call_id)? {
+                        Some(_) => serde_json::to_value(self.sync_call_session_from_remote(&call_id)?)
+                            .map_err(|error| error.to_string()),
+                        None => Ok(serde_json::Value::Null),
+                    }
+                }
             }
             "listCallSessions" => {
                 let scope_id = required_json_string(&params, "scopeId")?;
@@ -1438,6 +1493,13 @@ impl MobileAppHost {
                     .get("limit")
                     .and_then(serde_json::Value::as_u64)
                     .unwrap_or(20) as usize;
+                #[cfg(not(test))]
+                {
+                    let existing = self.call_sessions.list_for_scope(&scope_id, limit)?;
+                    for call in existing {
+                        let _ = self.sync_call_session_from_remote(&call.id)?;
+                    }
+                }
                 serde_json::to_value(self.call_sessions.list_for_scope(&scope_id, limit)?)
                     .map_err(|error| error.to_string())
             }
