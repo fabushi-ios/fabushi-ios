@@ -27,17 +27,34 @@ final class HumanCallSystemCoordinatorTests: XCTestCase {
         XCTAssertTrue(descriptor.hasVideo)
     }
 
-    func testPushDescriptorFailsClosedOnNegativeGenerationAndDefaultsPresentation() throws {
+    func testPushDescriptorFailsClosedOnMissingOrMalformedPresentationFields() {
         XCTAssertNil(HumanCallPushDescriptor.parse([
             "callId": "call-1",
             "generation": -1,
+            "displayName": "Alice",
+            "hasVideo": false,
         ]))
-        let descriptor = try XCTUnwrap(HumanCallPushDescriptor.parse([
+        XCTAssertNil(HumanCallPushDescriptor.parse([
             "callId": "call-2",
+            "displayName": "Alice",
+            "hasVideo": false,
         ]))
-        XCTAssertEqual(descriptor.generation, 0)
-        XCTAssertEqual(descriptor.displayName, "Fabushi 通话")
-        XCTAssertFalse(descriptor.hasVideo)
+        XCTAssertNil(HumanCallPushDescriptor.parse([
+            "callId": "call-3",
+            "generation": 0,
+            "hasVideo": false,
+        ]))
+        XCTAssertNil(HumanCallPushDescriptor.parse([
+            "callId": "call-4",
+            "generation": 0,
+            "displayName": "Alice",
+        ]))
+        XCTAssertNil(HumanCallPushDescriptor.parse([
+            "callId": "call-5",
+            "generation": 0,
+            "displayName": "   ",
+            "hasVideo": true,
+        ]))
     }
 
     func testVoIPTokenEncodingIsStableLowercaseHex() {
