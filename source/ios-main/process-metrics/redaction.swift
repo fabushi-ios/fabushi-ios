@@ -7,7 +7,7 @@ struct IOSProcessNameSanitization: Equatable, Sendable {
 }
 
 private let iosHelperProcessNameRegex = try! NSRegularExpression(
-    pattern: #"^Grok Bot(?: Lab)? Helper(?: \((?:GPU|Plugin|Renderer)\))?$"#
+    pattern: #"^(?:Fabushi(?: Lab)?|Grok Bot(?: Lab)?) Helper(?: \((?:GPU|Plugin|Renderer)\))?$"#
 )
 
 func hashProcessName(_ name: String) -> String {
