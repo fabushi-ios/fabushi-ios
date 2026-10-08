@@ -101,13 +101,13 @@ internal struct HumanCallTransportLease: Equatable, Sendable {
     }
 }
 
-internal struct HumanCallSignalRecord: Equatable, Sendable {
+internal struct HumanCallSignalRecord {
     let callId: String
     let generation: Int
     let seq: Int
     let senderDeviceId: String
     let kind: String
-    let payload: [String: AnySendable]
+    let payload: [String: Any]
 
     init?(raw: [String: Any]) {
         guard
@@ -124,23 +124,7 @@ internal struct HumanCallSignalRecord: Equatable, Sendable {
         self.seq = (raw["seq"] as? NSNumber)?.intValue ?? 0
         self.senderDeviceId = senderDeviceId
         self.kind = kind
-        self.payload = payload.mapValues(AnySendable.init)
-    }
-
-    var rawPayload: [String: Any] {
-        payload.mapValues(\.value)
-    }
-}
-
-internal struct AnySendable: @unchecked Sendable, Equatable {
-    let value: Any
-
-    init(_ value: Any) {
-        self.value = value
-    }
-
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        String(describing: lhs.value) == String(describing: rhs.value)
+        self.payload = payload
     }
 }
 
@@ -558,12 +542,12 @@ internal struct HumanCallsView: View {
 
                 switch signal.kind {
                 case "offer":
-                    let answer = try await peerConnection.applyOffer(signal.rawPayload)
+                    let answer = try await peerConnection.applyOffer(signal.payload)
                     await sendSignal(call: call, lease: lease, kind: "answer", payload: answer)
                 case "answer":
-                    try await peerConnection.applyAnswer(signal.rawPayload)
+                    try await peerConnection.applyAnswer(signal.payload)
                 case "candidate":
-                    try await peerConnection.applyCandidate(signal.rawPayload)
+                    try await peerConnection.applyCandidate(signal.payload)
                 default:
                     break
                 }
