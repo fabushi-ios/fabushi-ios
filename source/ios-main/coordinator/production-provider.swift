@@ -12,12 +12,12 @@ final class ProductionCoordinatorProvider {
         runtime = IOSCoordinatorRuntime(main: main)
     }
 
-    func start() -> IOSCoordinatorLaunchHandle {
-        runtime.start()
+    func start() throws -> IOSCoordinatorLaunchHandle {
+        try runtime.start()
     }
 
-    func restart() {
-        runtime.restart()
+    func restart() throws {
+        try runtime.restart()
     }
 
     func sceneDidResume() {
