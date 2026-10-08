@@ -2,7 +2,7 @@
 
 Status: superseded  
 Superseded on: 2026-10-02  
-Superseded by: `docs/specs/fabushi-desktop-pr20-ios-architecture-parity.md`
+Superseded by: `docs/specs/fabushi-desktop-main-ios-parity.md`
 
 This document was the original authority for a direct:
 
@@ -20,8 +20,8 @@ Grok Bot 0.18
     -> Fabushi iOS
 ```
 
-Fabushi Desktop PR #20 is now the direct product/architecture migration source for iOS. Grok Bot 0.18 remains historical architecture/provenance context only.
+Fabushi Desktop branch `main` is now the only live product/architecture migration source for iOS. Desktop PR #20 and Grok Bot 0.18 remain historical provenance only.
 
 Do not use the old 2,046-row Grok-direct ledger, its implementation counts, or prior Grok-bound verification claims as current iOS completion evidence.
 
-The active specification defines the pinned Desktop PR #20 exact HEAD, standalone iOS ownership, no-shared-runtime rule, Desktop-to-iOS architecture mapping, rebaseline protocol, verification, and completion gates.
+The active specification defines the live Desktop main exact-HEAD rebaseline, standalone iOS ownership, full source inventory and ledger, verification, and completion gates.
