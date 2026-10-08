@@ -166,19 +166,58 @@ internal struct HumanCallsView: View {
                         systemImage: "phone.down.fill",
                         description: Text("当前页面没有连接到 Coordinator/Host，无法读取通话状态。")
                     )
-                } else if loading && calls.isEmpty {
+                } else {
+                    let callable = conversations.filter { conversation in
+                        conversation.kind != .channel
+                            && conversation.kind != .savedMessages
+                            && conversation.participants.contains { $0.actorId != messaging.currentActorId }
+                    }
+                    if !callable.isEmpty {
+                        Section("发起通话") {
+                            ForEach(callable.prefix(50)) { conversation in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(conversation.title)
+                                        Text(conversation.kind.label)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Button {
+                                        Task { await start(conversation, video: false) }
+                                    } label: {
+                                        Image(systemName: "phone.fill")
+                                    }
+                                    .disabled(actionCallId != nil)
+                                    .accessibilityLabel("语音呼叫 \(conversation.title)")
+                                    .accessibilityIdentifier("human-call-start-voice-\(conversation.id)")
+                                    Button {
+                                        Task { await start(conversation, video: true) }
+                                    } label: {
+                                        Image(systemName: "video.fill")
+                                    }
+                                    .disabled(actionCallId != nil)
+                                    .accessibilityLabel("视频呼叫 \(conversation.title)")
+                                    .accessibilityIdentifier("human-call-start-video-\(conversation.id)")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if bridge != nil && loading && calls.isEmpty {
                     HStack {
                         Spacer()
                         ProgressView("正在加载通话…")
                         Spacer()
                     }
-                } else if calls.isEmpty {
+                } else if bridge != nil && calls.isEmpty {
                     ContentUnavailableView(
                         "暂无通话",
                         systemImage: "phone",
                         description: Text("收到或建立的 Human 通话会显示在这里。")
                     )
-                } else {
+                } else if bridge != nil {
                     Section("最近通话") {
                         ForEach(calls) { call in
                             callRow(call)
@@ -376,6 +415,78 @@ internal struct HumanCallsView: View {
             errorText = "无法读取通话状态，请稍后重试。"
         } else {
             errorText = nil
+        }
+    }
+
+    private func start(_ conversation: ConversationSummary, video: Bool) async {
+        guard let bridge else { return }
+        let participantIds = conversation.participants
+            .map(\.actorId)
+            .filter { !$0.isEmpty }
+        guard participantIds.contains(where: { $0 != messaging.currentActorId }) else {
+            errorText = "此会话没有可呼叫的其他参与者。"
+            return
+        }
+
+        actionCallId = "start:\(conversation.id)"
+        defer { actionCallId = nil }
+
+        do {
+            let permissions = await mediaPort.requestPermissions(audio: true, video: video)
+            guard permissions.microphone == .granted else {
+                throw HumanCallPeerConnection.Failure.microphoneUnavailable
+            }
+            if video, permissions.camera != .granted {
+                throw HumanCallPeerConnection.Failure.cameraUnavailable
+            }
+
+            let createdResult = try await bridge.request(
+                method: "createCallSession",
+                params: [
+                    "scopeId": conversation.id,
+                    "participantIds": participantIds,
+                ]
+            )
+            guard
+                let createdRaw = createdResult.value as? [String: Any],
+                let created = HumanCallSessionRecord(raw: createdRaw)
+            else {
+                throw NSError(
+                    domain: "Fabushi.HumanCall",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "通话服务返回了无效的会话。"]
+                )
+            }
+
+            let ringingResult = try await bridge.request(
+                method: "transitionCallSession",
+                params: [
+                    "callId": created.id,
+                    "generation": created.generation,
+                    "action": "ring",
+                ]
+            )
+            let ringing = (ringingResult.value as? [String: Any])
+                .flatMap(HumanCallSessionRecord.init(raw:)) ?? created
+
+            _ = try await bridge.request(
+                method: "updateCallMedia",
+                params: [
+                    "callId": ringing.id,
+                    "generation": ringing.generation,
+                    "mediaCapabilities": [
+                        "audio": true,
+                        "video": video,
+                        "screenShare": false,
+                    ],
+                ]
+            )
+            try await configureMedia(for: ringing, enableVideo: video)
+            errorText = nil
+            await reload()
+        } catch {
+            closeActiveMedia()
+            errorText = "发起通话失败：\(error.localizedDescription)"
         }
     }
 
