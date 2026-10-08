@@ -150,7 +150,7 @@ extension ContentView {
             }
         } else if section == .calls {
             HumanCallsView(
-                conversations: messaging.conversations,
+                messaging: messaging,
                 bridge: bridge,
                 onClose: { activeSection = nil }
             )
