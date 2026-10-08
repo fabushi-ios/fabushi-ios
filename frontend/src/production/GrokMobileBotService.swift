@@ -744,6 +744,11 @@ struct GrokMobileBotService {
         )
     }
 
+    static func canonicalProductDisplayName(_ configuredName: String) -> String {
+        let legacy = configuredName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return legacy == "grok" || legacy == "grok bot" ? "Fabushi" : configuredName
+    }
+
     static func parseBot(_ row: [String: Any]) -> MobileBotSummary? {
         guard let id = row["id"] as? String, !id.isEmpty else { return nil }
         let explicitMiniAppId = (row["miniAppId"] as? String)?
@@ -754,9 +759,10 @@ struct GrokMobileBotService {
         let menuText = (row["menuButtonText"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let summary = summaryProjection(row)
+        let configuredName = (row["name"] as? String) ?? (row["displayName"] as? String) ?? id
         return MobileBotSummary(
             id: id,
-            name: (row["name"] as? String) ?? (row["displayName"] as? String) ?? id,
+            name: canonicalProductDisplayName(configuredName),
             description: row["description"] as? String ?? "",
             title: row["title"] as? String,
             avatarDataURL: row["avatar"] as? String,
@@ -789,9 +795,10 @@ struct GrokMobileBotService {
               Set(memberIds).count == memberIds.count
         else { return nil }
         let summary = summaryProjection(row)
+        let configuredName = (row["name"] as? String) ?? id
         return MobileBotSummary(
             id: id,
-            name: (row["name"] as? String) ?? id,
+            name: canonicalProductDisplayName(configuredName),
             description: row["description"] as? String ?? "",
             avatarDataURL: row["avatar"] as? String,
             avatarShape: row["avatarShape"] as? String,

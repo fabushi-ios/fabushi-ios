@@ -50,6 +50,28 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
     @MainActor
+    func testLegacyGrokRosterNamesProjectAsFabushiWithoutChangingOtherNames() throws {
+        let grok = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "legacy-grok",
+            "name": "  Grok Bot  ",
+        ]))
+        XCTAssertEqual(grok.name, "Fabushi")
+
+        let group = try XCTUnwrap(GrokMobileBotService.parseGroup([
+            "id": "legacy-group",
+            "name": "GROK",
+            "memberIds": ["agent-1"],
+        ]))
+        XCTAssertEqual(group.name, "Fabushi")
+
+        let custom = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "custom",
+            "name": "Grok Research",
+        ]))
+        XCTAssertEqual(custom.name, "Grok Research")
+    }
+
+    @MainActor
     func testParseBotProjectsCanonicalAgentRowState() throws {
         let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
             "id": "agent-1",
