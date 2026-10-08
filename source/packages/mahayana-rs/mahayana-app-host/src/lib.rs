@@ -292,7 +292,7 @@ impl AppHost {
                 "account session is missing deviceId".into(),
             ))?;
         let local_actor_id = messaging_actor_id_for_user(local_user_id);
-        let peer_actor_id = messaging_actor_id_for_user(peer_user_id);
+        let peer_actor_id = messaging_peer_actor_id_for_user(peer_user_id);
         let request_id = format!("human-call-sync:{}", uuid::Uuid::new_v4().simple());
         let context = json!({
             "requestId": request_id,
@@ -444,6 +444,105 @@ impl AppHost {
             },
         }))?;
         Ok(conversation)
+    }
+
+    pub fn human_call_peer_for_messaging_conversation(
+        &self,
+        conversation_id: &str,
+    ) -> Result<String, AppHostError> {
+        let conversation_id = conversation_id.trim();
+        if conversation_id.is_empty() {
+            return Err(AppHostError::InvalidRequest(
+                "Human call conversation id is required".into(),
+            ));
+        }
+        let session = self
+            .product
+            .device_agent_session()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let local_user_id = session
+            .get("userId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppHostError::Operation(
+                "account session is missing userId".into(),
+            ))?;
+        let device_id = session
+            .get("deviceId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppHostError::Operation(
+                "account session is missing deviceId".into(),
+            ))?;
+        let local_actor_id = messaging_actor_id_for_user(local_user_id);
+        let request_id = format!(
+            "human-call-resolve-peer:{}",
+            uuid::Uuid::new_v4().simple()
+        );
+        let sync = self.feature_messaging_execute(json!({
+            "requestId": request_id,
+            "envelope": {
+                "protocolVersion": 2,
+                "context": {
+                    "requestId": request_id,
+                    "deviceId": device_id,
+                    "actorId": local_actor_id,
+                    "sessionId": "account-session:human-call-host",
+                    "sentAtMs": app_host_now_ms(),
+                },
+                "command": {"type": "sync", "cursor": Value::Null, "limit": 1000},
+            },
+        }))?;
+        let conversation = find_conversation_by_id(&sync, conversation_id)
+            .ok_or_else(|| AppHostError::InvalidRequest(
+                "Human call scope is not a canonical messaging conversation".into(),
+            ))?;
+        if conversation.get("kind").and_then(Value::as_str) != Some("direct") {
+            return Err(AppHostError::InvalidRequest(
+                "shipping Human calls require a direct conversation".into(),
+            ));
+        }
+        let participants = conversation
+            .get("participants")
+            .and_then(Value::as_array)
+            .ok_or_else(|| AppHostError::InvalidRequest(
+                "Human call conversation participants are invalid".into(),
+            ))?;
+        let mut peers = Vec::new();
+        let mut contains_local = false;
+        for participant in participants {
+            let actor_id = participant
+                .get("actorId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| AppHostError::InvalidRequest(
+                    "Human call conversation participant actorId is invalid".into(),
+                ))?;
+            if actor_id == local_actor_id {
+                contains_local = true;
+                continue;
+            }
+            if let Some(peer_user_id) = actor_id.strip_prefix("human:platform:") {
+                let peer_user_id = peer_user_id.trim();
+                if !peer_user_id.is_empty() {
+                    peers.push(peer_user_id.to_string());
+                }
+            } else {
+                return Err(AppHostError::InvalidRequest(
+                    "Human call peer is not a platform Human identity".into(),
+                ));
+            }
+        }
+        peers.sort();
+        peers.dedup();
+        if !contains_local || peers.len() != 1 {
+            return Err(AppHostError::InvalidRequest(
+                "shipping Human calls require the authenticated account and exactly one platform Human peer"
+                    .into(),
+            ));
+        }
+        Ok(peers.remove(0))
     }
 
     fn human_call_product_execute(
@@ -2198,6 +2297,10 @@ pub fn messaging_actor_id_for_user(user_id: &str) -> String {
     format!("human:account:{fingerprint}")
 }
 
+fn messaging_peer_actor_id_for_user(user_id: &str) -> String {
+    format!("human:platform:{}", user_id.trim())
+}
+
 fn deterministic_human_conversation_id(local_user_id: &str, peer_user_id: &str) -> String {
     let mut participant_ids = [
         local_user_id.trim().to_string(),
@@ -2228,6 +2331,22 @@ fn human_messaging_actor(actor_id: &str, display_name: &str) -> Value {
         },
         "verified": false,
     })
+}
+
+fn find_conversation_by_id(sync_result: &Value, conversation_id: &str) -> Option<Value> {
+    let envelopes = sync_result.get("envelopes")?.as_array()?;
+    for envelope in envelopes {
+        let event = envelope.get("event")?;
+        if event.get("type")?.as_str()? != "syncBatch" {
+            continue;
+        }
+        for conversation in event.get("conversations")?.as_array()? {
+            if conversation.get("id").and_then(Value::as_str) == Some(conversation_id) {
+                return Some(conversation.clone());
+            }
+        }
+    }
+    None
 }
 
 fn find_direct_conversation_for_actors(
@@ -2652,6 +2771,11 @@ mod fabushi_shipping_inference_tests {
         assert!(alice_actor.starts_with("human:account:"));
         assert_eq!(alice_actor.len(), "human:account:".len() + 32);
 
+        assert_eq!(
+            messaging_peer_actor_id_for_user(" 42 "),
+            "human:platform:42"
+        );
+
         let forward = deterministic_human_conversation_id("alice", "bob");
         let reverse = deterministic_human_conversation_id("bob", "alice");
         assert_eq!(forward, reverse);
@@ -2662,8 +2786,8 @@ mod fabushi_shipping_inference_tests {
     #[test]
     fn human_call_conversation_lookup_reuses_exact_existing_direct_participants() {
         let local = messaging_actor_id_for_user("alice");
-        let peer = messaging_actor_id_for_user("bob");
-        let other = messaging_actor_id_for_user("carol");
+        let peer = messaging_peer_actor_id_for_user("bob");
+        let other = messaging_peer_actor_id_for_user("carol");
         let sync = json!({
             "envelopes": [{
                 "event": {
