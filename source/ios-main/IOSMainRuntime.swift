@@ -134,6 +134,12 @@ final class IOSMainRuntime {
         coordinatorLocalHumanIdentity.value
     }
 
+    /// Applies only a stable account slot already settled by canonical Host auth.
+    /// Callers must never pass device/session identity here.
+    func applySettledHostLocalHumanIdentity(_ slot: String?) {
+        coordinatorLocalHumanIdentity.replace(with: slot)
+    }
+
     var devControlsEnabled: Bool {
         devControlAdapter.isEnabled
     }
