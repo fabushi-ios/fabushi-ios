@@ -149,6 +149,7 @@ internal struct HumanCallsView: View {
     @State private var mediaState = "idle"
     @State private var muted = false
     @State private var cameraEnabled = false
+    @State private var recovering = false
 
     var body: some View {
         NavigationStack {
@@ -537,7 +538,11 @@ internal struct HumanCallsView: View {
         }
     }
 
-    private func configureMedia(for call: HumanCallSessionRecord, enableVideo: Bool) async throws {
+    private func configureMedia(
+        for call: HumanCallSessionRecord,
+        enableVideo: Bool,
+        iceRestart: Bool = false
+    ) async throws {
         guard let bridge else { return }
         closeActiveMedia()
 
@@ -591,9 +596,15 @@ internal struct HumanCallsView: View {
                     mediaState = "通话中"
                     await transitionSilently(call, action: "connected")
                 case .disconnected:
-                    mediaState = "连接中断"
+                    mediaState = "正在重连"
+                    if !recovering {
+                        await recoverMedia(from: call)
+                    }
                 case .failed:
-                    mediaState = "连接失败"
+                    mediaState = "正在重连"
+                    if !recovering {
+                        await recoverMedia(from: call)
+                    }
                 case .closed:
                     mediaState = "已关闭"
                 }
@@ -610,10 +621,72 @@ internal struct HumanCallsView: View {
         cameraEnabled = enableVideo
 
         if lease.role == "creator" {
-            let offer = try await peer.makeOffer()
+            let offer = try await peer.makeOffer(iceRestart: iceRestart)
             await sendSignal(call: call, lease: lease, kind: "offer", payload: offer)
         }
         await consumeSignals(for: call)
+    }
+
+    private func recoverMedia(from call: HumanCallSessionRecord) async {
+        guard
+            let bridge,
+            activeMediaCallId == call.id,
+            !recovering
+        else { return }
+
+        recovering = true
+        defer { recovering = false }
+
+        let restoreMuted = muted
+        let restoreVideo = cameraEnabled
+        do {
+            let reconnectResult = try await bridge.request(
+                method: "transitionCallSession",
+                params: [
+                    "callId": call.id,
+                    "generation": call.generation,
+                    "action": "reconnect",
+                ]
+            )
+            let reconnecting = (reconnectResult.value as? [String: Any])
+                .flatMap(HumanCallSessionRecord.init(raw:)) ?? call
+            let resumeResult = try await bridge.request(
+                method: "transitionCallSession",
+                params: [
+                    "callId": reconnecting.id,
+                    "generation": reconnecting.generation,
+                    "action": "resume",
+                ]
+            )
+            let resumed = (resumeResult.value as? [String: Any])
+                .flatMap(HumanCallSessionRecord.init(raw:)) ?? reconnecting
+
+            try await configureMedia(
+                for: resumed,
+                enableVideo: restoreVideo,
+                iceRestart: true
+            )
+            if restoreMuted {
+                peerConnection?.setMuted(true)
+                muted = true
+                await updateMediaState(call: resumed)
+            }
+            mediaState = "正在重连"
+            await reload()
+        } catch {
+            mediaState = "连接失败"
+            errorText = "通话重连失败：\(error.localizedDescription)"
+            _ = try? await bridge.request(
+                method: "transitionCallSession",
+                params: [
+                    "callId": call.id,
+                    "generation": call.generation,
+                    "action": "fail",
+                    "terminalReason": "media-reconnect-failed",
+                ]
+            )
+            closeActiveMedia()
+        }
     }
 
     private func pollActiveMedia() async {
