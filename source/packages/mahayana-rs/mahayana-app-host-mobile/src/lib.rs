@@ -533,6 +533,10 @@ mod tool_call_identity;
 enum MobileHumanCallTransportCommand {
     Identity,
     IceServers,
+    EnsureConversation {
+        peer_user_id: String,
+        title: String,
+    },
     List {
         limit: usize,
     },
@@ -616,6 +620,13 @@ impl MobileHostBridge {
                                     MobileHumanCallTransportCommand::IceServers => {
                                         host.human_call_ice_servers()
                                     }
+                                    MobileHumanCallTransportCommand::EnsureConversation {
+                                        peer_user_id,
+                                        title,
+                                    } => host.human_call_ensure_messaging_conversation(
+                                        &peer_user_id,
+                                        &title,
+                                    ),
                                     MobileHumanCallTransportCommand::List { limit } => {
                                         host.human_call_remote_list(limit)
                                     }
