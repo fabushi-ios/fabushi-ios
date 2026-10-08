@@ -252,7 +252,7 @@ extension ContentView {
             messages.map { ChatSearchEntry(id: $0.id, text: chatSearchText(for: $0)) },
             query: chatSearchQuery
         )
-        NavigationStack {
+        return NavigationStack {
             ZStack {
                 Color(red: 0.055, green: 0.06, blue: 0.07).ignoresSafeArea()
                 VStack(spacing: 0) {
