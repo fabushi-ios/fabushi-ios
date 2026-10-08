@@ -1,4 +1,5 @@
 import SwiftUI
+@preconcurrency import LiveKitWebRTC
 
 internal struct HumanCallSessionRecord: Identifiable, Equatable, Sendable {
     let id: String
@@ -9,6 +10,7 @@ internal struct HumanCallSessionRecord: Identifiable, Equatable, Sendable {
     let signalSeq: Int
     let participantIds: [String]
     let mediaCapabilities: [String: String]
+    let deviceSelection: [String: String]
     let terminalReason: String?
     let updatedAtMs: Int64
 
@@ -37,6 +39,12 @@ internal struct HumanCallSessionRecord: Identifiable, Equatable, Sendable {
                     result[pair.key] = value
                 } else if let value = pair.value as? Bool {
                     result[pair.key] = value ? "granted" : "denied"
+                }
+            }
+        self.deviceSelection = (raw["deviceSelection"] as? [String: Any] ?? [:])
+            .reduce(into: [:]) { result, pair in
+                if let value = pair.value as? String, !value.isEmpty {
+                    result[pair.key] = value
                 }
             }
         self.terminalReason = raw["terminalReason"] as? String
@@ -149,6 +157,13 @@ internal struct HumanCallsView: View {
     @State private var mediaState = "idle"
     @State private var muted = false
     @State private var cameraEnabled = false
+    @State private var screenSharing = false
+    @State private var screenShareAvailable = false
+    @State private var localVideoTrack: LKRTCVideoTrack?
+    @State private var remoteVideoTrack: LKRTCVideoTrack?
+    @State private var mediaDevices: [HumanCallMediaDevice] = []
+    @State private var selectedMicrophoneId: String?
+    @State private var selectedCameraId: String?
     @State private var recovering = false
 
     var body: some View {
@@ -242,6 +257,7 @@ internal struct HumanCallsView: View {
                 }
             }
             .task(id: refreshGeneration) {
+                refreshMediaDevices()
                 await reload()
             }
             .task(id: activeMediaCallId) {
@@ -323,25 +339,109 @@ internal struct HumanCallsView: View {
                     }
                 }
                 if activeMediaCallId == call.id {
+                    if cameraEnabled || screenSharing || localVideoTrack != nil || remoteVideoTrack != nil {
+                        HumanCallVideoStage(
+                            remoteTrack: remoteVideoTrack,
+                            localTrack: localVideoTrack,
+                            localMirrored: !screenSharing,
+                            mediaState: mediaState
+                        )
+                    }
+
                     HStack(spacing: 10) {
                         Button(muted ? "取消静音" : "静音") {
                             Task { await setMuted(!muted, call: call) }
                         }
                         .buttonStyle(.bordered)
                         .accessibilityIdentifier("human-call-mute-\(call.id)")
+
                         Button(cameraEnabled ? "关闭摄像头" : "开启摄像头") {
                             Task { await setCameraEnabled(!cameraEnabled, call: call) }
                         }
                         .buttonStyle(.bordered)
                         .accessibilityIdentifier("human-call-camera-\(call.id)")
+
+                        Button(screenSharing ? "停止共享" : "共享屏幕") {
+                            Task { await setScreenSharing(!screenSharing, call: call) }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!screenSharing && !screenShareAvailable)
+                        .accessibilityIdentifier("human-call-screen-share-\(call.id)")
+
+                        Spacer(minLength: 4)
                         Text(mediaState)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                    }
+
+                    let microphones = mediaDevices.filter { $0.kind == .microphone }
+                    let cameras = mediaDevices.filter { $0.kind == .camera }
+                    if !microphones.isEmpty || !cameras.isEmpty {
+                        HStack(spacing: 10) {
+                            if !microphones.isEmpty {
+                                Menu {
+                                    ForEach(microphones) { device in
+                                        Button {
+                                            Task { await selectMicrophone(device, call: call) }
+                                        } label: {
+                                            Label(
+                                                device.name,
+                                                systemImage: selectedMicrophoneId == device.id ? "checkmark" : "mic"
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    Label(selectedMicrophoneName ?? "麦克风", systemImage: "mic")
+                                }
+                                .accessibilityIdentifier("human-call-microphone-menu-\(call.id)")
+                            }
+
+                            if !cameras.isEmpty {
+                                Menu {
+                                    ForEach(cameras) { device in
+                                        Button {
+                                            Task { await selectCamera(device, call: call) }
+                                        } label: {
+                                            Label(
+                                                device.name,
+                                                systemImage: selectedCameraId == device.id ? "checkmark" : "video"
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    Label(selectedCameraName ?? "摄像头", systemImage: "video")
+                                }
+                                .accessibilityIdentifier("human-call-camera-menu-\(call.id)")
+                            }
+                        }
+                        .font(.caption)
                     }
                 }
             }
         }
         .padding(.vertical, 5)
+    }
+
+    private var selectedMicrophoneName: String? {
+        guard let selectedMicrophoneId else { return nil }
+        return mediaDevices.first(where: {
+            $0.kind == .microphone && $0.id == selectedMicrophoneId
+        })?.name
+    }
+
+    private var selectedCameraName: String? {
+        guard let selectedCameraId else { return nil }
+        return mediaDevices.first(where: {
+            $0.kind == .camera && $0.id == selectedCameraId
+        })?.name
+    }
+
+    private func refreshMediaDevices() {
+        mediaDevices = mediaPort.devices()
+        let preferences = mediaPort.resolvedPreferences()
+        selectedMicrophoneId = preferences.microphoneId
+        selectedCameraId = preferences.cameraId
+        screenShareAvailable = mediaPort.screenShareCapability().available
     }
 
     private func conversationTitle(for scopeId: String) -> String {
@@ -470,18 +570,6 @@ internal struct HumanCallsView: View {
             let ringing = (ringingResult.value as? [String: Any])
                 .flatMap(HumanCallSessionRecord.init(raw:)) ?? created
 
-            _ = try await bridge.request(
-                method: "updateCallMedia",
-                params: [
-                    "callId": ringing.id,
-                    "generation": ringing.generation,
-                    "mediaCapabilities": [
-                        "audio": true,
-                        "video": video,
-                        "screenShare": false,
-                    ],
-                ]
-            )
             try await configureMedia(for: ringing, enableVideo: video)
             errorText = nil
             await reload()
@@ -516,19 +604,6 @@ internal struct HumanCallsView: View {
             let accepted = (transitionResult.value as? [String: Any])
                 .flatMap(HumanCallSessionRecord.init(raw:)) ?? call
 
-            _ = try await bridge.request(
-                method: "updateCallMedia",
-                params: [
-                    "callId": accepted.id,
-                    "generation": accepted.generation,
-                    "mediaCapabilities": [
-                        "audio": true,
-                        "video": video,
-                        "screenShare": false,
-                    ],
-                ]
-            )
-
             try await configureMedia(for: accepted, enableVideo: video)
             errorText = nil
             await reload()
@@ -545,6 +620,10 @@ internal struct HumanCallsView: View {
     ) async throws {
         guard let bridge else { return }
         closeActiveMedia()
+        refreshMediaDevices()
+        let preferences = mediaPort.resolvedPreferences()
+        selectedMicrophoneId = preferences.microphoneId
+        selectedCameraId = preferences.cameraId
 
         let leaseResult = try await bridge.request(
             method: "getCallTransportLease",
@@ -577,6 +656,7 @@ internal struct HumanCallsView: View {
         let peer = HumanCallPeerConnection()
         peer.onLocalCandidate = { payload in
             Task { @MainActor in
+                guard peerConnection === peer, activeMediaCallId == call.id else { return }
                 await sendSignal(
                     call: call,
                     lease: lease,
@@ -587,6 +667,7 @@ internal struct HumanCallsView: View {
         }
         peer.onStateChange = { state in
             Task { @MainActor in
+                guard peerConnection === peer, activeMediaCallId == call.id else { return }
                 switch state {
                 case .new:
                     mediaState = "准备中"
@@ -610,15 +691,54 @@ internal struct HumanCallsView: View {
                 }
             }
         }
-        try await peer.configure(iceServers: servers, enableVideo: enableVideo)
+        peer.onLocalVideoTrack = { track in
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
+            localVideoTrack = track
+        }
+        peer.onRemoteVideoTrack = { track in
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
+            remoteVideoTrack = track
+        }
+        peer.onScreenShareChange = { active in
+            guard peerConnection === peer, activeMediaCallId == call.id else { return }
+            screenSharing = active
+        }
+        peer.onScreenShareFailure = { message in
+            Task { @MainActor in
+                guard peerConnection === peer, activeMediaCallId == call.id else { return }
+                screenSharing = false
+                errorText = "屏幕共享已停止：\(message)"
+                await updateMediaState(call: call)
+            }
+        }
 
         peerConnection = peer
         activeMediaCallId = call.id
         activeLease = lease
         appliedSignalSeq = 0
-        mediaState = "正在连接"
+        mediaState = "准备中"
         muted = false
         cameraEnabled = enableVideo
+        screenSharing = false
+        localVideoTrack = nil
+        remoteVideoTrack = nil
+        screenShareAvailable = mediaPort.screenShareCapability().available
+
+        try await peer.configure(
+            iceServers: servers,
+            enableVideo: enableVideo,
+            preferredCameraId: preferences.cameraId
+        )
+        refreshMediaDevices()
+        if let microphone = try mediaPort.applyPreferredMicrophone() {
+            selectedMicrophoneId = microphone.id
+        }
+        if let cameraId = peer.activeCameraDeviceId ?? preferences.cameraId {
+            selectedCameraId = cameraId
+            mediaPort.setPreferredDeviceId(cameraId, kind: .camera)
+        }
+        try await updateMediaStateOrThrow(call: call)
+        mediaState = "正在连接"
 
         if lease.role == "creator" {
             let offer = try await peer.makeOffer(iceRestart: iceRestart)
@@ -639,6 +759,7 @@ internal struct HumanCallsView: View {
 
         let restoreMuted = muted
         let restoreVideo = cameraEnabled
+        let restoreScreenShare = screenSharing
         do {
             let reconnectResult = try await bridge.request(
                 method: "transitionCallSession",
@@ -669,8 +790,12 @@ internal struct HumanCallsView: View {
             if restoreMuted {
                 peerConnection?.setMuted(true)
                 muted = true
-                await updateMediaState(call: resumed)
             }
+            if restoreScreenShare {
+                try await peerConnection?.setScreenShareEnabled(true)
+                screenSharing = peerConnection?.isScreenSharing == true
+            }
+            await updateMediaState(call: resumed)
             mediaState = "正在重连"
             await reload()
         } catch {
@@ -784,32 +909,93 @@ internal struct HumanCallsView: View {
                     throw HumanCallPeerConnection.Failure.cameraUnavailable
                 }
             }
-            try await peerConnection?.setCameraEnabled(next)
+            try await peerConnection?.setCameraEnabled(
+                next,
+                preferredCameraId: selectedCameraId
+            )
             cameraEnabled = next
+            if let activeCameraId = peerConnection?.activeCameraDeviceId {
+                selectedCameraId = activeCameraId
+                mediaPort.setPreferredDeviceId(activeCameraId, kind: .camera)
+            }
             await updateMediaState(call: call)
         } catch {
             errorText = "摄像头切换失败：\(error.localizedDescription)"
         }
     }
 
-    private func updateMediaState(call: HumanCallSessionRecord) async {
-        guard let bridge else { return }
+    private func setScreenSharing(_ next: Bool, call: HumanCallSessionRecord) async {
         do {
-            _ = try await bridge.request(
-                method: "updateCallMedia",
-                params: [
-                    "callId": call.id,
-                    "generation": call.generation,
-                    "mediaCapabilities": [
-                        "audio": !muted,
-                        "video": cameraEnabled,
-                        "screenShare": false,
-                    ],
-                ]
-            )
+            guard next == false || screenShareAvailable else {
+                throw HumanCallPeerConnection.Failure.screenShareUnavailable
+            }
+            try await peerConnection?.setScreenShareEnabled(next)
+            screenSharing = peerConnection?.isScreenSharing == true
+            await updateMediaState(call: call)
+        } catch {
+            screenSharing = peerConnection?.isScreenSharing == true
+            errorText = "屏幕共享切换失败：\(error.localizedDescription)"
+            await updateMediaState(call: call)
+        }
+    }
+
+    private func selectMicrophone(
+        _ device: HumanCallMediaDevice,
+        call: HumanCallSessionRecord
+    ) async {
+        do {
+            let selected = try mediaPort.selectMicrophone(deviceId: device.id)
+            selectedMicrophoneId = selected.id
+            await updateMediaState(call: call)
+        } catch {
+            errorText = "麦克风切换失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func selectCamera(
+        _ device: HumanCallMediaDevice,
+        call: HumanCallSessionRecord
+    ) async {
+        do {
+            let selected = try mediaPort.selectCamera(deviceId: device.id)
+            selectedCameraId = selected.id
+            try await peerConnection?.selectCamera(deviceId: selected.id)
+            await updateMediaState(call: call)
+        } catch {
+            errorText = "摄像头设备切换失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func updateMediaState(call: HumanCallSessionRecord) async {
+        do {
+            try await updateMediaStateOrThrow(call: call)
         } catch {
             errorText = "通话媒体状态同步失败：\(error.localizedDescription)"
         }
+    }
+
+    private func updateMediaStateOrThrow(call: HumanCallSessionRecord) async throws {
+        guard let bridge else { return }
+        var deviceSelection: [String: Any] = [:]
+        if let selectedMicrophoneId, !selectedMicrophoneId.isEmpty {
+            deviceSelection["microphoneId"] = selectedMicrophoneId
+        }
+        if let selectedCameraId, !selectedCameraId.isEmpty {
+            deviceSelection["cameraId"] = selectedCameraId
+        }
+        _ = try await bridge.request(
+            method: "updateCallMedia",
+            params: [
+                "callId": call.id,
+                "generation": call.generation,
+                "mediaCapabilities": [
+                    "audio": !muted,
+                    "video": cameraEnabled,
+                    "screenShare": screenSharing,
+                ],
+                "deviceSelection": deviceSelection,
+            ]
+        )
     }
 
     private func transitionSilently(_ call: HumanCallSessionRecord, action: String) async {
@@ -825,14 +1011,18 @@ internal struct HumanCallsView: View {
     }
 
     private func closeActiveMedia() {
-        peerConnection?.close()
+        let closingPeer = peerConnection
         peerConnection = nil
         activeMediaCallId = nil
         activeLease = nil
+        closingPeer?.close()
         appliedSignalSeq = 0
         mediaState = "idle"
         muted = false
         cameraEnabled = false
+        screenSharing = false
+        localVideoTrack = nil
+        remoteVideoTrack = nil
     }
 
     private func transition(_ call: HumanCallSessionRecord, action: String) async {

@@ -1,5 +1,7 @@
 import AVFoundation
+import CoreMedia
 import Foundation
+import ReplayKit
 @preconcurrency import LiveKitWebRTC
 
 @MainActor
@@ -9,6 +11,7 @@ final class HumanCallPeerConnection: NSObject {
         case peerConnectionCreation
         case microphoneUnavailable
         case cameraUnavailable
+        case screenShareUnavailable
         case malformedSignal
 
         var errorDescription: String? {
@@ -21,6 +24,8 @@ final class HumanCallPeerConnection: NSObject {
                 return "无法建立麦克风音轨。"
             case .cameraUnavailable:
                 return "无法建立摄像头音轨。"
+            case .screenShareUnavailable:
+                return "当前设备无法开始屏幕共享。"
             case .malformedSignal:
                 return "通话信令格式无效。"
             }
@@ -59,21 +64,39 @@ final class HumanCallPeerConnection: NSObject {
 
     var onLocalCandidate: (([String: Any]) -> Void)?
     var onStateChange: ((State) -> Void)?
+    var onLocalVideoTrack: ((LKRTCVideoTrack?) -> Void)?
     var onRemoteVideoTrack: ((LKRTCVideoTrack?) -> Void)?
+    var onScreenShareChange: ((Bool) -> Void)?
+    var onScreenShareFailure: ((String) -> Void)?
 
     private static let factory: LKRTCPeerConnectionFactory = {
         LKRTCInitializeSSL()
         return LKRTCPeerConnectionFactory()
     }()
 
+    private let screenRecorder = RPScreenRecorder.shared()
     private var connection: LKRTCPeerConnection?
     private var audioTrack: LKRTCAudioTrack?
     private var videoTrack: LKRTCVideoTrack?
     private var videoSource: LKRTCVideoSource?
+    private var videoSender: LKRTCRtpSender?
     private var cameraCapturer: LKRTCCameraVideoCapturer?
+    private var screenTrack: LKRTCVideoTrack?
+    private var screenSource: LKRTCVideoSource?
+    private var screenCapturer: LKRTCVideoCapturer?
+    private var requestedCameraEnabled = false
 
-    func configure(iceServers: [IceServer], enableVideo: Bool) async throws {
-        close()
+    private(set) var activeCameraDeviceId: String?
+    private(set) var isScreenSharing = false
+
+    func configure(
+        iceServers: [IceServer],
+        enableVideo: Bool,
+        preferredCameraId: String? = nil
+    ) async throws {
+        if connection != nil {
+            close()
+        }
 
         let configuration = LKRTCConfiguration()
         configuration.sdpSemantics = .unifiedPlan
@@ -106,8 +129,9 @@ final class HumanCallPeerConnection: NSObject {
         self.audioTrack = audioTrack
         connection.add(audioTrack, streamIds: ["fabushi-human-call"])
 
+        try prepareStableVideoSender(on: connection)
         if enableVideo {
-            try await enableCamera()
+            try await setCameraEnabled(true, preferredCameraId: preferredCameraId)
         }
 
         try configureAudioSession()
@@ -117,11 +141,42 @@ final class HumanCallPeerConnection: NSObject {
         audioTrack?.isEnabled = !muted
     }
 
-    func setCameraEnabled(_ enabled: Bool) async throws {
-        if enabled, videoTrack == nil {
-            try await enableCamera()
+    func setCameraEnabled(_ enabled: Bool, preferredCameraId: String? = nil) async throws {
+        requestedCameraEnabled = enabled
+        guard enabled else {
+            videoTrack?.isEnabled = false
+            if !isScreenSharing {
+                onLocalVideoTrack?(nil)
+            }
+            return
         }
-        videoTrack?.isEnabled = enabled
+
+        try await startCamera(preferredCameraId: preferredCameraId)
+        videoTrack?.isEnabled = true
+        if !isScreenSharing {
+            videoSender?.track = videoTrack
+            onLocalVideoTrack?(videoTrack)
+        }
+    }
+
+    func selectCamera(deviceId: String) async throws {
+        guard requestedCameraEnabled else {
+            activeCameraDeviceId = deviceId
+            return
+        }
+        try await startCamera(preferredCameraId: deviceId)
+        if !isScreenSharing {
+            videoSender?.track = videoTrack
+            onLocalVideoTrack?(videoTrack)
+        }
+    }
+
+    func setScreenShareEnabled(_ enabled: Bool) async throws {
+        if enabled {
+            try await startScreenShare()
+        } else {
+            await stopScreenShare()
+        }
     }
 
     func makeOffer(iceRestart: Bool = false) async throws -> [String: Any] {
@@ -185,11 +240,23 @@ final class HumanCallPeerConnection: NSObject {
         if let cameraCapturer {
             cameraCapturer.stopCapture()
         }
+        if isScreenSharing || screenTrack != nil {
+            screenRecorder.stopCapture()
+        }
         cameraCapturer = nil
+        screenCapturer = nil
+        screenTrack = nil
+        screenSource = nil
+        videoSender = nil
         videoTrack = nil
         videoSource = nil
         audioTrack = nil
+        activeCameraDeviceId = nil
+        requestedCameraEnabled = false
+        isScreenSharing = false
+        onLocalVideoTrack?(nil)
         onRemoteVideoTrack?(nil)
+        onScreenShareChange?(false)
         connection?.delegate = nil
         connection?.close()
         connection = nil
@@ -200,19 +267,32 @@ final class HumanCallPeerConnection: NSObject {
         onStateChange?(.closed)
     }
 
-    private func enableCamera() async throws {
+    private func prepareStableVideoSender(on connection: LKRTCPeerConnection) throws {
+        let source = Self.factory.videoSource()
+        let track = Self.factory.videoTrack(with: source, trackId: "fabushi-human-call-video")
+        track.isEnabled = false
+        guard let sender = connection.add(track, streamIds: ["fabushi-human-call"]) else {
+            throw Failure.peerConnectionCreation
+        }
+        videoSource = source
+        videoTrack = track
+        videoSender = sender
+    }
+
+    private func startCamera(preferredCameraId: String?) async throws {
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
             throw Failure.cameraUnavailable
         }
-        guard let connection else { throw Failure.peerConnectionCreation }
-
-        if let videoTrack {
-            videoTrack.isEnabled = true
-            return
+        guard let videoSource, let videoTrack else {
+            throw Failure.peerConnectionCreation
         }
 
         let devices = LKRTCCameraVideoCapturer.captureDevices()
-        guard let device = devices.first(where: { $0.position == .front }) ?? devices.first else {
+        let preferred = preferredCameraId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let device = preferred.flatMap({ id in devices.first(where: { $0.uniqueID == id }) })
+            ?? devices.first(where: { $0.position == .front })
+            ?? devices.first
+        else {
             throw Failure.cameraUnavailable
         }
         let formats = LKRTCCameraVideoCapturer.supportedFormats(for: device)
@@ -228,24 +308,113 @@ final class HumanCallPeerConnection: NSObject {
         let range = format.videoSupportedFrameRateRanges.first
         let fps = Int(min(30, max(1, range?.maxFrameRate ?? 30)))
 
-        let source = Self.factory.videoSource()
-        let capturer = LKRTCCameraVideoCapturer(delegate: source)
-        let track = Self.factory.videoTrack(with: source, trackId: "fabushi-human-call-video")
-        track.isEnabled = true
-        connection.add(track, streamIds: ["fabushi-human-call"])
-        self.videoSource = source
-        self.cameraCapturer = capturer
-        self.videoTrack = track
-
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            capturer.startCapture(with: device, format: format, fps: fps) { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
+        cameraCapturer?.stopCapture()
+        let capturer = LKRTCCameraVideoCapturer(delegate: videoSource)
+        cameraCapturer = capturer
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                capturer.startCapture(with: device, format: format, fps: fps) { error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
                 }
             }
+        } catch {
+            if cameraCapturer === capturer {
+                cameraCapturer = nil
+            }
+            throw error
         }
+        activeCameraDeviceId = device.uniqueID
+        videoTrack.isEnabled = requestedCameraEnabled
+    }
+
+    private func startScreenShare() async throws {
+        guard !isScreenSharing else { return }
+        guard screenRecorder.isAvailable, let videoSender else {
+            throw Failure.screenShareUnavailable
+        }
+
+        let source = Self.factory.videoSource(forScreenCast: true)
+        let capturer = LKRTCVideoCapturer(delegate: source)
+        let track = Self.factory.videoTrack(with: source, trackId: "fabushi-human-call-screen")
+        track.isEnabled = true
+        screenSource = source
+        screenCapturer = capturer
+        screenTrack = track
+
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                screenRecorder.startCapture { [weak self, weak source, weak capturer] sampleBuffer, type, error in
+                    if let error {
+                        let message = error.localizedDescription
+                        Task { @MainActor [weak self] in
+                            self?.handleScreenCaptureFailure(message)
+                        }
+                        return
+                    }
+                    guard
+                        type == .video,
+                        let source,
+                        let capturer,
+                        let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)
+                    else { return }
+                    let rtcBuffer = LKRTCCVPixelBuffer(pixelBuffer: pixelBuffer)
+                    let frame = LKRTCVideoFrame(
+                        buffer: rtcBuffer,
+                        rotation: Self.rotation(for: sampleBuffer),
+                        timeStampNs: Self.timestampNanoseconds(for: sampleBuffer)
+                    )
+                    source.capturer(capturer, didCapture: frame)
+                } completionHandler: { error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            }
+        } catch {
+            screenSource = nil
+            screenCapturer = nil
+            screenTrack = nil
+            throw error
+        }
+
+        videoSender.track = track
+        isScreenSharing = true
+        onLocalVideoTrack?(track)
+        onScreenShareChange?(true)
+    }
+
+    private func stopScreenShare() async {
+        guard isScreenSharing || screenTrack != nil else { return }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            screenRecorder.stopCapture { _ in
+                continuation.resume()
+            }
+        }
+        restoreCameraAfterScreenShare()
+    }
+
+    private func handleScreenCaptureFailure(_ message: String) {
+        screenRecorder.stopCapture()
+        restoreCameraAfterScreenShare()
+        onScreenShareFailure?(message)
+    }
+
+    private func restoreCameraAfterScreenShare() {
+        screenTrack?.isEnabled = false
+        screenTrack = nil
+        screenSource = nil
+        screenCapturer = nil
+        isScreenSharing = false
+        videoSender?.track = videoTrack
+        videoTrack?.isEnabled = requestedCameraEnabled
+        onLocalVideoTrack?(requestedCameraEnabled ? videoTrack : nil)
+        onScreenShareChange?(false)
     }
 
     private func configureAudioSession() throws {
@@ -257,6 +426,35 @@ final class HumanCallPeerConnection: NSObject {
         )
         try audioSession.setActive(true)
     }
+
+    nonisolated private static func timestampNanoseconds(for sampleBuffer: CMSampleBuffer) -> Int64 {
+        let presentation = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let seconds = CMTimeGetSeconds(presentation)
+        if seconds.isFinite, seconds >= 0 {
+            return Int64(seconds * Double(NSEC_PER_SEC))
+        }
+        return Int64(ProcessInfo.processInfo.systemUptime * Double(NSEC_PER_SEC))
+    }
+
+    nonisolated private static func rotation(for sampleBuffer: CMSampleBuffer) -> LKRTCVideoRotation {
+        guard
+            let value = CMGetAttachment(
+                sampleBuffer,
+                key: RPVideoSampleOrientationKey as CFString,
+                attachmentModeOut: nil
+            ) as? NSNumber
+        else { return ._0 }
+        switch value.uint32Value {
+        case 3:
+            return ._180
+        case 6:
+            return ._90
+        case 8:
+            return ._270
+        default:
+            return ._0
+        }
+    }
 }
 
 extension HumanCallPeerConnection: LKRTCPeerConnectionDelegate {
@@ -265,16 +463,35 @@ extension HumanCallPeerConnection: LKRTCPeerConnectionDelegate {
     nonisolated func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange stateChanged: LKRTCSignalingState) {}
 
     nonisolated func peerConnection(_ peerConnection: LKRTCPeerConnection, didAdd stream: LKRTCMediaStream) {
-        let track = stream.videoTracks.first
-        Task { @MainActor [weak self] in
-            self?.onRemoteVideoTrack?(track)
-        }
+        publishRemoteVideoTrack(stream.videoTracks.first)
     }
 
     nonisolated func peerConnection(_ peerConnection: LKRTCPeerConnection, didRemove stream: LKRTCMediaStream) {
-        Task { @MainActor [weak self] in
-            self?.onRemoteVideoTrack?(nil)
+        publishRemoteVideoTrack(nil)
+    }
+
+    nonisolated func peerConnection(
+        _ peerConnection: LKRTCPeerConnection,
+        didAdd rtpReceiver: LKRTCRtpReceiver,
+        streams mediaStreams: [LKRTCMediaStream]
+    ) {
+        publishRemoteVideoTrack(rtpReceiver.track as? LKRTCVideoTrack)
+    }
+
+    nonisolated func peerConnection(
+        _ peerConnection: LKRTCPeerConnection,
+        didRemove rtpReceiver: LKRTCRtpReceiver
+    ) {
+        if rtpReceiver.track is LKRTCVideoTrack {
+            publishRemoteVideoTrack(nil)
         }
+    }
+
+    nonisolated func peerConnection(
+        _ peerConnection: LKRTCPeerConnection,
+        didStartReceivingOn transceiver: LKRTCRtpTransceiver
+    ) {
+        publishRemoteVideoTrack(transceiver.receiver.track as? LKRTCVideoTrack)
     }
 
     nonisolated func peerConnection(_ peerConnection: LKRTCPeerConnection, didGenerate candidate: LKRTCIceCandidate) {
@@ -318,4 +535,10 @@ extension HumanCallPeerConnection: LKRTCPeerConnectionDelegate {
     nonisolated func peerConnection(_ peerConnection: LKRTCPeerConnection, didChange newState: LKRTCIceGatheringState) {}
 
     nonisolated func peerConnection(_ peerConnection: LKRTCPeerConnection, didOpen dataChannel: LKRTCDataChannel) {}
+
+    nonisolated private func publishRemoteVideoTrack(_ track: LKRTCVideoTrack?) {
+        Task { @MainActor [weak self] in
+            self?.onRemoteVideoTrack?(track)
+        }
+    }
 }

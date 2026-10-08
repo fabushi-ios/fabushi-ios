@@ -1,4 +1,5 @@
 import AVFoundation
+import Foundation
 import XCTest
 @testable import Fabushi
 
@@ -32,6 +33,10 @@ extension HumanCallMediaPortTests {
                 "microphone": "granted",
                 "camera": "denied",
             ],
+            "deviceSelection": [
+                "microphoneId": "mic-built-in",
+                "cameraId": "camera-front",
+            ],
             "updatedAtMs": 1234,
         ])
 
@@ -40,6 +45,8 @@ extension HumanCallMediaPortTests {
         XCTAssertEqual(record?.generation, 3)
         XCTAssertEqual(record?.participantIds, ["alice", "bob"])
         XCTAssertEqual(record?.mediaCapabilities["microphone"], "granted")
+        XCTAssertEqual(record?.deviceSelection["microphoneId"], "mic-built-in")
+        XCTAssertEqual(record?.deviceSelection["cameraId"], "camera-front")
         XCTAssertEqual(record?.stateLabel, "响铃中")
         XCTAssertEqual(record?.canAccept, true)
         XCTAssertEqual(record?.canDecline, true)
@@ -123,5 +130,81 @@ extension HumanCallMediaPortTests {
             "kind": "unknown",
             "payload": [:],
         ]))
+    }
+
+    @MainActor
+    func testPreferredMediaDeviceResolutionUsesExactMatch() {
+        let devices = [
+            HumanCallMediaDevice(id: "mic-built-in", name: "iPhone 麦克风", kind: .microphone),
+            HumanCallMediaDevice(id: "camera-front", name: "前置摄像头", kind: .camera),
+            HumanCallMediaDevice(id: "camera-back", name: "后置摄像头", kind: .camera),
+        ]
+
+        XCTAssertEqual(
+            HumanCallMediaPort.resolvedDeviceId(
+                preferredId: "camera-back",
+                kind: .camera,
+                devices: devices
+            ),
+            "camera-back"
+        )
+    }
+
+    @MainActor
+    func testStalePreferredMediaDeviceFallsBackWithinKind() {
+        let devices = [
+            HumanCallMediaDevice(id: "mic-built-in", name: "iPhone 麦克风", kind: .microphone),
+            HumanCallMediaDevice(id: "camera-front", name: "前置摄像头", kind: .camera),
+            HumanCallMediaDevice(id: "camera-back", name: "后置摄像头", kind: .camera),
+        ]
+
+        XCTAssertEqual(
+            HumanCallMediaPort.resolvedDeviceId(
+                preferredId: "camera-removed",
+                kind: .camera,
+                devices: devices
+            ),
+            "camera-front"
+        )
+        XCTAssertEqual(
+            HumanCallMediaPort.resolvedDeviceId(
+                preferredId: "camera-front",
+                kind: .microphone,
+                devices: devices
+            ),
+            "mic-built-in"
+        )
+        XCTAssertNil(
+            HumanCallMediaPort.resolvedDeviceId(
+                preferredId: "camera-front",
+                kind: .camera,
+                devices: devices.filter { $0.kind == .microphone }
+            )
+        )
+    }
+
+    @MainActor
+    func testMediaDevicePreferencesPersistAndClear() throws {
+        let suiteName = "HumanCallMediaPortTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let port = HumanCallMediaPort(defaults: defaults)
+
+        port.setPreferredDeviceId(" mic-built-in ", kind: .microphone)
+        port.setPreferredDeviceId("camera-front", kind: .camera)
+        XCTAssertEqual(
+            port.storedPreferences(),
+            HumanCallMediaPreferences(
+                microphoneId: "mic-built-in",
+                cameraId: "camera-front"
+            )
+        )
+
+        port.setPreferredDeviceId(nil, kind: .microphone)
+        port.setPreferredDeviceId("   ", kind: .camera)
+        XCTAssertEqual(
+            port.storedPreferences(),
+            HumanCallMediaPreferences(microphoneId: nil, cameraId: nil)
+        )
     }
 }
