@@ -292,7 +292,18 @@ return fingerprintParts.joined(separator: "|")
                         role: "button",
                         name: destination.title,
                         action: .init(allowed: ["invoke"]) { _ in
-                            Task { await messaging.forwardMessage(sourceConversationId: conversation.id, messageId: forwarding.id, destinationConversationId: destination.id) }
+                            Task {
+                                try? await messaging.forwardMessage(
+                                    sourceConversationId: conversation.id,
+                                    messageId: forwarding.id,
+                                    destination: ForwardDestinationRequest(
+                                        conversationId: destination.id,
+                                        clientMessageId: "ios:\(UUID().uuidString.lowercased())"
+                                    ),
+                                    dropSenderNames: false,
+                                    dropCaptions: false
+                                )
+                            }
                             forwardMessage = nil
                         }
                     )
