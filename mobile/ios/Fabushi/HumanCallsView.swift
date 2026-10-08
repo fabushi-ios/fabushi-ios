@@ -73,6 +73,77 @@ internal struct HumanCallSessionRecord: Identifiable, Equatable, Sendable {
     }
 }
 
+internal struct HumanCallTransportLease: Equatable, Sendable {
+    let userId: String
+    let deviceId: String
+    let role: String
+    let isOwner: Bool
+    let claimAvailable: Bool
+    let generation: Int
+
+    init?(raw: [String: Any]) {
+        guard
+            let userId = raw["userId"] as? String,
+            !userId.isEmpty,
+            let deviceId = raw["deviceId"] as? String,
+            !deviceId.isEmpty,
+            let role = raw["role"] as? String,
+            role == "creator" || role == "peer",
+            let isOwner = raw["isOwner"] as? Bool,
+            let claimAvailable = raw["claimAvailable"] as? Bool
+        else { return nil }
+        self.userId = userId
+        self.deviceId = deviceId
+        self.role = role
+        self.isOwner = isOwner
+        self.claimAvailable = claimAvailable
+        self.generation = (raw["generation"] as? NSNumber)?.intValue ?? 0
+    }
+}
+
+internal struct HumanCallSignalRecord: Equatable, Sendable {
+    let callId: String
+    let generation: Int
+    let seq: Int
+    let senderDeviceId: String
+    let kind: String
+    let payload: [String: AnySendable]
+
+    init?(raw: [String: Any]) {
+        guard
+            let callId = raw["callId"] as? String,
+            !callId.isEmpty,
+            let senderDeviceId = raw["senderDeviceId"] as? String,
+            !senderDeviceId.isEmpty,
+            let kind = raw["kind"] as? String,
+            ["offer", "answer", "candidate"].contains(kind),
+            let payload = raw["payload"] as? [String: Any]
+        else { return nil }
+        self.callId = callId
+        self.generation = (raw["generation"] as? NSNumber)?.intValue ?? 0
+        self.seq = (raw["seq"] as? NSNumber)?.intValue ?? 0
+        self.senderDeviceId = senderDeviceId
+        self.kind = kind
+        self.payload = payload.mapValues(AnySendable.init)
+    }
+
+    var rawPayload: [String: Any] {
+        payload.mapValues(\.value)
+    }
+}
+
+internal struct AnySendable: @unchecked Sendable, Equatable {
+    let value: Any
+
+    init(_ value: Any) {
+        self.value = value
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        String(describing: lhs.value) == String(describing: rhs.value)
+    }
+}
+
 @MainActor
 internal struct HumanCallsView: View {
     let messaging: MessagingModel
@@ -87,6 +158,13 @@ internal struct HumanCallsView: View {
     @State private var errorText: String?
     @State private var refreshGeneration = 0
     @State private var mediaPort = HumanCallMediaPort()
+    @State private var peerConnection: HumanCallPeerConnection?
+    @State private var activeMediaCallId: String?
+    @State private var activeLease: HumanCallTransportLease?
+    @State private var appliedSignalSeq = 0
+    @State private var mediaState = "idle"
+    @State private var muted = false
+    @State private var cameraEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -142,6 +220,20 @@ internal struct HumanCallsView: View {
             .task(id: refreshGeneration) {
                 await reload()
             }
+            .task(id: activeMediaCallId) {
+                guard activeMediaCallId != nil else { return }
+                while !Task.isCancelled, activeMediaCallId != nil {
+                    await pollActiveMedia()
+                    do {
+                        try await Task.sleep(for: .seconds(1))
+                    } catch {
+                        break
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            closeActiveMedia()
         }
         .accessibilityIdentifier("human-calls-surface")
     }
@@ -177,12 +269,18 @@ internal struct HumanCallsView: View {
             if !call.isTerminal {
                 HStack(spacing: 10) {
                     if call.canAccept {
-                        Button("接听") {
-                            Task { await accept(call) }
+                        Button("语音接听") {
+                            Task { await accept(call, video: false) }
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(actionCallId != nil)
                         .accessibilityIdentifier("human-call-accept-\(call.id)")
+                        Button("视频接听") {
+                            Task { await accept(call, video: true) }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(actionCallId != nil)
+                        .accessibilityIdentifier("human-call-accept-video-\(call.id)")
                     }
                     if call.canDecline {
                         Button("拒绝", role: .destructive) {
@@ -198,6 +296,23 @@ internal struct HumanCallsView: View {
                         .buttonStyle(.bordered)
                         .disabled(actionCallId != nil)
                         .accessibilityIdentifier("human-call-hangup-\(call.id)")
+                    }
+                }
+                if activeMediaCallId == call.id {
+                    HStack(spacing: 10) {
+                        Button(muted ? "取消静音" : "静音") {
+                            Task { await setMuted(!muted, call: call) }
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("human-call-mute-\(call.id)")
+                        Button(cameraEnabled ? "关闭摄像头" : "开启摄像头") {
+                            Task { await setCameraEnabled(!cameraEnabled, call: call) }
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("human-call-camera-\(call.id)")
+                        Text(mediaState)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -280,25 +395,21 @@ internal struct HumanCallsView: View {
         }
     }
 
-    private func accept(_ call: HumanCallSessionRecord) async {
+    private func accept(_ call: HumanCallSessionRecord, video: Bool) async {
         guard let bridge else { return }
         actionCallId = call.id
         defer { actionCallId = nil }
 
         do {
-            let permissions = await mediaPort.requestPermissions(audio: true, video: true)
-            _ = try await bridge.request(
-                method: "updateCallMedia",
-                params: [
-                    "callId": call.id,
-                    "generation": call.generation,
-                    "mediaCapabilities": [
-                        "microphone": permissions.microphone.rawValue,
-                        "camera": permissions.camera.rawValue,
-                    ],
-                ]
-            )
-            _ = try await bridge.request(
+            let permissions = await mediaPort.requestPermissions(audio: true, video: video)
+            guard permissions.microphone == .granted else {
+                throw HumanCallPeerConnection.Failure.microphoneUnavailable
+            }
+            if video, permissions.camera != .granted {
+                throw HumanCallPeerConnection.Failure.cameraUnavailable
+            }
+
+            let transitionResult = try await bridge.request(
                 method: "transitionCallSession",
                 params: [
                     "callId": call.id,
@@ -306,11 +417,254 @@ internal struct HumanCallsView: View {
                     "action": "accept",
                 ]
             )
+            let accepted = (transitionResult.value as? [String: Any])
+                .flatMap(HumanCallSessionRecord.init(raw:)) ?? call
+
+            _ = try await bridge.request(
+                method: "updateCallMedia",
+                params: [
+                    "callId": accepted.id,
+                    "generation": accepted.generation,
+                    "mediaCapabilities": [
+                        "audio": true,
+                        "video": video,
+                        "screenShare": false,
+                    ],
+                ]
+            )
+
+            try await configureMedia(for: accepted, enableVideo: video)
             errorText = nil
             await reload()
         } catch {
+            closeActiveMedia()
             errorText = "接听失败：\(error.localizedDescription)"
         }
+    }
+
+    private func configureMedia(for call: HumanCallSessionRecord, enableVideo: Bool) async throws {
+        guard let bridge else { return }
+        closeActiveMedia()
+
+        let leaseResult = try await bridge.request(
+            method: "getCallTransportLease",
+            params: ["callId": call.id]
+        )
+        guard
+            let leaseRaw = leaseResult.value as? [String: Any],
+            let lease = HumanCallTransportLease(raw: leaseRaw),
+            lease.isOwner || lease.claimAvailable
+        else {
+            throw NSError(
+                domain: "Fabushi.HumanCall",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "此通话正在另一台设备上进行。"]
+            )
+        }
+
+        let iceResult = try await bridge.request(method: "getCallIceServers", params: [:])
+        guard
+            let iceRaw = iceResult.value as? [String: Any],
+            let rows = iceRaw["iceServers"] as? [[String: Any]]
+        else {
+            throw HumanCallPeerConnection.Failure.malformedICE
+        }
+        let servers = rows.compactMap(HumanCallPeerConnection.IceServer.init(raw:))
+        guard !servers.isEmpty else {
+            throw HumanCallPeerConnection.Failure.malformedICE
+        }
+
+        let peer = HumanCallPeerConnection()
+        peer.onLocalCandidate = { payload in
+            Task { @MainActor in
+                await sendSignal(
+                    call: call,
+                    lease: lease,
+                    kind: "candidate",
+                    payload: payload
+                )
+            }
+        }
+        peer.onStateChange = { state in
+            Task { @MainActor in
+                switch state {
+                case .new:
+                    mediaState = "准备中"
+                case .connecting:
+                    mediaState = "正在连接"
+                case .connected:
+                    mediaState = "通话中"
+                    await transitionSilently(call, action: "connected")
+                case .disconnected:
+                    mediaState = "连接中断"
+                case .failed:
+                    mediaState = "连接失败"
+                case .closed:
+                    mediaState = "已关闭"
+                }
+            }
+        }
+        try await peer.configure(iceServers: servers, enableVideo: enableVideo)
+
+        peerConnection = peer
+        activeMediaCallId = call.id
+        activeLease = lease
+        appliedSignalSeq = 0
+        mediaState = "正在连接"
+        muted = false
+        cameraEnabled = enableVideo
+
+        if lease.role == "creator" {
+            let offer = try await peer.makeOffer()
+            await sendSignal(call: call, lease: lease, kind: "offer", payload: offer)
+        }
+        await consumeSignals(for: call)
+    }
+
+    private func pollActiveMedia() async {
+        guard
+            let callId = activeMediaCallId,
+            let call = calls.first(where: { $0.id == callId }),
+            !call.isTerminal
+        else {
+            if activeMediaCallId != nil {
+                closeActiveMedia()
+            }
+            return
+        }
+        await consumeSignals(for: call)
+    }
+
+    private func consumeSignals(for call: HumanCallSessionRecord) async {
+        guard let bridge, let peerConnection, let lease = activeLease else { return }
+        do {
+            let result = try await bridge.request(
+                method: "listCallSignals",
+                params: [
+                    "callId": call.id,
+                    "generation": call.generation,
+                    "afterSeq": appliedSignalSeq,
+                    "limit": 100,
+                ]
+            )
+            guard let rows = result.value as? [[String: Any]] else { return }
+            for raw in rows {
+                guard
+                    let signal = HumanCallSignalRecord(raw: raw),
+                    signal.generation == call.generation
+                else { continue }
+                appliedSignalSeq = max(appliedSignalSeq, signal.seq)
+                guard signal.senderDeviceId != lease.deviceId else { continue }
+
+                switch signal.kind {
+                case "offer":
+                    let answer = try await peerConnection.applyOffer(signal.rawPayload)
+                    await sendSignal(call: call, lease: lease, kind: "answer", payload: answer)
+                case "answer":
+                    try await peerConnection.applyAnswer(signal.rawPayload)
+                case "candidate":
+                    try await peerConnection.applyCandidate(signal.rawPayload)
+                default:
+                    break
+                }
+            }
+        } catch {
+            errorText = "通话信令失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func sendSignal(
+        call: HumanCallSessionRecord,
+        lease: HumanCallTransportLease,
+        kind: String,
+        payload: [String: Any]
+    ) async {
+        guard let bridge else { return }
+        do {
+            let result = try await bridge.request(
+                method: "sendCallSignal",
+                params: [
+                    "callId": call.id,
+                    "generation": call.generation,
+                    "seq": max(appliedSignalSeq + 1, call.signalSeq + 1),
+                    "senderDeviceId": lease.deviceId,
+                    "kind": kind,
+                    "payload": payload,
+                ]
+            )
+            if let raw = result.value as? [String: Any],
+               let signal = HumanCallSignalRecord(raw: raw)
+            {
+                appliedSignalSeq = max(appliedSignalSeq, signal.seq)
+            }
+        } catch {
+            errorText = "通话信令发送失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func setMuted(_ next: Bool, call: HumanCallSessionRecord) async {
+        peerConnection?.setMuted(next)
+        muted = next
+        await updateMediaState(call: call)
+    }
+
+    private func setCameraEnabled(_ next: Bool, call: HumanCallSessionRecord) async {
+        do {
+            if next {
+                let permissions = await mediaPort.requestPermissions(audio: false, video: true)
+                guard permissions.camera == .granted else {
+                    throw HumanCallPeerConnection.Failure.cameraUnavailable
+                }
+            }
+            try await peerConnection?.setCameraEnabled(next)
+            cameraEnabled = next
+            await updateMediaState(call: call)
+        } catch {
+            errorText = "摄像头切换失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func updateMediaState(call: HumanCallSessionRecord) async {
+        guard let bridge else { return }
+        do {
+            _ = try await bridge.request(
+                method: "updateCallMedia",
+                params: [
+                    "callId": call.id,
+                    "generation": call.generation,
+                    "mediaCapabilities": [
+                        "audio": !muted,
+                        "video": cameraEnabled,
+                        "screenShare": false,
+                    ],
+                ]
+            )
+        } catch {
+            errorText = "通话媒体状态同步失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func transitionSilently(_ call: HumanCallSessionRecord, action: String) async {
+        guard let bridge else { return }
+        _ = try? await bridge.request(
+            method: "transitionCallSession",
+            params: [
+                "callId": call.id,
+                "generation": call.generation,
+                "action": action,
+            ]
+        )
+    }
+
+    private func closeActiveMedia() {
+        peerConnection?.close()
+        peerConnection = nil
+        activeMediaCallId = nil
+        activeLease = nil
+        appliedSignalSeq = 0
+        mediaState = "idle"
+        muted = false
+        cameraEnabled = false
     }
 
     private func transition(_ call: HumanCallSessionRecord, action: String) async {
@@ -327,6 +681,9 @@ internal struct HumanCallsView: View {
                     "action": action,
                 ]
             )
+            if action == "decline" || action == "hangup" || action == "fail" {
+                closeActiveMedia()
+            }
             errorText = nil
             await reload()
         } catch {
