@@ -3004,3 +3004,148 @@ impl MessagingEngine {
             })
     }
 }
+
+
+#[cfg(test)]
+mod forward_parity_tests {
+    use super::*;
+    use crate::actor::{Actor, Participant, ParticipantRole};
+    use crate::conversation::Conversation;
+    use crate::message::{FormattedText, MediaRef};
+
+    fn participant(actor_id: &ActorId) -> Participant {
+        Participant {
+            actor_id: actor_id.clone(),
+            role: ParticipantRole::Member,
+            joined_at_ms: 1,
+            muted_until_ms: None,
+        }
+    }
+
+    fn media() -> MediaRef {
+        MediaRef {
+            id: "blob:photo".into(),
+            file_name: Some("photo.jpg".into()),
+            mime_type: Some("image/jpeg".into()),
+            size_bytes: Some(10),
+            width: Some(10),
+            height: Some(10),
+            duration_ms: None,
+            thumbnail_id: None,
+            local_path: None,
+            remote_url: None,
+            content_hash: None,
+        }
+    }
+
+    fn seeded_engine(content: MessageContent) -> (MessagingEngine, ActorId) {
+        let actor_id = ActorId::new("alice");
+        let mut engine = MessagingEngine::new();
+        engine
+            .execute(Command::UpsertActor {
+                actor: Actor::human(actor_id.0.clone(), "Alice"),
+            })
+            .unwrap();
+        engine
+            .execute(Command::UpsertConversation {
+                conversation: Conversation::direct(
+                    "source",
+                    "Source",
+                    vec![participant(&actor_id)],
+                    1,
+                ),
+            })
+            .unwrap();
+        engine
+            .execute(Command::UpsertConversation {
+                conversation: Conversation::direct(
+                    "destination",
+                    "Destination",
+                    vec![participant(&actor_id)],
+                    1,
+                ),
+            })
+            .unwrap();
+        engine
+            .execute(Command::QueueMessage {
+                conversation_id: ConversationId::new("source"),
+                local_message_id: MessageId::new("source-message"),
+                client_message_id: ClientMessageId::new("source-client"),
+                sender_id: actor_id.clone(),
+                content,
+                reply_to_message_id: None,
+                thread_root_message_id: None,
+                created_at_ms: 2,
+                scheduled_at_ms: None,
+                silent: false,
+                protected_content: false,
+            })
+            .unwrap();
+        (engine, actor_id)
+    }
+
+    #[test]
+    fn forward_respects_destination_send_permission() {
+        let (mut engine, actor_id) =
+            seeded_engine(MessageContent::Text { text: FormattedText::plain("hello") });
+        engine
+            .state
+            .conversations
+            .get_mut(&ConversationId::new("destination"))
+            .unwrap()
+            .permissions
+            .can_send_messages = false;
+
+        let error = engine
+            .execute(Command::ForwardMessage {
+                source_conversation_id: ConversationId::new("source"),
+                message_id: MessageId::new("source-message"),
+                destination_conversation_id: ConversationId::new("destination"),
+                local_message_id: MessageId::new("forwarded"),
+                client_message_id: ClientMessageId::new("forward-client"),
+                sender_id: actor_id,
+                created_at_ms: 3,
+                drop_sender_names: false,
+                drop_captions: false,
+            })
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            EngineError::MessageSendPermissionDenied(ConversationId::new("destination"))
+        );
+    }
+
+    #[test]
+    fn forward_options_remove_attribution_and_media_caption() {
+        let (mut engine, actor_id) = seeded_engine(MessageContent::Photo {
+            media: media(),
+            caption: FormattedText::plain("caption"),
+            spoiler: false,
+        });
+
+        let events = engine
+            .execute(Command::ForwardMessage {
+                source_conversation_id: ConversationId::new("source"),
+                message_id: MessageId::new("source-message"),
+                destination_conversation_id: ConversationId::new("destination"),
+                local_message_id: MessageId::new("forwarded"),
+                client_message_id: ClientMessageId::new("forward-client"),
+                sender_id: actor_id,
+                created_at_ms: 3,
+                drop_sender_names: true,
+                drop_captions: true,
+            })
+            .unwrap();
+
+        let Event::MessageQueued { message } = &events[0] else {
+            panic!("expected forwarded message");
+        };
+        assert_eq!(message.forward_origin, None);
+        let MessageContent::Photo { caption, .. } = &message.content else {
+            panic!("expected photo content");
+        };
+        assert!(caption.text.is_empty());
+        assert!(caption.entities.is_empty());
+    }
+}
