@@ -59,6 +59,7 @@ internal enum MobileCommandPaletteActionKind: String {
     case openContacts
     case openChannels
     case openSettings
+    case updateComputer
 }
 
 internal struct MobileCommandPaletteAction: Identifiable {
@@ -67,6 +68,39 @@ internal struct MobileCommandPaletteAction: Identifiable {
     let keywords: [String]
     let detail: String
     let kind: MobileCommandPaletteActionKind
+}
+
+internal enum MobileCommandPaletteComputerUpdateAction: String, Equatable {
+    case ready
+    case busyOverride = "busy-override"
+}
+
+internal enum MobileCommandPaletteComputerUpdateProjection {
+    static func action(
+        agent: MobileBotSummary?,
+        status: RemoteComputerAgentBoxSnapshot?,
+        activity: RemoteComputerHostActivitySnapshot,
+        isPending: Bool,
+        isQueued: Bool
+    ) -> MobileCommandPaletteComputerUpdateAction? {
+        guard let agent,
+              !agent.isGroup,
+              let status,
+              status.agentID == agent.id,
+              status.imageUpdateAvailable,
+              !isPending,
+              !isQueued
+        else {
+            return nil
+        }
+
+        if let activityAgentID = activity.agentID,
+           activityAgentID != agent.id
+        {
+            return nil
+        }
+        return activity.isActive ? .busyOverride : .ready
+    }
 }
 
 internal struct MobileCommandPaletteMessage: Identifiable {
@@ -180,6 +214,7 @@ internal enum MobileCommandPaletteEntry: Identifiable {
             case .openContacts: return "person.2"
             case .openChannels: return "megaphone"
             case .openSettings: return "gearshape"
+            case .updateComputer: return "desktopcomputer"
             }
         }
     }
