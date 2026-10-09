@@ -126,6 +126,60 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertTrue(corrupt.mcpBoxServers.isEmpty)
         XCTAssertEqual(corrupt.conciergeConsent, "unset")
     }
+    func testCurrentMainUiAndCallPreferencesNormalizeAndPersist() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("settings.json")
+        let store = SandSettingsStore(settingsPath: path.path)
+
+        store.setUiPreferences(.init(
+            locale: "AR-sa",
+            direction: .auto,
+            reducedMotion: true,
+            highContrast: true,
+            textScale: 9
+        ))
+        store.setCallMediaPreferences(.init(
+            microphoneId: " mic-1 ",
+            cameraId: String(repeating: "x", count: 513)
+        ))
+
+        let restored = SandSettingsStore(settingsPath: path.path)
+        let ui = restored.getUiPreferences()
+        XCTAssertEqual(ui.locale, "ar-sa")
+        XCTAssertEqual(ui.direction, .auto)
+        XCTAssertEqual(resolveSandUiDirection(ui), .rtl)
+        XCTAssertTrue(ui.reducedMotion)
+        XCTAssertTrue(ui.highContrast)
+        XCTAssertEqual(ui.textScale, 2)
+
+        let media = restored.getCallMediaPreferences()
+        XCTAssertEqual(media.microphoneId, "mic-1")
+        XCTAssertNil(media.cameraId)
+    }
+
+    func testServerAcceptedBrowserAuthUrlMustStayOnConfiguredOrigin() {
+        XCTAssertEqual(
+            ExternalURLPolicy.parseServerAcceptedAuthExternalURL(
+                "https://api.ombhrum.com/auth/browser?attempt=1",
+                expectedOrigin: "https://api.ombhrum.com"
+            ),
+            "https://api.ombhrum.com/auth/browser?attempt=1"
+        )
+        XCTAssertNil(ExternalURLPolicy.parseServerAcceptedAuthExternalURL(
+            "https://attacker.invalid/auth/browser",
+            expectedOrigin: "https://api.ombhrum.com"
+        ))
+        XCTAssertNil(ExternalURLPolicy.parseServerAcceptedAuthExternalURL(
+            "http://api.ombhrum.com/auth/browser",
+            expectedOrigin: "https://api.ombhrum.com"
+        ))
+        XCTAssertNil(ExternalURLPolicy.parseServerAcceptedAuthExternalURL(
+            "https://user@api.ombhrum.com/auth/browser",
+            expectedOrigin: "https://api.ombhrum.com"
+        ))
+    }
+
     @MainActor
     func testCoordinatorOwnsAndScopesSettingsWithoutRendererHostBypass() throws {
         let root = try makeRoot()
