@@ -71,6 +71,71 @@ private final class BackendDiscoveryRecorder: @unchecked Sendable {
     }
 }
 
+private enum DiscoverySettlementTestError: Error {
+    case offline
+}
+
+private final class DiscoverySettlementHarness: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _nowMs: Int64 = 100
+    private var _fail = false
+    private var _listCalls = 0
+    private var _reports: [McpDiscoveryFailureEvent] = []
+
+    func nowMs() -> Int64 {
+        lock.lock(); defer { lock.unlock() }
+        return _nowMs
+    }
+
+    func expireAndFail() {
+        lock.lock()
+        _nowMs += Int64(MCP_TOOLS_CACHE_TTL_MS) + 1
+        _fail = true
+        lock.unlock()
+    }
+
+    func listTools() throws -> [BackendMcpToolServer] {
+        lock.lock()
+        _listCalls += 1
+        let fail = _fail
+        if fail { _nowMs += 37 }
+        lock.unlock()
+        if fail { throw DiscoverySettlementTestError.offline }
+        return [
+            .init(
+                serverIdentifier: "remote",
+                status: "connected",
+                tools: [
+                    .init(
+                        name: "search",
+                        providerIdentifier: "remote",
+                        toolName: "search",
+                        clientKey: "remote",
+                        description: nil,
+                        inputSchema: nil
+                    ),
+                ],
+                accountLabel: "default",
+                rowServerIdentifier: "remote"
+            ),
+        ]
+    }
+
+    func record(_ report: McpDiscoveryFailureEvent) {
+        lock.lock(); _reports.append(report); lock.unlock()
+    }
+
+    var latestReport: McpDiscoveryFailureEvent? {
+        lock.lock(); defer { lock.unlock() }
+        return _reports.last
+    }
+
+    var listCalls: Int {
+        lock.lock(); defer { lock.unlock() }
+        return _listCalls
+    }
+}
+
 final class SharedMcpToolsDiscoveryParityTests: XCTestCase {
     private func makeSettings() throws -> (SandSettingsStore, URL) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -379,4 +444,79 @@ final class SharedMcpToolsDiscoveryParityTests: XCTestCase {
         ))
         XCTAssertEqual(failure, generatedMcpResultFactory.error("failed"))
     }
+    func testDiscoveryRefreshFailureServesStaleToolsAndReportsSettlement() async throws {
+        let (settings, root) = try makeSettings()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = SandMcpDefinitionSource(includeBuiltins: false)
+        await source.adoptAccountConfig(.init(mcpServers: [
+            "remote": .http(url: "https://mcp.example.test"),
+        ]))
+        let harness = DiscoverySettlementHarness()
+        let discovery = SandMcpToolsDiscovery(deps: .init(
+            definitionSource: source,
+            settingsStore: settings,
+            backendListTools: { _ in try harness.listTools() },
+            backendExecuteTool: { _, _, _, _, _ in Self.success("ok") },
+            nowMs: { harness.nowMs() },
+            onDiscoveryFailed: { harness.record($0) }
+        ))
+
+        let initial = try await discovery.getTools()
+        XCTAssertEqual(initial.map(\.name), ["search"])
+
+        harness.expireAndFail()
+        let stale = try await discovery.getTools()
+        XCTAssertEqual(stale.map(\.name), ["search"])
+
+        for _ in 0..<50 where harness.latestReport == nil {
+            await Task.yield()
+        }
+        let report = try XCTUnwrap(harness.latestReport)
+        XCTAssertEqual(report.errorClass, "DiscoverySettlementTestError")
+        XCTAssertEqual(report.elapsedMs, 37)
+        XCTAssertTrue(report.servedStale)
+    }
+
+    func testColdDiscoveryFailureClearsCacheAndRetriesNextRead() async throws {
+        let (settings, root) = try makeSettings()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = SandMcpDefinitionSource(includeBuiltins: false)
+        await source.adoptAccountConfig(.init(mcpServers: [
+            "remote": .http(url: "https://mcp.example.test"),
+        ]))
+        let harness = DiscoverySettlementHarness()
+        harness.expireAndFail()
+        let discovery = SandMcpToolsDiscovery(deps: .init(
+            definitionSource: source,
+            settingsStore: settings,
+            backendListTools: { _ in try harness.listTools() },
+            backendExecuteTool: { _, _, _, _, _ in Self.success("ok") },
+            nowMs: { harness.nowMs() },
+            onDiscoveryFailed: { harness.record($0) }
+        ))
+
+        do {
+            _ = try await discovery.getTools()
+            XCTFail("cold discovery failure must surface")
+        } catch {
+            XCTAssertTrue(error is DiscoverySettlementTestError)
+        }
+        for _ in 0..<50 where harness.latestReport == nil {
+            await Task.yield()
+        }
+        let firstReport = try XCTUnwrap(harness.latestReport)
+        XCTAssertFalse(firstReport.servedStale)
+        XCTAssertEqual(firstReport.elapsedMs, 37)
+        let firstCalls = harness.listCalls
+
+        do {
+            _ = try await discovery.getTools()
+            XCTFail("cleared cold failure cache must retry and fail again")
+        } catch {
+            XCTAssertTrue(error is DiscoverySettlementTestError)
+        }
+        XCTAssertEqual(harness.listCalls, firstCalls + 1)
+    }
+
+
 }
