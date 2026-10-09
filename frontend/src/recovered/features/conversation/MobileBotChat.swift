@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 import UIKit
 
@@ -236,6 +237,120 @@ private struct MobileLinkMetadataCard: View {
             loading = true
             defer { loading = false }
             metadata = try? await model.linkMetadata(for: url)
+        }
+    }
+}
+
+private struct MobileTranscriptMediaAttachmentView: View {
+    let rawURL: String
+    let alt: String?
+
+    @State private var player: AVPlayer?
+    @State private var isPlaying = false
+
+    private var destination: URL? {
+        let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let url = URL(string: trimmed), url.scheme != nil { return url }
+        if trimmed.hasPrefix("/") { return URL(fileURLWithPath: trimmed) }
+        return nil
+    }
+
+    var body: some View {
+        Group {
+            if let destination {
+                switch mobileAttachmentMediaPresentation(rawURL) {
+                case .image:
+                    if destination.isFileURL,
+                       let image = UIImage(contentsOfFile: destination.path) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 260)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .accessibilityLabel(alt ?? "Image attachment")
+                    } else {
+                        AsyncImage(url: destination) { phase in
+                            switch phase {
+                            case let .success(image):
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxHeight: 260)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            case .empty:
+                                ProgressView().controlSize(.small)
+                            default:
+                                Link(alt ?? "Open image", destination: destination)
+                            }
+                        }
+                        .accessibilityLabel(alt ?? "Image attachment")
+                    }
+
+                case .video:
+                    if let player {
+                        VideoPlayer(player: player)
+                            .frame(minHeight: 180, maxHeight: 280)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .accessibilityLabel(alt ?? "Video attachment")
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+
+                case .audio:
+                    HStack(spacing: 10) {
+                        Button {
+                            guard let player else { return }
+                            if isPlaying {
+                                player.pause()
+                            } else {
+                                player.play()
+                            }
+                            isPlaying.toggle()
+                        } label: {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        }
+                        .buttonStyle(.bordered)
+                        Text(
+                            alt
+                                ?? (destination.lastPathComponent.isEmpty
+                                    ? "Audio attachment"
+                                    : destination.lastPathComponent)
+                        )
+                        .font(.caption)
+                        .lineLimit(1)
+                        Spacer()
+                        Link(destination: destination) {
+                            Image(systemName: "arrow.up.right.square")
+                        }
+                    }
+                    .accessibilityElement(children: .contain)
+
+                case .file:
+                    Link(alt ?? "Open attachment", destination: destination)
+                }
+            } else {
+                Label(alt ?? "Attachment unavailable", systemImage: "paperclip")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .task(id: destination?.absoluteString) {
+            guard let destination,
+                  [.video, .audio].contains(mobileAttachmentMediaPresentation(rawURL))
+            else {
+                player?.pause()
+                player = nil
+                isPlaying = false
+                return
+            }
+            player?.pause()
+            player = AVPlayer(url: destination)
+            isPlaying = false
+        }
+        .onDisappear {
+            player?.pause()
+            isPlaying = false
         }
     }
 }
@@ -1498,19 +1613,22 @@ internal struct MobileBotChat: View {
             case .legacyLink:
                 MobileLinkMetadataCard(url: attachment.url, model: model)
                     .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
-            case .media, .file:
-                let label = attachment.name
-                    ?? attachment.alt
-                    ?? (attachment.kind == .media ? "Open media" : "Open attachment")
-                let icon = attachment.kind == .media ? "photo" : "paperclip"
+            case .media:
+                MobileTranscriptMediaAttachmentView(
+                    rawURL: attachment.url,
+                    alt: attachment.alt ?? attachment.name
+                )
+                .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
+            case .file:
+                let label = attachment.name ?? attachment.alt ?? "Open attachment"
                 if let destination = attachmentDestinationURL(attachment.url) {
                     Link(destination: destination) {
-                        Label(label, systemImage: icon)
+                        Label(label, systemImage: "paperclip")
                             .font(.caption.weight(.medium))
                     }
                     .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
                 } else {
-                    Label(label, systemImage: icon)
+                    Label(label, systemImage: "paperclip")
                         .font(.caption.weight(.medium))
                         .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
                 }

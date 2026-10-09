@@ -552,6 +552,23 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         ]))
         XCTAssertEqual(media.kind, .media)
         XCTAssertEqual(media.alt, "Screenshot")
+        XCTAssertEqual(mobileAttachmentMediaPresentation(media.url), .image)
+
+        let audio = try XCTUnwrap(projectMobileAttachmentCard([
+            "kind": "send-message",
+            "id": "audio-1",
+            "message": [
+                "type": "attachment",
+                "url": "https://example.com/voice.m4a",
+                "alt": "Voice note",
+            ],
+        ]))
+        XCTAssertEqual(audio.kind, .media)
+        XCTAssertEqual(mobileAttachmentMediaPresentation(audio.url), .audio)
+        XCTAssertEqual(
+            mobileAttachmentMediaPresentation("https://example.com/demo.mp4"),
+            .video
+        )
 
         let file = try XCTUnwrap(projectMobileAttachmentCard([
             "kind": "send-message",

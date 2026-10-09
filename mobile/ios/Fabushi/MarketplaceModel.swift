@@ -675,6 +675,24 @@ private let mobileAttachmentImageExtensions: Set<String> = [
 private let mobileAttachmentVideoExtensions: Set<String> = [
     ".m4v", ".mov", ".mp4", ".ogv", ".webm",
 ]
+private let mobileAttachmentAudioExtensions: Set<String> = [
+    ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".wav",
+]
+
+enum MobileAttachmentMediaPresentation: Equatable {
+    case image
+    case video
+    case audio
+    case file
+}
+
+func mobileAttachmentMediaPresentation(_ value: String) -> MobileAttachmentMediaPresentation {
+    let ext = mobileAttachmentExtension(value)
+    if mobileAttachmentImageExtensions.contains(ext) { return .image }
+    if mobileAttachmentVideoExtensions.contains(ext) { return .video }
+    if mobileAttachmentAudioExtensions.contains(ext) { return .audio }
+    return .file
+}
 
 private func mobileAttachmentExtension(_ value: String) -> String {
     let normalized = value.replacingOccurrences(of: "\\", with: "/")
@@ -702,9 +720,7 @@ private func mobileAttachmentExtension(_ value: String) -> String {
 }
 
 private func isMobileAttachmentMediaURL(_ value: String) -> Bool {
-    let ext = mobileAttachmentExtension(value)
-    return mobileAttachmentImageExtensions.contains(ext)
-        || mobileAttachmentVideoExtensions.contains(ext)
+    mobileAttachmentMediaPresentation(value) != .file
 }
 
 private func normalizedMobileHTTPURL(_ value: String) -> String? {
