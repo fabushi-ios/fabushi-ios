@@ -11,6 +11,20 @@ let WORKFLOW_INJECTED_BODY_LIMIT = 8_000
 let WORKFLOW_UI_LIMIT = 100
 let WORKFLOW_MAX_PER_AGENT = 100
 
+private func workflowPrefixByUTF16Units(_ value: String, maxLength: Int) -> String {
+    guard maxLength > 0 else { return "" }
+    var result = ""
+    var units = 0
+    for character in value {
+        let part = String(character)
+        let next = part.utf16.count
+        guard units + next <= maxLength else { break }
+        result.append(character)
+        units += next
+    }
+    return result
+}
+
 indirect enum WorkflowValue: Equatable, Sendable {
     case string(String)
     case number(Double)
@@ -101,26 +115,26 @@ func clampWorkflowName(_ value: String?) -> String {
     guard let value else { return "" }
     let collapsed = value.replacingOccurrences(of: #"[\r\n]+"#, with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
-    return String(collapsed.prefix(WORKFLOW_MAX_NAME_LENGTH))
+    return workflowPrefixByUTF16Units(collapsed, maxLength: WORKFLOW_MAX_NAME_LENGTH)
 }
 
 func clampWorkflowDescription(_ value: String?) -> String {
     guard let value else { return "" }
     let collapsed = value.replacingOccurrences(of: #"[\r\n]+"#, with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
-    return String(collapsed.prefix(WORKFLOW_MAX_DESCRIPTION_LENGTH))
+    return workflowPrefixByUTF16Units(collapsed, maxLength: WORKFLOW_MAX_DESCRIPTION_LENGTH)
 }
 
 func clampWorkflowBody(_ value: String?) -> String {
     guard let value else { return "" }
-    return String(value.trimmingCharacters(in: .whitespacesAndNewlines).prefix(WORKFLOW_MAX_BODY_LENGTH))
+    return workflowPrefixByUTF16Units(value.trimmingCharacters(in: .whitespacesAndNewlines), maxLength: WORKFLOW_MAX_BODY_LENGTH)
 }
 
 func slugifyWorkflowName(_ name: String) -> String {
-    let folded = name.folding(options: [.diacriticInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX")).lowercased()
+    let folded = name.decomposedStringWithCompatibilityMapping.lowercased()
     let replaced = folded.replacingOccurrences(of: #"[^a-z0-9]+"#, with: "-", options: .regularExpression)
     let trimmed = replaced.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-    let limited = String(trimmed.prefix(64)).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    let limited = workflowPrefixByUTF16Units(trimmed, maxLength: 64).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
     return limited.isEmpty ? "workflow" : limited
 }
 
@@ -368,7 +382,7 @@ func deriveWorkflowNameFromMarkdown(_ body: String) -> String? {
         let heading = line.replacingOccurrences(of: #"^#+\s+"#, with: "", options: .regularExpression)
         let text = heading.replacingOccurrences(of: #"[*_\x60#>]"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.isEmpty { return String(text.prefix(WORKFLOW_MAX_NAME_LENGTH)) }
+        if !text.isEmpty { return workflowPrefixByUTF16Units(text, maxLength: WORKFLOW_MAX_NAME_LENGTH) }
     }
     return nil
 }
@@ -390,7 +404,7 @@ func workflowSpecFromMarkdown(_ markdown: String, fallbackName: String? = nil) -
 
 func buildLiveSourcePointerBody(_ source: String) -> String {
     [
-        "This workflow is a live reference to the skill at \(source).",
+        "This workflow is a live reference to the skill at `\(source)`.",
         "Read that source now with your file or fetch tools and follow it as written. Do not assume its contents from this note; the source is the source of truth and may have changed since this workflow was created.",
     ].joined(separator: "\n")
 }
@@ -472,7 +486,7 @@ func collectMentionedWorkflows(_ prompt: String, workflows: [WorkflowRecord]) ->
 
     let candidates = workflows.flatMap { workflow in
         workflowHandles(workflow).map { (handle: $0, id: workflow.id.lowercased()) }
-    }.sorted { $0.handle.count > $1.handle.count }
+    }.sorted { $0.handle.utf16.count > $1.handle.utf16.count }
     var claimed: [Range<String.Index>] = []
 
     for candidate in candidates {
@@ -481,7 +495,10 @@ func collectMentionedWorkflows(_ prompt: String, workflows: [WorkflowRecord]) ->
         while let range = lower.range(of: needle, range: search) {
             let before = range.lowerBound == lower.startIndex ? nil : lower[lower.index(before: range.lowerBound)]
             let after = range.upperBound == lower.endIndex ? nil : lower[range.upperBound]
-            func isWord(_ c: Character?) -> Bool { c?.isLetter == true || c?.isNumber == true }
+            func isWord(_ c: Character?) -> Bool {
+                guard let c, c.unicodeScalars.count == 1, let scalar = c.unicodeScalars.first else { return false }
+                return (scalar.value >= 97 && scalar.value <= 122) || (scalar.value >= 48 && scalar.value <= 57)
+            }
             let overlaps = claimed.contains { $0.lowerBound < range.upperBound && range.lowerBound < $0.upperBound }
             if !isWord(before) && !isWord(after) && !overlaps {
                 claimed.append(range)
