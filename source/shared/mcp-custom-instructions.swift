@@ -3,7 +3,7 @@ import Foundation
 let MCP_CUSTOM_INSTRUCTIONS_MAX_LENGTH = 500
 
 private let DEFAULT_MCP_CONNECTOR_INSTRUCTIONS: [String: String] = [
-    "hex": "When using Hex, work from the connector's underlying exported/raw data rather than reading values from chart screenshots.",
+    "hex": "When using Hex, get the underlying numbers as data: download/export the results as CSV or use the data the connector returns, and analyze those raw values directly. Don't read rendered charts or graphs from screenshots (computer-use chart reading is unreliable) — work from the actual data.",
 ]
 
 struct McpCustomInstructionEntry: Equatable, Sendable {
