@@ -25,7 +25,7 @@ struct IOSClientPausedError: LocalizedError, Equatable, Sendable {
 }
 
 @MainActor
-private final class IOSCoordinatorClientPauseControl {
+final class IOSCoordinatorClientPauseControl {
     typealias IsPaused = @MainActor () -> Bool
     typealias SetGatewayPaused = @MainActor (Bool) async throws -> Bool
     typealias DropObservedConnection = @MainActor () -> Void
@@ -159,6 +159,7 @@ final class MahayanaCoordinator {
             self.mcpSurface = nil
         }
         self.devControlAdapter = devControlAdapter
+        let pauseSurface = self.mcpSurface
         clientPauseControl = IOSCoordinatorClientPauseControl(
             isPaused: isClientPaused,
             setGatewayPaused: { [weak hostSupervisor] paused in
@@ -172,8 +173,8 @@ final class MahayanaCoordinator {
                 else { throw CoordinatorError.invalidResponse }
                 return acknowledged
             },
-            dropObservedConnection: { [weak self] in
-                self?.mcpSurface?.dropObservedComputerConnectionForClientPause()
+            dropObservedConnection: {
+                pauseSurface?.dropObservedComputerConnectionForClientPause()
             }
         )
         webAuthnSigner = passkeyProvider.map {
