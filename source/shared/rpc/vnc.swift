@@ -1,5 +1,7 @@
 import Foundation
 
+let BOX_VNC_RPC_CONTRACT_NAME = "box-vnc"
+
 enum RemoteComputerMethod: String, Codable, CaseIterable, Sendable {
     case readClipboard
     case writeClipboard
