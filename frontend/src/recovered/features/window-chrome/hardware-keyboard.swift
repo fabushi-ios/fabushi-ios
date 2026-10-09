@@ -10,7 +10,6 @@ internal enum MobileGlobalShortcutAction: Hashable, Sendable {
     case nextAgent
     case navigateBack
     case focusAgent(Int)
-    case toggleSidebar
     case escape
     case focusPrompt
 }
@@ -150,15 +149,6 @@ internal enum MobileHardwareKeyboardContract {
 
         items.append(
             .init(
-                id: "sand.toggleSidebar",
-                action: .toggleSidebar,
-                label: "Toggle compact sidebar",
-                keyName: "b",
-                command: true
-            )
-        )
-        items.append(
-            .init(
                 id: "sand.escape",
                 action: .escape,
                 label: "Close",
@@ -188,7 +178,7 @@ internal enum MobileHardwareKeyboardContract {
     // Desktop also exposes mod+] for browser-style forward navigation. The
     // shipping iOS shell has no forward stack and must not invent a second
     // navigation owner solely for a keyboard command.
-    static let platformNotApplicableHotkeys = ["cmd+]"]
+    static let platformNotApplicableHotkeys = ["cmd+]", "cmd+b"]
 }
 
 internal struct MobileHardwareKeyboardShortcutLayer: View {
@@ -314,7 +304,7 @@ extension GrokMobileShell {
             closeCommandPalette()
             selectBotForConversation(target)
 
-        case .navigateBack, .toggleSidebar, .escape:
+        case .navigateBack, .escape:
             closeTopLevelSurfaceForHardwareShortcut()
 
         case .focusPrompt:
