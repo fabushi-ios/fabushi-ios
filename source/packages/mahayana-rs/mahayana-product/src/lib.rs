@@ -4745,7 +4745,7 @@ mod tests {
             assert!(request.contains("\"silent\":true"));
             assert!(request.contains("\"scheduledAtMs\":2000000000000"));
 
-            let response = r#"{"success":true,"message":{"id":1}}"#;
+            let response = r#"{"success":true,"message":{"id":1,"silent":true,"scheduledAtMs":2000000000000,"deliveryState":"scheduled","deliveredAt":null}}"#;
             write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -4780,6 +4780,10 @@ mod tests {
             )
             .expect("send scheduled direct message");
         assert_eq!(response["success"], true);
+        assert_eq!(response["message"]["silent"], true);
+        assert_eq!(response["message"]["scheduledAtMs"], 2_000_000_000_000_u64);
+        assert_eq!(response["message"]["deliveryState"], "scheduled");
+        assert!(response["message"]["deliveredAt"].is_null());
         server.join().expect("join direct message test server");
         let _ = std::fs::remove_dir_all(root);
     }
