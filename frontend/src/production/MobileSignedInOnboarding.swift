@@ -185,9 +185,25 @@ struct MobileOnboardingSuggestion: Identifiable, Equatable, Sendable {
 }
 
 enum MobileSignedInOnboardingContract {
+    enum Route: Equatable {
+        case signIn
+        case onboarding
+        case shell
+    }
+
     static let handOffDwellNanoseconds: UInt64 = 1_500_000_000
     static let jobs = ["Invoice Chaser", "Weekly Standup", "Sales Forecast"]
     static let meetText = "Hand off any task to your team of agents"
+
+    static func resolveRoute(
+        isSignedIn: Bool,
+        hasSeenOnboarding: Bool,
+        agentCount: Int?
+    ) -> Route {
+        guard isSignedIn else { return .signIn }
+        if hasSeenOnboarding || (agentCount ?? 0) > 0 { return .shell }
+        return .onboarding
+    }
 
     static func descriptionWithDailyTools(_ description: String, tools: [String]) -> String {
         guard !tools.isEmpty else { return description }
