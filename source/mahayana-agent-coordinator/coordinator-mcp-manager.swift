@@ -1191,7 +1191,10 @@ final class CoordinatorMcpSurface {
 
         case "getCursorWeeklyUsage":
             guard (await cursorAuth.status()).loggedIn else { return .handled(NSNull()) }
-            return .handled(await dashboard.getCursorWeeklyUsage() ?? NSNull())
+            if let usage = await dashboard.getCursorWeeklyUsage() {
+                return .handled(usage)
+            }
+            return .handled(NSNull())
 
         case "getCursorUsageSummary":
             guard (await cursorAuth.status()).loggedIn else { return .handled(NSNull()) }

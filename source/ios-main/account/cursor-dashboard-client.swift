@@ -938,7 +938,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         let included = sandStatus["hasNonZeroIncludedLimit"] as? Bool == true
         var output: [String: Any] = [
             "percentUsed": max(percent, 0),
-            "nextResetMs": timestampMilliseconds(sandStatus["nextResetTimestampUtc"]) ?? NSNull(),
+            "nextResetMs": jsonValueOrNull(timestampMilliseconds(sandStatus["nextResetTimestampUtc"])),
             "hasNonZeroIncludedLimit": included,
             "onDemand": NSNull(),
         ]
@@ -976,23 +976,23 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
 
         var summary: [String: Any] = [
             "isEnterprise": teams.contains { $0["isEnterprise"] as? Bool == true },
-            "sandUsagePercent": nonNegativeFinite(status["usagePercent"]) ?? NSNull(),
-            "sandUsageResetTimestampMs": timestampMilliseconds(status["nextResetTimestampUtc"]) ?? NSNull(),
+            "sandUsagePercent": jsonValueOrNull(nonNegativeFinite(status["usagePercent"])),
+            "sandUsageResetTimestampMs": jsonValueOrNull(timestampMilliseconds(status["nextResetTimestampUtc"])),
             "hasAvailableUsage": status["hasAvailableUsage"] as? Bool == true,
             "isSandTrial": liveTrial,
             "hasEndedSandTrial": claimGranted && !liveTrial,
             "hasNonZeroIncludedLimit": included,
             "canCancelSandTrial": liveTrial && status["sandTrialCancelable"] as? Bool == true,
             "onDemand": NSNull(),
-            "upgradeCta": upgradeCTA(status["upgradeRecommendation"]) ?? NSNull(),
+            "upgradeCta": jsonValueOrNull(upgradeCTA(status["upgradeRecommendation"])),
         ]
         if included, let period, let spend = period["spendLimitUsage"] as? [String: Any] {
             let used = finiteDouble(spend["individualUsed"]) ?? 0
             let reset = int64Value(period["billingCycleEnd"]).flatMap { $0 > 0 ? $0 : nil }
             summary["onDemand"] = [
                 "usedCents": used,
-                "limitCents": normalizedLimitCents(spend["individualLimit"]) ?? NSNull(),
-                "resetTimestampMs": reset ?? NSNull(),
+                "limitCents": jsonValueOrNull(normalizedLimitCents(spend["individualLimit"])),
+                "resetTimestampMs": jsonValueOrNull(reset),
             ]
         }
         return summary
@@ -1005,7 +1005,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         } catch {
             let message = (error as? LocalizedError)?.errorDescription?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            return ["ok": false, "message": message?.isEmpty == false ? message! : NSNull()]
+            return ["ok": false, "message": jsonValueOrNull(message?.isEmpty == false ? message : nil)]
         }
     }
 
@@ -1024,7 +1024,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         let message = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
         return [
             "ok": ok,
-            "message": message?.isEmpty == false ? message! : NSNull(),
+            "message": jsonValueOrNull(message?.isEmpty == false ? message : nil),
         ]
     }
 
@@ -1050,12 +1050,12 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return result.isFinite ? result : nil
     }
 
-    private func nonNegativeFinite(_ value: Any?) -> Any? {
+    private func nonNegativeFinite(_ value: Any?) -> Double? {
         guard let value = finiteDouble(value), value >= 0 else { return nil }
         return value
     }
 
-    private func normalizedLimitCents(_ value: Any?) -> Any? {
+    private func normalizedLimitCents(_ value: Any?) -> Double? {
         guard let value = finiteDouble(value),
               value > 0,
               value < 2_147_483_647
@@ -1093,7 +1093,12 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return value == "SAND_TRIAL_CLAIM_STATUS_GRANTED" || value == "GRANTED"
     }
 
-    private func upgradeCTA(_ value: Any?) -> Any? {
+    private func jsonValueOrNull<T>(_ value: T?) -> Any {
+        if let value { return value }
+        return NSNull()
+    }
+
+    private func upgradeCTA(_ value: Any?) -> [String: Any]? {
         guard let recommendation = value as? [String: Any],
               let button = recommendation["cta"] as? [String: Any],
               let label = button["label"] as? String,
@@ -1122,7 +1127,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
                     "kind": "dashboard-action",
                     "action": "requestLimitIncrease",
                     "args": args,
-                    "successMessage": success?.isEmpty == false ? success! : NSNull(),
+                    "successMessage": jsonValueOrNull(success?.isEmpty == false ? success : nil),
                 ],
             ]
         }
