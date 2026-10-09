@@ -109,6 +109,49 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertEqual(scoped.mcpCustomInstructionsAccountScope, "owner-b")
     }
 
+    @MainActor
+    func testAccountAuthorizerClaimsFirstUnscopedSettingsAndAbandonsForeignScope() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        store.setMcpCustomInstructions(["GitHub": "legacy-owner"])
+        store.setHasSeenOnboarding(true)
+
+        var localHumanID: String?
+        let authorizer = IOSAccountAuthorizer(
+            applyAccountScope: { slot in
+                if let slot {
+                    store.scopeToAccount(slot)
+                } else {
+                    store.clearAccountScope()
+                }
+            },
+            applyLocalHumanIdentity: { slot in
+                localHumanID = slot
+            }
+        )
+
+        XCTAssertEqual(
+            authorizer.authorizeSettledHostSlot("owner-a", previousSlot: nil),
+            .ready(slot: "owner-a")
+        )
+        XCTAssertEqual(store.getMcpCustomInstructions()["GitHub"], "legacy-owner")
+        XCTAssertEqual(store.load().hasSeenOnboarding, true)
+        XCTAssertEqual(localHumanID, "owner-a")
+
+        XCTAssertEqual(
+            authorizer.authorizeSettledHostSlot("owner-b", previousSlot: "owner-a"),
+            .ready(slot: "owner-b")
+        )
+        let replaced = store.load()
+        XCTAssertTrue(replaced.mcpCustomInstructions.isEmpty)
+        XCTAssertNil(replaced.hasSeenOnboarding)
+        XCTAssertEqual(replaced.mcpCustomInstructionsAccountScope, "owner-b")
+        XCTAssertEqual(localHumanID, "owner-b")
+    }
+
     func testDefaultsFailClosedForInvalidOrCorruptSettings() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
