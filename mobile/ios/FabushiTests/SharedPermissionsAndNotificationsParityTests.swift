@@ -318,4 +318,57 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         XCTAssertFalse(broadcast[1].contains("\n        CURRENT_PROJECT_VERSION:"))
     }
 
+    func testLinkPreviewImagePolicyBoundsDecodeAndResizeBeforeRendering() {
+        func appendU32LE(_ value: UInt32, to bytes: inout [UInt8]) {
+            bytes.append(UInt8(value & 0xff))
+            bytes.append(UInt8((value >> 8) & 0xff))
+            bytes.append(UInt8((value >> 16) & 0xff))
+            bytes.append(UInt8((value >> 24) & 0xff))
+        }
+
+        func icoDataURL(width: Int32, height: Int32) -> String {
+            var bytes: [UInt8] = [
+                0, 0, 1, 0, 1, 0, // icon header
+                0, 0, 0, 0, 1, 0, 32, 0, // 256x256 directory hint
+                12, 0, 0, 0, 22, 0, 0, 0, // payload length/offset
+            ]
+            appendU32LE(40, to: &bytes)
+            appendU32LE(UInt32(bitPattern: width), to: &bytes)
+            appendU32LE(UInt32(bitPattern: height * 2), to: &bytes)
+            return "data:image/x-icon;base64,\(Data(bytes).base64EncodedString())"
+        }
+
+        let landscape = icoDataURL(width: 400, height: 200)
+        XCTAssertEqual(
+            LinkPreviewImagePolicy.readEncodedImageSize(landscape),
+            .init(width: 400, height: 200)
+        )
+
+        var requestedTarget: LinkPreviewResizeTarget?
+        let resized = LinkPreviewImagePolicy.bound(
+            landscape,
+            bounds: .init(maxDimension: 300, encoding: "jpeg")
+        ) { _, target, encoding in
+            requestedTarget = target
+            XCTAssertEqual(encoding, "jpeg")
+            return "resized"
+        }
+        XCTAssertEqual(requestedTarget, .width(300))
+        XCTAssertEqual(resized, "resized")
+
+        let fallback = LinkPreviewImagePolicy.bound(
+            landscape,
+            bounds: .init(maxDimension: 300, encoding: "jpeg")
+        ) { _, _, _ in nil }
+        XCTAssertEqual(fallback, landscape)
+
+        let oversized = icoDataURL(width: 6_000, height: 5_000)
+        XCTAssertNil(LinkPreviewImagePolicy.bound(
+            oversized,
+            bounds: .init(maxDimension: 512, encoding: "jpeg")
+        ) { _, _, _ in "must-not-resize" })
+        XCTAssertNil(LinkPreviewImagePolicy.readEncodedImageSize("not-a-data-url"))
+    }
+
+
 }
