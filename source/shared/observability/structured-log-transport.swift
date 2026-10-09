@@ -114,10 +114,12 @@ actor StructuredLogTransport {
     private let submit: StructuredLogSubmitter
     private var identityTags: [String: String] = [:]
     private var buffer: [BufferedStructuredLog]
+    private var activeBatch: [BufferedStructuredLog] = []
     private var counters: StructuredLogDropCounters
     private var counterID: String
     private var holdForIdentity: Bool
     private var disposed = false
+    private var deliveryGeneration = 0
 
     init(
         key: String,
@@ -160,15 +162,32 @@ actor StructuredLogTransport {
             timestampMs: timestampMs
         ))
 
-        if buffer.count > MAX_BUFFER_SIZE {
-            let overflow = buffer.count - MAX_BUFFER_SIZE
-            buffer.removeFirst(overflow)
-            recordDropped(reason: "overflow_evicted", count: overflow)
+        dropBufferOverflow()
+    }
+
+    private func dropBufferOverflow() {
+        var overflow = buffer.count - MAX_BUFFER_SIZE
+        guard overflow > 0 else { return }
+
+        var evicted = 0
+        buffer.removeAll { entry in
+            guard overflow > 0,
+                  entry.message == HOST_LOG_EVENT || entry.message == BOX_LOG_EVENT else {
+                return false
+            }
+            overflow -= 1
+            evicted += 1
+            return true
         }
+        if overflow > 0 {
+            buffer.removeFirst(overflow)
+            evicted += overflow
+        }
+        recordDropped(reason: "overflow_evicted", count: evicted)
     }
 
     func capturePending() -> [BufferedStructuredLog] {
-        buffer
+        activeBatch + buffer
     }
 
     func captureCheckpoint() -> StructuredLogCheckpoint {
@@ -183,17 +202,74 @@ actor StructuredLogTransport {
     }
 
     func clearPending() {
-        if !buffer.isEmpty {
-            recordDropped(reason: "account_rotated", count: buffer.count)
-        }
+        deliveryGeneration += 1
+        activeBatch.removeAll()
         buffer.removeAll()
         counterID = createDropCounterID()
         counters = emptyDropCounters()
     }
 
+    private func pendingDropSnapshot() -> [(reason: String, through: Int)] {
+        TELEMETRY_DROP_REASONS.compactMap { reason in
+            guard let counter = counters[reason],
+                  counter.observed > counter.acknowledgedThrough else { return nil }
+            return (reason, counter.observed)
+        }
+    }
+
+    private func buildEntry(
+        level: StructuredLogLevel,
+        message: String,
+        metadata: [String: String],
+        timestampMs: Int64
+    ) -> StructuredLogEntry {
+        StructuredLogEntry(
+            level: toClientLogLevel(level),
+            message: message,
+            metadata: metadata.merging(identityTags) { _, identity in identity },
+            timestamp: timestampMs,
+            key: key
+        )
+    }
+
+    private func reportPendingDrops(generation: Int, nowMs: Int64) async -> Bool {
+        let snapshot = pendingDropSnapshot()
+        guard !snapshot.isEmpty else { return true }
+        let reports = snapshot.map { item in
+            var metadata = platformTags
+            metadata["reason"] = item.reason
+            metadata["unit"] = TELEMETRY_DROP_UNIT_BY_REASON[item.reason] ?? "entries"
+            metadata["count"] = String(item.through)
+            metadata["counter_id"] = counterID
+            return buildEntry(
+                level: .warn,
+                message: TELEMETRY_DROPPED_EVENT,
+                metadata: metadata,
+                timestampMs: nowMs
+            )
+        }
+
+        do {
+            let receipt = try await submit(reports)
+            guard generation == deliveryGeneration else { return true }
+            guard isValidLogShipReceipt(receipt, requestSize: reports.count),
+                  receipt.logsProcessed == reports.count,
+                  receipt.logsDropped == 0 else { return false }
+            for item in snapshot {
+                guard var counter = counters[item.reason] else { continue }
+                counter.acknowledgedThrough = max(counter.acknowledgedThrough, item.through)
+                counters[item.reason] = counter
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
     func flushNow(nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)) async -> Bool {
-        guard !disposed else { return buffer.isEmpty }
+        guard !disposed else { return activeBatch.isEmpty && buffer.isEmpty && pendingDropSnapshot().isEmpty }
         guard !holdForIdentity else { return false }
+        let generation = deliveryGeneration
 
         let expiredCutoff = nowMs - Int64(STRUCTURED_LOG_REPLAY_MAX_AGE_MS)
         let expiredCount = buffer.lazy.filter { $0.timestampMs < expiredCutoff }.count
@@ -202,46 +278,67 @@ actor StructuredLogTransport {
             recordDropped(reason: "replay_expired", count: expiredCount)
         }
 
-        guard !buffer.isEmpty else { return true }
+        guard !buffer.isEmpty else {
+            return await reportPendingDrops(generation: generation, nowMs: nowMs)
+        }
 
         let split = takeLogShipBatch(buffer) {
             LogShipBufferedEntry(message: $0.message, metadata: $0.metadata)
         }
         let batch = split.batch
         buffer = split.remaining
+        activeBatch = batch
 
         let entries = batch.map { record in
-            StructuredLogEntry(
-                level: toClientLogLevel(record.level),
+            buildEntry(
+                level: record.level,
                 message: record.message,
-                metadata: record.metadata.merging(identityTags) { _, identity in identity },
-                timestamp: record.timestampMs,
-                key: key
+                metadata: record.metadata,
+                timestampMs: record.timestampMs
             )
         }
 
         do {
             let receipt = try await submit(entries)
+            guard generation == deliveryGeneration else {
+                activeBatch.removeAll()
+                return true
+            }
             guard isValidLogShipReceipt(receipt, requestSize: entries.count) else {
                 buffer.insert(contentsOf: batch, at: 0)
+                activeBatch.removeAll()
                 recordDropped(reason: "ship_failed", count: 1)
+                dropBufferOverflow()
                 return false
             }
+            activeBatch.removeAll()
             if receipt.logsDropped > 0 {
                 recordDropped(reason: "backend_dropped", count: receipt.logsDropped)
             }
-            return true
+            return await reportPendingDrops(generation: generation, nowMs: nowMs)
         } catch {
+            guard generation == deliveryGeneration else {
+                activeBatch.removeAll()
+                return true
+            }
             buffer.insert(contentsOf: batch, at: 0)
-            recordDropped(reason: isDeadlineExpiry(error) ? "ship_failed" : "ship_failed", count: 1)
+            activeBatch.removeAll()
+            recordDropped(reason: "ship_failed", count: 1)
+            dropBufferOverflow()
             return false
         }
     }
 
     func dispose(retainUndelivered: Bool = true) {
         disposed = true
+        deliveryGeneration += 1
         if !retainUndelivered {
+            activeBatch.removeAll()
             buffer.removeAll()
+        } else if !activeBatch.isEmpty {
+            buffer.insert(contentsOf: activeBatch, at: 0)
+            activeBatch.removeAll()
+            dropBufferOverflow()
         }
     }
 }
