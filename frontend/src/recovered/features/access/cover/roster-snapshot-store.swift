@@ -101,7 +101,7 @@ enum AccessRosterSnapshotProjection {
 }
 
 enum AccessRosterPersistence {
-    static let schemaVersion = 2
+    static let schemaVersion = 3
     private static let keyPrefix = "fabushi.ios.roster.last-roster.v2:"
 
     private struct Envelope: Codable {
@@ -128,6 +128,7 @@ enum AccessRosterPersistence {
         let menuButtonText: String?
         let isGroup: Bool
         let memberIds: [String]
+        let conversationPartnerIds: [String]
         let isSharedRoom: Bool
 
         init(_ bot: MobileBotSummary) {
@@ -149,6 +150,7 @@ enum AccessRosterPersistence {
             menuButtonText = bot.menuButtonText
             isGroup = bot.isGroup
             memberIds = bot.memberIds
+            conversationPartnerIds = bot.conversationPartnerIds
             isSharedRoom = bot.isSharedRoom
         }
 
@@ -172,6 +174,7 @@ enum AccessRosterPersistence {
                 menuButtonText: menuButtonText,
                 isGroup: isGroup,
                 memberIds: memberIds,
+                conversationPartnerIds: conversationPartnerIds,
                 isSharedRoom: isSharedRoom
             )
         }
