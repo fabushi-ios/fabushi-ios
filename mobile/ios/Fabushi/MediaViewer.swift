@@ -43,6 +43,7 @@ struct MediaViewer: View {
     @State private var localURL: URL?
     @State private var errorMessage: String?
     @State private var loading = true
+    @State private var loadGeneration = 0
 
     var body: some View {
         NavigationStack {
@@ -64,6 +65,7 @@ struct MediaViewer: View {
             }
         }
         .task(id: message.id) { await load() }
+        .onDisappear { invalidateLoadAndCleanUp() }
     }
 
     @ViewBuilder
@@ -119,9 +121,16 @@ struct MediaViewer: View {
 
     @MainActor
     private func load() async {
+        loadGeneration = loadGeneration == Int.max ? 1 : loadGeneration + 1
+        let generation = loadGeneration
+        if let staleURL = localURL { try? FileManager.default.removeItem(at: staleURL) }
+        data = nil
+        localURL = nil
         loading = true
         errorMessage = nil
-        defer { loading = false }
+        defer {
+            if generation == loadGeneration { loading = false }
+        }
         guard let blobId = message.mediaBlobId, message.mediaSizeBytes > 0 else {
             errorMessage = "媒体文件不可用"
             return
@@ -140,15 +149,32 @@ struct MediaViewer: View {
         }
         do {
             let bytes = try await messaging.loadBlob(blobId: blobId, sizeBytes: message.mediaSizeBytes)
-            data = bytes
+            guard generation == loadGeneration, !Task.isCancelled else { return }
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent("fabushi-media", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let safeName = (message.mediaFileName ?? "media-\(message.id)").replacingOccurrences(of: "/", with: "-")
-            let url = directory.appendingPathComponent(safeName)
+            let url = directory.appendingPathComponent("\(generation)-\(safeName)")
             try bytes.write(to: url, options: .atomic)
+            guard generation == loadGeneration, !Task.isCancelled else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            data = bytes
             localURL = url
+        } catch is CancellationError {
+            return
         } catch {
+            guard generation == loadGeneration else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func invalidateLoadAndCleanUp() {
+        loadGeneration = loadGeneration == Int.max ? 1 : loadGeneration + 1
+        if let localURL { try? FileManager.default.removeItem(at: localURL) }
+        data = nil
+        localURL = nil
+        loading = false
     }
 }
