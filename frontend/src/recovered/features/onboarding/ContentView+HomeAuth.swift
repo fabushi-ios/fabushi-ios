@@ -170,31 +170,413 @@ extension ContentView {
 
     var onboardingView: some View {
         ZStack {
-            Color(red: 0.043, green: 0.043, blue: 0.047).ignoresSafeArea()
-            VStack(spacing: 22) {
-                Spacer()
-                avatar.frame(width: 92, height: 92)
-                Text("欢迎来到法布施").font(.largeTitle.bold()).foregroundStyle(.white)
-                Text("统一的聊天、插件和 Mahayana 多步骤智能体工作台。每一步工作都会像消息一样实时出现。")
-                    .multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.72)).padding(.horizontal, 32)
-                HStack(spacing: 7) {
-                    ForEach(0..<3, id: \.self) { index in
-                        Capsule().fill(index <= model.onboardingStep ? Color.accentColor : Color.white.opacity(0.18)).frame(width: 24, height: 5)
-                    }
+            Color(red: 0.985, green: 0.985, blue: 0.978).ignoresSafeArea()
+            VStack(spacing: 20) {
+                onboardingStepContent
+                if model.signedInOnboardingStep != .handOff {
+                    onboardingFooter
                 }
-                Spacer()
-                Button(model.onboardingStep >= 2 ? "开始使用" : "继续") { model.advanceOnboarding() }
-                    .buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier("mobile-onboarding-continue")
-                Button("跳过介绍") { model.onboardingStep = 3; UserDefaults.standard.set(true, forKey: "fabushi.mobile.onboarding-complete.v1") }
-                    .font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("mobile-onboarding-skip")
+                if model.signedInOnboardingStep != .completed {
+                    Button("跳过介绍") {
+                        cancelOnboardingOperation()
+                        model.skipSignedInOnboarding()
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .disabled(onboardingCreateBusy)
+                    .accessibilityIdentifier("mobile-onboarding-skip")
+                }
                 if let featureHostSmokeStatus = model.featureHostSmokeStatus {
-                    Text(featureHostSmokeStatus).font(.caption2).foregroundStyle(.clear).accessibilityIdentifier("feature-host-smoke")
+                    Text(featureHostSmokeStatus)
+                        .font(.caption2)
+                        .foregroundStyle(.clear)
+                        .accessibilityIdentifier("feature-host-smoke")
                 }
             }
             .padding(24)
         }
+        .task(id: model.settingsNoticeAccountKey) {
+            synchronizeOnboardingAccountScope()
+        }
+        .onDisappear {
+            if model.signedInOnboardingStep != .completed {
+                cancelOnboardingOperation()
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mobile-onboarding")
+    }
+
+    @ViewBuilder
+    var onboardingStepContent: some View {
+        switch model.signedInOnboardingStep {
+        case .meet:
+            Spacer()
+            avatar.frame(width: 92, height: 92)
+            Text("Meet Fabushi")
+                .font(.largeTitle.bold())
+                .accessibilityIdentifier("mobile-onboarding-meet-title")
+            Text(MobileSignedInOnboardingContract.meetText)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+            Spacer()
+        case .computerDemo:
+            Spacer()
+            Text("Fabushi has its own computer and works just like you")
+                .font(.title2.bold())
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("mobile-onboarding-computer-title")
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color.black.opacity(0.88))
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Circle().fill(.red).frame(width: 9, height: 9)
+                        Circle().fill(.yellow).frame(width: 9, height: 9)
+                        Circle().fill(.green).frame(width: 9, height: 9)
+                    }
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.10))
+                        .overlay {
+                            VStack(spacing: 9) {
+                                Label("Research", systemImage: "magnifyingglass")
+                                Label("Draft", systemImage: "doc.text")
+                                Label("Send", systemImage: "paperplane")
+                            }
+                            .foregroundStyle(.white)
+                        }
+                }
+                .padding(18)
+            }
+            .frame(maxWidth: 420, maxHeight: 250)
+            .accessibilityLabel("Fabushi computer demo")
+            .accessibilityIdentifier("mobile-onboarding-computer-demo")
+            Spacer()
+        case .jobs:
+            Spacer()
+            Text("Give each Bot a job")
+                .font(.largeTitle.bold())
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("mobile-onboarding-jobs-title")
+            VStack(spacing: 12) {
+                ForEach(MobileSignedInOnboardingContract.jobs, id: \.self) { job in
+                    Label(job, systemImage: "sparkles")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
+                }
+            }
+            .frame(maxWidth: 440)
+            Spacer()
+        case .tools:
+            Text("What do you use every day?")
+                .font(.largeTitle.bold())
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("mobile-onboarding-tools-title")
+            TextField("Search", text: $onboardingToolQuery)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("mobile-onboarding-tool-search")
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
+                    ForEach(MobileOnboardingTool.filtered(onboardingToolQuery)) { tool in
+                        let selected = onboardingDailyTools.contains(tool.label)
+                        Button {
+                            if selected {
+                                onboardingDailyTools.removeAll { $0 == tool.label }
+                            } else {
+                                onboardingDailyTools.append(tool.label)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                Text(tool.label).lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityValue(selected ? "Selected" : "Not selected")
+                        .accessibilityIdentifier("mobile-onboarding-tool-\(tool.id)")
+                    }
+                }
+            }
+        case .create:
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("New Bot")
+                        .font(.largeTitle.bold())
+                        .accessibilityIdentifier("mobile-onboarding-create-title")
+                    HStack(spacing: 16) {
+                        LoginBlob(
+                            color: onboardingColor(onboardingDraft.normalized.color),
+                            width: 64,
+                            height: 64,
+                            rotation: 0
+                        )
+                        VStack(alignment: .leading) {
+                            Text(onboardingDraft.normalized.shape.capitalized)
+                                .font(.headline)
+                            Text(onboardingDraft.normalized.color.capitalized)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    TextField("Name", text: $onboardingDraft.name)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("mobile-onboarding-bot-name")
+
+                    Text("Character color").font(.caption).foregroundStyle(.secondary)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 10) {
+                        ForEach(AvatarImagePolicy.colors, id: \.id) { color in
+                            Button {
+                                onboardingDraft.color = color.id
+                                onboardingDraft.pickedTemplateId = nil
+                            } label: {
+                                Circle()
+                                    .fill(onboardingColor(color.id))
+                                    .frame(width: 30, height: 30)
+                                    .overlay(
+                                        Circle().stroke(
+                                            onboardingDraft.normalized.color == color.id ? Color.primary : Color.clear,
+                                            lineWidth: 2
+                                        )
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(color.label) color")
+                        }
+                    }
+
+                    Text("Character shape").font(.caption).foregroundStyle(.secondary)
+                    LazyVGrid(columns: Array(repeating: GridItem(.adaptive(minimum: 72)), count: 1), spacing: 8) {
+                        ForEach(AvatarImagePolicy.shapes, id: \.self) { shape in
+                            Button(shape.capitalized) {
+                                onboardingDraft.shape = shape
+                                onboardingDraft.pickedTemplateId = nil
+                            }
+                            .buttonStyle(onboardingDraft.normalized.shape == shape ? .borderedProminent : .bordered)
+                            .accessibilityLabel("\(shape) shape")
+                        }
+                    }
+
+                    Text("Suggestions").font(.headline)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(MobileOnboardingSuggestion.selected(for: onboardingDailyTools)) { choice in
+                                Button {
+                                    onboardingDraft.name = choice.suggestion.name
+                                    onboardingDraft.description = choice.renderedDescription
+                                    onboardingDraft.pickedTemplateId = choice.suggestion.id
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(choice.suggestion.name).font(.headline)
+                                        Text(choice.renderedDescription)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .multilineTextAlignment(.leading)
+                                    }
+                                    .frame(width: 190, alignment: .leading)
+                                    .padding()
+                                }
+                                .buttonStyle(.bordered)
+                                .accessibilityIdentifier("mobile-onboarding-suggestion-\(choice.id)")
+                            }
+                        }
+                    }
+
+                    Button(onboardingCreateBusy ? "Getting started…" : "Get started") {
+                        submitSignedInOnboarding()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(!onboardingDraft.canSubmit || onboardingCreateBusy)
+                    .accessibilityIdentifier("mobile-onboarding-create")
+                }
+            }
+        case .handOff:
+            Spacer()
+            avatar.frame(width: 76, height: 76)
+            if let onboardingCreateError {
+                Text("Fabushi couldn’t finish setting up")
+                    .font(.title2.bold())
+                    .multilineTextAlignment(.center)
+                Text(onboardingCreateError)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("mobile-onboarding-create-error")
+                Button("Try again") {
+                    submitSignedInOnboarding()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(onboardingCreateBusy)
+                .accessibilityIdentifier("mobile-onboarding-create-retry")
+            } else {
+                ProgressView()
+                Text("Getting your team ready…")
+                    .font(.title3.weight(.semibold))
+                    .accessibilityIdentifier("mobile-onboarding-hand-off-status")
+            }
+            Spacer()
+        case .completed:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    var onboardingFooter: some View {
+        let step = model.signedInOnboardingStep
+        if step != .create && step != .completed {
+            HStack {
+                if let previous = step.previous {
+                    Button("Back") {
+                        model.signedInOnboardingStep = previous
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("mobile-onboarding-back")
+                }
+                Spacer()
+                Button("Next") {
+                    model.advanceOnboarding()
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("mobile-onboarding-continue")
+            }
+        }
+    }
+
+    func onboardingColor(_ id: String) -> Color {
+        guard let value = AvatarImagePolicy.colors.first(where: { $0.id == id })?.value else {
+            return .blue
+        }
+        let cleaned = value.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        var parsed: UInt64 = 0
+        Scanner(string: cleaned).scanHexInt64(&parsed)
+        return Color(
+            red: Double((parsed >> 16) & 0xff) / 255,
+            green: Double((parsed >> 8) & 0xff) / 255,
+            blue: Double(parsed & 0xff) / 255
+        )
+    }
+
+    @MainActor
+    func synchronizeOnboardingAccountScope() {
+        let scope = model.settingsNoticeAccountKey
+        guard onboardingAccountScope != scope else { return }
+        onboardingAccountScope = scope
+        cancelOnboardingOperation()
+        onboardingDraft = .init()
+        onboardingDailyTools = []
+        onboardingToolQuery = ""
+        onboardingCreateError = nil
+        onboardingCreatedAgentId = nil
+        onboardingCreateRequestId = "ios-signed-in-onboarding-\(UUID().uuidString.lowercased())"
+    }
+
+    @MainActor
+    func cancelOnboardingOperation() {
+        onboardingOperationGeneration &+= 1
+        onboardingOperationTask?.cancel()
+        onboardingOperationTask = nil
+        onboardingCreateBusy = false
+    }
+
+    @MainActor
+    func submitSignedInOnboarding() {
+        guard let bridge,
+              model.loggedIn,
+              onboardingDraft.canSubmit,
+              !onboardingCreateBusy
+        else { return }
+
+        onboardingOperationGeneration &+= 1
+        let generation = onboardingOperationGeneration
+        let accountScope = model.settingsNoticeAccountKey
+        let draft = onboardingDraft.normalized
+        let dailyTools = onboardingDailyTools
+        let requestId = onboardingCreateRequestId
+        onboardingCreateBusy = true
+        onboardingCreateError = nil
+        model.beginOnboardingHandOff()
+
+        onboardingOperationTask?.cancel()
+        onboardingOperationTask = Task { @MainActor in
+            defer {
+                if generation == onboardingOperationGeneration {
+                    onboardingCreateBusy = false
+                    onboardingOperationTask = nil
+                }
+            }
+            do {
+                let service = GrokMobileBotService(bridge: bridge)
+                let existing = try await service.loadCanonicalRoster()
+                try Task.checkCancellation()
+                guard generation == onboardingOperationGeneration,
+                      model.loggedIn,
+                      model.settingsNoticeAccountKey == accountScope
+                else { return }
+
+                if !existing.isEmpty {
+                    onboardingCreatedAgentId = nil
+                    try await Task.sleep(nanoseconds: MobileSignedInOnboardingContract.handOffDwellNanoseconds)
+                    try Task.checkCancellation()
+                    guard generation == onboardingOperationGeneration,
+                          model.settingsNoticeAccountKey == accountScope
+                    else { return }
+                    onboardingOperationTask = nil
+                    model.completeSignedInOnboarding()
+                    return
+                }
+
+                let description = MobileSignedInOnboardingContract.descriptionWithDailyTools(
+                    draft.description,
+                    tools: dailyTools
+                )
+                let roster = try await service.createOnboardingBot(
+                    name: draft.name,
+                    description: description,
+                    avatarShape: draft.shape,
+                    avatarColor: draft.color,
+                    templateId: draft.pickedTemplateId,
+                    requestId: requestId
+                )
+                try Task.checkCancellation()
+                guard generation == onboardingOperationGeneration,
+                      model.loggedIn,
+                      model.settingsNoticeAccountKey == accountScope
+                else { return }
+
+                let existingIds = Set(existing.map(\.id))
+                guard let created = roster.first(where: { !existingIds.contains($0.id) })
+                    ?? roster.first(where: {
+                        $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                            == draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    })
+                else {
+                    throw NSError(
+                        domain: "Fabushi.MobileSignedInOnboarding",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Bot creation returned no matching Bot."]
+                    )
+                }
+                onboardingCreatedAgentId = created.id
+                try await Task.sleep(nanoseconds: MobileSignedInOnboardingContract.handOffDwellNanoseconds)
+                try Task.checkCancellation()
+                guard generation == onboardingOperationGeneration,
+                      model.settingsNoticeAccountKey == accountScope
+                else { return }
+                onboardingOperationTask = nil
+                model.completeSignedInOnboarding()
+            } catch is CancellationError {
+                return
+            } catch {
+                guard generation == onboardingOperationGeneration,
+                      model.settingsNoticeAccountKey == accountScope
+                else { return }
+                onboardingCreateError = MobileSignedInOnboardingContract.createErrorMessage(error)
+                model.signedInOnboardingStep = .handOff
+            }
+        }
     }
 
     var authLoadingView: some View {
