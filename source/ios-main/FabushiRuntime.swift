@@ -345,7 +345,8 @@ final class FabushiRuntime {
         }
         resumeTask?.cancel()
         let task = Task { [weak self] in
-            await self?.resyncAfterLifecycleRecovery(reason: "user-retry")
+            guard let self else { return }
+            await self.resyncAfterLifecycleRecovery(reason: "user-retry")
         }
         connectionRetryTask = task
         await task.value
