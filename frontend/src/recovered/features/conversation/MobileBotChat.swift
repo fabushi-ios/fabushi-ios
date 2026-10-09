@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 internal func isMobileBotVisibleAssistantCompletion(
     _ event: [String: Any],
@@ -67,6 +68,56 @@ internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> Mo
     )
     message.createdAt = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1_000)
     return message
+}
+
+internal func mobileTranscriptCanonicalId(_ message: MobileChatMessage) -> String {
+    message.canonicalMessageId ?? message.id
+}
+
+internal func mobileMainTranscriptEntries(_ entries: [MobileChatMessage]) -> [MobileChatMessage] {
+    let topology = entries.map {
+        TranscriptEntry(
+            kind: "message",
+            id: mobileTranscriptCanonicalId($0),
+            replyTo: $0.replyToMessageId,
+            branched: $0.branched
+        )
+    }
+    let mainIds = Set(getMainTranscriptEntries(topology).compactMap(\.id))
+    return entries.filter { mainIds.contains(mobileTranscriptCanonicalId($0)) }
+}
+
+internal func mobileThreadEntries(
+    _ entries: [MobileChatMessage],
+    rootId: String
+) -> [MobileChatMessage] {
+    let topology = entries.map {
+        TranscriptEntry(
+            kind: "message",
+            id: mobileTranscriptCanonicalId($0),
+            replyTo: $0.replyToMessageId,
+            branched: $0.branched
+        )
+    }
+    let threadIds = Set(getThreadTranscriptEntries(topology, rootId: rootId).compactMap(\.id))
+    return entries.filter { threadIds.contains(mobileTranscriptCanonicalId($0)) }
+}
+
+internal func mobileThreadReplyCounts(_ entries: [MobileChatMessage]) -> [String: Int] {
+    let branched = entries.compactMap { message -> BranchedTranscriptEntry? in
+        guard message.branched, let replyTo = message.replyToMessageId else { return nil }
+        return BranchedTranscriptEntry(id: mobileTranscriptCanonicalId(message), replyTo: replyTo)
+    }
+    return branchReplyCounts(branched)
+}
+
+internal func mobileTranscriptCopyText(_ entry: MobileChatMessage) -> String? {
+    if let projection = entry.sendMessageTextProjection {
+        guard case .text = projection.presentation else { return nil }
+        return projection.content.isEmpty ? nil : projection.content
+    }
+    guard entry.kind == .message, !entry.text.isEmpty else { return nil }
+    return entry.text
 }
 
 internal func reconcileMobileConversationBaseline(
@@ -189,6 +240,7 @@ internal struct MobileBotChat: View {
     @State private var asyncTasksPresented = false
     @State private var replyTargetId: String?
     @State private var replyIsFork = false
+    @State private var threadRootId: String?
     @State private var voiceRecorder = VoiceRecorder()
     @State private var voiceTranscriber = OfflineSpeechTranscriber()
     @State private var transcribingVoice = false
@@ -242,6 +294,14 @@ internal struct MobileBotChat: View {
         }
         .sheet(isPresented: $reactionPickerPresented) {
             reactionPickerSheet
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { threadRootId != nil },
+                set: { presented in if !presented { threadRootId = nil } }
+            )
+        ) {
+            threadSheet
         }
     }
 
@@ -325,7 +385,7 @@ internal struct MobileBotChat: View {
                         .padding(.horizontal, 30)
                     }
 
-                    ForEach(entries) { entry in
+                    ForEach(mobileMainTranscriptEntries(entries)) { entry in
                         transcript(entry)
                             .id(entry.id)
                     }
@@ -342,7 +402,7 @@ internal struct MobileBotChat: View {
             }
             .background(Color(red: 0.985, green: 0.985, blue: 0.975))
             .onChange(of: entries.count) { _, _ in
-                if let last = entries.last {
+                if let last = mobileMainTranscriptEntries(entries).last {
                     withAnimation(.easeOut(duration: 0.16)) {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
@@ -355,8 +415,8 @@ internal struct MobileBotChat: View {
     private var replyBanner: some View {
         if let replyTargetId {
             HStack(spacing: 8) {
-                Image(systemName: replyIsFork ? "arrow.triangle.branch" : "arrowshape.turn.up.left")
-                Text(replyIsFork ? "Fork reply · \(replyTargetId)" : "Replying · \(replyTargetId)")
+                Image(systemName: replyIsFork ? "bubble.left.and.bubble.right" : "arrowshape.turn.up.left")
+                Text(replyIsFork ? "Thread reply · \(replyTargetId)" : "Replying · \(replyTargetId)")
                     .font(.caption)
                     .lineLimit(1)
                 Spacer()
@@ -775,14 +835,18 @@ internal struct MobileBotChat: View {
                     messageTextContent(entry)
                     attachmentContent(entry)
                     reactionPills(entry)
+                    threadAffordance(entry)
                 }
                 .foregroundStyle(.white)
                 .tint(.white)
                 .padding(.horizontal, 15).padding(.vertical, 10)
                 .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .contextMenu {
-                    Button("Reply") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = false }
-                    Button("Reply in Fork") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = true }
+                    Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
+                    Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
+                    if let copyText = mobileTranscriptCopyText(entry) {
+                        Button("Copy") { UIPasteboard.general.string = copyText }
+                    }
                     reactionMenu(entry)
                 }
             }
@@ -796,17 +860,90 @@ internal struct MobileBotChat: View {
                             .foregroundStyle(.black)
                         attachmentContent(entry)
                         reactionPills(entry)
+                        threadAffordance(entry)
                     }
                     .padding(.horizontal, 15).padding(.vertical, 10)
                     .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .contextMenu {
-                        Button("Reply") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = false }
-                        Button("Reply in Fork") { replyTargetId = entry.canonicalMessageId ?? entry.id; replyIsFork = true }
+                        Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
+                        Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
+                    if let copyText = mobileTranscriptCopyText(entry) {
+                        Button("Copy") { UIPasteboard.general.string = copyText }
+                    }
                         reactionMenu(entry)
                     }
                     Spacer(minLength: 30)
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func beginReply(to entry: MobileChatMessage, inThread: Bool) {
+        replyTargetId = mobileTranscriptCanonicalId(entry)
+        replyIsFork = inThread
+        if threadRootId != nil { threadRootId = nil }
+    }
+
+    @ViewBuilder
+    private func threadAffordance(_ entry: MobileChatMessage) -> some View {
+        if threadRootId == nil {
+            let rootId = mobileTranscriptCanonicalId(entry)
+            let count = mobileThreadReplyCounts(entries)[rootId] ?? 0
+            if count > 0 {
+                Button {
+                    threadRootId = rootId
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("View thread")
+                        Text(count == 1 ? "1 reply" : "\(count) replies")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption2.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View thread, \(count == 1 ? "1 reply" : "\(count) replies")")
+                .accessibilityIdentifier(Self.semanticId("mobile-bot-view-thread-\(rootId)"))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var threadSheet: some View {
+        if let rootId = threadRootId {
+            NavigationStack {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 9) {
+                        ForEach(mobileThreadEntries(entries, rootId: rootId)) { entry in
+                            transcript(entry)
+                                .id("thread:\(entry.id)")
+                        }
+                    }
+                    .padding(16)
+                }
+                .navigationTitle("Thread")
+                .navigationBarTitleDisplayMode(.inline)
+                .safeAreaInset(edge: .bottom) {
+                    Button {
+                        replyTargetId = rootId
+                        replyIsFork = true
+                        threadRootId = nil
+                    } label: {
+                        Label("Reply in thread", systemImage: "arrowshape.turn.up.left")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding()
+                    .background(.ultraThinMaterial)
+                    .accessibilityIdentifier(Self.semanticId("mobile-bot-thread-reply-\(rootId)"))
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { threadRootId = nil }
+                    }
+                }
+            }
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-thread-\(rootId)"))
         }
     }
 

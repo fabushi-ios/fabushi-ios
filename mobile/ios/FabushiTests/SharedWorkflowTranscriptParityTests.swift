@@ -102,6 +102,41 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         ]))
     }
 
+    func testMobileTranscriptMessageActionsProjectMainThreadCountsAndCopySemantics() throws {
+        var root = MobileChatMessage(id: "root", role: .assistant, text: "Root", canonicalMessageId: "root")
+        var first = MobileChatMessage(id: "first", role: .assistant, text: "First", canonicalMessageId: "first")
+        first.replyToMessageId = "root"
+        first.branched = true
+        var nested = MobileChatMessage(id: "nested", role: .user, text: "Nested", canonicalMessageId: "nested")
+        nested.replyToMessageId = "first"
+        nested.branched = true
+        let main = MobileChatMessage(id: "main", role: .user, text: "Main", canonicalMessageId: "main")
+
+        let all = [root, first, nested, main]
+        XCTAssertEqual(mobileMainTranscriptEntries(all).map(mobileTranscriptCanonicalId), ["root", "main"])
+        XCTAssertEqual(mobileThreadEntries(all, rootId: "root").map(mobileTranscriptCanonicalId), ["root", "first", "nested"])
+        XCTAssertEqual(mobileThreadReplyCounts(all)["root"], 2)
+        XCTAssertEqual(mobileTranscriptCopyText(root), "Root")
+
+        root.text = ""
+        XCTAssertNil(mobileTranscriptCopyText(root))
+        let urlCard = MobileChatMessage(
+            id: "url",
+            role: .assistant,
+            text: "https://example.com",
+            sendMessageTextProjection: .init(
+                id: "url",
+                content: "https://example.com",
+                images: [],
+                channel: nil,
+                streaming: false,
+                timestampMs: nil,
+                presentation: .urlCard("https://example.com")
+            )
+        )
+        XCTAssertNil(mobileTranscriptCopyText(urlCard))
+    }
+
     func testTranscriptMainAndThreadProjection() {
         let entries: [TranscriptEntry] = [
             .init(kind: "message", id: "root"),
