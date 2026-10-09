@@ -122,10 +122,7 @@ final class MobileSignedInOnboardingParityTests: XCTestCase {
             description: String(repeating: "x", count: 2_200),
             avatarShape: "blob",
             avatarColor: "blue",
-            requestId: "stable-onboarding-request",
-            origin: "user",
-            isKickstartRequested: true,
-            templateId: "invoice-chaser"
+            requestId: "stable-onboarding-request"
         )
         XCTAssertEqual(command["type"] as? String, "bot.create")
         XCTAssertEqual(command["requestId"] as? String, "stable-onboarding-request")
@@ -133,9 +130,9 @@ final class MobileSignedInOnboardingParityTests: XCTestCase {
         XCTAssertEqual((command["description"] as? String)?.count, 2_000)
         XCTAssertEqual(command["avatarShape"] as? String, "blob")
         XCTAssertEqual(command["avatarColor"] as? String, "blue")
-        XCTAssertEqual(command["origin"] as? String, "user")
-        XCTAssertEqual(command["isKickstartRequested"] as? Bool, true)
-        XCTAssertEqual(command["templateId"] as? String, "invoice-chaser")
+        XCTAssertNil(command["origin"])
+        XCTAssertNil(command["isKickstartRequested"])
+        XCTAssertNil(command["templateId"])
     }
 
     func testTransportFailureMapsToRecoverableDesktopMessage() {
