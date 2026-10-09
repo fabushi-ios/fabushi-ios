@@ -310,4 +310,101 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
         XCTAssertTrue(cleared.isEmpty)
     }
 
+
+    func testRootNotificationLifecycleCommandsAndAccountScopeAreExact() throws {
+        XCTAssertNotEqual(
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 1
+            ),
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-b",
+                reconnectGeneration: 1
+            )
+        )
+        XCTAssertNotEqual(
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 1
+            ),
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 2
+            )
+        )
+
+        let list = mobileRootNotificationListCommand(requestID: "list-1")
+        XCTAssertEqual(list["type"] as? String, "tray.list")
+        XCTAssertEqual(list["requestId"] as? String, "list-1")
+
+        let dismiss = try XCTUnwrap(
+            mobileRootNotificationDismissCommand(
+                id: " tray-1 ",
+                requestID: "dismiss-1"
+            )
+        )
+        XCTAssertEqual(dismiss["type"] as? String, "tray.dismiss")
+        XCTAssertEqual(dismiss["requestId"] as? String, "dismiss-1")
+        XCTAssertEqual(dismiss["id"] as? String, "tray-1")
+        XCTAssertNil(
+            mobileRootNotificationDismissCommand(
+                id: "   ",
+                requestID: "dismiss-empty"
+            )
+        )
+
+        let clear = mobileRootNotificationClearCommand(requestID: "clear-1")
+        XCTAssertEqual(clear["type"] as? String, "tray.clear")
+        XCTAssertEqual(clear["requestId"] as? String, "clear-1")
+    }
+
+    func testRootNotificationActionsRouteOnlyValidatedTransportShapes() throws {
+        let open = try XCTUnwrap(
+            projectMobileRootNotificationAction([
+                "kind": "open-url",
+                "label": "Status",
+                "url": "https://status.example.com/path",
+            ])
+        )
+        let openRequest = mobileRootNotificationBridgeRequest(for: open)
+        XCTAssertEqual(openRequest.method, "openExternal")
+        XCTAssertEqual(
+            openRequest.params["url"] as? String,
+            "https://status.example.com/path"
+        )
+
+        let dashboard = try XCTUnwrap(
+            projectMobileRootNotificationAction([
+                "kind": "dashboard-action",
+                "label": "Retry",
+                "action": "retry-provider",
+                "args": ["provider": "cursor"],
+                "successMessage": "Retry requested",
+            ])
+        )
+        let dashboardRequest = mobileRootNotificationBridgeRequest(for: dashboard)
+        XCTAssertEqual(dashboardRequest.method, "invokeCursorDashboardAction")
+        XCTAssertEqual(dashboardRequest.params["action"] as? String, "retry-provider")
+        XCTAssertEqual(
+            (dashboardRequest.params["args"] as? [String: Any])?["provider"] as? String,
+            "cursor"
+        )
+
+        XCTAssertNil(
+            projectMobileRootNotificationAction([
+                "kind": "open-url",
+                "label": "Blocked",
+                "url": "file:///private/secret",
+            ])
+        )
+    }
+
 }
