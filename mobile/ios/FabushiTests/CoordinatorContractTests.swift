@@ -27,6 +27,20 @@ private final class TestCoordinatorPort: CoordinatorPort {
 }
 
 final class CoordinatorContractTests: XCTestCase {
+    func testCurrentMainCoordinatorMethodRegistriesIncludeCanonicalMethods() {
+        for method in [
+            "fetchLinkMetadata",
+            "reportConnectorAuth",
+            "reportMcpDiscoveryFailed",
+            "loadBoxMcpServers",
+            "listBoxMcpToolsRaw",
+            "executeBoxMcpToolRaw",
+        ] {
+            XCTAssertTrue(CoordinatorMainMethodRegistry.contains(method), "missing main method \(method)")
+        }
+        XCTAssertTrue(CoordinatorMethodRegistry.contains("interruptAgent"))
+    }
+
     func testCoordinatorFrameRoundTripsReferenceWireShape() throws {
         let frame = CoordinatorFrame.request(
             requestId: "r-1",
