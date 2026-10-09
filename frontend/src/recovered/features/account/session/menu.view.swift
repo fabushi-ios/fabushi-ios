@@ -710,9 +710,9 @@ struct AccountSettingsView: View {
     @MainActor
     private func refreshMediaDevices() {
         mediaDevices = mediaPort.devices()
-        let resolved = mediaPort.resolvedPreferences()
-        selectedMicrophoneId = resolved.microphoneId
-        selectedCameraId = resolved.cameraId
+        let stored = mediaPort.storedPreferences()
+        selectedMicrophoneId = stored.microphoneId
+        selectedCameraId = stored.cameraId
     }
 
     @MainActor
@@ -720,9 +720,6 @@ struct AccountSettingsView: View {
         do {
             if id.isEmpty {
                 mediaPort.setPreferredDeviceId(nil, kind: kind)
-                if kind == .microphone {
-                    _ = try mediaPort.applyPreferredMicrophone()
-                }
             } else if kind == .microphone {
                 _ = try mediaPort.selectMicrophone(deviceId: id)
             } else {
