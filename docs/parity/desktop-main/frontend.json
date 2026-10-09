@@ -3571,7 +3571,7 @@
       "desktop_owner": "renderer / root error boundary",
       "desktop_visible_effect": "A root rendering failure replaces the normal product surface with a full-window error message, a reload action, and copyable diagnostics; clipboard failure leaves the error surface intact.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/production/FabushiSceneRoot.swift; source/ios-main/FabushiRuntime.swift",
+      "ios_target_path": "frontend/src/production/FabushiSceneRoot.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "SwiftUI owns one FabushiRuntimeLifecycle at the existing production scene root. FabushiRuntime construction now throws instead of fatalError; only the ready state renders the existing ProductionRenderer, while initialization/root failures render one native full-screen recovery surface. Retry reconstructs only the same runtime owner through the lifecycle factory, and UIPasteboard copy failure is contained without replacing the failure state.",
       "implementation_status": "implemented",
