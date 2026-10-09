@@ -2162,17 +2162,17 @@
     {
       "desktop_path": "source/shared/observability/structured-log-transport.ts",
       "desktop_blob_sha": "742bffb8e5e9653b70798d63875cd5c4f775e935",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "shared-contracts",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Own bounded structured-log buffering/replay, identity hold, batch delivery, in-flight generation fencing, drop counters/receipts, overflow/expiry policy, deadline failure classification, checkpoint capture, and disposal semantics.",
+      "desktop_owner": "source/shared/observability/structured-log-transport.ts shared structured telemetry state machine",
+      "desktop_visible_effect": "Logs survive bounded offline/restart windows, do not cross account generations, report loss explicitly, respect backend receipts, and avoid unbounded memory or stale in-flight delivery after identity rotation.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/shared/observability/structured-log-transport.swift; source/shared/observability/log-ship-cadence.swift; source/shared/observability/telemetry-events.swift; mobile/ios/FabushiTests/SharedObservabilityParityTests.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "The iOS actor uses native async submission and caller/lifecycle-driven flushes rather than the Desktop embedded JS PollingPolicy/AbortSignal transport. Shared batching, replay expiry, identity hold, generation fencing, checkpoints, receipts, bounded overflow and drop reporting remain product-owned in the single Swift actor.",
+      "implementation_status": "implemented",
+      "production_evidence": "9f159bf7c173aa019905fcfcbee61c245106fa5c aligns non-ASCII batch sizing; 888c3ed6dadfcc00e584081f80533461167388ee adds active-batch/checkpoint state, generation fencing, Desktop overflow preference and drop report acknowledgement; b882ed2a8bcdad0735c524ff4a4f3ce87390e5e9 fixes actor-reentrancy so stale generations cannot clear a replacement active batch.",
+      "test_evidence": "59106ec7bdf1d8ce93ac5f7c3efa3a69a71c68ae locks UTF-16 batching; ade4d830b97aa8c6980090544d4f52ebe3d46800 adds stale in-flight account-clear fencing and host-log overflow preference tests, alongside replay expiry/identity hold/backend receipt tests. Same-head CI pending.",
+      "notes": "IOS-MAIN-SHARED-OBS-LOG-TRANSPORT-20261009: exact Desktop blob 742bffb8e5e9653b70798d63875cd5c4f775e935 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native flush scheduling is intentionally lifecycle/caller-owned rather than duplicating Desktop JS polling; keep implemented, not verified, until exact-head CI and aggregate review close."
     },
     {
       "desktop_path": "source/shared/observability/telemetry-events.ts",
