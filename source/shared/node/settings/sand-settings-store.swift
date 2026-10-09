@@ -539,6 +539,8 @@ final class SandSettingsStore: @unchecked Sendable {
             $0.computerUseModel = nil
             $0.localToolPermission = nil
             $0.localToolPermissionCeiling = nil
+            $0.hasSeenOnboarding = nil
+            $0.hasSeenOnboardingAccountScope = nil
         }
     }
 
