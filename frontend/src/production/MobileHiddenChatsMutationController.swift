@@ -32,7 +32,7 @@ final class MobileHiddenChatsMutationController {
     func ingestAgents(_ agents: [MobileBotSummary]) {
         guard !disposed else { return }
         let byID = Dictionary(uniqueKeysWithValues: agents.map { ($0.id, $0) })
-        for (id, mutation) in mutations {
+        for (id, mutation) in Array(mutations) {
             guard mutation.inFlight == 0, let confirmed = mutation.confirmed else { continue }
             if byID[id]?.hidden == confirmed {
                 mutations.removeValue(forKey: id)
@@ -44,6 +44,14 @@ final class MobileHiddenChatsMutationController {
     func isPending(_ agentId: String) -> Bool {
         guard !disposed else { return false }
         return held[agentId] != nil || (mutations[agentId]?.inFlight ?? 0) > 0
+    }
+
+    func projectAgents(_ agents: [MobileBotSummary]) -> [MobileBotSummary] {
+        guard !disposed else { return agents }
+        return agents.map { agent in
+            guard let mutation = mutations[agent.id] else { return agent }
+            return agent.replacingHidden(mutation.value)
+        }
     }
 
     func setAgentHidden(
