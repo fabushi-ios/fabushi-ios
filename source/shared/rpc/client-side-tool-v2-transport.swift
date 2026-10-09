@@ -96,11 +96,13 @@ enum ClientSideToolV2TransportEvent: Equatable, Sendable {
     static func fromFoundation(_ value: Any) -> ClientSideToolV2TransportEvent? {
         guard let object = value as? [String: Any],
               let version = integer(object["version"]),
+              version == ClientSideToolV2Transport.wireVersion,
               let kind = object["kind"] as? String,
-              let accountSlot = object["accountSlot"] as? String,
-              let agentId = object["agentId"] as? String,
-              let epoch = object["epoch"] as? String,
-              let sequence = unsignedInteger(object["sequence"])
+              let accountSlot = nonEmptyString(object["accountSlot"]),
+              let agentId = nonEmptyString(object["agentId"]),
+              let epoch = nonEmptyString(object["epoch"]),
+              let sequence = unsignedInteger(object["sequence"]),
+              sequence >= 1
         else { return nil }
 
         if kind == "reset" {
@@ -120,6 +122,19 @@ enum ClientSideToolV2TransportEvent: Equatable, Sendable {
               let bytes = messageObject["bytes"] as? String
         else { return nil }
 
+        let message = ClientSideToolV2WireMessage(
+            encoding: encoding,
+            messageType: messageType,
+            bytes: bytes
+        )
+        let expectedType = messageKind == .call
+            ? "aiserver.v1.ClientSideToolV2Call"
+            : "aiserver.v1.ClientSideToolV2Result"
+        guard message.messageType == expectedType,
+              let decoded = message.decodedBytes,
+              !decoded.isEmpty
+        else { return nil }
+
         return .update(
             version: version,
             kind: messageKind,
@@ -127,8 +142,13 @@ enum ClientSideToolV2TransportEvent: Equatable, Sendable {
             agentId: agentId,
             epoch: epoch,
             sequence: sequence,
-            message: .init(encoding: encoding, messageType: messageType, bytes: bytes)
+            message: message
         )
+    }
+
+    private static func nonEmptyString(_ value: Any?) -> String? {
+        guard let value = value as? String, !value.isEmpty else { return nil }
+        return value
     }
 
     private static func integer(_ value: Any?) -> Int? {
