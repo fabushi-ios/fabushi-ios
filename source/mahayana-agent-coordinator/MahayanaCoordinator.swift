@@ -414,6 +414,17 @@ final class MahayanaCoordinator {
                 throw IOSClientPausedError()
             }
         }
+        if method == "getOnboardingSeen" {
+            guard let settingsStore else { throw CoordinatorError.unavailable }
+            return JSONResult(value: settingsStore.getHasSeenOnboarding() == true)
+        }
+        if method == "setOnboardingSeen" {
+            guard let settingsStore,
+                  let seen = params["seen"] as? Bool
+            else { throw CoordinatorError.invalidParams }
+            settingsStore.setHasSeenOnboarding(seen)
+            return JSONResult(value: seen)
+        }
         if method == "getAutoReviewInstructions" {
             return JSONResult(value: autoReviewInstructionsObject())
         }
