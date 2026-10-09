@@ -193,7 +193,6 @@ private struct FabushiRootErrorSurface: View {
 @MainActor
 private struct FabushiProductionSceneRoot: View {
     @State private var lifecycle = FabushiRuntimeLifecycle()
-    @State private var uiPreferencesStore = MobileUiPreferencesStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @Environment(\.layoutDirection) private var systemLayoutDirection
@@ -234,28 +233,30 @@ private struct FabushiProductionSceneRoot: View {
             )
             .environment(
                 \.locale,
-                uiPreferencesStore.preferences.resolvedLocale()
+                runtime.uiPreferencesStore.preferences.resolvedLocale()
             )
             .environment(
                 \.layoutDirection,
-                uiPreferencesStore.preferences.resolvedLayoutDirection(
+                runtime.uiPreferencesStore.preferences.resolvedLayoutDirection(
                     system: systemLayoutDirection
                 )
             )
             .environment(
                 \.dynamicTypeSize,
-                uiPreferencesStore.preferences.adjustedDynamicTypeSize(
+                runtime.uiPreferencesStore.preferences.adjustedDynamicTypeSize(
                     system: systemDynamicTypeSize
                 )
             )
             .environment(
                 \.accessibilityReduceMotion,
-                systemReduceMotion || uiPreferencesStore.preferences.reducedMotion
+                systemReduceMotion || runtime.uiPreferencesStore.preferences.reducedMotion
             )
             .environment(
                 \.colorSchemeContrast,
-                uiPreferencesStore.preferences.highContrast ? .increased : systemColorSchemeContrast
+                runtime.uiPreferencesStore.preferences.highContrast ? .increased : systemColorSchemeContrast
             )
+            .environment(\.mobileUiPreferencesStore, runtime.uiPreferencesStore)
+            .environment(\.humanCallMediaPort, runtime.humanCallMediaPort)
             .task {
                 await runtime.start()
             }
