@@ -257,6 +257,40 @@ final class CoordinatorContractTests: XCTestCase {
     }
 
     @MainActor
+    func testHostSettingsReconcilerSameAccountRefreshPreservesPendingLocalWriteback() async {
+        var local: Bool?
+        var remote: Bool?
+        var pushes: [Bool?] = []
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            clearLocal: { local = nil },
+            readRemote: { .init(hasSeenOnboarding: remote) },
+            pushRemote: {
+                pushes.append($0.hasSeenOnboarding)
+                remote = $0.hasSeenOnboarding
+                return .init(hasSeenOnboarding: remote)
+            },
+            hostGeneration: { 7 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(false)
+        reconciler.scheduleLocalWrite(true)
+        await yieldHostSettingsWork()
+
+        XCTAssertEqual(local, true)
+        XCTAssertTrue(pushes.isEmpty)
+
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+        await yieldHostSettingsWork()
+
+        XCTAssertEqual(remote, true)
+        XCTAssertEqual(pushes, [true])
+        XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-a")
+    }
+
+    @MainActor
     func testHostSettingsReconcilerDropsStaleResultAfterHostGenerationChanges() async {
         var local: Bool?
         var generation: UInt64 = 7
