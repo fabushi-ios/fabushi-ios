@@ -355,7 +355,7 @@ final class SessionSettlementParityTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? IOSCursorAuthError, .keychain(errSecInteractionNotAllowed))
         }
-        XCTAssertEqual((await recorder.captures()).count, 2)
+        let finalCaptures = await recorder.captures()\n        XCTAssertEqual(finalCaptures.count, 2)
     }
 
     @MainActor
