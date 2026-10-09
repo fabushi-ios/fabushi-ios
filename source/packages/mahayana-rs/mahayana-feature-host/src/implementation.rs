@@ -759,6 +759,10 @@ fn account_boundary_requires_runtime_reset(
     initialized && active_account_id != next_account_id
 }
 
+fn clear_account_scoped_trays(state: &mut FeatureState) {
+    state.trays.clear();
+}
+
 const APPROVAL_PRESENTATION_SECRET_KEYS: &[&str] = &[
     "authorization",
     "apikey",
@@ -8010,6 +8014,7 @@ impl FeatureHostController {
             state.events.clear();
             state.conversation_session = ConversationSessionState::default();
             state.pending_approvals.clear();
+            clear_account_scoped_trays(&mut state);
             state.operations.clear();
             state.operation_agents.clear();
             state.human_handoff_operations.clear();
@@ -15734,6 +15739,24 @@ fn actor_id_for_account_id(account_id: &str) -> ActorId {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn account_boundary_reset_clears_host_owned_notification_trays() {
+        let mut state = FeatureState::default();
+        push_error_tray(
+            &mut state,
+            "research-bot".into(),
+            "Provider busy".into(),
+            Some("retry later".into()),
+            Some("request-a".into()),
+            Some("provider:busy".into()),
+        );
+        assert_eq!(state.trays.len(), 1);
+
+        clear_account_scoped_trays(&mut state);
+
+        assert!(state.trays.is_empty());
+    }
 
     #[test]
     fn initial_persisted_account_preserves_runtime_checkpoint_but_later_replacement_resets() {
