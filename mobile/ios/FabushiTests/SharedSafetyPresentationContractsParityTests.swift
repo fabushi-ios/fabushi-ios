@@ -34,6 +34,21 @@ final class SharedSafetyPresentationContractsParityTests: XCTestCase {
         XCTAssertEqual(shaped, "line1\n  token=…\nline3")
     }
 
+    func testSharedTextAndSidebarParsingMatchDesktopBounds() {
+        XCTAssertEqual(SandText.clampLine("  hi\nthere  ", maxLength: 20), "hi there")
+        XCTAssertEqual(SandText.clampBlock(String(repeating: "😀", count: 3), maxLength: 4).utf16.count, 4)
+
+        let parsed = SidebarSections.parse([
+            ["id": " first ", "name": "One", "agentIds": ["a", 42, "a"]],
+            ["id": "", "name": "drop", "agentIds": ["b"]],
+            ["id": "second", "agentIds": ["a", "b"]],
+            "invalid",
+        ])
+        XCTAssertEqual(parsed.map(\.id), ["first", "second", SidebarSections.agentsSectionID])
+        XCTAssertEqual(parsed[0].agentIDs, ["a"])
+        XCTAssertEqual(parsed[1].agentIDs, ["b"])
+    }
+
     func testSpotlightFencesOutsideTextAndStripsForgedMarkers() {
         let content = spotlightToolResultContent(
             source: "web<source>",
