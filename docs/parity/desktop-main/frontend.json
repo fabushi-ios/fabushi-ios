@@ -4821,13 +4821,13 @@
       "desktop_owner": "renderer global keyboard shortcut dispatcher",
       "desktop_visible_effect": "Desktop keyboard users can navigate/search/create/close/toggle chrome from predictable shortcuts without hijacking text editing.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/production/GrokMobileShell.swift",
-      "ios_language": "SwiftUI / UIKit keyboard commands",
-      "ios_platform_delta": "Touch-first iOS already exposes the corresponding search/add/close/sidebar actions as explicit controls, but the Desktop-equivalent hardware-keyboard command layer has not yet been composed at the native root. Keep this responsibility mapped until iPad/hardware keyboard shortcuts route into the existing shell actions without a second navigation owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
-      "test_evidence": "No current shipping-path hardware-keyboard parity test; implementation remains pending.",
-      "notes": "Exact Desktop shortcut blob f36271ee5d4de95526474d7f7cf7fa5e94740d69 reviewed on Desktop main. Do not mark implemented from the presence of touch buttons alone."
+      "ios_target_path": "frontend/src/recovered/features/window-chrome/hardware-keyboard.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_language": "SwiftUI hardware keyboard commands",
+      "ios_platform_delta": "iPad/hardware keyboard commands are composed at the existing GrokMobileShell root and route into the same search/create/settings/tools/selection/back owners used by touch UI. Active-chat prompt focus stays inside MobileBotChat via FocusState. Browser-style forward navigation has no native forward stack and is explicitly not applicable; the implementation does not create a second navigation store.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/window-chrome/hardware-keyboard.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "test_evidence": "mobile/ios/FabushiTests/MobileHardwareKeyboardParityTests.swift; current exact-HEAD Actions required before verified",
+      "notes": "Exact Desktop shortcut blob f36271ee5d4de95526474d7f7cf7fa5e94740d69 reviewed on Desktop main. Native commands preserve the existing shell/navigation owners and remain implemented, not verified, until current-head shipping-path Actions succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/model.contract.test.ts",
