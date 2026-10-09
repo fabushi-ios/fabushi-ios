@@ -1559,9 +1559,9 @@ mod tests {
         let events = events.0.lock().expect("events");
         assert!(events.iter().any(|event| matches!(
             event,
-            RuntimeEvent::ActivityUpdated { activity, .. }
-                if activity.status == RuntimeActivityStatus::Failed
-                    && activity.title == "Operation failed"
+            RuntimeEvent::AgentActivity { status, title, .. }
+                if *status == RuntimeActivityStatus::Failed
+                    && title == "Operation failed"
         )));
         assert!(!events.iter().any(|event| matches!(
             event,
