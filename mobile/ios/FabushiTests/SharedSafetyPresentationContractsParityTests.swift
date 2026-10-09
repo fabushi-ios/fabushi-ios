@@ -12,6 +12,12 @@ final class SharedSafetyPresentationContractsParityTests: XCTestCase {
         XCTAssertEqual(normalized.allowInstructions.count, 2)
         XCTAssertEqual(normalized.allowInstructions[0], "allow this")
         XCTAssertEqual(normalized.allowInstructions[1].count, 1_000)
+
+        let emojiLimited = normalizeSandAutoReviewInstructions(
+            allowInstructions: [String(repeating: "😀", count: 600)]
+        )
+        XCTAssertEqual(emojiLimited.allowInstructions[0].utf16.count, 1_000)
+        XCTAssertEqual(emojiLimited.allowInstructions[0].count, 500)
         XCTAssertEqual(normalized.blockInstructions, ["block"])
     }
 
@@ -23,6 +29,9 @@ final class SharedSafetyPresentationContractsParityTests: XCTestCase {
         XCTAssertFalse(redacted.contains("verysecret"))
         XCTAssertFalse(redacted.contains("sk-testsecret"))
         XCTAssertTrue(redacted.contains("https://example.com/path"))
+
+        let shaped = redactSandAutoReviewInlineSecrets("line1\n  token=secret\nline3")
+        XCTAssertEqual(shaped, "line1\n  token=…\nline3")
     }
 
     func testSpotlightFencesOutsideTextAndStripsForgedMarkers() {
@@ -51,5 +60,6 @@ final class SharedSafetyPresentationContractsParityTests: XCTestCase {
         let wake = buildTimelineEventWakePrompt([.channelConnected(label: "Slack")])
         XCTAssertTrue(wake.hasPrefix(TIMELINE_EVENT_WAKE_CUE))
         XCTAssertTrue(wake.contains("Connected to Slack"))
+        XCTAssertTrue(wake.contains("reply with SendMessage"))
     }
 }
