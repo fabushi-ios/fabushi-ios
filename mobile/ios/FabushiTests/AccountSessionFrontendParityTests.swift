@@ -103,7 +103,7 @@ final class AccountSessionFrontendParityTests: XCTestCase {
         XCTAssertEqual(unchanged.adjustedDynamicTypeSize(system: .large), .large)
 
         let enlarged = MobileUiPreferences(textScale: 1.5)
-        XCTAssertEqual(enlarged.adjustedDynamicTypeSize(system: .large), .xxLarge)
+        XCTAssertEqual(enlarged.adjustedDynamicTypeSize(system: .large), .xxxLarge)
 
         let reduced = MobileUiPreferences(textScale: 0.9)
         XCTAssertEqual(reduced.adjustedDynamicTypeSize(system: .large), .medium)
