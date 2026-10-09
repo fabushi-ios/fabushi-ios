@@ -41,7 +41,8 @@ final class MobileAppAlertParityTests: XCTestCase {
 
         controller.confirm()
         await Task.yield()
-        XCTAssertTrue(await first.value)
+        let firstAccepted = await first.value
+        XCTAssertTrue(firstAccepted)
         XCTAssertNil(controller.state)
 
         let active = Task {
@@ -92,10 +93,12 @@ final class MobileAppAlertParityTests: XCTestCase {
         XCTAssertFalse(third)
 
         controller.confirm()
-        XCTAssertTrue(await active.value)
+        let activeAccepted = await active.value
+        XCTAssertTrue(activeAccepted)
         XCTAssertEqual(controller.state?.request.title, "Second")
         controller.cancel()
-        XCTAssertFalse(await queued.value)
+        let queuedAccepted = await queued.value
+        XCTAssertFalse(queuedAccepted)
 
         let failed = Task {
             await controller.alert(.init(
@@ -118,7 +121,8 @@ final class MobileAppAlertParityTests: XCTestCase {
         await Task.yield()
         XCTAssertEqual(controller.state?.failure, "provider unavailable")
         controller.cancel()
-        XCTAssertFalse(await failed.value)
+        let failedAccepted = await failed.value
+        XCTAssertFalse(failedAccepted)
     }
 
     func testDisposeRejectsActiveQueuedAndFutureAlerts() async {
@@ -140,8 +144,10 @@ final class MobileAppAlertParityTests: XCTestCase {
         }
         await Task.yield()
         controller.dispose()
-        XCTAssertFalse(await active.value)
-        XCTAssertFalse(await queued.value)
+        let disposedActiveAccepted = await active.value
+        XCTAssertFalse(disposedActiveAccepted)
+        let disposedQueuedAccepted = await queued.value
+        XCTAssertFalse(disposedQueuedAccepted)
 
         let future = await controller.alert(.init(
             title: "C", description: nil, body: nil, warning: nil,
