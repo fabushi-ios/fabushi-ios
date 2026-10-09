@@ -162,6 +162,69 @@ private enum IOSCursorDashboardProto {
         return data
     }
 
+    static func prReviewUserSettingsRequest() -> Data {
+        Data()
+    }
+
+    static func teamAdminSettingsRequest() -> Data {
+        Data()
+    }
+
+    static func decodePrReviewUserDestination(_ data: Data) throws -> SandPrReviewDestination? {
+        var reader = Reader(data)
+        for (field, value) in try reader.readFields() where field == 6 {
+            if case .varint(let raw) = value {
+                return prReviewDestination(raw)
+            }
+        }
+        return nil
+    }
+
+    static func decodePrReviewTeamDestination(_ data: Data) throws -> SandPrReviewDestination? {
+        var reader = Reader(data)
+        var pullRequestPreferences: Data?
+        var backgroundAgentSettings: Data?
+        for (field, value) in try reader.readFields() {
+            switch (field, value) {
+            case (37, .bytes(let bytes)):
+                pullRequestPreferences = bytes
+            case (7, .bytes(let bytes)):
+                backgroundAgentSettings = bytes
+            default:
+                break
+            }
+        }
+        if let pullRequestPreferences,
+           let raw = try firstVarintField(1, in: pullRequestPreferences),
+           let destination = prReviewDestination(raw) {
+            return destination
+        }
+        if let backgroundAgentSettings,
+           let raw = try firstVarintField(5, in: backgroundAgentSettings) {
+            return prReviewDestination(raw)
+        }
+        return nil
+    }
+
+    private static func firstVarintField(_ target: Int, in data: Data) throws -> UInt64? {
+        var reader = Reader(data)
+        for (field, value) in try reader.readFields() where field == target {
+            if case .varint(let raw) = value {
+                return raw
+            }
+        }
+        return nil
+    }
+
+    private static func prReviewDestination(_ raw: UInt64) -> SandPrReviewDestination? {
+        switch raw {
+        case 1: .github
+        case 2: .graphite
+        case 3: .reviewCursor
+        default: nil
+        }
+    }
+
     static func publishPluginRequest(
         teamId: Int32,
         name: String,
@@ -456,6 +519,14 @@ struct IOSCursorConnectEnvelopeDecoder: Sendable {
 }
 
 final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient {
+    static func decodePrReviewUserDestinationForTests(_ data: Data) throws -> SandPrReviewDestination? {
+        try IOSCursorDashboardProto.decodePrReviewUserDestination(data)
+    }
+
+    static func decodePrReviewTeamDestinationForTests(_ data: Data) throws -> SandPrReviewDestination? {
+        try IOSCursorDashboardProto.decodePrReviewTeamDestination(data)
+    }
+
     typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
     private let credentials: AccountMcpCredentials
@@ -763,6 +834,25 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             timeoutMs: timeoutMs
         )
         return try IOSCursorDashboardProto.decodeTeams(response)
+    }
+
+    func getPrReviewPreferences(timeoutMs: Int = 10_000) async throws -> SandPrReviewPreferences {
+        async let userResponse = protoRPC(
+            "GetBackgroundComposerUserSettings",
+            service: "BackgroundComposerService",
+            body: IOSCursorDashboardProto.prReviewUserSettingsRequest(),
+            timeoutMs: timeoutMs
+        )
+        async let teamResponse = protoRPC(
+            "GetTeamAdminSettingsOrEmptyIfNotInTeam",
+            body: IOSCursorDashboardProto.teamAdminSettingsRequest(),
+            timeoutMs: timeoutMs
+        )
+        let (userData, teamData) = try await (userResponse, teamResponse)
+        return .init(
+            user: try IOSCursorDashboardProto.decodePrReviewUserDestination(userData),
+            team: try IOSCursorDashboardProto.decodePrReviewTeamDestination(teamData)
+        )
     }
 
     func publishSkillPlugin(

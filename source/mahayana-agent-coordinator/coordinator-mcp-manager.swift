@@ -1179,6 +1179,19 @@ final class CoordinatorMcpSurface {
         case "coordinator.mcp.cursorAuth.status":
             return .handled(projectCursorAuthStatus(await cursorAuth.status()))
 
+        case "coordinator.account.prReviewPreferences":
+            guard (await cursorAuth.status()).loggedIn else {
+                return .handled([
+                    "user": NSNull(),
+                    "team": NSNull(),
+                ])
+            }
+            let preferences = try await dashboard.getPrReviewPreferences()
+            return .handled([
+                "user": preferences.user?.rawValue ?? NSNull(),
+                "team": preferences.team?.rawValue ?? NSNull(),
+            ])
+
         case "coordinator.mcp.cursorAuth.start":
             let start = try cursorAuth.beginLogin()
             return .handled([
