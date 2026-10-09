@@ -60,9 +60,10 @@ extension GrokMobileShell {
         restoreRosterSelectionIfNeeded()
         let restored = AccessRosterPersistence.load(accountScopeKey: expectedScope)
         if !restored.isEmpty {
-            bots = restored
-            accessRosterSnapshot = AccessRosterSnapshotProjection.restore(restored)
-            reconcileRosterSelection(with: restored, isComplete: false)
+            let projectedRestored = hiddenChatsController.projectAgents(restored)
+            bots = projectedRestored
+            accessRosterSnapshot = AccessRosterSnapshotProjection.restore(projectedRestored)
+            reconcileRosterSelection(with: projectedRestored, isComplete: false)
             accessCoverFirstBox = FirstBoxGate.project(
                 previous: accessCoverFirstBox,
                 roster: firstBoxSnapshot(from: accessRosterSnapshot)
