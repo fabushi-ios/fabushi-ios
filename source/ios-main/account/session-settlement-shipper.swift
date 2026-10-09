@@ -164,7 +164,7 @@ final class IOSCursorSessionSettlementShipper {
         appVersion: String = (Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String) ?? "0.18.0",
-        arch: String = IOSCursorSessionSettlementShipper.currentArch,
+        arch: String? = nil,
         platform: String = "ios",
         nowMs: @escaping () -> Int64 = {
             Int64(Date().timeIntervalSince1970 * 1_000)
@@ -179,7 +179,7 @@ final class IOSCursorSessionSettlementShipper {
         self.getMachineID = getMachineID
         self.clientVersion = clientVersion
         self.appVersion = appVersion
-        self.arch = arch
+        self.arch = arch ?? Self.currentArch
         self.platform = platform
         self.nowMs = nowMs
         self.reportFailure = reportFailure
