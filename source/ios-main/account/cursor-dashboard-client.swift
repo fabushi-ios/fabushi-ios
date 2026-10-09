@@ -570,6 +570,10 @@ struct IOSCursorConnectEnvelopeDecoder: Sendable {
     }
 }
 
+struct IOSCursorDashboardJSON: @unchecked Sendable {
+    let value: [String: Any]
+}
+
 final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient {
     static func decodePrReviewUserDestinationForTests(_ data: Data) throws -> SandPrReviewDestination? {
         try IOSCursorDashboardProto.decodePrReviewUserDestination(data)
@@ -1121,6 +1125,30 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             "ok": ok,
             "message": jsonValueOrNull(message?.isEmpty == false ? message : nil),
         ]
+    }
+
+    func getCursorWeeklyUsageTransfer(timeoutMs: Int = 10_000) async -> IOSCursorDashboardJSON? {
+        await getCursorWeeklyUsage(timeoutMs: timeoutMs).map(IOSCursorDashboardJSON.init(value:))
+    }
+
+    func getCursorUsageSummaryTransfer(timeoutMs: Int = 15_000) async throws -> IOSCursorDashboardJSON {
+        .init(value: try await getCursorUsageSummary(timeoutMs: timeoutMs))
+    }
+
+    func cancelCursorSandTrialTransfer(timeoutMs: Int = 15_000) async -> IOSCursorDashboardJSON {
+        .init(value: await cancelCursorSandTrial(timeoutMs: timeoutMs))
+    }
+
+    func invokeCursorDashboardActionTransfer(
+        action: String,
+        args: [String: String],
+        timeoutMs: Int = 15_000
+    ) async throws -> IOSCursorDashboardJSON {
+        .init(value: try await invokeCursorDashboardAction(
+            action: action,
+            args: args,
+            timeoutMs: timeoutMs
+        ))
     }
 
     private func optionalRPC(_ method: String, timeoutMs: Int) async -> [String: Any]? {

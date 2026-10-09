@@ -1222,14 +1222,14 @@ final class CoordinatorMcpSurface {
 
         case "getCursorWeeklyUsage":
             guard (await cursorAuth.status()).loggedIn else { return .handled(NSNull()) }
-            if let usage = await dashboard.getCursorWeeklyUsage() {
-                return .handled(usage)
+            if let usage = await dashboard.getCursorWeeklyUsageTransfer() {
+                return .handled(usage.value)
             }
             return .handled(NSNull())
 
         case "getCursorUsageSummary":
             guard (await cursorAuth.status()).loggedIn else { return .handled(NSNull()) }
-            return .handled(try await dashboard.getCursorUsageSummary())
+            return .handled(try await dashboard.getCursorUsageSummaryTransfer().value)
 
         case "getCursorPrivacyModeEnabled":
             guard (await cursorAuth.status()).loggedIn else { return .handled(true) }
@@ -1239,7 +1239,7 @@ final class CoordinatorMcpSurface {
             guard (await cursorAuth.status()).loggedIn else {
                 throw IOSCursorAuthError.signInRequired
             }
-            return .handled(await dashboard.cancelCursorSandTrial())
+            return .handled(await dashboard.cancelCursorSandTrialTransfer().value)
 
         case "invokeCursorDashboardAction":
             guard (await cursorAuth.status()).loggedIn else {
@@ -1251,7 +1251,7 @@ final class CoordinatorMcpSurface {
             let rawArgs = params["args"] as? [String: Any] ?? [:]
             let args = rawArgs.compactMapValues { $0 as? String }
             return .handled(
-                try await dashboard.invokeCursorDashboardAction(action: action, args: args)
+                try await dashboard.invokeCursorDashboardActionTransfer(action: action, args: args).value
             )
 
         case "transcribeAudio":
