@@ -199,4 +199,160 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertNil(coordinator.sharedSettingsSnapshot().mcpCustomInstructionsAccountScope)
     }
 
+    func testAutoReviewInstructionEditorPreservesIdentityAndCrossListEdits() {
+        let base = SandAutoReviewInstructions(
+            isEnabled: true,
+            allowInstructions: ["read files", "run tests"],
+            blockInstructions: ["delete files"]
+        )
+        XCTAssertEqual(
+            sandAutoReviewInstructionRows(base),
+            [
+                .init(behavior: .allow, text: "read files", listIndex: 0),
+                .init(behavior: .allow, text: "run tests", listIndex: 1),
+                .init(behavior: .ask, text: "delete files", listIndex: 0),
+            ]
+        )
+        XCTAssertNil(
+            saveSandAutoReviewInstruction(
+                base,
+                text: "run tests",
+                behavior: .allow,
+                editing: nil
+            )
+        )
+
+        let edited = saveSandAutoReviewInstruction(
+            base,
+            text: "run checks",
+            behavior: .allow,
+            editing: .init(
+                behavior: .allow,
+                text: "run tests",
+                listIndex: 1
+            )
+        )
+        XCTAssertEqual(
+            edited?.allowInstructions,
+            ["read files", "run checks"]
+        )
+
+        let moved = saveSandAutoReviewInstruction(
+            base,
+            text: "delete files",
+            behavior: .allow,
+            editing: .init(
+                behavior: .ask,
+                text: "delete files",
+                listIndex: 0
+            )
+        )
+        XCTAssertEqual(
+            moved?.allowInstructions,
+            ["read files", "run tests", "delete files"]
+        )
+        XCTAssertEqual(moved?.blockInstructions, [])
+
+        let removed = removeSandAutoReviewInstruction(
+            base,
+            row: .init(
+                behavior: .allow,
+                text: "read files",
+                listIndex: 0
+            )
+        )
+        XCTAssertEqual(removed.allowInstructions, ["run tests"])
+
+        XCTAssertEqual(
+            reconcileSandAutoReviewInstructionRow(
+                .init(
+                    isEnabled: true,
+                    allowInstructions: ["new", "run tests"],
+                    blockInstructions: []
+                ),
+                row: .init(
+                    behavior: .allow,
+                    text: "run tests",
+                    listIndex: 0
+                )
+            ),
+            .init(
+                behavior: .allow,
+                text: "run tests",
+                listIndex: 1
+            )
+        )
+
+        let full = SandAutoReviewInstructions(
+            isEnabled: true,
+            allowInstructions: (0..<SAND_AUTO_REVIEW_INSTRUCTION_MAX_ENTRIES)
+                .map { "allow-\($0)" },
+            blockInstructions: []
+        )
+        XCTAssertNil(
+            saveSandAutoReviewInstruction(
+                full,
+                text: "overflow",
+                behavior: .allow,
+                editing: nil
+            )
+        )
+    }
+
+    @MainActor
+    func testCoordinatorInferenceProviderFacadeUsesCanonicalSettingsStore() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        let host = SettingsParityHost()
+        let supervisor = MahayanaLocalHostSupervisor(
+            host: host,
+            factory: { host }
+        )
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: supervisor,
+            settingsStore: store
+        )
+
+        let initial = try await coordinator.request(
+            method: "getInferenceProvider"
+        )
+        XCTAssertEqual(
+            (initial.value as? [String: Any])?["provider"] as? String,
+            SandInferenceProvider.fabushi.rawValue
+        )
+
+        let updated = try await coordinator.request(
+            method: "setInferenceProvider",
+            params: [
+                "provider": SandInferenceProvider.openrouter.rawValue
+            ]
+        )
+        XCTAssertEqual(
+            (updated.value as? [String: Any])?["provider"] as? String,
+            SandInferenceProvider.openrouter.rawValue
+        )
+        XCTAssertEqual(store.getInferenceProvider(), .openrouter)
+        XCTAssertEqual(
+            Set(SAND_INFERENCE_PROVIDER_DESCRIPTORS.map(\.provider)),
+            Set(SandInferenceProvider.allCases)
+        )
+        XCTAssertEqual(
+            sandInferenceProviderDescriptor(.openrouter).usageSource,
+            .external
+        )
+
+        do {
+            _ = try await coordinator.request(
+                method: "setInferenceProvider",
+                params: ["provider": "missing"]
+            )
+            XCTFail("unknown providers must fail closed")
+        } catch {
+            XCTAssertEqual(store.getInferenceProvider(), .openrouter)
+        }
+    }
+
 }

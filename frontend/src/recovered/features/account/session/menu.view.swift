@@ -288,6 +288,14 @@ struct AccountSettingsView: View {
     @State private var feedbackPresented = false
     @State private var aboutPresented = false
     @State private var actionError: String?
+    @State private var configurationLoading = true
+    @State private var configurationSaving = false
+    @State private var configurationGeneration = 0
+    @State private var autoReviewSettings = DEFAULT_SAND_AUTO_REVIEW_INSTRUCTIONS
+    @State private var inferenceProvider: SandInferenceProvider = .fabushi
+    @State private var ruleDraft = ""
+    @State private var ruleBehavior: SandAutoReviewInstructionBehavior = .allow
+    @State private var editingRule: SandAutoReviewInstructionRow?
 
     var body: some View {
         NavigationStack {
@@ -330,6 +338,8 @@ struct AccountSettingsView: View {
                         }
                     }
                 }
+
+                configurationSections
 
                 Section("支持") {
                     Button {
@@ -377,6 +387,14 @@ struct AccountSettingsView: View {
             .task {
                 await model.refreshAccountUsage()
             }
+            .task(id: model.settingsNoticeAccountKey) {
+                await refreshConfigurationSettings()
+            }
+            .onDisappear {
+                configurationGeneration = configurationGeneration == Int.max
+                    ? 1
+                    : configurationGeneration + 1
+            }
         }
         .sheet(isPresented: $feedbackPresented) {
             AccountFeedbackView(
@@ -398,6 +416,255 @@ struct AccountSettingsView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-settings")
+    }
+
+    @ViewBuilder
+    private var configurationSections: some View {
+        if configurationLoading {
+            Section("Agent 配置") {
+                ProgressView("正在读取配置…")
+                    .accessibilityIdentifier("settings-configuration-loading")
+            }
+        } else {
+            Section("Router") {
+                Picker(
+                    "Route Agent 请求",
+                    selection: Binding(
+                        get: { inferenceProvider },
+                        set: { beginInferenceProviderUpdate($0) }
+                    )
+                ) {
+                    ForEach(
+                        SAND_INFERENCE_PROVIDER_DESCRIPTORS,
+                        id: \.provider
+                    ) { option in
+                        Text(option.label).tag(option.provider)
+                    }
+                }
+                .disabled(configurationSaving)
+                .accessibilityIdentifier("settings-inference-provider")
+
+                let descriptor = sandInferenceProviderDescriptor(inferenceProvider)
+                Text(descriptor.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(descriptor.usageDescription)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("settings-inference-provider-usage")
+            }
+
+            Section("Auto Review") {
+                Toggle(
+                    "启用 Auto Review",
+                    isOn: Binding(
+                        get: { autoReviewSettings.isEnabled },
+                        set: { enabled in
+                            beginAutoReviewUpdate(.init(
+                                isEnabled: enabled,
+                                allowInstructions: autoReviewSettings.allowInstructions,
+                                blockInstructions: autoReviewSettings.blockInstructions
+                            ))
+                        }
+                    )
+                )
+                .disabled(configurationSaving)
+                .accessibilityIdentifier("settings-auto-review-enabled")
+
+                if autoReviewSettings.isEnabled {
+                    ForEach(sandAutoReviewInstructionRows(autoReviewSettings)) { row in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(row.text)
+                                .font(.body)
+                                .textSelection(.enabled)
+                            HStack {
+                                Text(row.behavior == .allow ? "自动允许" : "先询问")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("编辑") { beginEditingRule(row) }
+                                    .disabled(configurationSaving)
+                                    .accessibilityIdentifier("settings-auto-review-edit-\(row.id)")
+                                Button("删除", role: .destructive) {
+                                    beginAutoReviewUpdate(
+                                        removeSandAutoReviewInstruction(
+                                            autoReviewSettings,
+                                            row: row
+                                        )
+                                    )
+                                }
+                                .disabled(configurationSaving)
+                                .accessibilityIdentifier("settings-auto-review-delete-\(row.id)")
+                            }
+                        }
+                    }
+
+                    TextField(
+                        editingRule == nil ? "新增规则" : "编辑规则",
+                        text: $ruleDraft,
+                        axis: .vertical
+                    )
+                    .lineLimit(1...4)
+                    .disabled(configurationSaving)
+                    .accessibilityIdentifier("settings-auto-review-rule-draft")
+
+                    Picker("行为", selection: $ruleBehavior) {
+                        Text("自动允许").tag(SandAutoReviewInstructionBehavior.allow)
+                        Text("先询问").tag(SandAutoReviewInstructionBehavior.ask)
+                    }
+                    .disabled(configurationSaving)
+                    .accessibilityIdentifier("settings-auto-review-rule-behavior")
+
+                    HStack {
+                        Button(editingRule == nil ? "添加规则" : "保存规则") {
+                            commitRuleDraft()
+                        }
+                        .disabled(
+                            configurationSaving
+                                || ruleDraft.trimmingCharacters(
+                                    in: .whitespacesAndNewlines
+                                ).isEmpty
+                        )
+                        .accessibilityIdentifier("settings-auto-review-rule-save")
+
+                        if editingRule != nil {
+                            Button("取消编辑") { clearRuleEditor() }
+                                .disabled(configurationSaving)
+                                .accessibilityIdentifier("settings-auto-review-rule-cancel")
+                        }
+                    }
+
+                    Text("每种行为最多 \(SAND_AUTO_REVIEW_INSTRUCTION_MAX_ENTRIES) 条；规则由同一 Coordinator 设置 owner 持久化并同步到 Host。")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func refreshConfigurationSettings() async {
+        configurationGeneration = configurationGeneration == Int.max
+            ? 1
+            : configurationGeneration + 1
+        let generation = configurationGeneration
+        let accountKey = model.settingsNoticeAccountKey
+        configurationLoading = true
+        configurationSaving = false
+        do {
+            let snapshot = try await model.loadConfigurationSettings()
+            guard generation == configurationGeneration,
+                  accountKey == model.settingsNoticeAccountKey
+            else { return }
+            autoReviewSettings = snapshot.autoReview
+            inferenceProvider = snapshot.inferenceProvider
+            editingRule = editingRule.flatMap {
+                reconcileSandAutoReviewInstructionRow(
+                    snapshot.autoReview,
+                    row: $0
+                )
+            }
+            configurationLoading = false
+        } catch {
+            guard generation == configurationGeneration,
+                  accountKey == model.settingsNoticeAccountKey
+            else { return }
+            configurationLoading = false
+            actionError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func beginAutoReviewUpdate(
+        _ next: SandAutoReviewInstructions,
+        clearEditorAfterSuccess: Bool = false
+    ) {
+        guard !configurationSaving else { return }
+        configurationGeneration = configurationGeneration == Int.max
+            ? 1
+            : configurationGeneration + 1
+        let generation = configurationGeneration
+        let accountKey = model.settingsNoticeAccountKey
+        configurationSaving = true
+        Task { @MainActor in
+            do {
+                let saved = try await model.updateAutoReviewSettings(next)
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                autoReviewSettings = saved
+                configurationSaving = false
+                if clearEditorAfterSuccess {
+                    clearRuleEditor()
+                } else if let editingRule {
+                    self.editingRule = reconcileSandAutoReviewInstructionRow(
+                        saved,
+                        row: editingRule
+                    )
+                }
+            } catch {
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                configurationSaving = false
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    @MainActor
+    private func beginInferenceProviderUpdate(_ next: SandInferenceProvider) {
+        guard !configurationSaving, next != inferenceProvider else { return }
+        configurationGeneration = configurationGeneration == Int.max
+            ? 1
+            : configurationGeneration + 1
+        let generation = configurationGeneration
+        let accountKey = model.settingsNoticeAccountKey
+        configurationSaving = true
+        Task { @MainActor in
+            do {
+                let saved = try await model.updateInferenceProvider(next)
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                inferenceProvider = saved
+                configurationSaving = false
+            } catch {
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                configurationSaving = false
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    @MainActor
+    private func beginEditingRule(_ row: SandAutoReviewInstructionRow) {
+        editingRule = row
+        ruleDraft = row.text
+        ruleBehavior = row.behavior
+    }
+
+    @MainActor
+    private func clearRuleEditor() {
+        editingRule = nil
+        ruleDraft = ""
+        ruleBehavior = .allow
+    }
+
+    @MainActor
+    private func commitRuleDraft() {
+        guard let next = saveSandAutoReviewInstruction(
+            autoReviewSettings,
+            text: ruleDraft,
+            behavior: ruleBehavior,
+            editing: editingRule
+        ) else { return }
+        beginAutoReviewUpdate(
+            next,
+            clearEditorAfterSuccess: true
+        )
     }
 
     private func saveDisplayName() {

@@ -242,6 +242,22 @@ final class MahayanaCoordinator {
             try await syncAutoReviewRulesToHost()
             return JSONResult(value: autoReviewInstructionsObject())
         }
+        if method == "getInferenceProvider" {
+            guard let settingsStore else { throw CoordinatorError.unavailable }
+            return JSONResult(value: [
+                "provider": settingsStore.getInferenceProvider().rawValue,
+            ])
+        }
+        if method == "setInferenceProvider" {
+            guard let settingsStore,
+                  let rawProvider = params["provider"] as? String,
+                  let provider = SandInferenceProvider(rawValue: rawProvider)
+            else {
+                throw CoordinatorError.requestFailed("Unknown inference provider.")
+            }
+            settingsStore.setInferenceProvider(provider)
+            return JSONResult(value: ["provider": provider.rawValue])
+        }
         if method == "openExternal" {
             do {
                 let payload = try CoordinatorPayload.fromFoundation(params)

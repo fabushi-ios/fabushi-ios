@@ -691,6 +691,11 @@ func decodeMobileAutoReviewInstructions(_ value: Any) throws -> SandAutoReviewIn
     )
 }
 
+struct MobileConfigurationSettingsSnapshot: Equatable {
+    let autoReview: SandAutoReviewInstructions
+    let inferenceProvider: SandInferenceProvider
+}
+
 func appendMobileAutoReviewAllowRule(
     _ current: SandAutoReviewInstructions,
     proposedRule: String
@@ -1948,6 +1953,52 @@ final class MarketplaceModel {
             method: "openExternal",
             params: ["url": "https://cursor.com/help"]
         )
+    }
+
+    func loadConfigurationSettings() async throws -> MobileConfigurationSettingsSnapshot {
+        let review = try await bridge.request(method: "getAutoReviewInstructions")
+        let provider = try await bridge.request(method: "getInferenceProvider")
+        let autoReview = try decodeMobileAutoReviewInstructions(review.value)
+        guard let object = provider.value as? [String: Any],
+              let rawProvider = object["provider"] as? String,
+              let inferenceProvider = SandInferenceProvider(rawValue: rawProvider)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return .init(
+            autoReview: autoReview,
+            inferenceProvider: inferenceProvider
+        )
+    }
+
+    func updateAutoReviewSettings(
+        _ value: SandAutoReviewInstructions
+    ) async throws -> SandAutoReviewInstructions {
+        let result = try await bridge.request(
+            method: "setAutoReviewInstructions",
+            params: [
+                "isEnabled": value.isEnabled,
+                "allowInstructions": value.allowInstructions,
+                "blockInstructions": value.blockInstructions,
+            ]
+        )
+        return try decodeMobileAutoReviewInstructions(result.value)
+    }
+
+    func updateInferenceProvider(
+        _ provider: SandInferenceProvider
+    ) async throws -> SandInferenceProvider {
+        let result = try await bridge.request(
+            method: "setInferenceProvider",
+            params: ["provider": provider.rawValue]
+        )
+        guard let object = result.value as? [String: Any],
+              let rawProvider = object["provider"] as? String,
+              let authoritative = SandInferenceProvider(rawValue: rawProvider)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return authoritative
     }
 
     func submitAccountFeedback(_ value: String, conversationId: String? = nil) async throws {
