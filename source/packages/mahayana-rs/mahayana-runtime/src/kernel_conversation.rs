@@ -1513,6 +1513,63 @@ mod tests {
     }
 
     #[test]
+    fn provider_operation_failure_stays_activity_only_and_does_not_pollute_transcript() {
+        let conversation_id = conversation(mahayana_core::MAHAYANA_AI_CONVERSATION_ID);
+        let state = Arc::new(Mutex::new(ConversationState::new(vec![message(
+            &conversation_id,
+            MessageRole::User,
+            "hello",
+        )])));
+        let events = Arc::new(CapturedRuntimeEvents::default());
+        let bridge = RuntimeKernelEventBridge {
+            conversation_id: conversation_id.clone(),
+            operation_id: OperationId::generated("operation"),
+            events: events.clone(),
+            state: state.clone(),
+            history_path: None,
+            hide_assistant_history: false,
+            suppress_assistant_events: false,
+            reply_to_message_id: None,
+            is_fork: false,
+            attachment_batch_id: None,
+            streaming_assistant: Mutex::new(None),
+            suspended: Arc::new(AtomicBool::new(false)),
+        };
+
+        bridge
+            .emit(KernelEvent::OperationFailed {
+                operation_id: KernelOperationId::from_string("kernel-provider-failure"),
+                message: "Router error: upstream unavailable".into(),
+                retryable: true,
+            })
+            .expect("record provider failure activity");
+
+        let state = state.lock().expect("state");
+        assert_eq!(
+            state
+                .history
+                .iter()
+                .filter(|message| message.role == MessageRole::Assistant)
+                .count(),
+            0,
+            "provider/router diagnostics must never become synthetic assistant transcript messages"
+        );
+        drop(state);
+
+        let events = events.0.lock().expect("events");
+        assert!(events.iter().any(|event| matches!(
+            event,
+            RuntimeEvent::ActivityUpdated { activity, .. }
+                if activity.status == RuntimeActivityStatus::Failed
+                    && activity.title == "Operation failed"
+        )));
+        assert!(!events.iter().any(|event| matches!(
+            event,
+            RuntimeEvent::MessageCompleted { .. } | RuntimeEvent::MessageDelta { .. }
+        )));
+    }
+
+    #[test]
     fn generated_send_tool_output_becomes_canonical_transcript_message() {
         let conversation_id = conversation(mahayana_core::MAHAYANA_AI_CONVERSATION_ID);
         let history = vec![message(&conversation_id, MessageRole::User, "reply target")];
