@@ -68,12 +68,6 @@ internal struct MobileSettingsAccessibilityCopy: Equatable {
 /// account policy, Host state, Human/Agent stores, or platform accessibility
 /// settings. The Scene root is the single runtime projection owner.
 internal struct MobileUiPreferences: Equatable {
-    static let localeDefaultsKey = "fabushi.ui.locale"
-    static let directionDefaultsKey = "fabushi.ui.direction"
-    static let textScaleDefaultsKey = "fabushi.ui.text-scale"
-    static let reducedMotionDefaultsKey = "fabushi.ui.reduced-motion"
-    static let highContrastDefaultsKey = "fabushi.ui.high-contrast"
-
     static let supportedTextScales: [Double] = [0.9, 1, 1.1, 1.25, 1.5]
 
     let locale: MobileSettingsLocale
@@ -332,75 +326,78 @@ internal struct MobileUiPreferences: Equatable {
 }
 
 
-/// The single iOS owner for app-local presentation preferences.
+/// Observable renderer projection of the canonical SandSettingsStore UI values.
 ///
-/// This owner persists only presentation choices. System accessibility remains
-/// the baseline and account/Host policy is never copied into this store.
+/// Persistence is owned exclusively by SandSettingsStore. This object only
+/// mirrors normalized values for SwiftUI and writes changes through Coordinator.
 @MainActor
 @Observable
 internal final class MobileUiPreferencesStore {
-    static let shared = MobileUiPreferencesStore()
-
-    private let defaults: UserDefaults
+    private let coordinator: MahayanaCoordinator
     private(set) var preferences: MobileUiPreferences
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        let storedScale: Double
-        if defaults.object(forKey: MobileUiPreferences.textScaleDefaultsKey) == nil {
-            storedScale = 1
-        } else {
-            storedScale = defaults.double(forKey: MobileUiPreferences.textScaleDefaultsKey)
-        }
+    init(coordinator: MahayanaCoordinator) {
+        self.coordinator = coordinator
+        let value = coordinator.uiPreferencesProjection()
         preferences = MobileUiPreferences(
-            localeRaw: defaults.string(forKey: MobileUiPreferences.localeDefaultsKey)
-                ?? MobileSettingsLocale.system.rawValue,
-            directionRaw: defaults.string(forKey: MobileUiPreferences.directionDefaultsKey)
-                ?? MobileSettingsDirection.auto.rawValue,
-            textScale: storedScale,
-            reducedMotion: defaults.bool(forKey: MobileUiPreferences.reducedMotionDefaultsKey),
-            highContrast: defaults.bool(forKey: MobileUiPreferences.highContrastDefaultsKey)
+            localeRaw: value.locale,
+            directionRaw: value.direction,
+            textScale: value.textScale,
+            reducedMotion: value.reducedMotion,
+            highContrast: value.highContrast
         )
     }
 
+    func refresh() {
+        apply(coordinator.uiPreferencesProjection())
+    }
+
     func setLocale(_ locale: MobileSettingsLocale) {
-        replace(locale: locale)
+        persist(locale: locale)
     }
 
     func setDirection(_ direction: MobileSettingsDirection) {
-        replace(direction: direction)
+        persist(direction: direction)
     }
 
     func setTextScale(_ textScale: Double) {
-        replace(textScale: textScale)
+        persist(textScale: textScale)
     }
 
     func setReducedMotion(_ reducedMotion: Bool) {
-        replace(reducedMotion: reducedMotion)
+        persist(reducedMotion: reducedMotion)
     }
 
     func setHighContrast(_ highContrast: Bool) {
-        replace(highContrast: highContrast)
+        persist(highContrast: highContrast)
     }
 
-    private func replace(
+    private func persist(
         locale: MobileSettingsLocale? = nil,
         direction: MobileSettingsDirection? = nil,
         textScale: Double? = nil,
         reducedMotion: Bool? = nil,
         highContrast: Bool? = nil
     ) {
-        preferences = MobileUiPreferences(
-            localeRaw: (locale ?? preferences.locale).rawValue,
-            directionRaw: (direction ?? preferences.direction).rawValue,
-            textScale: textScale ?? preferences.textScale,
-            reducedMotion: reducedMotion ?? preferences.reducedMotion,
-            highContrast: highContrast ?? preferences.highContrast
+        let current = preferences
+        let value = coordinator.updateUiPreferences(
+            locale: (locale ?? current.locale).rawValue,
+            direction: (direction ?? current.direction).rawValue,
+            reducedMotion: reducedMotion ?? current.reducedMotion,
+            highContrast: highContrast ?? current.highContrast,
+            textScale: textScale ?? current.textScale
         )
-        defaults.set(preferences.locale.rawValue, forKey: MobileUiPreferences.localeDefaultsKey)
-        defaults.set(preferences.direction.rawValue, forKey: MobileUiPreferences.directionDefaultsKey)
-        defaults.set(preferences.textScale, forKey: MobileUiPreferences.textScaleDefaultsKey)
-        defaults.set(preferences.reducedMotion, forKey: MobileUiPreferences.reducedMotionDefaultsKey)
-        defaults.set(preferences.highContrast, forKey: MobileUiPreferences.highContrastDefaultsKey)
+        apply(value)
+    }
+
+    private func apply(_ value: MahayanaCoordinator.UiPreferencesProjection) {
+        preferences = MobileUiPreferences(
+            localeRaw: value.locale,
+            directionRaw: value.direction,
+            textScale: value.textScale,
+            reducedMotion: value.reducedMotion,
+            highContrast: value.highContrast
+        )
     }
 }
+
