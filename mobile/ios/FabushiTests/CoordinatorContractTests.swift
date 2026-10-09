@@ -219,6 +219,68 @@ final class CoordinatorContractTests: XCTestCase {
     }
 
     @MainActor
+    func testHostSettingsReconcilerDropsStaleResultAfterHostGenerationChanges() async {
+        var local: Bool?
+        var generation: UInt64 = 7
+        let gate = HostSettingsReadGate()
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            readRemote: {
+                await gate.wait()
+                return .init(hasSeenOnboarding: true)
+            },
+            pushRemote: { $0 },
+            hostGeneration: { generation }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+
+        for _ in 0..<32 where !gate.started {
+            await Task.yield()
+        }
+        XCTAssertTrue(gate.started)
+
+        generation = 8
+        gate.open()
+        await yieldHostSettingsWork()
+
+        XCTAssertNil(local)
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+    }
+
+    @MainActor
+    func testHostSettingsReconcilerAccountDepartureAbandonsInFlightResult() async {
+        var local: Bool?
+        let gate = HostSettingsReadGate()
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            readRemote: {
+                await gate.wait()
+                return .init(hasSeenOnboarding: true)
+            },
+            pushRemote: { $0 },
+            hostGeneration: { 9 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+
+        for _ in 0..<32 where !gate.started {
+            await Task.yield()
+        }
+        XCTAssertTrue(gate.started)
+
+        reconciler.accountDeparted()
+        gate.open()
+        await yieldHostSettingsWork()
+
+        XCTAssertNil(local)
+        XCTAssertFalse(reconciler.isReadable)
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+    }
+
+    @MainActor
     func testHostSettingsReconcilerFailureDoesNotFabricateCompletion() async {
         let reconciler = IOSHostSettingsReconciler(
             readLocal: { nil },
