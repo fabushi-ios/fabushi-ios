@@ -5,12 +5,14 @@ import UIKit
 extension ContentView {
     var body: some View {
         Group {
-            if model.onboardingStep < 3 {
-                onboardingView
-            } else if !model.authResolved {
+            if !model.authResolved {
                 authLoadingView
             } else if !model.loggedIn {
                 loginView
+            } else if !model.onboardingRouteResolved {
+                authLoadingView
+            } else if model.signedInOnboardingStep != .completed {
+                onboardingView
             } else {
                 authenticatedContent
             }
