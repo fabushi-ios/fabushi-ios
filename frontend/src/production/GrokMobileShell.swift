@@ -181,6 +181,7 @@ internal struct GrokMobileShell: View {
                 agentId: agent.id,
                 agentName: agent.name,
                 bridge: bridge,
+                reconnectGeneration: reconnectGeneration,
                 onClose: { asyncTasksTarget = nil }
             )
         }
@@ -364,6 +365,7 @@ internal struct GrokMobileShell: View {
             bridge: bridge,
             model: model,
             appAgentSurface: appAgentSurface,
+            reconnectGeneration: reconnectGeneration,
             onClose: { clearRosterSelection() },
             onOpenSettings: {
                 self.botSettingsRoutineID = nil

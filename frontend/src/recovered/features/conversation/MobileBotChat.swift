@@ -430,6 +430,7 @@ internal struct MobileBotChat: View {
     let bridge: IOSPreloadBridge
     let model: MarketplaceModel
     let appAgentSurface: FabushiAppAgentSurface
+    let reconnectGeneration: Int
     let onClose: () -> Void
     let onOpenSettings: () -> Void
     let onOpenAutomation: (String) -> Void
@@ -530,6 +531,7 @@ internal struct MobileBotChat: View {
                 agentId: bot.id,
                 agentName: bot.name,
                 bridge: bridge,
+                reconnectGeneration: reconnectGeneration,
                 onClose: { asyncTasksPresented = false }
             )
         }

@@ -1121,11 +1121,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift",
       "ios_language": "Swift/Rust",
-      "ios_platform_delta": "The native provider calls canonical getAsyncTasks through IOSPreloadBridge/Coordinator into AppHost and the single FeatureHostController owner. It strictly decodes subagent/shell/cloud-agent rows, generation-fences stale Agent requests, refreshes every 30 seconds and on pull-to-refresh, retains the last known snapshot across transient failures, and cancels with panel lifetime.",
+      "ios_platform_delta": "The native provider calls canonical getAsyncTasks through IOSPreloadBridge/Coordinator into AppHost and the single FeatureHostController owner. It strictly decodes subagent/shell/cloud-agent rows, keys panel lifetime by Agent id + shell reconnect generation, generation-fences stale pre-reconnect and Agent-replacement requests, refreshes every 30 seconds/on pull-to-refresh, retains the last known snapshot across transient failures, and cancels with panel lifetime.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs focused async-task durability/projection tests; exact-HEAD GitHub Actions pending",
-      "notes": "Canonical provider/backend ownership now exists and is shipping-composed. Do not promote to verified until the current iOS exact HEAD has ordinary Rust/Swift/UI/device-archive plus applicable protected evidence."
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/GrokMobileShell.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers strict task decoding plus Agent/reconnect/local-generation request fencing; exact-head GitHub Actions pending",
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and provider.ts@ec3ade25819916697a0a30b4aedf806a6d93cd70. Current source closes the prior reconnect-generation gap; same-head acceptance remains required."
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/view.tsx",
@@ -4269,17 +4269,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/recovered-state-models.contract.test.ts",
       "desktop_blob_sha": "c22993d0620a2e0a24ce523c9fa6516ff51f10cb",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "State-model contract for per-Agent async-task provider lifecycle/reconnect fencing/relative-time buckets and bounded avatar crop/zoom geometry.",
+      "desktop_owner": "renderer state models across Agent async tasks and avatar editor",
+      "desktop_visible_effect": "Async task state retains previous rows through transient errors, refreshes authoritatively after reconnect without stale overwrite, formats stable ages, and avatar crops stay inside the source image across zoom/pan.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "The native async-task panel is the single provider/view owner. Its task scope now includes Agent id + shell reconnect generation + local generation, so reconnect remounts an authoritative fetch and stale pre-reconnect replies fail closed; structured concurrency replaces the Desktop provider subscription object. Avatar geometry remains in MobileAvatarEditor/UIKit with the same bounded crop responsibilities.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; mobile/ios/FabushiTests/AvatarEditorParityTests.swift; current exact-HEAD Actions required before verified",
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob c22993d0620a2e0a24ce523c9fa6516ff51f10cb. Source-level implementation only."
     },
     {
       "desktop_path": "frontend/src/recovered/features/root-resilience/connection-state.ts",

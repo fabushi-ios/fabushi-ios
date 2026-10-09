@@ -89,4 +89,40 @@ final class AsyncTasksParityTests: XCTestCase {
             "startedAtMs": 10.0,
         ]))
     }
+    func testAsyncTaskRequestScopeRejectsAgentReconnectAndGenerationReplacement() {
+        let scope = MobileAsyncTasksRequestScope(
+            agentId: "agent-a",
+            reconnectGeneration: 4,
+            generation: 9
+        )
+        XCTAssertTrue(
+            scope.accepts(
+                agentId: "agent-a",
+                reconnectGeneration: 4,
+                generation: 9
+            )
+        )
+        XCTAssertFalse(
+            scope.accepts(
+                agentId: "agent-b",
+                reconnectGeneration: 4,
+                generation: 9
+            )
+        )
+        XCTAssertFalse(
+            scope.accepts(
+                agentId: "agent-a",
+                reconnectGeneration: 5,
+                generation: 9
+            )
+        )
+        XCTAssertFalse(
+            scope.accepts(
+                agentId: "agent-a",
+                reconnectGeneration: 4,
+                generation: 10
+            )
+        )
+    }
+
 }

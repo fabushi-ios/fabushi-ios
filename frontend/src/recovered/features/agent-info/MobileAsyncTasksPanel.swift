@@ -30,11 +30,28 @@ internal struct MobileAsyncTask: Identifiable, Equatable {
     }
 }
 
+internal struct MobileAsyncTasksRequestScope: Equatable, Sendable {
+    let agentId: String
+    let reconnectGeneration: Int
+    let generation: UInt64
+
+    func accepts(
+        agentId: String,
+        reconnectGeneration: Int,
+        generation: UInt64
+    ) -> Bool {
+        self.agentId == agentId
+            && self.reconnectGeneration == reconnectGeneration
+            && self.generation == generation
+    }
+}
+
 @MainActor
 internal struct MobileAsyncTasksPanel: View {
     let agentId: String
     let agentName: String
     let bridge: IOSPreloadBridge
+    let reconnectGeneration: Int
     let onClose: () -> Void
 
     @State private var tasks: [MobileAsyncTask] = []
@@ -105,26 +122,42 @@ internal struct MobileAsyncTasksPanel: View {
             }
         }
         .accessibilityIdentifier("mobile-async-tasks-panel")
-        .task(id: agentId) {
+        .task(id: "\(agentId):\(reconnectGeneration)") {
             generation &+= 1
-            let ownedGeneration = generation
-            await refresh(expectedGeneration: ownedGeneration)
+            let scope = MobileAsyncTasksRequestScope(
+                agentId: agentId,
+                reconnectGeneration: reconnectGeneration,
+                generation: generation
+            )
+            await refresh(expectedScope: scope)
             while !Task.isCancelled {
                 do { try await Task.sleep(for: Self.refreshInterval) }
                 catch { return }
-                guard generation == ownedGeneration else { return }
+                guard scope.accepts(
+                    agentId: agentId,
+                    reconnectGeneration: reconnectGeneration,
+                    generation: generation
+                ) else { return }
                 now = Date()
-                await refresh(expectedGeneration: ownedGeneration)
+                await refresh(expectedScope: scope)
             }
         }
     }
 
-    private func refresh(expectedGeneration: UInt64? = nil) async {
-        let ownedGeneration = expectedGeneration ?? generation
+    private func refresh(expectedScope: MobileAsyncTasksRequestScope? = nil) async {
+        let scope = expectedScope ?? .init(
+            agentId: agentId,
+            reconnectGeneration: reconnectGeneration,
+            generation: generation
+        )
         loading = true
         do {
             let result = try await bridge.request(method: "getAsyncTasks", params: ["id": agentId])
-            guard generation == ownedGeneration, !Task.isCancelled else { return }
+            guard scope.accepts(
+                agentId: agentId,
+                reconnectGeneration: reconnectGeneration,
+                generation: generation
+            ), !Task.isCancelled else { return }
             guard let rows = result.value as? [[String: Any]] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
@@ -141,10 +174,18 @@ internal struct MobileAsyncTasksPanel: View {
         } catch is CancellationError {
             return
         } catch {
-            guard generation == ownedGeneration else { return }
+            guard scope.accepts(
+                agentId: agentId,
+                reconnectGeneration: reconnectGeneration,
+                generation: generation
+            ), !Task.isCancelled else { return }
             errorText = error.localizedDescription
         }
-        guard generation == ownedGeneration else { return }
+        guard scope.accepts(
+            agentId: agentId,
+            reconnectGeneration: reconnectGeneration,
+            generation: generation
+        ), !Task.isCancelled else { return }
         loading = false
         now = Date()
     }
