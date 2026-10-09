@@ -147,6 +147,56 @@ func normalizeMobileReactionInput(_ value: String) -> String? {
     return trimmed
 }
 
+struct MobileListenerIntegrationProjection: Equatable, Sendable {
+    let platform: String
+    let displayName: String
+    let blurb: String
+    let isConnected: Bool
+    var accountLabel: String?
+    var error: String?
+}
+
+func projectMobileListenerIntegration(_ raw: Any?) -> MobileListenerIntegrationProjection? {
+    guard let row = raw as? [String: Any],
+          let platformValue = row["platform"] as? String,
+          let displayName = row["displayName"] as? String,
+          let blurb = row["blurb"] as? String,
+          let isConnected = row["isConnected"] as? Bool
+    else { return nil }
+    let platform = platformValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !platform.isEmpty else { return nil }
+    let accountLabel = (row["accountLabel"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let error = (row["error"] as? String)?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return .init(
+        platform: platform,
+        displayName: displayName,
+        blurb: blurb,
+        isConnected: isConnected,
+        accountLabel: accountLabel?.isEmpty == false ? accountLabel : nil,
+        error: error?.isEmpty == false ? error : nil
+    )
+}
+
+func projectMobileListenerIntegrations(_ raw: Any?) -> [String: MobileListenerIntegrationProjection]? {
+    guard let rows = raw as? [Any] else { return nil }
+    var projected: [String: MobileListenerIntegrationProjection] = [:]
+    for row in rows {
+        guard let integration = projectMobileListenerIntegration(row) else { continue }
+        projected[integration.platform] = integration
+    }
+    return projected
+}
+
+func validatedMobileListenerAuthorizationURL(_ raw: String) -> URL? {
+    guard let components = URLComponents(string: raw),
+          components.scheme?.lowercased() == "https",
+          components.host?.isEmpty == false
+    else { return nil }
+    return components.url
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
@@ -156,6 +206,7 @@ struct MobileChatMessage: Identifiable, Equatable {
     var actionTitle: String?
     var actionDetail: String?
     var actionStatus: String?
+    var listenerPlatform: String?
     var handoffRequestId: String?
     var handoffAgentId: String?
     var approvalId: String?
@@ -796,7 +847,8 @@ func projectListenerConnectTranscriptCard(
         operationId: operationId,
         actionTitle: connected ? "\(displayName) 已连接" : "连接 \(displayName)",
         actionDetail: detail,
-        actionStatus: connected ? "completed" : (pending ? "pending" : "waiting")
+        actionStatus: connected ? "completed" : (pending ? "pending" : "waiting"),
+        listenerPlatform: platform.lowercased()
     )
 }
 
@@ -985,6 +1037,11 @@ final class MarketplaceModel {
     var privateSkillAgentId: String?
     var privateSkillAgentName: String?
     var permissionRequest: PluginPermissionRequest?
+    var listenerIntegrations: [String: MobileListenerIntegrationProjection] = [:]
+    var listenerIntegrationsLoading = false
+    var listenerConnectingPlatform: String?
+    var listenerAuthorizingPlatform: String?
+    var listenerIntegrationErrors: [String: String] = [:]
     var mcpServers: [MarketplaceMcpServer] = []
     var mcpToolsByServerId: [String: [MarketplaceMcpTool]] = [:]
     var mcpLoading = false
@@ -1028,6 +1085,8 @@ final class MarketplaceModel {
     @ObservationIgnored private var mcpBackendLoginAttemptId: String?
     @ObservationIgnored private var linkMetadataCache: [String: MobileLinkMetadata] = [:]
     @ObservationIgnored private var linkMetadataTasks: [String: Task<MobileLinkMetadata, Error>] = [:]
+    @ObservationIgnored private var listenerRequestSerial = 0
+    @ObservationIgnored private var mcpOAuthGeneration = 0
     @ObservationIgnored private var mcpAccountEpoch = 0
     @ObservationIgnored private var mcpServerRequestSerial = 0
     @ObservationIgnored private var mcpToolRequestSerial: [String: Int] = [:]
@@ -1293,6 +1352,15 @@ final class MarketplaceModel {
     private func resetMcpState() {
         mcpAccountEpoch = mcpAccountEpoch == Int.max ? 1 : mcpAccountEpoch + 1
         mcpServerRequestSerial = mcpServerRequestSerial == Int.max ? 1 : mcpServerRequestSerial + 1
+        listenerRequestSerial = listenerRequestSerial == Int.max ? 1 : listenerRequestSerial + 1
+        mcpOAuthGeneration = mcpOAuthGeneration == Int.max ? 1 : mcpOAuthGeneration + 1
+        mcpOAuthSession?.cancel()
+        mcpOAuthSession = nil
+        listenerIntegrations = [:]
+        listenerIntegrationsLoading = false
+        listenerConnectingPlatform = nil
+        listenerAuthorizingPlatform = nil
+        listenerIntegrationErrors = [:]
         mcpToolRequestSerial.removeAll()
         mcpMutationSerial.removeAll()
         mcpServers = []
@@ -1650,6 +1718,148 @@ final class MarketplaceModel {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         return accepted
+    }
+
+    func listenerIntegrationState(for rawPlatform: String) -> MobileListenerIntegrationProjection? {
+        let platform = rawPlatform.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return listenerIntegrations[platform]
+    }
+
+    func refreshListenerIntegrations() async {
+        guard loggedIn, globalDharmaAccountScope != nil else {
+            listenerIntegrations = [:]
+            return
+        }
+        guard !listenerIntegrationsLoading else { return }
+        listenerIntegrationsLoading = true
+        listenerRequestSerial = listenerRequestSerial == Int.max ? 1 : listenerRequestSerial + 1
+        let serial = listenerRequestSerial
+        let accountScope = globalDharmaAccountScope
+        defer {
+            if listenerRequestSerial == serial {
+                listenerIntegrationsLoading = false
+            }
+        }
+
+        do {
+            _ = try await executeFeatureCommand(
+                type: "listener.list",
+                requestId: "ios-listener-list-\(UUID().uuidString.lowercased())"
+            )
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 5_120
+            ) { event in
+                event["type"] as? String == "listener.listed"
+            }
+            guard serial == listenerRequestSerial,
+                  loggedIn,
+                  globalDharmaAccountScope == accountScope,
+                  let event = result.value as? [String: Any],
+                  let projected = projectMobileListenerIntegrations(event["integrations"])
+            else { return }
+            listenerIntegrations = projected
+            for (platform, integration) in projected where integration.isConnected {
+                listenerIntegrationErrors.removeValue(forKey: platform)
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard serial == listenerRequestSerial,
+                  loggedIn,
+                  globalDharmaAccountScope == accountScope
+            else { return }
+            for platform in listenerIntegrations.keys {
+                listenerIntegrationErrors[platform] = error.localizedDescription
+            }
+        }
+    }
+
+    func connectListenerIntegration(platform rawPlatform: String) async {
+        let platform = rawPlatform.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !platform.isEmpty,
+              loggedIn,
+              let accountScope = globalDharmaAccountScope,
+              listenerIntegrations[platform]?.isConnected != true,
+              listenerConnectingPlatform != platform,
+              listenerAuthorizingPlatform != platform
+        else { return }
+
+        listenerConnectingPlatform = platform
+        listenerIntegrationErrors.removeValue(forKey: platform)
+        let requestId = "ios-listener-connect-\(platform)-\(UUID().uuidString.lowercased())"
+        do {
+            _ = try await executeFeatureCommand(
+                type: "listener.connect",
+                requestId: requestId,
+                fields: ["platform": platform]
+            )
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 5_120
+            ) { event in
+                guard let type = event["type"] as? String else { return false }
+                if type == "connector.oauthRequested" {
+                    return (event["connectorId"] as? String)?.lowercased() == platform
+                }
+                if type == "connector.changed" {
+                    return ((event["connector"] as? [String: Any])?["id"] as? String)?
+                        .lowercased() == platform
+                }
+                if type == "listener.changed" {
+                    return ((event["integration"] as? [String: Any])?["platform"] as? String)?
+                        .lowercased() == platform
+                }
+                return false
+            }
+            guard loggedIn, globalDharmaAccountScope == accountScope,
+                  let event = result.value as? [String: Any],
+                  let type = event["type"] as? String
+            else {
+                listenerConnectingPlatform = nil
+                return
+            }
+
+            if type == "connector.oauthRequested" {
+                guard let rawURL = event["authorizationUrl"] as? String,
+                      let url = validatedMobileListenerAuthorizationURL(rawURL)
+                else {
+                    throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                        "Listener authorization URL must use HTTPS"
+                    )
+                }
+                listenerConnectingPlatform = nil
+                listenerAuthorizingPlatform = platform
+                presentMcpOAuth(url, listenerPlatform: platform)
+                return
+            }
+
+            if type == "listener.changed",
+               let integration = projectMobileListenerIntegration(event["integration"]) {
+                listenerIntegrations[integration.platform] = integration
+                if integration.isConnected {
+                    listenerIntegrationErrors.removeValue(forKey: integration.platform)
+                }
+            } else {
+                await refreshListenerIntegrations()
+            }
+            if listenerConnectingPlatform == platform {
+                listenerConnectingPlatform = nil
+            }
+        } catch is CancellationError {
+            if listenerConnectingPlatform == platform {
+                listenerConnectingPlatform = nil
+            }
+        } catch {
+            guard loggedIn, globalDharmaAccountScope == accountScope else {
+                if listenerConnectingPlatform == platform {
+                    listenerConnectingPlatform = nil
+                }
+                return
+            }
+            listenerIntegrationErrors[platform] = error.localizedDescription
+            if listenerConnectingPlatform == platform {
+                listenerConnectingPlatform = nil
+            }
+        }
     }
 
     private func receiveFeatureEvent(type expectedType: String) async throws -> [String: Any] {
@@ -2387,15 +2597,29 @@ final class MarketplaceModel {
         }
     }
 
-    private func presentMcpOAuth(_ url: URL) {
+    private func presentMcpOAuth(
+        _ url: URL,
+        listenerPlatform: String? = nil
+    ) {
+        mcpOAuthGeneration = mcpOAuthGeneration == Int.max ? 1 : mcpOAuthGeneration + 1
+        let generation = mcpOAuthGeneration
         mcpOAuthSession?.cancel()
+        if let listenerPlatform {
+            listenerAuthorizingPlatform = listenerPlatform
+        }
         let session = ASWebAuthenticationSession(
             url: url,
             callbackURLScheme: "fabushi"
         ) { [weak self] callbackURL, error in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, self.mcpOAuthGeneration == generation else { return }
                 self.mcpOAuthSession = nil
+                defer {
+                    if let listenerPlatform,
+                       self.listenerAuthorizingPlatform == listenerPlatform {
+                        self.listenerAuthorizingPlatform = nil
+                    }
+                }
                 if let callbackURL {
                     do {
                         let result = try await self.bridge.request(
@@ -2404,16 +2628,29 @@ final class MarketplaceModel {
                         )
                         let outcome = (result.value as? [String: Any])?["outcome"] as? String
                         if outcome != "success" {
-                            self.mcpError = outcome ?? "MCP OAuth callback failed."
+                            let message = outcome ?? "MCP OAuth callback failed."
+                            self.mcpError = message
+                            if let listenerPlatform {
+                                self.listenerIntegrationErrors[listenerPlatform] = message
+                            }
                         }
                         await self.refreshMcpServers()
+                        if listenerPlatform != nil {
+                            await self.refreshListenerIntegrations()
+                        }
                     } catch {
                         self.mcpError = error.localizedDescription
+                        if let listenerPlatform {
+                            self.listenerIntegrationErrors[listenerPlatform] = error.localizedDescription
+                        }
                     }
                 } else if let error,
                           (error as? ASWebAuthenticationSessionError)?.code
                             != .canceledLogin {
                     self.mcpError = error.localizedDescription
+                    if let listenerPlatform {
+                        self.listenerIntegrationErrors[listenerPlatform] = error.localizedDescription
+                    }
                 }
             }
         }
@@ -2421,8 +2658,17 @@ final class MarketplaceModel {
         session.prefersEphemeralWebBrowserSession = false
         mcpOAuthSession = session
         if !session.start() {
-            mcpOAuthSession = nil
-            mcpError = "Unable to start MCP authentication."
+            if mcpOAuthGeneration == generation {
+                mcpOAuthSession = nil
+                let message = "Unable to start MCP authentication."
+                mcpError = message
+                if let listenerPlatform {
+                    listenerIntegrationErrors[listenerPlatform] = message
+                    if listenerAuthorizingPlatform == listenerPlatform {
+                        listenerAuthorizingPlatform = nil
+                    }
+                }
+            }
         }
     }
 

@@ -206,6 +206,9 @@ internal struct MobileBotChat: View {
         .task(id: "\(bot.id):\(bot.conversationId ?? "")") {
             await loadInitialConversationTail()
         }
+        .task(id: listenerScopeFingerprint) {
+            await pollVisibleListenerIntegrations()
+        }
         .onChange(of: bot.id) { _, _ in
             cancelVoiceInput()
             approvalGeneration &+= 1
@@ -229,6 +232,27 @@ internal struct MobileBotChat: View {
         }
         .sheet(isPresented: $reactionPickerPresented) {
             reactionPickerSheet
+        }
+    }
+
+    private var visibleListenerPlatforms: [String] {
+        Array(Set(entries.compactMap { $0.listenerPlatform })).sorted()
+    }
+
+    private var listenerScopeFingerprint: String {
+        "\(bot.id)|\(model.accountEmail)|\(visibleListenerPlatforms.joined(separator: ","))"
+    }
+
+    @MainActor
+    private func pollVisibleListenerIntegrations() async {
+        guard !visibleListenerPlatforms.isEmpty else { return }
+        while !Task.isCancelled {
+            await model.refreshListenerIntegrations()
+            do {
+                try await Task.sleep(for: .seconds(5))
+            } catch {
+                return
+            }
         }
     }
 
@@ -724,12 +748,16 @@ internal struct MobileBotChat: View {
             .padding(.vertical, 4)
             .accessibilityIdentifier(Self.semanticId("mobile-bot-timeline-event-\(entry.id)"))
         } else if entry.kind == .action {
-            HStack(spacing: 7) {
-                Circle().fill(entry.actionStatus == "failed" ? Color.red : Color.orange).frame(width: 7, height: 7)
-                Text(entry.actionTitle ?? "Working").font(.caption.weight(.medium))
-                if let detail = entry.actionDetail, !detail.isEmpty { Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+            if let platform = entry.listenerPlatform {
+                listenerIntegrationCard(entry, platform: platform)
+            } else {
+                HStack(spacing: 7) {
+                    Circle().fill(entry.actionStatus == "failed" ? Color.red : Color.orange).frame(width: 7, height: 7)
+                    Text(entry.actionTitle ?? "Working").font(.caption.weight(.medium))
+                    if let detail = entry.actionDetail, !detail.isEmpty { Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                }
+                .padding(.vertical, 2)
             }
-            .padding(.vertical, 2)
         } else if entry.role == .user {
             HStack {
                 Spacer(minLength: 54)
@@ -770,6 +798,60 @@ internal struct MobileBotChat: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func listenerIntegrationCard(
+        _ entry: MobileChatMessage,
+        platform rawPlatform: String
+    ) -> some View {
+        let platform = rawPlatform.lowercased()
+        let integration = model.listenerIntegrationState(for: platform)
+        let connected = integration?.isConnected ?? (entry.actionStatus == "completed")
+        let connecting = model.listenerConnectingPlatform == platform
+        let authorizing = model.listenerAuthorizingPlatform == platform
+        let busy = connecting || authorizing
+        let title = integration?.displayName
+            ?? entry.actionTitle?.replacingOccurrences(of: "连接 ", with: "")
+            ?? platform.capitalized
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Image(systemName: connected ? "checkmark.circle.fill" : "bolt.horizontal.circle")
+                    .foregroundStyle(connected ? .green : .secondary)
+                Text(connected ? "\(title) 已连接" : "连接 \(title)")
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
+                if connected {
+                    Text("Connected")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.green)
+                } else {
+                    Button(authorizing ? "授权中…" : (connecting ? "连接中…" : "连接")) {
+                        Task { await model.connectListenerIntegration(platform: platform) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(busy)
+                    .accessibilityIdentifier(Self.semanticId("mobile-bot-listener-connect-\(platform)"))
+                }
+            }
+            if !connected {
+                let detail = integration?.blurb ?? entry.actionDetail
+                if let detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let error = integration?.error ?? model.listenerIntegrationErrors[platform],
+               !error.isEmpty {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityIdentifier(Self.semanticId("mobile-bot-listener-card-\(platform)"))
     }
 
     private static let quickReactionEmojis = ["👍", "👎", "❤️", "😂", "🎉", "😮"]

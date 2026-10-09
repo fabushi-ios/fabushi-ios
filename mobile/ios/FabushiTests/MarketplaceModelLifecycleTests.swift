@@ -26,6 +26,7 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(pending.actionTitle, "连接 Slack")
         XCTAssertEqual(pending.actionDetail, "so this routine can fire")
         XCTAssertEqual(pending.actionStatus, "pending")
+        XCTAssertEqual(pending.listenerPlatform, "slack")
         XCTAssertEqual(pending.operationId, "op-1")
 
         let connected = try XCTUnwrap(projectListenerConnectTranscriptCard(
@@ -63,6 +64,40 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(github.actionDetail, "GitHub 已连接。")
     }
 
+
+    func testListenerIntegrationHostProjectionAndAuthorizationURLStayFailClosed() throws {
+        let projected = try XCTUnwrap(projectMobileListenerIntegrations([
+            [
+                "platform": "GitHub",
+                "displayName": "GitHub",
+                "blurb": "Watch repositories.",
+                "isConnected": true,
+                "accountLabel": "octocat",
+            ],
+            [
+                "platform": "slack",
+                "displayName": "Slack",
+                "blurb": "Watch messages.",
+                "isConnected": false,
+                "error": "reauth required",
+            ],
+            ["platform": "", "displayName": "Broken", "blurb": "", "isConnected": false],
+            ["platform": "linear", "displayName": "Linear", "blurb": "Watch issues."],
+        ]))
+        XCTAssertEqual(projected.count, 2)
+        XCTAssertEqual(projected["github"]?.accountLabel, "octocat")
+        XCTAssertTrue(projected["github"]?.isConnected == true)
+        XCTAssertEqual(projected["slack"]?.error, "reauth required")
+        XCTAssertFalse(projected["slack"]?.isConnected == true)
+
+        XCTAssertEqual(
+            validatedMobileListenerAuthorizationURL("https://example.com/oauth?state=abc")?.scheme,
+            "https"
+        )
+        XCTAssertNil(validatedMobileListenerAuthorizationURL("http://example.com/oauth"))
+        XCTAssertNil(validatedMobileListenerAuthorizationURL("javascript:alert(1)"))
+        XCTAssertNil(validatedMobileListenerAuthorizationURL("https:///missing-host"))
+    }
 
     @MainActor
     func testPrivateSkillProjectionUsesWorkflowOwnerAndRejectsAutomationRows() throws {
