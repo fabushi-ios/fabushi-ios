@@ -197,7 +197,7 @@ extension GrokMobileShell {
                             if let notice = rootNotificationActionNotice[tray.id] {
                                 Text(notice.text)
                                     .font(.caption)
-                                    .foregroundStyle(notice.isError ? .red : .secondary)
+                                    .foregroundStyle(notice.isError ? Color.red : Color.secondary)
                                     .accessibilityIdentifier("root-notification-action-result-\(tray.id)")
                             }
                         }
