@@ -48,6 +48,20 @@ final class SharedObservabilityParityTests: XCTestCase {
         XCTAssertEqual(split.remaining.count, 2)
     }
 
+    func testLogShipBatchMatchesJavaScriptUTF16StringLength() {
+        let prefixCount = LOG_SHIP_MAX_BATCH_BYTES - 3
+        let buffer = [
+            LogShipBufferedEntry(message: String(repeating: "a", count: prefixCount), metadata: [:]),
+            LogShipBufferedEntry(message: "😀", metadata: [:]),
+            LogShipBufferedEntry(message: "佛", metadata: [:]),
+        ]
+        let split = takeLogShipBatch(buffer)
+        XCTAssertEqual("😀".utf16.count, 2)
+        XCTAssertEqual("佛".utf16.count, 1)
+        XCTAssertEqual(split.batch.count, 2)
+        XCTAssertEqual(split.remaining.count, 1)
+    }
+
     func testLogShipScheduleUsesConnectRetryAfter() {
         let schedule = LogShipSchedule()
         let error = ObservabilityRateLimitError(
