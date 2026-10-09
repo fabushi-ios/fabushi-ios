@@ -1,14 +1,28 @@
 import Foundation
 
 enum SandText {
+    private static func prefixByUTF16Units(_ value: String, maxLength: Int) -> String {
+        guard maxLength > 0 else { return "" }
+        var result = ""
+        var units = 0
+        for character in value {
+            let part = String(character)
+            let next = part.utf16.count
+            guard units + next <= maxLength else { break }
+            result.append(character)
+            units += next
+        }
+        return result
+    }
+
     static func clampLine(_ raw: String, maxLength: Int) -> String {
         let collapsed = raw.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return String(collapsed.prefix(max(0, maxLength)))
+        return prefixByUTF16Units(collapsed, maxLength: maxLength)
     }
 
     static func clampBlock(_ raw: String, maxLength: Int) -> String {
-        String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(max(0, maxLength)))
+        prefixByUTF16Units(raw.trimmingCharacters(in: .whitespacesAndNewlines), maxLength: maxLength)
     }
 
     static func decapitalize(_ phrase: String) -> String {
