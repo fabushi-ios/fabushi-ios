@@ -407,7 +407,8 @@ final class SharedObservabilityParityTests: XCTestCase {
         await transport.clearPending()
         await transport.enqueue(.info, message: "new", timestampMs: 2_000)
         await gate.resume(processed: 1)
-        XCTAssertTrue(await oldFlush.value)
+        let oldResult = await oldFlush.value
+        XCTAssertTrue(oldResult)
 
         let checkpoint = await transport.captureCheckpoint()
         XCTAssertEqual(checkpoint.records.map(\.message), ["new"])
