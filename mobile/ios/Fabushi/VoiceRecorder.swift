@@ -5,9 +5,21 @@ import Observation
 @MainActor
 @Observable
 final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
+    static let minimumRecordingDuration: TimeInterval = 0.5
+    static let maximumRecordingDuration: TimeInterval = 300
+
     private(set) var isRecording = false
     private(set) var elapsedSeconds: Int = 0
+    private(set) var didReachMaximumDuration = false
     var errorMessage: String?
+
+    static func shouldTranscribe(duration: TimeInterval) -> Bool {
+        duration >= minimumRecordingDuration
+    }
+
+    static func reachedMaximumDuration(_ duration: TimeInterval) -> Bool {
+        duration >= maximumRecordingDuration
+    }
 
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
@@ -45,10 +57,20 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
             self.recorder = recorder
             outputURL = url
             elapsedSeconds = 0
+            didReachMaximumDuration = false
             isRecording = true
             timer?.invalidate()
-            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.elapsedSeconds += 1 }
+            timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, let recorder = self.recorder, self.isRecording else { return }
+                    let duration = recorder.currentTime
+                    self.elapsedSeconds = Int(duration)
+                    if Self.reachedMaximumDuration(duration) {
+                        self.didReachMaximumDuration = true
+                        self.timer?.invalidate()
+                        self.timer = nil
+                    }
+                }
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -58,16 +80,25 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
 
     func stop() -> (url: URL, data: Data)? {
         guard isRecording, let recorder, let outputURL else { return nil }
+        let recordedDuration = recorder.currentTime
         recorder.stop()
         timer?.invalidate()
         timer = nil
         isRecording = false
+        didReachMaximumDuration = false
         self.recorder = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+
+        guard Self.shouldTranscribe(duration: recordedDuration) else {
+            try? FileManager.default.removeItem(at: outputURL)
+            self.outputURL = nil
+            return nil
+        }
         guard let data = try? Data(contentsOf: outputURL), !data.isEmpty else {
             errorMessage = "录音文件为空"
             return nil
         }
+        self.outputURL = nil
         return (outputURL, data)
     }
 
@@ -76,6 +107,7 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
         timer?.invalidate()
         timer = nil
         isRecording = false
+        didReachMaximumDuration = false
         if let outputURL { try? FileManager.default.removeItem(at: outputURL) }
         recorder = nil
         outputURL = nil

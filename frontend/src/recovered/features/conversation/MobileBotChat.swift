@@ -717,6 +717,10 @@ internal struct MobileBotChat: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 7)
+            .onChange(of: voiceRecorder.didReachMaximumDuration) { _, reachedMaximum in
+                guard reachedMaximum, !transcribingVoice else { return }
+                Task { await finishVoiceInput() }
+            }
         }
     }
 
