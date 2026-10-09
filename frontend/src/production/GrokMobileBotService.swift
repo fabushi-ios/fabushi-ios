@@ -41,6 +41,30 @@ struct GrokMobileBotService {
         try await loadIndividualBotsStrict()
     }
 
+    func waitForOnboardingComputer(
+        timeoutNanoseconds: UInt64 = 60_000_000_000,
+        retryNanoseconds: UInt64 = 2_500_000_000
+    ) async throws -> [MobileBotSummary] {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .nanoseconds(Int64(clamping: timeoutNanoseconds)))
+        var lastError: Error?
+        repeat {
+            try Task.checkCancellation()
+            do {
+                return try await loadOnboardingAgents()
+            } catch {
+                lastError = error
+                guard clock.now < deadline else { break }
+                try await Task.sleep(nanoseconds: retryNanoseconds)
+            }
+        } while clock.now < deadline
+        throw lastError ?? NSError(
+            domain: "Fabushi.MobileSignedInOnboarding",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "The Fabushi computer did not become ready in time."]
+        )
+    }
+
     func loadCanonicalRoster() async throws -> [MobileBotSummary] {
         let individualBots = try await loadIndividualBotsStrict()
         let groupBots = try await loadGroupsStrict()
