@@ -225,40 +225,34 @@ func mobileTranscriptWidgetProjection(
         guard let label = row["label"] as? String else { return nil }
         if row["value"] != nil, row["value"] is String == false { return nil }
         if row["description"] != nil, row["description"] is String == false { return nil }
+
+        let style: WidgetActionStyle?
+        switch row["style"] as? String {
+        case "primary", "success":
+            style = .primary
+        case "danger":
+            style = .danger
+        default:
+            style = nil
+        }
+
         return .init(
             label: label,
             value: row["value"] as? String,
-            description: row["description"] as? String
+            description: row["description"] as? String,
+            style: style
         )
     }
     guard options.count == rawOptions.count else { return nil }
 
-    var actionStyles: [Int: WidgetActionStyle] = [:]
-    for (index, row) in rawOptions.enumerated() {
-        guard let style = row["style"] as? String else { continue }
-        switch style {
-        case "primary", "success":
-            actionStyles[index] = .primary
-        case "danger":
-            actionStyles[index] = .danger
-        default:
-            break
-        }
-    }
-
     let widget = SandWidget(
-        id: entry.id,
-        type: "choice",
         prompt: prompt,
         helpText: rawWidget["helpText"] as? String,
-        actionStyles: actionStyles,
-        choiceConfig: .init(
-            options: options,
-            allowCustom: rawWidget["allowCustom"] as? Bool ?? false
-        ),
+        options: options,
+        allowCustom: rawWidget["allowCustom"] as? Bool ?? false,
         dismissOnMoveOn: rawWidget["dismissOnMoveOn"] as? Bool ?? false
     )
-    guard validateSandWidget(widget) else { return nil }
+    guard widget.isValid else { return nil }
     if card["respondedValue"] != nil, card["respondedValue"] is String == false { return nil }
     if card["widgetDismissed"] != nil, card["widgetDismissed"] is Bool == false { return nil }
     if card["widgetSkipped"] != nil, card["widgetSkipped"] is Bool == false { return nil }
