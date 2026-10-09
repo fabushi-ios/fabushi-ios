@@ -129,6 +129,15 @@ struct ContentView: View {
     @State var composeMenuPresented = false
     @State var profileMenuPresented = false
     @State var signOutConfirmationPresented = false
+    @State var onboardingDraft = MobileSignedInOnboardingDraft()
+    @State var onboardingDailyTools: [String] = []
+    @State var onboardingToolQuery = ""
+    @State var onboardingCreateBusy = false
+    @State var onboardingCreateError: String?
+    @State var onboardingCreatedAgentId: String?
+    @State var onboardingCreateRequestId = "ios-signed-in-onboarding-\(UUID().uuidString.lowercased())"
+    @State var onboardingOperationGeneration = 0
+    @State var onboardingAccountScope = ""
     @State var composeKind: ConversationKind?
     @State var composeName = ""
     @State var composeDescription = ""
