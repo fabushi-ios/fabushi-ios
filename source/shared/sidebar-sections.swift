@@ -43,6 +43,17 @@ enum SidebarSections {
         return normalized
     }
 
+    static func parse(_ value: [Any]) -> [SidebarSection] {
+        let records = value.compactMap { entry -> SidebarSection? in
+            guard let record = entry as? [String: Any],
+                  let id = record["id"] as? String else { return nil }
+            let name = record["name"] as? String ?? ""
+            let agentIDs = (record["agentIds"] as? [Any] ?? []).compactMap { $0 as? String }
+            return SidebarSection(id: id, name: name, agentIDs: agentIDs)
+        }
+        return normalize(records)
+    }
+
     static func withFolds(_ sections: [SidebarSection], collapsedSectionIDs: [String]) -> [SidebarSection] {
         let collapsed = Set(collapsedSectionIDs)
         return sections.map {
