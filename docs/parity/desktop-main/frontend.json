@@ -3582,17 +3582,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/feedback/overlay/view.tsx",
       "desktop_blob_sha": "01697164300f3db199fce8e72cc1187441b4ada0",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "feedback overlay submission lifecycle, optional conversation context, and recoverable normalized error handling",
+      "desktop_owner": "renderer / feedback overlay",
+      "desktop_visible_effect": "Users can submit up to 10,000 characters of feedback, optionally include the current conversation ID, cannot dismiss the surface while a submission is in flight, see an explicit sent state that closes only with Done, and remain on a recoverable surface with a normalized user-facing error when submission fails.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/recovered/features/account/session/menu.view.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "The existing SwiftUI AccountFeedbackView remains the single feedback UI owner and the existing MarketplaceModel/IOSPreloadBridge remains the single transport owner. iOS adds optional conversationId inclusion, an explicit idle/sending/sent/failed state machine, disables cancel and interactive dismissal while sending, keeps sent visible until Done, and normalizes the Desktop feedback error-code set with unknown/transport failures fail-closed to unavailable.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/account/session/menu.view.swift: AccountFeedbackView and AccountFeedbackViewState own the shipping native form, optional conversation context, sending dismissal fence, sent/Done lifecycle, and recoverable failed surface. mobile/ios/Fabushi/MarketplaceModel.swift: AccountFeedbackCode, AccountFeedbackError, and submitAccountFeedback(_:conversationId:) preserve the existing IOSPreloadBridge submitFeedback transport while adding exact code normalization and optional conversationId payload.",
+      "test_evidence": "mobile/ios/FabushiTests/FeedbackOverlayParityTests.swift covers the exact Desktop feedback-code set, unknown/nil fail-closed normalization, user-facing recoverable errors, and distinct idle/sending/sent/failed lifecycle states.",
+      "notes": "Reviewed and implemented against Desktop main exact blob 01697164300f3db199fce8e72cc1187441b4ada0. Keep implemented until ordinary CI, protected acceptance, and evidence artifacts all succeed on the same exact iOS HEAD and the focused tests are observed executing."
     },
     {
       "desktop_path": "frontend/src/recovered/features/hidden-chats/overlay/entrypoint.ts",
