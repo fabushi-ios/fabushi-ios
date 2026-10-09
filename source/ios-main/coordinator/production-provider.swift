@@ -24,10 +24,12 @@ final class ProductionCoordinatorProvider {
     }
 
     func sceneDidResume() {
+        main.coordinator.hostSettingsTransportConnected()
         auxiliary.onTransportConnected(currentGeneration)
     }
 
     func transportDown(reason: String) {
+        main.coordinator.hostSettingsTransportDown()
         auxiliary.onTransportDown(currentGeneration, reason)
     }
 
