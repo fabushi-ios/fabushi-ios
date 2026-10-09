@@ -450,6 +450,7 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerDraft = ""
     @State private var approvalGeneration = 0
     @State private var transcriptBaselineGeneration = 0
+    @State private var transcriptBaselineError: String?
     @State private var widgetGeneration = 0
     @State private var widgetPendingEntryIds: Set<String> = []
     @State private var widgetCustomAnswers: [String: String] = [:]
@@ -488,6 +489,7 @@ internal struct MobileBotChat: View {
             cancelVoiceInput()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
+            transcriptBaselineError = nil
             widgetGeneration &+= 1
             widgetPendingEntryIds.removeAll()
             widgetCustomAnswers.removeAll()
@@ -615,6 +617,25 @@ internal struct MobileBotChat: View {
                     ForEach(mobileMainTranscriptEntries(entries)) { entry in
                         transcript(entry)
                             .id(entry.id)
+                    }
+                    if let transcriptBaselineError {
+                        VStack(spacing: 8) {
+                            Text("Couldn't load conversation")
+                                .font(.headline)
+                            Text("Couldn't load this conversation. Check your connection and try again.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                            Button("Retry") {
+                                Task { await loadInitialConversationTail() }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Couldn't load conversation. \(transcriptBaselineError)")
+                        .accessibilityIdentifier("mobile-bot-transcript-load-error")
                     }
                     if let errorText {
                         Text(errorText)
@@ -2221,6 +2242,7 @@ internal struct MobileBotChat: View {
         else { return }
 
         transcriptBaselineGeneration &+= 1
+        transcriptBaselineError = nil
         let generation = transcriptBaselineGeneration
         let ownedBotID = bot.id
         let identitiesAtRequestStart = Set(entries.map { $0.canonicalMessageId ?? $0.id })
@@ -2268,11 +2290,12 @@ internal struct MobileBotChat: View {
                 current: entries,
                 identitiesAtRequestStart: identitiesAtRequestStart
             )
+            transcriptBaselineError = nil
         } catch is CancellationError {
             return
         } catch {
             guard generation == transcriptBaselineGeneration, bot.id == ownedBotID else { return }
-            errorText = error.localizedDescription
+            transcriptBaselineError = error.localizedDescription
         }
     }
 
