@@ -837,10 +837,11 @@ fn approval_presentation_safe_value(value: &Value, key: Option<&str>, depth: usi
 
 fn approval_presentation_safe_details(details: &Value) -> String {
     let safe = approval_presentation_safe_value(details, None, 0);
-    approval_presentation_safe_text(
-        &serde_json::to_string(&safe).unwrap_or_else(|_| "{…}".into()),
-        1200,
-    )
+    serde_json::to_string(&safe)
+        .unwrap_or_else(|_| "{…}".into())
+        .chars()
+        .take(1200)
+        .collect()
 }
 
 pub struct FeatureHostController {
