@@ -185,6 +185,7 @@ const GROUP_PROMPT_HISTORY_LIMIT: usize = 24;
 const GROUP_MAX_MEMBERS: usize = 6;
 const REMOTE_DEVICE_SECRET_MAX_ENTRIES: usize = 256;
 const REMOTE_DEVICE_SECRET_MAX_BYTES: u64 = 256 * 1024;
+static MESSAGING_IO_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct GroupRunState {
@@ -563,6 +564,13 @@ fn persist_pending_async_tasks(
     }
 }
 
+#[derive(Debug, Clone)]
+struct HumanHandoffLease {
+    human_conversation_id: String,
+    agent_id: String,
+    agent_name: String,
+}
+
 #[derive(Debug)]
 struct FeatureState {
     events: VecDeque<HostEvent>,
@@ -571,6 +579,7 @@ struct FeatureState {
     pending_approvals: BTreeMap<String, PendingApproval>,
     operations: BTreeSet<String>,
     operation_agents: BTreeMap<String, String>,
+    human_handoff_operations: BTreeMap<String, HumanHandoffLease>,
     automation_operations: BTreeMap<String, (String, String)>,
     routine_executions: BTreeMap<String, RoutineExecution>,
     routine_operation_epochs: BTreeMap<String, u64>,
@@ -615,6 +624,7 @@ impl Default for FeatureState {
             pending_approvals: BTreeMap::new(),
             operations: BTreeSet::new(),
             operation_agents: BTreeMap::new(),
+            human_handoff_operations: BTreeMap::new(),
             automation_operations: BTreeMap::new(),
             routine_executions: BTreeMap::new(),
             routine_operation_epochs: BTreeMap::new(),
@@ -2733,7 +2743,6 @@ impl FeatureHostController {
         request_id: String,
         envelope: Value,
     ) -> Result<Vec<Value>, FeatureHostError> {
-        static MESSAGING_IO_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         let _io_guard = MESSAGING_IO_LOCK
             .get_or_init(|| Mutex::new(()))
             .lock()
@@ -8003,6 +8012,7 @@ impl FeatureHostController {
             state.pending_approvals.clear();
             state.operations.clear();
             state.operation_agents.clear();
+            state.human_handoff_operations.clear();
             state.automation_operations.clear();
             state.routine_executions.clear();
             state.routine_epoch = state.routine_epoch.wrapping_add(1).max(1);
@@ -8281,6 +8291,7 @@ impl FeatureHostController {
         let mut state = self.state()?;
         state.operations.remove(operation_id);
         state.operation_agents.remove(operation_id);
+        state.human_handoff_operations.remove(operation_id);
         state.events.push_back(HostEvent::OperationInterrupted {
             timestamp: timestamp(),
             operation_id: operation_id.to_string(),
@@ -8334,6 +8345,7 @@ impl FeatureHostController {
             state.background_operations.clear();
             state.operations.clear();
             state.operation_agents.clear();
+            state.human_handoff_operations.clear();
             *self
                 .client_side_tool_v2
                 .lock()
@@ -8724,6 +8736,20 @@ impl FeatureHostController {
                         None
                     }
                 } else {
+                    if message.role == RuntimeMessageRole::Assistant {
+                        let lease = self
+                            .state()?
+                            .human_handoff_operations
+                            .get(&operation_id)
+                            .cloned();
+                        if let Some(lease) = lease {
+                            self.project_human_handoff_message(
+                                &operation_id,
+                                &lease,
+                                &message.text,
+                            )?;
+                        }
+                    }
                     let mut cards = transcript_cards_from_metadata(&message.metadata);
                     let message_id = message.id.to_string();
                     if message.text.trim().is_empty() && !cards.is_empty() {
@@ -8830,6 +8856,7 @@ impl FeatureHostController {
                 } else {
                     let mut state = self.state()?;
                     state.operations.remove(&operation_id);
+                    state.human_handoff_operations.remove(&operation_id);
                     let terminal_agent_id = state.operation_agents.remove(&operation_id);
                     if state.awaited_operations.contains(&operation_id) {
                         state
@@ -8872,6 +8899,7 @@ impl FeatureHostController {
                     None
                 } else {
                     state.operation_agents.remove(&operation_id);
+                    state.human_handoff_operations.remove(&operation_id);
                     if state.awaited_operations.contains(&operation_id) {
                         state.operation_terminals.insert(
                             operation_id.clone(),
@@ -8956,6 +8984,7 @@ impl FeatureHostController {
                             }),
                         );
                     }
+                    state.human_handoff_operations.remove(&operation_id);
                     let agent_id = state
                         .operation_agents
                         .remove(&operation_id)
@@ -9820,6 +9849,110 @@ impl FeatureHostController {
     }
 
     #[cfg(feature = "production")]
+    fn project_human_handoff_message(
+        &self,
+        operation_id: &str,
+        lease: &HumanHandoffLease,
+        text: &str,
+    ) -> Result<(), FeatureHostError> {
+        let text = text.trim();
+        if text.is_empty() {
+            return Ok(());
+        }
+        let account_id = self
+            .active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone()
+            .ok_or_else(|| {
+                FeatureHostError::Contract(
+                    "human handoff projection requires an authenticated account".into(),
+                )
+            })?;
+        let root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("messaging storage is unavailable".into()))?;
+        let messaging_root = root.join("_messaging");
+        let _io_guard = MESSAGING_IO_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .map_err(|_| FeatureHostError::Contract("messaging storage lock is poisoned".into()))?;
+        let store = JsonFileStateStore::new(messaging_root.join("snapshot.json"));
+        let mut service = MessagingService::load_with_blob_store(
+            store,
+            FileBlobStore::new(messaging_root.join("blobs")),
+        )
+        .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        service
+            .project_trusted_assistant_text(
+                &actor_id_for_account_id(&account_id),
+                fabushi_messaging_core::ConversationId::new(
+                    lease.human_conversation_id.clone(),
+                ),
+                ActorId::new(format!("fabushi-agent:{}", lease.agent_id)),
+                lease.agent_name.clone(),
+                fabushi_messaging_core::ClientMessageId(format!(
+                    "human-handoff:{operation_id}"
+                )),
+                text.to_string(),
+                now_millis(),
+            )
+            .map_err(|error| {
+                FeatureHostError::Contract(format!(
+                    "project human handoff result into messaging transcript: {error}"
+                ))
+            })?;
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn production_human_handoff(
+        &self,
+        request_id: String,
+        agent_id: String,
+        human_conversation_id: String,
+        text: String,
+    ) -> Result<CommandAccepted, FeatureHostError> {
+        self.require_authenticated_account()?;
+        let agent_id = required(agent_id, "human handoff agent id")?;
+        let human_conversation_id =
+            required(human_conversation_id, "human handoff conversation id")?;
+        let text = required(text, "human handoff text")?;
+        let agent = self
+            .state()?
+            .bots
+            .get(&agent_id)
+            .cloned()
+            .ok_or_else(|| FeatureHostError::Contract(format!("unknown bot: {agent_id}")))?;
+        let accepted = self.production_chat(
+            request_id,
+            text,
+            Some(agent_id.clone()),
+            None,
+            AgentMode::Agent,
+            None,
+            None,
+            Vec::new(),
+            None,
+            false,
+        )?;
+        let operation_id = accepted.operation_id.clone().ok_or_else(|| {
+            FeatureHostError::Contract(
+                "human handoff requires an asynchronous Agent operation".into(),
+            )
+        })?;
+        self.state()?.human_handoff_operations.insert(
+            operation_id,
+            HumanHandoffLease {
+                human_conversation_id,
+                agent_id,
+                agent_name: agent.name,
+            },
+        );
+        Ok(accepted)
+    }
+
+    #[cfg(feature = "production")]
     fn production_chat(
         &self,
         request_id: String,
@@ -10372,6 +10505,17 @@ impl FeatureHostController {
             ensure_open(&state)?;
         }
         match command {
+            FeatureCommand::ChatHandoffHuman {
+                agent_id,
+                human_conversation_id,
+                text,
+                ..
+            } => self.production_human_handoff(
+                request_id,
+                agent_id,
+                human_conversation_id,
+                text,
+            ),
             FeatureCommand::ChatSend {
                 text,
                 agent_id,
@@ -10448,6 +10592,51 @@ impl FeatureHostController {
         let mut state = self.state()?;
         ensure_open(&state)?;
         match command {
+            FeatureCommand::ChatHandoffHuman {
+                agent_id,
+                human_conversation_id,
+                text,
+                ..
+            } => {
+                let text = required(text, "human handoff text")?;
+                let human_conversation_id =
+                    required(human_conversation_id, "human handoff conversation id")?;
+                let agent = state.bots.get(&agent_id).cloned().ok_or_else(|| {
+                    FeatureHostError::Contract(format!("unknown bot: {agent_id}"))
+                })?;
+                let operation_id = next_id(&mut state, "human-handoff");
+                state.operations.insert(operation_id.clone());
+                state.operation_agents.insert(operation_id.clone(), agent_id.clone());
+                state.human_handoff_operations.insert(
+                    operation_id.clone(),
+                    HumanHandoffLease {
+                        human_conversation_id,
+                        agent_id,
+                        agent_name: agent.name,
+                    },
+                );
+                state.events.push_back(HostEvent::OperationStarted {
+                    timestamp: timestamp(),
+                    operation_id: operation_id.clone(),
+                    label: "human-handoff".into(),
+                    interruptible: true,
+                });
+                state.events.push_back(HostEvent::ChatMessage {
+                    timestamp: timestamp(),
+                    role: MessageRole::User,
+                    text,
+                    operation_id: None,
+                    message_id: None,
+                    reply_to_message_id: None,
+                    attachment_batch_id: None,
+                    attachment: None,
+                    branched: false,
+                });
+                Ok(CommandAccepted {
+                    request_id,
+                    operation_id: Some(operation_id),
+                })
+            }
             FeatureCommand::ChatSend {
                 text,
                 agent_id,
@@ -17485,6 +17674,39 @@ mod tests {
         assert_eq!(automation.runs[0].status, AutomationRunStatus::Ok);
         assert!(automation.runs[0].started_at > 0);
         assert_eq!(automation.last_run_at_ms, Some(automation.runs[0].started_at));
+    }
+
+    #[test]
+    fn human_handoff_command_binds_and_clears_the_trusted_operation_lease() {
+        let controller = controller();
+        drain(&controller);
+        let accepted = controller
+            .execute(FeatureCommand::ChatHandoffHuman {
+                request_id: "handoff-request".into(),
+                agent_id: "mahayana-assistant".into(),
+                human_conversation_id: "direct:human-chat".into(),
+                text: "Continue from the Human conversation".into(),
+            })
+            .expect("accept human handoff");
+        let operation_id = accepted.operation_id.expect("handoff operation");
+        {
+            let state = controller.state().expect("state");
+            let lease = state
+                .human_handoff_operations
+                .get(&operation_id)
+                .expect("trusted handoff lease");
+            assert_eq!(lease.human_conversation_id, "direct:human-chat");
+            assert_eq!(lease.agent_id, "mahayana-assistant");
+        }
+        controller.interrupt(&operation_id).expect("interrupt handoff");
+        assert!(
+            controller
+                .state()
+                .expect("state")
+                .human_handoff_operations
+                .get(&operation_id)
+                .is_none()
+        );
     }
 
     #[test]

@@ -1139,6 +1139,16 @@ pub enum FeatureCommand {
         #[serde(rename = "isFork", default)]
         is_fork: bool,
     },
+    #[serde(rename = "chat.handoffHuman")]
+    ChatHandoffHuman {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        #[serde(rename = "humanConversationId")]
+        human_conversation_id: String,
+        text: String,
+    },
     #[serde(rename = "conversation.list")]
     ConversationList {
         #[serde(rename = "requestId")]
@@ -2072,6 +2082,7 @@ impl FeatureCommand {
     pub fn request_id(&self) -> &str {
         match self {
             Self::ChatSend { request_id, .. }
+            | Self::ChatHandoffHuman { request_id, .. }
             | Self::ConversationList { request_id, .. }
             | Self::ConversationOpen { request_id, .. }
             | Self::ConversationOpenWindowed { request_id, .. }
