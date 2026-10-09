@@ -181,6 +181,37 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(nextChatSearchIndex(current: 0, count: matches.count, delta: -1), 2)
     }
 
+    func testAgentForwardingRequiresCanonicalConversationAndSettledMessageIdentity() {
+        var message = MobileChatMessage(
+            id: "local",
+            role: .assistant,
+            text: "Forward me",
+            canonicalMessageId: "canonical-message"
+        )
+
+        XCTAssertEqual(
+            mobileBotForwardMessageId(message, sourceConversationId: "agent-conversation"),
+            "canonical-message"
+        )
+        XCTAssertNil(mobileBotForwardMessageId(message, sourceConversationId: nil))
+        XCTAssertNil(mobileBotForwardMessageId(message, sourceConversationId: "   "))
+
+        message.streaming = true
+        XCTAssertNil(
+            mobileBotForwardMessageId(message, sourceConversationId: "agent-conversation")
+        )
+
+        let notice = MobileChatMessage(
+            id: "notice",
+            role: .assistant,
+            text: "Not a message",
+            kind: .notice
+        )
+        XCTAssertNil(
+            mobileBotForwardMessageId(notice, sourceConversationId: "agent-conversation")
+        )
+    }
+
     func testConversationHistoryMergePreservesEphemeraAndReplacesCanonicalMessages() {
         let old = MobileChatMessage(
             id: "history:reply",
