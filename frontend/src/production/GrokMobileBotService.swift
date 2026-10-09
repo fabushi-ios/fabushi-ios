@@ -81,6 +81,31 @@ struct GrokMobileBotService {
         return await loadBots()
     }
 
+    func createOnboardingBot(
+        name: String,
+        description: String,
+        avatarShape: String,
+        avatarColor: String,
+        templateId: String?,
+        requestId: String
+    ) async throws -> [MobileBotSummary] {
+        let command = try Self.createCommand(
+            name: name,
+            description: description,
+            avatarShape: avatarShape,
+            avatarColor: avatarColor,
+            requestId: requestId,
+            origin: "user",
+            isKickstartRequested: true,
+            templateId: templateId
+        )
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: ["command": command]
+        )
+        return try await loadCanonicalRoster()
+    }
+
     static func createCommand(
         name: String,
         description: String,
