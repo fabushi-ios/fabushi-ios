@@ -157,6 +157,24 @@ final class ForwardMessageParityTests: XCTestCase {
             "message-1"
         )
 
+        message.text = "   "
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            )
+        )
+        message.attachmentURL = "https://example.invalid/report.pdf"
+        XCTAssertEqual(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            ),
+            "message-1"
+        )
+        message.attachmentURL = nil
+        message.text = "Ready"
+
         XCTAssertNil(
             mobileBotForwardMessageId(
                 message,
