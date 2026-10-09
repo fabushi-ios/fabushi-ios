@@ -37,6 +37,10 @@ struct GrokMobileBotService {
         return Self.mergeBots(installedBots, surfaceBots + groups)
     }
 
+    func loadOnboardingAgents() async throws -> [MobileBotSummary] {
+        try await loadIndividualBotsStrict()
+    }
+
     func loadCanonicalRoster() async throws -> [MobileBotSummary] {
         let individualBots = try await loadIndividualBotsStrict()
         let groupBots = try await loadGroupsStrict()
@@ -103,7 +107,7 @@ struct GrokMobileBotService {
             method: "feature.execute",
             params: ["command": command]
         )
-        return try await loadCanonicalRoster()
+        return try await loadOnboardingAgents()
     }
 
     static func createCommand(
