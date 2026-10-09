@@ -74,7 +74,7 @@ final class SharedObservabilityParityTests: XCTestCase {
     }
 
     func testLogShipBatchMatchesJavaScriptUTF16StringLength() {
-        let prefixCount = LOG_SHIP_MAX_BATCH_BYTES - 3
+        let prefixCount = LOG_SHIP_MAX_BATCH_BYTES - 2
         let buffer = [
             LogShipBufferedEntry(message: String(repeating: "a", count: prefixCount), metadata: [:]),
             LogShipBufferedEntry(message: "😀", metadata: [:]),
@@ -315,6 +315,7 @@ final class SharedObservabilityParityTests: XCTestCase {
             items: [.init(
                 header: ["type": "event"],
                 payload: [
+                    "level": "fatal",
                     "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                     "user": ["id": "other-account"],
                     "tags": [
