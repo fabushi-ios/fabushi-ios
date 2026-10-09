@@ -701,7 +701,10 @@ func appendMobileAutoReviewAllowRule(
     proposedRule: String
 ) -> SandAutoReviewInstructions? {
     let redacted = redactSandAutoReviewInlineSecrets(proposedRule)
-    let bounded = String(redacted.prefix(SAND_AUTO_REVIEW_INSTRUCTION_MAX_CHARS))
+    let canonicalSpacing = redacted
+        .split(whereSeparator: { $0.isWhitespace })
+        .joined(separator: " ")
+    let bounded = String(canonicalSpacing.prefix(SAND_AUTO_REVIEW_INSTRUCTION_MAX_CHARS))
         .trimmingCharacters(in: .whitespacesAndNewlines)
     guard !bounded.isEmpty else { return nil }
     var allow = current.allowInstructions
@@ -1510,6 +1513,7 @@ final class MarketplaceModel {
     var message = "Mahayana Rust Host 正在启动"
     var loading = false
     var installingPluginId: String?
+    var accountRosterRevision = 0
     var plugins: [MarketplacePlugin] = []
     var pluginBrowserTab: MarketplaceBrowserTab = .marketplace
     var privateSkillOwnershipFilter: MarketplaceSkillOwnershipFilter = .all
@@ -4059,6 +4063,7 @@ final class MarketplaceModel {
             else {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App 已本地安装，但 Fabushi 账号/Bot 同步未完成")
             }
+            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil
             publishPluginsNotice(
                 .install,
