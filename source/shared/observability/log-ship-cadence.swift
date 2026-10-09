@@ -99,9 +99,12 @@ func takeLogShipBatch<T>(
     for item in buffer {
         guard count < LOG_SHIP_MAX_BATCH_ENTRIES else { break }
         let record = entry(item)
-        var entryBytes = record.message.lengthOfBytes(using: .utf8)
+        // Desktop's canonical TypeScript contract uses JavaScript String.length,
+        // which counts UTF-16 code units rather than UTF-8 bytes. Preserve that
+        // exact batching boundary so non-ASCII log messages split identically.
+        var entryBytes = record.message.utf16.count
         for (key, value) in record.metadata {
-            entryBytes += key.lengthOfBytes(using: .utf8) + value.lengthOfBytes(using: .utf8)
+            entryBytes += key.utf16.count + value.utf16.count
         }
         if count > 0 && bytes + entryBytes > LOG_SHIP_MAX_BATCH_BYTES { break }
         bytes += entryBytes
