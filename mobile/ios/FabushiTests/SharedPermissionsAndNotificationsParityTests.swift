@@ -289,4 +289,29 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
     }
 
 
+
+    func testBroadcastExtensionInheritsCanonicalAppVersionsForInstall() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: iosRoot.appendingPathComponent("project.yml"),
+            encoding: .utf8
+        )
+
+        let root = project.components(separatedBy: "\ntargets:\n")[0]
+        XCTAssertTrue(root.contains("MARKETING_VERSION: 1.2.65"))
+        XCTAssertTrue(root.contains("CURRENT_PROJECT_VERSION: 34"))
+
+        let broadcast = project.components(
+            separatedBy: "\n  FabushiBroadcastUpload:\n"
+        )
+        XCTAssertEqual(broadcast.count, 2)
+        XCTAssertTrue(broadcast[1].contains(
+            "NSExtensionPointIdentifier: com.apple.broadcast-services-upload"
+        ))
+        XCTAssertFalse(broadcast[1].contains("\n        MARKETING_VERSION:"))
+        XCTAssertFalse(broadcast[1].contains("\n        CURRENT_PROJECT_VERSION:"))
+    }
+
 }
