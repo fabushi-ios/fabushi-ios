@@ -506,7 +506,7 @@ internal struct MobileUiPreferences: Equatable {
                 periodEnds: "周期结束", loadingUsage: "正在加载用量…", reloadUsage: "重新加载用量",
                 agentConfiguration: "Agent 配置", loadingConfiguration: "正在读取配置…",
                 router: "路由", routeAgentRequests: "Route Agent 请求", iosSection: "iOS", iosInstalled: "当前设备已安装 Fabushi iOS",
-                iosSelfReference: "Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责.",
+                iosSelfReference: "Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责。",
                 mediaRuntimeUnavailable: "通话媒体运行时不可用。", microphoneState: "麦克风",
                 cameraState: "摄像头"
             )
