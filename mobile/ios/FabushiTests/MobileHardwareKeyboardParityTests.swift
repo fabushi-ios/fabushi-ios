@@ -13,11 +13,11 @@ final class MobileHardwareKeyboardParityTests: XCTestCase {
         XCTAssertEqual(byID["sand.previousAgent"], "alt+up")
         XCTAssertEqual(byID["sand.nextAgent"], "alt+down")
         XCTAssertEqual(byID["sand.navigateBack"], "cmd+[")
-        XCTAssertEqual(byID["sand.toggleSidebar"], "cmd+b")
+        XCTAssertNil(byID["sand.toggleSidebar"])
         XCTAssertEqual(byID["sand.escape"], "escape")
         XCTAssertEqual(byID["sand.focusAgent1"], "cmd+1")
         XCTAssertEqual(byID["sand.focusAgent9"], "cmd+9")
-        XCTAssertEqual(MobileHardwareKeyboardContract.platformNotApplicableHotkeys, ["cmd+]"])
+        XCTAssertEqual(MobileHardwareKeyboardContract.platformNotApplicableHotkeys, ["cmd+]", "cmd+b"])
     }
 
     func testPromptShortcutsStayScopedToActiveChatOwner() {
