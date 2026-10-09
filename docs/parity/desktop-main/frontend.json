@@ -3827,13 +3827,10 @@
       "ios_target_path": "frontend/src/production/FabushiAgentNetworkView.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "Desktop React/SVG workspace is adapted to a native SwiftUI GeometryReader/Canvas surface. It reuses GrokMobileBotService bot.list/group.list, MobileBotSummary, account-scoped roster lifecycle, conversation.openTail history projection, reconnectGeneration and existing chat/room selection routing; no second Agent/group/message store is introduced.",
-      "implementation_status": "mapped",
-      "production_evidence": "Native shipping implementation exists at frontend/src/production/FabushiAgentNetworkView.swift, but this Desktop-main direct-change row remains re-review-fenced by docs/parity/desktop-main-impact.json and is not promoted until the changed-source owner/contract review closes.",
-      "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob read at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Because this path is a current-main direct change, authority_review_state remains requires-current-main-review and status remains mapped even though the native surface has been implemented.",
-      "historical_implementation_status": "unreviewed",
-      "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/FabushiAgentNetworkView.swift is the shipping native graph owner. GeometryReader feeds live container dimensions into MobileAgentNetworkLayout; Canvas renders canonical relationship edges; DragGesture and MagnificationGesture provide bounded pan/zoom; double-tap and toolbar reset restore the viewport; selection and Open chat/Open room routing remain on the existing roster/navigation owners.",
+      "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers responsive width/height-dependent layout, scale clamps, offset bounds, edge/activity projection, selection reconciliation, open routing and accessibility identifiers. Current exact-HEAD Actions/provenance are still required before verified.",
+      "notes": "Exact Desktop graph.tsx@a1fd0a426dba3964dfbc9bab82e4ed01a0f7f967 reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The current-main direct change adds container ResizeObserver measurement and live wheel geometry; native GeometryReader is the platform-equivalent live container measurement, with native magnification/drag replacing wheel/pointer mechanics. Source-level current-main review is closed for this row only; global dependency/spec review remains pending.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
