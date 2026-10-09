@@ -141,14 +141,18 @@ internal struct MobileUiPreferences: Equatable {
         ]
         guard let index = sizes.firstIndex(of: system) else { return system }
 
-        let offset: Int
+        let requestedOffset: Int
         switch textScale {
-        case ..<0.95: offset = -1
-        case ..<1.05: offset = 0
-        case ..<1.18: offset = 1
-        case ..<1.38: offset = 2
-        default: offset = 3
+        case ..<0.95: requestedOffset = -1
+        case ..<1.05: requestedOffset = 0
+        case ..<1.18: requestedOffset = 1
+        case ..<1.38: requestedOffset = 2
+        default: requestedOffset = 3
         }
+        let firstAccessibilityIndex = sizes.firstIndex(of: .accessibility1) ?? sizes.count
+        let offset = index >= firstAccessibilityIndex
+            ? max(0, requestedOffset)
+            : requestedOffset
         return sizes[min(max(index + offset, 0), sizes.count - 1)]
     }
 
