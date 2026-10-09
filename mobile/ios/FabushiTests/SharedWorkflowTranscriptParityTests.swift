@@ -82,6 +82,28 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(threadDescendants("root", branched: branched).map(\.id), ["b1", "b2"])
     }
 
+    func testTranscriptDuplicateIdsFollowDesktopLastValueMapSemanticsWithoutTrapping() {
+        let branched = [
+            BranchedTranscriptEntry(id: "dup", replyTo: "root-a"),
+            BranchedTranscriptEntry(id: "dup", replyTo: "root-b"),
+            BranchedTranscriptEntry(id: "child", replyTo: "dup"),
+        ]
+        let counts = branchReplyCounts(branched)
+        XCTAssertEqual(counts["root-a"], 1)
+        XCTAssertEqual(counts["root-b"], 2)
+
+        let entries = [
+            TranscriptEntry(kind: "message", id: "root-a"),
+            TranscriptEntry(kind: "message", id: "dup", replyTo: "root-a", branched: true),
+            TranscriptEntry(kind: "message", id: "dup", replyTo: "root-b", branched: true),
+            TranscriptEntry(kind: "message", id: "root-b"),
+        ]
+        XCTAssertEqual(
+            getThreadTranscriptEntries(entries, rootId: "root-b").compactMap(\.id),
+            ["dup", "dup", "root-b"]
+        )
+    }
+
     func testAgentPeerVisibilityAndWorkflowConstants() {
         let peer = TranscriptEntry(kind: "message", id: "m1", toAgent: .init(kind: "agent"))
         let hidden = TranscriptEntry(kind: "message", id: "m2", toAgent: .init(kind: "system"))
