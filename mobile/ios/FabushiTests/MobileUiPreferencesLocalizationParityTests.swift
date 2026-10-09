@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import XCTest
 @testable import Fabushi
@@ -53,6 +54,22 @@ final class MobileUiPreferencesLocalizationParityTests: XCTestCase {
         XCTAssertEqual(
             preferences.shellCopy(systemIdentifier: "zh-Hant-TW").settings,
             "設定"
+        )
+    }
+
+    func testAccessibilityCountUsesSelectedLocaleNumberFormatting() {
+        let preferences = MobileUiPreferences(
+            localeRaw: MobileSettingsLocale.ar.rawValue,
+            reducedMotion: true,
+            highContrast: true
+        )
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "ar")
+        formatter.numberStyle = .decimal
+        let expectedDigits = formatter.string(from: NSNumber(value: 2)) ?? "2"
+
+        XCTAssertTrue(
+            preferences.localizedAccessibilityCount(2).contains(expectedDigits)
         )
     }
 
