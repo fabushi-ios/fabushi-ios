@@ -773,10 +773,11 @@ pub struct ProductHostSettings {
     /// Mahayana capability and ownership checks before use.
     #[serde(default)]
     pub sandbox_runtime: SandboxRuntime,
-    /// Account-scoped onboarding acknowledgement mirrored over the Host
-    /// settings transport. None means the remote side has no established value.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub has_seen_onboarding: Option<bool>,
+    /// Onboarding acknowledgements mirrored over the Host settings transport,
+    /// keyed by the authenticated account id. The map lives inside the existing
+    /// settings owner so switching accounts cannot expose another account's value.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub has_seen_onboarding_by_account: BTreeMap<String, bool>,
 }
 
 impl Default for ProductHostSettings {
@@ -794,7 +795,7 @@ impl Default for ProductHostSettings {
             auto_review_rules: Vec::new(),
             inference_provider: InferenceProvider::default(),
             sandbox_runtime: SandboxRuntime::default(),
-            has_seen_onboarding: None,
+            has_seen_onboarding_by_account: BTreeMap::new(),
         }
     }
 }
