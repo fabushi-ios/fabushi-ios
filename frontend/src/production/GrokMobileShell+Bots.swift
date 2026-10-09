@@ -14,6 +14,32 @@ internal func mobileBotDeleteDescription(_ bot: MobileBotSummary) -> String {
 }
 
 extension GrokMobileShell {
+
+    @MainActor
+    func refreshAgentNetworkGate() async {
+        let expectedScope = mobileAccountScopeKey
+        let expectedReconnect = reconnectGeneration
+        do {
+            let response = try await bridge.request(method: "getExperimentsSnapshot")
+            try Task.checkCancellation()
+            guard mobileAccountScopeKey == expectedScope,
+                  reconnectGeneration == expectedReconnect
+            else { return }
+            agentNetworkGateEnabled = MobileAgentNetworkModel.gateEnabled(from: response.value)
+                ?? BUNDLED_FEATURE_FLAGS["sand_agent_network"]?.defaultValue
+                ?? false
+            if !agentNetworkGateEnabled { agentNetworkOpen = false }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard mobileAccountScopeKey == expectedScope,
+                  reconnectGeneration == expectedReconnect
+            else { return }
+            agentNetworkGateEnabled = false
+            agentNetworkOpen = false
+        }
+    }
+
     @MainActor
     func loadBots() async {
         await refreshAccessRoster()
@@ -52,6 +78,7 @@ extension GrokMobileShell {
 
     @MainActor
     func refreshAccessRoster() async {
+        await refreshAgentNetworkGate()
         accessRosterGeneration = accessRosterGeneration == Int.max ? 1 : accessRosterGeneration + 1
         let expectedGeneration = accessRosterGeneration
         let expectedScope = mobileAccountScopeKey
@@ -97,6 +124,33 @@ extension GrokMobileShell {
                 previous: accessCoverFirstBox,
                 roster: firstBoxSnapshot(from: accessRosterSnapshot)
             )
+            if agentNetworkGateEnabled {
+                let relationshipFence = MobileAgentNetworkFence.capture(
+                    accountScopeKey: expectedScope,
+                    reconnectGeneration: expectedReconnect,
+                    roster: projected
+                )
+                let relationships = try await MobileAgentNetworkHistorySource(bridge: bridge)
+                    .loadPartnerIds(roster: projected)
+                try Task.checkCancellation()
+                guard accessRosterGeneration == expectedGeneration,
+                      relationshipFence.matches(
+                          accountScopeKey: mobileAccountScopeKey,
+                          reconnectGeneration: reconnectGeneration,
+                          roster: bots
+                      )
+                else { return }
+                let enriched = bots.map { bot in
+                    bot.replacingConversationPartnerIds(relationships[bot.id] ?? bot.conversationPartnerIds)
+                }
+                bots = enriched
+                AccessRosterPersistence.save(enriched, accountScopeKey: expectedScope)
+                accessRosterSnapshot = AccessRosterSnapshotProjection.complete(
+                    enriched,
+                    previous: accessRosterSnapshot
+                )
+                reconcileRosterSelection(with: enriched, isComplete: true)
+            }
         } catch is CancellationError {
             return
         } catch {
