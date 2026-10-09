@@ -9659,12 +9659,23 @@ impl FeatureHostController {
         };
         let media_channels = crate::send_message_shaping::split_send_media_channels(&attachments);
         let selected_image_data_urls = selected_image_data_urls(&media_channels.image_attachments);
+        let memory_agent_id = agent_id.as_deref().unwrap_or("mahayana-assistant");
+        let identity_context = {
+            let state = self.state()?;
+            render_native_turn_identity_context(
+                state.auth_user.as_ref(),
+                state.bots.get(memory_agent_id),
+            )
+        };
         let mut runtime_text = compose_agent_input(
             &text,
             mode,
             mode_statement.as_deref(),
             &media_channels.file_attachments,
         );
+        if let Some(identity_context) = identity_context {
+            runtime_text = format!("{identity_context}\n\n[Current turn]\n{runtime_text}");
+        }
         runtime_text = crate::send_message_shaping::append_selected_video_context(
             runtime_text,
             &media_channels.selected_videos,
@@ -9677,7 +9688,6 @@ impl FeatureHostController {
 {runtime_text}"
             );
         }
-        let memory_agent_id = agent_id.as_deref().unwrap_or("mahayana-assistant");
         if is_safe_memory_agent_id(memory_agent_id) {
             if let Some(root) = self.active_account_root(self.memory_root_path.as_deref()) {
                 let memory_dir = root.join(memory_agent_id).join("memory");
@@ -12142,6 +12152,61 @@ fn selected_image_data_urls(attachments: &[AttachmentContext]) -> Vec<String> {
             ))
         })
         .collect()
+}
+
+fn render_native_turn_identity_context(
+    auth_user: Option<&Value>,
+    bot: Option<&BotSummary>,
+) -> Option<String> {
+    let mut lines = Vec::new();
+    if let Some(user) = auth_user {
+        let display_name = ["displayName", "fullName", "nickname", "name"]
+            .into_iter()
+            .find_map(|key| {
+                user.get(key)
+                    .and_then(Value::as_str)
+                    .map(|value| clamp_line(value, 120))
+                    .filter(|value| !value.is_empty())
+            });
+        if let Some(display_name) = display_name {
+            lines.push(format!(
+                "Authenticated user display name: {display_name}. Address and represent this user consistently when acting through their authenticated Fabushi account."
+            ));
+        }
+    }
+    if let Some(bot) = bot {
+        let configured_name = clamp_line(&bot.name, 120);
+        let configured_title = clamp_line(&bot.title, 120);
+        let description = clamp_block(&bot.description, 1200);
+        let display_name = if bot.id == "mahayana-assistant"
+            && (configured_name.is_empty()
+                || configured_name.eq_ignore_ascii_case("grok")
+                || configured_name.eq_ignore_ascii_case("grok bot")
+                || configured_name == "大乘助手")
+        {
+            "Fabushi".to_string()
+        } else if !configured_title.is_empty() {
+            configured_title
+        } else {
+            configured_name
+        };
+        if !display_name.is_empty() {
+            lines.push(format!(
+                "Current Agent profile name: {display_name}. Use this configured Agent identity when the user asks who this Agent is."
+            ));
+        }
+        if !description.is_empty() {
+            lines.push(format!("Current Agent profile description: {description}"));
+        }
+    }
+    if lines.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "[MAHAYANA_HIDDEN_CONTEXT]\n[Authenticated product identity]\n{}",
+            lines.join("\n")
+        ))
+    }
 }
 
 fn compose_agent_input(
@@ -15174,6 +15239,46 @@ mod tests {
             subagent_type: (kind == AsyncTaskKind::Subagent).then(|| "task".into()),
             resource_id: None,
         }
+    }
+
+    #[test]
+    fn native_turn_identity_context_uses_authenticated_user_and_bot_profile_without_email() {
+        let user = json!({
+            "id": "human-1",
+            "email": "private@example.test",
+            "nickname": "莲友"
+        });
+        let bot = BotSummary {
+            id: "agent-research".into(),
+            name: "Research Bot".into(),
+            description: "Verify sources before conclusions.".into(),
+            title: "研究助手".into(),
+            hidden: false,
+            avatar: None,
+            avatar_shape: None,
+            avatar_color: None,
+            notifications_enabled: true,
+            notify_on_updates: true,
+            unread: false,
+            conversation_id: Some("codex:agent:research".into()),
+        };
+        let context = render_native_turn_identity_context(Some(&user), Some(&bot))
+            .expect("identity context");
+        assert!(context.contains("莲友"));
+        assert!(context.contains("研究助手"));
+        assert!(context.contains("Verify sources before conclusions."));
+        assert!(!context.contains("private@example.test"));
+    }
+
+    #[test]
+    fn canonical_assistant_profile_projects_fabushi_identity() {
+        let bot = default_bots()
+            .remove("mahayana-assistant")
+            .expect("canonical assistant");
+        let context = render_native_turn_identity_context(None, Some(&bot))
+            .expect("assistant identity context");
+        assert!(context.contains("Current Agent profile name: Fabushi."));
+        assert!(!context.contains("Grok"));
     }
 
     #[test]
