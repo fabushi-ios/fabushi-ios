@@ -416,7 +416,9 @@ final class MahayanaCoordinator {
             }
         }
 
-        if autoReviewHostSyncNeeded && method == "feature.execute" {
+        if autoReviewHostSyncNeeded,
+           settingsStore != nil,
+           method == "feature.execute" {
             try await syncAutoReviewRulesToHost()
         }
 
