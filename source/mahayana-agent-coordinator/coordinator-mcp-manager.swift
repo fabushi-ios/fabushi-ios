@@ -1187,9 +1187,11 @@ final class CoordinatorMcpSurface {
                 ])
             }
             let preferences = try await dashboard.getPrReviewPreferences()
+            let user: Any = preferences.user.map { $0.rawValue } ?? NSNull()
+            let team: Any = preferences.team.map { $0.rawValue } ?? NSNull()
             return .handled([
-                "user": preferences.user?.rawValue ?? NSNull(),
-                "team": preferences.team?.rawValue ?? NSNull(),
+                "user": user,
+                "team": team,
             ])
 
         case "coordinator.mcp.cursorAuth.start":

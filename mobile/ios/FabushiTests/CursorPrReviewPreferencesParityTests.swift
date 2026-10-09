@@ -21,12 +21,29 @@ private func prReviewResponse(_ request: URLRequest, body: Data) -> (Data, URLRe
     )
 }
 
-private func prReviewVarint(_ field: UInt8, _ value: UInt8) -> Data {
-    Data([(field << 3), value])
+private func prReviewAppendVarint(_ value: UInt64, to data: inout Data) {
+    var value = value
+    repeat {
+        var byte = UInt8(value & 0x7f)
+        value >>= 7
+        if value != 0 { byte |= 0x80 }
+        data.append(byte)
+    } while value != 0
 }
 
-private func prReviewBytes(_ field: UInt8, _ body: Data) -> Data {
-    Data([(field << 3) | 2, UInt8(body.count)]) + body
+private func prReviewVarint(_ field: Int, _ value: UInt64) -> Data {
+    var data = Data()
+    prReviewAppendVarint(UInt64(field << 3), to: &data)
+    prReviewAppendVarint(value, to: &data)
+    return data
+}
+
+private func prReviewBytes(_ field: Int, _ body: Data) -> Data {
+    var data = Data()
+    prReviewAppendVarint(UInt64((field << 3) | 2), to: &data)
+    prReviewAppendVarint(UInt64(body.count), to: &data)
+    data.append(body)
+    return data
 }
 
 final class CursorPrReviewPreferencesParityTests: XCTestCase {
@@ -65,7 +82,8 @@ final class CursorPrReviewPreferencesParityTests: XCTestCase {
         let preferences = try await client.getPrReviewPreferences()
         XCTAssertEqual(preferences.user, .graphite)
         XCTAssertEqual(preferences.team, .reviewCursor)
-        XCTAssertEqual(await seen.all().count, 2)
+        let requests = await seen.all()
+        XCTAssertEqual(requests.count, 2)
     }
 
     func testTeamPreferenceFallsBackToBackgroundAgentSettingsAndUnknownModesStayUnset() throws {
