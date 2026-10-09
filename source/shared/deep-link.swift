@@ -132,11 +132,17 @@ enum FabushiDeepLinkParser {
         case ["v1", "plugin", "add"]:
             guard let query = exactQuery(components, allowed: ["id": nil]),
                   let pluginID = query["id"],
-                  FabushiDesktopPolicy.isDeepLinkPluginID(pluginID),
-                  let canonical = FabushiDesktopPolicy.buildPluginDeepLink(pluginID: pluginID),
-                  let canonicalURL = URL(string: canonical)
+                  isNativeMarketplacePluginID(pluginID)
             else { return nil }
-            return .init(route: .pluginAdd(id: pluginID), source: source, canonicalURL: canonicalURL)
+            return .init(
+                route: .pluginAdd(id: pluginID),
+                source: source,
+                canonicalURL: canonicalURL(
+                    host: "app",
+                    path: "/v1/plugin/add",
+                    queryItems: [URLQueryItem(name: "id", value: pluginID)]
+                )
+            )
         case ["v1", "open"]:
             guard exactQuery(components, allowed: [:]) != nil else { return nil }
             return .init(
@@ -160,6 +166,17 @@ enum FabushiDeepLinkParser {
         default:
             return nil
         }
+    }
+
+    private static func isNativeMarketplacePluginID(_ value: String) -> Bool {
+        if FabushiDesktopPolicy.isDeepLinkPluginID(value) {
+            return true
+        }
+        guard value.count <= 64 else { return false }
+        return value.range(
+            of: #"^[a-z0-9]+(?:-[a-z0-9]+)*$"#,
+            options: .regularExpression
+        ) != nil
     }
 
     private static func parseAuthComplete(
