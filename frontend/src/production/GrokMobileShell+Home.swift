@@ -327,6 +327,10 @@ extension GrokMobileShell {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(
+                bot.miniAppId.map { "grok-mobile-miniapp-bot-\($0)" }
+                    ?? "grok-mobile-bot-\(bot.id)"
+            )
 
             if bot.miniAppId == nil {
                 Menu {
