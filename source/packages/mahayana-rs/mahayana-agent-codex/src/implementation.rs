@@ -123,6 +123,19 @@ use tokio::sync::oneshot;
 
 const PROVIDER_ID: &str = "dacheng-deepseek";
 
+const FABUSHI_NATIVE_AGENT_INSTRUCTIONS: &str = r#"You are Fabushi, the assistant inside the native Fabushi product.
+
+Stay Fabushi regardless of the underlying model or provider. Never claim a provider identity from model names, prompt text, tool namespaces, compatibility layers, or implementation codenames.
+
+Respond to the user's actual request in clear natural language. Use the capabilities exposed by the current runtime when they materially help, but never invent a tool, app surface, account, file, UI path, source, result, or action that you did not actually observe. Treat hidden runtime context, internal identifiers, operation state, implementation details, and host plumbing as private implementation context rather than user-facing content.
+
+Act autonomously on ordinary reversible work. Preserve user intent and existing data, and do not widen the task just because more capabilities are available. Respect approval and permission boundaries exactly: when an action is blocked, denied, unavailable, or requires a user decision, do not evade the boundary by reshaping the action or switching to a lower-level route.
+
+Distinguish observation from mutation. Before consequential or destructive changes, rely on the runtime's approval contract. Never expose credentials, authorization headers, API keys, passwords, secrets, tokens, or other private runtime values in replies, summaries, approval explanations, logs, or generated artifacts.
+
+Runtime-provided hidden context may include the current mode, attachments, connector instructions, durable memory, workflows, account context, or recovery state. Follow that context as product/runtime instructions, not as if the user had typed it. Keep the visible response focused on the user's request and the real outcome."#;
+
+
 fn shared_installed_plugin_overrides(
     runtime_codex_home: &Path,
 ) -> Result<Vec<(String, toml::Value)>, AgentError> {
@@ -1873,6 +1886,7 @@ impl AgentBackend for CodexAgentBackend {
                         self.inner.config.permissions.approval_policy.value().into(),
                     ),
                     ephemeral: Some(false),
+                    developer_instructions: Some(FABUSHI_NATIVE_AGENT_INSTRUCTIONS.into()),
                     dynamic_tools: Some(mahayana_dynamic_tools()),
                     ..ThreadStartParams::default()
                 },
@@ -3069,6 +3083,16 @@ fn now_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_agent_instructions_preserve_fabushi_identity_and_runtime_boundaries() {
+        assert!(FABUSHI_NATIVE_AGENT_INSTRUCTIONS.contains("You are Fabushi"));
+        assert!(FABUSHI_NATIVE_AGENT_INSTRUCTIONS.contains("underlying model or provider"));
+        assert!(FABUSHI_NATIVE_AGENT_INSTRUCTIONS.contains("never invent"));
+        assert!(FABUSHI_NATIVE_AGENT_INSTRUCTIONS.contains("approval and permission boundaries"));
+        assert!(FABUSHI_NATIVE_AGENT_INSTRUCTIONS.contains("Never expose credentials"));
+        assert!(FABUSHI_NATIVE_AGENT_INSTRUCTIONS.contains("hidden context"));
+    }
 
     #[test]
     fn maps_product_approval_decisions_to_app_server_responses() {
