@@ -296,6 +296,7 @@ struct AccountSettingsView: View {
     @State private var ruleDraft = ""
     @State private var ruleBehavior: SandAutoReviewInstructionBehavior = .allow
     @State private var editingRule: SandAutoReviewInstructionRow?
+    @State private var uiPreferencesStore = MobileUiPreferencesStore.shared
 
     var body: some View {
         NavigationStack {
@@ -338,6 +339,8 @@ struct AccountSettingsView: View {
                         }
                     }
                 }
+
+                uiPreferencesSection
 
                 configurationSections
 
@@ -416,6 +419,96 @@ struct AccountSettingsView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-settings")
+    }
+
+    @ViewBuilder
+    private var uiPreferencesSection: some View {
+        let preferences = uiPreferencesStore.preferences
+        let copy = preferences.accessibilityCopy()
+        Section(copy.sectionTitle) {
+            Picker(
+                copy.language,
+                selection: Binding(
+                    get: { preferences.locale },
+                    set: { uiPreferencesStore.setLocale($0) }
+                )
+            ) {
+                ForEach(MobileSettingsLocale.allCases) { locale in
+                    Text(locale == .system ? copy.systemLanguage : locale.optionLabel)
+                        .tag(locale)
+                }
+            }
+            .accessibilityIdentifier("settings-ui-language")
+
+            Text(copy.languageDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Picker(
+                copy.readingDirection,
+                selection: Binding(
+                    get: { preferences.direction },
+                    set: { uiPreferencesStore.setDirection($0) }
+                )
+            ) {
+                Text(copy.directionAutomatic).tag(MobileSettingsDirection.auto)
+                Text(copy.directionLtr).tag(MobileSettingsDirection.ltr)
+                Text(copy.directionRtl).tag(MobileSettingsDirection.rtl)
+            }
+            .accessibilityIdentifier("settings-ui-reading-direction")
+
+            Text(copy.readingDirectionDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Picker(
+                copy.textSize,
+                selection: Binding(
+                    get: { preferences.textScale },
+                    set: { uiPreferencesStore.setTextScale($0) }
+                )
+            ) {
+                ForEach(MobileUiPreferences.supportedTextScales, id: \.self) { scale in
+                    Text("\(Int((scale * 100).rounded()))%").tag(scale)
+                }
+            }
+            .accessibilityIdentifier("settings-ui-text-scale")
+
+            Text(copy.textSizeDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle(
+                copy.reduceMotion,
+                isOn: Binding(
+                    get: { preferences.reducedMotion },
+                    set: { uiPreferencesStore.setReducedMotion($0) }
+                )
+            )
+            .accessibilityIdentifier("settings-ui-reduce-motion")
+
+            Text(copy.reduceMotionDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle(
+                copy.highContrast,
+                isOn: Binding(
+                    get: { preferences.highContrast },
+                    set: { uiPreferencesStore.setHighContrast($0) }
+                )
+            )
+            .accessibilityIdentifier("settings-ui-high-contrast")
+
+            Text(copy.highContrastDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(copy.accessibilityCount(preferences.activeAccessibilityPreferenceCount))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("settings-ui-accessibility-count")
+        }
     }
 
     @ViewBuilder
