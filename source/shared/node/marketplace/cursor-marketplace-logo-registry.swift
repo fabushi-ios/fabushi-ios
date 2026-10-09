@@ -7,7 +7,6 @@ final class CursorMarketplaceLogoRegistry: @unchecked Sendable {
     private var knownLogoUrls: Set<String> = []
 
     func rememberPluginLogoUrl(_ url: String) {
-        guard !url.isEmpty else { return }
         lock.lock()
         knownLogoUrls.insert(url)
         lock.unlock()
