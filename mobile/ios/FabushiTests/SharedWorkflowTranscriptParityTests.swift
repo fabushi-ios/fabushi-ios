@@ -137,6 +137,50 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertNil(mobileTranscriptCopyText(urlCard))
     }
 
+    func testBotFindSearchUsesOnlyMainTranscriptCopyableTextAndWrapsMatches() {
+        let root = MobileChatMessage(
+            id: "root",
+            role: .assistant,
+            text: "Alpha alpha",
+            canonicalMessageId: "root"
+        )
+        var branched = MobileChatMessage(
+            id: "branch",
+            role: .assistant,
+            text: "Alpha hidden in thread",
+            canonicalMessageId: "branch"
+        )
+        branched.replyToMessageId = "root"
+        branched.branched = true
+        let notice = MobileChatMessage(
+            id: "notice",
+            role: .assistant,
+            text: "Alpha activity",
+            kind: .notice
+        )
+        let user = MobileChatMessage(
+            id: "user",
+            role: .user,
+            text: "alpha",
+            canonicalMessageId: "user"
+        )
+
+        let searchable = mobileBotChatSearchEntries([root, branched, notice, user])
+        XCTAssertEqual(searchable.map(\.id), ["root", "user"])
+
+        let matches = chatSearchMatches(searchable, query: "ALPHA")
+        XCTAssertEqual(
+            matches,
+            [
+                ChatSearchMatch(entryId: "root", occurrence: 0),
+                ChatSearchMatch(entryId: "root", occurrence: 1),
+                ChatSearchMatch(entryId: "user", occurrence: 0),
+            ]
+        )
+        XCTAssertEqual(nextChatSearchIndex(current: 2, count: matches.count, delta: 1), 0)
+        XCTAssertEqual(nextChatSearchIndex(current: 0, count: matches.count, delta: -1), 2)
+    }
+
     func testConversationHistoryMergePreservesEphemeraAndReplacesCanonicalMessages() {
         let old = MobileChatMessage(
             id: "history:reply",
