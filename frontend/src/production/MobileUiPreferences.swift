@@ -110,6 +110,7 @@ internal struct MobileSettingsShellCopy: Equatable {
     let displayName: String
     let saving: String
     let saveDisplayName: String
+    let displayNameValidationError: String
     let email: String
     let currentPeriod: String
     let unlimited: String
@@ -502,6 +503,7 @@ internal struct MobileUiPreferences: Equatable {
                 sendFeedback: "发送反馈", aboutFabushi: "关于 Fabushi", done: "完成",
                 cancel: "取消", operationFailed: "操作失败", okay: "好",
                 displayName: "显示名称", saving: "正在保存…", saveDisplayName: "保存显示名称",
+                displayNameValidationError: "显示名称必须为 1–200 个字符。",
                 email: "邮箱", currentPeriod: "当前周期", unlimited: "不限量", remaining: "剩余",
                 periodEnds: "周期结束", loadingUsage: "正在加载用量…", reloadUsage: "重新加载用量",
                 agentConfiguration: "Agent 配置", loadingConfiguration: "正在读取配置…",
@@ -518,6 +520,7 @@ internal struct MobileUiPreferences: Equatable {
                 sendFeedback: "傳送意見回饋", aboutFabushi: "關於 Fabushi", done: "完成",
                 cancel: "取消", operationFailed: "操作失敗", okay: "好",
                 displayName: "顯示名稱", saving: "正在儲存…", saveDisplayName: "儲存顯示名稱",
+                displayNameValidationError: "顯示名稱必須為 1–200 個字元。",
                 email: "電子郵件", currentPeriod: "目前週期", unlimited: "不限量", remaining: "剩餘",
                 periodEnds: "週期結束", loadingUsage: "正在載入用量…", reloadUsage: "重新載入用量",
                 agentConfiguration: "Agent 設定", loadingConfiguration: "正在讀取設定…",
@@ -534,6 +537,7 @@ internal struct MobileUiPreferences: Equatable {
                 sendFeedback: "フィードバックを送信", aboutFabushi: "Fabushi について", done: "完了",
                 cancel: "キャンセル", operationFailed: "操作に失敗しました", okay: "OK",
                 displayName: "表示名", saving: "保存中…", saveDisplayName: "表示名を保存",
+                displayNameValidationError: "表示名は 1〜200 文字で入力してください。",
                 email: "メール", currentPeriod: "現在の期間", unlimited: "無制限", remaining: "残り",
                 periodEnds: "期間終了", loadingUsage: "使用量を読み込み中…", reloadUsage: "使用量を再読み込み",
                 agentConfiguration: "Agent 設定", loadingConfiguration: "設定を読み込み中…",
@@ -550,6 +554,7 @@ internal struct MobileUiPreferences: Equatable {
                 sendFeedback: "피드백 보내기", aboutFabushi: "Fabushi 정보", done: "완료",
                 cancel: "취소", operationFailed: "작업 실패", okay: "확인",
                 displayName: "표시 이름", saving: "저장 중…", saveDisplayName: "표시 이름 저장",
+                displayNameValidationError: "표시 이름은 1~200자여야 합니다.",
                 email: "이메일", currentPeriod: "현재 기간", unlimited: "무제한", remaining: "남음",
                 periodEnds: "기간 종료", loadingUsage: "사용량 불러오는 중…", reloadUsage: "사용량 다시 불러오기",
                 agentConfiguration: "Agent 설정", loadingConfiguration: "설정 불러오는 중…",
@@ -566,6 +571,7 @@ internal struct MobileUiPreferences: Equatable {
                 sendFeedback: "إرسال ملاحظات", aboutFabushi: "حول Fabushi", done: "تم",
                 cancel: "إلغاء", operationFailed: "فشلت العملية", okay: "حسنًا",
                 displayName: "اسم العرض", saving: "جارٍ الحفظ…", saveDisplayName: "حفظ اسم العرض",
+                displayNameValidationError: "يجب أن يكون اسم العرض من 1 إلى 200 حرف.",
                 email: "البريد الإلكتروني", currentPeriod: "الفترة الحالية", unlimited: "غير محدود", remaining: "المتبقي",
                 periodEnds: "نهاية الفترة", loadingUsage: "جارٍ تحميل الاستخدام…", reloadUsage: "إعادة تحميل الاستخدام",
                 agentConfiguration: "إعداد Agent", loadingConfiguration: "جارٍ قراءة الإعداد…",
@@ -582,6 +588,7 @@ internal struct MobileUiPreferences: Equatable {
                 sendFeedback: "שליחת משוב", aboutFabushi: "אודות Fabushi", done: "סיום",
                 cancel: "ביטול", operationFailed: "הפעולה נכשלה", okay: "אישור",
                 displayName: "שם תצוגה", saving: "שומר…", saveDisplayName: "שמירת שם תצוגה",
+                displayNameValidationError: "שם התצוגה חייב להכיל 1–200 תווים.",
                 email: "דוא״ל", currentPeriod: "התקופה הנוכחית", unlimited: "ללא הגבלה", remaining: "נותר",
                 periodEnds: "סיום התקופה", loadingUsage: "טוען נתוני שימוש…", reloadUsage: "טעינה מחדש של השימוש",
                 agentConfiguration: "הגדרות Agent", loadingConfiguration: "קורא הגדרות…",
@@ -598,6 +605,7 @@ internal struct MobileUiPreferences: Equatable {
                 sendFeedback: "Send Feedback", aboutFabushi: "About Fabushi", done: "Done",
                 cancel: "Cancel", operationFailed: "Operation Failed", okay: "OK",
                 displayName: "Display Name", saving: "Saving…", saveDisplayName: "Save Display Name",
+                displayNameValidationError: "Display name must be 1–200 characters.",
                 email: "Email", currentPeriod: "Current Period", unlimited: "Unlimited", remaining: "Remaining",
                 periodEnds: "Period Ends", loadingUsage: "Loading usage…", reloadUsage: "Reload Usage",
                 agentConfiguration: "Agent Configuration", loadingConfiguration: "Loading configuration…",

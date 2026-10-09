@@ -22,6 +22,27 @@ final class MobileUiPreferencesLocalizationParityTests: XCTestCase {
         }
     }
 
+    func testDisplayNameValidationUsesSelectedSettingsLocale() {
+        XCTAssertEqual(
+            MobileUiPreferences(localeRaw: MobileSettingsLocale.en.rawValue)
+                .shellCopy()
+                .displayNameValidationError,
+            "Display name must be 1–200 characters."
+        )
+        XCTAssertEqual(
+            MobileUiPreferences(localeRaw: MobileSettingsLocale.zhHans.rawValue)
+                .shellCopy()
+                .displayNameValidationError,
+            "显示名称必须为 1–200 个字符。"
+        )
+        XCTAssertEqual(
+            MobileUiPreferences(localeRaw: MobileSettingsLocale.ar.rawValue)
+                .shellCopy()
+                .displayNameValidationError,
+            "يجب أن يكون اسم العرض من 1 إلى 200 حرف."
+        )
+    }
+
     func testAutomaticDirectionFollowsSelectedRtlLocale() {
         XCTAssertEqual(
             MobileUiPreferences(localeRaw: MobileSettingsLocale.ar.rawValue)
@@ -71,8 +92,8 @@ final class MobileUiPreferencesLocalizationParityTests: XCTestCase {
                 copy.settings, copy.account, copy.usage, copy.support,
                 copy.workspace, copy.navigation, copy.signOut, copy.computer,
                 copy.marketplace, copy.helpCenter, copy.sendFeedback,
-                copy.aboutFabushi, copy.displayName, copy.email,
-                copy.agentConfiguration, copy.router, copy.iosSelfReference,
+                copy.aboutFabushi, copy.displayName, copy.displayNameValidationError,
+                copy.email, copy.agentConfiguration, copy.router, copy.iosSelfReference,
                 copy.mediaRuntimeUnavailable,
             ]
             XCTAssertTrue(required.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })

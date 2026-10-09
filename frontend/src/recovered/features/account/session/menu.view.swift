@@ -931,7 +931,7 @@ struct AccountSettingsView: View {
     private func saveDisplayName() {
         let normalized = MarketplaceModel.normalizedAccountDisplayName(nameDraft)
         guard !normalized.isEmpty, normalized.count <= 200 else {
-            actionError = "名称必须为 1–200 个字符。"
+            actionError = shellCopy.displayNameValidationError
             return
         }
         saveGeneration = saveGeneration == Int.max ? 1 : saveGeneration + 1
