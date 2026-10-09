@@ -387,6 +387,12 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerDraft = ""
     @State private var approvalGeneration = 0
     @State private var transcriptBaselineGeneration = 0
+    @State private var transcriptDraftRecipients: [String: String] = [:]
+    @State private var transcriptDraftSubjects: [String: String] = [:]
+    @State private var transcriptDraftBodies: [String: String] = [:]
+    @State private var transcriptDraftPendingEntryIds: Set<String> = []
+    @State private var transcriptDraftStatuses: [String: String] = [:]
+    @State private var transcriptDraftErrors: [String: String] = [:]
     @State private var secretDrafts: [String: String] = [:]
     @State private var secretPendingEntryIds: Set<String> = []
     @State private var secretProvidedEntryIds: Set<String> = []
@@ -419,6 +425,7 @@ internal struct MobileBotChat: View {
             threadLoadingRootId = nil
             threadLoadError = nil
             threadRootId = nil
+            resetTranscriptDraftUI()
             resetSecretRequestUI()
         }
         .onDisappear {
@@ -965,7 +972,9 @@ internal struct MobileBotChat: View {
             .padding(.vertical, 4)
             .accessibilityIdentifier(Self.semanticId("mobile-bot-timeline-event-\(entry.id)"))
         } else if entry.kind == .action {
-            if let secret = mobileSecretRequestProjection(entry.canonicalTranscriptCard) {
+            if let draft = mobileTranscriptDraftProjection(entry.canonicalTranscriptCard) {
+                transcriptDraftCard(entry, draft: draft)
+            } else if let secret = mobileSecretRequestProjection(entry.canonicalTranscriptCard) {
                 secretRequestCard(entry, secret: secret)
             } else if let platform = entry.listenerPlatform {
                 listenerIntegrationCard(entry, platform: platform)
@@ -1214,6 +1223,197 @@ internal struct MobileBotChat: View {
                   threadRootId == rootId
             else { return }
             threadLoadError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func resetTranscriptDraftUI() {
+        transcriptDraftRecipients.removeAll()
+        transcriptDraftSubjects.removeAll()
+        transcriptDraftBodies.removeAll()
+        transcriptDraftPendingEntryIds.removeAll()
+        transcriptDraftStatuses.removeAll()
+        transcriptDraftErrors.removeAll()
+    }
+
+    @MainActor
+    private func resolveTranscriptDraft(
+        entry: MobileChatMessage,
+        draft: MobileTranscriptDraftProjection,
+        action: String
+    ) async {
+        guard let payload = entry.canonicalTranscriptCard,
+              !transcriptDraftPendingEntryIds.contains(entry.id)
+        else { return }
+
+        var overrides: [String: Any] = [:]
+        if action == "send" {
+            switch draft {
+            case let .email(email):
+                let recipientsValue = transcriptDraftRecipients[entry.id] ?? email.to.joined(separator: ", ")
+                guard let recipients = mobileEmailRecipients(recipientsValue) else { return }
+                let subject = transcriptDraftSubjects[entry.id] ?? email.subject
+                let body = transcriptDraftBodies[entry.id] ?? email.body
+                guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                overrides["to"] = recipients
+                overrides["subject"] = subject
+                overrides["body"] = body
+            case let .slack(slack):
+                let body = transcriptDraftBodies[entry.id] ?? slack.body
+                guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                overrides["body"] = body
+            }
+        }
+
+        transcriptDraftPendingEntryIds.insert(entry.id)
+        transcriptDraftStatuses[entry.id] = action == "send" ? "sending" : "discarding"
+        transcriptDraftErrors.removeValue(forKey: entry.id)
+        defer { transcriptDraftPendingEntryIds.remove(entry.id) }
+
+        do {
+            let result = try await model.resolveTranscriptDraft(
+                payload,
+                overrides: overrides,
+                action: action
+            )
+            transcriptDraftStatuses[entry.id] = result.status
+            if let error = result.error, !error.isEmpty {
+                transcriptDraftErrors[entry.id] = error
+            }
+        } catch {
+            transcriptDraftStatuses[entry.id] = "failed"
+            transcriptDraftErrors[entry.id] = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func transcriptDraftCard(
+        _ entry: MobileChatMessage,
+        draft: MobileTranscriptDraftProjection
+    ) -> some View {
+        let pending = transcriptDraftPendingEntryIds.contains(entry.id)
+        switch draft {
+        case let .email(email):
+            let status = transcriptDraftStatuses[entry.id] ?? email.status
+            let terminal = ["sent", "discarded"].contains(status)
+            let recipients = transcriptDraftRecipients[entry.id] ?? email.to.joined(separator: ", ")
+            let body = transcriptDraftBodies[entry.id] ?? email.body
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Label("New email", systemImage: "envelope")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(status == "sending" ? "Sending…" : status.capitalized)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if let from = email.from, !from.isEmpty {
+                    LabeledContent("From", value: from).font(.caption2)
+                }
+                if !terminal {
+                    TextField(
+                        "name@example.com",
+                        text: Binding(
+                            get: { transcriptDraftRecipients[entry.id] ?? email.to.joined(separator: ", ") },
+                            set: { transcriptDraftRecipients[entry.id] = $0 }
+                        )
+                    )
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    TextField(
+                        "Subject",
+                        text: Binding(
+                            get: { transcriptDraftSubjects[entry.id] ?? email.subject },
+                            set: { transcriptDraftSubjects[entry.id] = $0 }
+                        )
+                    )
+                    TextField(
+                        "Write a message",
+                        text: Binding(
+                            get: { transcriptDraftBodies[entry.id] ?? email.body },
+                            set: { transcriptDraftBodies[entry.id] = $0 }
+                        ),
+                        axis: .vertical
+                    )
+                    .lineLimit(4...10)
+                    HStack {
+                        Button("Send email") {
+                            Task { await resolveTranscriptDraft(entry: entry, draft: draft, action: "send") }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(pending || mobileEmailRecipients(recipients) == nil || body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button("Discard", role: .destructive) {
+                            Task { await resolveTranscriptDraft(entry: entry, draft: draft, action: "discard") }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(pending)
+                    }
+                } else {
+                    Text(status == "sent" ? "Sent to \(email.to.first ?? "") — “\(email.subject)”" : "Draft discarded")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if let error = transcriptDraftErrors[entry.id] ?? email.error, !error.isEmpty {
+                    Text(error).font(.caption2).foregroundStyle(.red)
+                }
+            }
+            .padding(10)
+            .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-email-draft-\(entry.id)"))
+
+        case let .slack(slack):
+            let status = transcriptDraftStatuses[entry.id] ?? slack.status
+            let terminal = ["sent", "discarded"].contains(status)
+            let body = transcriptDraftBodies[entry.id] ?? slack.body
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Label("Slack message", systemImage: "message")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(status == "sending" ? "Sending…" : status.capitalized)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if let workspace = slack.workspace, !workspace.isEmpty {
+                    LabeledContent("Workspace", value: workspace).font(.caption2)
+                }
+                LabeledContent("To", value: slack.target).font(.caption2)
+                LabeledContent("Thread", value: slack.thread ?? "New message").font(.caption2)
+                if !terminal {
+                    TextField(
+                        "Write a message",
+                        text: Binding(
+                            get: { transcriptDraftBodies[entry.id] ?? slack.body },
+                            set: { transcriptDraftBodies[entry.id] = $0 }
+                        ),
+                        axis: .vertical
+                    )
+                    .lineLimit(4...10)
+                    HStack {
+                        Button("Send message") {
+                            Task { await resolveTranscriptDraft(entry: entry, draft: draft, action: "send") }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(pending || body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button("Discard", role: .destructive) {
+                            Task { await resolveTranscriptDraft(entry: entry, draft: draft, action: "discard") }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(pending)
+                    }
+                } else {
+                    Text(status == "sent" ? "Sent to \(slack.target)" : "Draft discarded")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if let error = transcriptDraftErrors[entry.id] ?? slack.error, !error.isEmpty {
+                    Text(error).font(.caption2).foregroundStyle(.red)
+                }
+            }
+            .padding(10)
+            .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-slack-draft-\(entry.id)"))
         }
     }
 

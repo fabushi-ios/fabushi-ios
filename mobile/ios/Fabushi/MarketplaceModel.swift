@@ -202,6 +202,100 @@ struct MobileCanonicalTranscriptCardPayload: Equatable {
     let json: String
 }
 
+struct MobileEmailDraftProjection: Equatable {
+    let id: String
+    let from: String?
+    let to: [String]
+    let cc: [String]?
+    let subject: String
+    let body: String
+    let status: String
+    let error: String?
+}
+
+struct MobileSlackDraftProjection: Equatable {
+    let id: String
+    let workspace: String?
+    let target: String
+    let thread: String?
+    let body: String
+    let status: String
+    let error: String?
+}
+
+enum MobileTranscriptDraftProjection: Equatable {
+    case email(MobileEmailDraftProjection)
+    case slack(MobileSlackDraftProjection)
+}
+
+struct MobileDraftResolution: Equatable {
+    let status: String
+    let error: String?
+}
+
+func mobileTranscriptDraftProjection(
+    _ payload: MobileCanonicalTranscriptCardPayload?
+) -> MobileTranscriptDraftProjection? {
+    guard let payload,
+          ["emailDraft", "slackDraft"].contains(payload.kind),
+          let data = payload.json.data(using: .utf8),
+          let card = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let draft = card["draft"] as? [String: Any],
+          let id = draft["id"] as? String,
+          !id.isEmpty,
+          let status = draft["status"] as? String
+    else { return nil }
+
+    if payload.kind == "emailDraft" {
+        guard draft["kind"] as? String == "email",
+              let to = draft["to"] as? [String],
+              let subject = draft["subject"] as? String,
+              let body = draft["body"] as? String
+        else { return nil }
+        return .email(.init(
+            id: id,
+            from: draft["from"] as? String,
+            to: to,
+            cc: draft["cc"] as? [String],
+            subject: subject,
+            body: body,
+            status: status,
+            error: draft["error"] as? String
+        ))
+    }
+
+    guard draft["kind"] as? String == "slack",
+          let target = draft["target"] as? String,
+          !target.isEmpty,
+          let body = draft["body"] as? String
+    else { return nil }
+    return .slack(.init(
+        id: id,
+        workspace: draft["workspace"] as? String,
+        target: target,
+        thread: draft["thread"] as? String,
+        body: body,
+        status: status,
+        error: draft["error"] as? String
+    ))
+}
+
+func mobileEmailRecipients(_ value: String) -> [String]? {
+    let recipients = value
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    guard !recipients.isEmpty,
+          recipients.allSatisfy({
+              $0.range(
+                  of: #"^[^\s@]+@[^\s@]+\.[^\s@]+$"#,
+                  options: .regularExpression
+              ) != nil
+          })
+    else { return nil }
+    return recipients
+}
+
 struct MobileSecretRequestProjection: Equatable {
     let requestId: String
     let label: String
@@ -1758,7 +1852,9 @@ final class MarketplaceModel {
                   let attemptId = object["attemptId"] as? String,
                   let loginURLString = (object["loginUrl"] as? String) ?? (object["authorizationUrl"] as? String),
                   let loginURL = URL(string: loginURLString)
-            else { throw MahayanaCoordinator.CoordinatorError.invalidResponse }
+            else { throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Draft returned an unsupported terminal status."
+                ) }
             browserLoginAttemptId = attemptId
             browserLoginURL = loginURL
             loginBusy = false
@@ -1962,6 +2058,65 @@ final class MarketplaceModel {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         return accepted
+    }
+
+    func resolveTranscriptDraft(
+        _ payload: MobileCanonicalTranscriptCardPayload,
+        overrides: [String: Any] = [:],
+        action: String
+    ) async throws -> MobileDraftResolution {
+        guard ["send", "discard"].contains(action),
+              let projection = mobileTranscriptDraftProjection(payload),
+              let data = payload.json.data(using: .utf8),
+              let card = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              var draft = card["draft"] as? [String: Any],
+              loggedIn, let accountScope = globalDharmaAccountScope
+        else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Draft is no longer available."
+            )
+        }
+        let draftId: String
+        switch projection {
+        case let .email(value): draftId = value.id
+        case let .slack(value): draftId = value.id
+        }
+        for (key, value) in overrides {
+            draft[key] = value
+        }
+
+        let requestId = "ios-draft-resolve-\(UUID().uuidString.lowercased())"
+        _ = try await executeFeatureCommand(
+            type: "draft.resolve",
+            requestId: requestId,
+            fields: [
+                "draft": draft,
+                "action": action,
+            ]
+        )
+
+        while true {
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 12_000
+            ) { event in
+                event["type"] as? String == "draft.changed"
+                    && event["draftId"] as? String == draftId
+            }
+            guard loggedIn, globalDharmaAccountScope == accountScope,
+                  let event = result.value as? [String: Any],
+                  let status = event["status"] as? String
+            else {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Draft scope changed before completion."
+                )
+            }
+            let error = event["error"] as? String
+            if status == "sending" { continue }
+            guard ["sent", "discarded", "failed"].contains(status) else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            return .init(status: status, error: error)
+        }
     }
 
     func provideTranscriptSecret(

@@ -259,6 +259,17 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(email.actionTitle, "Release")
         XCTAssertEqual(email.canonicalTranscriptCard?.kind, "emailDraft")
         XCTAssertTrue(email.canonicalTranscriptCard?.json.contains(#""id":"email-1""#) == true)
+        guard case let .email(emailDraft)? = mobileTranscriptDraftProjection(
+            email.canonicalTranscriptCard
+        ) else {
+            return XCTFail("expected email draft projection")
+        }
+        XCTAssertEqual(emailDraft.id, "email-1")
+        XCTAssertEqual(emailDraft.to, ["you@example.com"])
+        XCTAssertEqual(mobileEmailRecipients("a@example.com, b@example.org"), [
+            "a@example.com", "b@example.org",
+        ])
+        XCTAssertNil(mobileEmailRecipients("not-an-email"))
 
         let event = try XCTUnwrap(projectMobileCanonicalHostTranscriptCard(
             event: [
