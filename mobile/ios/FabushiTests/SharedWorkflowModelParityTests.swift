@@ -42,6 +42,9 @@ final class SharedWorkflowModelParityTests: XCTestCase {
         XCTAssertEqual(deriveWorkflowNameFromMarkdown("# Build Release\nbody"), "Build Release")
         XCTAssertEqual(deriveWorkflowNameFromUrl("https://example.com/my-skill.md"), "my skill")
         XCTAssertEqual(clampWorkflowName(String(repeating: "x", count: 100)).count, 80)
+        let emojiName = clampWorkflowName(String(repeating: "😀", count: 60))
+        XCTAssertEqual(emojiName.utf16.count, 80)
+        XCTAssertEqual(emojiName.count, 40)
     }
 
     func testWorkflowAutomationProjectionRoundTrip() {
@@ -84,6 +87,8 @@ final class SharedWorkflowModelParityTests: XCTestCase {
         XCTAssertEqual(agentSkillsFromWorkflows([managed, user]).count, 2)
         XCTAssertTrue(promptReferencesWorkflow("Please run @release train", workflow: user))
         XCTAssertTrue(promptReferencesWorkflow("Use sand-workflow:release", workflow: user))
+        XCTAssertTrue(promptReferencesWorkflow("é@release", workflow: user))
+        XCTAssertFalse(promptReferencesWorkflow("a@release", workflow: user))
 
         let rich = #"{"type":"doc","content":[{"type":"workflowReference","attrs":{"id":"release","teachQueueScope":"q1"}},{"type":"workflowReference","attrs":{"id":"release"}}]}"#
         XCTAssertEqual(collectWorkflowReferences(rich), [.init(id: "release", teachQueueScope: "q1")])
@@ -96,6 +101,7 @@ final class SharedWorkflowModelParityTests: XCTestCase {
         )
         XCTAssertEqual(spec.sourceRef, "https://example.com/SKILL.md")
         XCTAssertTrue(spec.body.contains("live reference"))
+        XCTAssertTrue(spec.body.contains("`https://example.com/SKILL.md`"))
         XCTAssertEqual(workflowDir("/skills/a/SKILL.md"), "/skills/a")
         XCTAssertTrue(renderWorkflowsSystemPrompt("/skills").contains("sand-workflow:<id>"))
     }
