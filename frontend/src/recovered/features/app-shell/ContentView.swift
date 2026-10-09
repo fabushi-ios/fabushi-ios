@@ -137,6 +137,7 @@ struct ContentView: View {
     @State var onboardingCreatedAgentId: String?
     @State var onboardingCreateRequestId = "ios-signed-in-onboarding-\(UUID().uuidString.lowercased())"
     @State var onboardingOperationGeneration = 0
+    @State var onboardingOperationTask: Task<Void, Never>?
     @State var onboardingAccountScope = ""
     @State var composeKind: ConversationKind?
     @State var composeName = ""
