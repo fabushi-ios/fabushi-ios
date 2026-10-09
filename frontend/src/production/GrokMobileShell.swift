@@ -60,6 +60,13 @@ internal struct GrokMobileShell: View {
     @State var commandPaletteRoutineStatus: MobileCommandPaletteProviderStatus = .idle
     @State var commandPaletteLinkMetadata: [String: MobileCommandPaletteLinkMetadata] = [:]
     @State var commandPaletteLinkStatus: MobileCommandPaletteProviderStatus = .idle
+    @State var commandPaletteAgentID: String?
+    @State var commandPaletteComputerStatus: RemoteComputerAgentBoxSnapshot?
+    @State var commandPaletteComputerActivity = RemoteComputerHostActivitySnapshot.empty
+    @State var commandPaletteComputerPending = false
+    @State var commandPaletteComputerQueued = false
+    @State var commandPaletteComputerConfirmation: MobileCommandPaletteComputerUpdateAction?
+    @State var commandPaletteComputerGeneration = 0
     @State var promptFocusGeneration = 0
 
     @ViewBuilder
@@ -90,7 +97,12 @@ internal struct GrokMobileShell: View {
         .onChange(of: model.accountRosterRevision) { _, _ in
             Task { await refreshAccessRoster() }
         }
+        .onChange(of: mobileAccountScopeKey) { _, _ in
+            resetCommandPaletteComputerScope()
+        }
         .onDisappear {
+            commandPaletteComputerGeneration &+= 1
+            commandPaletteComputerQueued = false
             hiddenChatsController.dispose()
         }
         .sheet(item: $groupMembersTarget) { group in
@@ -241,6 +253,35 @@ internal struct GrokMobileShell: View {
                 },
                 onClose: { agentNetworkOpen = false }
             )
+        }
+        .confirmationDialog(
+            commandPaletteComputerConfirmationTitle,
+            isPresented: Binding(
+                get: { commandPaletteComputerConfirmation != nil },
+                set: { if !$0 { commandPaletteComputerConfirmation = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if commandPaletteComputerConfirmation == .busyOverride {
+                Button("Update when done") {
+                    commandPaletteComputerConfirmation = nil
+                    queueCommandPaletteComputerUpdate()
+                }
+                Button("Update anyway", role: .destructive) {
+                    commandPaletteComputerConfirmation = nil
+                    Task { await performCommandPaletteComputerUpdate(force: true) }
+                }
+            } else if commandPaletteComputerConfirmation == .ready {
+                Button("Update Fabushi's Computer") {
+                    commandPaletteComputerConfirmation = nil
+                    Task { await performCommandPaletteComputerUpdate(force: false) }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                commandPaletteComputerConfirmation = nil
+            }
+        } message: {
+            Text(commandPaletteComputerConfirmationMessage)
         }
     }
 
