@@ -235,6 +235,25 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(event.kind, .notice)
         XCTAssertEqual(event.text, "PR opened — Review requested")
 
+        let secretMessage = try XCTUnwrap(projectMobileCanonicalHostTranscriptCard(
+            event: [
+                "entryId": "secret-entry",
+                "card": [
+                    "kind": "secretRequest",
+                    "requestId": "secret-1",
+                    "label": "Deploy token",
+                    "description": "Required to deploy",
+                    "provided": false,
+                ],
+            ],
+            operationId: nil
+        ))
+        let secret = try XCTUnwrap(mobileSecretRequestProjection(secretMessage.canonicalTranscriptCard))
+        XCTAssertEqual(secret.requestId, "secret-1")
+        XCTAssertEqual(secret.label, "Deploy token")
+        XCTAssertEqual(secret.description, "Required to deploy")
+        XCTAssertFalse(secret.provided)
+
         XCTAssertNil(projectMobileCanonicalHostTranscriptCard(
             event: ["card": [
                 "kind": "emailDraft",

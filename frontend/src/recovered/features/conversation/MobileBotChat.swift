@@ -251,6 +251,10 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerDraft = ""
     @State private var approvalGeneration = 0
     @State private var transcriptBaselineGeneration = 0
+    @State private var secretDrafts: [String: String] = [:]
+    @State private var secretPendingEntryIds: Set<String> = []
+    @State private var secretProvidedEntryIds: Set<String> = []
+    @State private var secretErrors: [String: String] = [:]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -275,6 +279,7 @@ internal struct MobileBotChat: View {
             cancelVoiceInput()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
+            resetSecretRequestUI()
         }
         .onDisappear {
             cancelVoiceInput()
@@ -818,7 +823,9 @@ internal struct MobileBotChat: View {
             .padding(.vertical, 4)
             .accessibilityIdentifier(Self.semanticId("mobile-bot-timeline-event-\(entry.id)"))
         } else if entry.kind == .action {
-            if let platform = entry.listenerPlatform {
+            if let secret = mobileSecretRequestProjection(entry.canonicalTranscriptCard) {
+                secretRequestCard(entry, secret: secret)
+            } else if let platform = entry.listenerPlatform {
                 listenerIntegrationCard(entry, platform: platform)
             } else {
                 HStack(spacing: 7) {
@@ -945,6 +952,104 @@ internal struct MobileBotChat: View {
             }
             .accessibilityIdentifier(Self.semanticId("mobile-bot-thread-\(rootId)"))
         }
+    }
+
+    @MainActor
+    private func resetSecretRequestUI() {
+        secretDrafts.removeAll()
+        secretPendingEntryIds.removeAll()
+        secretProvidedEntryIds.removeAll()
+        secretErrors.removeAll()
+    }
+
+    @MainActor
+    private func submitSecretRequest(
+        entry: MobileChatMessage,
+        secret: MobileSecretRequestProjection
+    ) async {
+        let value = (secretDrafts[entry.id] ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              !secret.provided,
+              !secretProvidedEntryIds.contains(entry.id),
+              !secretPendingEntryIds.contains(entry.id)
+        else { return }
+
+        secretPendingEntryIds.insert(entry.id)
+        secretErrors.removeValue(forKey: entry.id)
+        defer { secretPendingEntryIds.remove(entry.id) }
+        do {
+            try await model.provideTranscriptSecret(
+                secretRequestId: secret.requestId,
+                value: value
+            )
+            secretDrafts[entry.id] = ""
+            secretProvidedEntryIds.insert(entry.id)
+        } catch {
+            secretErrors[entry.id] = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func secretRequestCard(
+        _ entry: MobileChatMessage,
+        secret: MobileSecretRequestProjection
+    ) -> some View {
+        let provided = secret.provided || secretProvidedEntryIds.contains(entry.id)
+        let pending = secretPendingEntryIds.contains(entry.id)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 8) {
+                Image(systemName: provided ? "checkmark.shield.fill" : "key.fill")
+                    .foregroundStyle(provided ? .green : .secondary)
+                Text(secret.label)
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                if provided {
+                    Text("Provided")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
+            }
+            if let description = secret.description,
+               !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(description)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if !provided {
+                SecureField(
+                    "Enter secret",
+                    text: Binding(
+                        get: { secretDrafts[entry.id] ?? "" },
+                        set: { secretDrafts[entry.id] = $0 }
+                    )
+                )
+                .textContentType(.password)
+                .disabled(pending)
+                .accessibilityIdentifier(Self.semanticId("mobile-bot-secret-input-\(entry.id)"))
+
+                Button(pending ? "Submitting…" : "Submit") {
+                    Task { await submitSecretRequest(entry: entry, secret: secret) }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(
+                    pending
+                        || (secretDrafts[entry.id] ?? "")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .isEmpty
+                )
+                .accessibilityIdentifier(Self.semanticId("mobile-bot-secret-submit-\(entry.id)"))
+            }
+            if let error = secretErrors[entry.id], !error.isEmpty {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(10)
+        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityIdentifier(Self.semanticId("mobile-bot-secret-request-\(entry.id)"))
     }
 
     @ViewBuilder

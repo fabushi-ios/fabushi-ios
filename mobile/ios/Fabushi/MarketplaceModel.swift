@@ -202,6 +202,35 @@ struct MobileCanonicalTranscriptCardPayload: Equatable {
     let json: String
 }
 
+struct MobileSecretRequestProjection: Equatable {
+    let requestId: String
+    let label: String
+    let description: String?
+    let provided: Bool
+}
+
+func mobileSecretRequestProjection(
+    _ payload: MobileCanonicalTranscriptCardPayload?
+) -> MobileSecretRequestProjection? {
+    guard payload?.kind == "secretRequest",
+          let json = payload?.json,
+          let data = json.data(using: .utf8),
+          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let requestId = object["requestId"] as? String,
+          !requestId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          let label = object["label"] as? String,
+          !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          let provided = object["provided"] as? Bool
+    else { return nil }
+    if object["description"] != nil, object["description"] is String == false { return nil }
+    return .init(
+        requestId: requestId,
+        label: label,
+        description: object["description"] as? String,
+        provided: provided
+    )
+}
+
 private func mobileTranscriptCardPayload(
     kind: String,
     card: [String: Any]
@@ -1917,6 +1946,45 @@ final class MarketplaceModel {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         return accepted
+    }
+
+    func provideTranscriptSecret(
+        secretRequestId rawSecretRequestId: String,
+        value rawValue: String
+    ) async throws {
+        let secretRequestId = rawSecretRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !secretRequestId.isEmpty, !value.isEmpty,
+              loggedIn, let accountScope = globalDharmaAccountScope
+        else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Secret request is no longer available."
+            )
+        }
+
+        let requestId = "ios-secret-provide-\(UUID().uuidString.lowercased())"
+        _ = try await executeFeatureCommand(
+            type: "secret.provide",
+            requestId: requestId,
+            fields: [
+                "secretRequestId": secretRequestId,
+                "value": value,
+            ]
+        )
+        let result = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 8_000
+        ) { event in
+            event["type"] as? String == "secret.provided"
+                && event["secretRequestId"] as? String == secretRequestId
+        }
+        guard loggedIn, globalDharmaAccountScope == accountScope,
+              let event = result.value as? [String: Any],
+              event["secretRequestId"] as? String == secretRequestId
+        else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Secret request scope changed before completion."
+            )
+        }
     }
 
     func listenerIntegrationState(for rawPlatform: String) -> MobileListenerIntegrationProjection? {
