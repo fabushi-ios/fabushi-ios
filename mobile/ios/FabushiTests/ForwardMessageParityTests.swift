@@ -99,4 +99,78 @@ final class ForwardMessageParityTests: XCTestCase {
             2
         )
     }
+
+    func testAgentForwardRequiresSettledCanonicalMessageIdentity() {
+        var message = MobileChatMessage(
+            id: "local-row",
+            role: .assistant,
+            text: "Ready"
+        )
+
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            )
+        )
+
+        message.canonicalMessageId = "message-1"
+        message.streaming = true
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            )
+        )
+
+        message.streaming = false
+        message.optimisticDeliveryPhase = .pending
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            )
+        )
+
+        message.optimisticDeliveryPhase = .acceptedAwaitingEcho
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            )
+        )
+
+        message.optimisticDeliveryPhase = .failed
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            )
+        )
+
+        message.optimisticDeliveryPhase = nil
+        XCTAssertEqual(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            ),
+            "message-1"
+        )
+
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: nil
+            )
+        )
+
+        message.kind = .notice
+        XCTAssertNil(
+            mobileBotForwardMessageId(
+                message,
+                sourceConversationId: "conversation-1"
+            )
+        )
+    }
+
 }
