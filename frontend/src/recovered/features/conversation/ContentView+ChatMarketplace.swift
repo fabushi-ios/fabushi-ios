@@ -39,9 +39,9 @@ internal enum ForwardRecipientNavigation {
     }
 }
 
-private struct ForwardMessageSheet: View {
+internal struct ForwardMessageSheet: View {
     let sourceConversationId: String
-    let message: ChatMessage
+    let messageId: String
     let messaging: MessagingModel
     let appAgentSurface: FabushiAppAgentSurface
     let onDismiss: () -> Void
@@ -242,7 +242,7 @@ private struct ForwardMessageSheet: View {
         }.joined(separator: "|")
         return [
             sourceConversationId,
-            message.id,
+            messageId,
             query,
             recipientState,
             String(dropSenderNames),
@@ -470,7 +470,7 @@ private struct ForwardMessageSheet: View {
             defer { loading = false }
             recipients = try await messaging.searchForwardRecipients(
                 sourceConversationId: sourceConversationId,
-                messageId: message.id,
+                messageId: messageId,
                 query: query,
                 limit: 100
             )
@@ -505,7 +505,7 @@ private struct ForwardMessageSheet: View {
         }
         let results = await messaging.forwardMessageBatch(
             sourceConversationId: sourceConversationId,
-            messageId: message.id,
+            messageId: messageId,
             destinations: requests,
             dropSenderNames: dropSenderNames,
             dropCaptions: dropCaptions
@@ -618,7 +618,7 @@ extension ContentView {
                                                             } else {
                                                                 next = option.chosen ? [] : [option.id]
                                                             }
-                                                            Task { await messaging.votePoll(conversationId: conversation.id, messageId: message.id, optionIds: next) }
+                                                            Task { await messaging.votePoll(conversationId: conversation.id, messageId: messageId, optionIds: next) }
                                                         } label: {
                                                             HStack(spacing: 7) {
                                                                 Image(systemName: option.chosen ? "checkmark.circle.fill" : "circle").foregroundStyle(option.chosen ? Color.accentColor : .secondary)
@@ -632,8 +632,8 @@ extension ContentView {
                                             case "voice":
                                                 Button { Task { await voicePlayback.toggle(message: message, messaging: messaging) } } label: {
                                                     HStack(spacing: 10) {
-                                                        Image(systemName: voicePlayback.playingMessageId == message.id ? "stop.circle.fill" : "play.circle.fill").font(.title2).foregroundStyle(Color.accentColor)
-                                                        VStack(alignment: .leading) { Text("语音消息").fontWeight(.medium).foregroundStyle(.primary); Text(voicePlayback.playingMessageId == message.id ? "正在播放" : (message.mediaFileName ?? "录音")).font(.caption).foregroundStyle(.secondary) }
+                                                        Image(systemName: voicePlayback.playingMessageId == messageId ? "stop.circle.fill" : "play.circle.fill").font(.title2).foregroundStyle(Color.accentColor)
+                                                        VStack(alignment: .leading) { Text("语音消息").fontWeight(.medium).foregroundStyle(.primary); Text(voicePlayback.playingMessageId == messageId ? "正在播放" : (message.mediaFileName ?? "录音")).font(.caption).foregroundStyle(.secondary) }
                                                         Spacer()
                                                     }
                                                 }.buttonStyle(.plain)
@@ -657,7 +657,7 @@ extension ContentView {
                                                             Task {
                                                                 await messaging.setReaction(
                                                                     conversationId: conversation.id,
-                                                                    messageId: message.id,
+                                                                    messageId: messageId,
                                                                     reaction: reaction.reaction,
                                                                     enabled: !reaction.chosenByMe
                                                                 )
@@ -695,7 +695,7 @@ extension ContentView {
                                         .padding(.horizontal, 11).padding(.vertical, 7)
                                         .background(message.isOutgoing ? Color.accentColor.opacity(0.20) : Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
                                         .overlay {
-                                            if chatSearchTargetID == message.id {
+                                            if chatSearchTargetID == messageId {
                                                 RoundedRectangle(cornerRadius: 16).stroke(Color.accentColor, lineWidth: 2)
                                             }
                                         }
@@ -721,7 +721,7 @@ extension ContentView {
                                                 Task {
                                                     await messaging.setReaction(
                                                         conversationId: conversation.id,
-                                                        messageId: message.id,
+                                                        messageId: messageId,
                                                         reaction: "👍",
                                                         enabled: !hasOwnThumbsUp
                                                     )
@@ -730,11 +730,11 @@ extension ContentView {
                                             if message.isOutgoing {
                                                 Button("编辑", systemImage: "pencil") { editingMessage = message; replyTarget = nil; messageDraft = message.text }
                                             }
-                                            Button(message.isPinned ? "取消置顶消息" : "置顶消息", systemImage: "pin") { Task { await messaging.setMessagePinned(conversationId: conversation.id, messageId: message.id, pinned: !message.isPinned) } }
-                                            Button("删除", systemImage: "trash", role: .destructive) { Task { await messaging.deleteMessage(conversationId: conversation.id, messageId: message.id) } }
+                                            Button(message.isPinned ? "取消置顶消息" : "置顶消息", systemImage: "pin") { Task { await messaging.setMessagePinned(conversationId: conversation.id, messageId: messageId, pinned: !message.isPinned) } }
+                                            Button("删除", systemImage: "trash", role: .destructive) { Task { await messaging.deleteMessage(conversationId: conversation.id, messageId: messageId) } }
                                         }
                                         if !message.isOutgoing { Spacer(minLength: 56) }
-                                    }.padding(.horizontal, 10).id(message.id)
+                                    }.padding(.horizontal, 10).id(messageId)
                                 }
                             }.padding(.vertical, 12)
                         }
@@ -940,7 +940,7 @@ extension ContentView {
         .sheet(item: $forwardMessage) { message in
             ForwardMessageSheet(
                 sourceConversationId: conversation.id,
-                message: message,
+                messageId: message.id,
                 messaging: messaging,
                 appAgentSurface: appAgentSurface
             ) {
@@ -1035,7 +1035,7 @@ extension ContentView {
             guard !text.isEmpty else { return nil }
             let author = message.isOutgoing
                 ? "You"
-                : (messaging.searchAuthorByMessageId[message.id] ?? conversation.title)
+                : (messaging.searchAuthorByMessageId[messageId] ?? conversation.title)
             return "\(author): \(text)"
         }
         guard let prompt = GrokMobileBotService.humanHandoffPrompt(
