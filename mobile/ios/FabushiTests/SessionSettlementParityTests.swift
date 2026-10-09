@@ -1,3 +1,4 @@
+import Security
 import XCTest
 @testable import Fabushi
 
@@ -105,7 +106,8 @@ final class SessionSettlementParityTests: XCTestCase {
         ))
 
         XCTAssertTrue(failures.isEmpty)
-        let capture = try XCTUnwrap(await recorder.captures().first)
+        let captures = await recorder.captures()
+        let capture = try XCTUnwrap(captures.first)
         XCTAssertTrue(capture.url.hasSuffix("/aiserver.v1.AnalyticsService/SubmitLogs"))
         XCTAssertEqual(capture.timeout, 15, accuracy: 0.001)
         XCTAssertEqual(header("Authorization", in: capture.headers), "Bearer departing-secret")
@@ -165,7 +167,8 @@ final class SessionSettlementParityTests: XCTestCase {
 
         XCTAssertEqual(failures.count, 1)
         XCTAssertTrue(failures[0].contains("IOSCursorStructuredLogSubmitError"))
-        let capture = try XCTUnwrap(await recorder.captures().first)
+        let captures = await recorder.captures()
+        let capture = try XCTUnwrap(captures.first)
         let object = try XCTUnwrap(
             try JSONSerialization.jsonObject(with: capture.body) as? [String: Any]
         )
