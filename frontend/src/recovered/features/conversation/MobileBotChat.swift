@@ -196,17 +196,15 @@ internal func mergeMobileConversationHistory(
     func historyIdentity(_ message: MobileChatMessage) -> String {
         message.kind == .message ? mobileTranscriptCanonicalId(message) : message.id
     }
-    var entriesById: [String: MobileChatMessage] = [:]
+    var merged = fetched
+    var seen = Set(fetched.map(historyIdentity))
     for message in current {
-        entriesById[historyIdentity(message)] = message
+        let key = historyIdentity(message)
+        guard !seen.contains(key) else { continue }
+        merged.append(message)
+        seen.insert(key)
     }
-    for message in fetched {
-        entriesById[historyIdentity(message)] = message
-    }
-    return Array(entriesById.values).sorted {
-        if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
-        return $0.id < $1.id
-    }
+    return merged
 }
 
 internal func reconcileMobileConversationBaseline(
