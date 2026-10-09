@@ -83,6 +83,7 @@ struct AccountUsageProjection: Equatable, Sendable {
 struct AccountMenuView: View {
     @Bindable var model: MarketplaceModel
     let avatar: AnyView
+    let conversationId: String?
     let onClose: () -> Void
     let onRequestSignOut: () -> Void
     let onOpenRemoteComputer: () -> Void
@@ -194,12 +195,16 @@ struct AccountMenuView: View {
             FabushiAboutOverlayView()
         }
         .sheet(isPresented: $settingsPresented) {
-            AccountSettingsView(model: model) {
+            AccountSettingsView(model: model, conversationId: conversationId) {
                 settingsPresented = false
             }
         }
         .sheet(isPresented: $feedbackPresented) {
-            AccountFeedbackView(model: model) {
+            AccountFeedbackView(
+                model: model,
+                conversationId: conversationId,
+                defaultIncludeConversationId: conversationId != nil
+            ) {
                 feedbackPresented = false
             }
         }
@@ -264,7 +269,18 @@ struct AccountMenuView: View {
 /// preload bridge rather than introducing a renderer-owned account store.
 struct AccountSettingsView: View {
     @Bindable var model: MarketplaceModel
+    let conversationId: String?
     let onDone: () -> Void
+
+    init(
+        model: MarketplaceModel,
+        conversationId: String? = nil,
+        onDone: @escaping () -> Void
+    ) {
+        self.model = model
+        self.conversationId = conversationId
+        self.onDone = onDone
+    }
 
     @State private var nameDraft = ""
     @State private var nameSaving = false
@@ -363,7 +379,11 @@ struct AccountSettingsView: View {
             }
         }
         .sheet(isPresented: $feedbackPresented) {
-            AccountFeedbackView(model: model) { feedbackPresented = false }
+            AccountFeedbackView(
+                model: model,
+                conversationId: conversationId,
+                defaultIncludeConversationId: conversationId != nil
+            ) { feedbackPresented = false }
         }
         .sheet(isPresented: $aboutPresented) {
             FabushiAboutOverlayView()
