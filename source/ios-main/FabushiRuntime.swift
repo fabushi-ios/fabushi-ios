@@ -191,6 +191,8 @@ final class FabushiRuntime {
     let remoteDeviceGateway: FabushiRemoteDeviceGateway
     let marketplace: MarketplaceModel
     let messaging: MessagingModel
+    let uiPreferencesStore: MobileUiPreferencesStore
+    let humanCallMediaPort: HumanCallMediaPort
     let authCallbackRegistration: IOSAuthCallbackRegistration
     private(set) var reconnectGeneration = 0
     private(set) var appVersionPolicyState: IOSAppVersionPolicyLoadState = .idle
@@ -219,8 +221,26 @@ final class FabushiRuntime {
         let main = try IOSMainRuntime(appDataDirectory: base, featureHostTest: featureHostTest)
         let bridge = IOSPrimaryPreloadEntrypoint.install(main: main)
         let surface = FabushiAppAgentSurface()
+        let uiPreferencesStore = MobileUiPreferencesStore(coordinator: main.coordinator)
+        let humanCallMediaPort = HumanCallMediaPort(
+            loadPreferences: {
+                let value = main.coordinator.callMediaPreferencesProjection()
+                return HumanCallMediaPreferences(
+                    microphoneId: value.microphoneId,
+                    cameraId: value.cameraId
+                )
+            },
+            savePreferences: { value in
+                _ = main.coordinator.updateCallMediaPreferences(
+                    microphoneId: value.microphoneId,
+                    cameraId: value.cameraId
+                )
+            }
+        )
         self.main = main
         self.bridge = bridge
+        self.uiPreferencesStore = uiPreferencesStore
+        self.humanCallMediaPort = humanCallMediaPort
         self.authCallbackRegistration = authCallbackRegistration
         cloudAgentWakeWatcher = IOSCloudAgentWakeWatcher(coordinator: main.coordinator)
         #if DEBUG
