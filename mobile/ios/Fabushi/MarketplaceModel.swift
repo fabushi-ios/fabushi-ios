@@ -1534,6 +1534,7 @@ final class MarketplaceModel {
     var accountUsageLoading = false
     var accountUsageError: String?
     var onboardingStep: Int
+    var onboardingRouteResolved = false
     var browserLoginAttemptId: String?
     var browserLoginURL: URL?
     var loginBusy = false
@@ -1547,7 +1548,8 @@ final class MarketplaceModel {
 
     private let bridge: IOSPreloadBridge
     private let globalDharmaBridge: GlobalDharmaMiniAppBridge
-    private let onboardingKey = "fabushi.mobile.onboarding-complete.v1"
+    private static let onboardingKeyPrefix = "fabushi.mobile.onboarding-complete.v2:"
+    @ObservationIgnored private var onboardingRouteGeneration = 0
     @ObservationIgnored private var globalDharmaAccountScope: String?
     @ObservationIgnored private var globalDharmaExecution: [String: Any]?
     private static let globalDharmaExecutionKeyPrefix = "fabushi.ios.miniapp-execution.v1:"
@@ -1570,7 +1572,7 @@ final class MarketplaceModel {
         self.bridge = bridge
         globalDharmaBridge = GlobalDharmaMiniAppBridge(bridge: bridge)
         globalDharmaCommerce = GlobalDharmaCommerceModel(bridge: bridge)
-        onboardingStep = UserDefaults.standard.bool(forKey: onboardingKey) ? 3 : 0
+        onboardingStep = MobileSignedInOnboardingStep.meet.rawValue
     }
 
     var settingsNoticeAccountKey: String {
@@ -1852,6 +1854,7 @@ final class MarketplaceModel {
             applyAuth(result.value as? [String: Any])
             authResolved = true
             if loggedIn {
+                await resolveSignedInOnboardingRoute()
                 await refreshAccountUsage()
                 await refresh()
                 await refreshMcpBackendStatus()
@@ -1973,12 +1976,79 @@ final class MarketplaceModel {
         }
     }
 
-    func advanceOnboarding() {
-        onboardingStep = min(3, onboardingStep + 1)
-        if onboardingStep == 3 { UserDefaults.standard.set(true, forKey: onboardingKey) }
+    var signedInOnboardingStep: MobileSignedInOnboardingStep {
+        get { MobileSignedInOnboardingStep(rawValue: onboardingStep) ?? .meet }
+        set { onboardingStep = newValue.rawValue }
     }
 
-    func retreatOnboarding() { onboardingStep = max(0, onboardingStep - 1) }
+    private var scopedOnboardingKey: String {
+        Self.onboardingKeyPrefix + settingsNoticeAccountKey
+    }
+
+    func resolveSignedInOnboardingRoute() async {
+        guard loggedIn else {
+            onboardingRouteGeneration &+= 1
+            onboardingRouteResolved = false
+            signedInOnboardingStep = .meet
+            return
+        }
+        onboardingRouteGeneration &+= 1
+        let generation = onboardingRouteGeneration
+        let accountKey = settingsNoticeAccountKey
+        onboardingRouteResolved = false
+
+        if UserDefaults.standard.bool(forKey: Self.onboardingKeyPrefix + accountKey) {
+            guard generation == onboardingRouteGeneration,
+                  loggedIn,
+                  settingsNoticeAccountKey == accountKey
+            else { return }
+            signedInOnboardingStep = .completed
+            onboardingRouteResolved = true
+            return
+        }
+
+        let roster = await GrokMobileBotService(bridge: bridge).loadBots()
+        guard generation == onboardingRouteGeneration,
+              loggedIn,
+              settingsNoticeAccountKey == accountKey
+        else { return }
+
+        if !roster.isEmpty {
+            completeSignedInOnboarding()
+        } else {
+            signedInOnboardingStep = .meet
+        }
+        onboardingRouteResolved = true
+    }
+
+    func advanceOnboarding() {
+        let step = signedInOnboardingStep
+        guard step != .create, step != .handOff, step != .completed else { return }
+        signedInOnboardingStep = step.next
+    }
+
+    func retreatOnboarding() {
+        guard let previous = signedInOnboardingStep.previous,
+              signedInOnboardingStep != .handOff,
+              signedInOnboardingStep != .completed
+        else { return }
+        signedInOnboardingStep = previous
+    }
+
+    func beginOnboardingHandOff() {
+        signedInOnboardingStep = .handOff
+    }
+
+    func completeSignedInOnboarding() {
+        guard loggedIn else { return }
+        UserDefaults.standard.set(true, forKey: scopedOnboardingKey)
+        signedInOnboardingStep = .completed
+        onboardingRouteResolved = true
+    }
+
+    func skipSignedInOnboarding() {
+        completeSignedInOnboarding()
+    }
 
     func beginBrowserLogin() async {
         guard !loginBusy else { return }
@@ -2515,6 +2585,7 @@ final class MarketplaceModel {
                 browserLoginURL = nil
                 webAuthenticationSession = nil
                 loginError = nil
+                await resolveSignedInOnboardingRoute()
                 await refreshAccountUsage()
                 await refresh()
                 await refreshMcpServers()
@@ -2549,6 +2620,9 @@ final class MarketplaceModel {
             return
         }
         loggedIn = false
+        onboardingRouteGeneration &+= 1
+        onboardingRouteResolved = false
+        signedInOnboardingStep = .meet
         accountUsage = nil
         accountUsageError = nil
         chatMessages = []
