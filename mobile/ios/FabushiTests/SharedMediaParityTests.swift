@@ -55,4 +55,11 @@ final class SharedMediaParityTests:XCTestCase {
         let data=Data(box("moov",box("trak",box("tkhd",body))))
         XCTAssertEqual(MP4Dimensions.read(data),.init(width:640,height:360))
     }
+    func testNativePdfPreviewDetectionAndDesktopPreviewCap() {
+        XCTAssertTrue(isNativePdfAttachment(mimeType: "application/pdf", fileName: "report.bin"))
+        XCTAssertTrue(isNativePdfAttachment(mimeType: nil, fileName: "Report.PDF"))
+        XCTAssertFalse(isNativePdfAttachment(mimeType: "text/plain", fileName: "report.txt"))
+        XCTAssertEqual(nativePdfPreviewByteCap, 25 * 1024 * 1024)
+    }
+
 }
