@@ -1,4 +1,4 @@
-use crate::actor::{ActorId, ActorKind};
+use crate::actor::{Actor, ActorId, ActorKind, Participant, ParticipantRole};
 use crate::blob_store::{BlobStoreError, FileBlobStore};
 use crate::bot::BotInvocation;
 use crate::community::{CommunityState, MemberStatus};
@@ -8,7 +8,7 @@ use crate::conversation::{
 use crate::engine::topic_id_from_root;
 use crate::engine::{Command, EngineError, Event, MessagingEngine};
 use crate::message::{
-    ClientMessageId, DeliveryState, Message, MessageContent, MessageId,
+    ClientMessageId, DeliveryState, FormattedText, Message, MessageContent, MessageId,
 };
 use crate::payment::Money;
 use crate::protocol::{
@@ -132,6 +132,149 @@ impl<S: MessagingStateStore> MessagingService<S> {
 
     pub fn into_store(self) -> S {
         self.store
+    }
+
+
+    /// Persists a Host-authorized Agent response into an existing Human
+    /// conversation without allowing renderer clients to impersonate Agents.
+    ///
+    /// The assistant is added as a temporary participant only inside a staged
+    /// engine transaction so the canonical messaging engine can enforce all
+    /// normal message invariants. The final persisted conversation membership
+    /// is unchanged, while the durable message keeps its Assistant sender.
+    pub fn project_trusted_assistant_text(
+        &mut self,
+        viewer_actor_id: &ActorId,
+        conversation_id: ConversationId,
+        assistant_id: ActorId,
+        assistant_name: impl Into<String>,
+        client_message_id: ClientMessageId,
+        text: impl Into<String>,
+        now_ms: i64,
+    ) -> Result<Message, MessagingServiceError> {
+        let assistant_name = assistant_name.into().trim().to_string();
+        let text = text.into().trim().to_string();
+        if assistant_id.0.trim().is_empty() || assistant_name.is_empty() || text.is_empty() {
+            return Err(MessagingServiceError::Invariant(
+                "trusted assistant projection requires non-empty identity and text".into(),
+            ));
+        }
+        if &assistant_id == viewer_actor_id {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "trusted assistant projection cannot impersonate the viewing Human actor".into(),
+            ));
+        }
+
+        let conversation = self
+            .engine
+            .state()
+            .conversations
+            .get(&conversation_id)
+            .cloned()
+            .ok_or_else(|| EngineError::ConversationNotFound(conversation_id.clone()))?;
+        let viewer_is_participant = conversation
+            .participants
+            .iter()
+            .any(|participant| &participant.actor_id == viewer_actor_id)
+            || conversation.owner_id.as_ref() == Some(viewer_actor_id);
+        if !viewer_is_participant {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "trusted assistant projection requires the authenticated Human to belong to the target conversation".into(),
+            ));
+        }
+        if let Some(existing_actor) = self.engine.state().actors.get(&assistant_id)
+            && !matches!(existing_actor.kind, ActorKind::Assistant | ActorKind::Bot)
+        {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "trusted assistant projection cannot reuse a non-Agent actor identity".into(),
+            ));
+        }
+
+        let content = MessageContent::Text {
+            text: FormattedText::plain(text),
+        };
+        let message_id = stable_message_id(&assistant_id, &client_message_id);
+        if let Some(existing) = self
+            .engine
+            .state()
+            .messages
+            .get(&conversation_id)
+            .and_then(|messages| messages.get(&message_id))
+        {
+            if existing.sender_id == assistant_id && existing.content == content {
+                return Ok(existing.clone());
+            }
+            return Err(MessagingServiceError::IdempotencyConflict(
+                client_message_id.0.clone(),
+            ));
+        }
+
+        let was_participant = conversation
+            .participants
+            .iter()
+            .any(|participant| participant.actor_id == assistant_id)
+            || conversation.owner_id.as_ref() == Some(&assistant_id);
+        let mut staged = MessagingEngine::from_state(self.engine.state().clone());
+        let mut events = Vec::new();
+        events.extend(staged.execute(Command::UpsertActor {
+            actor: Actor::assistant(assistant_id.0.clone(), assistant_name),
+        })?);
+        if !was_participant {
+            events.extend(staged.execute(Command::SetConversationParticipant {
+                conversation_id: conversation_id.clone(),
+                participant: Participant {
+                    actor_id: assistant_id.clone(),
+                    role: ParticipantRole::Member,
+                    joined_at_ms: now_ms,
+                    muted_until_ms: None,
+                },
+            })?);
+        }
+        events.extend(staged.execute(Command::QueueMessage {
+            conversation_id: conversation_id.clone(),
+            local_message_id: message_id.clone(),
+            client_message_id,
+            sender_id: assistant_id.clone(),
+            content,
+            reply_to_message_id: None,
+            thread_root_message_id: None,
+            created_at_ms: now_ms,
+            scheduled_at_ms: None,
+            silent: false,
+            protected_content: false,
+        })?);
+        events.extend(staged.execute(Command::AcknowledgeMessage {
+            conversation_id: conversation_id.clone(),
+            local_message_id: message_id.clone(),
+            server_message_id: message_id.clone(),
+            accepted_at_ms: now_ms,
+        })?);
+        if !was_participant {
+            events.extend(staged.execute(Command::RemoveConversationParticipant {
+                conversation_id: conversation_id.clone(),
+                actor_id: assistant_id.clone(),
+            })?);
+        }
+
+        self.engine = staged;
+        self.cursor = self.cursor.saturating_add(events.len() as u64);
+        let responses = events
+            .into_iter()
+            .filter_map(|event| self.project_event(viewer_actor_id, event, now_ms))
+            .collect::<Vec<_>>();
+        let journal = self.journal_entries(viewer_actor_id, &responses);
+        self.persist_with_events(now_ms, &journal)?;
+        self.engine
+            .state()
+            .messages
+            .get(&conversation_id)
+            .and_then(|messages| messages.get(&message_id))
+            .cloned()
+            .ok_or_else(|| {
+                MessagingServiceError::Invariant(
+                    "trusted assistant projection did not persist its message".into(),
+                )
+            })
     }
 
     pub fn handle(

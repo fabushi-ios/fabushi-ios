@@ -625,3 +625,110 @@ fn human_group_message_requests_bot_execution_inside_messaging_service() {
         Some("messaging-service")
     );
 }
+
+
+#[test]
+fn trusted_assistant_projection_is_durable_idempotent_and_does_not_change_membership() {
+    let store = MemoryStateStore::default();
+    let mut service = MessagingService::load(store).unwrap();
+    let human = ActorId::new("human:1");
+
+    service
+        .handle(
+            ClientEnvelope::new(
+                context("human:1"),
+                ClientCommand::UpsertProfile {
+                    actor: Actor::human("human:1", "善友"),
+                },
+            ),
+            10,
+        )
+        .unwrap();
+    service
+        .handle(
+            ClientEnvelope::new(
+                context("human:1"),
+                ClientCommand::CreateConversation {
+                    conversation: Conversation::direct(
+                        "chat:handoff",
+                        "Human conversation",
+                        vec![Participant {
+                            actor_id: human.clone(),
+                            role: ParticipantRole::Owner,
+                            joined_at_ms: 10,
+                            muted_until_ms: None,
+                        }],
+                        10,
+                    ),
+                },
+            ),
+            11,
+        )
+        .unwrap();
+
+    let first = service
+        .project_trusted_assistant_text(
+            &human,
+            ConversationId::new("chat:handoff"),
+            ActorId::new("fabushi-agent:agent-1"),
+            "Agent One",
+            ClientMessageId("handoff:operation-1".into()),
+            "Agent result",
+            12,
+        )
+        .unwrap();
+    assert_eq!(first.sender_id, ActorId::new("fabushi-agent:agent-1"));
+    assert!(matches!(
+        first.content,
+        MessageContent::Text { ref text } if text.text == "Agent result"
+    ));
+    let conversation = &service.engine().state().conversations[&ConversationId::new("chat:handoff")];
+    assert_eq!(conversation.participants.len(), 1);
+    assert_eq!(conversation.participants[0].actor_id, human);
+    assert!(matches!(
+        service.engine().state().actors[&ActorId::new("fabushi-agent:agent-1")].kind,
+        ActorKind::Assistant
+    ));
+
+    let replay = service
+        .project_trusted_assistant_text(
+            &ActorId::new("human:1"),
+            ConversationId::new("chat:handoff"),
+            ActorId::new("fabushi-agent:agent-1"),
+            "Agent One",
+            ClientMessageId("handoff:operation-1".into()),
+            "Agent result",
+            13,
+        )
+        .unwrap();
+    assert_eq!(replay.id, first.id);
+    assert_eq!(
+        service.engine().state().messages[&ConversationId::new("chat:handoff")].len(),
+        1
+    );
+
+    let conflict = service
+        .project_trusted_assistant_text(
+            &ActorId::new("human:1"),
+            ConversationId::new("chat:handoff"),
+            ActorId::new("fabushi-agent:agent-1"),
+            "Agent One",
+            ClientMessageId("handoff:operation-1".into()),
+            "different result",
+            14,
+        )
+        .unwrap_err();
+    assert!(matches!(conflict, MessagingServiceError::IdempotencyConflict(_)));
+
+    let restored = MessagingService::load(service.into_store()).unwrap();
+    assert_eq!(
+        restored.engine().state().messages[&ConversationId::new("chat:handoff")].len(),
+        1
+    );
+    assert_eq!(
+        restored.engine().state().conversations[&ConversationId::new("chat:handoff")]
+            .participants
+            .len(),
+        1
+    );
+}
