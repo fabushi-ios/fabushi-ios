@@ -165,6 +165,125 @@ final class SharedObservabilityParityTests: XCTestCase {
         XCTAssertNil(gate.handle(unknown))
     }
 
+    func testFatalMetadataDropsNonFatalEventsAndRetainsOnlyFatalSafeContexts() {
+        let nonFatal = SandSentryEnvelope(
+            header: [:],
+            items: [.init(
+                header: ["type": "event"],
+                payload: [
+                    "level": "error",
+                    "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "contexts": ["app": ["app_version": "1.2.3"]],
+                ]
+            )]
+        )
+        XCTAssertNil(projectSandSentryEnvelope(nonFatal, tier: .fatalMetadata))
+
+        let fatal = SandSentryEnvelope(
+            header: [:],
+            items: [.init(
+                header: ["type": "event"],
+                payload: [
+                    "level": "fatal",
+                    "event_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "user": ["id": "account-1"],
+                    "request": ["method": "POST", "url": "https://secret.example/path"],
+                    "contexts": [
+                        "app": ["app_version": "1.2.3", "app_memory": 42],
+                        "os": ["name": "iOS", "version": "18.0"],
+                        "device": ["family": "iPhone"],
+                    ],
+                    "tags": ["event.process": "host", "private.tag": "drop-me"],
+                ]
+            )]
+        )
+        let projected = projectSandSentryEnvelope(fatal, tier: .fatalMetadata)
+        let event = projected?.items.first?.payload as? [String: Any]
+        let contexts = event?["contexts"] as? [String: Any]
+        XCTAssertEqual(event?["level"] as? String, "fatal")
+        XCTAssertNil(event?["user"])
+        XCTAssertNil(event?["request"])
+        XCTAssertNotNil(contexts?["app"])
+        XCTAssertNotNil(contexts?["os"])
+        XCTAssertNil(contexts?["device"])
+        XCTAssertEqual((event?["tags"] as? [String: Any])?["event.process"] as? String, "host")
+        XCTAssertNil((event?["tags"] as? [String: Any])?["private.tag"])
+    }
+
+    func testScrubbedSentryProjectsThreadsSessionsAndClientReportsWithinBounds() {
+        let envelope = SandSentryEnvelope(
+            header: ["event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sent_at": "2026-10-09T00:00:00Z"],
+            items: [
+                .init(
+                    header: ["type": "event"],
+                    payload: [
+                        "level": "error",
+                        "threads": [
+                            "values": [[
+                                "id": "thread-1",
+                                "main": true,
+                                "stacktrace": ["frames": [["filename": "node:runtime/main"]]],
+                            ]]
+                        ],
+                        "sdk": [
+                            "name": "sentry.swift",
+                            "version": "1.0.0",
+                            "integrations": ["Crash", "Network"],
+                        ],
+                        "contexts": [
+                            "runtime": ["name": "swift", "version": "6.0"],
+                            "culture": ["locale": "en_US", "timezone": "America/Phoenix"],
+                        ],
+                    ]
+                ),
+                .init(
+                    header: ["type": "session"],
+                    payload: [
+                        "init": true,
+                        "sid": "session-1",
+                        "started": "2026-10-09T00:00:00Z",
+                        "status": "crashed",
+                        "errors": 1,
+                        "did": "must-not-project",
+                        "attrs": ["release": "1.0.0", "environment": "production"],
+                    ]
+                ),
+                .init(
+                    header: ["type": "sessions"],
+                    payload: [
+                        "attrs": ["release": "1.0.0"],
+                        "aggregates": [["started": "2026-10-09", "exited": 1, "errored": 2, "crashed": 3]],
+                    ]
+                ),
+                .init(
+                    header: ["type": "client_report"],
+                    payload: [
+                        "timestamp": 42,
+                        "discarded_events": [["reason": "queue_overflow", "category": "error", "quantity": 2]],
+                    ]
+                ),
+            ]
+        )
+        let projected = projectSandSentryEnvelope(envelope, tier: .scrubbed)
+        XCTAssertEqual(projected?.items.count, 4)
+
+        let event = projected?.items[0].payload as? [String: Any]
+        let threadValues = (event?["threads"] as? [String: Any])?["values"] as? [[String: Any]]
+        XCTAssertEqual(threadValues?.first?["id"] as? String, "thread-1")
+        XCTAssertNotNil(event?["sdk"])
+        XCTAssertNotNil(event?["contexts"])
+
+        let session = projected?.items[1].payload as? [String: Any]
+        XCTAssertEqual(session?["status"] as? String, "crashed")
+        XCTAssertNil(session?["did"])
+
+        let sessions = projected?.items[2].payload as? [String: Any]
+        XCTAssertEqual((sessions?["aggregates"] as? [[String: Any]])?.count, 1)
+
+        let report = projected?.items[3].payload as? [String: Any]
+        XCTAssertEqual((report?["discarded_events"] as? [[String: Any]])?.count, 1)
+    }
+
     func testSentryAccountMismatchFallsBackToFatalMetadataAndEventRingIsBounded() {
         let envelope = SandSentryEnvelope(
             header: [:],
