@@ -1,6 +1,120 @@
 import SwiftUI
 import UIKit
 
+internal struct MobileRootNotificationAction {
+    enum Kind {
+        case openURL(URL)
+        case dashboard(action: String, args: [String: Any], successMessage: String?)
+    }
+
+    let label: String
+    let kind: Kind
+}
+
+internal struct MobileRootNotificationTray: Identifiable {
+    let id: String
+    let title: String
+    let detail: String?
+    let requestID: String?
+    let errorKind: String?
+    let actions: [MobileRootNotificationAction]
+    let count: Int?
+}
+
+internal struct MobileRootNotificationActionNotice {
+    let isError: Bool
+    let text: String
+}
+
+internal func projectMobileRootNotificationAction(_ value: Any) -> MobileRootNotificationAction? {
+    guard let row = value as? [String: Any],
+          let kind = row["kind"] as? String,
+          let label = row["label"] as? String,
+          !label.isEmpty
+    else { return nil }
+
+    if kind == "open-url",
+       let rawURL = row["url"] as? String,
+       let url = URL(string: rawURL),
+       ["http", "https"].contains(url.scheme?.lowercased() ?? "")
+    {
+        return .init(label: label, kind: .openURL(url))
+    }
+
+    guard kind == "dashboard-action",
+          let action = row["action"] as? String,
+          !action.isEmpty,
+          let args = row["args"] as? [String: Any]
+    else { return nil }
+
+    return .init(
+        label: label,
+        kind: .dashboard(
+            action: action,
+            args: args,
+            successMessage: row["successMessage"] as? String
+        )
+    )
+}
+
+internal func projectMobileRootNotificationTray(_ value: Any) -> MobileRootNotificationTray? {
+    guard let row = value as? [String: Any],
+          row["kind"] as? String == "error",
+          let id = row["id"] as? String,
+          !id.isEmpty,
+          let title = row["title"] as? String,
+          !title.isEmpty
+    else { return nil }
+
+    let actions = (row["actions"] as? [Any] ?? [])
+        .compactMap(projectMobileRootNotificationAction)
+        .prefix(3)
+
+    let rawCount = (row["count"] as? NSNumber)?.intValue
+    return .init(
+        id: id,
+        title: title,
+        detail: (row["detail"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+        requestID: (row["requestId"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+        errorKind: (row["errorKind"] as? String).flatMap { $0.isEmpty ? nil : $0 },
+        actions: Array(actions),
+        count: rawCount.flatMap { $0 > 1 ? $0 : nil }
+    )
+}
+
+internal func projectMobileRootNotificationTrays(_ value: Any) -> [MobileRootNotificationTray] {
+    (value as? [Any] ?? []).compactMap(projectMobileRootNotificationTray)
+}
+
+internal func reduceMobileRootNotificationEvent(
+    _ current: [MobileRootNotificationTray],
+    event: [String: Any]
+) -> [MobileRootNotificationTray] {
+    guard event["type"] as? String == "tray.changed",
+          let action = event["action"] as? String
+    else { return current }
+
+    switch action {
+    case "cleared":
+        return []
+    case "dismissed":
+        guard let id = event["id"] as? String else { return current }
+        return current.filter { $0.id != id }
+    case "pushed":
+        guard let trayValue = event["tray"],
+              let tray = projectMobileRootNotificationTray(trayValue)
+        else { return current }
+        if let index = current.firstIndex(where: { $0.id == tray.id }) {
+            var next = current
+            next[index] = tray
+            return next
+        }
+        return current + [tray]
+    default:
+        return current
+    }
+}
+
 internal func mobileBotHomeSubtitle(_ bot: MobileBotSummary) -> String {
     if bot.isComposingMessage { return "正在输入…" }
     if let waitingReason = bot.waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -18,6 +132,289 @@ internal func mobileBotHomeSubtitle(_ bot: MobileBotSummary) -> String {
 }
 
 extension GrokMobileShell {
+    var rootNotificationLifecycleKey: String {
+        [
+            String(model.authResolved),
+            String(model.loggedIn),
+            mobileAccountScopeKey,
+            String(reconnectGeneration),
+        ].joined(separator: "|")
+    }
+
+    @ViewBuilder
+    var rootNotificationStack: some View {
+        if !rootNotificationTrays.isEmpty {
+            VStack(alignment: .trailing, spacing: 8) {
+                if rootNotificationTrays.count > 1 {
+                    Button("Clear all") {
+                        Task { await clearRootNotifications() }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("root-notifications-clear-all")
+                }
+
+                ForEach(rootNotificationTrays) { tray in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                            .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Text(tray.title)
+                                    .font(.subheadline.weight(.semibold))
+                                if let count = tray.count {
+                                    Text("×\(count)")
+                                        .font(.caption.monospacedDigit().weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .accessibilityLabel("Occurred \(count) times")
+                                }
+                            }
+                            if let detail = tray.detail {
+                                Text(detail)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !tray.actions.isEmpty {
+                                HStack(spacing: 8) {
+                                    ForEach(Array(tray.actions.enumerated()), id: \.offset) { index, action in
+                                        Button(action.label) {
+                                            Task {
+                                                await runRootNotificationAction(
+                                                    action,
+                                                    trayID: tray.id,
+                                                    actionIndex: index
+                                                )
+                                            }
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                        .disabled(rootNotificationActionPending.contains("\(tray.id):\(index)"))
+                                    }
+                                }
+                            }
+                            if let notice = rootNotificationActionNotice[tray.id] {
+                                Text(notice.text)
+                                    .font(.caption)
+                                    .foregroundStyle(notice.isError ? .red : .secondary)
+                                    .accessibilityIdentifier("root-notification-action-result-\(tray.id)")
+                            }
+                        }
+
+                        Spacer(minLength: 4)
+
+                        if let requestID = tray.requestID {
+                            Button {
+                                UIPasteboard.general.string = requestID
+                                rootNotificationCopiedRequestID = requestID
+                            } label: {
+                                Image(systemName: rootNotificationCopiedRequestID == requestID ? "checkmark" : "doc.on.doc")
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Copy request ID")
+                            .accessibilityIdentifier("root-notification-copy-\(tray.id)")
+                        }
+
+                        Button {
+                            Task { await dismissRootNotification(tray.id) }
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Dismiss notification")
+                        .accessibilityIdentifier("root-notification-dismiss-\(tray.id)")
+                    }
+                    .padding(12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.red.opacity(0.18), lineWidth: 1)
+                    )
+                    .shadow(radius: 6, y: 2)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("root-notification-\(tray.id)")
+                }
+            }
+            .frame(maxWidth: 520)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Notifications")
+            .accessibilityIdentifier("root-notifications")
+        }
+    }
+
+    @MainActor
+    func runRootNotificationLifecycle() async {
+        rootNotificationTrays = []
+        rootNotificationActionPending.removeAll()
+        rootNotificationActionNotice.removeAll()
+        rootNotificationCopiedRequestID = nil
+
+        guard model.authResolved, model.loggedIn else { return }
+
+        do {
+            try await refreshRootNotifications()
+        } catch is CancellationError {
+            return
+        } catch {
+            // Advisory surface: a failed hydration must not fabricate Host
+            // success or block the primary product UI.
+        }
+
+        while !Task.isCancelled, model.loggedIn {
+            do {
+                let event = try await bridge.receiveFeatureEvent(
+                    deadlineMilliseconds: 1_000
+                ) { event in
+                    event["type"] as? String == "tray.changed"
+                }
+                guard !Task.isCancelled,
+                      let payload = event.value as? [String: Any]
+                else { return }
+                rootNotificationTrays = reduceMobileRootNotificationEvent(
+                    rootNotificationTrays,
+                    event: payload
+                )
+            } catch is CancellationError {
+                return
+            } catch IOSFeatureEventBrokerError.timedOut {
+                continue
+            } catch {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+        }
+    }
+
+    @MainActor
+    func refreshRootNotifications() async throws {
+        let requestID = "ios-tray-list-\(UUID().uuidString.lowercased())"
+        _ = try await bridge.request(
+            method: "feature.execute",
+            params: [
+                "command": [
+                    "type": "tray.list",
+                    "requestId": requestID,
+                ],
+            ]
+        )
+        let event = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 5_120
+        ) { event in
+            event["type"] as? String == "tray.listed"
+        }
+        guard let payload = event.value as? [String: Any],
+              let trays = payload["trays"]
+        else {
+            rootNotificationTrays = []
+            return
+        }
+        rootNotificationTrays = projectMobileRootNotificationTrays(trays)
+    }
+
+    @MainActor
+    func dismissRootNotification(_ id: String) async {
+        guard !id.isEmpty else { return }
+        do {
+            _ = try await bridge.request(
+                method: "feature.execute",
+                params: [
+                    "command": [
+                        "type": "tray.dismiss",
+                        "requestId": "ios-tray-dismiss-\(UUID().uuidString.lowercased())",
+                        "id": id,
+                    ],
+                ]
+            )
+        } catch {
+            rootNotificationActionNotice[id] = .init(
+                isError: true,
+                text: "Couldn’t dismiss this notification."
+            )
+        }
+    }
+
+    @MainActor
+    func clearRootNotifications() async {
+        do {
+            _ = try await bridge.request(
+                method: "feature.execute",
+                params: [
+                    "command": [
+                        "type": "tray.clear",
+                        "requestId": "ios-tray-clear-\(UUID().uuidString.lowercased())",
+                    ],
+                ]
+            )
+        } catch {
+            guard let firstID = rootNotificationTrays.first?.id else { return }
+            rootNotificationActionNotice[firstID] = .init(
+                isError: true,
+                text: "Couldn’t clear notifications."
+            )
+        }
+    }
+
+    @MainActor
+    func runRootNotificationAction(
+        _ action: MobileRootNotificationAction,
+        trayID: String,
+        actionIndex: Int
+    ) async {
+        let pendingKey = "\(trayID):\(actionIndex)"
+        guard !rootNotificationActionPending.contains(pendingKey) else { return }
+        rootNotificationActionPending.insert(pendingKey)
+        rootNotificationActionNotice[trayID] = nil
+        defer { rootNotificationActionPending.remove(pendingKey) }
+
+        do {
+            switch action.kind {
+            case .openURL(let url):
+                _ = try await bridge.request(
+                    method: "openExternal",
+                    params: ["url": url.absoluteString]
+                )
+            case .dashboard(let actionName, let args, let successMessage):
+                let result = try await bridge.request(
+                    method: "invokeCursorDashboardAction",
+                    params: [
+                        "action": actionName,
+                        "args": args,
+                    ]
+                ).value
+                guard let response = result as? [String: Any],
+                      let ok = response["ok"] as? Bool
+                else {
+                    rootNotificationActionNotice[trayID] = .init(
+                        isError: true,
+                        text: "Couldn’t complete the notification action — try again."
+                    )
+                    return
+                }
+                let message = (response["message"] as? String) ?? successMessage
+                if ok {
+                    if let message, !message.isEmpty {
+                        rootNotificationActionNotice[trayID] = .init(
+                            isError: false,
+                            text: message
+                        )
+                    }
+                } else {
+                    rootNotificationActionNotice[trayID] = .init(
+                        isError: true,
+                        text: message ?? "Couldn’t complete the notification action — try again."
+                    )
+                }
+            }
+        } catch {
+            rootNotificationActionNotice[trayID] = .init(
+                isError: true,
+                text: "Couldn’t complete the notification action — try again."
+            )
+        }
+    }
+
     var home: some View {
         ZStack {
             Color(red: 0.985, green: 0.985, blue: 0.975).ignoresSafeArea()
