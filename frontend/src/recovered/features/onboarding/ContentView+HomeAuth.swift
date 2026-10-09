@@ -552,7 +552,6 @@ extension ContentView {
                     description: description,
                     avatarShape: draft.shape,
                     avatarColor: draft.color,
-                    templateId: draft.pickedTemplateId,
                     requestId: requestId
                 )
                 try Task.checkCancellation()
