@@ -1877,17 +1877,17 @@
     {
       "desktop_path": "source/electron-main/prefs/settings-ipc.ts",
       "desktop_blob_sha": "729d335bcda052f3b8ba141375648ff76a60c4ae",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "PLATFORM-SETTINGS-SYNC-IPC-001 — expose theme, egress-tunnel, egress-status, and WebAuthn-proxy snapshots synchronously to the Electron renderer",
       "desktop_owner": "platform-main",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Desktop renderer can synchronously bootstrap platform setting/status snapshots before normal asynchronous application traffic settles.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/shared/node/settings/sand-settings-store.swift; frontend/src/production/FabushiSceneRoot.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/ios-preload/preload.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Electron ipcMain synchronous channels do not exist on iOS. Native Swift owners expose persisted settings and runtime projections directly through the Coordinator/preload bridge and SwiftUI environment; individual setting capabilities remain tracked by their own parity rows rather than recreating synchronous Electron IPC.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "SandSettingsStore owns egressTunnelEnabled and webauthnProxyEnabled persistence plus theme preference; FabushiSceneRoot owns native appearance/environment projection; MahayanaCoordinator and IOSPreloadBridge provide typed asynchronous native routing instead of Electron ipcMain.",
+      "test_evidence": "SharedSettingsParityTests exercises persisted setting normalization/owners; current-head architecture workflow validates the native Coordinator/Host boundary. This row covers only the Electron synchronous IPC mechanism, not completion of each underlying setting feature.",
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 / blob 729d335bcda052f3b8ba141375648ff76a60c4ae. No Electron IPC compatibility shim should be introduced on iOS."
     },
     {
       "desktop_path": "source/electron-main/prefs/theme-controller.ts",
