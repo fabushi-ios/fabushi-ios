@@ -655,6 +655,46 @@ impl AppHost {
                     string_param(&params, "emoji")?,
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "getHostSettings" => {
+                let settings = self
+                    .feature
+                    .host_settings_snapshot_direct()
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                Ok(json!({
+                    "hasSeenOnboarding": settings.has_seen_onboarding,
+                }))
+            }
+            "setHostSettings" => {
+                let object = params
+                    .get("settings")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        AppHostError::InvalidRequest(
+                            "host settings payload must contain a settings object".into(),
+                        )
+                    })?;
+                let value = match object.get("hasSeenOnboarding") {
+                    Some(Value::Bool(value)) => Some(*value),
+                    Some(Value::Null) => None,
+                    Some(_) => {
+                        return Err(AppHostError::InvalidRequest(
+                            "hasSeenOnboarding must be boolean or null".into(),
+                        ));
+                    }
+                    None => {
+                        return Err(AppHostError::InvalidRequest(
+                            "host settings payload must include hasSeenOnboarding".into(),
+                        ));
+                    }
+                };
+                let settings = self
+                    .feature
+                    .set_has_seen_onboarding_direct(value)
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                Ok(json!({
+                    "hasSeenOnboarding": settings.has_seen_onboarding,
+                }))
+            }
             "feature.settings.localToolPermission" => {
                 let permission = serde_json::from_value::<mahayana_host_protocol::LocalToolPermission>(
                     params.get("permission").cloned().unwrap_or(Value::Null),
