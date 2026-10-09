@@ -129,6 +129,15 @@ final class MobileAgentNetworkParityTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(clamped.height, -720)
     }
 
+    func testOpenRoutingAndAccessibilityUseCanonicalAgentIdentity() {
+        let individual = bot("a")
+        let group = bot("g", isGroup: true, members: ["a"])
+        XCTAssertEqual(MobileAgentNetworkModel.openTarget(id: "a", agents: [individual, group])?.id, "a")
+        XCTAssertEqual(MobileAgentNetworkModel.openTarget(id: "g", agents: [individual, group])?.isGroup, true)
+        XCTAssertNil(MobileAgentNetworkModel.openTarget(id: "missing", agents: [individual, group]))
+        XCTAssertEqual(MobileAgentNetworkModel.nodeAccessibilityIdentifier("a"), "agent-network-node-a")
+    }
+
     func testSummaryAndRelationshipReplacementPreserveCanonicalRosterFields() {
         let original = MobileBotSummary(
             id: "a",
