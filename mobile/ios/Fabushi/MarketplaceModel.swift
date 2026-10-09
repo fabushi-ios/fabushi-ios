@@ -1454,6 +1454,38 @@ private final class BrowserAuthPresentationContext: NSObject, ASWebAuthenticatio
 
 @MainActor
 @Observable
+enum AccountFeedbackCode: String, CaseIterable, Sendable {
+    case accessDenied = "access-denied"
+    case invalidFeedback = "invalid-feedback"
+    case notSignedIn = "not-signed-in"
+    case rateLimited = "rate-limited"
+    case subscriptionRequired = "subscription-required"
+    case unavailable
+
+    static func normalize(_ rawValue: Any?) -> AccountFeedbackCode {
+        guard let rawValue = rawValue as? String,
+              let code = AccountFeedbackCode(rawValue: rawValue)
+        else { return .unavailable }
+        return code
+    }
+
+    var localizedMessage: String {
+        switch self {
+        case .accessDenied: "当前账号无权提交反馈。"
+        case .invalidFeedback: "反馈内容无效，请检查后重试。"
+        case .notSignedIn: "请先登录后再提交反馈。"
+        case .rateLimited: "提交过于频繁，请稍后重试。"
+        case .subscriptionRequired: "当前订阅无法提交反馈。"
+        case .unavailable: "反馈服务暂时不可用，请稍后重试。"
+        }
+    }
+}
+
+struct AccountFeedbackError: LocalizedError, Equatable {
+    let code: AccountFeedbackCode
+    var errorDescription: String? { code.localizedMessage }
+}
+
 final class MarketplaceModel {
     var query = ""
     var message = "Mahayana Rust Host 正在启动"
@@ -1901,39 +1933,43 @@ final class MarketplaceModel {
         )
     }
 
-    func submitAccountFeedback(_ value: String) async throws {
+    func submitAccountFeedback(_ value: String, conversationId: String? = nil) async throws {
         let message = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty, message.count <= 10_000 else {
-            throw NSError(
-                domain: "Fabushi.AccountMenu",
-                code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "反馈内容必须为 1–10,000 个字符。"]
-            )
+            throw AccountFeedbackError(code: .invalidFeedback)
         }
         let slot = (globalDharmaAccountScope ?? accountEmail)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !slot.isEmpty, slot.count <= 512 else {
-            throw NSError(
-                domain: "Fabushi.AccountMenu",
-                code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "当前账号缺少可用于提交反馈的稳定身份。"]
-            )
+            throw AccountFeedbackError(code: .notSignedIn)
         }
-        let result = try await bridge.request(
-            method: "submitFeedback",
-            params: [
-                "accountSlot": slot,
-                "message": message,
-                "submissionId": UUID().uuidString.lowercased(),
-            ]
-        )
-        if let response = result.value as? [String: Any], response["ok"] as? Bool == false {
-            let code = response["code"] as? String ?? "unavailable"
-            throw NSError(
-                domain: "Fabushi.AccountMenu",
-                code: 4,
-                userInfo: [NSLocalizedDescriptionKey: "反馈提交失败：\(code)"]
-            )
+
+        var params: [String: Any] = [
+            "accountSlot": slot,
+            "message": message,
+            "submissionId": UUID().uuidString.lowercased(),
+        ]
+        if let conversationId {
+            let normalizedConversationId = conversationId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !normalizedConversationId.isEmpty {
+                params["conversationId"] = normalizedConversationId
+            }
+        }
+
+        let result: MahayanaBridgeResponse
+        do {
+            result = try await bridge.request(method: "submitFeedback", params: params)
+        } catch {
+            throw AccountFeedbackError(code: .unavailable)
+        }
+
+        guard let response = result.value as? [String: Any],
+              let ok = response["ok"] as? Bool
+        else {
+            throw AccountFeedbackError(code: .unavailable)
+        }
+        guard ok else {
+            throw AccountFeedbackError(code: AccountFeedbackCode.normalize(response["code"]))
         }
     }
 
