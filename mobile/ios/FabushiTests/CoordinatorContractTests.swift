@@ -441,7 +441,7 @@ final class CoordinatorContractTests: XCTestCase {
         var coordinatorStates: [Bool] = []
         let control = IOSCoordinatorClientPauseControl(
             isPaused: { paused },
-            setGatewayPaused: { value in
+            applyCoordinatorPause: { value in
                 coordinatorStates.append(value)
                 return value
             },
@@ -473,7 +473,7 @@ final class CoordinatorContractTests: XCTestCase {
         var coordinatorStates: [Bool] = []
         let control = IOSCoordinatorClientPauseControl(
             isPaused: { true },
-            setGatewayPaused: { value in
+            applyCoordinatorPause: { value in
                 coordinatorStates.append(value)
                 return value
             },
