@@ -47,8 +47,9 @@ final class CursorAvatarParityTests: XCTestCase {
                 )
             }
         )
+        let avatarDataURL = await client.getCursorAvatarDataURL(authId: "github|123")
         XCTAssertEqual(
-            await client.getCursorAvatarDataURL(authId: "github|123"),
+            avatarDataURL,
             "data:image/png;base64,\(image.base64EncodedString())"
         )
     }
@@ -86,7 +87,9 @@ final class CursorAvatarParityTests: XCTestCase {
                 )
             }
         )
-        XCTAssertNil(await client.getCursorAvatarDataURL(authId: "github|987"))
-        XCTAssertNil(await client.getCursorAvatarDataURL(authId: "github|not-a-number"))
+        let oversizedAvatar = await client.getCursorAvatarDataURL(authId: "github|987")
+        let invalidSubjectAvatar = await client.getCursorAvatarDataURL(authId: "github|not-a-number")
+        XCTAssertNil(oversizedAvatar)
+        XCTAssertNil(invalidSubjectAvatar)
     }
 }
