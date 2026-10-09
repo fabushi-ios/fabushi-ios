@@ -373,6 +373,148 @@ final class SharedSettingsParityTests: XCTestCase {
     }
 
     @MainActor
+    func testHostSettingsReconcilerAbsorbsRemoteAndWritesBackLocalWhenRemoteIsMissing() async {
+        var local: Bool?
+        var remote: Bool? = true
+        var generation: UInt64 = 1
+
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            clearLocal: { local = nil },
+            readRemote: { .init(hasSeenOnboarding: remote) },
+            pushRemote: { snapshot in
+                remote = snapshot.hasSeenOnboarding
+                return .init(hasSeenOnboarding: remote)
+            },
+            hostGeneration: { generation }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+
+        XCTAssertTrue(await reconciler.reconcileIfReadable())
+        XCTAssertEqual(local, true)
+        XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-a")
+
+        reconciler.accountDeparted()
+        local = false
+        remote = nil
+        generation &+= 1
+        reconciler.scopeToAccount("owner-b")
+        reconciler.setTransportLive(true)
+
+        XCTAssertTrue(await reconciler.reconcileIfReadable())
+        XCTAssertEqual(remote, false)
+        XCTAssertEqual(local, false)
+        XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-b")
+    }
+
+    @MainActor
+    func testHostSettingsTransportDownWritesLocalOnlyThenReconnectBackfillsUnwrittenRemote() async {
+        var local: Bool?
+        var remote: Bool?
+        var remoteReads = 0
+        var remoteWrites = 0
+
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            clearLocal: { local = nil },
+            readRemote: {
+                remoteReads += 1
+                return .init(hasSeenOnboarding: remote)
+            },
+            pushRemote: { snapshot in
+                remoteWrites += 1
+                remote = snapshot.hasSeenOnboarding
+                return .init(hasSeenOnboarding: remote)
+            },
+            hostGeneration: { 1 }
+        )
+        reconciler.scopeToAccount("owner-a")
+
+        XCTAssertFalse(await reconciler.pushLocalIfWritable(true))
+        XCTAssertEqual(local, true)
+        XCTAssertNil(remote)
+        XCTAssertEqual(remoteReads, 0)
+        XCTAssertEqual(remoteWrites, 0)
+
+        reconciler.setTransportLive(true)
+        XCTAssertTrue(await reconciler.reconcileIfReadable())
+        XCTAssertEqual(remote, true)
+        XCTAssertGreaterThanOrEqual(remoteReads, 1)
+        XCTAssertGreaterThanOrEqual(remoteWrites, 1)
+
+        reconciler.setTransportLive(false)
+        XCTAssertFalse(await reconciler.reconcileIfReadable())
+        XCTAssertFalse(await reconciler.pushLocalIfWritable(false))
+        XCTAssertEqual(local, false)
+        XCTAssertEqual(remote, true)
+    }
+
+    @MainActor
+    func testHostSettingsDropsInFlightResultAfterAccountReplacementAndDeparture() async {
+        var local: Bool?
+        var continuation: CheckedContinuation<MahayanaHostSettingsSnapshot, Error>?
+        let readStarted = expectation(description: "remote host-settings read started")
+
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            clearLocal: { local = nil },
+            readRemote: {
+                try await withCheckedThrowingContinuation { pending in
+                    continuation = pending
+                    readStarted.fulfill()
+                }
+            },
+            pushRemote: { $0 },
+            hostGeneration: { 1 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+        await fulfillment(of: [readStarted], timeout: 2)
+
+        reconciler.scopeToAccount("owner-b")
+        continuation?.resume(returning: .init(hasSeenOnboarding: true))
+        await Task.yield()
+        await Task.yield()
+
+        XCTAssertNil(local)
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+
+        reconciler.accountDeparted()
+        XCTAssertFalse(reconciler.isReadable)
+        XCTAssertFalse(await reconciler.reconcileIfReadable())
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+    }
+
+    @MainActor
+    func testHostSettingsFailureNeverReportsSuccessfulReconciliation() async {
+        var local: Bool?
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            clearLocal: { local = nil },
+            readRemote: {
+                throw NSError(
+                    domain: "SharedSettingsParityTests",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "host settings unavailable"]
+                )
+            },
+            pushRemote: { $0 },
+            hostGeneration: { 1 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+
+        XCTAssertFalse(await reconciler.reconcileIfReadable())
+        XCTAssertNil(local)
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+    }
+
+    @MainActor
     func testCoordinatorInferenceProviderFacadeUsesCanonicalSettingsStore() async throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
