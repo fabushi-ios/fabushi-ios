@@ -48,7 +48,7 @@ func pluginVariablesSchemaToFields(_ schema: Any) -> [PluginVariableField] {
             defaultValue: defaultValue,
             hint: description
         )
-    }.sorted { $0.key < $1.key }
+    }
 }
 
 func findMissingRequiredCatalogFields(
