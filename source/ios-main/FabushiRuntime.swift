@@ -202,7 +202,7 @@ final class FabushiRuntime {
     @ObservationIgnored private var devControlsPreload: IOSDevControlsPreload?
     #endif
 
-    init() {
+    init() throws {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("com.ombhrum.fabushi", isDirectory: true)
         #if DEBUG
@@ -212,45 +212,41 @@ final class FabushiRuntime {
         let featureHostTest = false
         #endif
 
-        do {
-            let authCallbackRegistration = try IOSAuthCallbackRegistrar.requireShippingRegistration()
-            let main = try IOSMainRuntime(appDataDirectory: base, featureHostTest: featureHostTest)
-            let bridge = IOSPrimaryPreloadEntrypoint.install(main: main)
-            let surface = FabushiAppAgentSurface()
-            self.main = main
-            self.bridge = bridge
-            self.authCallbackRegistration = authCallbackRegistration
-            cloudAgentWakeWatcher = IOSCloudAgentWakeWatcher(coordinator: main.coordinator)
-            #if DEBUG
-            devControlsPreload = IOSDevControlsPreloadEntrypoint.installIfEnabled(
-                bridge: bridge,
-                capability: main.devCapability
-            )
-            #endif
-            appAgentSurface = surface
-            marketplace = MarketplaceModel(bridge: bridge)
-            messaging = MessagingModel(bridge: bridge)
-            remoteDeviceGateway = FabushiRemoteDeviceGateway(
-                bridge: bridge,
-                surface: surface,
-                traceURL: base.appendingPathComponent("device-gateway-trace.jsonl")
-            )
-            deepLinkController = IOSDeepLinkController(
-                dispatch: { [weak self] parsed in
-                    self?.dispatchGrokDeepLink(parsed)
-                }
-            )
-            HumanCallSystemCoordinator.shared.bind { [weak self] action in
-                guard let self else {
-                    throw HumanCallSystemCoordinatorError.runtimeUnavailable
-                }
-                try await self.handleHumanCallSystemAction(action)
+        let authCallbackRegistration = try IOSAuthCallbackRegistrar.requireShippingRegistration()
+        let main = try IOSMainRuntime(appDataDirectory: base, featureHostTest: featureHostTest)
+        let bridge = IOSPrimaryPreloadEntrypoint.install(main: main)
+        let surface = FabushiAppAgentSurface()
+        self.main = main
+        self.bridge = bridge
+        self.authCallbackRegistration = authCallbackRegistration
+        cloudAgentWakeWatcher = IOSCloudAgentWakeWatcher(coordinator: main.coordinator)
+        #if DEBUG
+        devControlsPreload = IOSDevControlsPreloadEntrypoint.installIfEnabled(
+            bridge: bridge,
+            capability: main.devCapability
+        )
+        #endif
+        appAgentSurface = surface
+        marketplace = MarketplaceModel(bridge: bridge)
+        messaging = MessagingModel(bridge: bridge)
+        remoteDeviceGateway = FabushiRemoteDeviceGateway(
+            bridge: bridge,
+            surface: surface,
+            traceURL: base.appendingPathComponent("device-gateway-trace.jsonl")
+        )
+        deepLinkController = IOSDeepLinkController(
+            dispatch: { [weak self] parsed in
+                self?.dispatchGrokDeepLink(parsed)
             }
-            HumanCallSystemCoordinator.shared.bindVoIPTokenChangeHandler { [weak self] in
-                await self?.remoteDeviceGateway.voIPTokenDidChange()
+        )
+        HumanCallSystemCoordinator.shared.bind { [weak self] action in
+            guard let self else {
+                throw HumanCallSystemCoordinatorError.runtimeUnavailable
             }
-        } catch {
-            fatalError("Failed to initialize iOS runtime: \(error)")
+            try await self.handleHumanCallSystemAction(action)
+        }
+        HumanCallSystemCoordinator.shared.bindVoIPTokenChangeHandler { [weak self] in
+            await self?.remoteDeviceGateway.voIPTokenDidChange()
         }
     }
 
