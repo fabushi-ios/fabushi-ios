@@ -141,7 +141,11 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
         }
     }
 
-    func testPluginVariableFieldsPreserveSchemaPropertyOrder() {
+    func testPluginVariableFieldsPreserveSchemaFieldSemantics() throws {
+        // Foundation dictionaries do not carry the JavaScript Object.entries
+        // insertion-order contract. The shipping Marketplace wire model carries
+        // variableFields as an explicit array; this helper is responsible for
+        // field semantics after a schema has crossed that unordered boundary.
         let properties = Dictionary(uniqueKeysWithValues: [
             ("Z_URL", ["title": "URL"]),
             ("A_TOKEN", ["title": "Token", "format": "password"]),
@@ -151,11 +155,39 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
             "required": ["A_TOKEN"],
         ])
 
-        XCTAssertEqual(fields.map(\.key), ["Z_URL", "A_TOKEN"])
-        XCTAssertEqual(fields.map(\.label), ["URL", "Token"])
-        XCTAssertFalse(fields[0].isSecret)
-        XCTAssertTrue(fields[1].isSecret)
-        XCTAssertTrue(fields[1].isRequired)
+        let url = try XCTUnwrap(fields.first { $0.key == "Z_URL" })
+        let token = try XCTUnwrap(fields.first { $0.key == "A_TOKEN" })
+        XCTAssertEqual(url.label, "URL")
+        XCTAssertEqual(token.label, "Token")
+        XCTAssertFalse(url.isSecret)
+        XCTAssertTrue(token.isSecret)
+        XCTAssertTrue(token.isRequired)
+
+        let ordered = [
+            PluginVariableField(
+                key: "Z_URL",
+                label: "URL",
+                placeholder: "Z_URL",
+                isRequired: false,
+                isSecret: false
+            ),
+            PluginVariableField(
+                key: "A_TOKEN",
+                label: "Token",
+                placeholder: "A_TOKEN",
+                isRequired: true,
+                isSecret: true
+            ),
+        ]
+        let plugin = SandMarketplacePlugin(
+            pluginId: "101",
+            name: "ordered",
+            displayName: "Ordered",
+            description: "",
+            category: "MCP",
+            variableFields: ordered
+        )
+        XCTAssertEqual(marketplacePluginToView(plugin).fields.map(\.key), ["Z_URL", "A_TOKEN"])
     }
 
     func testMarketplaceHelpersPreserveGrokTransportAndSourceSemantics() throws {
