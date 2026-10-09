@@ -40,7 +40,7 @@ final class SharedMcpDisplayDefinitionParityTests: XCTestCase {
         XCTAssertEqual(try validateMarketplacePluginId(" 123 "), "123")
         XCTAssertThrowsError(try validateMarketplacePluginId("a12"))
         XCTAssertEqual(statusFromBackendListStatus("loading").status, "initializing")
-        XCTAssertEqual(statusFromBoxListStatus(nil, unavailable:true).statusDetail, "Grok Bot's computer unreachable")
+        XCTAssertEqual(statusFromBoxListStatus(nil, unavailable:true).statusDetail, "Fabushi's computer unreachable")
     }
 
     func testBuiltinUsesRemoteRunnerAndNeverLocalProcess() {
