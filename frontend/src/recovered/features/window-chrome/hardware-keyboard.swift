@@ -259,7 +259,8 @@ extension GrokMobileShell {
     @ViewBuilder
     var rootHardwareKeyboardShortcuts: some View {
         MobileHardwareKeyboardShortcutLayer(
-            specs: MobileHardwareKeyboardContract.rootSpecs,
+            specs: MobileHardwareKeyboardContract.rootSpecs
+                + (selectedBot == nil ? [] : MobileHardwareKeyboardContract.promptSpecs),
             perform: performGlobalHardwareShortcut
         )
     }
@@ -317,10 +318,8 @@ extension GrokMobileShell {
             closeTopLevelSurfaceForHardwareShortcut()
 
         case .focusPrompt:
-            // Prompt focus belongs to the active MobileBotChat so it can obey
-            // native text-input responder priority instead of creating a
-            // second global focus owner.
-            break
+            guard selectedBot != nil else { return }
+            promptFocusGeneration &+= 1
         }
     }
 
