@@ -319,12 +319,21 @@ final class IOSCursorAuthService {
         }
         let resolved = requestedBackendURL.flatMap(URL.init(string:)) ?? backendURL
         let access: String?
-        let refresh: String?
         do {
             access = try await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+        } catch {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            throw error
+        }
+
+        let refresh: String?
+        do {
             refresh = try await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
         } catch {
             authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            if let access, !access.isEmpty {
+                await shipKeychainUnavailableOnce(accessToken: access)
+            }
             throw error
         }
         guard let access, !access.isEmpty, let refresh, !refresh.isEmpty else {
