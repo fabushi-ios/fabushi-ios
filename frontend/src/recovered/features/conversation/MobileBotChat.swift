@@ -199,6 +199,21 @@ internal func mobileBotChatSearchEntries(_ entries: [MobileChatMessage]) -> [Cha
     }
 }
 
+internal func mobileBotForwardMessageId(
+    _ entry: MobileChatMessage,
+    sourceConversationId: String?
+) -> String? {
+    guard entry.kind == .message,
+          !entry.streaming,
+          let sourceConversationId,
+          !sourceConversationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else { return nil }
+
+    let messageId = mobileTranscriptCanonicalId(entry)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return messageId.isEmpty ? nil : messageId
+}
+
 internal func mergeMobileConversationHistory(
     current: [MobileChatMessage],
     fetched: [MobileChatMessage]
@@ -437,6 +452,7 @@ internal struct MobileBotChat: View {
     let bot: MobileBotSummary
     let bridge: IOSPreloadBridge
     let model: MarketplaceModel
+    let messaging: MessagingModel
     let appAgentSurface: FabushiAppAgentSurface
     let reconnectGeneration: Int
     let focusPromptGeneration: Int
@@ -485,6 +501,7 @@ internal struct MobileBotChat: View {
     @State private var findPresented = false
     @State private var findQuery = ""
     @State private var findIndex: Int?
+    @State private var forwardMessage: MobileChatMessage?
     @FocusState private var promptFocused: Bool
     @FocusState private var findFocused: Bool
 
@@ -527,6 +544,7 @@ internal struct MobileBotChat: View {
             threadRootId = nil
             resetTranscriptDraftUI()
             resetSecretRequestUI()
+            forwardMessage = nil
             closeFind()
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
@@ -544,6 +562,7 @@ internal struct MobileBotChat: View {
             widgetPendingEntryIds.removeAll()
             threadLoadGeneration &+= 1
             threadLoadingRootId = nil
+            forwardMessage = nil
             closeFind()
         }
         .fullScreenCover(isPresented: $openedMiniApp) {
@@ -560,6 +579,23 @@ internal struct MobileBotChat: View {
         }
         .sheet(isPresented: $reactionPickerPresented) {
             reactionPickerSheet
+        }
+        .sheet(item: $forwardMessage) { entry in
+            if let sourceConversationId = bot.conversationId,
+               let messageId = mobileBotForwardMessageId(
+                   entry,
+                   sourceConversationId: sourceConversationId
+               )
+            {
+                ForwardMessageSheet(
+                    sourceConversationId: sourceConversationId,
+                    messageId: messageId,
+                    messaging: messaging,
+                    appAgentSurface: appAgentSurface
+                ) {
+                    forwardMessage = nil
+                }
+            }
         }
         .sheet(
             isPresented: Binding(
@@ -1330,6 +1366,12 @@ internal struct MobileBotChat: View {
                 .contextMenu {
                     Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
                     Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
+                    if mobileBotForwardMessageId(
+                        entry,
+                        sourceConversationId: bot.conversationId
+                    ) != nil {
+                        Button("Forward") { forwardMessage = entry }
+                    }
                     if let copyText = mobileTranscriptCopyText(entry) {
                         Button("Copy") { UIPasteboard.general.string = copyText }
                     }
@@ -1353,9 +1395,15 @@ internal struct MobileBotChat: View {
                     .contextMenu {
                         Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
                         Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
-                    if let copyText = mobileTranscriptCopyText(entry) {
-                        Button("Copy") { UIPasteboard.general.string = copyText }
-                    }
+                        if mobileBotForwardMessageId(
+                            entry,
+                            sourceConversationId: bot.conversationId
+                        ) != nil {
+                            Button("Forward") { forwardMessage = entry }
+                        }
+                        if let copyText = mobileTranscriptCopyText(entry) {
+                            Button("Copy") { UIPasteboard.general.string = copyText }
+                        }
                         reactionMenu(entry)
                     }
                     Spacer(minLength: 30)
