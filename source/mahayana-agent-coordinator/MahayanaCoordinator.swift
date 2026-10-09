@@ -129,6 +129,9 @@ final class IOSHostSettingsReconciler {
         abandonInFlight()
         accountScope = scope
         lastSuccessfulAccountScope = nil
+        if transportLive {
+            scheduleReconcile()
+        }
     }
 
     func accountDeparted() {
@@ -486,7 +489,6 @@ final class MahayanaCoordinator {
         if let accountScope {
             settingsStore?.scopeToAccount(accountScope)
             hostSettingsReconciler?.scopeToAccount(accountScope)
-            hostSettingsReconciler?.setTransportLive(lifecycleState == .ready)
         } else {
             hostSettingsReconciler?.accountDeparted()
             settingsStore?.clearAccountScope()
@@ -799,23 +801,28 @@ final class MahayanaCoordinator {
         } else {
             lifecycleState = .ready
         }
+    }
+
+    func hostSettingsTransportConnected() {
         hostSettingsReconciler?.setTransportLive(true)
+    }
+
+    func hostSettingsTransportDown() {
+        hostSettingsReconciler?.setTransportLive(false)
     }
 
     func sceneEnteredBackground() {
         if case .failed = lifecycleState { return }
         lifecycleState = .background
-        hostSettingsReconciler?.setTransportLive(false)
     }
 
     func sceneWillSuspend() {
         if case .failed = lifecycleState { return }
         lifecycleState = .suspended
-        hostSettingsReconciler?.setTransportLive(false)
     }
 
     func beginShutdown() {
-        hostSettingsReconciler?.setTransportLive(false)
+        hostSettingsTransportDown()
         lifecycleState = .shuttingDown
         inFlight.removeAll()
         clientSideToolV2Relay.clear()
