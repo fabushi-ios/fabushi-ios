@@ -33,6 +33,15 @@ enum MobileSignedInOnboardingStep: Int, CaseIterable, Sendable {
     }
 }
 
+enum MobileOnboardingCharacterCatalog {
+    static let colorIds = ["brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet", "magenta", "gray"]
+    static let shapeIds = ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"]
+
+    static var colors: [MobileAvatarColor] {
+        colorIds.compactMap { id in AvatarImagePolicy.colors.first(where: { $0.id == id }) }
+    }
+}
+
 struct MobileSignedInOnboardingDraft: Equatable, Sendable {
     var name = ""
     var description = ""
@@ -42,10 +51,10 @@ struct MobileSignedInOnboardingDraft: Equatable, Sendable {
 
     var normalized: Self {
         var value = self
-        if !AvatarImagePolicy.colors.contains(where: { $0.id == value.color }) {
+        if !MobileOnboardingCharacterCatalog.colorIds.contains(value.color) {
             value.color = "blue"
         }
-        if !AvatarImagePolicy.shapes.contains(value.shape) {
+        if !MobileOnboardingCharacterCatalog.shapeIds.contains(value.shape) {
             value.shape = "blob"
         }
         return value
@@ -144,6 +153,67 @@ struct MobileOnboardingSuggestion: Identifiable, Equatable, Sendable {
         .init(id:"dashboard-watcher",name:"Dashboard Watcher",description:"Watches your {tool} metrics and alerts you on anomalies",eligibility:.selectedTools(["Tableau","Hex","Amplitude","Mixpanel","Snowflake","Databricks","Stripe","Shopify"])),
         .init(id:"data-scientist",name:"Data Scientist",description:"Answers data questions with real {tool} queries and charts",eligibility:.selectedTools(["Tableau","Hex","Amplitude","Mixpanel","Snowflake","Databricks"])),
     ]
+
+    struct Identity: Equatable, Sendable {
+        let color: String
+        let shape: String
+    }
+
+    static func identities(for suggestions: [MobileOnboardingSuggestionChoice]) -> [Identity] {
+        var usedColors = Set<String>()
+        var usedShapes = Set<String>()
+        return suggestions.map { choice in
+            let seededColor = colorFor(choice.suggestion.name)
+            let seededShape = shapeFor(choice.suggestion.name)
+            let color = firstUnused(seededColor, values: MobileOnboardingCharacterCatalog.colorIds, used: usedColors)
+            let shape = firstUnused(seededShape, values: MobileOnboardingCharacterCatalog.shapeIds, used: usedShapes)
+            usedColors.insert(color)
+            usedShapes.insert(shape)
+            return .init(color: color, shape: shape)
+        }
+    }
+
+    private static func fnv1a(_ value: String) -> UInt32 {
+        var hash: UInt32 = 2_166_136_261
+        for byte in value.utf8 {
+            hash ^= UInt32(byte)
+            hash = hash &* 16_777_619
+        }
+        return hash
+    }
+
+    private static func nextRandom(_ state: inout UInt32) -> Double {
+        state = state &+ 1_831_565_813
+        var next = (state ^ (state >> 15)) &* (1 | state)
+        next = next &+ (((next ^ (next >> 7)) &* (61 | next)) ^ next)
+        next = next ^ (next >> 14)
+        return Double(next) / 4_294_967_296.0
+    }
+
+    private static func colorFor(_ name: String) -> String {
+        let seed = fnv1a(name) ^ (1 &* 2_654_435_769)
+        var state = seed ^ (1 &* 2_654_435_769)
+        let index = Int(nextRandom(&state) * Double(MobileOnboardingCharacterCatalog.colorIds.count))
+        return MobileOnboardingCharacterCatalog.colorIds[min(max(index, 0), MobileOnboardingCharacterCatalog.colorIds.count - 1)]
+    }
+
+    private static func shapeFor(_ name: String) -> String {
+        var hash = fnv1a(name)
+        hash = (hash ^ (hash >> 16)) &* 73_244_475
+        hash = (hash ^ (hash >> 13)) &* 3_266_489_909
+        hash = hash ^ (hash >> 16)
+        return MobileOnboardingCharacterCatalog.shapeIds[Int(hash % UInt32(MobileOnboardingCharacterCatalog.shapeIds.count))]
+    }
+
+    private static func firstUnused(_ candidate: String, values: [String], used: Set<String>) -> String {
+        guard used.contains(candidate) else { return candidate }
+        let start = values.firstIndex(of: candidate) ?? 0
+        for offset in 1..<values.count {
+            let value = values[(start + offset) % values.count]
+            if !used.contains(value) { return value }
+        }
+        return candidate
+    }
 
     static func selected(for tools: [String], limit: Int = 10) -> [MobileOnboardingSuggestionChoice] {
         var output: [MobileOnboardingSuggestionChoice] = []
