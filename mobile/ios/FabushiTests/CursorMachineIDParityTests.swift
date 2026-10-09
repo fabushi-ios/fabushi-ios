@@ -35,7 +35,8 @@ final class CursorMachineIDParityTests: XCTestCase {
         store.value = "existing"
         let resolver = IOSMachineIDResolver(secrets: store, createID: { "new" })
 
-        XCTAssertEqual(try await resolver.getOrCreate(), "existing")
+        let resolved = try await resolver.getOrCreate()
+        XCTAssertEqual(resolved, "existing")
         XCTAssertEqual(store.readCount, 1)
         XCTAssertEqual(store.waitCount, 0)
         XCTAssertTrue(store.writes.isEmpty)
@@ -46,7 +47,8 @@ final class CursorMachineIDParityTests: XCTestCase {
         store.valueAfterWait = "settled"
         let resolver = IOSMachineIDResolver(secrets: store, createID: { "new" })
 
-        XCTAssertEqual(try await resolver.getOrCreate(), "settled")
+        let resolved = try await resolver.getOrCreate()
+        XCTAssertEqual(resolved, "settled")
         XCTAssertEqual(store.readCount, 2)
         XCTAssertEqual(store.waitCount, 1)
         XCTAssertTrue(store.writes.isEmpty)
@@ -60,14 +62,16 @@ final class CursorMachineIDParityTests: XCTestCase {
             return "generated-id"
         })
 
-        XCTAssertEqual(try await resolver.getOrCreate(), "generated-id")
+        let resolved = try await resolver.getOrCreate()
+        XCTAssertEqual(resolved, "generated-id")
         XCTAssertEqual(createCount, 1)
         XCTAssertEqual(store.waitCount, 1)
         XCTAssertEqual(store.writes.count, 1)
         XCTAssertEqual(store.writes.first?.0, iosMachineIDSecretKey)
         XCTAssertEqual(store.writes.first?.1, "generated-id")
 
-        XCTAssertEqual(try await resolver.getOrCreate(), "generated-id")
+        let resolvedAgain = try await resolver.getOrCreate()
+        XCTAssertEqual(resolvedAgain, "generated-id")
         XCTAssertEqual(createCount, 1)
         XCTAssertEqual(store.writes.count, 1)
     }
