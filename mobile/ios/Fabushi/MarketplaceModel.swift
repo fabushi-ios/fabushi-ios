@@ -202,6 +202,74 @@ struct MobileCanonicalTranscriptCardPayload: Equatable {
     let json: String
 }
 
+struct MobileTranscriptWidgetProjection: Equatable {
+    let widget: SandWidget
+    let respondedValue: String?
+    let dismissed: Bool
+    let skipped: Bool
+}
+
+func mobileTranscriptWidgetProjection(
+    _ entry: MobileChatMessage
+) -> MobileTranscriptWidgetProjection? {
+    guard let payload = entry.canonicalTranscriptCard,
+          payload.kind == "widget",
+          let data = payload.json.data(using: .utf8),
+          let card = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let rawWidget = card["widget"] as? [String: Any],
+          let prompt = rawWidget["prompt"] as? String,
+          let rawOptions = rawWidget["options"] as? [[String: Any]]
+    else { return nil }
+
+    let options = rawOptions.compactMap { row -> SandWidgetChoiceOption? in
+        guard let label = row["label"] as? String else { return nil }
+        if row["value"] != nil, row["value"] is String == false { return nil }
+        if row["description"] != nil, row["description"] is String == false { return nil }
+        return .init(
+            label: label,
+            value: row["value"] as? String,
+            description: row["description"] as? String
+        )
+    }
+    guard options.count == rawOptions.count else { return nil }
+
+    var actionStyles: [Int: WidgetActionStyle] = [:]
+    for (index, row) in rawOptions.enumerated() {
+        guard let style = row["style"] as? String else { continue }
+        switch style {
+        case "primary", "success":
+            actionStyles[index] = .primary
+        case "danger":
+            actionStyles[index] = .danger
+        default:
+            break
+        }
+    }
+
+    let widget = SandWidget(
+        id: entry.id,
+        type: "choice",
+        prompt: prompt,
+        helpText: rawWidget["helpText"] as? String,
+        actionStyles: actionStyles,
+        choiceConfig: .init(
+            options: options,
+            allowCustom: rawWidget["allowCustom"] as? Bool ?? false
+        ),
+        dismissOnMoveOn: rawWidget["dismissOnMoveOn"] as? Bool ?? false
+    )
+    guard validateSandWidget(widget) else { return nil }
+    if card["respondedValue"] != nil, card["respondedValue"] is String == false { return nil }
+    if card["widgetDismissed"] != nil, card["widgetDismissed"] is Bool == false { return nil }
+    if card["widgetSkipped"] != nil, card["widgetSkipped"] is Bool == false { return nil }
+    return .init(
+        widget: widget,
+        respondedValue: card["respondedValue"] as? String,
+        dismissed: card["widgetDismissed"] as? Bool ?? false,
+        skipped: card["widgetSkipped"] as? Bool ?? false
+    )
+}
+
 struct MobileEmailDraftProjection: Equatable {
     let id: String
     let from: String?
@@ -369,6 +437,38 @@ func projectMobileCanonicalHostTranscriptCard(
     guard let payload = mobileTranscriptCardPayload(kind: kind, card: card) else { return nil }
 
     switch kind {
+    case "widget":
+        guard let rawWidget = card["widget"] as? [String: Any],
+              let prompt = mobileTranscriptCardNonEmptyString(rawWidget["prompt"]),
+              let options = rawWidget["options"] as? [[String: Any]],
+              (1...6).contains(options.count),
+              rawWidget["allowCustom"] == nil || rawWidget["allowCustom"] is Bool,
+              rawWidget["dismissOnMoveOn"] == nil || rawWidget["dismissOnMoveOn"] is Bool,
+              mobileTranscriptCardOptionalString(rawWidget, key: "helpText"),
+              card["respondedValue"] == nil || card["respondedValue"] is String,
+              card["widgetDismissed"] == nil || card["widgetDismissed"] is Bool,
+              card["widgetSkipped"] == nil || card["widgetSkipped"] is Bool
+        else { return nil }
+        for option in options {
+            guard mobileTranscriptCardNonEmptyString(option["label"]) != nil,
+                  mobileTranscriptCardOptionalString(option, key: "value"),
+                  mobileTranscriptCardOptionalString(option, key: "description"),
+                  mobileTranscriptCardOptionalString(option, key: "style")
+            else { return nil }
+        }
+        let responded = (card["respondedValue"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let dismissed = card["widgetDismissed"] as? Bool ?? false
+        return .init(
+            id: entryId, role: .assistant, text: "", kind: .action,
+            operationId: operationId,
+            actionTitle: prompt,
+            actionDetail: rawWidget["helpText"] as? String,
+            actionStatus: (responded?.isEmpty == false || dismissed) ? "completed" : "waiting",
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
     case "emailDraft":
         guard let draft = card["draft"] as? [String: Any],
               draft["kind"] as? String == "email",

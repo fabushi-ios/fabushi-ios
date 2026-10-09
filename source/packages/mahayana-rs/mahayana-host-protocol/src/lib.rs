@@ -960,6 +960,31 @@ pub struct EventCard {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WidgetChoiceOption {
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WidgetQuestion {
+    pub prompt: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub help_text: Option<String>,
+    pub options: Vec<WidgetChoiceOption>,
+    #[serde(default)]
+    pub allow_custom: bool,
+    #[serde(default)]
+    pub dismiss_on_move_on: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum TranscriptCard {
     #[serde(rename = "emailDraft")]
@@ -983,6 +1008,20 @@ pub enum TranscriptCard {
         connected: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pending: Option<bool>,
+    },
+    #[serde(rename = "widget")]
+    Widget {
+        widget: WidgetQuestion,
+        #[serde(
+            rename = "respondedValue",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        responded_value: Option<String>,
+        #[serde(rename = "widgetDismissed", default)]
+        widget_dismissed: bool,
+        #[serde(rename = "widgetSkipped", default)]
+        widget_skipped: bool,
     },
     #[serde(rename = "event")]
     Event { event: EventCard },
@@ -1937,6 +1976,29 @@ pub enum FeatureCommand {
         draft: MessageDraft,
         action: DraftAction,
     },
+    #[serde(rename = "widget.respond")]
+    WidgetRespond {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "conversationId")]
+        conversation_id: String,
+        #[serde(rename = "entryId")]
+        entry_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        value: String,
+    },
+    #[serde(rename = "widget.dismiss")]
+    WidgetDismiss {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "conversationId")]
+        conversation_id: String,
+        #[serde(rename = "entryId")]
+        entry_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+    },
     #[serde(rename = "secret.provide")]
     SecretProvide {
         #[serde(rename = "requestId")]
@@ -2094,6 +2156,8 @@ impl FeatureCommand {
             | Self::SettingsUpdate { request_id, .. }
             | Self::AuditList { request_id, .. }
             | Self::DraftResolve { request_id, .. }
+            | Self::WidgetRespond { request_id, .. }
+            | Self::WidgetDismiss { request_id, .. }
             | Self::SecretProvide { request_id, .. }
             | Self::ListenerList { request_id }
             | Self::ListenerConnect { request_id, .. }
@@ -2173,6 +2237,8 @@ pub struct ConversationMessage {
     pub reply_to_message_id: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub branched: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cards: Vec<TranscriptCard>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reactions: Vec<TranscriptReaction>,
 }
@@ -3240,12 +3306,32 @@ mod tests {
             created_at_ms: 42,
             reply_to_message_id: Some("message-parent".into()),
             branched: true,
+            cards: vec![TranscriptCard::Widget {
+                widget: WidgetQuestion {
+                    prompt: "Choose".into(),
+                    help_text: Some("Pick one".into()),
+                    options: vec![WidgetChoiceOption {
+                        label: "A".into(),
+                        value: Some("a".into()),
+                        description: None,
+                        style: Some("primary".into()),
+                    }],
+                    allow_custom: true,
+                    dismiss_on_move_on: true,
+                },
+                responded_value: Some("a".into()),
+                widget_dismissed: false,
+                widget_skipped: false,
+            }],
             reactions: Vec::new(),
         };
         let history_value =
             serde_json::to_value(history_message).expect("encode conversation relation projection");
         assert_eq!(history_value["replyToMessageId"], "message-parent");
         assert_eq!(history_value["branched"], true);
+        assert_eq!(history_value["cards"][0]["kind"], "widget");
+        assert_eq!(history_value["cards"][0]["respondedValue"], "a");
+        assert_eq!(history_value["cards"][0]["widget"]["dismissOnMoveOn"], true);
 
         let legacy_history: ConversationMessage = serde_json::from_value(serde_json::json!({
             "id": "legacy-history",

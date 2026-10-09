@@ -71,6 +71,38 @@ internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> Mo
     return message
 }
 
+internal func projectMobileConversationWindowEntries(
+    _ row: [String: Any]
+) -> [MobileChatMessage]? {
+    guard var message = projectMobileConversationWindowMessage(row) else { return nil }
+    var projected: [MobileChatMessage] = []
+    let cards: [[String: Any]]
+    if let rawCards = row["cards"] {
+        guard let typedCards = rawCards as? [[String: Any]] else { return nil }
+        cards = typedCards
+    } else {
+        cards = []
+    }
+    if !message.text.isEmpty || cards.isEmpty {
+        projected.append(message)
+    }
+    let sourceMessageId = message.canonicalMessageId ?? message.id
+    for (index, card) in cards.enumerated() {
+        let entryId = "\(sourceMessageId)-card-\(index)"
+        guard var cardMessage = projectMobileTranscriptCardWithFallback(
+            event: [
+                "type": "transcript.card",
+                "entryId": entryId,
+                "card": card,
+            ],
+            operationId: nil
+        ) else { return nil }
+        cardMessage.createdAt = message.createdAt
+        projected.append(cardMessage)
+    }
+    return projected
+}
+
 internal func mobileTranscriptCanonicalId(_ message: MobileChatMessage) -> String {
     message.canonicalMessageId ?? message.id
 }
@@ -125,15 +157,17 @@ internal func mergeMobileConversationHistory(
     current: [MobileChatMessage],
     fetched: [MobileChatMessage]
 ) -> [MobileChatMessage] {
-    var messagesById: [String: MobileChatMessage] = [:]
-    for message in current where message.kind == .message {
-        messagesById[mobileTranscriptCanonicalId(message)] = message
+    func historyIdentity(_ message: MobileChatMessage) -> String {
+        message.kind == .message ? mobileTranscriptCanonicalId(message) : message.id
+    }
+    var entriesById: [String: MobileChatMessage] = [:]
+    for message in current {
+        entriesById[historyIdentity(message)] = message
     }
     for message in fetched {
-        messagesById[mobileTranscriptCanonicalId(message)] = message
+        entriesById[historyIdentity(message)] = message
     }
-    let ephemera = current.filter { $0.kind != .message }
-    return (Array(messagesById.values) + ephemera).sorted {
+    return Array(entriesById.values).sorted {
         if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
         return $0.id < $1.id
     }
@@ -387,6 +421,10 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerDraft = ""
     @State private var approvalGeneration = 0
     @State private var transcriptBaselineGeneration = 0
+    @State private var widgetGeneration = 0
+    @State private var widgetPendingEntryIds: Set<String> = []
+    @State private var widgetCustomAnswers: [String: String] = [:]
+    @State private var widgetErrors: [String: String] = [:]
     @State private var transcriptDraftRecipients: [String: String] = [:]
     @State private var transcriptDraftSubjects: [String: String] = [:]
     @State private var transcriptDraftBodies: [String: String] = [:]
@@ -421,6 +459,10 @@ internal struct MobileBotChat: View {
             cancelVoiceInput()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
+            widgetGeneration &+= 1
+            widgetPendingEntryIds.removeAll()
+            widgetCustomAnswers.removeAll()
+            widgetErrors.removeAll()
             threadLoadGeneration &+= 1
             threadLoadingRootId = nil
             threadLoadError = nil
@@ -432,6 +474,8 @@ internal struct MobileBotChat: View {
             cancelVoiceInput()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
+            widgetGeneration &+= 1
+            widgetPendingEntryIds.removeAll()
             threadLoadGeneration &+= 1
             threadLoadingRootId = nil
         }
@@ -972,7 +1016,9 @@ internal struct MobileBotChat: View {
             .padding(.vertical, 4)
             .accessibilityIdentifier(Self.semanticId("mobile-bot-timeline-event-\(entry.id)"))
         } else if entry.kind == .action {
-            if let draft = mobileTranscriptDraftProjection(entry.canonicalTranscriptCard) {
+            if let widget = mobileTranscriptWidgetProjection(entry) {
+                transcriptWidgetCard(entry, projection: widget)
+            } else if let draft = mobileTranscriptDraftProjection(entry.canonicalTranscriptCard) {
                 transcriptDraftCard(entry, draft: draft)
             } else if let secret = mobileSecretRequestProjection(entry.canonicalTranscriptCard) {
                 secretRequestCard(entry, secret: secret)
@@ -1177,16 +1223,21 @@ internal struct MobileBotChat: View {
                       let rows = event["messages"] as? [[String: Any]]
                 else { return }
 
-                let pageMessages = rows.compactMap(projectMobileConversationWindowMessage)
-                guard pageMessages.count == rows.count else {
-                    throw NSError(
-                        domain: "Fabushi.MobileBotChat",
-                        code: 42,
-                        userInfo: [NSLocalizedDescriptionKey: "Host returned malformed thread history"]
-                    )
+                var pageEntries: [MobileChatMessage] = []
+                for row in rows {
+                    guard let projected = projectMobileConversationWindowEntries(row) else {
+                        throw NSError(
+                            domain: "Fabushi.MobileBotChat",
+                            code: 42,
+                            userInfo: [NSLocalizedDescriptionKey: "Host returned malformed thread history"]
+                        )
+                    }
+                    pageEntries.append(contentsOf: projected)
                 }
-                fetched.append(contentsOf: pageMessages)
-                if pageMessages.contains(where: { mobileTranscriptCanonicalId($0) == rootId }) {
+                fetched.append(contentsOf: pageEntries)
+                if pageEntries.contains(where: {
+                    $0.kind == .message && mobileTranscriptCanonicalId($0) == rootId
+                }) {
                     entries = mergeMobileConversationHistory(current: entries, fetched: fetched)
                     threadLoadError = nil
                     return
@@ -1224,6 +1275,215 @@ internal struct MobileBotChat: View {
             else { return }
             threadLoadError = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func resolveTranscriptWidget(
+        entry: MobileChatMessage,
+        value: String?,
+        dismiss: Bool
+    ) async {
+        guard !widgetPendingEntryIds.contains(entry.id),
+              let conversationId = bot.conversationId?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !conversationId.isEmpty
+        else { return }
+
+        let answer = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !dismiss, answer?.isEmpty != false { return }
+
+        let ownedGeneration = widgetGeneration
+        let ownedBotId = bot.id
+        widgetPendingEntryIds.insert(entry.id)
+        widgetErrors.removeValue(forKey: entry.id)
+        defer {
+            if widgetGeneration == ownedGeneration {
+                widgetPendingEntryIds.remove(entry.id)
+            }
+        }
+
+        do {
+            let requestId = "ios-widget-\(UUID().uuidString.lowercased())"
+            var command: [String: Any] = [
+                "type": dismiss ? "widget.dismiss" : "widget.respond",
+                "requestId": requestId,
+                "conversationId": conversationId,
+                "entryId": entry.id,
+                "agentId": bot.id,
+            ]
+            if let answer { command["value"] = answer }
+            let result = try await bridge.request(
+                method: "feature.execute",
+                params: ["command": command]
+            )
+            guard widgetGeneration == ownedGeneration, bot.id == ownedBotId else { return }
+            let accepted = result.value as? [String: Any]
+            let operationId = accepted?["operationId"] as? String
+
+            let changed = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 8_000
+            ) { event in
+                event["type"] as? String == "transcript.card"
+                    && event["entryId"] as? String == entry.id
+            }
+            guard widgetGeneration == ownedGeneration, bot.id == ownedBotId,
+                  let event = changed.value as? [String: Any],
+                  let projected = projectMobileTranscriptCard(
+                    event: event,
+                    operationId: operationId
+                  )
+            else { return }
+            if let index = entries.firstIndex(where: { $0.id == entry.id }) {
+                entries[index] = projected
+            }
+            widgetCustomAnswers[entry.id] = ""
+
+            guard let operationId, !operationId.isEmpty else { return }
+            busy = true
+            activeOperationId = operationId
+            entries.append(MobileChatMessage(
+                id: "thinking:\(operationId)",
+                role: .assistant,
+                text: "",
+                kind: .thinking,
+                operationId: operationId,
+                actionTitle: "Continuing from your answer",
+                actionStatus: "running"
+            ))
+            await pump(operationId: operationId)
+            if widgetGeneration == ownedGeneration, bot.id == ownedBotId {
+                activeOperationId = nil
+                busy = false
+            }
+        } catch {
+            guard widgetGeneration == ownedGeneration, bot.id == ownedBotId else { return }
+            widgetErrors[entry.id] = error.localizedDescription
+            activeOperationId = nil
+            busy = false
+        }
+    }
+
+    @ViewBuilder
+    private func transcriptWidgetCard(
+        _ entry: MobileChatMessage,
+        projection: MobileTranscriptWidgetProjection
+    ) -> some View {
+        let widget = projection.widget
+        let pending = widgetPendingEntryIds.contains(entry.id)
+        let settled = projection.respondedValue != nil || projection.dismissed
+        let options = widget.choiceConfig?.options ?? []
+        VStack(alignment: .leading, spacing: 10) {
+            Text(widget.prompt)
+                .font(.body.weight(.semibold))
+            if let help = widget.helpText, !help.isEmpty {
+                Text(help)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let respondedValue = projection.respondedValue {
+                Label(
+                    getWidgetAnswerLabel(widget: widget, answerValue: respondedValue),
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+            } else if projection.dismissed {
+                Label("Dismissed", systemImage: "xmark.circle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+                    Button {
+                        Task {
+                            await resolveTranscriptWidget(
+                                entry: entry,
+                                value: option.value ?? option.label,
+                                dismiss: false
+                            )
+                        }
+                    } label: {
+                        HStack(alignment: .top, spacing: 9) {
+                            Text(String(UnicodeScalar(65 + index)!))
+                                .font(.caption.monospaced().weight(.bold))
+                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(option.label)
+                                    .font(.caption.weight(.semibold))
+                                if let description = option.description, !description.isEmpty {
+                                    Text(description)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(pending)
+                    .keyboardShortcut(
+                        KeyEquivalent(Character(String(UnicodeScalar(97 + index)!))),
+                        modifiers: []
+                    )
+                }
+
+                if widget.choiceConfig?.allowCustom == true {
+                    HStack(spacing: 8) {
+                        TextField(
+                            "Other answer",
+                            text: Binding(
+                                get: { widgetCustomAnswers[entry.id] ?? "" },
+                                set: { widgetCustomAnswers[entry.id] = $0 }
+                            )
+                        )
+                        .disabled(pending)
+                        Button("Submit") {
+                            Task {
+                                await resolveTranscriptWidget(
+                                    entry: entry,
+                                    value: widgetCustomAnswers[entry.id],
+                                    dismiss: false
+                                )
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(
+                            pending
+                                || (widgetCustomAnswers[entry.id] ?? "")
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                    .isEmpty
+                        )
+                    }
+                }
+
+                Button("Dismiss", role: .cancel) {
+                    Task {
+                        await resolveTranscriptWidget(
+                            entry: entry,
+                            value: nil,
+                            dismiss: true
+                        )
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(pending)
+            }
+
+            if pending {
+                ProgressView("Saving response…")
+                    .controlSize(.small)
+            }
+            if let error = widgetErrors[entry.id], !error.isEmpty {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(10)
+        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityIdentifier(Self.semanticId("mobile-bot-widget-\(entry.id)"))
+        .accessibilityValue(settled ? "settled" : "waiting")
     }
 
     @MainActor
@@ -1939,13 +2199,16 @@ internal struct MobileBotChat: View {
                 let rows = event["messages"] as? [[String: Any]]
             else { return }
 
-            let baseline = rows.compactMap(projectMobileConversationWindowMessage)
-            guard baseline.count == rows.count else {
-                throw NSError(
-                    domain: "Fabushi.MobileBotChat",
-                    code: 41,
-                    userInfo: [NSLocalizedDescriptionKey: "Host returned a malformed conversation baseline"]
-                )
+            var baseline: [MobileChatMessage] = []
+            for row in rows {
+                guard let projected = projectMobileConversationWindowEntries(row) else {
+                    throw NSError(
+                        domain: "Fabushi.MobileBotChat",
+                        code: 41,
+                        userInfo: [NSLocalizedDescriptionKey: "Host returned a malformed conversation baseline"]
+                    )
+                }
+                baseline.append(contentsOf: projected)
             }
             entries = reconcileMobileConversationBaseline(
                 baseline: baseline,

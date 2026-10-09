@@ -6316,6 +6316,28 @@ impl FeatureHostController {
                     bot,
                 });
             }
+            FeatureCommand::WidgetRespond {
+                conversation_id,
+                entry_id,
+                agent_id,
+                value,
+                ..
+            } => {
+                required(conversation_id.clone(), "conversationId")?;
+                required(entry_id.clone(), "entryId")?;
+                required(agent_id.clone(), "agentId")?;
+                required(value.clone(), "value")?;
+            }
+            FeatureCommand::WidgetDismiss {
+                conversation_id,
+                entry_id,
+                agent_id,
+                ..
+            } => {
+                required(conversation_id.clone(), "conversationId")?;
+                required(entry_id.clone(), "entryId")?;
+                required(agent_id.clone(), "agentId")?;
+            }
             FeatureCommand::DraftResolve { draft, action, .. } => {
                 let draft_id = draft.id().to_string();
                 match action {
@@ -6719,6 +6741,39 @@ impl FeatureHostController {
                     request_id,
                     operation_id: None,
                 }))
+            }
+            FeatureCommand::WidgetRespond {
+                conversation_id,
+                entry_id,
+                agent_id,
+                value,
+                ..
+            } => {
+                let accepted = self.production_widget_resolve(
+                    request_id,
+                    conversation_id,
+                    entry_id,
+                    agent_id,
+                    Some(value.as_str()),
+                    false,
+                )?;
+                Ok(Some(accepted))
+            }
+            FeatureCommand::WidgetDismiss {
+                conversation_id,
+                entry_id,
+                agent_id,
+                ..
+            } => {
+                let accepted = self.production_widget_resolve(
+                    request_id,
+                    conversation_id,
+                    entry_id,
+                    agent_id,
+                    None,
+                    true,
+                )?;
+                Ok(Some(accepted))
             }
             FeatureCommand::DraftResolve { draft, action, .. } => {
                 let draft_id = draft.id().to_string();
@@ -9566,6 +9621,119 @@ impl FeatureHostController {
     }
 
     #[cfg(feature = "production")]
+    fn production_widget_resolve(
+        &self,
+        request_id: String,
+        conversation_id: &str,
+        entry_id: &str,
+        agent_id: &str,
+        response_value: Option<&str>,
+        dismiss: bool,
+    ) -> Result<CommandAccepted, FeatureHostError> {
+        self.require_authenticated_account()?;
+        let conversation_id = required(conversation_id.to_string(), "conversationId")?;
+        let entry_id = required(entry_id.to_string(), "entryId")?;
+        let agent_id = required(agent_id.to_string(), "agentId")?;
+        let (message_id, card_index) = parse_widget_entry_id(&entry_id)?;
+
+        let history = match self.runtime()?.execute(RuntimeCommand::ConversationHistory {
+            conversation_id: ConversationId(conversation_id.clone()),
+            limit: Some(10_000),
+        })? {
+            RuntimeResponse::History { data } => data,
+            other => return Err(unexpected_response("widget.history", other)),
+        };
+        let position = history
+            .iter()
+            .position(|message| message.id.as_str() == message_id)
+            .ok_or_else(|| FeatureHostError::Contract("widget transcript entry is no longer available".into()))?;
+        let original = history[position].clone();
+        let later_user_turn_exists = history
+            .iter()
+            .skip(position + 1)
+            .any(|message| message.role == RuntimeMessageRole::User);
+
+        let mut updated = original.clone();
+        let (card, answer_label) = mutate_widget_card_metadata(
+            &mut updated.metadata,
+            card_index,
+            response_value,
+            dismiss,
+            later_user_turn_exists,
+        )?;
+        self.runtime()?.replace_conversation_message(updated)?;
+
+        let operation_id = if dismiss {
+            None
+        } else {
+            let answer_label = answer_label.ok_or_else(|| {
+                FeatureHostError::Contract("widget answer label is unavailable".into())
+            })?;
+            let question = match &card {
+                TranscriptCard::Widget { widget, .. } => widget.prompt.trim(),
+                _ => "",
+            };
+            let prompt = format!(
+                "[Interactive question answered]\nQuestion: {question}\nAnswer: {answer_label}\nContinue from this answer. Do not append another user-visible transcript message for the answer."
+            );
+            let requested_operation_id =
+                OperationId(format!("widget-response-{}", Uuid::new_v4()));
+            let started = self.runtime()?.start_recoverable_message(
+                mahayana_conversation::SendMessageRequest {
+                    conversation_id: ConversationId(conversation_id.clone()),
+                    operation_id: requested_operation_id.clone(),
+                    text: prompt,
+                    display_text: None,
+                    client_message_id: Some(format!("widget-response:{request_id}")),
+                    hidden: true,
+                    show_assistant_output: true,
+                    recovery_eligible: true,
+                    reply_to_message_id: None,
+                    is_fork: false,
+                    attachment_batch_id: None,
+                    selected_image_data_urls: Vec::new(),
+                },
+            );
+            match started {
+                Ok(operation_id) => {
+                    if operation_id != requested_operation_id {
+                        let _ = self.runtime()?.replace_conversation_message(original);
+                        return Err(FeatureHostError::Contract(
+                            "widget response operation identity drifted".into(),
+                        ));
+                    }
+                    let operation_id = operation_id.to_string();
+                    let mut state = self.state()?;
+                    state.operations.insert(operation_id.clone());
+                    state.operation_agents.insert(operation_id.clone(), agent_id);
+                    state.events.push_back(HostEvent::OperationStarted {
+                        timestamp: timestamp(),
+                        operation_id: operation_id.clone(),
+                        label: "widget-response".into(),
+                        interruptible: true,
+                    });
+                    Some(operation_id)
+                }
+                Err(error) => {
+                    let _ = self.runtime()?.replace_conversation_message(original);
+                    return Err(error.into());
+                }
+            }
+        };
+
+        self.state()?.events.push_back(HostEvent::TranscriptCard {
+            timestamp: timestamp(),
+            entry_id,
+            operation_id: operation_id.clone(),
+            card,
+        });
+        Ok(CommandAccepted {
+            request_id,
+            operation_id,
+        })
+    }
+
+    #[cfg(feature = "production")]
     fn production_chat(
         &self,
         request_id: String,
@@ -9874,6 +10042,7 @@ impl FeatureHostController {
                     .get("branched")
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
+                cards: transcript_cards_from_metadata(&message.metadata),
                 reactions: message
                     .metadata
                     .get("reactions")
@@ -9936,6 +10105,7 @@ impl FeatureHostController {
                     .get("branched")
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
+                cards: transcript_cards_from_metadata(&message.metadata),
                 reactions: message
                     .metadata
                     .get("reactions")
@@ -10497,6 +10667,88 @@ impl FeatureHostController {
     }
 }
 
+fn parse_widget_entry_id(entry_id: &str) -> Result<(&str, usize), FeatureHostError> {
+    let (message_id, index) = entry_id
+        .rsplit_once("-card-")
+        .ok_or_else(|| FeatureHostError::Contract("widget entryId is malformed".into()))?;
+    if message_id.trim().is_empty() {
+        return Err(FeatureHostError::Contract("widget entryId has no message id".into()));
+    }
+    let index = index
+        .parse::<usize>()
+        .map_err(|_| FeatureHostError::Contract("widget entryId has an invalid card index".into()))?;
+    Ok((message_id, index))
+}
+
+fn mutate_widget_card_metadata(
+    metadata: &mut Value,
+    card_index: usize,
+    response_value: Option<&str>,
+    dismiss: bool,
+    later_user_turn_exists: bool,
+) -> Result<(TranscriptCard, Option<String>), FeatureHostError> {
+    let target: &mut Value = if let Some(cards) = metadata.get_mut("cards").and_then(Value::as_array_mut) {
+        cards.get_mut(card_index).ok_or_else(|| {
+            FeatureHostError::Contract("widget card index is no longer available".into())
+        })?
+    } else {
+        if card_index != 0 {
+            return Err(FeatureHostError::Contract("widget card index is no longer available".into()));
+        }
+        if metadata.get("transcriptCard").is_some() {
+            metadata.get_mut("transcriptCard").expect("checked transcriptCard")
+        } else if metadata.get("card").is_some() {
+            metadata.get_mut("card").expect("checked card")
+        } else if metadata.get("artifact").is_some() {
+            metadata.get_mut("artifact").expect("checked artifact")
+        } else {
+            metadata
+        }
+    };
+
+    let mut card = decode_transcript_card(target)
+        .ok_or_else(|| FeatureHostError::Contract("widget transcript card is malformed".into()))?;
+    let TranscriptCard::Widget {
+        widget,
+        responded_value,
+        widget_dismissed,
+        widget_skipped,
+    } = &mut card
+    else {
+        return Err(FeatureHostError::Contract("transcript entry is not a widget".into()));
+    };
+    if responded_value.is_some() || *widget_dismissed {
+        return Err(FeatureHostError::Contract("widget is already settled".into()));
+    }
+    if widget.dismiss_on_move_on && later_user_turn_exists {
+        return Err(FeatureHostError::Contract("widget is stale after a later user turn".into()));
+    }
+
+    let answer_label = if dismiss {
+        *widget_dismissed = true;
+        *widget_skipped = false;
+        None
+    } else {
+        let value = response_value
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| FeatureHostError::Contract("widget response must not be empty".into()))?;
+        let option = widget.options.iter().find(|option| {
+            option.value.as_deref().unwrap_or(option.label.as_str()) == value
+        });
+        if option.is_none() && !widget.allow_custom {
+            return Err(FeatureHostError::Contract("widget response is not an allowed option".into()));
+        }
+        let label = option.map(|option| option.label.clone()).unwrap_or_else(|| value.to_string());
+        *responded_value = Some(value.to_string());
+        Some(label)
+    };
+
+    *target = serde_json::to_value(&card)
+        .map_err(|error| FeatureHostError::Contract(format!("encode widget card: {error}")))?;
+    Ok((card, answer_label))
+}
+
 fn transcript_cards_from_metadata(metadata: &Value) -> Vec<TranscriptCard> {
     if let Some(cards) = metadata.get("cards").and_then(Value::as_array) {
         return cards.iter().filter_map(decode_transcript_card).collect();
@@ -10536,6 +10788,8 @@ fn is_product_surface_command(command: &FeatureCommand) -> bool {
             | FeatureCommand::BotList { .. }
             | FeatureCommand::BotSetHidden { .. }
             | FeatureCommand::DraftResolve { .. }
+            | FeatureCommand::WidgetRespond { .. }
+            | FeatureCommand::WidgetDismiss { .. }
             | FeatureCommand::SecretProvide { .. }
             | FeatureCommand::ListenerList { .. }
             | FeatureCommand::ListenerConnect { .. }
@@ -15218,6 +15472,86 @@ mod tests {
     }
     use mahayana_host_protocol::ApprovalDecision;
 
+    #[test]
+    fn widget_response_metadata_is_durable_validated_and_stale_fenced() {
+        assert_eq!(
+            parse_widget_entry_id("message-42-card-1").expect("parse widget entry"),
+            ("message-42", 1)
+        );
+        assert!(parse_widget_entry_id("bad-entry").is_err());
+
+        let fixture = || {
+            json!({
+                "cards": [{
+                    "kind": "widget",
+                    "widget": {
+                        "prompt": "Deploy?",
+                        "helpText": "Choose one",
+                        "options": [
+                            {"label": "Ship", "value": "ship", "style": "primary"},
+                            {"label": "Stop", "value": "stop", "style": "danger"}
+                        ],
+                        "allowCustom": false,
+                        "dismissOnMoveOn": true
+                    }
+                }]
+            })
+        };
+
+        let mut answered = fixture();
+        let (card, label) = mutate_widget_card_metadata(
+            &mut answered,
+            0,
+            Some("ship"),
+            false,
+            false,
+        )
+        .expect("answer widget");
+        assert_eq!(label.as_deref(), Some("Ship"));
+        assert_eq!(answered["cards"][0]["respondedValue"], "ship");
+        assert!(matches!(
+            card,
+            TranscriptCard::Widget {
+                responded_value: Some(ref value),
+                ..
+            } if value == "ship"
+        ));
+        assert!(mutate_widget_card_metadata(
+            &mut answered,
+            0,
+            Some("stop"),
+            false,
+            false,
+        )
+        .is_err());
+
+        let mut dismissed = fixture();
+        mutate_widget_card_metadata(&mut dismissed, 0, None, true, false)
+            .expect("dismiss widget");
+        assert_eq!(dismissed["cards"][0]["widgetDismissed"], true);
+        assert_eq!(dismissed["cards"][0]["widgetSkipped"], false);
+
+        let mut stale = fixture();
+        assert!(mutate_widget_card_metadata(
+            &mut stale,
+            0,
+            Some("ship"),
+            false,
+            true,
+        )
+        .is_err());
+
+        let mut invalid = fixture();
+        assert!(mutate_widget_card_metadata(
+            &mut invalid,
+            0,
+            Some("maybe"),
+            false,
+            false,
+        )
+        .is_err());
+    }
+
     #[cfg(feature = "production")]
     fn isolated_host_config(profile: &str) -> HostCreateConfig {
         let root = std::env::temp_dir().join(format!(
@@ -18439,6 +18773,7 @@ mod tests {
                 created_at_ms: 0,
                 reply_to_message_id: None,
                 branched: false,
+                cards: Vec::new(),
                 reactions: Vec::new(),
             })
             .collect::<Vec<_>>();

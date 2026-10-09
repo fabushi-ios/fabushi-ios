@@ -237,6 +237,65 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertTrue(isSandUpdateTrack("stable"))
         XCTAssertFalse(isSandUpdateTrack("beta"))
     }
+    func testWidgetTranscriptProjectionAndDurableHistoryCards() throws {
+        let card: [String: Any] = [
+            "kind": "widget",
+            "widget": [
+                "prompt": "Deploy?",
+                "helpText": "Choose one",
+                "options": [
+                    ["label": "Ship", "value": "ship", "style": "primary"],
+                    ["label": "Stop", "value": "stop", "style": "danger"],
+                ],
+                "allowCustom": true,
+                "dismissOnMoveOn": true,
+            ],
+            "respondedValue": "ship",
+            "widgetDismissed": false,
+            "widgetSkipped": false,
+        ]
+        let projected = try XCTUnwrap(projectMobileCanonicalHostTranscriptCard(
+            event: [
+                "entryId": "message-1-card-0",
+                "card": card,
+            ],
+            operationId: nil
+        ))
+        let widget = try XCTUnwrap(mobileTranscriptWidgetProjection(projected))
+        XCTAssertEqual(widget.widget.prompt, "Deploy?")
+        XCTAssertEqual(widget.widget.choiceConfig?.options.count, 2)
+        XCTAssertEqual(widget.respondedValue, "ship")
+        XCTAssertFalse(widget.dismissed)
+
+        let historyEntries = try XCTUnwrap(projectMobileConversationWindowEntries([
+            "id": "message-1",
+            "role": "assistant",
+            "text": "",
+            "createdAtMs": 1234,
+            "cards": [card],
+        ]))
+        XCTAssertEqual(historyEntries.count, 1)
+        XCTAssertEqual(historyEntries[0].id, "message-1-card-0")
+        XCTAssertEqual(
+            mobileTranscriptWidgetProjection(historyEntries[0])?.respondedValue,
+            "ship"
+        )
+
+        XCTAssertNil(projectMobileCanonicalHostTranscriptCard(
+            event: [
+                "entryId": "bad-card",
+                "card": [
+                    "kind": "widget",
+                    "widget": [
+                        "prompt": "Bad",
+                        "options": [],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+    }
+
     func testCanonicalHostTranscriptCardsPreserveValidatedPayloadAndFailClosed() throws {
         let email = try XCTUnwrap(projectMobileCanonicalHostTranscriptCard(
             event: [
