@@ -41,6 +41,106 @@ struct GrokMobileBotService {
         try await loadIndividualBotsStrict()
     }
 
+    static func humanHandoffPrompt(
+        conversationTitle: String,
+        transcriptLines: [String]
+    ) -> String? {
+        let normalizedTitle = conversationTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let recent = transcriptLines
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .suffix(20)
+        guard !recent.isEmpty else { return nil }
+        let title = normalizedTitle.isEmpty ? "Human conversation" : normalizedTitle
+        return """
+        Continue from this Human conversation and help with the user's explicit handoff request. Preserve the Human/Agent distinction and use tools or artifacts when useful.
+
+        Human conversation: \(title)
+
+        \(recent.joined(separator: "\n"))
+        """
+    }
+
+    static func humanHandoffCommand(
+        requestId: String,
+        agentId: String,
+        humanConversationId: String,
+        prompt: String
+    ) -> [String: Any]? {
+        let requestId = requestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let agentId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let humanConversationId = humanConversationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !requestId.isEmpty, !agentId.isEmpty, !humanConversationId.isEmpty, !prompt.isEmpty else {
+            return nil
+        }
+        return [
+            "type": "chat.handoffHuman",
+            "requestId": requestId,
+            "agentId": agentId,
+            "humanConversationId": humanConversationId,
+            "text": prompt,
+        ]
+    }
+
+    func handoffHumanConversation(
+        agentId: String,
+        humanConversationId: String,
+        prompt: String,
+        requestId: String = "ios-human-handoff-\(UUID().uuidString.lowercased())"
+    ) async throws {
+        guard let command = Self.humanHandoffCommand(
+            requestId: requestId,
+            agentId: agentId,
+            humanConversationId: humanConversationId,
+            prompt: prompt
+        ) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 30,
+                userInfo: [NSLocalizedDescriptionKey: "Human handoff requires an Agent, conversation, and transcript."]
+            )
+        }
+        let accepted = try await bridge.request(
+            method: "feature.execute",
+            params: ["command": command]
+        )
+        guard let object = accepted.value as? [String: Any],
+              let operationId = object["operationId"] as? String,
+              !operationId.isEmpty
+        else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 31,
+                userInfo: [NSLocalizedDescriptionKey: "Host did not bind the Human handoff to an Agent operation."]
+            )
+        }
+
+        let terminal = try await bridge.receiveFeatureEvent(
+            deadlineMilliseconds: 180_000
+        ) { event in
+            guard event["operationId"] as? String == operationId,
+                  let type = event["type"] as? String
+            else { return false }
+            return type == "operation.completed"
+                || type == "operation.failed"
+                || type == "operation.interrupted"
+        }
+        guard let event = terminal.value as? [String: Any],
+              event["type"] as? String == "operation.completed"
+        else {
+            let event = terminal.value as? [String: Any]
+            let reason = (event?["error"] as? String)
+                ?? (event?["reason"] as? String)
+                ?? "Agent handoff did not complete."
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 32,
+                userInfo: [NSLocalizedDescriptionKey: reason]
+            )
+        }
+    }
+
     func waitForOnboardingComputer(
         timeoutNanoseconds: UInt64 = 60_000_000_000,
         retryNanoseconds: UInt64 = 2_500_000_000

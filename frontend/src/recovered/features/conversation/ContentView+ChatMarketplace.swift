@@ -775,6 +775,30 @@ extension ContentView {
                             Button { self.replyTarget = nil } label: { Image(systemName: "xmark.circle.fill") }
                         }.padding(.horizontal, 12).padding(.vertical, 6).background(.ultraThinMaterial)
                     }
+                    if humanHandoffBusy || humanHandoffError != nil {
+                        HStack(spacing: 8) {
+                            if humanHandoffBusy {
+                                ProgressView()
+                                Text("Agent 正在从这段 Human 会话继续…")
+                            } else if let humanHandoffError {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                Text(humanHandoffError)
+                            }
+                            Spacer()
+                            if humanHandoffError != nil {
+                                Button {
+                                    self.humanHandoffError = nil
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }
+                            }
+                        }
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial)
+                    }
                     if voiceRecorder.isRecording {
                         HStack(spacing: 10) {
                             Circle().fill(Color.red).frame(width: 9, height: 9)
@@ -854,6 +878,28 @@ extension ContentView {
                                 chatSearchTargetID = nil
                             }
                         }
+                        Menu {
+                            if humanHandoffAgents.isEmpty {
+                                Text("没有可用的 Agent")
+                            } else {
+                                ForEach(humanHandoffAgents) { agent in
+                                    Button(agent.name, systemImage: "sparkles") {
+                                        startHumanHandoff(
+                                            to: agent,
+                                            conversation: conversation,
+                                            messages: messages
+                                        )
+                                    }
+                                    .disabled(humanHandoffBusy)
+                                }
+                            }
+                        } label: {
+                            Label(
+                                humanHandoffBusy ? "Agent 正在接手…" : "Ask Agent",
+                                systemImage: "sparkles"
+                            )
+                        }
+                        .disabled(humanHandoffBusy || bridge == nil)
                         Button(conversation.isMuted ? "取消静音" : "静音", systemImage: "speaker.slash") { Task { await messaging.setMuted(conversation.id, muted: !conversation.isMuted) } }
                         Button(conversation.isPinned ? "取消置顶" : "置顶", systemImage: "pin") { Task { await messaging.setPinned(conversation.id, pinned: !conversation.isPinned) } }
                         Button("标为未读", systemImage: "circle.fill") { Task { await messaging.setMarkedUnread(conversation.id, markedUnread: true) }; selectedConversation = nil }
@@ -865,6 +911,21 @@ extension ContentView {
         .task(id: conversation.id) {
             chatSearchMatchIndex = nil
             chatSearchTargetID = nil
+            humanHandoffConversationId = conversation.id
+            humanHandoffAgents = []
+            humanHandoffError = nil
+            if let bridge {
+                do {
+                    let agents = try await GrokMobileBotService(bridge: bridge).loadOnboardingAgents()
+                    guard !Task.isCancelled, humanHandoffConversationId == conversation.id else { return }
+                    humanHandoffAgents = agents
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard !Task.isCancelled, humanHandoffConversationId == conversation.id else { return }
+                    humanHandoffError = "无法加载 Agent：\(error.localizedDescription)"
+                }
+            }
             let draft = messaging.draftsByConversation[conversation.id]
             messageDraft = draft?.text ?? ""
             replyTarget = draft?.replyToMessageId.flatMap { replyId in messaging.messagesByConversation[conversation.id]?.first(where: { $0.id == replyId }) }
@@ -958,6 +1019,54 @@ extension ContentView {
                         }.disabled(pollQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || pollOption1.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || pollOption2.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
+            }
+        }
+    }
+
+    func startHumanHandoff(
+        to agent: MobileBotSummary,
+        conversation: ConversationSummary,
+        messages: [ChatMessage]
+    ) {
+        guard let bridge, !humanHandoffBusy else { return }
+        let transcriptLines = messages.compactMap { message -> String? in
+            let text = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            let author = message.isOutgoing
+                ? "You"
+                : (messaging.searchAuthorByMessageId[message.id] ?? conversation.title)
+            return "\(author): \(text)"
+        }
+        guard let prompt = GrokMobileBotService.humanHandoffPrompt(
+            conversationTitle: conversation.title,
+            transcriptLines: transcriptLines
+        ) else {
+            humanHandoffError = "这段 Human 会话还没有可交给 Agent 的消息。"
+            return
+        }
+
+        humanHandoffBusy = true
+        humanHandoffError = nil
+        humanHandoffConversationId = conversation.id
+        Task {
+            do {
+                try await GrokMobileBotService(bridge: bridge).handoffHumanConversation(
+                    agentId: agent.id,
+                    humanConversationId: conversation.id,
+                    prompt: prompt
+                )
+                guard !Task.isCancelled, humanHandoffConversationId == conversation.id else { return }
+                await messaging.refresh()
+                guard !Task.isCancelled, humanHandoffConversationId == conversation.id else { return }
+                humanHandoffBusy = false
+            } catch is CancellationError {
+                if humanHandoffConversationId == conversation.id {
+                    humanHandoffBusy = false
+                }
+            } catch {
+                guard humanHandoffConversationId == conversation.id else { return }
+                humanHandoffBusy = false
+                humanHandoffError = "Agent 接手失败：\(error.localizedDescription)"
             }
         }
     }

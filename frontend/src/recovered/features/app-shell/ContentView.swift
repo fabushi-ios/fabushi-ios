@@ -109,6 +109,10 @@ struct ContentView: View {
     @State var replyTarget: ChatMessage?
     @State var editingMessage: ChatMessage?
     @State var forwardMessage: ChatMessage?
+    @State var humanHandoffAgents: [MobileBotSummary] = []
+    @State var humanHandoffBusy = false
+    @State var humanHandoffError: String?
+    @State var humanHandoffConversationId: String?
     @State var mediaViewerMessage: ChatMessage?
     @State var conversationInfoPresented = false
     @State var chatSearchPresented = false

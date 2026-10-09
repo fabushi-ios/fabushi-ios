@@ -2,6 +2,52 @@ import XCTest
 @testable import Fabushi
 
 final class GrokMobileBotServiceTests: XCTestCase {
+    func testHumanHandoffPromptKeepsOnlyTheMostRecentTwentyTranscriptLines() throws {
+        let lines = (1...23).map { "Human \($0): message \($0)" }
+        let prompt = try XCTUnwrap(
+            GrokMobileBotService.humanHandoffPrompt(
+                conversationTitle: "Family",
+                transcriptLines: lines
+            )
+        )
+        XCTAssertFalse(prompt.contains("Human 1: message 1"))
+        XCTAssertFalse(prompt.contains("Human 3: message 3"))
+        XCTAssertTrue(prompt.contains("Human 4: message 4"))
+        XCTAssertTrue(prompt.contains("Human 23: message 23"))
+        XCTAssertTrue(prompt.contains("Human conversation: Family"))
+        XCTAssertTrue(prompt.contains("Preserve the Human/Agent distinction"))
+    }
+
+    func testHumanHandoffCommandUsesTypedHostContractAndFailsClosed() throws {
+        let command = try XCTUnwrap(
+            GrokMobileBotService.humanHandoffCommand(
+                requestId: "handoff-1",
+                agentId: "agent-1",
+                humanConversationId: "direct:human-1",
+                prompt: "Continue this Human conversation."
+            )
+        )
+        XCTAssertEqual(command["type"] as? String, "chat.handoffHuman")
+        XCTAssertEqual(command["requestId"] as? String, "handoff-1")
+        XCTAssertEqual(command["agentId"] as? String, "agent-1")
+        XCTAssertEqual(command["humanConversationId"] as? String, "direct:human-1")
+        XCTAssertEqual(command["text"] as? String, "Continue this Human conversation.")
+        XCTAssertNil(
+            GrokMobileBotService.humanHandoffCommand(
+                requestId: "handoff-2",
+                agentId: "",
+                humanConversationId: "direct:human-1",
+                prompt: "context"
+            )
+        )
+        XCTAssertNil(
+            GrokMobileBotService.humanHandoffPrompt(
+                conversationTitle: "Empty",
+                transcriptLines: ["   "]
+            )
+        )
+    }
+
     @MainActor
     func testMergePrefersInstalledMiniAppProjectionForSameBot() {
         let surface = [
