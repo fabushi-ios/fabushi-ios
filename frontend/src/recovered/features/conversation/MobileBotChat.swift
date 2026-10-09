@@ -189,6 +189,172 @@ internal func mobileTranscriptCopyText(_ entry: MobileChatMessage) -> String? {
     return entry.text
 }
 
+internal enum MobileReplyReferencePreview: Equatable {
+    case userText(String)
+    case assistantText(String)
+    case image(url: String)
+    case file(url: String, name: String?)
+    case link(url: String)
+    case missing
+}
+
+internal struct MobileReplyReferenceResolution: Equatable {
+    let targetID: String
+    let preview: MobileReplyReferencePreview
+    let isResolved: Bool
+}
+
+internal func mobileStableReplyTargetID(_ entry: MobileChatMessage) -> String? {
+    guard entry.kind == .message,
+          !entry.streaming,
+          let raw = entry.canonicalMessageId
+    else { return nil }
+    let targetID = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    return targetID.isEmpty ? nil : targetID
+}
+
+private func mobileReplyReferenceNormalizedText(_ value: String) -> String {
+    value.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+}
+
+private func mobileReplyReferenceTruncatedText(_ value: String, limit: Int) -> String {
+    let normalized = mobileReplyReferenceNormalizedText(value)
+    guard normalized.count > limit, limit > 1 else { return normalized }
+    let end = normalized.index(normalized.startIndex, offsetBy: limit - 1)
+    return String(normalized[..<end]).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+}
+
+private func mobileReplyReferenceBasename(_ value: String) -> String {
+    if let url = URL(string: value), !url.lastPathComponent.isEmpty {
+        return url.lastPathComponent
+    }
+    let normalized = value.replacingOccurrences(of: "\\", with: "/")
+    return normalized.split(separator: "/", omittingEmptySubsequences: true).last.map(String.init)
+        ?? "Attachment"
+}
+
+private func mobileReplyReferenceLinkHost(_ value: String) -> String {
+    guard let url = URL(string: value), let host = url.host, !host.isEmpty else {
+        return value
+    }
+    return host
+}
+
+internal func mobileReplyReferencePreview(
+    for entry: MobileChatMessage
+) -> MobileReplyReferencePreview {
+    guard entry.kind == .message, !entry.streaming else { return .missing }
+
+    if let projection = entry.sendMessageTextProjection {
+        switch projection.presentation {
+        case .urlCard(let rawURL):
+            return .link(url: rawURL)
+        case .text:
+            let text = mobileReplyReferenceNormalizedText(projection.content)
+            if !text.isEmpty {
+                return entry.role == .user ? .userText(text) : .assistantText(text)
+            }
+        }
+    }
+
+    let text = mobileReplyReferenceNormalizedText(entry.text)
+    if !text.isEmpty {
+        return entry.role == .user ? .userText(text) : .assistantText(text)
+    }
+
+    guard let rawURL = entry.attachmentURL?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+        !rawURL.isEmpty
+    else { return .missing }
+
+    switch classifyMobileAttachmentURL(rawURL) {
+    case .legacyLink:
+        return .link(url: rawURL)
+    case .media:
+        if mobileAttachmentMediaPresentation(rawURL) == .image {
+            return .image(url: rawURL)
+        }
+        return .file(
+            url: rawURL,
+            name: entry.attachmentFileName ?? entry.attachmentAlt
+        )
+    case .file:
+        return .file(
+            url: rawURL,
+            name: entry.attachmentFileName ?? entry.attachmentAlt
+        )
+    case .box:
+        return .file(url: rawURL, name: "Computer attachment")
+    }
+}
+
+internal func mobileResolveReplyReference(
+    targetID: String,
+    entries: [MobileChatMessage]
+) -> MobileReplyReferenceResolution {
+    let normalizedTargetID = targetID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalizedTargetID.isEmpty,
+          let target = entries.first(where: {
+              mobileStableReplyTargetID($0) == normalizedTargetID
+          })
+    else {
+        return .init(
+            targetID: normalizedTargetID,
+            preview: .missing,
+            isResolved: false
+        )
+    }
+    return .init(
+        targetID: normalizedTargetID,
+        preview: mobileReplyReferencePreview(for: target),
+        isResolved: true
+    )
+}
+
+internal func mobileReplyReferenceComposerLabel(
+    _ preview: MobileReplyReferencePreview
+) -> String {
+    switch preview {
+    case .userText(let text), .assistantText(let text):
+        let label = mobileReplyReferenceTruncatedText(text, limit: 40)
+        return label.isEmpty ? "Thread" : label
+    case .image:
+        return "Photo"
+    case .file(let url, let name):
+        let value = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value?.isEmpty == false ? value! : mobileReplyReferenceBasename(url)
+    case .link(let url):
+        return mobileReplyReferenceLinkHost(url)
+    case .missing:
+        return "Thread"
+    }
+}
+
+internal func mobileReplyReferenceQuoteLabel(
+    _ preview: MobileReplyReferencePreview
+) -> String {
+    switch preview {
+    case .userText(let text), .assistantText(let text):
+        let label = mobileReplyReferenceTruncatedText(text, limit: 96)
+        return label.isEmpty ? "(empty)" : label
+    case .image:
+        return "Photo"
+    case .file(let url, let name):
+        let value = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return mobileReplyReferenceTruncatedText(
+            value?.isEmpty == false ? value! : mobileReplyReferenceBasename(url),
+            limit: 96
+        )
+    case .link(let url):
+        return mobileReplyReferenceTruncatedText(
+            mobileReplyReferenceLinkHost(url),
+            limit: 96
+        )
+    case .missing:
+        return "(deleted)"
+    }
+}
+
 internal func mobileBotChatSearchEntries(_ entries: [MobileChatMessage]) -> [ChatSearchEntry] {
     mobileMainTranscriptEntries(entries).compactMap { entry in
         guard let text = mobileTranscriptCopyText(entry)?
@@ -877,9 +1043,14 @@ internal struct MobileBotChat: View {
     @ViewBuilder
     private var replyBanner: some View {
         if let replyTargetId {
+            let resolution = mobileResolveReplyReference(
+                targetID: replyTargetId,
+                entries: entries
+            )
+            let previewLabel = mobileReplyReferenceComposerLabel(resolution.preview)
             HStack(spacing: 8) {
                 Image(systemName: replyIsFork ? "bubble.left.and.bubble.right" : "arrowshape.turn.up.left")
-                Text(replyIsFork ? "Thread reply · \(replyTargetId)" : "Replying · \(replyTargetId)")
+                Text(replyIsFork ? "Thread reply · \(previewLabel)" : "Replying · \(previewLabel)")
                     .font(.caption)
                     .lineLimit(1)
                 Spacer()
@@ -1330,6 +1501,7 @@ internal struct MobileBotChat: View {
             HStack {
                 Spacer(minLength: 54)
                 VStack(alignment: .leading, spacing: 7) {
+                    replyReferenceContent(entry)
                     messageTextContent(entry)
                     attachmentContent(entry)
                     reactionPills(entry)
@@ -1364,8 +1536,10 @@ internal struct MobileBotChat: View {
                 .padding(.horizontal, 15).padding(.vertical, 10)
                 .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .contextMenu {
-                    Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
-                    Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
+                    if mobileStableReplyTargetID(entry) != nil {
+                        Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
+                        Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
+                    }
                     if mobileBotForwardMessageId(
                         entry,
                         sourceConversationId: bot.conversationId
@@ -1384,6 +1558,7 @@ internal struct MobileBotChat: View {
                 HStack(alignment: .bottom, spacing: 7) {
                     ClothGhostAvatar(botId: bot.id, size: 20)
                     VStack(alignment: .leading, spacing: 7) {
+                        replyReferenceContent(entry)
                         messageTextContent(entry)
                             .foregroundStyle(.black)
                         attachmentContent(entry)
@@ -1393,8 +1568,10 @@ internal struct MobileBotChat: View {
                     .padding(.horizontal, 15).padding(.vertical, 10)
                     .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .contextMenu {
-                        Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
-                        Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
+                        if mobileStableReplyTargetID(entry) != nil {
+                            Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
+                            Button(threadRootId == nil ? "Start Thread" : "Reply in Thread") { beginReply(to: entry, inThread: true) }
+                        }
                         if mobileBotForwardMessageId(
                             entry,
                             sourceConversationId: bot.conversationId
@@ -1414,9 +1591,45 @@ internal struct MobileBotChat: View {
 
     @MainActor
     private func beginReply(to entry: MobileChatMessage, inThread: Bool) {
-        replyTargetId = mobileTranscriptCanonicalId(entry)
+        guard let targetID = mobileStableReplyTargetID(entry) else { return }
+        replyTargetId = targetID
         replyIsFork = inThread
         if threadRootId != nil { threadRootId = nil }
+    }
+
+    @ViewBuilder
+    private func replyReferenceContent(_ entry: MobileChatMessage) -> some View {
+        if let targetID = entry.replyToMessageId {
+            let resolution = mobileResolveReplyReference(
+                targetID: targetID,
+                entries: entries
+            )
+            HStack(spacing: 5) {
+                switch resolution.preview {
+                case .image:
+                    Image(systemName: "photo")
+                case .file:
+                    Image(systemName: "doc")
+                case .link:
+                    Image(systemName: "link")
+                case .userText, .assistantText, .missing:
+                    Image(systemName: "arrowshape.turn.up.left")
+                }
+                Text(mobileReplyReferenceQuoteLabel(resolution.preview))
+                    .lineLimit(2)
+            }
+            .font(.caption2)
+            .opacity(0.72)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                resolution.isResolved
+                    ? "Reply to \(mobileReplyReferenceQuoteLabel(resolution.preview))"
+                    : "Reply target deleted"
+            )
+            .accessibilityIdentifier(
+                Self.semanticId("mobile-bot-reply-reference-\(entry.id)")
+            )
+        }
     }
 
     @ViewBuilder
