@@ -79,6 +79,24 @@ final class SettingsNoticeControllerParityTests: XCTestCase {
         )
     }
 
+    func testPresenterMapsAssertiveErrorsAheadOfPoliteSuccessAnnouncements() {
+        XCTAssertEqual(
+            SettingsNoticePresentationPolicy
+                .accessibilityAnnouncementDelayMilliseconds(for: .error),
+            0
+        )
+        XCTAssertGreaterThan(
+            SettingsNoticePresentationPolicy
+                .accessibilityAnnouncementDelayMilliseconds(for: .success),
+            0
+        )
+        XCTAssertLessThan(
+            SettingsNoticePresentationPolicy
+                .accessibilityAnnouncementDelayMilliseconds(for: .success),
+            SettingsNoticePresentationPolicy.dismissDelayMilliseconds(for: .success)
+        )
+    }
+
     func testPublisherFeedsTypedRootAndLegacyStringSink() {
         let controller = SettingsNoticeController()
         controller.updateScope(accountKey: "account-a", surface: .plugins)

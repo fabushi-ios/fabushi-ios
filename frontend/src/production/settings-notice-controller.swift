@@ -1,5 +1,6 @@
 import Observation
 import SwiftUI
+import UIKit
 
 enum SurfaceNoticeKind: String, CaseIterable, Equatable, Hashable, Sendable {
     case success
@@ -141,6 +142,18 @@ enum SettingsNoticePresentationPolicy {
         case .error: 6_000
         }
     }
+
+    /// Native equivalent of Desktop's polite status vs assertive alert semantics.
+    /// Errors announce immediately; successes yield briefly so current VoiceOver
+    /// focus/speech is not unnecessarily interrupted.
+    static func accessibilityAnnouncementDelayMilliseconds(
+        for kind: SurfaceNoticeKind
+    ) -> Int {
+        switch kind {
+        case .success: 180
+        case .error: 0
+        }
+    }
 }
 
 @MainActor
@@ -175,6 +188,23 @@ struct SettingsNoticeView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("settings-notice")
             }
+        }
+        .task(id: "notice-announcement-\(controller.snapshot?.revision ?? 0)") {
+            guard let snapshot = controller.snapshot else { return }
+            let delay = SettingsNoticePresentationPolicy
+                .accessibilityAnnouncementDelayMilliseconds(for: snapshot.event.kind)
+            if delay > 0 {
+                do {
+                    try await Task.sleep(for: .milliseconds(delay))
+                } catch {
+                    return
+                }
+            }
+            guard controller.snapshot?.revision == snapshot.revision else { return }
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: snapshot.event.message
+            )
         }
         .task(id: controller.snapshot?.revision) {
             expired = false
