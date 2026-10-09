@@ -83,7 +83,8 @@ final class CursorProfileParityTests: XCTestCase {
                 ])
             }
         )
-        XCTAssertFalse(await allowed.getCursorPrivacyModeEnabled())
+        let allowedPrivacyMode = await allowed.getCursorPrivacyModeEnabled()
+        XCTAssertFalse(allowedPrivacyMode)
 
         let noStorage = IOSCursorDashboardClient(
             credentials: profileCredentials(),
@@ -94,7 +95,8 @@ final class CursorProfileParityTests: XCTestCase {
                 ])
             }
         )
-        XCTAssertTrue(await noStorage.getCursorPrivacyModeEnabled())
+        let noStoragePrivacyMode = await noStorage.getCursorPrivacyModeEnabled()
+        XCTAssertTrue(noStoragePrivacyMode)
     }
 
     func testUsageSummaryAndDashboardActionUseDesktopTimeoutAndProjection() async throws {
@@ -206,10 +208,14 @@ final class CursorLocalToolPermissionCeilingParityTests: XCTestCase {
             )
             return try await client.getLocalToolPermissionCeiling()
         }
-        XCTAssertEqual(try await read(1), "never")
-        XCTAssertEqual(try await read(2), "ask")
-        XCTAssertEqual(try await read(3), "always")
-        XCTAssertNil(try await read(0))
+        let never = try await read(1)
+        let ask = try await read(2)
+        let always = try await read(3)
+        let unknown = try await read(0)
+        XCTAssertEqual(never, "never")
+        XCTAssertEqual(ask, "ask")
+        XCTAssertEqual(always, "always")
+        XCTAssertNil(unknown)
     }
 
     func testLoggedInCeilingAppliesAndEffectiveChangeSyncsHostOnce() async throws {
