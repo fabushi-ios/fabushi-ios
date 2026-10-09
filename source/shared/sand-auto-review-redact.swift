@@ -32,7 +32,7 @@ func redactSandAutoReviewInlineSecrets(_ value: String) -> String {
     var result = redactAutoReviewURLs(value)
     result = redactRegex(
         result,
-        pattern: #"((?:--)?(?:api[_-]?key|authorization|credential|password|secret|signature|token)\s*(?:=|:|\s)\s*)(?:\"[^\"]*\"|'[^']*'|[^\s]+)"#,
+        pattern: #"((?:--)?(?:api[_-]?key|authorization|credential|password|secret|signature|token)\s*(?:=|:|\s)\s*)(?:\"[^\"]*\"|'[^']*'|Bearer\s+[^\s]+|[^\s]+)"#,
         replacement: "$1…"
     )
     result = redactRegex(result, pattern: #"\bBearer\s+[^\s\"']+"#, replacement: "Bearer …")
