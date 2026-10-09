@@ -301,7 +301,9 @@ actor StructuredLogTransport {
         do {
             let receipt = try await submit(entries)
             guard generation == deliveryGeneration else {
-                activeBatch.removeAll()
+                // A newer generation owns activeBatch now. clearPending/dispose
+                // already detached this request's batch; stale completion must
+                // not mutate the replacement generation.
                 return true
             }
             guard isValidLogShipReceipt(receipt, requestSize: entries.count) else {
@@ -318,7 +320,9 @@ actor StructuredLogTransport {
             return await reportPendingDrops(generation: generation, nowMs: nowMs)
         } catch {
             guard generation == deliveryGeneration else {
-                activeBatch.removeAll()
+                // A newer generation owns activeBatch now. clearPending/dispose
+                // already detached this request's batch; stale completion must
+                // not mutate the replacement generation.
                 return true
             }
             buffer.insert(contentsOf: batch, at: 0)
