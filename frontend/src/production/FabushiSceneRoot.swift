@@ -193,8 +193,13 @@ private struct FabushiRootErrorSurface: View {
 @MainActor
 private struct FabushiProductionSceneRoot: View {
     @State private var lifecycle = FabushiRuntimeLifecycle()
+    @State private var uiPreferencesStore = MobileUiPreferencesStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+    @Environment(\.layoutDirection) private var systemLayoutDirection
+    @Environment(\.dynamicTypeSize) private var systemDynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var systemDifferentiateWithoutColor
 
     @ViewBuilder
     var body: some View {
@@ -226,6 +231,30 @@ private struct FabushiProductionSceneRoot: View {
                 onOpenUpdateURL: { url in
                     openURL(url)
                 }
+            )
+            .environment(
+                \.locale,
+                uiPreferencesStore.preferences.resolvedLocale()
+            )
+            .environment(
+                \.layoutDirection,
+                uiPreferencesStore.preferences.resolvedLayoutDirection(
+                    system: systemLayoutDirection
+                )
+            )
+            .environment(
+                \.dynamicTypeSize,
+                uiPreferencesStore.preferences.adjustedDynamicTypeSize(
+                    system: systemDynamicTypeSize
+                )
+            )
+            .environment(
+                \.accessibilityReduceMotion,
+                systemReduceMotion || uiPreferencesStore.preferences.reducedMotion
+            )
+            .environment(
+                \.accessibilityDifferentiateWithoutColor,
+                systemDifferentiateWithoutColor || uiPreferencesStore.preferences.highContrast
             )
             .task {
                 await runtime.start()
