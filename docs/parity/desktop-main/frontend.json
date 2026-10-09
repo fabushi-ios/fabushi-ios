@@ -344,11 +344,12 @@
       "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "Swift / SwiftUI + Rust",
       "ios_platform_delta": "SwiftUI sheet replaces the Desktop dialog while canonical fabushi-messaging-core owns eligibility, authorization, stable replay identity and message mutation. The iOS sheet keeps per-destination client IDs across failed-only retries and never uses the local conversation list as an authorization source.",
-      "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift reuses the existing ForwardMessageSheet and MessagingModel searchForwardRecipients/forwardMessageBatch owners. The native sheet preserves eligible-only search, multi-recipient selection, drop-sender/drop-caption privacy, per-destination stable clientMessageId retry identity, partial settlement retention, and now adds bounded iPad/hardware-keyboard Arrow/Page/Home/End navigation plus Return/Space selection and cmd+Return submit without a second conversation/message store.",
-      "test_evidence": "mobile/ios/FabushiTests/ForwardMessageParityTests.swift covers bounded Arrow/Page/Home/End recipient navigation and invalid-index clamping; current exact-HEAD Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blobs reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61: ForwardMessageDialog.tsx@45b4031d4e9a9081ec3e3987d77b7128add050c5 and forward-recipient-navigation.ts@aba269a9dd687747e4d53fd1d971f74451a8542c. Current-main keyboard-selection semantics are implemented in the existing shipping forward sheet. Keep source-level implemented until current-head shipping-path Actions and artifact provenance succeed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "mapped",
+      "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift reuses the existing ForwardMessageSheet and MessagingModel searchForwardRecipients/forwardMessageBatch owners. The native sheet preserves eligible-only search, multi-recipient selection, drop-sender/drop-caption privacy, per-destination stable clientMessageId retry identity, partial settlement retention, and adds bounded iPad/hardware-keyboard Arrow/Page/Home/End navigation plus Return/Space selection and cmd+Return submit without a second conversation/message store.",
+      "test_evidence": "mobile/ios/FabushiTests/ForwardMessageParityTests.swift covers bounded Arrow/Page/Home/End recipient navigation and invalid-index clamping; source/packages/mahayana-messaging/src/engine.rs::forward_parity_tests covers service behavior; exact-HEAD Actions are required before any promotion.",
+      "notes": "Exact Desktop ForwardMessageDialog.tsx@45b4031d4e9a9081ec3e3987d77b7128add050c5 reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Shipping iOS behavior is implemented, including the newly closed hardware-keyboard gap, but this blob-changed source must remain mapped/re-review-fenced until aggregate dependency/shared-contract/main-active-spec review is accepted.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "frontend/src/production/ProductionRenderer.tsx",
@@ -453,11 +454,14 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native Swift value types preserve normalization/fuzzy search/tab semantics; individual Bots stay in Agents and Host-owned Bot groups project into Groups. Current-main roster de-duplication preserves the first palette slot while replacing the stale object with the newest canonical row.",
-      "implementation_status": "implemented",
+      "implementation_status": "mapped",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift is the shipping native command-palette projection. It normalizes/fuzzy-ranks entries, preserves the first slot while replacing duplicate bot identity with the newest roster row, excludes hidden bots from the default palette, and appends matching hidden bots only after visible scored results during search; existing GrokMobileShell command-palette composition remains the single navigation owner.",
-      "test_evidence": "mobile/ios/FabushiTests/MobileCommandPaletteCurrentMainTests.swift covers hidden-default exclusion, visible-before-hidden search ordering, hidden-group search, and duplicate roster identity retaining the first slot with the newest row. Current exact-HEAD Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop command-palette-model.ts@8f3ac50a132c2b2e050a51ccc911b81dca897b21 reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The current-main hidden-agent/dedup semantics exposed a real iOS production bug and were fixed in the existing model; source-level current-main review is closed for this row only.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "test_evidence": "mobile/ios/FabushiTests/MobileCommandPaletteCurrentMainTests.swift covers hidden-default exclusion, visible-before-hidden search ordering, hidden-group search, and duplicate roster identity retaining the first slot with the newest row; exact-HEAD Actions are required before any promotion.",
+      "notes": "Exact Desktop command-palette-model.ts@8f3ac50a132c2b2e050a51ccc911b81dca897b21 reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The review exposed and fixed a real hidden-bot production bug. Historical verified evidence remains historical only; this blob-changed source stays mapped/re-review-fenced until aggregate dependency/shared-contract/main-active-spec review is accepted.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "requires-current-main-review",
+      "historical_implementation_status": "verified",
+      "historical_ios_disposition": "ios-adapted"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-provider.ts",
@@ -567,11 +571,12 @@
       "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "Swift / SwiftUI + Rust",
       "ios_platform_delta": "Native SwiftUI List/search replaces Desktop keyboard-index helpers. Selection identity is conversation-ID based, persists independently of query reordering, and recipient rows originate only from server-filtered ForwardRecipients results.",
-      "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift reuses the existing ForwardMessageSheet and MessagingModel searchForwardRecipients/forwardMessageBatch owners. The native sheet preserves eligible-only search, multi-recipient selection, drop-sender/drop-caption privacy, per-destination stable clientMessageId retry identity, partial settlement retention, and now adds bounded iPad/hardware-keyboard Arrow/Page/Home/End navigation plus Return/Space selection and cmd+Return submit without a second conversation/message store.",
-      "test_evidence": "mobile/ios/FabushiTests/ForwardMessageParityTests.swift covers bounded Arrow/Page/Home/End recipient navigation and invalid-index clamping; current exact-HEAD Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blobs reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61: ForwardMessageDialog.tsx@45b4031d4e9a9081ec3e3987d77b7128add050c5 and forward-recipient-navigation.ts@aba269a9dd687747e4d53fd1d971f74451a8542c. Current-main keyboard-selection semantics are implemented in the existing shipping forward sheet. Keep source-level implemented until current-head shipping-path Actions and artifact provenance succeed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "mapped",
+      "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift owns identity-based recipient selection over server-filtered ForwardRecipients and now mirrors Desktop bounded Arrow/Page/Home/End navigation, Return/Space toggle, and cmd+Return submit; MessagingModel remains the only message/eligibility owner.",
+      "test_evidence": "mobile/ios/FabushiTests/ForwardMessageParityTests.swift covers bounded navigation and clamping; source/packages/mahayana-messaging/src/engine.rs::forward_parity_tests covers eligibility/forward behavior; exact-HEAD Actions are required before any promotion.",
+      "notes": "Exact Desktop forward-recipient-navigation.ts@aba269a9dd687747e4d53fd1d971f74451a8542c reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Shipping iOS behavior is implemented, but this added source remains mapped/re-review-fenced until aggregate current-main impact review is accepted.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "frontend/src/production/group-members-root.ts",
@@ -3825,11 +3830,14 @@
       "ios_target_path": "frontend/src/production/FabushiAgentNetworkView.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "Desktop React/SVG workspace is adapted to a native SwiftUI GeometryReader/Canvas surface. It reuses GrokMobileBotService bot.list/group.list, MobileBotSummary, account-scoped roster lifecycle, conversation.openTail history projection, reconnectGeneration and existing chat/room selection routing; no second Agent/group/message store is introduced.",
-      "implementation_status": "implemented",
+      "implementation_status": "mapped",
       "production_evidence": "frontend/src/production/FabushiAgentNetworkView.swift is the shipping native graph owner. GeometryReader feeds live container dimensions into MobileAgentNetworkLayout; Canvas renders canonical relationship edges; DragGesture and MagnificationGesture provide bounded pan/zoom; double-tap and toolbar reset restore the viewport; selection and Open chat/Open room routing remain on the existing roster/navigation owners.",
-      "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers responsive width/height-dependent layout, scale clamps, offset bounds, edge/activity projection, selection reconciliation, open routing and accessibility identifiers. Current exact-HEAD Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop graph.tsx@a1fd0a426dba3964dfbc9bab82e4ed01a0f7f967 reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The current-main direct change adds container ResizeObserver measurement and live wheel geometry; native GeometryReader is the platform-equivalent live container measurement, with native magnification/drag replacing wheel/pointer mechanics. Source-level current-main review is closed for this row only; global dependency/spec review remains pending.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers responsive width/height-dependent layout, scale clamps, offset bounds, edge/activity projection, selection reconciliation, open routing and accessibility identifiers; exact-HEAD Actions are required before any promotion.",
+      "notes": "Exact Desktop graph.tsx@a1fd0a426dba3964dfbc9bab82e4ed01a0f7f967 reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native GeometryReader is the platform-equivalent of current-main live ResizeObserver measurement and native gestures replace wheel/pointer mechanics. Shipping behavior exists, but this blob-changed source remains mapped/re-review-fenced until aggregate current-main impact review is accepted.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "requires-current-main-review",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/inspector.tsx",
