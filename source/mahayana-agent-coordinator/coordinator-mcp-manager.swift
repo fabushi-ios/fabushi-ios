@@ -639,6 +639,7 @@ final class CoordinatorMcpSurface {
     private let cursorAuth: IOSCursorAuthService
     private let dashboard: IOSCursorDashboardClient
     private let avatarImageGenerator: CursorGenerateImageService
+    private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
     private var computerMigrationWatchTask: Task<Void, Never>?
     private var computerMigrationResumeOffsetKey = ""
     private var computerMigrationStatus: [String: Any]?
@@ -652,18 +653,21 @@ final class CoordinatorMcpSurface {
         port: CoordinatorMcpHostPort,
         cursorAuth: IOSCursorAuthService,
         dashboard: IOSCursorDashboardClient,
-        avatarImageGenerator: CursorGenerateImageService
+        avatarImageGenerator: CursorGenerateImageService,
+        localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
     ) {
         self.manager = manager
         self.port = port
         self.cursorAuth = cursorAuth
         self.dashboard = dashboard
         self.avatarImageGenerator = avatarImageGenerator
+        self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
     }
 
     static func make(
         hostSupervisor: MahayanaLocalHostSupervisor,
-        settingsStore: SandSettingsStore
+        settingsStore: SandSettingsStore,
+        reportFailure: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in }
     ) -> CoordinatorMcpSurface {
         let port = CoordinatorMcpHostPort(
             hostSupervisor: hostSupervisor,
@@ -679,6 +683,20 @@ final class CoordinatorMcpSurface {
             }
         )
         let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        let localToolPermissionCeilingSynchronizer = IOSCursorLocalToolPermissionCeilingSynchronizer(
+            settingsStore: settingsStore,
+            fetchCeiling: { try await dashboard.getLocalToolPermissionCeiling() },
+            syncHost: { permission in
+                _ = try await hostSupervisor.request(
+                    method: "feature.settings.localToolPermission",
+                    params: ["permission": permission]
+                )
+            },
+            reportFailure: reportFailure
+        )
+        cursorAuth.setStatusObserver { [weak localToolPermissionCeilingSynchronizer] status in
+            localToolPermissionCeilingSynchronizer?.consume(status)
+        }
         let avatarImageGenerator = createCursorGenerateImageService(
             client: IOSCursorGenerateImageClient(credentials: credentials),
             modelId: SAND_DEFAULT_MODEL_ID
@@ -752,7 +770,8 @@ final class CoordinatorMcpSurface {
             port: port,
             cursorAuth: cursorAuth,
             dashboard: dashboard,
-            avatarImageGenerator: avatarImageGenerator
+            avatarImageGenerator: avatarImageGenerator,
+            localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer
         )
     }
 
@@ -764,6 +783,10 @@ final class CoordinatorMcpSurface {
             stopComputerMigrationWatch(clearState: true)
         }
         port.updateAccountScope(next)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.localToolPermissionCeilingSynchronizer.consume(await self.cursorAuth.status())
+        }
     }
 
     private func stopComputerMigrationWatch(clearState: Bool) {

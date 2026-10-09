@@ -111,6 +111,8 @@ final class IOSCursorCredentialStore: IOSMachineIDSecretStore {
 
 @MainActor
 final class IOSCursorAuthService {
+    typealias StatusObserver = @MainActor (IOSCursorAuthStatus) -> Void
+
     private struct PendingLogin {
         let uuid: String
         let verifier: String
@@ -122,6 +124,8 @@ final class IOSCursorAuthService {
     private let websiteURL: URL
     private let machineIDResolver: IOSMachineIDResolver
     private var pending: [String: PendingLogin] = [:]
+    private var statusObserver: StatusObserver?
+    private var statusObserverGeneration: UInt64 = 0
 
     init(
         store: IOSCursorCredentialStore = .init(),
@@ -134,6 +138,26 @@ final class IOSCursorAuthService {
         self.backendURL = backendURL
         self.websiteURL = websiteURL
         self.machineIDResolver = IOSMachineIDResolver(secrets: store)
+    }
+
+    func setStatusObserver(_ observer: StatusObserver?) {
+        statusObserverGeneration = statusObserverGeneration == UInt64.max
+            ? 1
+            : statusObserverGeneration + 1
+        statusObserver = observer
+        guard let observer else { return }
+        let generation = statusObserverGeneration
+        Task { @MainActor [weak self] in
+            guard let self,
+                  generation == self.statusObserverGeneration,
+                  self.statusObserver != nil
+            else { return }
+            observer(await self.status())
+        }
+    }
+
+    private func publishStatus(_ status: IOSCursorAuthStatus) {
+        statusObserver?(status)
     }
 
     func status() async -> IOSCursorAuthStatus {
@@ -215,7 +239,9 @@ final class IOSCursorAuthService {
         try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: accessToken)
         try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: refreshToken)
         pending.removeValue(forKey: attemptId)
-        return await status()
+        let settled = await status()
+        publishStatus(settled)
+        return settled
     }
 
     func cancelLogin(attemptId: String) {
@@ -226,6 +252,7 @@ final class IOSCursorAuthService {
         pending.removeAll()
         try await store.deleteSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
         try await store.deleteSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
+        publishStatus(.init(loggedIn: false))
     }
 
     func getMachineID() async throws -> String {
@@ -278,6 +305,7 @@ final class IOSCursorAuthService {
         }
         try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: nextAccess)
         try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: nextRefresh)
+        publishStatus(await status())
         return nextAccess
     }
 
@@ -297,5 +325,117 @@ final class IOSCursorAuthService {
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+
+/// Reconciles the authoritative Cursor team ceiling into the single local
+/// settings owner. The only retained mutable state is an async generation
+/// fence; the permission itself remains owned by SandSettingsStore.
+@MainActor
+final class IOSCursorLocalToolPermissionCeilingSynchronizer {
+    typealias FetchCeiling = @MainActor () async throws -> SandLocalToolPermission?
+    typealias SyncHost = @MainActor (SandLocalToolPermission) async throws -> Void
+    typealias ReportFailure = @MainActor (_ area: String, _ leg: String, _ error: Error) -> Void
+
+    private let settingsStore: SandSettingsStore
+    private let fetchCeiling: FetchCeiling
+    private let syncHostProjection: SyncHost
+    private let reportFailure: ReportFailure
+    private var generation: UInt64 = 0
+    private var syncTask: Task<Void, Never>?
+
+    init(
+        settingsStore: SandSettingsStore,
+        fetchCeiling: @escaping FetchCeiling,
+        syncHost: @escaping SyncHost,
+        reportFailure: @escaping ReportFailure
+    ) {
+        self.settingsStore = settingsStore
+        self.fetchCeiling = fetchCeiling
+        self.syncHostProjection = syncHost
+        self.reportFailure = reportFailure
+    }
+
+    func consume(_ status: IOSCursorAuthStatus) {
+        generation = generation == UInt64.max ? 1 : generation + 1
+        let sequence = generation
+        syncTask?.cancel()
+
+        guard status.loggedIn else {
+            let previous = settingsStore.getResolvedLocalToolPermission()
+            settingsStore.setLocalToolPermissionCeiling(nil)
+            let effective = settingsStore.getResolvedLocalToolPermission()
+            guard effective != previous else {
+                syncTask = nil
+                return
+            }
+            syncTask = Task { @MainActor [weak self] in
+                await self?.projectToHost(effective, sequence: sequence)
+            }
+            return
+        }
+
+        syncTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let ceiling = try await self.fetchCeiling()
+                guard self.isCurrent(sequence) else { return }
+                await self.apply(ceiling, sequence: sequence)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard self.isCurrent(sequence) else { return }
+                self.reportFailure("cursor-profile", "local-tool-ceiling-fetch", error)
+                let failClosed = self.settingsStore.getLocalToolPermissionCeiling() ?? "never"
+                await self.apply(failClosed, sequence: sequence)
+            }
+        }
+    }
+
+    func waitForIdleForTesting() async {
+        await syncTask?.value
+    }
+
+    private func isCurrent(_ sequence: UInt64) -> Bool {
+        sequence == generation
+    }
+
+    private func apply(
+        _ ceiling: SandLocalToolPermission?,
+        sequence: UInt64
+    ) async {
+        guard isCurrent(sequence) else { return }
+        let previous = settingsStore.getResolvedLocalToolPermission()
+        settingsStore.setLocalToolPermissionCeiling(ceiling)
+        let effective = settingsStore.getResolvedLocalToolPermission()
+        guard effective != previous else { return }
+        await projectToHost(effective, sequence: sequence)
+    }
+
+    private func projectToHost(
+        _ effective: SandLocalToolPermission,
+        sequence: UInt64
+    ) async {
+        guard isCurrent(sequence) else { return }
+        do {
+            try await syncHostProjection(effective)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard sequence == generation else { return }
+            reportFailure("host-settings", "local-tool-ceiling", error)
+            // If the normal projection failed, make one best-effort restrictive
+            // projection through the same Host owner. The canonical store is
+            // not duplicated or rolled back.
+            do {
+                try await syncHostProjection("never")
+            } catch is CancellationError {
+                return
+            } catch {
+                guard sequence == generation else { return }
+                reportFailure("host-settings", "local-tool-ceiling-fail-closed", error)
+            }
+        }
     }
 }

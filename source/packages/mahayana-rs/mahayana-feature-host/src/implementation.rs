@@ -8120,6 +8120,20 @@ impl FeatureHostController {
         Ok(rules)
     }
 
+    pub fn set_local_tool_permission_direct(
+        &self,
+        permission: LocalToolPermission,
+    ) -> Result<LocalToolPermission, FeatureHostError> {
+        let settings = {
+            let mut state = self.state()?;
+            ensure_open(&state)?;
+            state.settings.local_tool_permission = permission;
+            state.settings.clone()
+        };
+        sync_computer_control_policy(&settings);
+        Ok(permission)
+    }
+
     pub fn resolve_approval(&self, resolution: ApprovalResolution) -> Result<(), FeatureHostError> {
         let pending = {
             let mut state = self.state()?;
@@ -16071,6 +16085,20 @@ mod tests {
                 &settings,
             )
             .expect("current target accepted");
+    }
+
+    #[test]
+    fn direct_local_tool_permission_projection_updates_canonical_host_owner() {
+        let controller = controller();
+        drain(&controller);
+        let projected = controller
+            .set_local_tool_permission_direct(LocalToolPermission::Never)
+            .expect("project local-tool permission");
+        assert_eq!(projected, LocalToolPermission::Never);
+        assert_eq!(
+            controller.state().expect("canonical state").settings.local_tool_permission,
+            LocalToolPermission::Never
+        );
     }
 
     #[test]

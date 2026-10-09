@@ -199,6 +199,24 @@ private enum IOSCursorDashboardProto {
         Data()
     }
 
+    static func decodeLocalToolPermissionCeiling(
+        _ data: Data
+    ) throws -> SandLocalToolPermission? {
+        var reader = Reader(data)
+        for (field, value) in try reader.readFields() where field == 60 {
+            guard case .bytes(let controls) = value,
+                  let raw = try firstVarintField(1, in: controls)
+            else { continue }
+            switch raw {
+            case 1: return "never"
+            case 2: return "ask"
+            case 3: return "always"
+            default: return nil
+            }
+        }
+        return nil
+    }
+
     static func decodePrReviewUserDestination(_ data: Data) throws -> SandPrReviewDestination? {
         var reader = Reader(data)
         for (field, value) in try reader.readFields() where field == 6 {
@@ -1228,6 +1246,17 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             user: try IOSCursorDashboardProto.decodePrReviewUserDestination(userData),
             team: try IOSCursorDashboardProto.decodePrReviewTeamDestination(teamData)
         )
+    }
+
+    func getLocalToolPermissionCeiling(
+        timeoutMs: Int = 10_000
+    ) async throws -> SandLocalToolPermission? {
+        let response = try await protoRPC(
+            "GetTeamAdminSettingsOrEmptyIfNotInTeam",
+            body: IOSCursorDashboardProto.teamAdminSettingsRequest(),
+            timeoutMs: timeoutMs
+        )
+        return try IOSCursorDashboardProto.decodeLocalToolPermissionCeiling(response)
     }
 
     func publishSkillPlugin(

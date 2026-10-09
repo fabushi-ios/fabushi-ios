@@ -655,6 +655,20 @@ impl AppHost {
                     string_param(&params, "emoji")?,
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.settings.localToolPermission" => {
+                let permission = serde_json::from_value::<mahayana_host_protocol::LocalToolPermission>(
+                    params.get("permission").cloned().unwrap_or(Value::Null),
+                )
+                .map_err(|error| AppHostError::InvalidRequest(format!(
+                    "invalid local-tool permission: {error}"
+                )))?;
+                serde_json::to_value(
+                    self.feature
+                        .set_local_tool_permission_direct(permission)
+                        .map_err(|error| AppHostError::Operation(error.to_string()))?,
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string()))
+            }
             "feature.settings.autoReviewRules" => {
                 let rules: Vec<mahayana_host_protocol::AutoReviewRule> = serde_json::from_value(
                     params.get("rules").cloned().unwrap_or_else(|| json!([]))

@@ -67,7 +67,8 @@ final class MahayanaCoordinator {
         settingsStore: SandSettingsStore? = nil,
         experimentService: SandExperimentService? = nil,
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
-        mcpSurface: CoordinatorMcpSurface? = nil
+        mcpSurface: CoordinatorMcpSurface? = nil,
+        mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
@@ -77,7 +78,8 @@ final class MahayanaCoordinator {
         } else if let settingsStore {
             self.mcpSurface = CoordinatorMcpSurface.make(
                 hostSupervisor: hostSupervisor,
-                settingsStore: settingsStore
+                settingsStore: settingsStore,
+                reportFailure: mcpFailureReporter
             )
         } else {
             self.mcpSurface = nil
@@ -100,7 +102,8 @@ final class MahayanaCoordinator {
         appDataDirectory: URL,
         featureHostTest: Bool = false,
         passkeyProvider: (any PasskeyProviding)? = nil,
-        devControlAdapter: (any CoordinatorDevControlAdapting)? = nil
+        devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
+        mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in }
     ) throws -> MahayanaCoordinator {
         let experimentCacheDirectory = appDataDirectory
             .appendingPathComponent("experiments", isDirectory: true)
@@ -120,7 +123,8 @@ final class MahayanaCoordinator {
                 settingsPath: appDataDirectory.appendingPathComponent("sand-settings.json").path
             ),
             experimentService: experimentService,
-            devControlAdapter: devControlAdapter
+            devControlAdapter: devControlAdapter,
+            mcpFailureReporter: mcpFailureReporter
         )
     }
 

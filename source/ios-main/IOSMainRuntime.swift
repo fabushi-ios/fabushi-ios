@@ -54,7 +54,18 @@ final class IOSMainRuntime {
             appDataDirectory: appDataDirectory,
             featureHostTest: featureHostTest,
             passkeyProvider: passkeyProvider,
-            devControlAdapter: devControlAdapter
+            devControlAdapter: devControlAdapter,
+            mcpFailureReporter: { area, leg, error in
+                reporter.report(
+                    .localExecLifecycle,
+                    level: .error,
+                    metadata: [
+                        "area": area,
+                        "leg": leg,
+                        "error": String(error.localizedDescription.prefix(512)),
+                    ]
+                )
+            }
         )
         self.coordinator = coordinator
 

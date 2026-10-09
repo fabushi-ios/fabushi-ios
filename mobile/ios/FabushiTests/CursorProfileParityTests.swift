@@ -179,3 +179,161 @@ final class CursorProfileParityTests: XCTestCase {
         XCTAssertEqual(result["message"] as? String, "cancel failed")
     }
 }
+
+
+@MainActor
+final class CursorLocalToolPermissionCeilingParityTests: XCTestCase {
+    private enum TestError: Error { case fetch, host }
+
+    private func makeStore() throws -> (URL, SandSettingsStore) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-cursor-ceiling-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return (root, SandSettingsStore(settingsPath: root.appendingPathComponent("settings.json").path))
+    }
+
+    func testDashboardPermissionCeilingDecodesAuthoritativeDesktopWireFields() async throws {
+        func read(_ raw: UInt8) async throws -> SandLocalToolPermission? {
+            let client = IOSCursorDashboardClient(
+                credentials: profileCredentials(),
+                backendURL: URL(string: "https://backend.example.test")!,
+                requestExecutor: { request in
+                    XCTAssertEqual(request.url?.path, "/aiserver.v1.DashboardService/GetTeamAdminSettingsOrEmptyIfNotInTeam")
+                    XCTAssertEqual(request.timeoutInterval, 10)
+                    let body = Data([0xe2, 0x03, 0x02, 0x08, raw])
+                    return (body, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/2", headerFields: ["Content-Type": "application/proto"])!)
+                }
+            )
+            return try await client.getLocalToolPermissionCeiling()
+        }
+        XCTAssertEqual(try await read(1), "never")
+        XCTAssertEqual(try await read(2), "ask")
+        XCTAssertEqual(try await read(3), "always")
+        XCTAssertNil(try await read(0))
+    }
+
+    func testLoggedInCeilingAppliesAndEffectiveChangeSyncsHostOnce() async throws {
+        let (root, store) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        store.setLocalToolPermission("always")
+        var hostSyncs: [SandLocalToolPermission] = []
+        let sync = IOSCursorLocalToolPermissionCeilingSynchronizer(
+            settingsStore: store,
+            fetchCeiling: { "ask" },
+            syncHost: { hostSyncs.append($0) },
+            reportFailure: { _, _, _ in XCTFail("unexpected failure") }
+        )
+        sync.consume(.init(loggedIn: true))
+        await sync.waitForIdleForTesting()
+        XCTAssertEqual(store.getLocalToolPermissionCeiling(), "ask")
+        XCTAssertEqual(store.getResolvedLocalToolPermission(), "ask")
+        XCTAssertEqual(hostSyncs, ["ask"])
+        sync.consume(.init(loggedIn: true))
+        await sync.waitForIdleForTesting()
+        XCTAssertEqual(hostSyncs, ["ask"])
+    }
+
+    func testLoggedOutClearsCeilingAndProjectsChangedEffectivePermissionOnce() async throws {
+        let (root, store) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        store.setLocalToolPermission("always")
+        store.setLocalToolPermissionCeiling("ask")
+        var hostSyncs: [SandLocalToolPermission] = []
+        let sync = IOSCursorLocalToolPermissionCeilingSynchronizer(
+            settingsStore: store,
+            fetchCeiling: { "ask" },
+            syncHost: { hostSyncs.append($0) },
+            reportFailure: { _, _, _ in XCTFail("unexpected failure") }
+        )
+        sync.consume(.init(loggedIn: false))
+        await sync.waitForIdleForTesting()
+        XCTAssertNil(store.getLocalToolPermissionCeiling())
+        XCTAssertEqual(store.getResolvedLocalToolPermission(), "always")
+        XCTAssertEqual(hostSyncs, ["always"])
+    }
+
+    func testOutOfOrderOlderFetchCannotOverwriteNewerStatusGeneration() async throws {
+        let (root, store) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        store.setLocalToolPermission("always")
+        var fetchCount = 0
+        var hostSyncs: [SandLocalToolPermission] = []
+        let sync = IOSCursorLocalToolPermissionCeilingSynchronizer(
+            settingsStore: store,
+            fetchCeiling: {
+                fetchCount += 1
+                if fetchCount == 1 {
+                    do { try await Task.sleep(nanoseconds: 80_000_000) } catch {}
+                    return "always"
+                }
+                return "never"
+            },
+            syncHost: { hostSyncs.append($0) },
+            reportFailure: { _, _, _ in XCTFail("unexpected failure") }
+        )
+        sync.consume(.init(loggedIn: true))
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        sync.consume(.init(loggedIn: true))
+        await sync.waitForIdleForTesting()
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(store.getLocalToolPermissionCeiling(), "never")
+        XCTAssertEqual(store.getResolvedLocalToolPermission(), "never")
+        XCTAssertEqual(hostSyncs, ["never"])
+    }
+
+    func testSameEffectivePermissionDoesNotRepeatHostSync() async throws {
+        let (root, store) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        store.setLocalToolPermission("ask")
+        var hostSyncs: [SandLocalToolPermission] = []
+        let sync = IOSCursorLocalToolPermissionCeilingSynchronizer(
+            settingsStore: store,
+            fetchCeiling: { "always" },
+            syncHost: { hostSyncs.append($0) },
+            reportFailure: { _, _, _ in XCTFail("unexpected failure") }
+        )
+        sync.consume(.init(loggedIn: true))
+        await sync.waitForIdleForTesting()
+        XCTAssertEqual(store.getResolvedLocalToolPermission(), "ask")
+        XCTAssertTrue(hostSyncs.isEmpty)
+    }
+
+    func testFetchAndHostFailuresFailClosed() async throws {
+        let (fetchRoot, fetchStore) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: fetchRoot) }
+        fetchStore.setLocalToolPermission("always")
+        var fetchFailures: [String] = []
+        var fetchHostSyncs: [SandLocalToolPermission] = []
+        let fetchFailure = IOSCursorLocalToolPermissionCeilingSynchronizer(
+            settingsStore: fetchStore,
+            fetchCeiling: { throw TestError.fetch },
+            syncHost: { fetchHostSyncs.append($0) },
+            reportFailure: { area, leg, _ in fetchFailures.append("\(area):\(leg)") }
+        )
+        fetchFailure.consume(.init(loggedIn: true))
+        await fetchFailure.waitForIdleForTesting()
+        XCTAssertEqual(fetchStore.getResolvedLocalToolPermission(), "never")
+        XCTAssertEqual(fetchHostSyncs, ["never"])
+        XCTAssertEqual(fetchFailures, ["cursor-profile:local-tool-ceiling-fetch"])
+
+        let (hostRoot, hostStore) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: hostRoot) }
+        hostStore.setLocalToolPermission("always")
+        var attempts: [SandLocalToolPermission] = []
+        var failures: [String] = []
+        let hostFailure = IOSCursorLocalToolPermissionCeilingSynchronizer(
+            settingsStore: hostStore,
+            fetchCeiling: { "ask" },
+            syncHost: { permission in
+                attempts.append(permission)
+                if permission == "ask" { throw TestError.host }
+            },
+            reportFailure: { area, leg, _ in failures.append("\(area):\(leg)") }
+        )
+        hostFailure.consume(.init(loggedIn: true))
+        await hostFailure.waitForIdleForTesting()
+        XCTAssertEqual(hostStore.getResolvedLocalToolPermission(), "ask")
+        XCTAssertEqual(attempts, ["ask", "never"])
+        XCTAssertEqual(failures, ["host-settings:local-tool-ceiling"])
+    }
+}
