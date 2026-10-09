@@ -26,6 +26,66 @@ internal struct MobileRootNotificationActionNotice {
     let text: String
 }
 
+internal struct MobileRootNotificationBridgeRequest {
+    let method: String
+    let params: [String: Any]
+}
+
+internal func mobileRootNotificationLifecycleKey(
+    authResolved: Bool,
+    loggedIn: Bool,
+    accountScopeKey: String,
+    reconnectGeneration: Int
+) -> String {
+    [
+        String(authResolved),
+        String(loggedIn),
+        accountScopeKey,
+        String(reconnectGeneration),
+    ].joined(separator: "|")
+}
+
+internal func mobileRootNotificationListCommand(requestID: String) -> [String: Any] {
+    ["type": "tray.list", "requestId": requestID]
+}
+
+internal func mobileRootNotificationDismissCommand(
+    id: String,
+    requestID: String
+) -> [String: Any]? {
+    let normalizedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalizedID.isEmpty else { return nil }
+    return [
+        "type": "tray.dismiss",
+        "requestId": requestID,
+        "id": normalizedID,
+    ]
+}
+
+internal func mobileRootNotificationClearCommand(requestID: String) -> [String: Any] {
+    ["type": "tray.clear", "requestId": requestID]
+}
+
+internal func mobileRootNotificationBridgeRequest(
+    for action: MobileRootNotificationAction
+) -> MobileRootNotificationBridgeRequest {
+    switch action.kind {
+    case .openURL(let url):
+        return .init(
+            method: "openExternal",
+            params: ["url": url.absoluteString]
+        )
+    case .dashboard(let actionName, let args, _):
+        return .init(
+            method: "invokeCursorDashboardAction",
+            params: [
+                "action": actionName,
+                "args": args,
+            ]
+        )
+    }
+}
+
 internal func projectMobileRootNotificationAction(_ value: Any) -> MobileRootNotificationAction? {
     guard let row = value as? [String: Any],
           let kind = row["kind"] as? String,
@@ -133,12 +193,12 @@ internal func mobileBotHomeSubtitle(_ bot: MobileBotSummary) -> String {
 
 extension GrokMobileShell {
     var rootNotificationLifecycleKey: String {
-        [
-            String(model.authResolved),
-            String(model.loggedIn),
-            mobileAccountScopeKey,
-            String(reconnectGeneration),
-        ].joined(separator: "|")
+        mobileRootNotificationLifecycleKey(
+            authResolved: model.authResolved,
+            loggedIn: model.loggedIn,
+            accountScopeKey: mobileAccountScopeKey,
+            reconnectGeneration: reconnectGeneration
+        )
     }
 
     @ViewBuilder
@@ -293,10 +353,7 @@ extension GrokMobileShell {
         _ = try await bridge.request(
             method: "feature.execute",
             params: [
-                "command": [
-                    "type": "tray.list",
-                    "requestId": requestID,
-                ],
+                "command": mobileRootNotificationListCommand(requestID: requestID),
             ]
         )
         let event = try await bridge.receiveFeatureEvent(
@@ -315,17 +372,15 @@ extension GrokMobileShell {
 
     @MainActor
     func dismissRootNotification(_ id: String) async {
-        guard !id.isEmpty else { return }
+        let requestID = "ios-tray-dismiss-\(UUID().uuidString.lowercased())"
+        guard let command = mobileRootNotificationDismissCommand(
+            id: id,
+            requestID: requestID
+        ) else { return }
         do {
             _ = try await bridge.request(
                 method: "feature.execute",
-                params: [
-                    "command": [
-                        "type": "tray.dismiss",
-                        "requestId": "ios-tray-dismiss-\(UUID().uuidString.lowercased())",
-                        "id": id,
-                    ],
-                ]
+                params: ["command": command]
             )
         } catch {
             rootNotificationActionNotice[id] = .init(
@@ -341,10 +396,9 @@ extension GrokMobileShell {
             _ = try await bridge.request(
                 method: "feature.execute",
                 params: [
-                    "command": [
-                        "type": "tray.clear",
-                        "requestId": "ios-tray-clear-\(UUID().uuidString.lowercased())",
-                    ],
+                    "command": mobileRootNotificationClearCommand(
+                        requestID: "ios-tray-clear-\(UUID().uuidString.lowercased())"
+                    ),
                 ]
             )
         } catch {
@@ -369,19 +423,17 @@ extension GrokMobileShell {
         defer { rootNotificationActionPending.remove(pendingKey) }
 
         do {
+            let request = mobileRootNotificationBridgeRequest(for: action)
             switch action.kind {
-            case .openURL(let url):
+            case .openURL:
                 _ = try await bridge.request(
-                    method: "openExternal",
-                    params: ["url": url.absoluteString]
+                    method: request.method,
+                    params: request.params
                 )
-            case .dashboard(let actionName, let args, let successMessage):
+            case .dashboard(_, _, let successMessage):
                 let result = try await bridge.request(
-                    method: "invokeCursorDashboardAction",
-                    params: [
-                        "action": actionName,
-                        "args": args,
-                    ]
+                    method: request.method,
+                    params: request.params
                 ).value
                 guard let response = result as? [String: Any],
                       let ok = response["ok"] as? Bool
