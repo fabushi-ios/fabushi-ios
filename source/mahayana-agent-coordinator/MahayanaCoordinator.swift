@@ -84,9 +84,14 @@ final class IOSCoordinatorClientPauseControl {
 final class IOSHostSettingsReconciler {
     typealias ReadLocal = @MainActor () -> Bool?
     typealias WriteLocal = @MainActor (Bool) -> Void
+    typealias ClearLocal = @MainActor () -> Void
     typealias ReadRemote = @MainActor () async throws -> MahayanaHostSettingsSnapshot
     typealias PushRemote = @MainActor (MahayanaHostSettingsSnapshot) async throws -> MahayanaHostSettingsSnapshot
     typealias HostGeneration = @MainActor () -> UInt64
+
+    private enum SyncError: Error {
+        case unavailableOrStale
+    }
 
     private struct Token: Equatable {
         let accountScope: String
@@ -96,6 +101,7 @@ final class IOSHostSettingsReconciler {
 
     private let readLocal: ReadLocal
     private let writeLocal: WriteLocal
+    private let clearLocal: ClearLocal
     private let readRemote: ReadRemote
     private let pushRemote: PushRemote
     private let hostGeneration: HostGeneration
@@ -104,18 +110,43 @@ final class IOSHostSettingsReconciler {
     private var transportLive = false
     private var epoch: UInt64 = 1
     private var inFlight: Task<Void, Never>?
+    private var lastSuccessfulEpoch: UInt64?
 
     private(set) var lastSuccessfulAccountScope: String?
+
+    private lazy var onboardingSeen = BoxSettingsField<MahayanaHostSettingsSnapshot, Bool>(
+        port: HostSettingsPort(
+            isReadable: { [weak self] in
+                self?.isReadable == true
+            },
+            read: { [weak self] in
+                guard let self else { throw SyncError.unavailableOrStale }
+                return try await self.readRemoteCurrent()
+            },
+            write: { [weak self] value in
+                guard let self else { throw SyncError.unavailableOrStale }
+                return try await self.writeRemoteCurrent(value)
+            },
+            value: { $0.hasSeenOnboarding }
+        ),
+        mirror: HostSettingsMirror(
+            read: { [weak self] in self?.readLocal() },
+            write: { [weak self] value in self?.writeLocal(value) },
+            clear: { [weak self] in self?.clearLocal() }
+        )
+    )
 
     init(
         readLocal: @escaping ReadLocal,
         writeLocal: @escaping WriteLocal,
+        clearLocal: @escaping ClearLocal = {},
         readRemote: @escaping ReadRemote,
         pushRemote: @escaping PushRemote,
         hostGeneration: @escaping HostGeneration
     ) {
         self.readLocal = readLocal
         self.writeLocal = writeLocal
+        self.clearLocal = clearLocal
         self.readRemote = readRemote
         self.pushRemote = pushRemote
         self.hostGeneration = hostGeneration
@@ -126,30 +157,36 @@ final class IOSHostSettingsReconciler {
     }
 
     func scopeToAccount(_ scope: String) {
-        abandonInFlight()
+        invalidateInFlight(resetFieldSession: true)
         accountScope = scope
         lastSuccessfulAccountScope = nil
+        lastSuccessfulEpoch = nil
         if transportLive {
             scheduleReconcile()
         }
     }
 
     func accountDeparted() {
-        abandonInFlight()
+        invalidateInFlight(resetFieldSession: true)
         accountScope = nil
         transportLive = false
         lastSuccessfulAccountScope = nil
+        lastSuccessfulEpoch = nil
     }
 
     func setTransportLive(_ live: Bool) {
-        abandonInFlight()
+        // A transport transition fences async work, but it is not an account
+        // departure. Keep BoxSettingsField's answered-this-session state so a
+        // local answer made while the transport was down can be written back
+        // when the Host reconnects with an unwritten field.
+        invalidateInFlight(resetFieldSession: false)
         transportLive = live
         guard live, accountScope != nil else { return }
         scheduleReconcile()
     }
 
     func scheduleReconcile() {
-        abandonInFlight()
+        invalidateInFlight(resetFieldSession: false)
         guard tokenIfReadable() != nil else { return }
         inFlight = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -158,8 +195,7 @@ final class IOSHostSettingsReconciler {
     }
 
     func scheduleLocalWrite(_ value: Bool) {
-        abandonInFlight()
-        guard tokenIfReadable() != nil else { return }
+        invalidateInFlight(resetFieldSession: false)
         inFlight = Task { @MainActor [weak self] in
             guard let self else { return }
             _ = await self.pushLocalIfWritable(value)
@@ -169,40 +205,55 @@ final class IOSHostSettingsReconciler {
     @discardableResult
     func reconcileIfReadable() async -> Bool {
         guard let token = tokenIfReadable() else { return false }
-        do {
-            let remote = try await readRemote()
-            guard isCurrent(token) else { return false }
-
-            if let local = readLocal() {
-                if remote.hasSeenOnboarding != local {
-                    _ = try await pushRemote(.init(hasSeenOnboarding: local))
-                    guard isCurrent(token) else { return false }
-                }
-            } else if let remoteSeen = remote.hasSeenOnboarding {
-                writeLocal(remoteSeen)
-                guard isCurrent(token) else { return false }
-            }
-
-            lastSuccessfulAccountScope = token.accountScope
-            return true
-        } catch {
-            return false
-        }
+        _ = await onboardingSeen.absorbFromBox()
+        return isCurrent(token) && lastSuccessfulEpoch == token.epoch
     }
 
     @discardableResult
     func pushLocalIfWritable(_ value: Bool) async -> Bool {
-        guard let token = tokenIfReadable() else { return false }
-        do {
-            let response = try await pushRemote(.init(hasSeenOnboarding: value))
-            guard response.hasSeenOnboarding == value, isCurrent(token) else {
-                return false
-            }
-            lastSuccessfulAccountScope = token.accountScope
-            return true
-        } catch {
+        // BoxSettingsField.apply writes the canonical local mirror first and
+        // records that this account session answered the field. The typed port
+        // below fails closed while transport is down, so no remote write is
+        // attempted; a later absorbFromBox can safely backfill the unwritten
+        // remote field without losing the local answer.
+        let result = await onboardingSeen.apply(value)
+        guard case .persisted(let echoed) = result,
+              echoed == value,
+              let token = tokenIfReadable(),
+              lastSuccessfulEpoch == token.epoch,
+              isCurrent(token)
+        else {
             return false
         }
+        return true
+    }
+
+    private func readRemoteCurrent() async throws -> MahayanaHostSettingsSnapshot {
+        guard let token = tokenIfReadable() else {
+            throw SyncError.unavailableOrStale
+        }
+        let value = try await readRemote()
+        guard isCurrent(token) else {
+            throw SyncError.unavailableOrStale
+        }
+        lastSuccessfulAccountScope = token.accountScope
+        lastSuccessfulEpoch = token.epoch
+        return value
+    }
+
+    private func writeRemoteCurrent(_ value: Bool) async throws -> MahayanaHostSettingsSnapshot? {
+        guard let token = tokenIfReadable() else {
+            throw SyncError.unavailableOrStale
+        }
+        let response = try await pushRemote(.init(hasSeenOnboarding: value))
+        guard isCurrent(token) else {
+            throw SyncError.unavailableOrStale
+        }
+        if response.hasSeenOnboarding == value {
+            lastSuccessfulAccountScope = token.accountScope
+            lastSuccessfulEpoch = token.epoch
+        }
+        return response
     }
 
     private func tokenIfReadable() -> Token? {
@@ -221,10 +272,13 @@ final class IOSHostSettingsReconciler {
             && hostGeneration() == token.hostGeneration
     }
 
-    private func abandonInFlight() {
+    private func invalidateInFlight(resetFieldSession: Bool) {
         inFlight?.cancel()
         inFlight = nil
         epoch = epoch == UInt64.max ? 1 : epoch + 1
+        if resetFieldSession {
+            onboardingSeen.abandonInFlight()
+        }
     }
 }
 
@@ -290,6 +344,7 @@ final class MahayanaCoordinator {
             IOSHostSettingsReconciler(
                 readLocal: { store.getHasSeenOnboarding() },
                 writeLocal: { store.setHasSeenOnboarding($0) },
+                clearLocal: { store.clearHasSeenOnboarding() },
                 readRemote: { try await hostSupervisor.readHostSettings() },
                 pushRemote: { try await hostSupervisor.pushHostSettings($0) },
                 hostGeneration: { hostSupervisor.generation }
