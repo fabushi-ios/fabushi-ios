@@ -2165,6 +2165,14 @@ pub struct ConversationMessage {
     pub role: MessageRole,
     pub text: String,
     pub created_at_ms: i64,
+    #[serde(
+        rename = "replyToMessageId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub reply_to_message_id: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub branched: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reactions: Vec<TranscriptReaction>,
 }
@@ -3222,6 +3230,30 @@ mod tests {
         assert_eq!(value["attachmentBatchId"], "batch-1");
         assert_eq!(value["attachment"]["file_name"], "report.pdf");
         assert_eq!(value["branched"], true);
+
+        let history_message = ConversationMessage {
+            id: "history-1".into(),
+            role: MessageRole::Assistant,
+            text: "thread reply".into(),
+            created_at_ms: 42,
+            reply_to_message_id: Some("message-parent".into()),
+            branched: true,
+            reactions: Vec::new(),
+        };
+        let history_value =
+            serde_json::to_value(history_message).expect("encode conversation relation projection");
+        assert_eq!(history_value["replyToMessageId"], "message-parent");
+        assert_eq!(history_value["branched"], true);
+
+        let legacy_history: ConversationMessage = serde_json::from_value(serde_json::json!({
+            "id": "legacy-history",
+            "role": "assistant",
+            "text": "legacy",
+            "createdAtMs": 7
+        }))
+        .expect("decode legacy conversation message");
+        assert_eq!(legacy_history.reply_to_message_id, None);
+        assert!(!legacy_history.branched);
     }
 
     #[test]

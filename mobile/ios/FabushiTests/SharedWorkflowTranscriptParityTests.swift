@@ -63,6 +63,45 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         )
     }
 
+    func testConversationWindowProjectionPreservesThreadTopologyAndRejectsMalformedRelations() throws {
+        let threaded = try XCTUnwrap(projectMobileConversationWindowMessage([
+            "id": "reply-1",
+            "role": "assistant",
+            "text": "Thread reply",
+            "createdAtMs": 1_234,
+            "replyToMessageId": "root-1",
+            "branched": true,
+            "reactions": [],
+        ]))
+        XCTAssertEqual(threaded.canonicalMessageId, "reply-1")
+        XCTAssertEqual(threaded.replyToMessageId, "root-1")
+        XCTAssertTrue(threaded.branched)
+
+        let legacy = try XCTUnwrap(projectMobileConversationWindowMessage([
+            "id": "legacy-1",
+            "role": "user",
+            "text": "Legacy",
+            "createdAtMs": 2_000,
+        ]))
+        XCTAssertNil(legacy.replyToMessageId)
+        XCTAssertFalse(legacy.branched)
+
+        XCTAssertNil(projectMobileConversationWindowMessage([
+            "id": "broken-1",
+            "role": "assistant",
+            "text": "Broken",
+            "createdAtMs": 3_000,
+            "replyToMessageId": 42,
+        ]))
+        XCTAssertNil(projectMobileConversationWindowMessage([
+            "id": "broken-2",
+            "role": "assistant",
+            "text": "Broken",
+            "createdAtMs": 3_000,
+            "branched": "yes",
+        ]))
+    }
+
     func testTranscriptMainAndThreadProjection() {
         let entries: [TranscriptEntry] = [
             .init(kind: "message", id: "root"),

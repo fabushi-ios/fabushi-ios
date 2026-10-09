@@ -48,12 +48,22 @@ internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> Mo
     else {
         return nil
     }
+    var replyToMessageId: String?
+    if let rawReplyTo = row["replyToMessageId"] {
+        guard let value = rawReplyTo as? String else { return nil }
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+        replyToMessageId = normalized
+    }
+    if row["branched"] != nil, row["branched"] is Bool == false { return nil }
     var message = MobileChatMessage(
         id: "history:\(id)",
         role: role,
         text: text,
         canonicalMessageId: id,
-        reactions: projectMobileTranscriptReactions(row["reactions"])
+        replyToMessageId: replyToMessageId,
+        reactions: projectMobileTranscriptReactions(row["reactions"]),
+        branched: row["branched"] as? Bool ?? false
     )
     message.createdAt = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1_000)
     return message

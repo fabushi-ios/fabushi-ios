@@ -9862,6 +9862,18 @@ impl FeatureHostController {
                     RuntimeMessageRole::User => MessageRole::User,
                     _ => MessageRole::Assistant,
                 },
+                reply_to_message_id: message
+                    .metadata
+                    .get("replyToMessageId")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToOwned::to_owned),
+                branched: message
+                    .metadata
+                    .get("branched")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
                 reactions: message
                     .metadata
                     .get("reactions")
@@ -9912,6 +9924,18 @@ impl FeatureHostController {
                     RuntimeMessageRole::User => MessageRole::User,
                     _ => MessageRole::Assistant,
                 },
+                reply_to_message_id: message
+                    .metadata
+                    .get("replyToMessageId")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToOwned::to_owned),
+                branched: message
+                    .metadata
+                    .get("branched")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
                 reactions: message
                     .metadata
                     .get("reactions")
@@ -18411,6 +18435,8 @@ mod tests {
                 role: MessageRole::Assistant,
                 text: id.into(),
                 created_at_ms: 0,
+                reply_to_message_id: None,
+                branched: false,
                 reactions: Vec::new(),
             })
             .collect::<Vec<_>>();
