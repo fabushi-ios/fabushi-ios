@@ -162,12 +162,20 @@ enum ClientSideToolV2TransportEvent: Equatable, Sendable {
     }
 
     private static func unsignedInteger(_ value: Any?) -> UInt64? {
-        if let value = value as? UInt64 { return value }
-        if let value = value as? Int, value >= 0 { return UInt64(value) }
+        let maxSafeInteger = 9_007_199_254_740_991.0
+        if let value = value as? UInt64 {
+            return value <= UInt64(maxSafeInteger) ? value : nil
+        }
+        if let value = value as? Int, value >= 0 {
+            return Double(value) <= maxSafeInteger ? UInt64(value) : nil
+        }
         if let value = value as? NSNumber {
             let double = value.doubleValue
-            guard double.isFinite, double >= 0, double.rounded() == double else { return nil }
-            return UInt64(value.uint64Value)
+            guard double.isFinite,
+                  double >= 0,
+                  double <= maxSafeInteger,
+                  double.rounded() == double else { return nil }
+            return UInt64(double)
         }
         return nil
     }
