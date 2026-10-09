@@ -27,11 +27,11 @@ struct IOSClientPausedError: LocalizedError, Equatable, Sendable {
 @MainActor
 final class IOSCoordinatorClientPauseControl {
     typealias IsPaused = @MainActor () -> Bool
-    typealias SetGatewayPaused = @MainActor (Bool) async throws -> Bool
+    typealias ApplyCoordinatorPause = @MainActor (Bool) async throws -> Bool
     typealias DropObservedConnection = @MainActor () -> Void
 
     private let isPausedProvider: IsPaused
-    private let setGatewayPaused: SetGatewayPaused
+    private let applyCoordinatorPause: ApplyCoordinatorPause
     private let dropObservedConnection: DropObservedConnection
     private var coordinatorPaused = false
     private var egressDroppedForPause = false
@@ -40,11 +40,11 @@ final class IOSCoordinatorClientPauseControl {
 
     init(
         isPaused: @escaping IsPaused,
-        setGatewayPaused: @escaping SetGatewayPaused,
+        applyCoordinatorPause: @escaping ApplyCoordinatorPause,
         dropObservedConnection: @escaping DropObservedConnection
     ) {
         isPausedProvider = isPaused
-        self.setGatewayPaused = setGatewayPaused
+        self.applyCoordinatorPause = applyCoordinatorPause
         self.dropObservedConnection = dropObservedConnection
     }
 
@@ -62,7 +62,7 @@ final class IOSCoordinatorClientPauseControl {
             if let previous { await previous.value }
             guard let self, self.coordinatorPaused != desired else { return }
             do {
-                self.coordinatorPaused = try await self.setGatewayPaused(desired)
+                self.coordinatorPaused = try await self.applyCoordinatorPause(desired)
             } catch {
                 self.lastSyncError = error
             }
@@ -164,17 +164,7 @@ final class MahayanaCoordinator {
         let pauseSurface = resolvedMcpSurface
         clientPauseControl = IOSCoordinatorClientPauseControl(
             isPaused: isClientPaused,
-            setGatewayPaused: { [weak hostSupervisor] paused in
-                guard let hostSupervisor else { throw CoordinatorError.unavailable }
-                let reply = try await hostSupervisor.request(
-                    method: "setGatewayPaused",
-                    params: ["paused": paused]
-                )
-                guard let body = reply.value as? [String: Any],
-                      let acknowledged = body["paused"] as? Bool
-                else { throw CoordinatorError.invalidResponse }
-                return acknowledged
-            },
+            applyCoordinatorPause: { paused in paused },
             dropObservedConnection: {
                 pauseSurface?.dropObservedComputerConnectionForClientPause()
             }
