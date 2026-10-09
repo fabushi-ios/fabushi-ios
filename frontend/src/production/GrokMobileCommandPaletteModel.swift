@@ -60,6 +60,7 @@ internal enum MobileCommandPaletteActionKind: String {
     case openChannels
     case openSettings
     case updateComputer
+    case cancelComputerUpdate
 }
 
 internal struct MobileCommandPaletteAction: Identifiable {
@@ -233,6 +234,7 @@ internal enum MobileCommandPaletteEntry: Identifiable {
             case .openChannels: return "megaphone"
             case .openSettings: return "gearshape"
             case .updateComputer: return "desktopcomputer"
+            case .cancelComputerUpdate: return "xmark.circle"
             }
         }
     }
