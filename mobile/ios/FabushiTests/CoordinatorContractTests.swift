@@ -433,4 +433,66 @@ final class CoordinatorContractTests: XCTestCase {
             [.init(event: "transcript", id: "7", data: "one\ntwo")]
         )
     }
+
+    @MainActor
+    func testClientPauseControlDropsObservedConnectionOnceAndSerializesCoordinatorState() async throws {
+        var paused = true
+        var dropped = 0
+        var coordinatorStates: [Bool] = []
+        let control = IOSCoordinatorClientPauseControl(
+            isPaused: { paused },
+            setGatewayPaused: { value in
+                coordinatorStates.append(value)
+                return value
+            },
+            dropObservedConnection: {
+                dropped += 1
+            }
+        )
+
+        try await control.synchronize()
+        try await control.synchronize()
+        XCTAssertTrue(control.isPaused)
+        XCTAssertEqual(dropped, 1)
+        XCTAssertEqual(coordinatorStates, [true])
+
+        paused = false
+        try await control.synchronize()
+        XCTAssertFalse(control.isPaused)
+        XCTAssertEqual(dropped, 1)
+        XCTAssertEqual(coordinatorStates, [true, false])
+
+        paused = true
+        try await control.synchronize()
+        XCTAssertEqual(dropped, 2)
+        XCTAssertEqual(coordinatorStates, [true, false, true])
+    }
+
+    @MainActor
+    func testClientPauseControlReappliesPauseAfterCoordinatorRelaunch() async throws {
+        var coordinatorStates: [Bool] = []
+        let control = IOSCoordinatorClientPauseControl(
+            isPaused: { true },
+            setGatewayPaused: { value in
+                coordinatorStates.append(value)
+                return value
+            },
+            dropObservedConnection: {}
+        )
+
+        try await control.synchronize()
+        control.reapplyAfterCoordinatorLaunch()
+        try await control.synchronize()
+
+        XCTAssertEqual(coordinatorStates, [true, true])
+    }
+
+    func testClientPauseErrorMatchesCanonicalDesktopBlockedMarker() {
+        XCTAssertEqual(IOS_SAND_CLIENT_PAUSE_GATE, "sand_client_pause")
+        XCTAssertEqual(
+            IOSClientPausedError().localizedDescription,
+            "sand box blocked by kill switch: SAND_CLIENT_PAUSE\u{001F}\u{001F}"
+        )
+    }
+
 }
