@@ -1452,7 +1452,7 @@ internal struct MobileBotChat: View {
         let widget = projection.widget
         let pending = widgetPendingEntryIds.contains(entry.id)
         let settled = projection.respondedValue != nil || projection.dismissed
-        let options = widget.choiceConfig?.options ?? []
+        let options = widget.options
         VStack(alignment: .leading, spacing: 10) {
             Text(widget.prompt)
                 .font(.body.weight(.semibold))
@@ -1509,7 +1509,7 @@ internal struct MobileBotChat: View {
                     )
                 }
 
-                if widget.choiceConfig?.allowCustom == true {
+                if widget.allowCustom == true {
                     HStack(spacing: 8) {
                         TextField(
                             "Other answer",
