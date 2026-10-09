@@ -1179,7 +1179,7 @@ final class CoordinatorMcpSurface {
         case "coordinator.mcp.cursorAuth.status":
             return .handled(projectCursorAuthStatus(await cursorAuth.status()))
 
-        case "coordinator.account.prReviewPreferences":
+        case "getCursorPrReviewPreferences":
             guard (await cursorAuth.status()).loggedIn else {
                 return .handled([
                     "user": NSNull(),
