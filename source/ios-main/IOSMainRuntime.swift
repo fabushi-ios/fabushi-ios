@@ -22,6 +22,7 @@ final class IOSMainRuntime {
     private let coordinatorDataDirectory: String
     private let coordinatorLocalHumanIdentity: CoordinatorLocalHumanIdentityState
     private let lifecycleRecovery: IOSLifecycleRecoveryStore
+    private let boxVisibilityTracker: IOSBoxVisibilityTracker
     private let passkeyProvider: IOSAuthenticationServicesPasskeyProvider
     private let accountRuntime: CoordinatorAccountRuntime
     private let updateWiring: IOSUpdateServiceWiring
@@ -46,6 +47,8 @@ final class IOSMainRuntime {
 
         let reporter = IOSLifecycleReporter()
         lifecycleReporter = reporter
+        let boxVisibilityTracker = IOSBoxVisibilityTracker(reporter: reporter)
+        self.boxVisibilityTracker = boxVisibilityTracker
 
         let passkeyProvider = IOSAuthenticationServicesPasskeyProvider()
         self.passkeyProvider = passkeyProvider
@@ -80,6 +83,7 @@ final class IOSMainRuntime {
             dependencies: .init(
                 clearAccountScope: {
                     coordinatorLocalHumanIdentity.replace(with: nil)
+                    boxVisibilityTracker.noteAccountSlot(nil)
                     coordinator.updateAccountSettingsScope(nil)
                 },
                 didClearAccountScope: { _, nextSlot in
@@ -95,6 +99,7 @@ final class IOSMainRuntime {
         )
         let accountAuthorizer = IOSAccountAuthorizer(
             applyAccountScope: { slot in
+                boxVisibilityTracker.noteAccountSlot(slot)
                 coordinator.updateAccountSettingsScope(slot)
             },
             applyLocalHumanIdentity: { slot in
@@ -236,6 +241,12 @@ final class IOSMainRuntime {
         method: String,
         args: CoordinatorPayload
     ) async -> CoordinatorReplyOutcome {
+        if method == "reportBoxVisibility" {
+            if let report = args.foundationValue as? [String: Any] {
+                boxVisibilityTracker.handle(report, documentKey: "ios-main")
+            }
+            return .ok(.object([:]))
+        }
         if let updateOutcome = updateWiring.route(method: method, args: args) {
             return updateOutcome
         }
@@ -311,7 +322,9 @@ final class IOSMainRuntime {
             metadata: ["phase": "shutting-down"]
         )
         accountRuntime.reset()
+        boxVisibilityTracker.abandonAll()
         coordinatorLocalHumanIdentity.replace(with: nil)
+        boxVisibilityTracker.noteAccountSlot(nil)
         coordinator.updateAccountSettingsScope(nil)
         reportSessionActivity(active: false)
         coordinator.beginShutdown()
