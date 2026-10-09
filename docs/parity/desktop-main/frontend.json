@@ -4823,7 +4823,7 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/window-chrome/hardware-keyboard.swift",
       "ios_language": "SwiftUI hardware keyboard commands",
-      "ios_platform_delta": "iPad/hardware keyboard commands are composed at the existing GrokMobileShell root and route into the same search/create/settings/tools/selection/back owners used by touch UI. Active-chat prompt focus stays inside MobileBotChat via FocusState. Browser-style forward navigation has no native forward stack and is explicitly not applicable; the implementation does not create a second navigation store.",
+      "ios_platform_delta": "iPad/hardware keyboard commands are composed at the existing GrokMobileShell root and route into the same search/create/settings/tools/selection/back owners used by touch UI. Active-chat prompt focus stays inside MobileBotChat via FocusState. Browser-style forward navigation and Desktop whole-sidebar collapse have no equivalent native iOS surface and are explicitly not applicable; cmd+] and cmd+b are therefore not misrouted to unrelated actions, and no second navigation store is created.",
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/window-chrome/hardware-keyboard.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "mobile/ios/FabushiTests/MobileHardwareKeyboardParityTests.swift; current exact-HEAD Actions required before verified",
