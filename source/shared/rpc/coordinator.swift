@@ -21,7 +21,7 @@ struct CoordinatorTranscriptWindowResponse: Equatable, Sendable {
 enum CoordinatorMethodRegistry {
     static let methods: Set<String> = [
         "getAgentTranscriptWindow", "getAgentThread", "getAgentTranscriptTail", "openAgentTail",
-        "sendPrompt", "promptAcceptanceStatus", "respondToWidget", "resolveAutoReviewApproval",
+        "sendPrompt", "interruptAgent", "promptAcceptanceStatus", "respondToWidget", "resolveAutoReviewApproval",
         "resolveLocalToolPermission", "dismissWidget", "submitSecret", "reactToMessage",
         "listAgents", "countAgents", "searchAgents", "searchMedia", "createAgent", "createGroup",
         "setGroupMembers", "updateAgent", "deleteAgents", "duplicateAgent", "kickstartAgent",
