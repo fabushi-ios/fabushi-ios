@@ -50,17 +50,14 @@ struct IOSCursorStructuredLogBackend: Sendable {
     typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
     let backendURL: URL
-    let getMachineID: @Sendable () async throws -> String
     let requestExecutor: RequestExecutor
 
     init(
         backendURL: URL,
-        getMachineID: @escaping @Sendable () async throws -> String,
         session: URLSession = .shared,
         requestExecutor: RequestExecutor? = nil
     ) {
         self.backendURL = backendURL
-        self.getMachineID = getMachineID
         self.requestExecutor = requestExecutor ?? { request in
             try await session.data(for: request)
         }
@@ -68,6 +65,7 @@ struct IOSCursorStructuredLogBackend: Sendable {
 
     func submit(
         accessToken: String,
+        machineID: String,
         logs: [StructuredLogEntry]
     ) async throws -> StructuredLogReceipt {
         guard !logs.isEmpty else {
@@ -77,7 +75,7 @@ struct IOSCursorStructuredLogBackend: Sendable {
         let headers = try await createSandInferenceHeaders(
             backendUrl: backendURL.absoluteString,
             getAccessToken: { _ in accessToken },
-            getMachineId: getMachineID,
+            getMachineId: { machineID },
             // Settlement must remain privacy-safe even after the live auth
             // owner has revoked the account. A missing privacy lookup therefore
             // fails closed instead of consulting a second auth state.
@@ -149,6 +147,7 @@ final class IOSCursorSessionSettlementShipper {
     typealias ReportFailure = @MainActor (_ operation: String, _ error: Error) -> Void
 
     private let backend: IOSCursorStructuredLogBackend
+    private let getMachineID: @MainActor () async throws -> String
     private let clientVersion: String
     private let appVersion: String
     private let arch: String
@@ -158,7 +157,7 @@ final class IOSCursorSessionSettlementShipper {
 
     init(
         backendURL: URL,
-        getMachineID: @escaping @Sendable () async throws -> String,
+        getMachineID: @escaping @MainActor () async throws -> String,
         session: URLSession = .shared,
         requestExecutor: IOSCursorStructuredLogBackend.RequestExecutor? = nil,
         clientVersion: String = getSandClientVersion(),
@@ -174,10 +173,10 @@ final class IOSCursorSessionSettlementShipper {
     ) {
         backend = .init(
             backendURL: backendURL,
-            getMachineID: getMachineID,
             session: session,
             requestExecutor: requestExecutor
         )
+        self.getMachineID = getMachineID
         self.clientVersion = clientVersion
         self.appVersion = appVersion
         self.arch = arch
@@ -189,7 +188,7 @@ final class IOSCursorSessionSettlementShipper {
     func ship(_ settlement: IOSCursorSessionSettlement) async {
         let projection = settlement.projection
         do {
-            let machineID = try await backend.getMachineID()
+            let machineID = try await getMachineID()
             var metadata = [
                 "client": "sand",
                 "client.type": "sand",
@@ -211,6 +210,7 @@ final class IOSCursorSessionSettlementShipper {
             )
             let receipt = try await backend.submit(
                 accessToken: settlement.accessToken,
+                machineID: machineID,
                 logs: [entry]
             )
             guard receipt.logsProcessed + receipt.logsDropped == 1 else {
