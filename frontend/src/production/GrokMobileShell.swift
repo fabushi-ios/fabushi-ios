@@ -25,6 +25,8 @@ internal struct GrokMobileShell: View {
     @State var botActionBusy = false
     @State var botActionError: String?
     @State var bots: [MobileBotSummary] = []
+    @State var hiddenChatsOpen = false
+    @State var hiddenChatsController = MobileHiddenChatsMutationController()
     @State var accessRosterSnapshot = AccessRosterSnapshot.initial
     @State var accessCoverFirstBox = FirstBoxGateState.initial
     @State var accessCoverAccess = AccessCoverSandAccess.checking
@@ -67,6 +69,18 @@ internal struct GrokMobileShell: View {
             } else {
                 homeContent
             }
+        }
+        .task(id: "\(mobileAccountScopeKey)|\(selectedBot?.id ?? "")") {
+            hiddenChatsController.setScope(
+                accountScopeKey: mobileAccountScopeKey,
+                activeAgentId: selectedBot?.id
+            )
+        }
+        .onChange(of: reconnectGeneration) { _, _ in
+            retryHeldHiddenChatMutations()
+        }
+        .onDisappear {
+            hiddenChatsController.dispose()
         }
         .sheet(item: $groupMembersTarget) { group in
             MobileBotGroupMembersSheet(
