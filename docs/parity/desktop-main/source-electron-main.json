@@ -75,17 +75,17 @@
     {
       "desktop_path": "source/electron-main/account/cursor-avatar.ts",
       "desktop_blob_sha": "f59db646b964a8c1142fda525e07d9049816beb4",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Resolve the signed-in account avatar fail-closed: parse provider|subject auth identity, prefer an explicit HTTPS avatar URL, derive GitHub numeric-subject avatar URLs, enforce a 10s request deadline, image content type and 1 MiB body cap, and cache successful data URLs.",
       "desktop_owner": "platform-main",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Signed-in account surfaces can show the remote profile avatar without allowing non-HTTPS fallback, oversized/non-image payloads, unbounded requests or repeated downloads.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/recovered/features/account/session/menu.view.swift; native account avatar resolver (missing)",
+      "ios_language": "Swift / URLSession / SwiftUI",
+      "ios_platform_delta": "AccountMenuView has a native avatar slot, but exact review of current iOS auth/dashboard/Marketplace owners did not find a production resolver matching the Desktop HTTPS/provider parsing, deadline, MIME/size bounds and cache. Keep the existing account/auth truth; add the missing resolver rather than a second profile store.",
+      "implementation_status": "mapped",
+      "production_evidence": "frontend/src/recovered/features/account/session/menu.view.swift currently renders an injected avatar AnyView; no equivalent bounded remote resolver was proven in reviewed shipping owners.",
+      "test_evidence": "Requires focused URL/provider/MIME/size/timeout/cache tests and current-head UI/build evidence before promotion.",
+      "notes": "Exact Desktop cursor-avatar.ts@f59db646b964a8c1142fda525e07d9049816beb4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Concrete production gap recorded; no completion inferred from the presence of an avatar slot."
     },
     {
       "desktop_path": "source/electron-main/account/cursor-machine-id.ts",
