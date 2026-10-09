@@ -210,7 +210,7 @@ struct GrokMobileBotService {
         return next
     }
 
-    func setBotHidden(id: String, hidden: Bool) async throws -> [MobileBotSummary] {
+    func setBotHiddenMutation(id: String, hidden: Bool) async throws {
         _ = try await bridge.request(
             method: "feature.execute",
             params: [
@@ -221,6 +221,10 @@ struct GrokMobileBotService {
                 ),
             ]
         )
+    }
+
+    func setBotHidden(id: String, hidden: Bool) async throws -> [MobileBotSummary] {
+        try await setBotHiddenMutation(id: id, hidden: hidden)
         return await loadBots()
     }
 
