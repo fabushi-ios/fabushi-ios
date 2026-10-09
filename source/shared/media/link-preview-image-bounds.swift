@@ -74,9 +74,11 @@ enum LinkPreviewImagePolicy {
             let entryWidth = bytes[entry] == 0 ? 256 : Int(bytes[entry])
             let entryHeight = bytes[entry + 1] == 0 ? 256 : Int(bytes[entry + 1])
             let candidates: [LinkPreviewImageSize?] = [
-                .init(width: entryWidth, height: entryHeight),
+                LinkPreviewImageSize(width: entryWidth, height: entryHeight),
                 payload < bytes.count
-                    ? ImageFileDimensions.readPng(Data(bytes[payload...])).map { .init(width: $0.width, height: $0.height) }
+                    ? ImageFileDimensions.readPng(Data(bytes[payload...])).map {
+                        LinkPreviewImageSize(width: $0.width, height: $0.height)
+                    }
                     : nil,
                 readIcoBitmapSize(bytes, offset: payload),
             ]
