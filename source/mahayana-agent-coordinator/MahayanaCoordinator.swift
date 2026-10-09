@@ -145,10 +145,11 @@ final class MahayanaCoordinator {
                 ?? false
         }
 
+        let resolvedMcpSurface: CoordinatorMcpSurface?
         if let mcpSurface {
-            self.mcpSurface = mcpSurface
+            resolvedMcpSurface = mcpSurface
         } else if let settingsStore {
-            self.mcpSurface = CoordinatorMcpSurface.make(
+            resolvedMcpSurface = CoordinatorMcpSurface.make(
                 hostSupervisor: hostSupervisor,
                 settingsStore: settingsStore,
                 reportFailure: mcpFailureReporter,
@@ -156,10 +157,11 @@ final class MahayanaCoordinator {
                 isClientPaused: isClientPaused
             )
         } else {
-            self.mcpSurface = nil
+            resolvedMcpSurface = nil
         }
+        self.mcpSurface = resolvedMcpSurface
         self.devControlAdapter = devControlAdapter
-        let pauseSurface = self.mcpSurface
+        let pauseSurface = resolvedMcpSurface
         clientPauseControl = IOSCoordinatorClientPauseControl(
             isPaused: isClientPaused,
             setGatewayPaused: { [weak hostSupervisor] paused in
