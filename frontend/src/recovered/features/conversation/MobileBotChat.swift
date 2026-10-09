@@ -357,13 +357,28 @@ internal func mobileReplyReferenceQuoteLabel(
     }
 }
 
-internal func mobileBotChatSearchEntries(_ entries: [MobileChatMessage]) -> [ChatSearchEntry] {
-    mobileMainTranscriptEntries(entries).compactMap { entry in
-        guard let text = mobileTranscriptCopyText(entry)?
+internal func mobileBotChatSearchEntries(
+    _ entries: [MobileChatMessage],
+    botName: String
+) -> [ChatSearchEntry] {
+    let normalizedBotName = botName.trimmingCharacters(in: .whitespacesAndNewlines)
+    return mobileMainTranscriptEntries(entries).compactMap { entry in
+        guard entry.kind == .message else { return nil }
+        var fields: [String] = []
+        if let text = mobileTranscriptCopyText(entry)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
-              !text.isEmpty
-        else { return nil }
-        return ChatSearchEntry(id: entry.id, text: text)
+           !text.isEmpty
+        {
+            fields.append(text)
+        }
+        fields.append(entry.role == .user ? "You" : (normalizedBotName.isEmpty ? "Agent" : normalizedBotName))
+        if let fileName = entry.attachmentFileName?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !fileName.isEmpty
+        {
+            fields.append(fileName)
+        }
+        return ChatSearchEntry(id: entry.id, text: fields.joined(separator: "\n"))
     }
 }
 
@@ -943,7 +958,7 @@ internal struct MobileBotChat: View {
     }
 
     private var findSearchEntries: [ChatSearchEntry] {
-        mobileBotChatSearchEntries(entries)
+        mobileBotChatSearchEntries(entries, botName: bot.name)
     }
 
     private var findMatches: [ChatSearchMatch] {
