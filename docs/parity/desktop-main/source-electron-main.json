@@ -110,11 +110,11 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "PR review routing receives the current user and team preference for GitHub, Graphite or Review Cursor, while unset/unknown modes remain safely unset.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/account/cursor-dashboard-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "ios_target_path": "source/ios-main/account/cursor-dashboard-client.swift",
       "ios_language": "Swift / URLSession / protobuf",
       "ios_platform_delta": "Reuses the canonical IOSCursorAuthService, durable machine-id resolver and IOSCursorDashboardClient already owned by CoordinatorMcpSurface. Native protobuf decoding preserves user field 6, team pull_request_preferences field 37 -> field 1, background_agent_settings field 7 -> field 5, and enum 0/1/2/3 semantics without introducing a second account or network store.",
       "implementation_status": "implemented",
-      "production_evidence": "source/ios-main/account/cursor-dashboard-client.swift getPrReviewPreferences(); source/mahayana-agent-coordinator/coordinator-mcp-manager.swift canonical getCursorPrReviewPreferences route on the shipping CoordinatorMcpSurface, matching IOSMainRPCRuntime.methodTable.",
+      "production_evidence": "Primary native owner: source/ios-main/account/cursor-dashboard-client.swift getPrReviewPreferences(). Shipping composition: source/mahayana-agent-coordinator/coordinator-mcp-manager.swift canonical getCursorPrReviewPreferences route on CoordinatorMcpSurface, matching source/ios-preload/main-rpc-runtime.swift.",
       "test_evidence": "mobile/ios/FabushiTests/CursorPrReviewPreferencesParityTests.swift covers canonical routes, 10 second timeout, parallel two-request fetch shape, user/team decoding, team fallback and unknown-mode nil; current exact-head Actions remain required before verified.",
       "notes": "Exact Desktop cursor-pr-review.ts@700ee2f8bf05f317a74e724f413b78b154ab4221 plus generated dashboard/background-composer wire fields reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Shared SandPrReviewPreferences owner is reused. Canonical renderer contract is getCursorPrReviewPreferences; no alternate account RPC namespace is introduced.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
