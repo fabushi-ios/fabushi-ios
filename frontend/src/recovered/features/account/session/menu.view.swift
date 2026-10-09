@@ -95,10 +95,6 @@ struct AccountMenuView: View {
     @State private var feedbackPresented = false
     @State private var actionError: String?
 
-    private var localizedFeatureCopy: MobileSettingsFeatureCopy {
-        (uiPreferencesStore?.preferences ?? MobileUiPreferences()).featureCopy()
-    }
-
     var body: some View {
         NavigationStack {
             List {
@@ -303,6 +299,10 @@ struct AccountSettingsView: View {
     @State private var editingRule: SandAutoReviewInstructionRow?
     @Environment(\.mobileUiPreferencesStore) private var uiPreferencesStore
     @Environment(\.humanCallMediaPort) private var mediaPort
+
+    private var localizedFeatureCopy: MobileSettingsFeatureCopy {
+        (uiPreferencesStore?.preferences ?? MobileUiPreferences()).featureCopy()
+    }
     @State private var mediaDevices: [HumanCallMediaDevice] = []
     @State private var selectedMicrophoneId: String?
     @State private var selectedCameraId: String?
