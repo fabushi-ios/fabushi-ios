@@ -87,6 +87,9 @@ internal struct GrokMobileShell: View {
         .onChange(of: reconnectGeneration) { _, _ in
             retryHeldHiddenChatMutations()
         }
+        .onChange(of: model.accountRosterRevision) { _, _ in
+            Task { await refreshAccessRoster() }
+        }
         .onDisappear {
             hiddenChatsController.dispose()
         }
