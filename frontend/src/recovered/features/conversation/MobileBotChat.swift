@@ -431,6 +431,7 @@ internal struct MobileBotChat: View {
     let model: MarketplaceModel
     let appAgentSurface: FabushiAppAgentSurface
     let reconnectGeneration: Int
+    let focusPromptGeneration: Int
     let onClose: () -> Void
     let onOpenSettings: () -> Void
     let onOpenAutomation: (String) -> Void
@@ -473,6 +474,7 @@ internal struct MobileBotChat: View {
     @State private var secretPendingEntryIds: Set<String> = []
     @State private var secretProvidedEntryIds: Set<String> = []
     @State private var secretErrors: [String: String] = [:]
+    @FocusState private var promptFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -512,6 +514,9 @@ internal struct MobileBotChat: View {
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             invalidateReactionScope()
+        }
+        .onChange(of: focusPromptGeneration) { _, _ in
+            promptFocused = true
         }
         .onDisappear {
             cancelVoiceInput()
@@ -720,6 +725,7 @@ internal struct MobileBotChat: View {
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
             TextField("Message", text: $draft, axis: .vertical)
+                .focused($promptFocused)
                 .lineLimit(1...5)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
