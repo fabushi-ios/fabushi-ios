@@ -122,6 +122,14 @@ internal enum MobileAgentNetworkModel {
         return result.sorted()
     }
 
+    static func openTarget(id: String, agents: [MobileBotSummary]) -> MobileBotSummary? {
+        agents.first(where: { $0.id == id })
+    }
+
+    static func nodeAccessibilityIdentifier(_ id: String) -> String {
+        "agent-network-node-\(id)"
+    }
+
     static func gateEnabled(from snapshot: Any?) -> Bool? {
         guard let root = snapshot as? [String: Any] else { return nil }
         let direct = root["featureGates"] as? [String: Any]
@@ -287,7 +295,7 @@ internal struct FabushiAgentNetworkView: View {
         }
         .buttonStyle(.plain).accessibilityLabel(agent.name).accessibilityValue(activityLabel(activity, agent: agent))
         .accessibilityAddTraits(selection?.agentId == agent.id ? .isSelected : [])
-        .accessibilityIdentifier("agent-network-node-\(agent.id)")
+        .accessibilityIdentifier(MobileAgentNetworkModel.nodeAccessibilityIdentifier(agent.id))
     }
 
     @ViewBuilder private func inspector(_ agent: MobileBotSummary, byId: [String: MobileBotSummary]) -> some View {
