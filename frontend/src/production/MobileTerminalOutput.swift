@@ -65,7 +65,7 @@ internal enum MobileTerminalOutputModel {
             command: command,
             cwd: nonEmptyString(root["cwd"])
                 ?? nonEmptyString(root["cwdFull"])
-                ?? nonEmptyString(metadata?["cwd"]),
+                ?? metadata.flatMap { nonEmptyString($0["cwd"]) },
             output: normalizeOutput(
                 root["outputRaw"]
                     ?? root["output_raw"]
