@@ -264,7 +264,9 @@ extension GrokMobileShell {
             if selectedBot == nil, !legacyOpen, searchOpen {
                 closeCommandPalette()
             } else {
+                let scopedAgentID = selectedBot?.id ?? rosterSelection.currentAgentID
                 returnToHomeForHardwareShortcut()
+                setCommandPaletteComputerScope(agentID: scopedAgentID)
                 searchOpen = true
                 paletteTab = .all
             }
