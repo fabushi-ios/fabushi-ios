@@ -1956,20 +1956,20 @@ final class MarketplaceModel {
             }
         }
 
-        let result: MahayanaBridgeResponse
         do {
-            result = try await bridge.request(method: "submitFeedback", params: params)
+            let result = try await bridge.request(method: "submitFeedback", params: params)
+            guard let response = result.value as? [String: Any],
+                  let ok = response["ok"] as? Bool
+            else {
+                throw AccountFeedbackError(code: .unavailable)
+            }
+            guard ok else {
+                throw AccountFeedbackError(code: AccountFeedbackCode.normalize(response["code"]))
+            }
+        } catch let error as AccountFeedbackError {
+            throw error
         } catch {
             throw AccountFeedbackError(code: .unavailable)
-        }
-
-        guard let response = result.value as? [String: Any],
-              let ok = response["ok"] as? Bool
-        else {
-            throw AccountFeedbackError(code: .unavailable)
-        }
-        guard ok else {
-            throw AccountFeedbackError(code: AccountFeedbackCode.normalize(response["code"]))
         }
     }
 
