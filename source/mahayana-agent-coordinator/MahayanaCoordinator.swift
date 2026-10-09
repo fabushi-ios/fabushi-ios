@@ -17,6 +17,69 @@ protocol CoordinatorDevControlAdapting: AnyObject {
     func coordinatorDidLaunch()
 }
 
+let IOS_SAND_CLIENT_PAUSE_GATE = "sand_client_pause"
+let IOS_SAND_CLIENT_PAUSE_BLOCKED_MESSAGE = "sand box blocked by kill switch: SAND_CLIENT_PAUSE\u{001F}\u{001F}"
+
+struct IOSClientPausedError: LocalizedError, Equatable, Sendable {
+    var errorDescription: String? { IOS_SAND_CLIENT_PAUSE_BLOCKED_MESSAGE }
+}
+
+@MainActor
+private final class IOSCoordinatorClientPauseControl {
+    typealias IsPaused = @MainActor () -> Bool
+    typealias SetGatewayPaused = @MainActor (Bool) async throws -> Bool
+    typealias DropObservedConnection = @MainActor () -> Void
+
+    private let isPausedProvider: IsPaused
+    private let setGatewayPaused: SetGatewayPaused
+    private let dropObservedConnection: DropObservedConnection
+    private var coordinatorPaused = false
+    private var egressDroppedForPause = false
+    private var serialTail: Task<Void, Never>?
+    private var lastSyncError: Error?
+
+    init(
+        isPaused: @escaping IsPaused,
+        setGatewayPaused: @escaping SetGatewayPaused,
+        dropObservedConnection: @escaping DropObservedConnection
+    ) {
+        isPausedProvider = isPaused
+        self.setGatewayPaused = setGatewayPaused
+        self.dropObservedConnection = dropObservedConnection
+    }
+
+    var isPaused: Bool { isPausedProvider() }
+
+    func synchronize() async throws {
+        let desired = isPausedProvider()
+        if desired && !egressDroppedForPause {
+            dropObservedConnection()
+        }
+        egressDroppedForPause = desired
+
+        let previous = serialTail
+        let operation = Task { @MainActor [weak self] in
+            if let previous { await previous.value }
+            guard let self, self.coordinatorPaused != desired else { return }
+            do {
+                self.coordinatorPaused = try await self.setGatewayPaused(desired)
+            } catch {
+                self.lastSyncError = error
+            }
+        }
+        serialTail = operation
+        await operation.value
+        if let error = lastSyncError {
+            lastSyncError = nil
+            throw error
+        }
+    }
+
+    func reapplyAfterCoordinatorLaunch() {
+        coordinatorPaused = false
+    }
+}
+
 @MainActor
 final class MahayanaCoordinator {
     struct JSONResult: @unchecked Sendable {
@@ -52,6 +115,7 @@ final class MahayanaCoordinator {
     private let settingsStore: SandSettingsStore?
     private let mcpSurface: CoordinatorMcpSurface?
     private let experimentService: SandExperimentService?
+    private var clientPauseControl: IOSCoordinatorClientPauseControl?
     private let webAuthnSigner: CoordinatorWebAuthnSigner?
     private let devControlAdapter: (any CoordinatorDevControlAdapting)?
     private let clientSideToolV2Relay = ClientSideToolV2Relay()
@@ -73,6 +137,13 @@ final class MahayanaCoordinator {
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
+        self.experimentService = experimentService
+
+        let isClientPaused: @MainActor () -> Bool = {
+            experimentService?.checkFeatureGate(IOS_SAND_CLIENT_PAUSE_GATE)
+                ?? BUNDLED_FEATURE_FLAGS[IOS_SAND_CLIENT_PAUSE_GATE]?.defaultValue
+                ?? false
+        }
 
         if let mcpSurface {
             self.mcpSurface = mcpSurface
@@ -81,13 +152,30 @@ final class MahayanaCoordinator {
                 hostSupervisor: hostSupervisor,
                 settingsStore: settingsStore,
                 reportFailure: mcpFailureReporter,
-                reportAuthTelemetry: mcpAuthTelemetryReporter
+                reportAuthTelemetry: mcpAuthTelemetryReporter,
+                isClientPaused: isClientPaused
             )
         } else {
             self.mcpSurface = nil
         }
-        self.experimentService = experimentService
         self.devControlAdapter = devControlAdapter
+        clientPauseControl = IOSCoordinatorClientPauseControl(
+            isPaused: isClientPaused,
+            setGatewayPaused: { [weak hostSupervisor] paused in
+                guard let hostSupervisor else { throw CoordinatorError.unavailable }
+                let reply = try await hostSupervisor.request(
+                    method: "setGatewayPaused",
+                    params: ["paused": paused]
+                )
+                guard let body = reply.value as? [String: Any],
+                      let acknowledged = body["paused"] as? Bool
+                else { throw CoordinatorError.invalidResponse }
+                return acknowledged
+            },
+            dropObservedConnection: { [weak self] in
+                self?.mcpSurface?.dropObservedComputerConnectionForClientPause()
+            }
+        )
         webAuthnSigner = passkeyProvider.map {
             CoordinatorWebAuthnSigner(
                 passkeys: CoordinatorPasskeyProvider(provider: $0)
@@ -235,6 +323,12 @@ final class MahayanaCoordinator {
     /// replacing dictionary-shaped calls. Host ownership remains here.
     func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
         guard lifecycleState != .shuttingDown else { throw CoordinatorError.unavailable }
+        if let clientPauseControl {
+            try await clientPauseControl.synchronize()
+            if clientPauseControl.isPaused && method == "forceReconnectGateway" {
+                throw IOSClientPausedError()
+            }
+        }
         if method == "getAutoReviewInstructions" {
             return JSONResult(value: autoReviewInstructionsObject())
         }
@@ -424,6 +518,13 @@ final class MahayanaCoordinator {
             return .ok(try CoordinatorPayload.fromFoundation(result.value))
         } catch {
             return .failed(.init(code: "request-failed", message: error.localizedDescription))
+        }
+    }
+
+    func reapplyClientPauseAfterCoordinatorLaunch() {
+        clientPauseControl?.reapplyAfterCoordinatorLaunch()
+        Task { @MainActor [weak self] in
+            try? await self?.clientPauseControl?.synchronize()
         }
     }
 
