@@ -109,4 +109,129 @@ final class GrokMobileGroupMembersModelTests: XCTestCase {
         XCTAssertFalse(GrokMobileGroupMembersModel.canAdd(group: editable, roster: roster, pending: true))
         XCTAssertFalse(GrokMobileGroupMembersModel.canRemove(group: editable, pending: true))
     }
+    func testRouteScopeRequiresCurrentLocalGroupAccountAndReconnectGeneration() {
+        let group = MobileBotSummary(
+            id: "group-1",
+            name: "Room",
+            description: "",
+            isGroup: true,
+            memberIds: ["bot-a"]
+        )
+        let shared = MobileBotSummary(
+            id: "shared",
+            name: "Shared",
+            description: "",
+            isGroup: true,
+            memberIds: ["bot-a"],
+            isSharedRoom: true
+        )
+        guard let scope = GrokMobileGroupMembersModel.routeScope(
+            group: group,
+            accountScopeKey: "account-a",
+            reconnectGeneration: 7
+        ) else {
+            return XCTFail("local group should project a route")
+        }
+        XCTAssertTrue(
+            GrokMobileGroupMembersModel.accepts(
+                scope,
+                group: group,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 7
+            )
+        )
+        XCTAssertFalse(
+            GrokMobileGroupMembersModel.accepts(
+                scope,
+                group: group,
+                accountScopeKey: "account-b",
+                reconnectGeneration: 7
+            )
+        )
+        XCTAssertFalse(
+            GrokMobileGroupMembersModel.accepts(
+                scope,
+                group: group,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 8
+            )
+        )
+        XCTAssertNil(
+            GrokMobileGroupMembersModel.routeScope(
+                group: shared,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 7
+            )
+        )
+        XCTAssertNil(
+            GrokMobileGroupMembersModel.routeScope(
+                group: group,
+                accountScopeKey: "",
+                reconnectGeneration: 7
+            )
+        )
+        XCTAssertNil(
+            GrokMobileGroupMembersModel.routeScope(
+                group: group,
+                accountScopeKey: "account-a",
+                reconnectGeneration: -1
+            )
+        )
+    }
+
+    func testGroupInfoOpenTargetRoutesOnlyCurrentIndividualMembers() {
+        let group = MobileBotSummary(
+            id: "group-1",
+            name: "Room",
+            description: "",
+            isGroup: true,
+            memberIds: ["bot-a"]
+        )
+        let member = MobileBotSummary(
+            id: "bot-a",
+            name: "A",
+            description: ""
+        )
+        let outsider = MobileBotSummary(
+            id: "bot-b",
+            name: "B",
+            description: ""
+        )
+        let nested = MobileBotSummary(
+            id: "nested",
+            name: "Nested",
+            description: "",
+            isGroup: true,
+            memberIds: []
+        )
+        XCTAssertEqual(
+            GrokMobileGroupMembersModel.openTarget(
+                memberId: member.id,
+                group: group,
+                roster: [group, member, outsider, nested]
+            )?.id,
+            member.id
+        )
+        XCTAssertNil(
+            GrokMobileGroupMembersModel.openTarget(
+                memberId: outsider.id,
+                group: group,
+                roster: [group, member, outsider]
+            )
+        )
+        XCTAssertNil(
+            GrokMobileGroupMembersModel.openTarget(
+                memberId: nested.id,
+                group: MobileBotSummary(
+                    id: "group-2",
+                    name: "Room 2",
+                    description: "",
+                    isGroup: true,
+                    memberIds: [nested.id]
+                ),
+                roster: [nested]
+            )
+        )
+    }
+
 }

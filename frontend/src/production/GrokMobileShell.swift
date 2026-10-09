@@ -90,9 +90,17 @@ internal struct GrokMobileShell: View {
                 roster: bots,
                 bridge: bridge,
                 accountScopeKey: mobileAccountScopeKey,
+                reconnectGeneration: reconnectGeneration,
                 onRosterChanged: { updated in
                     applyBotRosterUpdate(updated)
                     groupMembersTarget = updated.first(where: { $0.id == group.id })
+                },
+                onOpenAgentChat: { member in
+                    groupMembersTarget = nil
+                    guard let current = bots.first(where: { $0.id == member.id }),
+                          !current.isGroup
+                    else { return }
+                    selectBotForConversation(current)
                 },
                 onClose: { groupMembersTarget = nil }
             )

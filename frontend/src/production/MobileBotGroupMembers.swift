@@ -5,7 +5,9 @@ internal struct MobileBotGroupMembersSheet: View {
     let roster: [MobileBotSummary]
     let bridge: IOSPreloadBridge
     let accountScopeKey: String
+    let reconnectGeneration: Int
     let onRosterChanged: ([MobileBotSummary]) -> Void
+    let onOpenAgentChat: (MobileBotSummary) -> Void
     let onClose: () -> Void
 
     @State private var pendingAgentId: String?
@@ -13,6 +15,7 @@ internal struct MobileBotGroupMembersSheet: View {
     @State private var generation = 0
     @State private var mutationTask: Task<Void, Never>?
     @State private var removalTarget: MobileBotSummary?
+    @State private var routeScope: GrokMobileGroupMembersModel.RouteScope?
 
     private var currentGroup: MobileBotSummary? {
         GrokMobileGroupMembersModel.group(id: group.id, fallback: group, roster: roster)
@@ -35,9 +38,21 @@ internal struct MobileBotGroupMembersSheet: View {
                     Section("成员") {
                         ForEach(members) { member in
                             HStack(spacing: 12) {
-                                ClothGhostAvatar(botId: member.id, size: 36)
-                                Text(member.name)
-                                Spacer()
+                                Button {
+                                    openMemberChat(member)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        ClothGhostAvatar(botId: member.id, size: 36)
+                                        Text(member.name)
+                                        Spacer()
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(pendingAgentId != nil)
+                                .accessibilityLabel("打开 \(member.name) 的聊天")
+                                .accessibilityIdentifier("mobile-group-member-open-\(member.id)")
+
                                 if pendingAgentId == member.id {
                                     ProgressView().controlSize(.small)
                                 } else {
@@ -119,8 +134,10 @@ internal struct MobileBotGroupMembersSheet: View {
             }
         }
         .accessibilityIdentifier("mobile-group-members")
-        .onChange(of: group.id) { _, _ in invalidatePending() }
-        .onChange(of: accountScopeKey) { _, _ in invalidatePending() }
+        .onAppear { refreshRouteScopeOrClose() }
+        .onChange(of: group.id) { _, _ in refreshRouteScopeOrClose() }
+        .onChange(of: accountScopeKey) { _, _ in refreshRouteScopeOrClose() }
+        .onChange(of: reconnectGeneration) { _, _ in refreshRouteScopeOrClose() }
         .onDisappear { invalidatePending() }
         .alert(item: $removalTarget) { member in
             Alert(
@@ -132,6 +149,42 @@ internal struct MobileBotGroupMembersSheet: View {
                 secondaryButton: .cancel(Text("取消"))
             )
         }
+    }
+
+    @MainActor
+    private func refreshRouteScopeOrClose() {
+        invalidatePending()
+        guard let currentGroup,
+              let projected = GrokMobileGroupMembersModel.routeScope(
+                  group: currentGroup,
+                  accountScopeKey: accountScopeKey,
+                  reconnectGeneration: reconnectGeneration
+              )
+        else {
+            routeScope = nil
+            onClose()
+            return
+        }
+        routeScope = projected
+    }
+
+    @MainActor
+    private func openMemberChat(_ member: MobileBotSummary) {
+        guard let currentGroup,
+              let routeScope,
+              GrokMobileGroupMembersModel.accepts(
+                  routeScope,
+                  group: currentGroup,
+                  accountScopeKey: accountScopeKey,
+                  reconnectGeneration: reconnectGeneration
+              ),
+              let target = GrokMobileGroupMembersModel.openTarget(
+                  memberId: member.id,
+                  group: currentGroup,
+                  roster: roster
+              )
+        else { return }
+        onOpenAgentChat(target)
     }
 
     @MainActor

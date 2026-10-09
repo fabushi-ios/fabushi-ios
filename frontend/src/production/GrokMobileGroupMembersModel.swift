@@ -6,6 +6,12 @@ internal enum GrokMobileGroupMembersModel {
         let generation: Int
     }
 
+    struct RouteScope: Equatable {
+        let groupId: String
+        let accountScopeKey: String
+        let reconnectGeneration: Int
+    }
+
     static let maximumMembers = 6
 
     static func accepts(
@@ -16,9 +22,57 @@ internal enum GrokMobileGroupMembersModel {
         fence.accountScopeKey == accountScopeKey && fence.generation == generation
     }
 
-    static func group(id: String, fallback: MobileBotSummary, roster: [MobileBotSummary]) -> MobileBotSummary? {
+    static func group(
+        id: String,
+        fallback: MobileBotSummary,
+        roster: [MobileBotSummary]
+    ) -> MobileBotSummary? {
         let candidate = roster.first(where: { $0.id == id }) ?? fallback
         return candidate.isGroup && !candidate.isSharedRoom ? candidate : nil
+    }
+
+    static func routeScope(
+        group: MobileBotSummary,
+        accountScopeKey: String,
+        reconnectGeneration: Int
+    ) -> RouteScope? {
+        let account = accountScopeKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard group.isGroup,
+              !group.isSharedRoom,
+              !group.id.isEmpty,
+              !account.isEmpty,
+              reconnectGeneration >= 0
+        else { return nil }
+        return .init(
+            groupId: group.id,
+            accountScopeKey: account,
+            reconnectGeneration: reconnectGeneration
+        )
+    }
+
+    static func accepts(
+        _ scope: RouteScope,
+        group: MobileBotSummary,
+        accountScopeKey: String,
+        reconnectGeneration: Int
+    ) -> Bool {
+        routeScope(
+            group: group,
+            accountScopeKey: accountScopeKey,
+            reconnectGeneration: reconnectGeneration
+        ) == scope
+    }
+
+    static func openTarget(
+        memberId: String,
+        group: MobileBotSummary,
+        roster: [MobileBotSummary]
+    ) -> MobileBotSummary? {
+        guard group.memberIds.contains(memberId),
+              let member = roster.first(where: { $0.id == memberId }),
+              !member.isGroup
+        else { return nil }
+        return member
     }
 
     static func members(group: MobileBotSummary, roster: [MobileBotSummary]) -> [MobileBotSummary] {
