@@ -189,6 +189,16 @@ internal func mobileTranscriptCopyText(_ entry: MobileChatMessage) -> String? {
     return entry.text
 }
 
+internal func mobileBotChatSearchEntries(_ entries: [MobileChatMessage]) -> [ChatSearchEntry] {
+    mobileMainTranscriptEntries(entries).compactMap { entry in
+        guard let text = mobileTranscriptCopyText(entry)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty
+        else { return nil }
+        return ChatSearchEntry(id: entry.id, text: text)
+    }
+}
+
 internal func mergeMobileConversationHistory(
     current: [MobileChatMessage],
     fetched: [MobileChatMessage]
@@ -472,12 +482,20 @@ internal struct MobileBotChat: View {
     @State private var secretPendingEntryIds: Set<String> = []
     @State private var secretProvidedEntryIds: Set<String> = []
     @State private var secretErrors: [String: String] = [:]
+    @State private var findPresented = false
+    @State private var findQuery = ""
+    @State private var findIndex: Int?
     @FocusState private var promptFocused: Bool
+    @FocusState private var findFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             chatHeader
             Divider().opacity(0.35)
+            if findPresented {
+                findBar
+                Divider().opacity(0.25)
+            }
             transcriptList
             replyBanner
             voiceStatusBanner
@@ -509,6 +527,7 @@ internal struct MobileBotChat: View {
             threadRootId = nil
             resetTranscriptDraftUI()
             resetSecretRequestUI()
+            closeFind()
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             invalidateReactionScope()
@@ -525,6 +544,7 @@ internal struct MobileBotChat: View {
             widgetPendingEntryIds.removeAll()
             threadLoadGeneration &+= 1
             threadLoadingRootId = nil
+            closeFind()
         }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
@@ -596,6 +616,18 @@ internal struct MobileBotChat: View {
             .accessibilityIdentifier("mobile-bot-settings")
             Spacer()
             Button {
+                openFind()
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 38, height: 38)
+                    .background(Color.black.opacity(0.045), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Find in chat")
+            .accessibilityIdentifier("mobile-bot-find")
+
+            Button {
                 asyncTasksPresented = true
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
@@ -633,6 +665,25 @@ internal struct MobileBotChat: View {
 
                     ForEach(mobileMainTranscriptEntries(entries)) { entry in
                         transcript(entry)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(
+                                        currentFindMatch?.entryId == entry.id
+                                            ? Color.yellow.opacity(0.20)
+                                            : findMatchEntryIDs.contains(entry.id)
+                                                ? Color.yellow.opacity(0.08)
+                                                : Color.clear
+                                    )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(
+                                        currentFindMatch?.entryId == entry.id
+                                            ? Color.orange.opacity(0.65)
+                                            : Color.clear,
+                                        lineWidth: 1
+                                    )
+                            )
                             .id(entry.id)
                     }
                     if let transcriptBaselineError {
@@ -667,13 +718,124 @@ internal struct MobileBotChat: View {
             }
             .background(Color(red: 0.985, green: 0.985, blue: 0.975))
             .onChange(of: entries.count) { _, _ in
-                if let last = mobileMainTranscriptEntries(entries).last {
+                if findPresented, let match = currentFindMatch {
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        proxy.scrollTo(match.entryId, anchor: .center)
+                    }
+                } else if let last = mobileMainTranscriptEntries(entries).last {
                     withAnimation(.easeOut(duration: 0.16)) {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
             }
+            .onChange(of: currentFindMatch?.entryId) { _, entryId in
+                guard findPresented, let entryId else { return }
+                withAnimation(.easeOut(duration: 0.16)) {
+                    proxy.scrollTo(entryId, anchor: .center)
+                }
+            }
         }
+    }
+
+    private var findSearchEntries: [ChatSearchEntry] {
+        mobileBotChatSearchEntries(entries)
+    }
+
+    private var findMatches: [ChatSearchMatch] {
+        chatSearchMatches(findSearchEntries, query: findQuery)
+    }
+
+    private var currentFindMatch: ChatSearchMatch? {
+        guard let findIndex, findMatches.indices.contains(findIndex) else { return nil }
+        return findMatches[findIndex]
+    }
+
+    private var findMatchEntryIDs: Set<String> {
+        Set(findMatches.map(\.entryId))
+    }
+
+    private var findOrdinal: String {
+        guard !findQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "" }
+        guard let findIndex, findMatches.indices.contains(findIndex) else {
+            return "0/\(findMatches.count)"
+        }
+        return "\(findIndex + 1)/\(findMatches.count)"
+    }
+
+    private var findBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Find in chat", text: $findQuery)
+                .focused($findFocused)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onSubmit { stepFind(1) }
+                .onChange(of: findQuery) { _, _ in
+                    findIndex = nextChatSearchIndex(
+                        current: nil,
+                        count: findMatches.count,
+                        delta: 1
+                    )
+                }
+                .accessibilityLabel("Find in chat")
+                .accessibilityIdentifier("mobile-bot-find-field")
+            if !findOrdinal.isEmpty {
+                Text(findOrdinal)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("mobile-bot-find-count")
+            }
+            Button { stepFind(-1) } label: {
+                Image(systemName: "chevron.up")
+            }
+            .disabled(findMatches.isEmpty)
+            .accessibilityLabel("Previous match")
+            .accessibilityIdentifier("mobile-bot-find-previous")
+            Button { stepFind(1) } label: {
+                Image(systemName: "chevron.down")
+            }
+            .disabled(findMatches.isEmpty)
+            .accessibilityLabel("Next match")
+            .accessibilityIdentifier("mobile-bot-find-next")
+            Button { closeFind() } label: {
+                Image(systemName: "xmark")
+            }
+            .accessibilityLabel("Close find")
+            .accessibilityIdentifier("mobile-bot-find-close")
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.97))
+    }
+
+    @MainActor
+    private func openFind() {
+        findPresented = true
+        findIndex = nextChatSearchIndex(
+            current: nil,
+            count: findMatches.count,
+            delta: 1
+        )
+        findFocused = true
+    }
+
+    @MainActor
+    private func closeFind() {
+        findPresented = false
+        findQuery = ""
+        findIndex = nil
+        findFocused = false
+    }
+
+    @MainActor
+    private func stepFind(_ delta: Int) {
+        findIndex = nextChatSearchIndex(
+            current: findIndex,
+            count: findMatches.count,
+            delta: delta
+        )
     }
 
     @ViewBuilder
@@ -898,6 +1060,7 @@ internal struct MobileBotChat: View {
             .init(agentId: "mobile-bot-chat", role: "application", name: "Bot \(String(bot.name.prefix(160)))"),
             .init(agentId: "mobile-bot-close", role: "button", name: "关闭 Bot 对话"),
             .init(agentId: "mobile-bot-settings", role: "button", name: "Bot 设置"),
+            .init(agentId: "mobile-bot-find", role: "button", name: "Find in chat"),
             .init(agentId: "mobile-bot-async-tasks", role: "button", name: "Async tasks"),
             .init(agentId: "mobile-bot-draft", role: "textbox", name: "Bot 消息"),
         ]
@@ -951,6 +1114,7 @@ internal struct MobileBotChat: View {
         var actions: [String: FabushiAppAgentSurface.Action] = [
             "mobile-bot-close": .init(allowed: ["invoke"]) { _ in onClose() },
             "mobile-bot-settings": .init(allowed: ["invoke"]) { _ in onOpenSettings() },
+            "mobile-bot-find": .init(allowed: ["invoke"]) { _ in openFind() },
             "mobile-bot-async-tasks": .init(allowed: ["invoke"]) { _ in asyncTasksPresented = true },
             "mobile-bot-draft": .init(allowed: ["setValue"]) { value in draft = value ?? "" },
         ]
