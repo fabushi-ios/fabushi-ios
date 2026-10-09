@@ -4534,7 +4534,7 @@
       "implementation_status": "mapped",
       "production_evidence": "source/shared/node/settings/sand-settings-store.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/mahayana-agent-coordinator/local-host-supervisor.swift; source/host/MahayanaHostRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift; current iOS exact-HEAD GitHub Actions pending",
-      "notes": "Revalidated against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1; persisted explicit provider remains authoritative and only an unset profile falls back to Fabushi."
+      "notes": "Desktop-main impact entry is metadata-corrected, not a source-body delta: previous 798cf51d96cb1cb98cf657af212bb47274ccb701 and current 3bc92400826cc4ca7ac665b467708e22261edc61 both resolve this path to identical blob f34a4d90ac1bf5a3b8208cc4d573ea97c9f8da72. Do not infer or implement a new current-main provider-default behavior from the metadata size correction; the existing iOS provider-persistence mapping remains a baseline responsibility and stays mapped pending aggregate review/current-head acceptance."
     },
     {
       "desktop_path": "source/host/src/extensions/source_map/extension.rs",
