@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import ReplayKit
+import SwiftUI
 
 internal enum HumanCallMediaPermission: String, Sendable {
     case granted
@@ -305,5 +306,16 @@ internal final class HumanCallMediaPort {
         @unknown default:
             return 3
         }
+    }
+}
+
+private struct HumanCallMediaPortEnvironmentKey: EnvironmentKey {
+    static let defaultValue: HumanCallMediaPort? = nil
+}
+
+extension EnvironmentValues {
+    internal var humanCallMediaPort: HumanCallMediaPort? {
+        get { self[HumanCallMediaPortEnvironmentKey.self] }
+        set { self[HumanCallMediaPortEnvironmentKey.self] = newValue }
     }
 }
