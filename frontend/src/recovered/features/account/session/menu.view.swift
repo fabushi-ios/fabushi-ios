@@ -322,7 +322,7 @@ struct AccountSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("账号") {
+                Section(shellCopy.account) {
                     TextField(shellCopy.displayName, text: $nameDraft)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
@@ -389,27 +389,27 @@ struct AccountSettingsView: View {
                             catch { actionError = error.localizedDescription }
                         }
                     } label: {
-                        Label("帮助中心", systemImage: "questionmark.circle")
+                        Label(shellCopy.helpCenter, systemImage: "questionmark.circle")
                     }
                     .accessibilityIdentifier("settings-help-entry")
 
                     Button {
                         feedbackPresented = true
                     } label: {
-                        Label("发送反馈", systemImage: "exclamationmark.bubble")
+                        Label(shellCopy.sendFeedback, systemImage: "exclamationmark.bubble")
                     }
                     .accessibilityIdentifier("settings-feedback-entry")
 
                     Button {
                         aboutPresented = true
                     } label: {
-                        Label("关于 Fabushi", systemImage: "info.circle")
+                        Label(shellCopy.aboutFabushi, systemImage: "info.circle")
                     }
                     .accessibilityIdentifier("settings-about-entry")
                 }
 
                 Section(shellCopy.iosSection) {
-                    Label("当前设备已安装 Fabushi iOS", systemImage: "checkmark.seal.fill")
+                    Label(shellCopy.iosInstalled, systemImage: "checkmark.seal.fill")
                     Text(shellCopy.iosSelfReference)
                         .font(.caption)
                         .foregroundStyle(.secondary)
