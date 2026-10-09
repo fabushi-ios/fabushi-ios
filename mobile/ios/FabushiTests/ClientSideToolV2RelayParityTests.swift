@@ -27,6 +27,56 @@ final class ClientSideToolV2RelayParityTests: XCTestCase {
         )
     }
 
+    func testTransportParserRejectsMalformedIdentityVersionSequenceAndWireShape() {
+        let validBytes = callMessage("call-parse").bytes
+        let base: [String: Any] = [
+            "version": 1,
+            "kind": "call",
+            "accountSlot": "host",
+            "agentId": "agent-parse",
+            "epoch": "epoch-parse",
+            "sequence": 1,
+            "message": [
+                "encoding": "protobuf-base64",
+                "messageType": "aiserver.v1.ClientSideToolV2Call",
+                "bytes": validBytes,
+            ],
+        ]
+        XCTAssertNotNil(ClientSideToolV2TransportEvent.fromFoundation(base))
+
+        var badVersion = base
+        badVersion["version"] = 2
+        XCTAssertNil(ClientSideToolV2TransportEvent.fromFoundation(badVersion))
+
+        var emptyAgent = base
+        emptyAgent["agentId"] = ""
+        XCTAssertNil(ClientSideToolV2TransportEvent.fromFoundation(emptyAgent))
+
+        var zeroSequence = base
+        zeroSequence["sequence"] = 0
+        XCTAssertNil(ClientSideToolV2TransportEvent.fromFoundation(zeroSequence))
+
+        var unsafeSequence = base
+        unsafeSequence["sequence"] = 9_007_199_254_740_992.0
+        XCTAssertNil(ClientSideToolV2TransportEvent.fromFoundation(unsafeSequence))
+
+        var wrongMessageType = base
+        wrongMessageType["message"] = [
+            "encoding": "protobuf-base64",
+            "messageType": "aiserver.v1.ClientSideToolV2Result",
+            "bytes": validBytes,
+        ]
+        XCTAssertNil(ClientSideToolV2TransportEvent.fromFoundation(wrongMessageType))
+
+        var nonCanonicalBase64 = base
+        nonCanonicalBase64["message"] = [
+            "encoding": "protobuf-base64",
+            "messageType": "aiserver.v1.ClientSideToolV2Call",
+            "bytes": validBytes + "\n",
+        ]
+        XCTAssertNil(ClientSideToolV2TransportEvent.fromFoundation(nonCanonicalBase64))
+    }
+
     @MainActor
     func testRelayFencesEpochsSequencesSettlesAndReplays() {
         let relay = ClientSideToolV2Relay()
