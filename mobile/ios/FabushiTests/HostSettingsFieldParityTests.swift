@@ -63,7 +63,8 @@ final class HostSettingsFieldParityTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(await field.absorbFromBox(), .repainted)
+        let absorb = await field.absorbFromBox()
+        XCTAssertEqual(absorb, .repainted)
         XCTAssertEqual(local, false)
         XCTAssertTrue(pushes.isEmpty)
         XCTAssertTrue(readable)
@@ -97,12 +98,14 @@ final class HostSettingsFieldParityTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(await field.apply(true), .unreachable)
+        let downApply = await field.apply(true)
+        XCTAssertEqual(downApply, .unreachable)
         XCTAssertEqual(local, true)
         XCTAssertTrue(pushes.isEmpty)
 
         readable = true
-        XCTAssertEqual(await field.absorbFromBox(), .none)
+        let reconnectAbsorb = await field.absorbFromBox()
+        XCTAssertEqual(reconnectAbsorb, .none)
 
         XCTAssertEqual(local, true)
         XCTAssertEqual(remote.value, true)
@@ -130,7 +133,8 @@ final class HostSettingsFieldParityTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(await field.absorbFromBox(), .cleared)
+        let absorb = await field.absorbFromBox()
+        XCTAssertEqual(absorb, .cleared)
         XCTAssertNil(local)
     }
 }
