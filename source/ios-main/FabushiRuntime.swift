@@ -193,12 +193,14 @@ final class FabushiRuntime {
     let messaging: MessagingModel
     let authCallbackRegistration: IOSAuthCallbackRegistration
     private(set) var reconnectGeneration = 0
+    private(set) var appVersionPolicyState: IOSAppVersionPolicyLoadState = .idle
 
     @ObservationIgnored private var deepLinkController: IOSDeepLinkController?
     @ObservationIgnored private let cloudAgentWakeWatcher: IOSCloudAgentWakeWatcher
     @ObservationIgnored private var wasBackgrounded = false
     @ObservationIgnored private var resumeTask: Task<Void, Never>?
     @ObservationIgnored private var connectionRetryTask: Task<Void, Never>?
+    @ObservationIgnored private var appVersionPolicyTask: Task<Void, Never>?
     #if DEBUG
     @ObservationIgnored private var devControlsPreload: IOSDevControlsPreload?
     #endif
@@ -252,6 +254,7 @@ final class FabushiRuntime {
     }
 
     func start() async {
+        refreshAppVersionPolicy()
         await marketplace.runFeatureHostSmokeIfRequested()
         await marketplace.initializeApp()
         await remoteDeviceGateway.setLoggedIn(marketplace.loggedIn)
@@ -300,6 +303,39 @@ final class FabushiRuntime {
 
     func memoryPressureReceived() {
         main.memoryPressureReceived()
+    }
+
+    func refreshAppVersionPolicy() {
+        appVersionPolicyTask?.cancel()
+        let retained = appVersionPolicyState.policy
+        appVersionPolicyState = retained == nil ? .loading : .ready(retained!)
+        appVersionPolicyTask = Task { [weak self] in
+            guard let self else { return }
+            guard let metadata = IOSReleaseMetadataReader.read() else {
+                self.appVersionPolicyState = .failed(
+                    message: IOSAppStoreUpdateService.ServiceError.releaseMetadataUnavailable.localizedDescription,
+                    retained: retained
+                )
+                return
+            }
+            do {
+                let policy = try await IOSAppVersionPolicyClient.fetch(metadata: metadata)
+                guard !Task.isCancelled else { return }
+                self.appVersionPolicyState = .ready(policy)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.appVersionPolicyState = .failed(
+                    message: error.localizedDescription,
+                    retained: retained
+                )
+            }
+        }
+    }
+
+    func retryAppVersionPolicy() {
+        refreshAppVersionPolicy()
     }
 
     func retryConnection() async {

@@ -194,6 +194,7 @@ private struct FabushiRootErrorSurface: View {
 private struct FabushiProductionSceneRoot: View {
     @State private var lifecycle = FabushiRuntimeLifecycle()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     @ViewBuilder
     var body: some View {
@@ -217,6 +218,13 @@ private struct FabushiProductionSceneRoot: View {
                 reconnectGeneration: runtime.reconnectGeneration,
                 onRetryConnection: {
                     await runtime.retryConnection()
+                },
+                appVersionPolicyState: runtime.appVersionPolicyState,
+                onRetryAppVersionPolicy: {
+                    runtime.retryAppVersionPolicy()
+                },
+                onOpenUpdateURL: { url in
+                    openURL(url)
                 }
             )
             .task {
