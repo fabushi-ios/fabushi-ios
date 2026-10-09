@@ -1189,6 +1189,14 @@ final class CoordinatorMcpSurface {
             try await dashboard.updateCursorAccountName(name)
             return .handled([:])
 
+        case "getCursorAvatar":
+            let auth = await cursorAuth.status()
+            guard auth.loggedIn else { return .handled(NSNull()) }
+            if let avatar = await dashboard.getCursorAvatarDataURL(authId: auth.authId) {
+                return .handled(avatar)
+            }
+            return .handled(NSNull())
+
         case "getCursorWeeklyUsage":
             guard (await cursorAuth.status()).loggedIn else { return .handled(NSNull()) }
             if let usage = await dashboard.getCursorWeeklyUsage() {

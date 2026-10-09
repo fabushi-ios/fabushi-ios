@@ -567,6 +567,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
     private let backendURL: URL
     private let session: URLSession
     private let requestExecutor: RequestExecutor?
+    private let avatarCache = NSCache<NSString, NSString>()
 
     init(
         credentials: AccountMcpCredentials,
@@ -896,6 +897,82 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             timeoutMs: timeoutMs
         )
         return try IOSCursorDashboardProto.decodeTranscribeAudioResponse(response)
+    }
+
+    func getCursorAvatarDataURL(
+        authId: String?,
+        timeoutMs: Int = 10_000
+    ) async -> String? {
+        let profile = try? await rpc("GetMe", body: [:], timeoutMs: timeoutMs)
+        let preferred = (profile?["profilePictureUrl"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let preferred, !preferred.isEmpty,
+           let value = await fetchAvatarDataURL(preferred, timeoutMs: timeoutMs) {
+            return value
+        }
+        guard let authId,
+              let separator = authId.firstIndex(of: "|"),
+              separator != authId.startIndex,
+              separator != authId.index(before: authId.endIndex),
+              String(authId[..<separator]) == "github"
+        else { return nil }
+        let subject = String(authId[authId.index(after: separator)...])
+        guard !subject.isEmpty, subject.allSatisfy(\.isNumber) else { return nil }
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "avatars.githubusercontent.com"
+        components.path = "/u/\(subject)"
+        components.queryItems = [
+            .init(name: "v", value: "4"),
+            .init(name: "s", value: "192"),
+        ]
+        guard let url = components.url else { return nil }
+        return await fetchAvatarDataURL(url.absoluteString, timeoutMs: timeoutMs)
+    }
+
+    private func fetchAvatarDataURL(_ rawURL: String, timeoutMs: Int) async -> String? {
+        guard let url = URL(string: rawURL), url.scheme?.lowercased() == "https" else {
+            return nil
+        }
+        let key = url.absoluteString as NSString
+        if let cached = avatarCache.object(forKey: key) {
+            return cached as String
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = TimeInterval(max(1, timeoutMs)) / 1_000
+        do {
+            let data: Data
+            let response: URLResponse
+            if let requestExecutor {
+                let result = try await requestExecutor(request)
+                data = result.0
+                response = result.1
+            } else {
+                let result = try await session.data(for: request)
+                data = result.0
+                response = result.1
+            }
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode)
+            else { return nil }
+            let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "")
+                .split(separator: ";", maxSplits: 1)
+                .first
+                .map(String.init)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard contentType.hasPrefix("image/") else { return nil }
+            if let length = http.value(forHTTPHeaderField: "Content-Length"),
+               let declared = Int(length),
+               declared > 1_048_576 {
+                return nil
+            }
+            guard !data.isEmpty, data.count <= 1_048_576 else { return nil }
+            let value = "data:\(contentType);base64,\(data.base64EncodedString())"
+            avatarCache.setObject(value as NSString, forKey: key)
+            return value
+        } catch {
+            return nil
+        }
     }
 
     func updateCursorAccountName(_ name: String, timeoutMs: Int = 10_000) async throws {
