@@ -1,6 +1,38 @@
 import AVKit
+import PDFKit
 import SwiftUI
 import UIKit
+
+let nativePdfPreviewByteCap = 25 * 1024 * 1024
+
+internal func isNativePdfAttachment(mimeType: String?, fileName: String?) -> Bool {
+    if mimeType?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "application/pdf" {
+        return true
+    }
+    guard let fileName else { return false }
+    return URL(fileURLWithPath: fileName).pathExtension.lowercased() == "pdf"
+}
+
+private struct NativePDFPreview: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true
+        view.displayMode = .singlePageContinuous
+        view.displayDirection = .vertical
+        view.usePageViewController(false)
+        view.backgroundColor = .black
+        return view
+    }
+
+    func updateUIView(_ view: PDFView, context: Context) {
+        if view.document?.documentURL != url {
+            view.document = PDFDocument(url: url)
+            view.autoScales = true
+        }
+    }
+}
 
 struct MediaViewer: View {
     let message: ChatMessage
@@ -50,6 +82,11 @@ struct MediaViewer: View {
             }
         } else if message.contentType == "video", let localURL {
             VideoPlayer(player: AVPlayer(url: localURL)).ignoresSafeArea(edges: .bottom)
+        } else if isNativePdfAttachment(mimeType: message.mediaMimeType, fileName: message.mediaFileName),
+                  let localURL {
+            NativePDFPreview(url: localURL)
+                .ignoresSafeArea(edges: .bottom)
+                .accessibilityLabel(message.mediaFileName ?? "PDF document")
         } else if let localURL {
             VStack(spacing: 18) {
                 Image(systemName: "doc.fill").font(.system(size: 64)).foregroundStyle(.orange)
@@ -77,6 +114,11 @@ struct MediaViewer: View {
         defer { loading = false }
         guard let blobId = message.mediaBlobId, message.mediaSizeBytes > 0 else {
             errorMessage = "媒体文件不可用"
+            return
+        }
+        if isNativePdfAttachment(mimeType: message.mediaMimeType, fileName: message.mediaFileName),
+           message.mediaSizeBytes > nativePdfPreviewByteCap {
+            errorMessage = "PDF 超过 25 MB，无法在 Fabushi 内预览"
             return
         }
         do {
