@@ -212,7 +212,14 @@ extension ContentView {
         switch model.signedInOnboardingStep {
         case .meet:
             Spacer()
-            avatar.frame(width: 92, height: 92)
+            MobileOnboardingCharacter(
+                colorId: "blue",
+                shapeId: "blob",
+                size: 92,
+                state: .happy
+            )
+            .accessibilityLabel("Fabushi character")
+            .accessibilityIdentifier("mobile-onboarding-character")
             Text("Meet Fabushi")
                 .font(.largeTitle.bold())
                 .accessibilityIdentifier("mobile-onboarding-meet-title")
@@ -308,11 +315,11 @@ extension ContentView {
                         .font(.largeTitle.bold())
                         .accessibilityIdentifier("mobile-onboarding-create-title")
                     HStack(spacing: 16) {
-                        LoginBlob(
-                            color: onboardingColor(onboardingDraft.normalized.color),
-                            width: 64,
-                            height: 64,
-                            rotation: 0
+                        MobileOnboardingCharacter(
+                            colorId: onboardingDraft.normalized.color,
+                            shapeId: onboardingDraft.normalized.shape,
+                            size: 64,
+                            state: .idle
                         )
                         VStack(alignment: .leading) {
                             Text(onboardingDraft.normalized.shape.capitalized)
@@ -377,11 +384,11 @@ extension ContentView {
                                     onboardingDraft.pickedTemplateId = choice.suggestion.id
                                 } label: {
                                     HStack(alignment: .top, spacing: 10) {
-                                        LoginBlob(
-                                            color: onboardingColor(identity.color),
-                                            width: 40,
-                                            height: 40,
-                                            rotation: 0
+                                        MobileOnboardingCharacter(
+                                            colorId: identity.color,
+                                            shapeId: identity.shape,
+                                            size: 40,
+                                            state: .idle
                                         )
                                         VStack(alignment: .leading, spacing: 6) {
                                             Text(choice.suggestion.name).font(.headline)
@@ -411,7 +418,14 @@ extension ContentView {
             }
         case .handOff:
             Spacer()
-            avatar.frame(width: 76, height: 76)
+            MobileOnboardingCharacter(
+                colorId: onboardingDraft.normalized.color,
+                shapeId: onboardingDraft.normalized.shape,
+                size: 76,
+                state: onboardingCreateError == nil ? .working : .idle
+            )
+            .accessibilityLabel("Fabushi onboarding character")
+            .accessibilityIdentifier("mobile-onboarding-handoff-character")
             if let onboardingCreateError {
                 Text("Fabushi couldn’t finish setting up")
                     .font(.title2.bold())
