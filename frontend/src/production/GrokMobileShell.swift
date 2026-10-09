@@ -448,6 +448,7 @@ internal struct GrokMobileShell: View {
             bot: bot,
             bridge: bridge,
             model: model,
+            messaging: messaging,
             appAgentSurface: appAgentSurface,
             reconnectGeneration: reconnectGeneration,
             focusPromptGeneration: promptFocusGeneration,
