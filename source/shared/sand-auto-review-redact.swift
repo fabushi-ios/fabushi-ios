@@ -10,7 +10,7 @@ private func redactRegex(_ input: String, pattern: String, replacement: String) 
 }
 
 private func redactAutoReviewURLs(_ value: String) -> String {
-    guard let regex = try? NSRegularExpression(pattern: #"https?://[^\s\"']+"#, options: [.caseInsensitive]) else { return value }
+    guard let regex = try? NSRegularExpression(pattern: #"https?://[^\s\"'`]+"#, options: [.caseInsensitive]) else { return value }
     let ns = value as NSString
     let matches = regex.matches(in: value, range: NSRange(location: 0, length: ns.length)).reversed()
     let mutable = NSMutableString(string: value)
@@ -42,7 +42,4 @@ func redactSandAutoReviewInlineSecrets(_ value: String) -> String {
         replacement: "…"
     )
     return result
-        .split(whereSeparator: { $0.isWhitespace })
-        .joined(separator: " ")
-        .trimmingCharacters(in: .whitespacesAndNewlines)
 }
