@@ -4840,6 +4840,66 @@ mod tests {
     }
 
     #[test]
+    fn direct_message_list_preserves_server_delivery_projection() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind direct message list test server");
+        let address = listener.local_addr().expect("direct message list test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept direct message list request");
+            let mut request = [0_u8; 8192];
+            let size = stream.read(&mut request).expect("read direct message list request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("GET /api/social/messages?contactId=peer-2&limit=50 "));
+            let lower = request.to_ascii_lowercase();
+            assert!(lower.contains("authorization: bearer test-token"));
+            assert!(lower.contains("x-fabushi-device-id: device-1"));
+
+            // The server is the visibility authority: for a recipient this endpoint
+            // returns scheduled rows only after its cron changes deliveryState to
+            // delivered. The client must preserve, not reconstruct, that projection.
+            let response = r#"{"success":true,"data":{"contact":{"id":"peer-2"},"messages":[{"id":1,"silent":true,"scheduledAtMs":2000000000000,"deliveryState":"delivered","deliveredAt":"2033-05-18T03:33:20.000Z"}]}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.len(),
+                response
+            )
+            .expect("write direct message list response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-direct-message-list-delivery-test-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let response = client
+            .execute(
+                "mahayana.messages.list",
+                &json!({
+                    "contact": "peer-2",
+                    "accessToken": "test-token",
+                    "deviceId": "device-1",
+                }),
+            )
+            .expect("list delivered direct messages");
+        let message = &response["data"]["messages"][0];
+        assert_eq!(message["silent"], true);
+        assert_eq!(message["scheduledAtMs"], 2_000_000_000_000_u64);
+        assert_eq!(message["deliveryState"], "delivered");
+        assert_eq!(message["deliveredAt"], "2033-05-18T03:33:20.000Z");
+        server.join().expect("join direct message list server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn direct_message_resource_upload_binds_account_device_and_multipart_file() {
         use std::io::{Read, Write};
         use std::net::TcpListener;
