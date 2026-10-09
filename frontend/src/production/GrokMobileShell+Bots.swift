@@ -145,10 +145,6 @@ extension GrokMobileShell {
                 }
                 bots = enriched
                 AccessRosterPersistence.save(enriched, accountScopeKey: expectedScope)
-                accessRosterSnapshot = AccessRosterSnapshotProjection.complete(
-                    enriched,
-                    previous: accessRosterSnapshot
-                )
                 reconcileRosterSelection(with: enriched, isComplete: true)
             }
         } catch is CancellationError {
