@@ -136,28 +136,21 @@ extension GrokMobileShell {
                             }
 
                             let hiddenBots = bots.filter { $0.hidden }
-                            if !hiddenBots.isEmpty {
-                                Menu {
-                                    ForEach(hiddenBots) { bot in
-                                        Button {
-                                            Task { await setBotHidden(bot, hidden: false) }
-                                        } label: {
-                                            Label("恢复 \(bot.name)", systemImage: "eye")
-                                        }
-                                    }
-                                } label: {
-                                    Label(
-                                        "隐藏的 Bots  \(hiddenBots.count)",
-                                        systemImage: "eye.slash"
-                                    )
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.horizontal, 18)
-                                    .padding(.vertical, 10)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(botActionBusy)
-                                .accessibilityIdentifier("grok-hidden-bots")
+                            Button {
+                                hiddenChatsOpen = true
+                            } label: {
+                                Label(
+                                    "隐藏的 Bots  \(hiddenBots.count)",
+                                    systemImage: "eye.slash"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 10)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Hidden Bots")
+                            .accessibilityValue("\(hiddenBots.count)")
+                            .accessibilityIdentifier("grok-hidden-bots")
                         }
 
                         let projects = filteredConversations.filter { $0.kind == .group || $0.kind == .direct }
@@ -198,9 +191,68 @@ extension GrokMobileShell {
             Button("Cancel", role: .cancel) { }
         }
         .sheet(isPresented: $createBotOpen) { createBotSheet }
+        .sheet(isPresented: $hiddenChatsOpen) { hiddenChatsSheet }
         .sheet(item: $botRenameTarget) { bot in renameBotSheet(bot) }
         .sheet(item: $botDeleteTarget) { bot in botDeleteConfirmationSheet(bot) }
         .accessibilityIdentifier("grok-mobile-home")
+    }
+
+    var hiddenChatsSheet: some View {
+        let hiddenBots = bots.filter { $0.hidden && !$0.isGroup && $0.miniAppId == nil }
+        return NavigationStack {
+            Group {
+                if hiddenBots.isEmpty {
+                    ContentUnavailableView(
+                        "No hidden bots",
+                        systemImage: "eye.slash",
+                        description: Text("Hidden Bots stay active and keep their history; they are only removed from the home list.")
+                    )
+                    .accessibilityIdentifier("hidden-bots-empty")
+                } else {
+                    List(hiddenBots) { bot in
+                        HStack(spacing: 12) {
+                            Button {
+                                hiddenChatsOpen = false
+                                selectBotForConversation(bot)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    ClothGhostAvatar(botId: bot.id, size: 42, badge: .green)
+                                    Text(bot.name)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(bot.name)
+                            .accessibilityIdentifier("hidden-bot-open-\(bot.id)")
+
+                            Button("Unhide") {
+                                Task { await setBotHidden(bot, hidden: false) }
+                            }
+                            .disabled(hiddenChatsController.isPending(bot.id))
+                            .accessibilityLabel("Unhide \(bot.name)")
+                            .accessibilityIdentifier("hidden-bot-unhide-\(bot.id)")
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("hidden-bot-row-\(bot.id)")
+                    }
+                }
+            }
+            .navigationTitle("Hidden Bots")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { hiddenChatsOpen = false }
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityIdentifier("hidden-bots-close")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("hidden-bots-dialog")
     }
 
     var filteredBots: [MobileBotSummary] {
