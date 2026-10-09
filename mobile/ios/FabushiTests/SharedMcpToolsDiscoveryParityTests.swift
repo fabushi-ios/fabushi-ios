@@ -457,8 +457,8 @@ final class SharedMcpToolsDiscoveryParityTests: XCTestCase {
             settingsStore: settings,
             backendListTools: { _ in try harness.listTools() },
             backendExecuteTool: { _, _, _, _, _ in Self.success("ok") },
-            nowMs: { harness.nowMs() },
-            onDiscoveryFailed: { harness.record($0) }
+            onDiscoveryFailed: { harness.record($0) },
+            nowMs: { harness.nowMs() }
         ))
 
         let initial = try await discovery.getTools()
@@ -491,8 +491,8 @@ final class SharedMcpToolsDiscoveryParityTests: XCTestCase {
             settingsStore: settings,
             backendListTools: { _ in try harness.listTools() },
             backendExecuteTool: { _, _, _, _, _ in Self.success("ok") },
-            nowMs: { harness.nowMs() },
-            onDiscoveryFailed: { harness.record($0) }
+            onDiscoveryFailed: { harness.record($0) },
+            nowMs: { harness.nowMs() }
         ))
 
         do {

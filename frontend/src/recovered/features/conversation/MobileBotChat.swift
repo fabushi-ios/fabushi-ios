@@ -494,6 +494,7 @@ internal struct MobileBotChat: View {
         }
         .onChange(of: bot.id) { _, _ in
             cancelVoiceInput()
+            invalidateReactionScope()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
             transcriptBaselineError = nil
@@ -508,8 +509,12 @@ internal struct MobileBotChat: View {
             resetTranscriptDraftUI()
             resetSecretRequestUI()
         }
+        .onChange(of: model.settingsNoticeAccountKey) { _, _ in
+            invalidateReactionScope()
+        }
         .onDisappear {
             cancelVoiceInput()
+            invalidateReactionScope()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
             widgetGeneration &+= 1
@@ -2004,6 +2009,14 @@ internal struct MobileBotChat: View {
     }
 
     @MainActor
+    private func invalidateReactionScope() {
+        reactionGeneration &+= 1
+        reactionPickerPresented = false
+        reactionPickerTargetId = nil
+        reactionPickerDraft = ""
+    }
+
+    @MainActor
     private func openReactionPicker(_ entry: MobileChatMessage) {
         reactionPickerTargetId = entry.id
         reactionPickerDraft = ""
@@ -2039,8 +2052,11 @@ internal struct MobileBotChat: View {
         }
 
         reactionGeneration &+= 1
-        let generation = reactionGeneration
-        let agentId = bot.id
+        let fence = MobileReactionRequestFence(
+            accountKey: model.settingsNoticeAccountKey,
+            agentId: bot.id,
+            generation: reactionGeneration
+        )
         Task { @MainActor in
             do {
                 let response = try await bridge.request(
@@ -2048,11 +2064,14 @@ internal struct MobileBotChat: View {
                     params: [
                         "entryId": entryId,
                         "emoji": emoji,
-                        "agentId": agentId,
+                        "agentId": fence.agentId,
                     ]
                 )
-                guard generation == reactionGeneration,
-                      agentId == bot.id,
+                guard fence.accepts(
+                    accountKey: model.settingsNoticeAccountKey,
+                    agentId: bot.id,
+                    generation: reactionGeneration
+                ),
                       let object = response.value as? [String: Any],
                       object["applied"] as? Bool == true,
                       let currentIndex = entries.firstIndex(where: { $0.id == entry.id })

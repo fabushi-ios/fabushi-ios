@@ -263,7 +263,7 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         ))
         let widget = try XCTUnwrap(mobileTranscriptWidgetProjection(projected))
         XCTAssertEqual(widget.widget.prompt, "Deploy?")
-        XCTAssertEqual(widget.widget.choiceConfig?.options.count, 2)
+        XCTAssertEqual(widget.widget.options.count, 2)
         XCTAssertEqual(widget.respondedValue, "ship")
         XCTAssertFalse(widget.dismissed)
 
@@ -839,6 +839,26 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         )
         XCTAssertEqual(messages[0].reactions.count, 2)
         XCTAssertEqual(messages[0].myReactions, Set(["❤️"]))
+        XCTAssertFalse(
+            applyMobileTranscriptReactionEvent(
+                event,
+                agentId: "agent-1",
+                messages: &messages
+            ),
+            "unchanged authoritative reaction fingerprints must be a no-op"
+        )
+    }
+
+    func testReactionRequestFenceRejectsAccountAgentAndGenerationReplacement() {
+        let fence = MobileReactionRequestFence(
+            accountKey: "account-a",
+            agentId: "agent-1",
+            generation: 7
+        )
+        XCTAssertTrue(fence.accepts(accountKey: "account-a", agentId: "agent-1", generation: 7))
+        XCTAssertFalse(fence.accepts(accountKey: "account-b", agentId: "agent-1", generation: 7))
+        XCTAssertFalse(fence.accepts(accountKey: "account-a", agentId: "agent-2", generation: 7))
+        XCTAssertFalse(fence.accepts(accountKey: "account-a", agentId: "agent-1", generation: 8))
     }
 
 

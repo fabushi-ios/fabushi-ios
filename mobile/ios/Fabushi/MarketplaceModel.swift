@@ -147,6 +147,18 @@ func normalizeMobileReactionInput(_ value: String) -> String? {
     return trimmed
 }
 
+struct MobileReactionRequestFence: Equatable {
+    let accountKey: String
+    let agentId: String
+    let generation: Int
+
+    func accepts(accountKey: String, agentId: String, generation: Int) -> Bool {
+        self.accountKey == accountKey
+            && self.agentId == agentId
+            && self.generation == generation
+    }
+}
+
 struct MobileListenerIntegrationProjection: Equatable, Sendable {
     let platform: String
     let displayName: String
@@ -753,16 +765,18 @@ func applyMobileTranscriptReactionEvent(
     else { return false }
 
     let canonical = projectMobileTranscriptReactions(payload["reactions"])
-    messages[index].reactions = canonical
+    let myReactions: Set<String>
     if let rawMine = payload["myReactions"] as? [String] {
-        messages[index].myReactions = Set(
-            rawMine.compactMap(normalizeMobileReactionInput)
-        )
+        myReactions = Set(rawMine.compactMap(normalizeMobileReactionInput))
     } else {
-        messages[index].myReactions = Set(
-            canonical.filter { $0.by == "me" }.map(\.emoji)
-        )
+        myReactions = Set(canonical.filter { $0.by == "me" }.map(\.emoji))
     }
+    guard messages[index].reactions != canonical
+        || messages[index].myReactions != myReactions
+    else { return false }
+
+    messages[index].reactions = canonical
+    messages[index].myReactions = myReactions
     return true
 }
 

@@ -4141,17 +4141,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/reaction-system.contract.test.ts",
       "desktop_blob_sha": "bdc0c1dde0ed40073eafdbcdf6fde6cf774949fe",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Focused contract evidence for transcript reaction projection, the six quick reactions, scoped optimistic mutation, authoritative feed reconciliation/clear, unchanged-fingerprint dedupe, workspace/account/Agent generation fencing, and fail-closed picker handoff.",
+      "desktop_owner": "renderer reaction workspace contract tests over canonical transcript state",
+      "desktop_visible_effect": "Reaction controls remain bound to the active signed-in Agent workspace: stale account/Agent/view results cannot overwrite replacement state, duplicate authoritative events do not churn the transcript, and picker actions target only the selected message.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_language": "Swift / SwiftUI + Rust Host",
+      "ios_platform_delta": "iOS keeps reactions inside the existing MobileBotChat/MobileChatMessage owner and FeatureHost reactToMessage transport. A request fence binds account key + Agent + generation; account/Agent/view replacement invalidates the generation, and duplicate host.transport reaction payloads no-op. Native sheet lifetime replaces DOM picker handoff/reconnect subscription mechanics.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift; current exact-HEAD GitHub Actions required before verified promotion",
+      "notes": "Reviewed against Desktop main exact SHA 3bc92400826cc4ca7ac665b467708e22261edc61 and reaction-system.contract.test.ts@bdc0c1dde0ed40073eafdbcdf6fde6cf774949fe. Production path is implemented; keep below verified until the replacement iOS exact HEAD passes ordinary/protected Actions and artifact provenance."
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-configuration-models.contract.test.ts",
