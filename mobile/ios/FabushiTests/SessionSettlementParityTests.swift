@@ -30,18 +30,24 @@ private actor IOSSettlementRequestRecorder {
 private final class IOSSettlementCredentialStore: IOSCursorCredentialStoring {
     var values: [String: String]
     var deleteFailures: Set<String>
+    var readFailures: Set<String>
     private(set) var deleteAttempts: [String] = []
 
     init(
         values: [String: String],
-        deleteFailures: Set<String> = []
+        deleteFailures: Set<String> = [],
+        readFailures: Set<String> = []
     ) {
         self.values = values
         self.deleteFailures = deleteFailures
+        self.readFailures = readFailures
     }
 
     func readSecret(_ key: String) async throws -> String? {
-        values[key]
+        if readFailures.contains(key) {
+            throw IOSCursorAuthError.keychain(errSecInteractionNotAllowed)
+        }
+        return values[key]
     }
 
     func writeSecret(_ key: String, value: String) async throws {
@@ -229,6 +235,58 @@ final class SessionSettlementParityTests: XCTestCase {
         } catch let error as IOSCursorAuthError {
             XCTAssertEqual(error, .signInRequired)
         }
+    }
+
+    @MainActor
+    func testRefreshSecretReadFailureShipsOneKeychainUnavailableWithAlreadyReadAccessToken() async throws {
+        let recorder = IOSSettlementRequestRecorder()
+        let store = IOSSettlementCredentialStore(
+            values: [
+                IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY: "readable-access-token",
+                IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY: "blocked-refresh-token",
+                iosMachineIDSecretKey: "machine-keychain-read",
+            ],
+            readFailures: [IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY]
+        )
+        let service = IOSCursorAuthService(
+            store: store,
+            backendURL: try XCTUnwrap(URL(string: "https://api2.cursor.sh")),
+            structuredLogRequestExecutor: { request in
+                await recorder.record(request)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!
+                return (
+                    Data(#"{"logsProcessed":1,"logsDropped":0}"#.utf8),
+                    response
+                )
+            }
+        )
+
+        do {
+            _ = try await service.getValidAccessToken()
+            XCTFail("refresh-token Keychain failure must fail auth")
+        } catch {
+            XCTAssertEqual(error as? IOSCursorAuthError, .keychain(errSecInteractionNotAllowed))
+        }
+
+        do {
+            _ = try await service.getValidAccessToken()
+            XCTFail("repeat Keychain failure must remain a real auth failure")
+        } catch {
+            XCTAssertEqual(error as? IOSCursorAuthError, .keychain(errSecInteractionNotAllowed))
+        }
+
+        let captures = await recorder.captures()
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(header("Authorization", in: captures[0].headers), "Bearer readable-access-token")
+        let body = String(data: captures[0].body, encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains(#""phase":"keychain_unavailable""#))
+        XCTAssertFalse(body.contains("readable-access-token"))
+        XCTAssertFalse(body.contains("blocked-refresh-token"))
     }
 
     @MainActor
