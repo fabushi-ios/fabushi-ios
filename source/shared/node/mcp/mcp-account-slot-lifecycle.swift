@@ -62,7 +62,7 @@ final class SandMcpAccountSlotLifecycle {
             throw SandMcpConfigError("MCP server not found.")
         }
         guard server.config.transport != .stdio, let url = server.config.url else {
-            throw SandMcpConfigError("This connector runs on Grok Bot's computer and has no OAuth accounts.")
+            throw SandMcpConfigError("This connector runs on Fabushi's computer and has no OAuth accounts.")
         }
         return (serverId, url)
     }
