@@ -81,6 +81,151 @@ final class IOSCoordinatorClientPauseControl {
 }
 
 @MainActor
+final class IOSHostSettingsReconciler {
+    typealias ReadLocal = @MainActor () -> Bool?
+    typealias WriteLocal = @MainActor (Bool) -> Void
+    typealias ReadRemote = @MainActor () async throws -> MahayanaHostSettingsSnapshot
+    typealias PushRemote = @MainActor (MahayanaHostSettingsSnapshot) async throws -> MahayanaHostSettingsSnapshot
+    typealias HostGeneration = @MainActor () -> UInt64
+
+    private struct Token: Equatable {
+        let accountScope: String
+        let epoch: UInt64
+        let hostGeneration: UInt64
+    }
+
+    private let readLocal: ReadLocal
+    private let writeLocal: WriteLocal
+    private let readRemote: ReadRemote
+    private let pushRemote: PushRemote
+    private let hostGeneration: HostGeneration
+
+    private var accountScope: String?
+    private var transportLive = false
+    private var epoch: UInt64 = 1
+    private var inFlight: Task<Void, Never>?
+
+    private(set) var lastSuccessfulAccountScope: String?
+
+    init(
+        readLocal: @escaping ReadLocal,
+        writeLocal: @escaping WriteLocal,
+        readRemote: @escaping ReadRemote,
+        pushRemote: @escaping PushRemote,
+        hostGeneration: @escaping HostGeneration
+    ) {
+        self.readLocal = readLocal
+        self.writeLocal = writeLocal
+        self.readRemote = readRemote
+        self.pushRemote = pushRemote
+        self.hostGeneration = hostGeneration
+    }
+
+    var isReadable: Bool {
+        transportLive && accountScope != nil
+    }
+
+    func scopeToAccount(_ scope: String) {
+        abandonInFlight()
+        accountScope = scope
+        lastSuccessfulAccountScope = nil
+    }
+
+    func accountDeparted() {
+        abandonInFlight()
+        accountScope = nil
+        transportLive = false
+        lastSuccessfulAccountScope = nil
+    }
+
+    func setTransportLive(_ live: Bool) {
+        abandonInFlight()
+        transportLive = live
+        guard live, accountScope != nil else { return }
+        scheduleReconcile()
+    }
+
+    func scheduleReconcile() {
+        abandonInFlight()
+        guard tokenIfReadable() != nil else { return }
+        inFlight = Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = await self.reconcileIfReadable()
+        }
+    }
+
+    func scheduleLocalWrite(_ value: Bool) {
+        abandonInFlight()
+        guard tokenIfReadable() != nil else { return }
+        inFlight = Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = await self.pushLocalIfWritable(value)
+        }
+    }
+
+    @discardableResult
+    func reconcileIfReadable() async -> Bool {
+        guard let token = tokenIfReadable() else { return false }
+        do {
+            let remote = try await readRemote()
+            guard isCurrent(token) else { return false }
+
+            if let local = readLocal() {
+                if remote.hasSeenOnboarding != local {
+                    _ = try await pushRemote(.init(hasSeenOnboarding: local))
+                    guard isCurrent(token) else { return false }
+                }
+            } else if let remoteSeen = remote.hasSeenOnboarding {
+                writeLocal(remoteSeen)
+                guard isCurrent(token) else { return false }
+            }
+
+            lastSuccessfulAccountScope = token.accountScope
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    @discardableResult
+    func pushLocalIfWritable(_ value: Bool) async -> Bool {
+        guard let token = tokenIfReadable() else { return false }
+        do {
+            let response = try await pushRemote(.init(hasSeenOnboarding: value))
+            guard response.hasSeenOnboarding == value, isCurrent(token) else {
+                return false
+            }
+            lastSuccessfulAccountScope = token.accountScope
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func tokenIfReadable() -> Token? {
+        guard transportLive, let accountScope else { return nil }
+        return .init(
+            accountScope: accountScope,
+            epoch: epoch,
+            hostGeneration: hostGeneration()
+        )
+    }
+
+    private func isCurrent(_ token: Token) -> Bool {
+        transportLive
+            && accountScope == token.accountScope
+            && epoch == token.epoch
+            && hostGeneration() == token.hostGeneration
+    }
+
+    private func abandonInFlight() {
+        inFlight?.cancel()
+        inFlight = nil
+        epoch = epoch == UInt64.max ? 1 : epoch + 1
+    }
+}
+
+@MainActor
 final class MahayanaCoordinator {
     struct JSONResult: @unchecked Sendable {
         let value: Any
@@ -113,6 +258,7 @@ final class MahayanaCoordinator {
 
     private let hostSupervisor: MahayanaLocalHostSupervisor
     private let settingsStore: SandSettingsStore?
+    private let hostSettingsReconciler: IOSHostSettingsReconciler?
     private let mcpSurface: CoordinatorMcpSurface?
     private let experimentService: SandExperimentService?
     private var clientPauseControl: IOSCoordinatorClientPauseControl?
@@ -137,6 +283,15 @@ final class MahayanaCoordinator {
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
+        self.hostSettingsReconciler = settingsStore.map { store in
+            IOSHostSettingsReconciler(
+                readLocal: { store.getHasSeenOnboarding() },
+                writeLocal: { store.setHasSeenOnboarding($0) },
+                readRemote: { try await hostSupervisor.readHostSettings() },
+                pushRemote: { try await hostSupervisor.pushHostSettings($0) },
+                hostGeneration: { hostSupervisor.generation }
+            )
+        }
         self.experimentService = experimentService
 
         let isClientPaused: @MainActor () -> Bool = {
@@ -330,7 +485,10 @@ final class MahayanaCoordinator {
     func updateAccountSettingsScope(_ accountScope: String?) {
         if let accountScope {
             settingsStore?.scopeToAccount(accountScope)
+            hostSettingsReconciler?.scopeToAccount(accountScope)
+            hostSettingsReconciler?.setTransportLive(lifecycleState == .ready)
         } else {
+            hostSettingsReconciler?.accountDeparted()
             settingsStore?.clearAccountScope()
         }
         autoReviewHostSyncNeeded = true
@@ -416,6 +574,7 @@ final class MahayanaCoordinator {
         }
         if method == "getOnboardingSeen" {
             guard let settingsStore else { throw CoordinatorError.unavailable }
+            _ = await hostSettingsReconciler?.reconcileIfReadable()
             return JSONResult(value: settingsStore.getHasSeenOnboarding() == true)
         }
         if method == "setOnboardingSeen" {
@@ -423,6 +582,7 @@ final class MahayanaCoordinator {
                   let seen = params["seen"] as? Bool
             else { throw CoordinatorError.invalidParams }
             settingsStore.setHasSeenOnboarding(seen)
+            hostSettingsReconciler?.scheduleLocalWrite(seen)
             return JSONResult(value: seen)
         }
         if method == "getAutoReviewInstructions" {
@@ -639,19 +799,23 @@ final class MahayanaCoordinator {
         } else {
             lifecycleState = .ready
         }
+        hostSettingsReconciler?.setTransportLive(true)
     }
 
     func sceneEnteredBackground() {
         if case .failed = lifecycleState { return }
         lifecycleState = .background
+        hostSettingsReconciler?.setTransportLive(false)
     }
 
     func sceneWillSuspend() {
         if case .failed = lifecycleState { return }
         lifecycleState = .suspended
+        hostSettingsReconciler?.setTransportLive(false)
     }
 
     func beginShutdown() {
+        hostSettingsReconciler?.setTransportLive(false)
         lifecycleState = .shuttingDown
         inFlight.removeAll()
         clientSideToolV2Relay.clear()
