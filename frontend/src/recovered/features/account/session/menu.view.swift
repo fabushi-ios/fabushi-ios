@@ -404,14 +404,43 @@ struct AccountSettingsView: View {
     }
 }
 
+enum AccountFeedbackViewState: Equatable {
+    case idle
+    case sending
+    case sent
+    case failed(AccountFeedbackCode)
+}
+
 struct AccountFeedbackView: View {
     @Bindable var model: MarketplaceModel
+    let conversationId: String?
     let onDone: () -> Void
 
     @State private var message = ""
-    @State private var submitting = false
+    @State private var includeConversationId: Bool
+    @State private var state: AccountFeedbackViewState = .idle
     @State private var submitGeneration = 0
-    @State private var errorMessage: String?
+
+    init(
+        model: MarketplaceModel,
+        conversationId: String? = nil,
+        defaultIncludeConversationId: Bool = false,
+        onDone: @escaping () -> Void
+    ) {
+        self.model = model
+        self.conversationId = conversationId
+        self.onDone = onDone
+        _includeConversationId = State(initialValue: defaultIncludeConversationId)
+    }
+
+    private var sending: Bool { state == .sending }
+    private var sent: Bool { state == .sent }
+    private var canSend: Bool {
+        !sending
+            && !sent
+            && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && message.count <= 10_000
+    }
 
     var body: some View {
         NavigationStack {
@@ -419,56 +448,82 @@ struct AccountFeedbackView: View {
                 Section("反馈内容") {
                     TextEditor(text: $message)
                         .frame(minHeight: 180)
+                        .disabled(sending || sent)
                         .accessibilityIdentifier("account-feedback-message")
                     Text("\(message.count) / 10,000")
                         .font(.caption)
                         .foregroundStyle(message.count > 10_000 ? Color.red : Color.secondary)
                 }
-                if let errorMessage {
+
+                if conversationId != nil {
                     Section {
-                        Text(errorMessage)
+                        Toggle("附带当前会话 ID", isOn: $includeConversationId)
+                            .disabled(sending || sent)
+                            .accessibilityIdentifier("account-feedback-include-conversation")
+                    } footer: {
+                        Text("仅在你选择时，将当前会话 ID 与反馈一起发送，便于定位相关问题。")
+                    }
+                }
+
+                switch state {
+                case .sent:
+                    Section {
+                        Text("反馈已发送。")
+                            .accessibilityIdentifier("account-feedback-sent")
+                            .accessibilityAddTraits(.isStaticText)
+                    }
+                case let .failed(code):
+                    Section {
+                        Text(code.localizedMessage)
                             .foregroundStyle(.red)
                             .accessibilityIdentifier("account-feedback-error")
                     }
+                case .idle, .sending:
+                    EmptyView()
                 }
             }
             .navigationTitle("发送反馈")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消", action: onDone)
+                    Button(sent ? "完成" : "取消", action: onDone)
+                        .disabled(sending)
+                        .accessibilityIdentifier(sent ? "account-feedback-done" : "account-feedback-cancel")
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(submitting ? "正在发送…" : "发送") {
-                        submit()
+                if !sent {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(sending ? "正在发送…" : "发送") {
+                            submit()
+                        }
+                        .disabled(!canSend)
+                        .accessibilityIdentifier("account-feedback-submit")
                     }
-                    .disabled(
-                        submitting
-                            || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            || message.count > 10_000
-                    )
-                    .accessibilityIdentifier("account-feedback-submit")
                 }
             }
         }
+        .interactiveDismissDisabled(sending)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("account-feedback")
     }
 
     private func submit() {
+        guard canSend else { return }
         submitGeneration = submitGeneration == Int.max ? 1 : submitGeneration + 1
         let generation = submitGeneration
-        submitting = true
-        errorMessage = nil
+        state = .sending
         Task {
             do {
-                try await model.submitAccountFeedback(message)
+                try await model.submitAccountFeedback(
+                    message,
+                    conversationId: includeConversationId ? conversationId : nil
+                )
                 guard generation == submitGeneration else { return }
-                submitting = false
-                onDone()
+                state = .sent
+            } catch let error as AccountFeedbackError {
+                guard generation == submitGeneration else { return }
+                state = .failed(error.code)
             } catch {
                 guard generation == submitGeneration else { return }
-                submitting = false
-                errorMessage = error.localizedDescription
+                state = .failed(.unavailable)
             }
         }
     }
