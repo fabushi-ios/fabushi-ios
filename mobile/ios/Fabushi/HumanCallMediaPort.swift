@@ -54,18 +54,57 @@ internal final class HumanCallMediaPort {
         static let camera = "fabushi.human-call.preferred-camera-id"
     }
 
+    typealias LoadPreferences = @MainActor () -> HumanCallMediaPreferences
+    typealias SavePreferences = @MainActor (HumanCallMediaPreferences) -> Void
+
     private let audioSession: AVAudioSession
     private let screenRecorder: RPScreenRecorder
-    private let defaults: UserDefaults
+    private let loadPreferences: LoadPreferences
+    private let savePreferences: SavePreferences
 
     init(
         audioSession: AVAudioSession = .sharedInstance(),
         screenRecorder: RPScreenRecorder = .shared(),
-        defaults: UserDefaults = .standard
+        loadPreferences: @escaping LoadPreferences,
+        savePreferences: @escaping SavePreferences
     ) {
         self.audioSession = audioSession
         self.screenRecorder = screenRecorder
-        self.defaults = defaults
+        self.loadPreferences = loadPreferences
+        self.savePreferences = savePreferences
+    }
+
+    convenience init(
+        audioSession: AVAudioSession = .sharedInstance(),
+        screenRecorder: RPScreenRecorder = .shared(),
+        defaults: UserDefaults
+    ) {
+        self.init(
+            audioSession: audioSession,
+            screenRecorder: screenRecorder,
+            loadPreferences: {
+                HumanCallMediaPreferences(
+                    microphoneId: Self.normalizedIdentifier(
+                        defaults.string(forKey: PreferenceKey.microphone)
+                    ),
+                    cameraId: Self.normalizedIdentifier(
+                        defaults.string(forKey: PreferenceKey.camera)
+                    )
+                )
+            },
+            savePreferences: { value in
+                if let microphoneId = Self.normalizedIdentifier(value.microphoneId) {
+                    defaults.set(microphoneId, forKey: PreferenceKey.microphone)
+                } else {
+                    defaults.removeObject(forKey: PreferenceKey.microphone)
+                }
+                if let cameraId = Self.normalizedIdentifier(value.cameraId) {
+                    defaults.set(cameraId, forKey: PreferenceKey.camera)
+                } else {
+                    defaults.removeObject(forKey: PreferenceKey.camera)
+                }
+            }
+        )
     }
 
     static func permission(for status: AVAuthorizationStatus) -> HumanCallMediaPermission {
@@ -150,9 +189,10 @@ internal final class HumanCallMediaPort {
     }
 
     func storedPreferences() -> HumanCallMediaPreferences {
-        HumanCallMediaPreferences(
-            microphoneId: Self.normalizedIdentifier(defaults.string(forKey: PreferenceKey.microphone)),
-            cameraId: Self.normalizedIdentifier(defaults.string(forKey: PreferenceKey.camera))
+        let value = loadPreferences()
+        return HumanCallMediaPreferences(
+            microphoneId: Self.normalizedIdentifier(value.microphoneId),
+            cameraId: Self.normalizedIdentifier(value.cameraId)
         )
     }
 
@@ -174,12 +214,14 @@ internal final class HumanCallMediaPort {
     }
 
     func setPreferredDeviceId(_ id: String?, kind: HumanCallMediaDevice.Kind) {
-        let key = kind == .microphone ? PreferenceKey.microphone : PreferenceKey.camera
-        if let normalized = Self.normalizedIdentifier(id) {
-            defaults.set(normalized, forKey: key)
-        } else {
-            defaults.removeObject(forKey: key)
-        }
+        let current = storedPreferences()
+        let normalized = Self.normalizedIdentifier(id)
+        savePreferences(
+            HumanCallMediaPreferences(
+                microphoneId: kind == .microphone ? normalized : current.microphoneId,
+                cameraId: kind == .camera ? normalized : current.cameraId
+            )
+        )
     }
 
     @discardableResult
