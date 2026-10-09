@@ -242,6 +242,36 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertNil(coordinator.sharedSettingsSnapshot().mcpCustomInstructionsAccountScope)
     }
 
+    @MainActor
+    func testOnboardingSeenRoutesThroughAccountScopedCanonicalSettingsOwner() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        store.scopeToAccount("owner-a")
+        let host = SettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+
+        let initial = try await coordinator.request(method: "getOnboardingSeen")
+        XCTAssertEqual(initial.value as? Bool, false)
+
+        let updated = try await coordinator.request(
+            method: "setOnboardingSeen",
+            params: ["seen": true]
+        )
+        XCTAssertEqual(updated.value as? Bool, true)
+        XCTAssertEqual(store.getHasSeenOnboarding(), true)
+
+        coordinator.updateAccountSettingsScope("owner-b")
+        let foreignAccount = try await coordinator.request(method: "getOnboardingSeen")
+        XCTAssertEqual(foreignAccount.value as? Bool, false)
+        XCTAssertNil(store.getHasSeenOnboarding())
+    }
+
     func testAutoReviewInstructionEditorPreservesIdentityAndCrossListEdits() {
         let base = SandAutoReviewInstructions(
             isEnabled: true,
