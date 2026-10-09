@@ -7,17 +7,17 @@
     {
       "desktop_path": "source/electron-dev-controls/main.ts",
       "desktop_blob_sha": "6af13ff5d271ddd3e3ed4046c3c3aaa84eb096ba",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Desktop development-only Electron control app: fail-closed dev gate, single-instance panel lifecycle, trusted-sender IPC RPC edge, local box diagnostics/control, 1Password CLI dev wiring, crash guards and Electron BrowserWindow bootstrap.",
       "desktop_owner": "dev-controls",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Developers can operate local/attached development boxes from a dedicated Electron-only control panel; this surface is intentionally disabled in packaged production.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "GitHub Actions / protected CI diagnostics; native production app excludes Desktop dev-controls",
+      "ios_language": "GitHub Actions / native iOS production configuration",
+      "ios_platform_delta": "Do not ship an Electron developer-control backdoor/panel in the iOS production app. Development diagnostics remain CI/tooling concerns and production remote-computer operations use authenticated product surfaces rather than dev IPC.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "mobile/ios project contains no Electron dev-controls entrypoint; remote Computer production operations are owned by RemoteComputerSurface/Coordinator paths.",
+      "test_evidence": "Current exact-head architecture/build/protected workflows are the supported iOS diagnostic/acceptance path.",
+      "notes": "Exact Desktop main.ts@6af13ff5d271ddd3e3ed4046c3c3aaa84eb096ba reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; packaged-production gate is part of the reason this dev-only surface is not ported."
     }
   ]
 }
