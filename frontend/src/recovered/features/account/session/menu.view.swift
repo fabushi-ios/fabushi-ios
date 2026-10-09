@@ -94,11 +94,16 @@ struct AccountMenuView: View {
     @State private var settingsPresented = false
     @State private var feedbackPresented = false
     @State private var actionError: String?
+    @Environment(\.mobileUiPreferencesStore) private var uiPreferencesStore
+
+    private var shellCopy: MobileSettingsShellCopy {
+        (uiPreferencesStore?.preferences ?? MobileUiPreferences()).shellCopy()
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section("账号") {
+                Section(shellCopy.account) {
                     HStack(spacing: 12) {
                         avatar
                             .frame(width: 42, height: 42)
@@ -115,29 +120,29 @@ struct AccountMenuView: View {
 
                     usageSurface
 
-                    Button("退出登录", role: .destructive) {
+                    Button(shellCopy.signOut, role: .destructive) {
                         onRequestSignOut()
                     }
                     .accessibilityIdentifier("mobile-logout")
                 }
 
-                Section("工作台") {
+                Section(shellCopy.workspace) {
                     Button(action: onOpenRemoteComputer) {
-                        Label("我的电脑", systemImage: "desktopcomputer")
+                        Label(shellCopy.computer, systemImage: "desktopcomputer")
                     }
                     .accessibilityIdentifier("remote-computer-entry")
 
                     Button(action: onOpenMarketplace) {
-                        Label("插件市场", systemImage: "puzzlepiece.extension")
+                        Label(shellCopy.marketplace, systemImage: "puzzlepiece.extension")
                     }
                     .accessibilityIdentifier("marketplace-entry")
                 }
 
-                Section("应用") {
+                Section(shellCopy.app) {
                     Button {
                         settingsPresented = true
                     } label: {
-                        Label("设置", systemImage: "gearshape")
+                        Label(shellCopy.settings, systemImage: "gearshape")
                     }
                     .accessibilityIdentifier("account-settings-entry")
 
@@ -147,26 +152,26 @@ struct AccountMenuView: View {
                             catch { actionError = error.localizedDescription }
                         }
                     } label: {
-                        Label("帮助中心", systemImage: "questionmark.circle")
+                        Label(shellCopy.helpCenter, systemImage: "questionmark.circle")
                     }
                     .accessibilityIdentifier("account-help-entry")
 
                     Button {
                         feedbackPresented = true
                     } label: {
-                        Label("发送反馈", systemImage: "exclamationmark.bubble")
+                        Label(shellCopy.sendFeedback, systemImage: "exclamationmark.bubble")
                     }
                     .accessibilityIdentifier("account-feedback-entry")
 
                     Button {
                         aboutPresented = true
                     } label: {
-                        Label("关于 Fabushi", systemImage: "info.circle")
+                        Label(shellCopy.aboutFabushi, systemImage: "info.circle")
                     }
                     .accessibilityIdentifier("about-entry")
                 }
 
-                Section("导航") {
+                Section(shellCopy.navigation) {
                     ForEach(MobileSection.allCases) { section in
                         Button {
                             onOpenSection(section)
@@ -177,10 +182,10 @@ struct AccountMenuView: View {
                     }
                 }
             }
-            .navigationTitle("导航")
+            .navigationTitle(shellCopy.navigation)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消", action: onClose)
+                    Button(shellCopy.cancel, action: onClose)
                         .accessibilityIdentifier("account-menu-close")
                 }
             }
@@ -208,11 +213,11 @@ struct AccountMenuView: View {
                 feedbackPresented = false
             }
         }
-        .alert("操作失败", isPresented: Binding(
+        .alert(shellCopy.operationFailed, isPresented: Binding(
             get: { actionError != nil },
             set: { if !$0 { actionError = nil } }
         )) {
-            Button("好") { actionError = nil }
+            Button(shellCopy.okay) { actionError = nil }
         } message: {
             Text(actionError ?? "")
         }
@@ -225,9 +230,9 @@ struct AccountMenuView: View {
         if let usage = model.accountUsage {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label("当前周期用量", systemImage: "chart.bar.fill")
+                    Label(shellCopy.currentPeriod, systemImage: "chart.bar.fill")
                     Spacer()
-                    Text(usage.unlimited ? "不限量" : "\(usage.usagePercent ?? 0)%")
+                    Text(usage.unlimited ? shellCopy.unlimited : "\(usage.usagePercent ?? 0)%")
                         .foregroundStyle(.secondary)
                 }
 
@@ -239,7 +244,7 @@ struct AccountMenuView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("周期结束：\(Date(timeIntervalSince1970: TimeInterval(usage.windowEnd)).formatted(date: .abbreviated, time: .shortened))")
+                Text("\(shellCopy.periodEnds)：\(Date(timeIntervalSince1970: TimeInterval(usage.windowEnd)).formatted(date: .abbreviated, time: .shortened))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -248,7 +253,7 @@ struct AccountMenuView: View {
         } else if model.accountUsageLoading {
             HStack(spacing: 8) {
                 ProgressView()
-                Text("正在加载用量…")
+                Text(shellCopy.loadingUsage)
                     .foregroundStyle(.secondary)
             }
             .accessibilityIdentifier("account-usage-loading")
@@ -256,7 +261,7 @@ struct AccountMenuView: View {
             Button {
                 Task { await model.refreshAccountUsage() }
             } label: {
-                Label("重新加载用量", systemImage: "arrow.clockwise")
+                Label(shellCopy.reloadUsage, systemImage: "arrow.clockwise")
             }
             .accessibilityIdentifier("account-usage-retry")
         }
@@ -303,6 +308,11 @@ struct AccountSettingsView: View {
     private var localizedFeatureCopy: MobileSettingsFeatureCopy {
         (uiPreferencesStore?.preferences ?? MobileUiPreferences()).featureCopy()
     }
+
+    private var shellCopy: MobileSettingsShellCopy {
+        (uiPreferencesStore?.preferences ?? MobileUiPreferences()).shellCopy()
+    }
+
     @State private var mediaDevices: [HumanCallMediaDevice] = []
     @State private var selectedMicrophoneId: String?
     @State private var selectedCameraId: String?
@@ -313,39 +323,39 @@ struct AccountSettingsView: View {
         NavigationStack {
             Form {
                 Section("账号") {
-                    TextField("显示名称", text: $nameDraft)
+                    TextField(shellCopy.displayName, text: $nameDraft)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
                         .accessibilityIdentifier("account-display-name-field")
 
-                    Button(nameSaving ? "正在保存…" : "保存显示名称") {
+                    Button(nameSaving ? shellCopy.saving : shellCopy.saveDisplayName) {
                         saveDisplayName()
                     }
                     .disabled(nameSaving || MarketplaceModel.normalizedAccountDisplayName(nameDraft).isEmpty)
                     .accessibilityIdentifier("account-display-name-save")
 
                     if !model.accountEmail.isEmpty {
-                        LabeledContent("邮箱", value: model.accountEmail)
+                        LabeledContent(shellCopy.email, value: model.accountEmail)
                     }
                 }
 
-                Section("用量") {
+                Section(shellCopy.usage) {
                     if let usage = model.accountUsage {
-                        LabeledContent("当前周期", value: usage.unlimited ? "不限量" : "\(usage.usagePercent ?? 0)%")
+                        LabeledContent(shellCopy.currentPeriod, value: usage.unlimited ? shellCopy.unlimited : "\(usage.usagePercent ?? 0)%")
                         if !usage.unlimited {
                             ProgressView(value: usage.usageFraction ?? 0)
                                 .accessibilityIdentifier("settings-account-usage-progress")
-                            LabeledContent("剩余", value: "\(usage.remainingTokens.formatted()) tokens")
+                            LabeledContent(shellCopy.remaining, value: "\(usage.remainingTokens.formatted()) tokens")
                         }
                         LabeledContent(
-                            "周期结束",
+                            shellCopy.periodEnds,
                             value: Date(timeIntervalSince1970: TimeInterval(usage.windowEnd))
                                 .formatted(date: .abbreviated, time: .shortened)
                         )
                     } else if model.accountUsageLoading {
-                        ProgressView("正在加载用量…")
+                        ProgressView(shellCopy.loadingUsage)
                     } else {
-                        Button("重新加载用量") {
+                        Button(shellCopy.reloadUsage) {
                             Task { await model.refreshAccountUsage() }
                         }
                     }
@@ -372,7 +382,7 @@ struct AccountSettingsView: View {
                     .accessibilityIdentifier("settings-privacy-mode-description")
                 }
 
-                Section("支持") {
+                Section(shellCopy.support) {
                     Button {
                         Task {
                             do { try await model.openAccountHelp() }
@@ -398,18 +408,18 @@ struct AccountSettingsView: View {
                     .accessibilityIdentifier("settings-about-entry")
                 }
 
-                Section("iOS") {
+                Section(shellCopy.iosSection) {
                     Label("当前设备已安装 Fabushi iOS", systemImage: "checkmark.seal.fill")
-                    Text("Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责。")
+                    Text(shellCopy.iosSelfReference)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("settings-ios-self-reference-disposition")
                 }
             }
-            .navigationTitle("设置")
+            .navigationTitle(shellCopy.settings)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成", action: onDone)
+                    Button(shellCopy.done, action: onDone)
                 }
             }
             .onAppear {
@@ -438,11 +448,11 @@ struct AccountSettingsView: View {
         .sheet(isPresented: $aboutPresented) {
             FabushiAboutOverlayView()
         }
-        .alert("操作失败", isPresented: Binding(
+        .alert(shellCopy.operationFailed, isPresented: Binding(
             get: { actionError != nil },
             set: { if !$0 { actionError = nil } }
         )) {
-            Button("好") { actionError = nil }
+            Button(shellCopy.okay) { actionError = nil }
         } message: {
             Text(actionError ?? "")
         }
@@ -592,7 +602,7 @@ struct AccountSettingsView: View {
 
             if let mediaPermissions {
                 Text(
-                    "麦克风：\(mediaPermissions.microphone.rawValue) · 摄像头：\(mediaPermissions.camera.rawValue)"
+                    "\(shellCopy.microphoneState)：\(mediaPermissions.microphone.rawValue) · \(shellCopy.cameraState)：\(mediaPermissions.camera.rawValue)"
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -608,14 +618,14 @@ struct AccountSettingsView: View {
     @ViewBuilder
     private var configurationSections: some View {
         if configurationLoading {
-            Section("Agent 配置") {
-                ProgressView("正在读取配置…")
+            Section(shellCopy.agentConfiguration) {
+                ProgressView(shellCopy.loadingConfiguration)
                     .accessibilityIdentifier("settings-configuration-loading")
             }
         } else {
-            Section("Router") {
+            Section(shellCopy.router) {
                 Picker(
-                    "Route Agent 请求",
+                    shellCopy.routeAgentRequests,
                     selection: Binding(
                         get: { inferenceProvider },
                         set: { beginInferenceProviderUpdate($0) }
@@ -758,7 +768,7 @@ struct AccountSettingsView: View {
     @MainActor
     private func selectMediaDevice(_ id: String, kind: HumanCallMediaDevice.Kind) {
         guard let mediaPort else {
-            actionError = "通话媒体运行时不可用。"
+            actionError = shellCopy.mediaRuntimeUnavailable
             return
         }
         do {
