@@ -197,6 +197,198 @@ func validatedMobileListenerAuthorizationURL(_ raw: String) -> URL? {
     return components.url
 }
 
+struct MobileCanonicalTranscriptCardPayload: Equatable {
+    let kind: String
+    let json: String
+}
+
+private func mobileTranscriptCardPayload(
+    kind: String,
+    card: [String: Any]
+) -> MobileCanonicalTranscriptCardPayload? {
+    guard JSONSerialization.isValidJSONObject(card),
+          let data = try? JSONSerialization.data(withJSONObject: card, options: [.sortedKeys]),
+          let json = String(data: data, encoding: .utf8)
+    else { return nil }
+    return .init(kind: kind, json: json)
+}
+
+private func mobileTranscriptCardNonEmptyString(_ value: Any?) -> String? {
+    guard let value = value as? String else { return nil }
+    let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return normalized.isEmpty ? nil : normalized
+}
+
+private func mobileTranscriptCardOptionalString(
+    _ object: [String: Any],
+    key: String
+) -> Bool {
+    object[key] == nil || object[key] is String
+}
+
+private func mobileTranscriptDraftStatus(_ value: Any?) -> String? {
+    guard let value = value as? String,
+          ["editable", "sending", "sent", "discarded", "failed"].contains(value)
+    else { return nil }
+    return value
+}
+
+func projectMobileCanonicalHostTranscriptCard(
+    event: [String: Any],
+    operationId: String?
+) -> MobileChatMessage? {
+    guard let card = event["card"] as? [String: Any],
+          let kind = card["kind"] as? String
+    else { return nil }
+    let entryId = (event["entryId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        ?? "transcript-card:\(UUID().uuidString.lowercased())"
+    let createdAt = mobileTranscriptCardDate(event["timestampMs"] ?? card["timestampMs"])
+    guard let payload = mobileTranscriptCardPayload(kind: kind, card: card) else { return nil }
+
+    switch kind {
+    case "emailDraft":
+        guard let draft = card["draft"] as? [String: Any],
+              draft["kind"] as? String == "email",
+              mobileTranscriptCardNonEmptyString(draft["id"]) != nil,
+              let recipients = draft["to"] as? [String],
+              recipients.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+              let subject = draft["subject"] as? String,
+              draft["body"] is String,
+              let status = mobileTranscriptDraftStatus(draft["status"]),
+              mobileTranscriptCardOptionalString(draft, key: "from"),
+              draft["cc"] == nil || draft["cc"] is [String],
+              mobileTranscriptCardOptionalString(draft, key: "error")
+        else { return nil }
+        return .init(
+            id: entryId, role: .assistant, text: "", kind: .action,
+            operationId: operationId,
+            actionTitle: subject.isEmpty ? "Email draft" : subject,
+            actionDetail: recipients.isEmpty ? "Email draft" : "To: \(recipients.joined(separator: ", "))",
+            actionStatus: status,
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
+    case "slackDraft":
+        guard let draft = card["draft"] as? [String: Any],
+              draft["kind"] as? String == "slack",
+              mobileTranscriptCardNonEmptyString(draft["id"]) != nil,
+              let target = mobileTranscriptCardNonEmptyString(draft["target"]),
+              let body = draft["body"] as? String,
+              let status = mobileTranscriptDraftStatus(draft["status"]),
+              mobileTranscriptCardOptionalString(draft, key: "workspace"),
+              mobileTranscriptCardOptionalString(draft, key: "thread"),
+              mobileTranscriptCardOptionalString(draft, key: "error")
+        else { return nil }
+        return .init(
+            id: entryId, role: .assistant, text: "", kind: .action,
+            operationId: operationId,
+            actionTitle: "Slack draft · \(target)",
+            actionDetail: body,
+            actionStatus: status,
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
+    case "secretRequest":
+        guard mobileTranscriptCardNonEmptyString(card["requestId"]) != nil,
+              let label = mobileTranscriptCardNonEmptyString(card["label"]),
+              let provided = card["provided"] as? Bool,
+              mobileTranscriptCardOptionalString(card, key: "description")
+        else { return nil }
+        return .init(
+            id: entryId, role: .assistant, text: "", kind: .action,
+            operationId: operationId,
+            actionTitle: provided ? "\(label) provided" : "Secret required · \(label)",
+            actionDetail: card["description"] as? String,
+            actionStatus: provided ? "completed" : "waiting",
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
+    case "event":
+        guard let item = card["event"] as? [String: Any],
+              mobileTranscriptCardNonEmptyString(item["source"]) != nil,
+              mobileTranscriptCardNonEmptyString(item["event"]) != nil,
+              let title = mobileTranscriptCardNonEmptyString(item["title"]),
+              let summary = item["summary"] as? String,
+              mobileTranscriptCardOptionalString(item, key: "url"),
+              mobileTranscriptCardOptionalString(item, key: "actor")
+        else { return nil }
+        if let fields = item["fields"] {
+            guard let rows = fields as? [[String: Any]],
+                  rows.allSatisfy({
+                      mobileTranscriptCardNonEmptyString($0["label"]) != nil
+                          && $0["value"] is String
+                  })
+            else { return nil }
+        }
+        if item["occurredAtMs"] != nil,
+           GrokMobileBotService.int64Value(item["occurredAtMs"]) == nil {
+            return nil
+        }
+        return .init(
+            id: entryId, role: .assistant,
+            text: summary.isEmpty ? title : "\(title) — \(summary)",
+            kind: .notice, operationId: operationId,
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
+    case "pdf":
+        guard let name = mobileTranscriptCardNonEmptyString(card["name"]),
+              mobileTranscriptCardOptionalString(card, key: "url"),
+              mobileTranscriptCardOptionalString(card, key: "dataBase64")
+        else { return nil }
+        if card["pageCount"] != nil {
+            guard let count = GrokMobileBotService.int64Value(card["pageCount"]), count >= 0
+            else { return nil }
+        }
+        return .init(
+            id: entryId, role: .assistant, text: "PDF · \(name)",
+            kind: .notice, operationId: operationId,
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
+    case "spreadsheet":
+        guard let name = mobileTranscriptCardNonEmptyString(card["name"]),
+              let sheets = card["sheets"] as? [[String: Any]]
+        else { return nil }
+        for sheet in sheets {
+            guard mobileTranscriptCardNonEmptyString(sheet["name"]) != nil,
+                  sheet["rows"] is [[String]]
+            else { return nil }
+        }
+        return .init(
+            id: entryId, role: .assistant,
+            text: "Spreadsheet · \(name) · \(sheets.count) sheets",
+            kind: .notice, operationId: operationId,
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
+    case "miniApp":
+        guard mobileTranscriptCardNonEmptyString(card["miniAppId"]) != nil,
+              let name = mobileTranscriptCardNonEmptyString(card["name"]),
+              card["html"] is String,
+              mobileTranscriptCardOptionalString(card, key: "description")
+        else { return nil }
+        return .init(
+            id: entryId, role: .assistant, text: "", kind: .action,
+            operationId: operationId,
+            actionTitle: "Open \(name)",
+            actionDetail: card["description"] as? String,
+            actionStatus: "waiting",
+            canonicalTranscriptCard: payload,
+            createdAt: createdAt
+        )
+
+    default:
+        return nil
+    }
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
@@ -207,6 +399,7 @@ struct MobileChatMessage: Identifiable, Equatable {
     var actionDetail: String?
     var actionStatus: String?
     var listenerPlatform: String?
+    var canonicalTranscriptCard: MobileCanonicalTranscriptCardPayload?
     var handoffRequestId: String?
     var handoffAgentId: String?
     var approvalId: String?
@@ -710,6 +903,12 @@ func projectMobileTranscriptCard(
 
     if kind == "listenerConnect" {
         return projectListenerConnectTranscriptCard(event: event, operationId: operationId)
+    }
+    if let hostCard = projectMobileCanonicalHostTranscriptCard(
+        event: event,
+        operationId: operationId
+    ) {
+        return hostCard
     }
 
     let entryId = (event["entryId"] as? String).flatMap { $0.isEmpty ? nil : $0 }

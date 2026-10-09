@@ -192,6 +192,69 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertTrue(isSandUpdateTrack("stable"))
         XCTAssertFalse(isSandUpdateTrack("beta"))
     }
+    func testCanonicalHostTranscriptCardsPreserveValidatedPayloadAndFailClosed() throws {
+        let email = try XCTUnwrap(projectMobileCanonicalHostTranscriptCard(
+            event: [
+                "entryId": "draft-1",
+                "card": [
+                    "kind": "emailDraft",
+                    "draft": [
+                        "kind": "email",
+                        "id": "email-1",
+                        "to": ["you@example.com"],
+                        "subject": "Release",
+                        "body": "Ready",
+                        "status": "editable",
+                    ],
+                ],
+            ],
+            operationId: "op-1"
+        ))
+        XCTAssertEqual(email.kind, .action)
+        XCTAssertEqual(email.actionTitle, "Release")
+        XCTAssertEqual(email.canonicalTranscriptCard?.kind, "emailDraft")
+        XCTAssertTrue(email.canonicalTranscriptCard?.json.contains(#""id":"email-1""#) == true)
+
+        let event = try XCTUnwrap(projectMobileCanonicalHostTranscriptCard(
+            event: [
+                "entryId": "event-1",
+                "card": [
+                    "kind": "event",
+                    "event": [
+                        "source": "github",
+                        "event": "pull_request",
+                        "title": "PR opened",
+                        "summary": "Review requested",
+                        "fields": [["label": "repo", "value": "fabushi"]],
+                        "occurredAtMs": 1234,
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+        XCTAssertEqual(event.kind, .notice)
+        XCTAssertEqual(event.text, "PR opened — Review requested")
+
+        XCTAssertNil(projectMobileCanonicalHostTranscriptCard(
+            event: ["card": [
+                "kind": "emailDraft",
+                "draft": [
+                    "kind": "email",
+                    "id": "broken",
+                    "to": "not-an-array",
+                    "subject": "Broken",
+                    "body": "",
+                    "status": "editable",
+                ],
+            ]],
+            operationId: nil
+        ))
+        XCTAssertNil(projectMobileCanonicalHostTranscriptCard(
+            event: ["card": ["kind": "pdf", "name": "bad.pdf", "pageCount": -1]],
+            operationId: nil
+        ))
+    }
+
     func testNativeTranscriptCardsProjectRecoveredNoticePermissionAndTimelineSemantics() throws {
         let notice = try XCTUnwrap(projectMobileTranscriptCard(
             event: [
