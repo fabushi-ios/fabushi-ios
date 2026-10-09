@@ -10034,6 +10034,7 @@ impl FeatureHostController {
             == Some(conversation_id.as_str());
         state.events.push_back(HostEvent::ConversationWindowOpened {
             timestamp: timestamp(),
+            request_id: Some(request_id.clone()),
             conversation_id: conversation_id.clone(),
             messages,
             next_before_message_id,
@@ -10310,16 +10311,16 @@ impl FeatureHostController {
                 })
             }
             FeatureCommand::ConversationOpenWindowed {
+                request_id,
                 conversation_id,
                 before_message_id,
                 limit,
-                ..
             }
             | FeatureCommand::ConversationOpenTail {
+                request_id,
                 conversation_id,
                 before_message_id,
                 limit,
-                ..
             } => {
                 let (messages, next_before_message_id) =
                     bounded_conversation_window(&[], before_message_id.as_deref(), limit);
@@ -10328,6 +10329,7 @@ impl FeatureHostController {
                     == Some(conversation_id.as_str());
                 state.events.push_back(HostEvent::ConversationWindowOpened {
                     timestamp: timestamp(),
+                    request_id: Some(request_id.clone()),
                     conversation_id: conversation_id.clone(),
                     messages,
                     next_before_message_id,

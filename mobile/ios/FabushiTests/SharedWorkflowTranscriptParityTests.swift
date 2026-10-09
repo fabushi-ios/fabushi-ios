@@ -137,6 +137,51 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertNil(mobileTranscriptCopyText(urlCard))
     }
 
+    func testConversationHistoryMergePreservesEphemeraAndReplacesCanonicalMessages() {
+        let old = MobileChatMessage(
+            id: "history:reply",
+            role: .assistant,
+            text: "old",
+            canonicalMessageId: "reply",
+            replyToMessageId: "root",
+            branched: true
+        )
+        let ephemeral = MobileChatMessage(
+            id: "thinking:op",
+            role: .assistant,
+            text: "",
+            kind: .thinking
+        )
+        let refreshed = MobileChatMessage(
+            id: "history:reply",
+            role: .assistant,
+            text: "new",
+            canonicalMessageId: "reply",
+            replyToMessageId: "root",
+            branched: true
+        )
+        let root = MobileChatMessage(
+            id: "history:root",
+            role: .user,
+            text: "root",
+            canonicalMessageId: "root"
+        )
+
+        let merged = mergeMobileConversationHistory(
+            current: [old, ephemeral],
+            fetched: [root, refreshed]
+        )
+        XCTAssertEqual(
+            merged.filter { $0.kind == .message }.map(mobileTranscriptCanonicalId),
+            ["root", "reply"]
+        )
+        XCTAssertEqual(
+            merged.first { mobileTranscriptCanonicalId($0) == "reply" }?.text,
+            "new"
+        )
+        XCTAssertTrue(merged.contains { $0.id == "thinking:op" })
+    }
+
     func testTranscriptMainAndThreadProjection() {
         let entries: [TranscriptEntry] = [
             .init(kind: "message", id: "root"),

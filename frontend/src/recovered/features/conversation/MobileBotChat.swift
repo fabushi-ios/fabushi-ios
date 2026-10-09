@@ -120,6 +120,24 @@ internal func mobileTranscriptCopyText(_ entry: MobileChatMessage) -> String? {
     return entry.text
 }
 
+internal func mergeMobileConversationHistory(
+    current: [MobileChatMessage],
+    fetched: [MobileChatMessage]
+) -> [MobileChatMessage] {
+    var messagesById: [String: MobileChatMessage] = [:]
+    for message in current where message.kind == .message {
+        messagesById[mobileTranscriptCanonicalId(message)] = message
+    }
+    for message in fetched {
+        messagesById[mobileTranscriptCanonicalId(message)] = message
+    }
+    let ephemera = current.filter { $0.kind != .message }
+    return (Array(messagesById.values) + ephemera).sorted {
+        if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+        return $0.id < $1.id
+    }
+}
+
 internal func reconcileMobileConversationBaseline(
     baseline: [MobileChatMessage],
     current: [MobileChatMessage],
@@ -241,6 +259,9 @@ internal struct MobileBotChat: View {
     @State private var replyTargetId: String?
     @State private var replyIsFork = false
     @State private var threadRootId: String?
+    @State private var threadLoadGeneration = 0
+    @State private var threadLoadingRootId: String?
+    @State private var threadLoadError: String?
     @State private var voiceRecorder = VoiceRecorder()
     @State private var voiceTranscriber = OfflineSpeechTranscriber()
     @State private var transcribingVoice = false
@@ -279,12 +300,18 @@ internal struct MobileBotChat: View {
             cancelVoiceInput()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
+            threadLoadGeneration &+= 1
+            threadLoadingRootId = nil
+            threadLoadError = nil
+            threadRootId = nil
             resetSecretRequestUI()
         }
         .onDisappear {
             cancelVoiceInput()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
+            threadLoadGeneration &+= 1
+            threadLoadingRootId = nil
         }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
@@ -899,7 +926,7 @@ internal struct MobileBotChat: View {
             let count = mobileThreadReplyCounts(entries)[rootId] ?? 0
             if count > 0 {
                 Button {
-                    threadRootId = rootId
+                    openThread(rootId: rootId)
                 } label: {
                     HStack(spacing: 5) {
                         Text("View thread")
@@ -921,6 +948,15 @@ internal struct MobileBotChat: View {
             NavigationStack {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 9) {
+                        if threadLoadingRootId == rootId {
+                            ProgressView("Loading full thread…")
+                                .controlSize(.small)
+                        }
+                        if let threadLoadError, !threadLoadError.isEmpty {
+                            Text(threadLoadError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                         ForEach(mobileThreadEntries(entries, rootId: rootId)) { entry in
                             transcript(entry)
                                 .id("thread:\(entry.id)")
@@ -951,6 +987,118 @@ internal struct MobileBotChat: View {
                 }
             }
             .accessibilityIdentifier(Self.semanticId("mobile-bot-thread-\(rootId)"))
+        }
+    }
+
+    @MainActor
+    private func openThread(rootId: String) {
+        threadRootId = rootId
+        threadLoadError = nil
+        Task { await loadCompleteThread(rootId: rootId) }
+    }
+
+    @MainActor
+    private func loadCompleteThread(rootId: String) async {
+        guard bot.miniAppId == nil,
+              let conversationId = bot.conversationId?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !conversationId.isEmpty
+        else { return }
+
+        threadLoadGeneration &+= 1
+        let generation = threadLoadGeneration
+        let ownedBotId = bot.id
+        threadLoadingRootId = rootId
+        defer {
+            if generation == threadLoadGeneration, threadLoadingRootId == rootId {
+                threadLoadingRootId = nil
+            }
+        }
+
+        var beforeMessageId: String?
+        var fetched: [MobileChatMessage] = []
+        var seenAnchors: Set<String> = []
+        do {
+            for page in 0..<50 {
+                guard generation == threadLoadGeneration,
+                      bot.id == ownedBotId,
+                      threadRootId == rootId
+                else { return }
+
+                let requestId = "ios-mobile-thread-\(page)-\(UUID().uuidString.lowercased())"
+                var command: [String: Any] = [
+                    "type": "conversation.openWindowed",
+                    "requestId": requestId,
+                    "conversationId": conversationId,
+                    "limit": 200,
+                ]
+                if let beforeMessageId {
+                    command["beforeMessageId"] = beforeMessageId
+                }
+                _ = try await bridge.request(
+                    method: "feature.execute",
+                    params: ["command": command]
+                )
+                let result = try await bridge.receiveFeatureEvent(
+                    deadlineMilliseconds: 8_000
+                ) { event in
+                    event["type"] as? String == "conversation.windowOpened"
+                        && event["requestId"] as? String == requestId
+                        && event["conversationId"] as? String == conversationId
+                }
+                guard generation == threadLoadGeneration,
+                      bot.id == ownedBotId,
+                      threadRootId == rootId,
+                      let event = result.value as? [String: Any],
+                      let rows = event["messages"] as? [[String: Any]]
+                else { return }
+
+                let pageMessages = rows.compactMap(projectMobileConversationWindowMessage)
+                guard pageMessages.count == rows.count else {
+                    throw NSError(
+                        domain: "Fabushi.MobileBotChat",
+                        code: 42,
+                        userInfo: [NSLocalizedDescriptionKey: "Host returned malformed thread history"]
+                    )
+                }
+                fetched.append(contentsOf: pageMessages)
+                if pageMessages.contains(where: { mobileTranscriptCanonicalId($0) == rootId }) {
+                    entries = mergeMobileConversationHistory(current: entries, fetched: fetched)
+                    threadLoadError = nil
+                    return
+                }
+
+                guard let next = event["nextBeforeMessageId"] as? String,
+                      !next.isEmpty
+                else {
+                    throw NSError(
+                        domain: "Fabushi.MobileBotChat",
+                        code: 43,
+                        userInfo: [NSLocalizedDescriptionKey: "Thread root is no longer available in conversation history"]
+                    )
+                }
+                guard seenAnchors.insert(next).inserted else {
+                    throw NSError(
+                        domain: "Fabushi.MobileBotChat",
+                        code: 44,
+                        userInfo: [NSLocalizedDescriptionKey: "Conversation history pagination repeated an anchor"]
+                    )
+                }
+                beforeMessageId = next
+            }
+            throw NSError(
+                domain: "Fabushi.MobileBotChat",
+                code: 45,
+                userInfo: [NSLocalizedDescriptionKey: "Thread history exceeded the bounded 10,000-message lookup"]
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            guard generation == threadLoadGeneration,
+                  bot.id == ownedBotId,
+                  threadRootId == rootId
+            else { return }
+            threadLoadError = error.localizedDescription
         }
     }
 
@@ -1463,6 +1611,7 @@ internal struct MobileBotChat: View {
                 deadlineMilliseconds: 8_000
             ) { event in
                 event["type"] as? String == "conversation.windowOpened"
+                    && event["requestId"] as? String == requestId
                     && event["conversationId"] as? String == conversationId
             }
             guard

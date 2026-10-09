@@ -2377,6 +2377,8 @@ pub enum HostEvent {
     #[serde(rename = "conversation.windowOpened")]
     ConversationWindowOpened {
         timestamp: String,
+        #[serde(rename = "requestId", default, skip_serializing_if = "Option::is_none")]
+        request_id: Option<String>,
         #[serde(rename = "conversationId")]
         conversation_id: String,
         messages: Vec<ConversationMessage>,
