@@ -2,6 +2,43 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+internal enum ForwardRecipientNavigationKey: Equatable {
+    case arrowDown
+    case arrowUp
+    case pageDown
+    case pageUp
+    case home
+    case end
+}
+
+internal enum ForwardRecipientNavigation {
+    static func nextIndex(
+        currentIndex: Int,
+        recipientCount: Int,
+        key: ForwardRecipientNavigationKey,
+        pageSize: Int = 6
+    ) -> Int? {
+        guard recipientCount > 0 else { return nil }
+        let last = recipientCount - 1
+        let current = min(max(currentIndex, 0), last)
+        let page = max(1, pageSize)
+        switch key {
+        case .arrowDown:
+            return min(current + 1, last)
+        case .arrowUp:
+            return max(current - 1, 0)
+        case .pageDown:
+            return min(current + page, last)
+        case .pageUp:
+            return max(current - page, 0)
+        case .home:
+            return 0
+        case .end:
+            return last
+        }
+    }
+}
+
 private struct ForwardMessageSheet: View {
     let sourceConversationId: String
     let message: ChatMessage
@@ -19,6 +56,8 @@ private struct ForwardMessageSheet: View {
     @State private var loading = false
     @State private var sending = false
     @State private var errorText: String?
+    @State private var activeRecipientIndex = 0
+    @FocusState private var recipientListFocused: Bool
 
     private var selectedInOrder: [ConversationSummary] {
         selectedRecipients.values.sorted {
@@ -78,8 +117,9 @@ private struct ForwardMessageSheet: View {
                             systemImage: "arrowshape.turn.up.right"
                         )
                     } else {
-                        ForEach(recipients) { recipient in
+                        ForEach(Array(recipients.enumerated()), id: \.element.id) { index, recipient in
                             Button {
+                                activeRecipientIndex = index
                                 toggleRecipient(recipient)
                             } label: {
                                 HStack(spacing: 10) {
@@ -116,6 +156,11 @@ private struct ForwardMessageSheet: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(sending || settlements[recipient.id]?.sent == true)
+                            .listRowBackground(
+                                activeRecipientIndex == index
+                                    ? Color.accentColor.opacity(0.14)
+                                    : Color.clear
+                            )
                         }
                     }
                 }
@@ -143,6 +188,14 @@ private struct ForwardMessageSheet: View {
                 }
             }
             .searchable(text: $query, prompt: "搜索会话")
+            .focusable()
+            .focused($recipientListFocused)
+            .onKeyPress(
+                keys: [.downArrow, .upArrow, .pageDown, .pageUp, .home, .end, .return, .space],
+                phases: [.down, .repeat]
+            ) { press in
+                handleRecipientKeyPress(press)
+            }
             .navigationTitle("转发到")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -340,6 +393,55 @@ private struct ForwardMessageSheet: View {
         )
     }
 
+    private func handleRecipientKeyPress(_ press: KeyPress) -> KeyPress.Result {
+        guard !sending, !recipients.isEmpty else { return .ignored }
+
+        let navigationKey: ForwardRecipientNavigationKey?
+        switch press.key {
+        case .downArrow:
+            navigationKey = .arrowDown
+        case .upArrow:
+            navigationKey = .arrowUp
+        case .pageDown:
+            navigationKey = .pageDown
+        case .pageUp:
+            navigationKey = .pageUp
+        case .home:
+            navigationKey = .home
+        case .end:
+            navigationKey = .end
+        default:
+            navigationKey = nil
+        }
+
+        if let navigationKey,
+           let next = ForwardRecipientNavigation.nextIndex(
+               currentIndex: activeRecipientIndex,
+               recipientCount: recipients.count,
+               key: navigationKey
+           )
+        {
+            activeRecipientIndex = next
+            return .handled
+        }
+
+        if press.key == .return, press.modifiers.contains(.command) {
+            guard !pendingRecipients.isEmpty else { return .ignored }
+            Task { await submit() }
+            return .handled
+        }
+
+        if press.key == .return || press.key == .space {
+            guard recipients.indices.contains(activeRecipientIndex) else { return .ignored }
+            let recipient = recipients[activeRecipientIndex]
+            guard settlements[recipient.id]?.sent != true else { return .handled }
+            toggleRecipient(recipient)
+            return .handled
+        }
+
+        return .ignored
+    }
+
     private var actionTitle: String {
         if sending { return "发送中" }
         if failedCount > 0 { return "重试失败项" }
@@ -372,6 +474,11 @@ private struct ForwardMessageSheet: View {
                 query: query,
                 limit: 100
             )
+            if recipients.isEmpty {
+                activeRecipientIndex = 0
+            } else {
+                activeRecipientIndex = min(activeRecipientIndex, recipients.count - 1)
+            }
             errorText = nil
         } catch is CancellationError {
             return
