@@ -8107,26 +8107,66 @@ impl FeatureHostController {
         Ok(secret)
     }
 
-    /// Return the existing persisted Host settings snapshot for native Main
-    /// reconciliation. This reuses the FeatureHost settings owner.
-    pub fn host_settings_snapshot_direct(
-        &self,
-    ) -> Result<ProductHostSettings, FeatureHostError> {
-        let state = self.state()?;
-        ensure_open(&state)?;
-        Ok(state.settings.clone())
+    fn host_settings_account_id(&self) -> Result<String, FeatureHostError> {
+        if self.config.mode == HostMode::Test {
+            return Ok(format!("test:{}", self.config.profile_id));
+        }
+        #[cfg(feature = "production")]
+        {
+            return self
+                .active_account_id
+                .lock()
+                .map_err(|_| FeatureHostError::StatePoisoned)?
+                .clone()
+                .ok_or_else(|| {
+                    FeatureHostError::Contract(
+                        "host settings require an authenticated Fabushi account".into(),
+                    )
+                });
+        }
+        #[cfg(not(feature = "production"))]
+        Err(FeatureHostError::ProductionUnavailable)
     }
 
-    /// Update only the account-scoped onboarding field and write through the
-    /// existing FeatureHost settings.json persistence.
+    /// Read only the current authenticated account's onboarding value from the
+    /// existing persisted Host settings owner.
+    pub fn host_settings_onboarding_seen_direct(
+        &self,
+    ) -> Result<Option<bool>, FeatureHostError> {
+        let account_id = self.host_settings_account_id()?;
+        let state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state
+            .settings
+            .has_seen_onboarding_by_account
+            .get(&account_id)
+            .copied())
+    }
+
+    /// Update only the current authenticated account's onboarding value and
+    /// write through the existing FeatureHost settings.json persistence.
     pub fn set_has_seen_onboarding_direct(
         &self,
         value: Option<bool>,
-    ) -> Result<ProductHostSettings, FeatureHostError> {
+    ) -> Result<Option<bool>, FeatureHostError> {
+        let account_id = self.host_settings_account_id()?;
         let settings = {
             let mut state = self.state()?;
             ensure_open(&state)?;
-            state.settings.has_seen_onboarding = value;
+            match value {
+                Some(value) => {
+                    state
+                        .settings
+                        .has_seen_onboarding_by_account
+                        .insert(account_id, value);
+                }
+                None => {
+                    state
+                        .settings
+                        .has_seen_onboarding_by_account
+                        .remove(&account_id);
+                }
+            }
             state.settings.clone()
         };
         if let Some(path) = self.settings_path.as_deref() {
@@ -8134,9 +8174,9 @@ impl FeatureHostController {
         }
         self.state()?.events.push_back(HostEvent::SettingsChanged {
             timestamp: timestamp(),
-            settings: settings.clone(),
+            settings,
         });
-        Ok(settings)
+        Ok(value)
     }
 
     /// Main settings are canonical on iOS; the Host receives this bounded
@@ -16126,30 +16166,32 @@ mod tests {
 
         assert_eq!(
             controller
-                .host_settings_snapshot_direct()
-                .expect("read initial host settings")
-                .has_seen_onboarding,
+                .host_settings_onboarding_seen_direct()
+                .expect("read initial host settings"),
             None
         );
         assert_eq!(
             controller
                 .set_has_seen_onboarding_direct(Some(true))
-                .expect("set onboarding true")
-                .has_seen_onboarding,
+                .expect("set onboarding true"),
+            Some(true)
+        );
+        assert_eq!(
+            controller
+                .host_settings_onboarding_seen_direct()
+                .expect("read onboarding true"),
             Some(true)
         );
         assert_eq!(
             controller
                 .set_has_seen_onboarding_direct(Some(false))
-                .expect("set onboarding false")
-                .has_seen_onboarding,
+                .expect("set onboarding false"),
             Some(false)
         );
         assert_eq!(
             controller
                 .set_has_seen_onboarding_direct(None)
-                .expect("clear onboarding")
-                .has_seen_onboarding,
+                .expect("clear onboarding"),
             None
         );
     }
