@@ -640,6 +640,7 @@ final class CoordinatorMcpSurface {
     private let dashboard: IOSCursorDashboardClient
     private let avatarImageGenerator: CursorGenerateImageService
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
+    private let isClientPaused: @MainActor () -> Bool
     private var computerMigrationWatchTask: Task<Void, Never>?
     private var computerMigrationResumeOffsetKey = ""
     private var computerMigrationStatus: [String: Any]?
@@ -654,7 +655,8 @@ final class CoordinatorMcpSurface {
         cursorAuth: IOSCursorAuthService,
         dashboard: IOSCursorDashboardClient,
         avatarImageGenerator: CursorGenerateImageService,
-        localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
+        localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer,
+        isClientPaused: @escaping @MainActor () -> Bool
     ) {
         self.manager = manager
         self.port = port
@@ -662,13 +664,15 @@ final class CoordinatorMcpSurface {
         self.dashboard = dashboard
         self.avatarImageGenerator = avatarImageGenerator
         self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
+        self.isClientPaused = isClientPaused
     }
 
     static func make(
         hostSupervisor: MahayanaLocalHostSupervisor,
         settingsStore: SandSettingsStore,
         reportFailure: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
-        reportAuthTelemetry: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
+        reportAuthTelemetry: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
+        isClientPaused: @escaping @MainActor () -> Bool = { false }
     ) -> CoordinatorMcpSurface {
         let port = CoordinatorMcpHostPort(
             hostSupervisor: hostSupervisor,
@@ -774,7 +778,8 @@ final class CoordinatorMcpSurface {
             cursorAuth: cursorAuth,
             dashboard: dashboard,
             avatarImageGenerator: avatarImageGenerator,
-            localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer
+            localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
+            isClientPaused: isClientPaused
         )
     }
 
@@ -789,6 +794,17 @@ final class CoordinatorMcpSurface {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.localToolPermissionCeilingSynchronizer.consume(await self.cursorAuth.status())
+        }
+    }
+
+    func dropObservedComputerConnectionForClientPause() {
+        stopComputerMigrationWatch(clearState: true)
+    }
+
+    private func refuseComputerConnectionWhileClientPaused() throws {
+        if isClientPaused() {
+            dropObservedComputerConnectionForClientPause()
+            throw IOSClientPausedError()
         }
     }
 
@@ -972,6 +988,7 @@ final class CoordinatorMcpSurface {
     ) async throws -> CoordinatorDevControlRouting {
         switch method {
         case "getBoxMigrationStatus":
+            try refuseComputerConnectionWhileClientPaused()
             try await requireCursorComputerLifecycle()
             if let status = computerMigrationStatus ?? computerMigrationLastTerminal {
                 return .handled(status)
@@ -979,6 +996,7 @@ final class CoordinatorMcpSurface {
             return .handled(NSNull())
 
         case "updateComputer":
+            try refuseComputerConnectionWhileClientPaused()
             try await requireCursorComputerLifecycle()
             guard nonEmptyString(params["id"]) != nil else {
                 throw SandMcpConfigError("A computer update requires an agent id.")
@@ -990,6 +1008,7 @@ final class CoordinatorMcpSurface {
             return .handled(projectRecreate(result))
 
         case "forceRecreateComputer":
+            try refuseComputerConnectionWhileClientPaused()
             try await requireCursorComputerLifecycle()
             return .handled(projectRecreate(try await dashboard.forceRecreateSandBox()))
 
