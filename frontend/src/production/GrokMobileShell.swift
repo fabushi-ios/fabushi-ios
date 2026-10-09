@@ -25,6 +25,8 @@ internal struct GrokMobileShell: View {
     @State var botActionBusy = false
     @State var botActionError: String?
     @State var bots: [MobileBotSummary] = []
+    @State var agentNetworkOpen = false
+    @State var agentNetworkGateEnabled = false
     @State var hiddenChatsOpen = false
     @State var hiddenChatsController = MobileHiddenChatsMutationController()
     @State var accessRosterSnapshot = AccessRosterSnapshot.initial
@@ -211,6 +213,17 @@ internal struct GrokMobileShell: View {
                 remoteComputerAgentTarget = nil
             }
         }
+        .fullScreenCover(isPresented: $agentNetworkOpen) {
+            FabushiAgentNetworkView(
+                agents: bots,
+                onOpenAgent: { id in
+                    guard let agent = bots.first(where: { $0.id == id }) else { return }
+                    agentNetworkOpen = false
+                    selectBotForConversation(agent)
+                },
+                onClose: { agentNetworkOpen = false }
+            )
+        }
     }
 
     var mobileAccountScopeKey: String {
@@ -223,6 +236,13 @@ internal struct GrokMobileShell: View {
 
     var accessRosterTaskKey: String {
         "\(mobileAccountScopeKey):\(reconnectGeneration)"
+    }
+
+    var agentNetworkAvailability: MobileAgentNetworkAvailability {
+        MobileAgentNetworkAvailability.resolve(
+            gateEnabled: agentNetworkGateEnabled,
+            hasAgents: !bots.isEmpty
+        )
     }
 
     var accessCoverComposition: AccessCoverCompositionState {
@@ -450,6 +470,7 @@ internal struct GrokMobileShell: View {
                     bot.miniAppId ?? "",
                     String(bot.isGroup),
                     bot.memberIds.joined(separator: "+"),
+                    bot.conversationPartnerIds.joined(separator: "+"),
                     String(bot.isSharedRoom),
                 ].joined(separator: ":")
             }
