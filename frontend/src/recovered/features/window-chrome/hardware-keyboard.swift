@@ -304,7 +304,7 @@ extension GrokMobileShell {
             returnToHomeForHardwareShortcut()
             openLegacySection(.miniapps)
 
-        case .previousAgent, .nextAgent, .focusAgent:
+        case .previousAgent, .nextAgent, .focusAgent(_):
             guard let target = MobileHardwareKeyboardProjection.target(
                 for: action,
                 currentAgentID: selectedBot?.id ?? rosterSelection.currentAgentID,
