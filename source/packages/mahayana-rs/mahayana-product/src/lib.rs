@@ -4909,9 +4909,34 @@ mod tests {
         let address = listener.local_addr().expect("attachment upload test address");
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept attachment upload request");
-            let mut request = [0_u8; 16384];
-            let size = stream.read(&mut request).expect("read attachment upload request");
-            let request = String::from_utf8_lossy(&request[..size]);
+            let mut request = Vec::new();
+            let expected_total = loop {
+                let mut chunk = [0_u8; 4096];
+                let size = stream.read(&mut chunk).expect("read attachment upload request");
+                assert!(size > 0, "attachment upload closed before request headers completed");
+                request.extend_from_slice(&chunk[..size]);
+                let Some(headers_end) = request.windows(4).position(|window| window == b"\r\n\r\n") else {
+                    continue;
+                };
+                let headers = String::from_utf8_lossy(&request[..headers_end]);
+                let content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse::<usize>().ok())
+                            .flatten()
+                    })
+                    .expect("attachment upload content-length");
+                break headers_end + 4 + content_length;
+            };
+            while request.len() < expected_total {
+                let mut chunk = [0_u8; 4096];
+                let size = stream.read(&mut chunk).expect("read attachment upload body");
+                assert!(size > 0, "attachment upload closed before multipart body completed");
+                request.extend_from_slice(&chunk[..size]);
+            }
+            let request = String::from_utf8_lossy(&request[..expected_total]);
             assert!(request.starts_with("POST /api/social/message-resources "));
             let lower = request.to_ascii_lowercase();
             assert!(lower.contains("authorization: bearer test-token"));
