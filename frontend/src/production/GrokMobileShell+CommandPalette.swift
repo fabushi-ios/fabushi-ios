@@ -1,8 +1,23 @@
 import SwiftUI
 
 extension GrokMobileShell {
+    var commandPaletteAgent: MobileBotSummary? {
+        guard let commandPaletteAgentID else { return nil }
+        return bots.first { $0.id == commandPaletteAgentID && !$0.isGroup }
+    }
+
+    var commandPaletteComputerUpdateAction: MobileCommandPaletteComputerUpdateAction? {
+        MobileCommandPaletteComputerUpdateProjection.action(
+            agent: commandPaletteAgent,
+            status: commandPaletteComputerStatus,
+            activity: commandPaletteComputerActivity,
+            isPending: commandPaletteComputerPending,
+            isQueued: commandPaletteComputerQueued
+        )
+    }
+
     var commandPaletteActions: [MobileCommandPaletteAction] {
-        [
+        var actions: [MobileCommandPaletteAction] = [
             .init(
                 id: "create-bot",
                 label: "New Bot",
@@ -39,6 +54,16 @@ extension GrokMobileShell {
                 kind: .openSettings
             ),
         ]
+        if commandPaletteComputerUpdateAction != nil {
+            actions.append(.init(
+                id: "update-computer",
+                label: "Update Fabushi's Computer",
+                keywords: ["box", "image", "machine", "recreate", "latest", "shared"],
+                detail: "Updates",
+                kind: .updateComputer
+            ))
+        }
+        return actions
     }
 
     var commandPaletteEntries: [MobileCommandPaletteEntry] {
@@ -128,6 +153,9 @@ extension GrokMobileShell {
         .task(id: commandPaletteProviderKey) {
             await refreshCommandPaletteProviders()
         }
+        .task(id: commandPaletteComputerProviderKey) {
+            await refreshCommandPaletteComputerProjection()
+        }
     }
 
     func commandPaletteRow(_ entry: MobileCommandPaletteEntry) -> some View {
@@ -164,6 +192,9 @@ extension GrokMobileShell {
 
     @MainActor
     func toggleCommandPalette() {
+        if !searchOpen {
+            setCommandPaletteComputerScope(agentID: selectedBot?.id ?? commandPaletteAgentID)
+        }
         searchOpen.toggle()
         if searchOpen {
             paletteTab = .all
@@ -231,6 +262,9 @@ extension GrokMobileShell {
                 openLegacySection(.channels)
             case .openSettings:
                 openLegacySection(.settings)
+            case .updateComputer:
+                guard let action = commandPaletteComputerUpdateAction else { return }
+                commandPaletteComputerConfirmation = action
             }
         }
     }
@@ -255,6 +289,218 @@ extension GrokMobileShell {
                 .map { key, messages in "\(key):\(messages.count):\(messages.last?.id ?? "")" }
                 .joined(separator: ","),
         ].joined(separator: "|")
+    }
+
+    var commandPaletteComputerProviderKey: String {
+        [
+            String(searchOpen),
+            mobileAccountScopeKey,
+            commandPaletteAgentID ?? "",
+            String(reconnectGeneration),
+        ].joined(separator: "|")
+    }
+
+    var commandPaletteComputerConfirmationTitle: String {
+        switch commandPaletteComputerConfirmation {
+        case .ready:
+            return "Update Fabushi's Computer?"
+        case .busyOverride:
+            return "An agent is working"
+        case nil:
+            return "Update Fabushi's Computer?"
+        }
+    }
+
+    var commandPaletteComputerConfirmationMessage: String {
+        switch commandPaletteComputerConfirmation {
+        case .ready:
+            return "This updates the shared computer all your agents run on to the latest version. Their files and logins are kept."
+        case .busyOverride:
+            return "Waiting lets the current Computer Use task finish. Updating now recreates the computer and interrupts it. Files and logins are kept either way."
+        case nil:
+            return ""
+        }
+    }
+
+    @MainActor
+    func setCommandPaletteComputerScope(agentID: String?) {
+        guard commandPaletteAgentID != agentID else { return }
+        commandPaletteComputerGeneration &+= 1
+        commandPaletteAgentID = agentID
+        commandPaletteComputerStatus = nil
+        commandPaletteComputerActivity = .empty
+        commandPaletteComputerPending = false
+        commandPaletteComputerQueued = false
+        commandPaletteComputerConfirmation = nil
+    }
+
+    @MainActor
+    func resetCommandPaletteComputerScope() {
+        commandPaletteComputerGeneration &+= 1
+        commandPaletteAgentID = nil
+        commandPaletteComputerStatus = nil
+        commandPaletteComputerActivity = .empty
+        commandPaletteComputerPending = false
+        commandPaletteComputerQueued = false
+        commandPaletteComputerConfirmation = nil
+    }
+
+    @MainActor
+    func refreshCommandPaletteComputerProjection() async {
+        guard searchOpen, let agent = commandPaletteAgent else {
+            commandPaletteComputerStatus = nil
+            commandPaletteComputerActivity = .empty
+            return
+        }
+        let generation = commandPaletteComputerGeneration
+        do {
+            let status = try await IOSRemoteComputerAgentBoxSource(bridge: bridge)
+                .status(agentID: agent.id)
+            guard !Task.isCancelled,
+                  generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agent.id
+            else { return }
+
+            let activity = try await IOSRemoteComputerHostActivitySource(bridge: bridge)
+                .load(agentID: agent.id)
+            guard !Task.isCancelled,
+                  generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agent.id
+            else { return }
+
+            commandPaletteComputerStatus = status
+            commandPaletteComputerActivity = activity
+        } catch is CancellationError {
+            return
+        } catch {
+            guard generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agent.id
+            else { return }
+            commandPaletteComputerStatus = nil
+            commandPaletteComputerActivity = .empty
+        }
+    }
+
+    @MainActor
+    func queueCommandPaletteComputerUpdate() {
+        guard let agent = commandPaletteAgent,
+              !commandPaletteComputerPending,
+              !commandPaletteComputerQueued
+        else { return }
+
+        commandPaletteComputerQueued = true
+        let generation = commandPaletteComputerGeneration
+        let agentID = agent.id
+        Task { @MainActor in
+            while commandPaletteComputerQueued,
+                  generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agentID
+            {
+                do {
+                    let status = try await IOSRemoteComputerAgentBoxSource(bridge: bridge)
+                        .status(agentID: agentID)
+                    let activity = try await IOSRemoteComputerHostActivitySource(bridge: bridge)
+                        .load(agentID: agentID)
+
+                    guard generation == commandPaletteComputerGeneration,
+                          commandPaletteAgentID == agentID,
+                          commandPaletteComputerQueued
+                    else { return }
+
+                    commandPaletteComputerStatus = status
+                    commandPaletteComputerActivity = activity
+                    guard status?.imageUpdateAvailable == true else {
+                        commandPaletteComputerQueued = false
+                        return
+                    }
+                    if !activity.isActive {
+                        commandPaletteComputerQueued = false
+                        await performCommandPaletteComputerUpdate(
+                            force: false,
+                            expectedGeneration: generation
+                        )
+                        return
+                    }
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard generation == commandPaletteComputerGeneration,
+                          commandPaletteAgentID == agentID
+                    else { return }
+                    commandPaletteComputerQueued = false
+                    model.message = "Computer update could not be queued: \(error.localizedDescription)"
+                    return
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func performCommandPaletteComputerUpdate(
+        force: Bool,
+        expectedGeneration: Int? = nil
+    ) async {
+        guard let agent = commandPaletteAgent,
+              !commandPaletteComputerPending,
+              !commandPaletteComputerQueued,
+              expectedGeneration == nil || expectedGeneration == commandPaletteComputerGeneration
+        else { return }
+
+        let generation = commandPaletteComputerGeneration
+        let agentID = agent.id
+        do {
+            let status = try await IOSRemoteComputerAgentBoxSource(bridge: bridge)
+                .status(agentID: agentID)
+            guard generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agentID
+            else { return }
+            commandPaletteComputerStatus = status
+            guard status?.imageUpdateAvailable == true else { return }
+
+            let activity = try await IOSRemoteComputerHostActivitySource(bridge: bridge)
+                .load(agentID: agentID)
+            guard generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agentID
+            else { return }
+            commandPaletteComputerActivity = activity
+            if !force && activity.isActive {
+                queueCommandPaletteComputerUpdate()
+                return
+            }
+
+            commandPaletteComputerPending = true
+            let value = try await bridge.request(
+                method: "updateComputer",
+                params: [
+                    "id": agentID,
+                    "force": force,
+                ]
+            ).value
+            guard generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agentID
+            else { return }
+
+            commandPaletteComputerPending = false
+            if let response = value as? [String: Any],
+               let status = response["status"] as? String
+            {
+                if status == "rejected" {
+                    model.message = (response["reason"] as? String) ?? "Computer update was rejected."
+                    return
+                }
+                if status == "started-untrackable" {
+                    model.message = "The computer update started, but Fabushi can't track its progress. Restart Fabushi after the computer is available again."
+                }
+            }
+            commandPaletteComputerStatus = nil
+        } catch {
+            guard generation == commandPaletteComputerGeneration,
+                  commandPaletteAgentID == agentID
+            else { return }
+            commandPaletteComputerPending = false
+            model.message = "Computer update failed: \(error.localizedDescription)"
+        }
     }
 
     @MainActor
