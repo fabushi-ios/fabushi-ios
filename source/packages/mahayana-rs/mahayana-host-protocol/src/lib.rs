@@ -773,6 +773,10 @@ pub struct ProductHostSettings {
     /// Mahayana capability and ownership checks before use.
     #[serde(default)]
     pub sandbox_runtime: SandboxRuntime,
+    /// Account-scoped onboarding acknowledgement mirrored over the Host
+    /// settings transport. None means the remote side has no established value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_seen_onboarding: Option<bool>,
 }
 
 impl Default for ProductHostSettings {
@@ -790,6 +794,7 @@ impl Default for ProductHostSettings {
             auto_review_rules: Vec::new(),
             inference_provider: InferenceProvider::default(),
             sandbox_runtime: SandboxRuntime::default(),
+            has_seen_onboarding: None,
         }
     }
 }
