@@ -2,6 +2,26 @@ import XCTest
 @testable import Fabushi
 
 final class AccountSessionFrontendParityTests: XCTestCase {
+    func testSettingsFeatureCopyFollowsSelectedLocaleAcrossNativeSections() {
+        let english = MobileUiPreferences(localeRaw: "en").featureCopy()
+        XCTAssertEqual(english.mediaDevices, "Media & Devices")
+        XCTAssertEqual(english.privacyMode, "Privacy mode")
+        XCTAssertEqual(english.allowAutomatically, "Allow automatically")
+
+        let japanese = MobileUiPreferences(localeRaw: "ja").featureCopy()
+        XCTAssertEqual(japanese.mediaDevices, "メディアとデバイス")
+        XCTAssertEqual(japanese.privacyMode, "プライバシーモード")
+        XCTAssertEqual(japanese.askFirst, "先に確認")
+
+        let arabic = MobileUiPreferences(localeRaw: "ar").featureCopy()
+        XCTAssertEqual(arabic.mediaDevices, "الوسائط والأجهزة")
+        XCTAssertEqual(arabic.autoReviewTitle, "المراجعة التلقائية")
+
+        let hebrew = MobileUiPreferences(localeRaw: "he").featureCopy()
+        XCTAssertEqual(hebrew.privacy, "פרטיות")
+        XCTAssertEqual(hebrew.delete, "מחיקה")
+    }
+
     func testMobileConfigurationSnapshotCarriesServerAuthoritativePrivacyProjection() {
         let snapshot = MobileConfigurationSettingsSnapshot(
             autoReview: DEFAULT_SAND_AUTO_REVIEW_INSTRUCTIONS,

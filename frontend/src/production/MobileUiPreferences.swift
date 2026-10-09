@@ -62,6 +62,33 @@ internal struct MobileSettingsAccessibilityCopy: Equatable {
     }
 }
 
+internal struct MobileSettingsFeatureCopy: Equatable {
+    let mediaDevices: String
+    let microphone: String
+    let camera: String
+    let defaultDevice: String
+    let refreshDevices: String
+    let grantMediaPermissions: String
+    let mediaPermissionDescription: String
+    let privacy: String
+    let privacyMode: String
+    let privacyModeDescription: String
+    let stateEnabled: String
+    let stateDisabled: String
+    let autoReviewTitle: String
+    let autoReviewDescription: String
+    let autoReviewDraftLabel: String
+    let ruleBehaviorLabel: String
+    let allowAutomatically: String
+    let askFirst: String
+    let addRule: String
+    let saveRule: String
+    let cancel: String
+    let edit: String
+    let delete: String
+    let rulesScope: String
+}
+
 /// iOS-owned presentation preferences corresponding to DesktopUiPreferences.
 ///
 /// The values are intentionally local presentation state. They never mutate
@@ -295,6 +322,127 @@ internal struct MobileUiPreferences: Equatable {
                 directionRtl: "Right to left",
                 accessibilityCountOne: "{count} accessibility preference active",
                 accessibilityCountOther: "{count} accessibility preferences active"
+            )
+        }
+    }
+
+    func featureCopy(
+        systemIdentifier: String = Locale.autoupdatingCurrent.identifier
+    ) -> MobileSettingsFeatureCopy {
+        switch Self.copyLocaleKey(
+            resolvedLocaleIdentifier(systemIdentifier: systemIdentifier)
+        ) {
+        case .zhHans:
+            return .init(
+                mediaDevices: "媒体与设备", microphone: "麦克风", camera: "摄像头",
+                defaultDevice: "系统默认", refreshDevices: "刷新设备",
+                grantMediaPermissions: "允许麦克风和摄像头",
+                mediaPermissionDescription: "设备偏好仅保存在本机，并用于 Human 通话。",
+                privacy: "隐私", privacyMode: "隐私模式",
+                privacyModeDescription: "由 Fabushi 账户策略强制执行，无法通过本机设置降低保护。",
+                stateEnabled: "已启用", stateDisabled: "已停用",
+                autoReviewTitle: "自动审查",
+                autoReviewDescription: "Fabushi 会在执行前检查每项操作，并在需要时先询问你。你可以设置哪些操作可以自动执行。",
+                autoReviewDraftLabel: "自动审查规则草稿", ruleBehaviorLabel: "规则行为",
+                allowAutomatically: "自动允许", askFirst: "先询问", addRule: "添加规则",
+                saveRule: "保存规则", cancel: "取消", edit: "编辑", delete: "删除",
+                rulesScope: "这些规则仅适用于你。内置安全检查始终生效。"
+            )
+        case .zhHant:
+            return .init(
+                mediaDevices: "媒體與裝置", microphone: "麥克風", camera: "相機",
+                defaultDevice: "系統預設", refreshDevices: "重新整理裝置",
+                grantMediaPermissions: "允許麥克風與相機",
+                mediaPermissionDescription: "裝置偏好只儲存在本機，並用於 Human 通話。",
+                privacy: "隱私", privacyMode: "隱私模式",
+                privacyModeDescription: "由 Fabushi 帳戶政策強制執行，無法透過本機設定降低保護。",
+                stateEnabled: "已啟用", stateDisabled: "已停用",
+                autoReviewTitle: "自動審查",
+                autoReviewDescription: "Fabushi 會在執行前檢查每項操作，並在需要時先詢問你。你可以設定哪些操作可自動執行。",
+                autoReviewDraftLabel: "自動審查規則草稿", ruleBehaviorLabel: "規則行為",
+                allowAutomatically: "自動允許", askFirst: "先詢問", addRule: "新增規則",
+                saveRule: "儲存規則", cancel: "取消", edit: "編輯", delete: "刪除",
+                rulesScope: "這些規則僅適用於你。內建安全檢查一律生效。"
+            )
+        case .ja:
+            return .init(
+                mediaDevices: "メディアとデバイス", microphone: "マイク", camera: "カメラ",
+                defaultDevice: "システム既定", refreshDevices: "デバイスを更新",
+                grantMediaPermissions: "マイクとカメラを許可",
+                mediaPermissionDescription: "デバイス設定はローカルに保存され、Human 通話で使用されます。",
+                privacy: "プライバシー", privacyMode: "プライバシーモード",
+                privacyModeDescription: "Fabushi アカウントポリシーで強制され、ローカル設定から保護を弱めることはできません。",
+                stateEnabled: "有効", stateDisabled: "無効",
+                autoReviewTitle: "自動レビュー",
+                autoReviewDescription: "Fabushi は各操作を実行前に確認し、必要な場合は確認を求めます。自動実行できる操作をルールで設定できます。",
+                autoReviewDraftLabel: "自動レビューのルール案", ruleBehaviorLabel: "ルールの動作",
+                allowAutomatically: "自動的に許可", askFirst: "先に確認", addRule: "ルールを追加",
+                saveRule: "ルールを保存", cancel: "キャンセル", edit: "編集", delete: "削除",
+                rulesScope: "これらのルールはあなたにのみ適用されます。組み込みの安全チェックは常に有効です。"
+            )
+        case .ko:
+            return .init(
+                mediaDevices: "미디어 및 기기", microphone: "마이크", camera: "카메라",
+                defaultDevice: "시스템 기본값", refreshDevices: "기기 새로고침",
+                grantMediaPermissions: "마이크 및 카메라 허용",
+                mediaPermissionDescription: "기기 환경설정은 로컬에 저장되고 Human 통화에 사용됩니다.",
+                privacy: "개인정보 보호", privacyMode: "개인정보 보호 모드",
+                privacyModeDescription: "Fabushi 계정 정책에서 강제하며 로컬 설정으로 보호 수준을 낮출 수 없습니다.",
+                stateEnabled: "사용", stateDisabled: "사용 안 함",
+                autoReviewTitle: "자동 검토",
+                autoReviewDescription: "Fabushi는 작업을 실행하기 전에 확인하고 필요한 경우 먼저 묻습니다. 자동 실행할 작업을 규칙으로 설정하세요.",
+                autoReviewDraftLabel: "자동 검토 규칙 초안", ruleBehaviorLabel: "규칙 동작",
+                allowAutomatically: "자동 허용", askFirst: "먼저 묻기", addRule: "규칙 추가",
+                saveRule: "규칙 저장", cancel: "취소", edit: "편집", delete: "삭제",
+                rulesScope: "이 규칙은 사용자에게만 적용됩니다. 기본 안전 검사는 항상 적용됩니다."
+            )
+        case .ar:
+            return .init(
+                mediaDevices: "الوسائط والأجهزة", microphone: "الميكروفون", camera: "الكاميرا",
+                defaultDevice: "الإعداد الافتراضي للنظام", refreshDevices: "تحديث الأجهزة",
+                grantMediaPermissions: "السماح بالميكروفون والكاميرا",
+                mediaPermissionDescription: "تُحفظ تفضيلات الأجهزة محليًا وتُستخدم في مكالمات Human.",
+                privacy: "الخصوصية", privacyMode: "وضع الخصوصية",
+                privacyModeDescription: "تفرضه سياسة حساب Fabushi ولا يمكن خفض مستوى الحماية من إعداد محلي.",
+                stateEnabled: "مفعّل", stateDisabled: "معطّل",
+                autoReviewTitle: "المراجعة التلقائية",
+                autoReviewDescription: "تتحقق Fabushi من كل إجراء قبل تشغيله وتسألك عند الحاجة. أضف قواعد لتحديد ما يمكن تنفيذه تلقائيًا.",
+                autoReviewDraftLabel: "مسودة قاعدة المراجعة التلقائية", ruleBehaviorLabel: "سلوك القاعدة",
+                allowAutomatically: "السماح تلقائيًا", askFirst: "اسأل أولًا", addRule: "إضافة قاعدة",
+                saveRule: "حفظ القاعدة", cancel: "إلغاء", edit: "تعديل", delete: "حذف",
+                rulesScope: "تنطبق هذه القواعد عليك فقط. تظل فحوصات الأمان المضمنة مفعلة دائمًا."
+            )
+        case .he:
+            return .init(
+                mediaDevices: "מדיה והתקנים", microphone: "מיקרופון", camera: "מצלמה",
+                defaultDevice: "ברירת מחדל של המערכת", refreshDevices: "רענון התקנים",
+                grantMediaPermissions: "מתן גישה למיקרופון ולמצלמה",
+                mediaPermissionDescription: "העדפות ההתקנים נשמרות מקומית ומשמשות בשיחות Human.",
+                privacy: "פרטיות", privacyMode: "מצב פרטיות",
+                privacyModeDescription: "נאכף על ידי מדיניות חשבון Fabushi ולא ניתן להחליש אותו בהגדרה מקומית.",
+                stateEnabled: "מופעל", stateDisabled: "כבוי",
+                autoReviewTitle: "בדיקה אוטומטית",
+                autoReviewDescription: "Fabushi בודקת כל פעולה לפני ההרצה ושואלת אותך כשצריך. אפשר להוסיף כללים כדי לקבוע מה ניתן לבצע אוטומטית.",
+                autoReviewDraftLabel: "טיוטת כלל לבדיקה אוטומטית", ruleBehaviorLabel: "התנהגות הכלל",
+                allowAutomatically: "לאפשר אוטומטית", askFirst: "לשאול קודם", addRule: "הוספת כלל",
+                saveRule: "שמירת הכלל", cancel: "ביטול", edit: "עריכה", delete: "מחיקה",
+                rulesScope: "הכללים האלה חלים רק עליך. בדיקות הבטיחות המובנות תמיד פעילות."
+            )
+        case .en, .system:
+            return .init(
+                mediaDevices: "Media & Devices", microphone: "Microphone", camera: "Camera",
+                defaultDevice: "System default", refreshDevices: "Refresh devices",
+                grantMediaPermissions: "Allow microphone & camera",
+                mediaPermissionDescription: "Device preferences are stored locally and used by Human calls.",
+                privacy: "Privacy", privacyMode: "Privacy mode",
+                privacyModeDescription: "Enforced by the Fabushi account policy and cannot be downgraded by a local setting.",
+                stateEnabled: "Enabled", stateDisabled: "Disabled",
+                autoReviewTitle: "Auto-review",
+                autoReviewDescription: "Fabushi checks each action before it runs and asks you first when needed. Add rules to customize what it can do automatically.",
+                autoReviewDraftLabel: "Auto-review rule draft", ruleBehaviorLabel: "Rule behavior",
+                allowAutomatically: "Allow automatically", askFirst: "Ask first", addRule: "Add Rule",
+                saveRule: "Save Rule", cancel: "Cancel", edit: "Edit", delete: "Delete",
+                rulesScope: "These rules apply only to you. Built-in safety checks always apply."
             )
         }
     }

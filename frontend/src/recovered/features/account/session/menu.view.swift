@@ -95,6 +95,10 @@ struct AccountMenuView: View {
     @State private var feedbackPresented = false
     @State private var actionError: String?
 
+    private var localizedFeatureCopy: MobileSettingsFeatureCopy {
+        (uiPreferencesStore?.preferences ?? MobileUiPreferences()).featureCopy()
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -353,18 +357,16 @@ struct AccountSettingsView: View {
 
                 configurationSections
 
-                Section("隐私") {
+                Section(localizedFeatureCopy.privacy) {
                     LabeledContent(
-                        "Privacy Mode",
-                        value: privacyModeEnabled ? "已启用" : "已关闭"
+                        localizedFeatureCopy.privacyMode,
+                        value: privacyModeEnabled
+                            ? localizedFeatureCopy.stateEnabled
+                            : localizedFeatureCopy.stateDisabled
                     )
                     .accessibilityIdentifier("settings-privacy-mode-status")
 
-                    Text(
-                        privacyModeEnabled
-                            ? "账号当前禁止将使用数据或代码库数据用于训练；此状态由 Cursor 账号服务端权威返回。"
-                            : "账号当前允许至少一种训练数据用途；请在 Cursor 账号隐私设置中更改。"
-                    )
+                    Text(localizedFeatureCopy.privacyModeDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("settings-privacy-mode-description")
@@ -545,15 +547,15 @@ struct AccountSettingsView: View {
         let microphones = mediaDevices.filter { $0.kind == .microphone }
         let cameras = mediaDevices.filter { $0.kind == .camera }
 
-        Section("媒体与设备") {
+        Section(localizedFeatureCopy.mediaDevices) {
             Picker(
-                "麦克风",
+                localizedFeatureCopy.microphone,
                 selection: Binding(
                     get: { selectedMicrophoneId ?? "" },
                     set: { value in selectMediaDevice(value, kind: .microphone) }
                 )
             ) {
-                Text("系统默认").tag("")
+                Text(localizedFeatureCopy.defaultDevice).tag("")
                 ForEach(microphones) { device in
                     Text(device.name).tag(device.id)
                 }
@@ -562,13 +564,13 @@ struct AccountSettingsView: View {
             .accessibilityIdentifier("settings-media-microphone")
 
             Picker(
-                "摄像头",
+                localizedFeatureCopy.camera,
                 selection: Binding(
                     get: { selectedCameraId ?? "" },
                     set: { value in selectMediaDevice(value, kind: .camera) }
                 )
             ) {
-                Text("系统默认").tag("")
+                Text(localizedFeatureCopy.defaultDevice).tag("")
                 ForEach(cameras) { device in
                     Text(device.name).tag(device.id)
                 }
@@ -576,13 +578,13 @@ struct AccountSettingsView: View {
             .disabled(mediaBusy)
             .accessibilityIdentifier("settings-media-camera")
 
-            Button(mediaBusy ? "正在请求权限…" : "允许麦克风和摄像头") {
+            Button(mediaBusy ? localizedFeatureCopy.grantMediaPermissions + "…" : localizedFeatureCopy.grantMediaPermissions) {
                 requestMediaPermissions()
             }
             .disabled(mediaBusy)
             .accessibilityIdentifier("settings-media-request-permissions")
 
-            Button("刷新设备") {
+            Button(localizedFeatureCopy.refreshDevices) {
                 refreshMediaDevices()
             }
             .disabled(mediaBusy)
@@ -597,7 +599,7 @@ struct AccountSettingsView: View {
                 .accessibilityIdentifier("settings-media-permission-state")
             }
 
-            Text("设备偏好保存在本机，并由现有 Human 通话媒体 owner 读取。")
+            Text(localizedFeatureCopy.mediaPermissionDescription)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -639,9 +641,9 @@ struct AccountSettingsView: View {
                     .accessibilityIdentifier("settings-inference-provider-usage")
             }
 
-            Section("Auto Review") {
+            Section(localizedFeatureCopy.autoReviewTitle) {
                 Toggle(
-                    "启用 Auto Review",
+                    localizedFeatureCopy.autoReviewDescription,
                     isOn: Binding(
                         get: { autoReviewSettings.isEnabled },
                         set: { enabled in
@@ -663,14 +665,18 @@ struct AccountSettingsView: View {
                                 .font(.body)
                                 .textSelection(.enabled)
                             HStack {
-                                Text(row.behavior == .allow ? "自动允许" : "先询问")
+                                Text(
+                                    row.behavior == .allow
+                                        ? localizedFeatureCopy.allowAutomatically
+                                        : localizedFeatureCopy.askFirst
+                                )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
-                                Button("编辑") { beginEditingRule(row) }
+                                Button(localizedFeatureCopy.edit) { beginEditingRule(row) }
                                     .disabled(configurationSaving)
                                     .accessibilityIdentifier("settings-auto-review-edit-\(row.id)")
-                                Button("删除", role: .destructive) {
+                                Button(localizedFeatureCopy.delete, role: .destructive) {
                                     beginAutoReviewUpdate(
                                         removeSandAutoReviewInstruction(
                                             autoReviewSettings,
@@ -685,7 +691,9 @@ struct AccountSettingsView: View {
                     }
 
                     TextField(
-                        editingRule == nil ? "新增规则" : "编辑规则",
+                        editingRule == nil
+                            ? localizedFeatureCopy.autoReviewDraftLabel
+                            : localizedFeatureCopy.autoReviewDraftLabel,
                         text: $ruleDraft,
                         axis: .vertical
                     )
@@ -693,15 +701,21 @@ struct AccountSettingsView: View {
                     .disabled(configurationSaving)
                     .accessibilityIdentifier("settings-auto-review-rule-draft")
 
-                    Picker("行为", selection: $ruleBehavior) {
-                        Text("自动允许").tag(SandAutoReviewInstructionBehavior.allow)
-                        Text("先询问").tag(SandAutoReviewInstructionBehavior.ask)
+                    Picker(localizedFeatureCopy.ruleBehaviorLabel, selection: $ruleBehavior) {
+                        Text(localizedFeatureCopy.allowAutomatically)
+                            .tag(SandAutoReviewInstructionBehavior.allow)
+                        Text(localizedFeatureCopy.askFirst)
+                            .tag(SandAutoReviewInstructionBehavior.ask)
                     }
                     .disabled(configurationSaving)
                     .accessibilityIdentifier("settings-auto-review-rule-behavior")
 
                     HStack {
-                        Button(editingRule == nil ? "添加规则" : "保存规则") {
+                        Button(
+                            editingRule == nil
+                                ? localizedFeatureCopy.addRule
+                                : localizedFeatureCopy.saveRule
+                        ) {
                             commitRuleDraft()
                         }
                         .disabled(
@@ -713,13 +727,13 @@ struct AccountSettingsView: View {
                         .accessibilityIdentifier("settings-auto-review-rule-save")
 
                         if editingRule != nil {
-                            Button("取消编辑") { clearRuleEditor() }
+                            Button(localizedFeatureCopy.cancel) { clearRuleEditor() }
                                 .disabled(configurationSaving)
                                 .accessibilityIdentifier("settings-auto-review-rule-cancel")
                         }
                     }
 
-                    Text("每种行为最多 \(SAND_AUTO_REVIEW_INSTRUCTION_MAX_ENTRIES) 条；规则由同一 Coordinator 设置 owner 持久化并同步到 Host。")
+                    Text(localizedFeatureCopy.rulesScope)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
