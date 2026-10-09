@@ -9914,7 +9914,10 @@ impl FeatureHostController {
             role: MessageRole::User,
             text,
             operation_id: None,
-            message_id: None,
+            // RuntimeConversation uses request_id as the durable user MessageId.
+            // Preserve it on the renderer echo so optimistic UI can settle by
+            // identity rather than by ambiguous text equality.
+            message_id: Some(request_id.clone()),
             reply_to_message_id: None,
             attachment_batch_id: None,
             attachment: None,

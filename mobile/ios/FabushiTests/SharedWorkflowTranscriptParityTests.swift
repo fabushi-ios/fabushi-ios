@@ -960,4 +960,34 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(reconciled[0].text, "persisted version")
     }
 
+    func testOptimisticUserEchoSettlesOnlyExactDurableMessageIdentity() {
+        var messages = [
+            MobileChatMessage(
+                id: "ios-mobile-bot-chat-request-7",
+                role: .user,
+                text: "pending",
+                canonicalMessageId: "ios-mobile-bot-chat-request-7",
+                optimisticDeliveryPhase: .acceptedAwaitingEcho,
+                optimisticDeliveryError: "old error"
+            )
+        ]
+
+        XCTAssertFalse(applyMobileOptimisticUserEcho([
+            "type": "chat.message",
+            "role": "user",
+            "messageId": "different-request",
+            "text": "pending",
+        ], messages: &messages))
+        XCTAssertEqual(messages[0].optimisticDeliveryPhase, .acceptedAwaitingEcho)
+
+        XCTAssertTrue(applyMobileOptimisticUserEcho([
+            "type": "chat.message",
+            "role": "user",
+            "messageId": "ios-mobile-bot-chat-request-7",
+            "text": "pending",
+        ], messages: &messages))
+        XCTAssertNil(messages[0].optimisticDeliveryPhase)
+        XCTAssertNil(messages[0].optimisticDeliveryError)
+    }
+
 }

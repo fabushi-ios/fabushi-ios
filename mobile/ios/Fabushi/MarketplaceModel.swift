@@ -612,6 +612,12 @@ func projectMobileCanonicalHostTranscriptCard(
     }
 }
 
+enum MobileOptimisticDeliveryPhase: String, Equatable {
+    case pending
+    case acceptedAwaitingEcho
+    case failed
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
@@ -642,6 +648,8 @@ struct MobileChatMessage: Identifiable, Equatable {
     var myReactions: Set<String> = []
     var branched = false
     var streaming = false
+    var optimisticDeliveryPhase: MobileOptimisticDeliveryPhase?
+    var optimisticDeliveryError: String?
     var createdAt = Date()
 }
 
