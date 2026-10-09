@@ -122,6 +122,7 @@ internal struct MobileSettingsShellCopy: Equatable {
     let router: String
     let routeAgentRequests: String
     let iosSection: String
+    let iosInstalled: String
     let iosSelfReference: String
     let mediaRuntimeUnavailable: String
     let microphoneState: String
@@ -504,8 +505,8 @@ internal struct MobileUiPreferences: Equatable {
                 email: "邮箱", currentPeriod: "当前周期", unlimited: "不限量", remaining: "剩余",
                 periodEnds: "周期结束", loadingUsage: "正在加载用量…", reloadUsage: "重新加载用量",
                 agentConfiguration: "Agent 配置", loadingConfiguration: "正在读取配置…",
-                router: "路由", routeAgentRequests: "Route Agent 请求", iosSection: "iOS",
-                iosSelfReference: "Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责。",
+                router: "路由", routeAgentRequests: "Route Agent 请求", iosSection: "iOS", iosInstalled: "当前设备已安装 Fabushi iOS",
+                iosSelfReference: "Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责.",
                 mediaRuntimeUnavailable: "通话媒体运行时不可用。", microphoneState: "麦克风",
                 cameraState: "摄像头"
             )
@@ -520,7 +521,7 @@ internal struct MobileUiPreferences: Equatable {
                 email: "電子郵件", currentPeriod: "目前週期", unlimited: "不限量", remaining: "剩餘",
                 periodEnds: "週期結束", loadingUsage: "正在載入用量…", reloadUsage: "重新載入用量",
                 agentConfiguration: "Agent 設定", loadingConfiguration: "正在讀取設定…",
-                router: "路由", routeAgentRequests: "路由 Agent 請求", iosSection: "iOS",
+                router: "路由", routeAgentRequests: "路由 Agent 請求", iosSection: "iOS", iosInstalled: "此裝置已安裝 Fabushi iOS",
                 iosSelfReference: "Desktop 的「下載 iOS」入口在 iOS 上是自我參照；安裝與更新由目前 App 與 App Store 生命週期負責。",
                 mediaRuntimeUnavailable: "通話媒體執行階段無法使用。", microphoneState: "麥克風",
                 cameraState: "相機"
@@ -536,7 +537,7 @@ internal struct MobileUiPreferences: Equatable {
                 email: "メール", currentPeriod: "現在の期間", unlimited: "無制限", remaining: "残り",
                 periodEnds: "期間終了", loadingUsage: "使用量を読み込み中…", reloadUsage: "使用量を再読み込み",
                 agentConfiguration: "Agent 設定", loadingConfiguration: "設定を読み込み中…",
-                router: "ルーター", routeAgentRequests: "Agent リクエストをルーティング", iosSection: "iOS",
+                router: "ルーター", routeAgentRequests: "Agent リクエストをルーティング", iosSection: "iOS", iosInstalled: "このデバイスには Fabushi iOS がインストールされています",
                 iosSelfReference: "Desktop の「iOS をダウンロード」は iOS では自己参照です。インストールと更新は現在の App と App Store のライフサイクルが管理します。",
                 mediaRuntimeUnavailable: "通話メディアのランタイムを利用できません。", microphoneState: "マイク",
                 cameraState: "カメラ"
@@ -552,7 +553,7 @@ internal struct MobileUiPreferences: Equatable {
                 email: "이메일", currentPeriod: "현재 기간", unlimited: "무제한", remaining: "남음",
                 periodEnds: "기간 종료", loadingUsage: "사용량 불러오는 중…", reloadUsage: "사용량 다시 불러오기",
                 agentConfiguration: "Agent 설정", loadingConfiguration: "설정 불러오는 중…",
-                router: "라우터", routeAgentRequests: "Agent 요청 라우팅", iosSection: "iOS",
+                router: "라우터", routeAgentRequests: "Agent 요청 라우팅", iosSection: "iOS", iosInstalled: "이 기기에 Fabushi iOS가 설치되어 있습니다",
                 iosSelfReference: "Desktop의 ‘iOS 다운로드’ 항목은 iOS에서는 자기 참조입니다. 설치와 업데이트는 현재 App 및 App Store 수명 주기가 관리합니다.",
                 mediaRuntimeUnavailable: "통화 미디어 런타임을 사용할 수 없습니다.", microphoneState: "마이크",
                 cameraState: "카메라"
@@ -568,7 +569,7 @@ internal struct MobileUiPreferences: Equatable {
                 email: "البريد الإلكتروني", currentPeriod: "الفترة الحالية", unlimited: "غير محدود", remaining: "المتبقي",
                 periodEnds: "نهاية الفترة", loadingUsage: "جارٍ تحميل الاستخدام…", reloadUsage: "إعادة تحميل الاستخدام",
                 agentConfiguration: "إعداد Agent", loadingConfiguration: "جارٍ قراءة الإعداد…",
-                router: "الموجّه", routeAgentRequests: "توجيه طلبات Agent", iosSection: "iOS",
+                router: "الموجّه", routeAgentRequests: "توجيه طلبات Agent", iosSection: "iOS", iosInstalled: "تم تثبيت Fabushi iOS على هذا الجهاز",
                 iosSelfReference: "خيار «تنزيل iOS» في Desktop مرجع ذاتي على iOS؛ تدير دورة حياة التطبيق وApp Store التثبيت والتحديثات.",
                 mediaRuntimeUnavailable: "وقت تشغيل وسائط المكالمة غير متاح.", microphoneState: "الميكروفون",
                 cameraState: "الكاميرا"
@@ -584,7 +585,7 @@ internal struct MobileUiPreferences: Equatable {
                 email: "דוא״ל", currentPeriod: "התקופה הנוכחית", unlimited: "ללא הגבלה", remaining: "נותר",
                 periodEnds: "סיום התקופה", loadingUsage: "טוען נתוני שימוש…", reloadUsage: "טעינה מחדש של השימוש",
                 agentConfiguration: "הגדרות Agent", loadingConfiguration: "קורא הגדרות…",
-                router: "נתב", routeAgentRequests: "ניתוב בקשות Agent", iosSection: "iOS",
+                router: "נתב", routeAgentRequests: "ניתוב בקשות Agent", iosSection: "iOS", iosInstalled: "Fabushi iOS מותקן במכשיר הזה",
                 iosSelfReference: "האפשרות „הורדת iOS” ב-Desktop היא הפניה עצמית ב-iOS; ההתקנה והעדכונים מנוהלים על ידי היישום הנוכחי ומחזור החיים של App Store.",
                 mediaRuntimeUnavailable: "זמן הריצה של מדיית השיחה אינו זמין.", microphoneState: "מיקרופון",
                 cameraState: "מצלמה"
@@ -600,7 +601,7 @@ internal struct MobileUiPreferences: Equatable {
                 email: "Email", currentPeriod: "Current Period", unlimited: "Unlimited", remaining: "Remaining",
                 periodEnds: "Period Ends", loadingUsage: "Loading usage…", reloadUsage: "Reload Usage",
                 agentConfiguration: "Agent Configuration", loadingConfiguration: "Loading configuration…",
-                router: "Router", routeAgentRequests: "Route Agent Requests", iosSection: "iOS",
+                router: "Router", routeAgentRequests: "Route Agent Requests", iosSection: "iOS", iosInstalled: "Fabushi iOS is installed on this device",
                 iosSelfReference: "Desktop's “Download iOS” entry is self-referential on iOS; installation and updates are owned by the current app and App Store lifecycle.",
                 mediaRuntimeUnavailable: "Call media runtime is unavailable.", microphoneState: "Microphone",
                 cameraState: "Camera"
