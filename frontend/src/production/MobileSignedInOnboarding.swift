@@ -185,7 +185,7 @@ struct MobileOnboardingSuggestion: Identifiable, Equatable, Sendable {
     private static func nextRandom(_ state: inout UInt32) -> Double {
         state = state &+ 1_831_565_813
         var next = (state ^ (state >> 15)) &* (1 | state)
-        next = next &+ (((next ^ (next >> 7)) &* (61 | next)) ^ next)
+        next = (next &+ ((next ^ (next >> 7)) &* (61 | next))) ^ next
         next = next ^ (next >> 14)
         return Double(next) / 4_294_967_296.0
     }
