@@ -1572,7 +1572,7 @@ final class MarketplaceModel {
 
     private let bridge: IOSPreloadBridge
     private let globalDharmaBridge: GlobalDharmaMiniAppBridge
-    private static let onboardingKeyPrefix = "fabushi.mobile.onboarding-complete.v2:"
+    // Read-only migration source for builds that predate the canonical SandSettingsStore owner.\n    private static let legacyOnboardingKeyPrefix = "fabushi.mobile.onboarding-complete.v2:"
     @ObservationIgnored private var onboardingRouteGeneration = 0
     @ObservationIgnored private var globalDharmaAccountScope: String?
     @ObservationIgnored private var globalDharmaExecution: [String: Any]?
@@ -2055,8 +2055,8 @@ final class MarketplaceModel {
         set { onboardingStep = newValue.rawValue }
     }
 
-    private var scopedOnboardingKey: String {
-        Self.onboardingKeyPrefix + settingsNoticeAccountKey
+    private func legacyOnboardingKey(accountKey: String) -> String {
+        Self.legacyOnboardingKeyPrefix + accountKey
     }
 
     func resolveSignedInOnboardingRoute() async {
@@ -2071,7 +2071,42 @@ final class MarketplaceModel {
         let accountKey = settingsNoticeAccountKey
         onboardingRouteResolved = false
 
-        if UserDefaults.standard.bool(forKey: Self.onboardingKeyPrefix + accountKey) {
+        let canonicalSeen: Bool
+        do {
+            let result = try await bridge.request(method: "getOnboardingSeen")
+            guard let seen = result.value as? Bool else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            canonicalSeen = seen
+        } catch {
+            canonicalSeen = false
+        }
+        guard generation == onboardingRouteGeneration,
+              loggedIn,
+              settingsNoticeAccountKey == accountKey
+        else { return }
+
+        if canonicalSeen {
+            signedInOnboardingStep = .completed
+            onboardingRouteResolved = true
+            return
+        }
+
+        let legacyKey = legacyOnboardingKey(accountKey: accountKey)
+        if UserDefaults.standard.bool(forKey: legacyKey) {
+            do {
+                _ = try await bridge.request(
+                    method: "setOnboardingSeen",
+                    params: ["seen": true]
+                )
+                guard generation == onboardingRouteGeneration,
+                      loggedIn,
+                      settingsNoticeAccountKey == accountKey
+                else { return }
+                UserDefaults.standard.removeObject(forKey: legacyKey)
+            } catch {
+                // Preserve the legacy marker until the canonical store accepts it.
+            }
             guard generation == onboardingRouteGeneration,
                   loggedIn,
                   settingsNoticeAccountKey == accountKey
@@ -2120,9 +2155,27 @@ final class MarketplaceModel {
 
     func completeSignedInOnboarding() {
         guard loggedIn else { return }
-        UserDefaults.standard.set(true, forKey: scopedOnboardingKey)
+        let accountKey = settingsNoticeAccountKey
         signedInOnboardingStep = .completed
         onboardingRouteResolved = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await self.bridge.request(
+                    method: "setOnboardingSeen",
+                    params: ["seen": true]
+                )
+                guard self.loggedIn,
+                      self.settingsNoticeAccountKey == accountKey
+                else { return }
+                UserDefaults.standard.removeObject(
+                    forKey: self.legacyOnboardingKey(accountKey: accountKey)
+                )
+            } catch {
+                // Desktop also treats this write as asynchronous. Keep the UI
+                // completed while leaving any legacy migration marker intact.
+            }
+        }
     }
 
     func skipSignedInOnboarding() {
