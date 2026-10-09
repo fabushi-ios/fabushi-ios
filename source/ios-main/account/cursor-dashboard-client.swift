@@ -898,6 +898,237 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return try IOSCursorDashboardProto.decodeTranscribeAudioResponse(response)
     }
 
+    func updateCursorAccountName(_ name: String, timeoutMs: Int = 10_000) async throws {
+        let parts = name.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        _ = try await rpc(
+            "UpdateUserName",
+            body: [
+                "firstName": parts.first ?? "",
+                "lastName": parts.dropFirst().joined(separator: " "),
+            ],
+            timeoutMs: timeoutMs
+        )
+    }
+
+    func getCursorPrivacyModeEnabled(timeoutMs: Int = 10_000) async -> Bool {
+        guard let response = try? await rpc("GetUserPrivacyMode", body: [:], timeoutMs: timeoutMs) else {
+            return true
+        }
+        let raw = response["privacyMode"]
+        if let number = raw as? NSNumber {
+            return number.intValue != 3 && number.intValue != 4
+        }
+        if let value = raw as? String {
+            return value != "PRIVACY_MODE_USAGE_DATA_TRAINING_ALLOWED"
+                && value != "USAGE_DATA_TRAINING_ALLOWED"
+                && value != "PRIVACY_MODE_USAGE_CODEBASE_TRAINING_ALLOWED"
+                && value != "USAGE_CODEBASE_TRAINING_ALLOWED"
+        }
+        return true
+    }
+
+    func getCursorWeeklyUsage(timeoutMs: Int = 10_000) async -> [String: Any]? {
+        async let status = optionalRPC("GetSandUsageStatus", timeoutMs: timeoutMs)
+        async let period = optionalRPC("GetCurrentPeriodUsage", timeoutMs: timeoutMs)
+        guard let sandStatus = await status,
+              sandStatus["usesPooledEnterpriseAllowance"] as? Bool != true,
+              let percent = finiteDouble(sandStatus["usagePercent"])
+        else { return nil }
+
+        let included = sandStatus["hasNonZeroIncludedLimit"] as? Bool == true
+        var output: [String: Any] = [
+            "percentUsed": max(percent, 0),
+            "nextResetMs": timestampMilliseconds(sandStatus["nextResetTimestampUtc"]) ?? NSNull(),
+            "hasNonZeroIncludedLimit": included,
+            "onDemand": NSNull(),
+        ]
+        if included,
+           let current = await period,
+           let spend = current["spendLimitUsage"] as? [String: Any],
+           let used = finiteDouble(spend["individualUsed"]),
+           let limit = normalizedLimitCents(spend["individualLimit"]) {
+            output["onDemand"] = [
+                "usedCents": used,
+                "limitCents": limit,
+            ]
+        }
+        return output
+    }
+
+    func getCursorUsageSummary(timeoutMs: Int = 15_000) async throws -> [String: Any] {
+        async let statusTask = rpc("GetSandUsageStatus", body: [:], timeoutMs: timeoutMs)
+        async let periodTask = currentPeriodUsageForSummary(timeoutMs: timeoutMs)
+        async let teamsTask = rpc("GetTeams", body: [:], timeoutMs: timeoutMs)
+        async let trialTask = rpc("GetSandTrialClaimStatus", body: [:], timeoutMs: timeoutMs)
+        let (status, period, teamsResponse, trial) = try await (
+            statusTask,
+            periodTask,
+            teamsTask,
+            trialTask
+        )
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
+        let trialExpiry = timestampMilliseconds(status["sandTrialExpiresAt"])
+        let liveTrial = trialExpiry.map { $0 > nowMs } ?? false
+        let claimGranted = enumIsGranted(trial["status"])
+        let included = status["hasNonZeroIncludedLimit"] as? Bool == true
+        let teams = teamsResponse["teams"] as? [[String: Any]] ?? []
+
+        var summary: [String: Any] = [
+            "isEnterprise": teams.contains { $0["isEnterprise"] as? Bool == true },
+            "sandUsagePercent": nonNegativeFinite(status["usagePercent"]) ?? NSNull(),
+            "sandUsageResetTimestampMs": timestampMilliseconds(status["nextResetTimestampUtc"]) ?? NSNull(),
+            "hasAvailableUsage": status["hasAvailableUsage"] as? Bool == true,
+            "isSandTrial": liveTrial,
+            "hasEndedSandTrial": claimGranted && !liveTrial,
+            "hasNonZeroIncludedLimit": included,
+            "canCancelSandTrial": liveTrial && status["sandTrialCancelable"] as? Bool == true,
+            "onDemand": NSNull(),
+            "upgradeCta": upgradeCTA(status["upgradeRecommendation"]) ?? NSNull(),
+        ]
+        if included, let period, let spend = period["spendLimitUsage"] as? [String: Any] {
+            let used = finiteDouble(spend["individualUsed"]) ?? 0
+            let reset = int64Value(period["billingCycleEnd"]).flatMap { $0 > 0 ? $0 : nil }
+            summary["onDemand"] = [
+                "usedCents": used,
+                "limitCents": normalizedLimitCents(spend["individualLimit"]) ?? NSNull(),
+                "resetTimestampMs": reset ?? NSNull(),
+            ]
+        }
+        return summary
+    }
+
+    func cancelCursorSandTrial(timeoutMs: Int = 15_000) async -> [String: Any] {
+        do {
+            _ = try await rpc("CancelSandTrial", body: [:], timeoutMs: timeoutMs)
+            return ["ok": true, "message": NSNull()]
+        } catch {
+            let message = (error as? LocalizedError)?.errorDescription?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return ["ok": false, "message": message?.isEmpty == false ? message! : NSNull()]
+        }
+    }
+
+    func invokeCursorDashboardAction(
+        action: String,
+        args: [String: String],
+        timeoutMs: Int = 15_000
+    ) async throws -> [String: Any] {
+        let response = try await rpc(
+            "ClientAction",
+            body: ["action": action, "args": args],
+            timeoutMs: timeoutMs
+        )
+        let ok = response["success"] as? Bool == true
+        let rawMessage = (ok ? response["infoMessage"] : response["errorMessage"]) as? String
+        let message = rawMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [
+            "ok": ok,
+            "message": message?.isEmpty == false ? message! : NSNull(),
+        ]
+    }
+
+    private func optionalRPC(_ method: String, timeoutMs: Int) async -> [String: Any]? {
+        try? await rpc(method, body: [:], timeoutMs: timeoutMs)
+    }
+
+    private func currentPeriodUsageForSummary(timeoutMs: Int) async throws -> [String: Any]? {
+        do {
+            return try await rpc("GetCurrentPeriodUsage", body: [:], timeoutMs: timeoutMs)
+        } catch {
+            let message = error.localizedDescription.lowercased()
+            if message.contains("invalid_argument") || message.contains("invalid argument") {
+                return nil
+            }
+            throw error
+        }
+    }
+
+    private func finiteDouble(_ value: Any?) -> Double? {
+        guard let number = value as? NSNumber else { return nil }
+        let result = number.doubleValue
+        return result.isFinite ? result : nil
+    }
+
+    private func nonNegativeFinite(_ value: Any?) -> Any? {
+        guard let value = finiteDouble(value), value >= 0 else { return nil }
+        return value
+    }
+
+    private func normalizedLimitCents(_ value: Any?) -> Any? {
+        guard let value = finiteDouble(value),
+              value > 0,
+              value < 2_147_483_647
+        else { return nil }
+        return value
+    }
+
+    private func int64Value(_ value: Any?) -> Int64? {
+        if let value = value as? String { return Int64(value) }
+        if let value = value as? NSNumber { return value.int64Value }
+        return nil
+    }
+
+    private func timestampMilliseconds(_ value: Any?) -> Int64? {
+        if let raw = value as? String {
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let fallback = ISO8601DateFormatter()
+            fallback.formatOptions = [.withInternetDateTime]
+            if let date = fractional.date(from: raw) ?? fallback.date(from: raw) {
+                return Int64(date.timeIntervalSince1970 * 1_000)
+            }
+        }
+        if let object = value as? [String: Any],
+           let seconds = int64Value(object["seconds"]) {
+            let nanos = int64Value(object["nanos"]) ?? 0
+            return seconds * 1_000 + nanos / 1_000_000
+        }
+        return nil
+    }
+
+    private func enumIsGranted(_ value: Any?) -> Bool {
+        if let number = value as? NSNumber { return number.intValue == 3 }
+        guard let value = value as? String else { return false }
+        return value == "SAND_TRIAL_CLAIM_STATUS_GRANTED" || value == "GRANTED"
+    }
+
+    private func upgradeCTA(_ value: Any?) -> Any? {
+        guard let recommendation = value as? [String: Any],
+              let button = recommendation["cta"] as? [String: Any],
+              let label = button["label"] as? String,
+              !label.isEmpty
+        else { return nil }
+        let disabled = recommendation["disabled"] as? Bool == true
+        if let urlAction = button["url"] as? [String: Any],
+           let raw = urlAction["url"] as? String,
+           let url = URL(string: raw),
+           url.scheme == "https" || url.scheme == "http" {
+            return [
+                "label": label,
+                "disabled": disabled,
+                "action": ["kind": "open-url", "url": raw],
+            ]
+        }
+        if let dashboardAction = button["dashboardAction"] as? [String: Any],
+           dashboardAction["action"] as? String == "requestLimitIncrease" {
+            let args = (dashboardAction["args"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+            let success = (dashboardAction["successMessage"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return [
+                "label": label,
+                "disabled": disabled,
+                "action": [
+                    "kind": "dashboard-action",
+                    "action": "requestLimitIncrease",
+                    "args": args,
+                    "successMessage": success?.isEmpty == false ? success! : NSNull(),
+                ],
+            ]
+        }
+        return nil
+    }
+
     func getPrReviewPreferences(timeoutMs: Int = 10_000) async throws -> SandPrReviewPreferences {
         async let userResponse = protoRPC(
             "GetBackgroundComposerUserSettings",

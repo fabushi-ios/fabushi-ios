@@ -1179,6 +1179,47 @@ final class CoordinatorMcpSurface {
         case "coordinator.mcp.cursorAuth.status":
             return .handled(projectCursorAuthStatus(await cursorAuth.status()))
 
+        case "updateCursorAccountName":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw IOSCursorAuthError.signInRequired
+            }
+            guard let name = params["name"] as? String else {
+                throw SandMcpConfigError("updateCursorAccountName requires name.")
+            }
+            try await dashboard.updateCursorAccountName(name)
+            return .handled([:])
+
+        case "getCursorWeeklyUsage":
+            guard (await cursorAuth.status()).loggedIn else { return .handled(NSNull()) }
+            return .handled(await dashboard.getCursorWeeklyUsage() ?? NSNull())
+
+        case "getCursorUsageSummary":
+            guard (await cursorAuth.status()).loggedIn else { return .handled(NSNull()) }
+            return .handled(try await dashboard.getCursorUsageSummary())
+
+        case "getCursorPrivacyModeEnabled":
+            guard (await cursorAuth.status()).loggedIn else { return .handled(true) }
+            return .handled(await dashboard.getCursorPrivacyModeEnabled())
+
+        case "cancelCursorSandTrial":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw IOSCursorAuthError.signInRequired
+            }
+            return .handled(await dashboard.cancelCursorSandTrial())
+
+        case "invokeCursorDashboardAction":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw IOSCursorAuthError.signInRequired
+            }
+            guard let action = nonEmptyString(params["action"]) else {
+                throw SandMcpConfigError("invokeCursorDashboardAction requires action.")
+            }
+            let rawArgs = params["args"] as? [String: Any] ?? [:]
+            let args = rawArgs.compactMapValues { $0 as? String }
+            return .handled(
+                try await dashboard.invokeCursorDashboardAction(action: action, args: args)
+            )
+
         case "transcribeAudio":
             guard (await cursorAuth.status()).loggedIn else {
                 throw IOSCursorAuthError.signInRequired

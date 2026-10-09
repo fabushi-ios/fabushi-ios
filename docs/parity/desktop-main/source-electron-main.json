@@ -130,9 +130,9 @@
       "ios_language": "Swift / Keychain / URLSession / protobuf / native account projection",
       "ios_platform_delta": "The iOS product already has canonical auth, durable machine-id credentials, account UI and method-table names for updateCursorAccountName/getCursorAvatar/getCursorWeeklyUsage/getCursorUsageSummary/getCursorPrivacyModeEnabled/invokeCursorDashboardAction/cancelCursorSandTrial, but this review did not find complete same-head production handlers for the full Desktop cursor-profile responsibility. The account UI also uses feature.usage.status, so source-level equivalence must be closed without creating a second account/usage store.",
       "implementation_status": "mapped",
-      "production_evidence": "Existing owners identified: IOSCursorAuthService + IOSCursorDashboardClient in CoordinatorMcpSurface; IOSMainRPCRuntime exposes the Desktop-compatible account/profile method names; MarketplaceModel owns the single native account UI and feature.usage.status projection. Full handler equivalence remains open.",
-      "test_evidence": "No claim of full cursor-profile verification. Current exact-head Actions and focused profile/usage/privacy/trial/action tests are still required after production composition is closed.",
-      "notes": "Exact Desktop cursor-profile.ts@69645a4dee5b40a700fef5199c044892f46eaf3a reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Kept mapped because declared RPC surface alone is not shipping evidence for all profile/usage/privacy/trial semantics.",
+      "production_evidence": "Primary native owner: source/ios-main/account/cursor-dashboard-client.swift now implements update name, weekly usage, full usage summary, privacy-mode projection, trial cancellation and bounded dashboard actions through the canonical signed-in Dashboard transport. source/mahayana-agent-coordinator/coordinator-mcp-manager.swift binds those methods to the existing IOSMainRPCRuntime names. getCursorAvatar plus local-tool ceiling composition remain open, so this row stays mapped.",
+      "test_evidence": "mobile/ios/FabushiTests/CursorProfileParityTests.swift covers name splitting/10s, weekly usage parallel projection, privacy modes, 15s full usage/trial/team/CTA projection, dashboard action and stable cancel failure. Current exact-head Actions required; avatar/local-tool ceiling focused evidence remains open.",
+      "notes": "Exact Desktop cursor-profile.ts@69645a4dee5b40a700fef5199c044892f46eaf3a reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Kept mapped because declared RPC surface alone is not shipping evidence for all profile/usage/privacy/trial semantics. PROFILE-PARTIAL-20261009: six canonical profile RPCs are now shipping-composed without creating another account/usage store; row intentionally remains mapped until avatar and local-tool ceiling are closed.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -234,17 +234,18 @@
     {
       "desktop_path": "source/electron-main/adapters/account-edge.ts",
       "desktop_blob_sha": "b9d422b18bfcf692708a70a2d5625106c1da6e38",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Compose the single production Cursor account edge from auth freshness/runtime, access, avatar, weekly/full usage, PR-review preferences, privacy, trial/dashboard actions, MCP reset/Host refresh and lazy audio transcription, all sharing canonical access-token and machine-id credentials.",
       "desktop_owner": "platform-main",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Renderer/main-RPC account operations share one authenticated backend edge and one settled account runtime rather than drifting across duplicate stores or clients.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "CoordinatorMcpSurface is the single native composition owner for IOSCursorAuthService and IOSCursorDashboardClient. PR review, transcription and most cursor-profile methods are now composed there. Avatar and local-tool ceiling parity still remain, so the aggregate edge stays mapped.",
+      "implementation_status": "mapped",
+      "production_evidence": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift owns one cursorAuth/dashboard pair and canonical handlers; source/ios-main/account/cursor-dashboard-client.swift owns Dashboard/AiService transport.",
+      "test_evidence": "PR review, transcribe and cursor-profile focused tests exist; aggregate edge cannot promote until avatar/local-tool ceiling and current-head Actions close.",
+      "notes": "Exact Desktop account-edge.ts@b9d422b18bfcf692708a70a2d5625106c1da6e38 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "source/electron-main/adapters/account-oauth.ts",
