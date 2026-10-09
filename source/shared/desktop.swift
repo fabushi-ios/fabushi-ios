@@ -38,12 +38,12 @@ private func normalizeSandLocale(_ value: String?) -> String {
     guard let first = parts.first,
           (2...3).contains(first.count),
           first.unicodeScalars.allSatisfy({
-              CharacterSet.letters.contains($0) && $0.isASCII
+              $0.value < 128 && CharacterSet.letters.contains($0)
           }),
           parts.allSatisfy({ part in
               (1...8).contains(part.count)
                   && part.unicodeScalars.allSatisfy {
-                      $0.isASCII && (CharacterSet.alphanumerics.contains($0))
+                      $0.value < 128 && CharacterSet.alphanumerics.contains($0)
                   }
           })
     else {
