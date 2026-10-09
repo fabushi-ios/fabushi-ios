@@ -2007,7 +2007,12 @@ final class MarketplaceModel {
             return
         }
 
-        let roster = await GrokMobileBotService(bridge: bridge).loadBots()
+        let roster: [MobileBotSummary]
+        do {
+            roster = try await GrokMobileBotService(bridge: bridge).loadOnboardingAgents()
+        } catch {
+            roster = []
+        }
         guard generation == onboardingRouteGeneration,
               loggedIn,
               settingsNoticeAccountKey == accountKey
