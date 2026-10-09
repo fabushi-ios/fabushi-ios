@@ -87,3 +87,36 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         self.isSharedRoom = isSharedRoom
     }
 }
+
+
+extension MobileBotSummary {
+    func replacingConversationPartnerIds(_ ids: [String]) -> MobileBotSummary {
+        MobileBotSummary(
+            id: id,
+            name: name,
+            description: description,
+            title: title,
+            avatarDataURL: avatarDataURL,
+            avatarShape: avatarShape,
+            avatarColor: avatarColor,
+            notifyOnUpdatesEnabled: notifyOnUpdatesEnabled,
+            hidden: hidden,
+            unread: unread,
+            conversationId: conversationId,
+            lastEntry: lastEntry,
+            lastMessageId: lastMessageId,
+            lastMessagePreview: lastMessagePreview,
+            updatedAtMs: updatedAtMs,
+            isComposingMessage: isComposingMessage,
+            waitingReason: waitingReason,
+            isRunning: isRunning,
+            draftPrompt: draftPrompt,
+            miniAppId: miniAppId,
+            menuButtonText: menuButtonText,
+            isGroup: isGroup,
+            memberIds: memberIds,
+            conversationPartnerIds: ids,
+            isSharedRoom: isSharedRoom
+        )
+    }
+}
