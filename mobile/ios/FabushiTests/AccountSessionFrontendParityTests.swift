@@ -69,4 +69,45 @@ final class AccountSessionFrontendParityTests: XCTestCase {
         XCTAssertEqual(MarketplaceModel.normalizedAccountDisplayName("   "), "")
     }
 
+    func testMobileUiPreferencesNormalizeDesktopPreferenceDomain() {
+        let preferences = MobileUiPreferences(
+            localeRaw: "unsupported",
+            directionRaw: "sideways",
+            textScale: 1.18,
+            reducedMotion: true,
+            highContrast: true
+        )
+        XCTAssertEqual(preferences.locale, .system)
+        XCTAssertEqual(preferences.direction, .auto)
+        XCTAssertEqual(preferences.textScale, 1.25)
+        XCTAssertEqual(preferences.activeAccessibilityPreferenceCount, 3)
+    }
+
+    func testMobileUiPreferencesResolveLocaleAliasesAndRtlDirection() {
+        XCTAssertEqual(MobileUiPreferences.copyLocaleKey("zh-TW"), .zhHant)
+        XCTAssertEqual(MobileUiPreferences.copyLocaleKey("zh-CN"), .zhHans)
+        XCTAssertEqual(MobileUiPreferences.copyLocaleKey("iw-IL"), .he)
+
+        let arabic = MobileUiPreferences(localeRaw: "ar", directionRaw: "auto")
+        XCTAssertEqual(arabic.resolvedLayoutDirection(system: .leftToRight), .rightToLeft)
+
+        let english = MobileUiPreferences(localeRaw: "en", directionRaw: "auto")
+        XCTAssertEqual(english.resolvedLayoutDirection(system: .rightToLeft), .leftToRight)
+
+        let system = MobileUiPreferences(localeRaw: "system", directionRaw: "auto")
+        XCTAssertEqual(system.resolvedLayoutDirection(system: .rightToLeft), .rightToLeft)
+    }
+
+    func testMobileUiPreferencesAdjustDynamicTypeFromSystemBaseline() {
+        let unchanged = MobileUiPreferences(textScale: 1)
+        XCTAssertEqual(unchanged.adjustedDynamicTypeSize(system: .large), .large)
+
+        let enlarged = MobileUiPreferences(textScale: 1.5)
+        XCTAssertEqual(enlarged.adjustedDynamicTypeSize(system: .large), .xxLarge)
+
+        let reduced = MobileUiPreferences(textScale: 0.9)
+        XCTAssertEqual(reduced.adjustedDynamicTypeSize(system: .large), .medium)
+    }
+
+
 }
