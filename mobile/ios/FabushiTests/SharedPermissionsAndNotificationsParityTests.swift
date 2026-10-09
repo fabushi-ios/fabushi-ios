@@ -132,7 +132,11 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
 
     func testMcpCustomInstructionSelectionIsBoundedDeduplicatedAndStable() {
         XCTAssertEqual(clampMcpCustomInstruction(String(repeating: "x", count: 700)).count, 500)
-        XCTAssertFalse(getDefaultMcpCustomInstruction(" Hex ").isEmpty)
+        let hexDefault = getDefaultMcpCustomInstruction(" Hex ")
+        XCTAssertTrue(hexDefault.contains("download/export the results as CSV"))
+        XCTAssertTrue(hexDefault.contains("data the connector returns"))
+        XCTAssertTrue(hexDefault.contains("Don\'t read rendered charts or graphs from screenshots"))
+        XCTAssertTrue(hexDefault.contains("computer-use chart reading is unreliable"))
 
         let entries = selectConnectedMcpCustomInstructions(
             ["zeta", "hex", "zeta"],
