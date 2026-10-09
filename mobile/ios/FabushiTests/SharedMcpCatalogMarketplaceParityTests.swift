@@ -141,6 +141,23 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
         }
     }
 
+    func testPluginVariableFieldsPreserveSchemaPropertyOrder() {
+        let properties = Dictionary(uniqueKeysWithValues: [
+            ("Z_URL", ["title": "URL"]),
+            ("A_TOKEN", ["title": "Token", "format": "password"]),
+        ])
+        let fields = pluginVariablesSchemaToFields([
+            "properties": properties,
+            "required": ["A_TOKEN"],
+        ])
+
+        XCTAssertEqual(fields.map(\.key), ["Z_URL", "A_TOKEN"])
+        XCTAssertEqual(fields.map(\.label), ["URL", "Token"])
+        XCTAssertFalse(fields[0].isSecret)
+        XCTAssertTrue(fields[1].isSecret)
+        XCTAssertTrue(fields[1].isRequired)
+    }
+
     func testMarketplaceHelpersPreserveGrokTransportAndSourceSemantics() throws {
         XCTAssertEqual(
             toRawGithubUrl(
