@@ -18,6 +18,20 @@ struct AccessRosterFailure: Equatable, Sendable {
     let transportKind: String?
 }
 
+struct AccessRosterReadiness: Equatable, Sendable {
+    let accountScopeKey: String?
+    let isAccountBound: Bool
+    let isConnected: Bool
+    let isLoaded: Bool
+    let hasReachedBox: Bool
+    let hasSelectedAgent: Bool
+    let isSelectionReady: Bool
+    let rosterFailureCode: String?
+    let rosterFailureTransportKind: String?
+    let isShowingRestoredRoster: Bool
+    let isPrivacyBlocked: Bool
+}
+
 struct AccessRosterSnapshot: Equatable, Sendable {
     let bots: [MobileBotSummary]
     let hasCompleteRoster: Bool
@@ -38,6 +52,43 @@ struct AccessRosterSnapshot: Equatable, Sendable {
         confirmedFetches: 0,
         transport: .connecting
     )
+}
+
+enum AccessRosterReadinessProjection {
+    static func select(
+        accountScopeKey: String?,
+        roster: AccessRosterSnapshot,
+        selectedAgentID: String?,
+        isPrivacyBlocked: Bool
+    ) -> AccessRosterReadiness {
+        let normalizedAccount = accountScopeKey?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let account = normalizedAccount?.isEmpty == false ? normalizedAccount : nil
+        let isAccountBound = account != nil
+        let agentIDs = roster.bots.map(\.id)
+        let hasLoadedAgents = roster.hasCompleteRoster || !roster.bots.isEmpty
+        let hasSelectedAgent = isAccountBound
+            && selectedAgentID != nil
+            && agentIDs.contains(selectedAgentID!)
+        let isLoaded = isAccountBound
+            && hasLoadedAgents
+            && roster.loadState == .ready
+        let isConnected = isAccountBound && roster.transport == .connected
+
+        return .init(
+            accountScopeKey: account,
+            isAccountBound: isAccountBound,
+            isConnected: isConnected,
+            isLoaded: isLoaded,
+            hasReachedBox: isAccountBound && hasLoadedAgents,
+            hasSelectedAgent: hasSelectedAgent,
+            isSelectionReady: isLoaded && isConnected && hasSelectedAgent,
+            rosterFailureCode: roster.failure?.code,
+            rosterFailureTransportKind: roster.failure?.transportKind,
+            isShowingRestoredRoster: roster.isShowingRestoredRoster,
+            isPrivacyBlocked: isPrivacyBlocked
+        )
+    }
 }
 
 enum AccessRosterSnapshotProjection {

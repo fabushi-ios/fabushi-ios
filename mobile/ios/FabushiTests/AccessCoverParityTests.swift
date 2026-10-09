@@ -415,4 +415,114 @@ final class AccessCoverParityTests: XCTestCase {
         )
     }
 
+    func testRuntimeRosterReadinessIsAccountBoundConnectedLoadedAndSelected() {
+        let botA = MobileBotSummary(id: "a", name: "A", description: "")
+        let botB = MobileBotSummary(id: "b", name: "B", description: "")
+        let ready = AccessRosterSnapshot(
+            bots: [botA, botB],
+            hasCompleteRoster: true,
+            isShowingRestoredRoster: false,
+            loadState: .ready,
+            failure: nil,
+            isFetching: false,
+            confirmedFetches: 1,
+            transport: .connected
+        )
+        let projected = AccessRosterReadinessProjection.select(
+            accountScopeKey: "account-1",
+            roster: ready,
+            selectedAgentID: "b",
+            isPrivacyBlocked: false
+        )
+        XCTAssertTrue(projected.isAccountBound)
+        XCTAssertTrue(projected.isConnected)
+        XCTAssertTrue(projected.isLoaded)
+        XCTAssertTrue(projected.hasReachedBox)
+        XCTAssertTrue(projected.hasSelectedAgent)
+        XCTAssertTrue(projected.isSelectionReady)
+
+        let disconnected = AccessRosterReadinessProjection.select(
+            accountScopeKey: "account-1",
+            roster: .init(
+                bots: [botA],
+                hasCompleteRoster: true,
+                isShowingRestoredRoster: true,
+                loadState: .error,
+                failure: .init(
+                    code: "DOWN",
+                    message: nil,
+                    transportKind: "network"
+                ),
+                isFetching: false,
+                confirmedFetches: 0,
+                transport: .down
+            ),
+            selectedAgentID: "a",
+            isPrivacyBlocked: false
+        )
+        XCTAssertTrue(disconnected.hasReachedBox)
+        XCTAssertFalse(disconnected.isSelectionReady)
+        XCTAssertEqual(disconnected.rosterFailureCode, "DOWN")
+        XCTAssertEqual(disconnected.rosterFailureTransportKind, "network")
+
+        let loggedOut = AccessRosterReadinessProjection.select(
+            accountScopeKey: nil,
+            roster: ready,
+            selectedAgentID: "a",
+            isPrivacyBlocked: true
+        )
+        XCTAssertFalse(loggedOut.isAccountBound)
+        XCTAssertFalse(loggedOut.hasReachedBox)
+        XCTAssertFalse(loggedOut.hasSelectedAgent)
+        XCTAssertFalse(loggedOut.isSelectionReady)
+        XCTAssertTrue(loggedOut.isPrivacyBlocked)
+    }
+
+    func testTerminalProjectionNormalizesLegacyFieldsAndStatusPriority() {
+        XCTAssertEqual(
+            MobileTerminalOutputModel.normalizeOutput("a\r\nb\rc"),
+            "a\nb\nc"
+        )
+        XCTAssertNil(MobileTerminalOutputModel.project(nil))
+        XCTAssertNil(MobileTerminalOutputModel.project(["sessionId": "s"]))
+
+        let snapshot = MobileTerminalOutputModel.project([
+            "terminal_instance_id": 42,
+            "metadata": [
+                "cwd": "/repo",
+                "currentCommand": ["command": "npm test"],
+            ],
+            "output_raw": "one\r\ntwo",
+            "exit_code": 0,
+        ])
+        XCTAssertEqual(
+            snapshot,
+            .init(
+                sessionId: "42",
+                command: "npm test",
+                cwd: "/repo",
+                output: "one\ntwo",
+                status: .exited,
+                exitCode: 0
+            )
+        )
+        XCTAssertEqual(
+            MobileTerminalOutputModel.project([
+                "sessionId": "run",
+                "command": "build",
+                "status": "running",
+                "exitCode": 7,
+            ])?.status,
+            .running
+        )
+        XCTAssertEqual(
+            MobileTerminalOutputModel.project([
+                "sessionId": "run",
+                "command": "build",
+                "exitCode": 7,
+            ])?.status,
+            .error
+        )
+    }
+
 }
