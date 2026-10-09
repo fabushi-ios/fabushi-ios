@@ -34,6 +34,14 @@ extension GrokMobileShell {
                         }
                         .accessibilityIdentifier("grok-mobile-legacy")
                         Spacer()
+                        if agentNetworkAvailability != .unavailable {
+                            Button { agentNetworkOpen = true } label: {
+                                Image(systemName: "point.3.connected.trianglepath.dotted")
+                            }
+                            .accessibilityLabel("Agent network")
+                            .accessibilityValue(agentNetworkAvailability == .retainedEmptyRoster ? "No agents yet" : "\(bots.count) nodes")
+                            .accessibilityIdentifier("grok-mobile-agent-network")
+                        }
                         Button { toggleCommandPalette() } label: { Image(systemName: "magnifyingglass") }
                             .accessibilityIdentifier("grok-mobile-search")
                         Button { composeOpen = true } label: { Image(systemName: "plus") }
