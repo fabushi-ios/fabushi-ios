@@ -13,11 +13,14 @@ final class ProductionCoordinatorProvider {
     }
 
     func start() throws -> IOSCoordinatorLaunchHandle {
-        try runtime.start()
+        let handle = try runtime.start()
+        main.coordinator.reapplyClientPauseAfterCoordinatorLaunch()
+        return handle
     }
 
     func restart() throws {
         try runtime.restart()
+        main.coordinator.reapplyClientPauseAfterCoordinatorLaunch()
     }
 
     func sceneDidResume() {
