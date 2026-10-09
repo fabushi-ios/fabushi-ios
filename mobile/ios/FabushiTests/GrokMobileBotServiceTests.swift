@@ -659,4 +659,43 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
 
+
+    func testAgentFindIndexesAuthorAndAttachmentFilenameWithoutThreadLeakage() {
+        var assistant = MobileChatMessage(
+            id: "history:m-1",
+            role: .assistant,
+            text: "Quarterly summary",
+            canonicalMessageId: "m-1"
+        )
+        assistant.attachmentFileName = "metrics-q4.xlsx"
+
+        let user = MobileChatMessage(
+            id: "history:m-2",
+            role: .user,
+            text: "Please review",
+            canonicalMessageId: "m-2"
+        )
+
+        var threadOnly = MobileChatMessage(
+            id: "history:m-3",
+            role: .assistant,
+            text: "Thread secret",
+            canonicalMessageId: "m-3",
+            replyToMessageId: "m-1"
+        )
+        threadOnly.branched = true
+
+        let searchable = mobileBotChatSearchEntries(
+            [assistant, user, threadOnly],
+            botName: "Researcher"
+        )
+
+        XCTAssertEqual(searchable.map(\.id), ["history:m-1", "history:m-2"])
+        XCTAssertTrue(searchable[0].text.contains("Quarterly summary"))
+        XCTAssertTrue(searchable[0].text.contains("Researcher"))
+        XCTAssertTrue(searchable[0].text.contains("metrics-q4.xlsx"))
+        XCTAssertTrue(searchable[1].text.contains("You"))
+        XCTAssertFalse(searchable.contains { $0.text.contains("Thread secret") })
+    }
+
 }
