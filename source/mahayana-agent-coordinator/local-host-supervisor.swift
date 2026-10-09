@@ -1,5 +1,17 @@
 import Foundation
 
+struct MahayanaHostSettingsSnapshot: Equatable, Sendable {
+    let hasSeenOnboarding: Bool?
+}
+
+private enum MahayanaHostSettingsTransportError: LocalizedError {
+    case invalidResponse
+
+    var errorDescription: String? {
+        "Mahayana Host settings transport returned an invalid response"
+    }
+}
+
 /// Owns the current local Mahayana Host generation.
 ///
 /// A request that observes a native-host integrity failure is never replayed:
@@ -45,6 +57,44 @@ final class MahayanaLocalHostSupervisor {
         params: [String: Any]
     ) async throws -> MahayanaHostJSONResult {
         try await host.request(method: method, params: params)
+    }
+
+    func readHostSettings() async throws -> MahayanaHostSettingsSnapshot {
+        let response = try await request(method: "getHostSettings", params: [:])
+        return try Self.decodeHostSettings(response.value)
+    }
+
+    @discardableResult
+    func pushHostSettings(
+        _ settings: MahayanaHostSettingsSnapshot
+    ) async throws -> MahayanaHostSettingsSnapshot {
+        let encoded: Any = settings.hasSeenOnboarding.map { $0 as Any } ?? NSNull()
+        let response = try await request(
+            method: "setHostSettings",
+            params: [
+                "settings": [
+                    "hasSeenOnboarding": encoded,
+                ],
+            ]
+        )
+        return try Self.decodeHostSettings(response.value)
+    }
+
+    private static func decodeHostSettings(
+        _ value: Any
+    ) throws -> MahayanaHostSettingsSnapshot {
+        guard let object = value as? [String: Any],
+              let raw = object["hasSeenOnboarding"]
+        else {
+            throw MahayanaHostSettingsTransportError.invalidResponse
+        }
+        if raw is NSNull {
+            return .init(hasSeenOnboarding: nil)
+        }
+        guard let seen = raw as? Bool else {
+            throw MahayanaHostSettingsTransportError.invalidResponse
+        }
+        return .init(hasSeenOnboarding: seen)
     }
 
     @discardableResult
