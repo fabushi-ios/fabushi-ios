@@ -87,6 +87,16 @@ struct MediaViewer: View {
             NativePDFPreview(url: localURL)
                 .ignoresSafeArea(edges: .bottom)
                 .accessibilityLabel(message.mediaFileName ?? "PDF document")
+        } else if isNativeSpreadsheetAttachment(
+            mimeType: message.mediaMimeType,
+            fileName: message.mediaFileName
+        ), let data, let localURL {
+            NativeSpreadsheetPreview(
+                data: data,
+                url: localURL,
+                fileName: message.mediaFileName,
+                mimeType: message.mediaMimeType
+            )
         } else if let localURL {
             VStack(spacing: 18) {
                 Image(systemName: "doc.fill").font(.system(size: 64)).foregroundStyle(.orange)
@@ -119,6 +129,13 @@ struct MediaViewer: View {
         if isNativePdfAttachment(mimeType: message.mediaMimeType, fileName: message.mediaFileName),
            message.mediaSizeBytes > nativePdfPreviewByteCap {
             errorMessage = "PDF 超过 25 MB，无法在 Fabushi 内预览"
+            return
+        }
+        if isNativeSpreadsheetAttachment(
+            mimeType: message.mediaMimeType,
+            fileName: message.mediaFileName
+        ), message.mediaSizeBytes > nativeSpreadsheetPreviewByteCap {
+            errorMessage = "Spreadsheet 超过 25 MB，无法在 Fabushi 内预览；可导出后打开。"
             return
         }
         do {
