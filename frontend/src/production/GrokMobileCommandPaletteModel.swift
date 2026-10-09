@@ -318,7 +318,12 @@ internal enum GrokMobileCommandPaletteModel {
         let conversationEntries = conversations
             .filter { !$0.isArchived }
             .map(MobileCommandPaletteEntry.conversation)
-        let botEntries = uniqueBots.map(MobileCommandPaletteEntry.bot)
+        let visibleBotEntries = uniqueBots
+            .filter { !$0.hidden }
+            .map(MobileCommandPaletteEntry.bot)
+        let hiddenBotEntries = uniqueBots
+            .filter(\.hidden)
+            .map(MobileCommandPaletteEntry.bot)
         let actionEntries = actions.map(MobileCommandPaletteEntry.action)
         let messageEntries = messages(conversations: conversations, messagesByConversation: messagesByConversation)
             .map(MobileCommandPaletteEntry.message)
@@ -333,25 +338,30 @@ internal enum GrokMobileCommandPaletteModel {
             }
         let routineEntries = routines.map(MobileCommandPaletteEntry.routine)
 
-        let base = (botEntries + conversationEntries + fileEntries + linkEntries + routineEntries + messageEntries + actionEntries)
+        let base = (visibleBotEntries + conversationEntries + fileEntries + linkEntries + routineEntries + messageEntries + actionEntries)
             .filter { matches(tab: tab, entry: $0) }
         let tokens = searchTokens(query)
         if tokens.isEmpty {
             if tab == .all {
-                return (botEntries + conversationEntries + actionEntries).prefix(100).map { $0 }
+                return (visibleBotEntries + conversationEntries + actionEntries).prefix(100).map { $0 }
             }
             return base.prefix(100).map { $0 }
         }
 
         let normalizedQuery = tokens.joined(separator: " ")
-        let scored = base.enumerated().compactMap { index, entry -> (Int, Double, MobileCommandPaletteEntry)? in
-            guard let score = score(entry: entry, tokens: tokens, normalizedQuery: normalizedQuery) else { return nil }
-            return (index, score, entry)
+        func scored(_ entries: [MobileCommandPaletteEntry]) -> [(Int, Double, MobileCommandPaletteEntry)] {
+            entries.enumerated().compactMap { index, entry in
+                guard let value = score(entry: entry, tokens: tokens, normalizedQuery: normalizedQuery) else { return nil }
+                return (index, value, entry)
+            }.sorted {
+                if $0.1 == $1.1 { return $0.0 < $1.0 }
+                return $0.1 > $1.1
+            }
         }
-        return scored.sorted {
-            if $0.1 == $1.1 { return $0.0 < $1.0 }
-            return $0.1 > $1.1
-        }.prefix(100).map { $0.2 }
+
+        let visibleScored = scored(base)
+        let hiddenScored = scored(hiddenBotEntries.filter { matches(tab: tab, entry: $0) })
+        return (visibleScored + hiddenScored).prefix(100).map { $0.2 }
     }
 
 
