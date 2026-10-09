@@ -24,14 +24,24 @@ fn untildify(value: &str) -> String {
     result.to_string_lossy().into_owned()
 }
 
+pub fn file_path_from_file_url(value: &str) -> Option<PathBuf> {
+    let url = Url::parse(value).ok()?;
+    if url.scheme() != "file" {
+        return None;
+    }
+    url.to_file_path().ok()
+}
+
+pub fn posix_path_from_file_url(value: &str) -> Option<String> {
+    file_path_from_file_url(value)
+        .map(|path| normalize_to_unix_path(&path.to_string_lossy()))
+}
+
 fn strip_file_url_if_present(value: &str) -> String {
     if !value.starts_with("file://") {
         return value.to_owned();
     }
-    Url::parse(value)
-        .ok()
-        .filter(|url| url.scheme() == "file")
-        .and_then(|url| url.to_file_path().ok())
+    file_path_from_file_url(value)
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_else(|| value.to_owned())
 }
@@ -115,6 +125,42 @@ pub fn is_path_within(base_path: &Path, target_path: &Path) -> bool {
         make_absolute(target_path.to_path_buf(), Some(&base))
     };
     is_path_within_path(&base, &target)
+}
+
+pub fn is_path_strictly_within(base_path: &Path, target_path: &Path) -> bool {
+    let base = make_absolute(base_path.to_path_buf(), None);
+    let target = if target_path.is_absolute() {
+        make_absolute(target_path.to_path_buf(), None)
+    } else {
+        make_absolute(target_path.to_path_buf(), Some(&base))
+    };
+    target != base && is_path_within_path(&base, &target)
+}
+
+pub fn contain_within_roots(
+    roots: &[PathBuf],
+    candidate_path: &Path,
+) -> io::Result<Option<PathBuf>> {
+    if roots.is_empty() || !candidate_path.is_absolute() {
+        return Ok(None);
+    }
+
+    let resolved = normalize_lexically(candidate_path);
+    if !roots
+        .iter()
+        .any(|root| is_path_strictly_within(root, &resolved))
+    {
+        return Ok(None);
+    }
+
+    let real_resolved = canonicalize_nearest_existing(&resolved)?;
+    for root in roots {
+        let real_root = canonicalize_nearest_existing(root)?;
+        if is_path_strictly_within(&real_root, &real_resolved) {
+            return Ok(Some(resolved));
+        }
+    }
+    Ok(None)
 }
 
 pub fn normalize_to_unix_path(value: &str) -> String {
@@ -216,6 +262,20 @@ mod tests {
     }
 
     #[test]
+    fn file_url_helpers_reject_non_file_urls_and_decode_file_paths() {
+        assert_eq!(
+            file_path_from_file_url("file:///tmp/a%20b"),
+            Some(PathBuf::from("/tmp/a b"))
+        );
+        assert_eq!(
+            posix_path_from_file_url("file:///tmp/a%20b"),
+            Some("/tmp/a b".to_string())
+        );
+        assert_eq!(file_path_from_file_url("https://example.com/a"), None);
+        assert_eq!(file_path_from_file_url("not a url"), None);
+    }
+
+    #[test]
     fn path_within_is_component_aware() {
         assert!(is_path_within(
             Path::new("/tmp/work"),
@@ -229,6 +289,32 @@ mod tests {
             Path::new("/tmp/work"),
             Path::new("/tmp/work-other")
         ));
+
+        assert!(is_path_strictly_within(
+            Path::new("/tmp/work"),
+            Path::new("/tmp/work/a")
+        ));
+        assert!(!is_path_strictly_within(
+            Path::new("/tmp/work"),
+            Path::new("/tmp/work")
+        ));
+    }
+
+    #[test]
+    fn contain_within_roots_rejects_relative_root_and_sibling_paths() {
+        let roots = vec![PathBuf::from("/tmp/work")];
+        assert_eq!(
+            contain_within_roots(&roots, Path::new("relative/file")).unwrap(),
+            None
+        );
+        assert_eq!(
+            contain_within_roots(&roots, Path::new("/tmp/work")).unwrap(),
+            None
+        );
+        assert_eq!(
+            contain_within_roots(&roots, Path::new("/tmp/work-other/file")).unwrap(),
+            None
+        );
     }
 
     #[test]
@@ -283,6 +369,37 @@ mod tests {
         .unwrap();
         let canonical_real = real.canonicalize().unwrap();
         assert_eq!(resolved, canonical_real.join("missing/file.txt"));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn contain_within_roots_rejects_symlink_escape_for_missing_leaf() {
+        use std::os::unix::fs::symlink;
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-containment-root-{}",
+            std::process::id()
+        ));
+        let allowed = root.join("allowed");
+        let outside = root.join("outside");
+        let link = allowed.join("escape");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&allowed).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, &link).unwrap();
+
+        let escaped = link.join("missing/file.txt");
+        assert_eq!(
+            contain_within_roots(std::slice::from_ref(&allowed), &escaped).unwrap(),
+            None
+        );
+
+        let safe = allowed.join("nested/missing.txt");
+        assert_eq!(
+            contain_within_roots(std::slice::from_ref(&allowed), &safe).unwrap(),
+            Some(normalize_lexically(&safe))
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }
