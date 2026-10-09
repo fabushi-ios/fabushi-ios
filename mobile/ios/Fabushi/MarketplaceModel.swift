@@ -3194,6 +3194,22 @@ final class MarketplaceModel {
         )
     }
 
+    nonisolated static func optimisticallySetMcpToolEnabled(
+        _ tools: [MarketplaceMcpTool],
+        toolName: String,
+        enabled: Bool
+    ) -> [MarketplaceMcpTool] {
+        tools.map { tool in
+            guard tool.name == toolName else { return tool }
+            return .init(
+                name: tool.name,
+                title: tool.title,
+                description: tool.description,
+                isDisabled: !enabled
+            )
+        }
+    }
+
     func refreshMcpBackendStatus() async {
         guard loggedIn else {
             mcpBackendLoggedIn = false
@@ -3527,6 +3543,13 @@ final class MarketplaceModel {
         mcpMutationSerial[key] = serial
         mcpMutatingToolKey = key
         mcpError = nil
+        if let current = mcpToolsByServerId[serverId] {
+            mcpToolsByServerId[serverId] = Self.optimisticallySetMcpToolEnabled(
+                current,
+                toolName: toolName,
+                enabled: enabled
+            )
+        }
         do {
             let response = try await bridge.request(
                 method: "coordinator.mcp.setToolDisabled",

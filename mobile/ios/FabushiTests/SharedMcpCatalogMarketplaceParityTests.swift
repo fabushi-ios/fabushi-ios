@@ -294,4 +294,47 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
     }
 
 
+    func testMarketplaceMcpToolToggleProjectsOptimisticallyBeforeHostReconcile() {
+        let initial = [
+            MarketplaceMcpTool(
+                name: "read",
+                title: "Read",
+                description: nil,
+                isDisabled: false
+            ),
+            MarketplaceMcpTool(
+                name: "write",
+                title: "Write",
+                description: nil,
+                isDisabled: true
+            ),
+        ]
+        let disabledRead = MarketplaceModel.optimisticallySetMcpToolEnabled(
+            initial,
+            toolName: "read",
+            enabled: false
+        )
+        XCTAssertEqual(
+            disabledRead.map { ($0.name, $0.isDisabled) },
+            [("read", true), ("write", true)]
+        )
+
+        let enabledWrite = MarketplaceModel.optimisticallySetMcpToolEnabled(
+            disabledRead,
+            toolName: "write",
+            enabled: true
+        )
+        XCTAssertEqual(
+            enabledWrite.map { ($0.name, $0.isDisabled) },
+            [("read", true), ("write", false)]
+        )
+
+        let missing = MarketplaceModel.optimisticallySetMcpToolEnabled(
+            enabledWrite,
+            toolName: "missing",
+            enabled: true
+        )
+        XCTAssertEqual(missing, enabledWrite)
+    }
+
 }

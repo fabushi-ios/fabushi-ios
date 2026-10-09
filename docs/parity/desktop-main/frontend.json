@@ -4111,17 +4111,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/server-tools.ts",
       "desktop_blob_sha": "0077e0cb2f30b0cfd9f98e191018d1fddadb5ad6",
-      "desktop_responsibility": "Owns authoritative per-MCP-server tool loading and optimistic enable/disable state with request fencing, rollback on failure and disposal.",
+      "desktop_responsibility": "Own authoritative per-MCP-server tool loading and optimistic enable/disable state with request/generation fencing and disposal.",
       "desktop_owner": "renderer / MCP server tool controller",
       "desktop_visible_effect": "Users can inspect and toggle individual tools for an MCP server without stale or failed mutations corrupting the visible tool list.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS exposes generic account-scoped MCP server tools through the shipping SwiftUI Marketplace. Requests flow IOSPreloadBridge → CoordinatorMcpSurface → the existing SandMcpManager/tools-discovery owner → direct authenticated Rust Host MCP management methods. Tool changes are Host-confirmed rather than optimistic and are fenced across logout/account replacement.",
+      "ios_platform_delta": "iOS exposes account-scoped MCP server tools through the shipping SwiftUI Marketplace. MarketplaceModel applies the requested enabled state optimistically before IOSPreloadBridge → CoordinatorMcpSurface → SandMcpManager/Host mutation, then replaces it with authoritative Host rows. Account epoch and per-tool mutation serial fence logout/account replacement and stale completions.",
       "implementation_status": "implemented",
-      "production_evidence": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/shared/node/mcp/mcp-manager.swift; mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
-      "notes": "Implemented against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. This implementation still requires its own ordinary + protected exact-HEAD Actions evidence before promotion to verified."
+      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/shared/node/mcp/mcp-manager.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
+      "test_evidence": "mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; current exact-HEAD Actions required before verified",
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and server-tools.ts@0077e0cb2f30b0cfd9f98e191018d1fddadb5ad6. Source-level implementation now includes the Desktop optimistic visible-state effect; exact-head acceptance remains pending."
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/view.tsx",
@@ -4224,17 +4224,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/recovered-owner-utilities.contract.test.ts",
       "desktop_blob_sha": "c5c9e749994b94e9a056274b2f124928d73b9a98",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Owner-lifecycle contract for the shared routine run-history presentation clock and per-MCP-server tool loading/toggling, including lazy subscription, time-zone changes, optimistic tool state and stale/dispose fencing.",
+      "desktop_owner": "renderer owner utilities over routines presentation time and MCP server tools",
+      "desktop_visible_effect": "Relative routine timestamps refresh from one lazy time-zone-aware clock, and MCP tool toggles respond immediately while stale account/view operations cannot overwrite current tool state.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "Foundation RunLoop Timer replaces the browser scheduler with the same named 30-second lazy clock. MCP tool state stays in the existing MarketplaceModel/Coordinator MCP owner: iOS projects the requested toggle optimistically, then reconciles from Host rows while account epoch + per-tool mutation serial replace Desktop open/dispose generation fencing.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/MobileBotRoutines.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift; mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift; current exact-HEAD Actions required before verified",
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob c5c9e749994b94e9a056274b2f124928d73b9a98. Existing clock owner was already complete; this review closed the missing optimistic MCP tool projection. Keep below verified until same-head evidence succeeds."
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-runtime-models.contract.test.ts",
