@@ -312,13 +312,30 @@ final class MahayanaCoordinator {
         }
     }
 
+    static func isClientPauseBlockedMethod(_ method: String) -> Bool {
+        switch method {
+        case "forceReconnectGateway",
+             "resolveGatewayConnection",
+             "ensureForeverBox",
+             "computer.agentBox.ensure",
+             "getBoxMigrationStatus",
+             "updateComputer",
+             "forceRecreateComputer",
+             "mintLocalExecDaemonCredential",
+             "spawnLocalExecDaemon":
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Compatibility entry used while feature-specific typed facades are
     /// replacing dictionary-shaped calls. Host ownership remains here.
     func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {
         guard lifecycleState != .shuttingDown else { throw CoordinatorError.unavailable }
         if let clientPauseControl {
             try await clientPauseControl.synchronize()
-            if clientPauseControl.isPaused && method == "forceReconnectGateway" {
+            if clientPauseControl.isPaused && Self.isClientPauseBlockedMethod(method) {
                 throw IOSClientPausedError()
             }
         }
