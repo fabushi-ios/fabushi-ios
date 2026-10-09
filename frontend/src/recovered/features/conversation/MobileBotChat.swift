@@ -373,12 +373,13 @@ internal func mobileBotForwardMessageId(
 ) -> String? {
     guard entry.kind == .message,
           !entry.streaming,
+          entry.optimisticDeliveryPhase == nil,
+          let rawMessageId = entry.canonicalMessageId,
           let sourceConversationId,
           !sourceConversationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else { return nil }
 
-    let messageId = mobileTranscriptCanonicalId(entry)
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let messageId = rawMessageId.trimmingCharacters(in: .whitespacesAndNewlines)
     return messageId.isEmpty ? nil : messageId
 }
 
