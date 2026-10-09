@@ -217,7 +217,7 @@ internal struct GrokMobileShell: View {
             FabushiAgentNetworkView(
                 agents: bots,
                 onOpenAgent: { id in
-                    guard let agent = bots.first(where: { $0.id == id }) else { return }
+                    guard let agent = MobileAgentNetworkModel.openTarget(id: id, agents: bots) else { return }
                     agentNetworkOpen = false
                     selectBotForConversation(agent)
                 },
