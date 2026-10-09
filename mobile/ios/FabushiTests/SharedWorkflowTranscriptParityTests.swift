@@ -990,4 +990,13 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertNil(messages[0].optimisticDeliveryError)
     }
 
+    func testTranscriptLoadRetrySurfaceUsesCanonicalCopy() {
+        XCTAssertEqual(MobileTranscriptLoadErrorCopy.title, "Couldn't load conversation")
+        XCTAssertEqual(
+            MobileTranscriptLoadErrorCopy.detail,
+            "Couldn't load this conversation. Check your connection and try again."
+        )
+        XCTAssertEqual(MobileTranscriptLoadErrorCopy.retry, "Retry")
+    }
+
 }
