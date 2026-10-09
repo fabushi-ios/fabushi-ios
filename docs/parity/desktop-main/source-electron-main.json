@@ -513,13 +513,13 @@
       "desktop_owner": "Electron main auth callback registrar",
       "desktop_visible_effect": "Browser authentication returns to the signed Fabushi app through the expected callback scheme without hijacking unrelated protocol handlers.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/auth/auth-callback-registration.swift; source/shared/deep-link.swift",
+      "ios_target_path": "source/ios-main/auth/auth-callback-registration.swift",
       "ios_language": "Swift / CFBundle URL schemes",
       "ios_platform_delta": "iOS cannot call Electron setAsDefaultProtocolClient. The signed bundle declares the same custom scheme and the native registrar inspects/fail-closes the production Info.plist declaration used by the shared deep-link parser.",
       "implementation_status": "implemented",
       "production_evidence": "IOSAuthCallbackRegistrar derives redirectTarget/protocolScheme from FabushiDeepLinkParser.customScheme, inspects CFBundleURLTypes/CFBundleURLSchemes and exposes production validation instead of runtime protocol registration.",
       "test_evidence": "Deep-link projection tests cover trusted custom-scheme parsing/deduplication; current exact-head build/UI acceptance is still required before verified promotion.",
-      "notes": "Reviewed exact Desktop blob 587fcc53c9436423e2bd212177b3e746d2a3ab95. Native implementation exists, but row remains implemented—not verified—pending same-head CI and aggregate acceptance.",
+      "notes": "Reviewed exact Desktop blob 587fcc53c9436423e2bd212177b3e746d2a3ab95. Native implementation exists, but row remains implemented—not verified—pending same-head CI and aggregate acceptance. Supporting path: source/shared/deep-link.swift.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -529,13 +529,13 @@
       "desktop_owner": "Electron main client-pause control around the production remote Host connector and Coordinator gateway state",
       "desktop_visible_effect": "When the remote kill-switch pause gate is active, Fabushi stops initiating or recreating remote computer access and does not retain a stale observed connection; Coordinator state follows the same gate deterministically.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/ios-main/coordinator/production-provider.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "The existing iOS Coordinator remains the single owner. SandExperimentService supplies the gate; IOSCoordinatorClientPauseControl serializes setGatewayPaused, drops CoordinatorMcpSurface observed migration connection state on pause, rejects forceReconnectGateway, and CoordinatorMcpSurface rejects migration connect/update/recreate/force-recreate while paused. ProductionCoordinatorProvider reapplies pause after launch/restart. iOS has no Desktop local-exec daemon credential issuer; remote process semantics are delegated instead of minting a phone-side daemon credential.",
       "implementation_status": "implemented",
       "production_evidence": "MahayanaCoordinator owns the gate and serialized gateway pause synchronization; CoordinatorMcpSurface clears its observed migration watch/state and rejects getBoxMigrationStatus/updateComputer/forceRecreateComputer while paused; ProductionCoordinatorProvider re-applies pause after Coordinator start/restart.",
       "test_evidence": "CoordinatorContractTests now cover single-drop semantics across a pause interval, coordinator pause state transitions, relaunch reapplication, and the canonical blocked marker. Exact-head GitHub Actions are required before any verified promotion.",
-      "notes": "Reviewed exact Desktop blob 81d7f540fea1f2cb4afa1177a1b53fcf20e589e7 and its shipping composition in main-production-services.ts. Status is implemented only; current-head compile/runtime evidence and aggregate review remain open.",
+      "notes": "Reviewed exact Desktop blob 81d7f540fea1f2cb4afa1177a1b53fcf20e589e7 and its shipping composition in main-production-services.ts. Status is implemented only; current-head compile/runtime evidence and aggregate review remain open. Supporting owners: source/mahayana-agent-coordinator/coordinator-mcp-manager.swift and source/ios-main/coordinator/production-provider.swift.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
