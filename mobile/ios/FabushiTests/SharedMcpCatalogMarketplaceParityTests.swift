@@ -314,20 +314,16 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
             toolName: "read",
             enabled: false
         )
-        XCTAssertEqual(
-            disabledRead.map { ($0.name, $0.isDisabled) },
-            [("read", true), ("write", true)]
-        )
+        XCTAssertEqual(disabledRead.map(\.name), ["read", "write"])
+        XCTAssertEqual(disabledRead.map(\.isDisabled), [true, true])
 
         let enabledWrite = MarketplaceModel.optimisticallySetMcpToolEnabled(
             disabledRead,
             toolName: "write",
             enabled: true
         )
-        XCTAssertEqual(
-            enabledWrite.map { ($0.name, $0.isDisabled) },
-            [("read", true), ("write", false)]
-        )
+        XCTAssertEqual(enabledWrite.map(\.name), ["read", "write"])
+        XCTAssertEqual(enabledWrite.map(\.isDisabled), [true, false])
 
         let missing = MarketplaceModel.optimisticallySetMcpToolEnabled(
             enabledWrite,
