@@ -89,6 +89,46 @@ internal struct MobileSettingsFeatureCopy: Equatable {
     let rulesScope: String
 }
 
+internal struct MobileSettingsShellCopy: Equatable {
+    let settings: String
+    let account: String
+    let usage: String
+    let support: String
+    let app: String
+    let workspace: String
+    let navigation: String
+    let signOut: String
+    let computer: String
+    let marketplace: String
+    let helpCenter: String
+    let sendFeedback: String
+    let aboutFabushi: String
+    let done: String
+    let cancel: String
+    let operationFailed: String
+    let okay: String
+    let displayName: String
+    let saving: String
+    let saveDisplayName: String
+    let email: String
+    let currentPeriod: String
+    let unlimited: String
+    let remaining: String
+    let periodEnds: String
+    let loadingUsage: String
+    let reloadUsage: String
+    let agentConfiguration: String
+    let loadingConfiguration: String
+    let router: String
+    let routeAgentRequests: String
+    let iosSection: String
+    let iosSelfReference: String
+    let mediaRuntimeUnavailable: String
+    let microphoneState: String
+    let cameraState: String
+}
+
+
 /// iOS-owned presentation preferences corresponding to DesktopUiPreferences.
 ///
 /// The values are intentionally local presentation state. They never mutate
@@ -443,6 +483,127 @@ internal struct MobileUiPreferences: Equatable {
                 allowAutomatically: "Allow automatically", askFirst: "Ask first", addRule: "Add Rule",
                 saveRule: "Save Rule", cancel: "Cancel", edit: "Edit", delete: "Delete",
                 rulesScope: "These rules apply only to you. Built-in safety checks always apply."
+            )
+        }
+    }
+
+    func shellCopy(
+        systemIdentifier: String = Locale.autoupdatingCurrent.identifier
+    ) -> MobileSettingsShellCopy {
+        switch Self.copyLocaleKey(
+            resolvedLocaleIdentifier(systemIdentifier: systemIdentifier)
+        ) {
+        case .zhHans:
+            return .init(
+                settings: "设置", account: "账号", usage: "用量", support: "支持",
+                app: "应用", workspace: "工作台", navigation: "导航", signOut: "退出登录",
+                computer: "我的电脑", marketplace: "插件市场", helpCenter: "帮助中心",
+                sendFeedback: "发送反馈", aboutFabushi: "关于 Fabushi", done: "完成",
+                cancel: "取消", operationFailed: "操作失败", okay: "好",
+                displayName: "显示名称", saving: "正在保存…", saveDisplayName: "保存显示名称",
+                email: "邮箱", currentPeriod: "当前周期", unlimited: "不限量", remaining: "剩余",
+                periodEnds: "周期结束", loadingUsage: "正在加载用量…", reloadUsage: "重新加载用量",
+                agentConfiguration: "Agent 配置", loadingConfiguration: "正在读取配置…",
+                router: "路由", routeAgentRequests: "Route Agent 请求", iosSection: "iOS",
+                iosSelfReference: "Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责。",
+                mediaRuntimeUnavailable: "通话媒体运行时不可用。", microphoneState: "麦克风",
+                cameraState: "摄像头"
+            )
+        case .zhHant:
+            return .init(
+                settings: "設定", account: "帳戶", usage: "用量", support: "支援",
+                app: "應用程式", workspace: "工作區", navigation: "導覽", signOut: "登出",
+                computer: "我的電腦", marketplace: "外掛市集", helpCenter: "說明中心",
+                sendFeedback: "傳送意見回饋", aboutFabushi: "關於 Fabushi", done: "完成",
+                cancel: "取消", operationFailed: "操作失敗", okay: "好",
+                displayName: "顯示名稱", saving: "正在儲存…", saveDisplayName: "儲存顯示名稱",
+                email: "電子郵件", currentPeriod: "目前週期", unlimited: "不限量", remaining: "剩餘",
+                periodEnds: "週期結束", loadingUsage: "正在載入用量…", reloadUsage: "重新載入用量",
+                agentConfiguration: "Agent 設定", loadingConfiguration: "正在讀取設定…",
+                router: "路由", routeAgentRequests: "路由 Agent 請求", iosSection: "iOS",
+                iosSelfReference: "Desktop 的「下載 iOS」入口在 iOS 上是自我參照；安裝與更新由目前 App 與 App Store 生命週期負責。",
+                mediaRuntimeUnavailable: "通話媒體執行階段無法使用。", microphoneState: "麥克風",
+                cameraState: "相機"
+            )
+        case .ja:
+            return .init(
+                settings: "設定", account: "アカウント", usage: "使用量", support: "サポート",
+                app: "アプリ", workspace: "ワークスペース", navigation: "ナビゲーション", signOut: "サインアウト",
+                computer: "マイコンピュータ", marketplace: "プラグインマーケット", helpCenter: "ヘルプセンター",
+                sendFeedback: "フィードバックを送信", aboutFabushi: "Fabushi について", done: "完了",
+                cancel: "キャンセル", operationFailed: "操作に失敗しました", okay: "OK",
+                displayName: "表示名", saving: "保存中…", saveDisplayName: "表示名を保存",
+                email: "メール", currentPeriod: "現在の期間", unlimited: "無制限", remaining: "残り",
+                periodEnds: "期間終了", loadingUsage: "使用量を読み込み中…", reloadUsage: "使用量を再読み込み",
+                agentConfiguration: "Agent 設定", loadingConfiguration: "設定を読み込み中…",
+                router: "ルーター", routeAgentRequests: "Agent リクエストをルーティング", iosSection: "iOS",
+                iosSelfReference: "Desktop の「iOS をダウンロード」は iOS では自己参照です。インストールと更新は現在の App と App Store のライフサイクルが管理します。",
+                mediaRuntimeUnavailable: "通話メディアのランタイムを利用できません。", microphoneState: "マイク",
+                cameraState: "カメラ"
+            )
+        case .ko:
+            return .init(
+                settings: "설정", account: "계정", usage: "사용량", support: "지원",
+                app: "앱", workspace: "작업 공간", navigation: "탐색", signOut: "로그아웃",
+                computer: "내 컴퓨터", marketplace: "플러그인 마켓", helpCenter: "도움말 센터",
+                sendFeedback: "피드백 보내기", aboutFabushi: "Fabushi 정보", done: "완료",
+                cancel: "취소", operationFailed: "작업 실패", okay: "확인",
+                displayName: "표시 이름", saving: "저장 중…", saveDisplayName: "표시 이름 저장",
+                email: "이메일", currentPeriod: "현재 기간", unlimited: "무제한", remaining: "남음",
+                periodEnds: "기간 종료", loadingUsage: "사용량 불러오는 중…", reloadUsage: "사용량 다시 불러오기",
+                agentConfiguration: "Agent 설정", loadingConfiguration: "설정 불러오는 중…",
+                router: "라우터", routeAgentRequests: "Agent 요청 라우팅", iosSection: "iOS",
+                iosSelfReference: "Desktop의 ‘iOS 다운로드’ 항목은 iOS에서는 자기 참조입니다. 설치와 업데이트는 현재 App 및 App Store 수명 주기가 관리합니다.",
+                mediaRuntimeUnavailable: "통화 미디어 런타임을 사용할 수 없습니다.", microphoneState: "마이크",
+                cameraState: "카메라"
+            )
+        case .ar:
+            return .init(
+                settings: "الإعدادات", account: "الحساب", usage: "الاستخدام", support: "الدعم",
+                app: "التطبيق", workspace: "مساحة العمل", navigation: "التنقل", signOut: "تسجيل الخروج",
+                computer: "جهاز الكمبيوتر", marketplace: "سوق الإضافات", helpCenter: "مركز المساعدة",
+                sendFeedback: "إرسال ملاحظات", aboutFabushi: "حول Fabushi", done: "تم",
+                cancel: "إلغاء", operationFailed: "فشلت العملية", okay: "حسنًا",
+                displayName: "اسم العرض", saving: "جارٍ الحفظ…", saveDisplayName: "حفظ اسم العرض",
+                email: "البريد الإلكتروني", currentPeriod: "الفترة الحالية", unlimited: "غير محدود", remaining: "المتبقي",
+                periodEnds: "نهاية الفترة", loadingUsage: "جارٍ تحميل الاستخدام…", reloadUsage: "إعادة تحميل الاستخدام",
+                agentConfiguration: "إعداد Agent", loadingConfiguration: "جارٍ قراءة الإعداد…",
+                router: "الموجّه", routeAgentRequests: "توجيه طلبات Agent", iosSection: "iOS",
+                iosSelfReference: "خيار «تنزيل iOS» في Desktop مرجع ذاتي على iOS؛ تدير دورة حياة التطبيق وApp Store التثبيت والتحديثات.",
+                mediaRuntimeUnavailable: "وقت تشغيل وسائط المكالمة غير متاح.", microphoneState: "الميكروفون",
+                cameraState: "الكاميرا"
+            )
+        case .he:
+            return .init(
+                settings: "הגדרות", account: "חשבון", usage: "שימוש", support: "תמיכה",
+                app: "יישום", workspace: "סביבת עבודה", navigation: "ניווט", signOut: "התנתקות",
+                computer: "המחשב שלי", marketplace: "שוק התוספים", helpCenter: "מרכז העזרה",
+                sendFeedback: "שליחת משוב", aboutFabushi: "אודות Fabushi", done: "סיום",
+                cancel: "ביטול", operationFailed: "הפעולה נכשלה", okay: "אישור",
+                displayName: "שם תצוגה", saving: "שומר…", saveDisplayName: "שמירת שם תצוגה",
+                email: "דוא״ל", currentPeriod: "התקופה הנוכחית", unlimited: "ללא הגבלה", remaining: "נותר",
+                periodEnds: "סיום התקופה", loadingUsage: "טוען נתוני שימוש…", reloadUsage: "טעינה מחדש של השימוש",
+                agentConfiguration: "הגדרות Agent", loadingConfiguration: "קורא הגדרות…",
+                router: "נתב", routeAgentRequests: "ניתוב בקשות Agent", iosSection: "iOS",
+                iosSelfReference: "האפשרות „הורדת iOS” ב-Desktop היא הפניה עצמית ב-iOS; ההתקנה והעדכונים מנוהלים על ידי היישום הנוכחי ומחזור החיים של App Store.",
+                mediaRuntimeUnavailable: "זמן הריצה של מדיית השיחה אינו זמין.", microphoneState: "מיקרופון",
+                cameraState: "מצלמה"
+            )
+        case .en, .system:
+            return .init(
+                settings: "Settings", account: "Account", usage: "Usage", support: "Support",
+                app: "App", workspace: "Workspace", navigation: "Navigation", signOut: "Sign Out",
+                computer: "My Computer", marketplace: "Plugin Marketplace", helpCenter: "Help Center",
+                sendFeedback: "Send Feedback", aboutFabushi: "About Fabushi", done: "Done",
+                cancel: "Cancel", operationFailed: "Operation Failed", okay: "OK",
+                displayName: "Display Name", saving: "Saving…", saveDisplayName: "Save Display Name",
+                email: "Email", currentPeriod: "Current Period", unlimited: "Unlimited", remaining: "Remaining",
+                periodEnds: "Period Ends", loadingUsage: "Loading usage…", reloadUsage: "Reload Usage",
+                agentConfiguration: "Agent Configuration", loadingConfiguration: "Loading configuration…",
+                router: "Router", routeAgentRequests: "Route Agent Requests", iosSection: "iOS",
+                iosSelfReference: "Desktop's “Download iOS” entry is self-referential on iOS; installation and updates are owned by the current app and App Store lifecycle.",
+                mediaRuntimeUnavailable: "Call media runtime is unavailable.", microphoneState: "Microphone",
+                cameraState: "Camera"
             )
         }
     }
