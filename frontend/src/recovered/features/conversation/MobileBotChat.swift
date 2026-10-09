@@ -2,6 +2,13 @@ import AVKit
 import SwiftUI
 import UIKit
 
+enum MobileTranscriptLoadErrorCopy {
+    static let title = "Couldn't load conversation"
+    static let detail = "Couldn't load this conversation. Check your connection and try again."
+    static let retry = "Retry"
+}
+
+
 internal func isMobileBotVisibleAssistantCompletion(
     _ event: [String: Any],
     operationId: String
@@ -626,7 +633,7 @@ internal struct MobileBotChat: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
-                            Button("Retry") {
+                            Button(MobileTranscriptLoadErrorCopy.retry) {
                                 Task { await loadInitialConversationTail() }
                             }
                             .buttonStyle(.borderedProminent)
