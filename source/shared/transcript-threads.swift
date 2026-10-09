@@ -21,7 +21,8 @@ private func resolveBranchedTranscriptRoot(
 }
 
 func branchReplyCounts(_ branched: [BranchedTranscriptEntry]) -> [String: Int] {
-    let byId = Dictionary(uniqueKeysWithValues: branched.map { ($0.id, $0) })
+    var byId: [String: BranchedTranscriptEntry] = [:]
+    for entry in branched { byId[entry.id] = entry }
     var counts: [String: Int] = [:]
     for entry in branched {
         guard let root = resolveBranchedTranscriptRoot(entry, branchedById: byId) else { continue }
@@ -31,6 +32,7 @@ func branchReplyCounts(_ branched: [BranchedTranscriptEntry]) -> [String: Int] {
 }
 
 func threadDescendants(_ rootId: String, branched: [BranchedTranscriptEntry]) -> [BranchedTranscriptEntry] {
-    let byId = Dictionary(uniqueKeysWithValues: branched.map { ($0.id, $0) })
+    var byId: [String: BranchedTranscriptEntry] = [:]
+    for entry in branched { byId[entry.id] = entry }
     return branched.filter { resolveBranchedTranscriptRoot($0, branchedById: byId) == rootId }
 }
