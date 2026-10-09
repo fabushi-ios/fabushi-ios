@@ -297,6 +297,12 @@ struct AccountSettingsView: View {
     @State private var ruleBehavior: SandAutoReviewInstructionBehavior = .allow
     @State private var editingRule: SandAutoReviewInstructionRow?
     @State private var uiPreferencesStore = MobileUiPreferencesStore.shared
+    @State private var mediaPort = HumanCallMediaPort()
+    @State private var mediaDevices: [HumanCallMediaDevice] = []
+    @State private var selectedMicrophoneId: String?
+    @State private var selectedCameraId: String?
+    @State private var mediaPermissions: HumanCallMediaPermissions?
+    @State private var mediaBusy = false
 
     var body: some View {
         NavigationStack {
@@ -342,6 +348,8 @@ struct AccountSettingsView: View {
 
                 uiPreferencesSection
 
+                mediaDevicesSection
+
                 configurationSections
 
                 Section("支持") {
@@ -386,6 +394,7 @@ struct AccountSettingsView: View {
             }
             .onAppear {
                 if nameDraft.isEmpty { nameDraft = model.accountName }
+                refreshMediaDevices()
             }
             .task {
                 await model.refreshAccountUsage()
@@ -512,6 +521,69 @@ struct AccountSettingsView: View {
     }
 
     @ViewBuilder
+    private var mediaDevicesSection: some View {
+        let microphones = mediaDevices.filter { $0.kind == .microphone }
+        let cameras = mediaDevices.filter { $0.kind == .camera }
+
+        Section("媒体与设备") {
+            Picker(
+                "麦克风",
+                selection: Binding(
+                    get: { selectedMicrophoneId ?? "" },
+                    set: { value in selectMediaDevice(value, kind: .microphone) }
+                )
+            ) {
+                Text("系统默认").tag("")
+                ForEach(microphones) { device in
+                    Text(device.name).tag(device.id)
+                }
+            }
+            .disabled(mediaBusy)
+            .accessibilityIdentifier("settings-media-microphone")
+
+            Picker(
+                "摄像头",
+                selection: Binding(
+                    get: { selectedCameraId ?? "" },
+                    set: { value in selectMediaDevice(value, kind: .camera) }
+                )
+            ) {
+                Text("系统默认").tag("")
+                ForEach(cameras) { device in
+                    Text(device.name).tag(device.id)
+                }
+            }
+            .disabled(mediaBusy)
+            .accessibilityIdentifier("settings-media-camera")
+
+            Button(mediaBusy ? "正在请求权限…" : "允许麦克风和摄像头") {
+                requestMediaPermissions()
+            }
+            .disabled(mediaBusy)
+            .accessibilityIdentifier("settings-media-request-permissions")
+
+            Button("刷新设备") {
+                refreshMediaDevices()
+            }
+            .disabled(mediaBusy)
+            .accessibilityIdentifier("settings-media-refresh")
+
+            if let mediaPermissions {
+                Text(
+                    "麦克风：\(mediaPermissions.microphone.rawValue) · 摄像头：\(mediaPermissions.camera.rawValue)"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("settings-media-permission-state")
+            }
+
+            Text("设备偏好保存在本机，并由现有 Human 通话媒体 owner 读取。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
     private var configurationSections: some View {
         if configurationLoading {
             Section("Agent 配置") {
@@ -632,6 +704,46 @@ struct AccountSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func refreshMediaDevices() {
+        mediaDevices = mediaPort.devices()
+        let resolved = mediaPort.resolvedPreferences()
+        selectedMicrophoneId = resolved.microphoneId
+        selectedCameraId = resolved.cameraId
+    }
+
+    @MainActor
+    private func selectMediaDevice(_ id: String, kind: HumanCallMediaDevice.Kind) {
+        do {
+            if id.isEmpty {
+                mediaPort.setPreferredDeviceId(nil, kind: kind)
+                if kind == .microphone {
+                    _ = try mediaPort.applyPreferredMicrophone()
+                }
+            } else if kind == .microphone {
+                _ = try mediaPort.selectMicrophone(deviceId: id)
+            } else {
+                _ = try mediaPort.selectCamera(deviceId: id)
+            }
+            refreshMediaDevices()
+        } catch {
+            actionError = error.localizedDescription
+            refreshMediaDevices()
+        }
+    }
+
+    @MainActor
+    private func requestMediaPermissions() {
+        guard !mediaBusy else { return }
+        mediaBusy = true
+        Task { @MainActor in
+            let result = await mediaPort.requestPermissions(audio: true, video: true)
+            mediaPermissions = result
+            mediaBusy = false
+            refreshMediaDevices()
         }
     }
 
