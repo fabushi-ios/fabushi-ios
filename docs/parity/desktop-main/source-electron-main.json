@@ -22,17 +22,17 @@
     {
       "desktop_path": "source/electron-main/account/account-authorization.ts",
       "desktop_blob_sha": "5470896e1a623e69ec3b326cb08a5fb9865fb737",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Authorize a settled Desktop account slot against the environment descriptor/durable-data claim policy, then atomically scope MCP custom instructions to the account cache scope and abandon a foreign onboarding mirror before adopting a different account.",
       "desktop_owner": "platform-main",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "A newly authenticated account cannot silently inherit another account's durable onboarding/custom-instruction state, while first-start existing data may be explicitly claimed only under the startup policy.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/ios-main/account/account-authorization.swift; CoordinatorAccountRuntime account-scope owner",
+      "ios_language": "Swift",
+      "ios_platform_delta": "IOSAccountAuthorizer already adopts the settled Host slot and local-human/account scope without creating a second auth source. Exact review did not establish an iOS equivalent for Desktop's descriptor-backed existing-durable-data claim and foreign-onboarding-mirror abandonment at this owner boundary, so the row remains mapped/fail-closed until that lifecycle is proven or implemented.",
+      "implementation_status": "mapped",
+      "production_evidence": "source/ios-main/account/account-authorization.swift (settled Host slot -> canonical account/local-human scope); wider durable-data/onboarding claim owner not yet proven in this review.",
+      "test_evidence": "Requires focused account replacement/startup durable-data tests plus current-head protected account acceptance before implemented/verified promotion.",
+      "notes": "Exact Desktop account-authorization.ts@5470896e1a623e69ec3b326cb08a5fb9865fb737 and iOS account-authorization.swift@b30335dbace12b2a6253f32af1d001d2c7e3b1e6 reviewed. Do not infer parity from filename alone; durable-data claim / foreign onboarding mirror semantics are the remaining gap."
     },
     {
       "desktop_path": "source/electron-main/account/cursor-auth-wiring.ts",
