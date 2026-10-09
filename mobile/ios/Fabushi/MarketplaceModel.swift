@@ -1452,8 +1452,6 @@ private final class BrowserAuthPresentationContext: NSObject, ASWebAuthenticatio
     }
 }
 
-@MainActor
-@Observable
 enum AccountFeedbackCode: String, CaseIterable, Sendable {
     case accessDenied = "access-denied"
     case invalidFeedback = "invalid-feedback"
@@ -1486,6 +1484,8 @@ struct AccountFeedbackError: LocalizedError, Equatable {
     var errorDescription: String? { code.localizedMessage }
 }
 
+@MainActor
+@Observable
 final class MarketplaceModel {
     var query = ""
     var message = "Mahayana Rust Host 正在启动"
