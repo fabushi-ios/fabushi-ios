@@ -60,6 +60,7 @@ internal struct GrokMobileShell: View {
     @State var commandPaletteRoutineStatus: MobileCommandPaletteProviderStatus = .idle
     @State var commandPaletteLinkMetadata: [String: MobileCommandPaletteLinkMetadata] = [:]
     @State var commandPaletteLinkStatus: MobileCommandPaletteProviderStatus = .idle
+    @State var promptFocusGeneration = 0
 
     @ViewBuilder
     var body: some View {
@@ -73,6 +74,9 @@ internal struct GrokMobileShell: View {
             } else {
                 homeContent
             }
+        }
+        .overlay(alignment: .topLeading) {
+            rootHardwareKeyboardShortcuts
         }
         .task(id: "\(mobileAccountScopeKey)|\(selectedBot?.id ?? "")") {
             hiddenChatsController.setScope(
@@ -402,6 +406,7 @@ internal struct GrokMobileShell: View {
             model: model,
             appAgentSurface: appAgentSurface,
             reconnectGeneration: reconnectGeneration,
+            focusPromptGeneration: promptFocusGeneration,
             onClose: { clearRosterSelection() },
             onOpenSettings: {
                 self.botSettingsRoutineID = nil
