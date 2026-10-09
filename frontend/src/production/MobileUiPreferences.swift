@@ -401,3 +401,14 @@ internal final class MobileUiPreferencesStore {
     }
 }
 
+
+private struct MobileUiPreferencesStoreEnvironmentKey: EnvironmentKey {
+    static let defaultValue: MobileUiPreferencesStore? = nil
+}
+
+extension EnvironmentValues {
+    internal var mobileUiPreferencesStore: MobileUiPreferencesStore? {
+        get { self[MobileUiPreferencesStoreEnvironmentKey.self] }
+        set { self[MobileUiPreferencesStoreEnvironmentKey.self] = newValue }
+    }
+}
