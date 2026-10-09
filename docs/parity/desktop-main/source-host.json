@@ -4531,7 +4531,7 @@
       "ios_target_path": "source/shared/node/settings/sand-settings-store.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS SandSettingsStore owns the persisted selection and MahayanaCoordinator projects it through the native Host FFI at startup rather than an Electron settings extension.",
-      "implementation_status": "implemented",
+      "implementation_status": "mapped",
       "production_evidence": "source/shared/node/settings/sand-settings-store.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/mahayana-agent-coordinator/local-host-supervisor.swift; source/host/MahayanaHostRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift; current iOS exact-HEAD GitHub Actions pending",
       "notes": "Revalidated against Desktop PR #20 a3d9a509144f0997df10cdc85a50cc27507f5aa1; persisted explicit provider remains authoritative and only an unset profile falls back to Fabushi."
