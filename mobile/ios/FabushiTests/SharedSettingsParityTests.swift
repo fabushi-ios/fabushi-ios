@@ -373,7 +373,7 @@ final class SharedSettingsParityTests: XCTestCase {
     }
 
     @MainActor
-    func testHostSettingsReconcilerAbsorbsRemoteAndWritesBackLocalWhenRemoteIsMissing() async {
+    func testHostSettingsReconcilerAbsorbsRemoteTrueAndFalseIntoCanonicalLocalMirror() async {
         var local: Bool?
         var remote: Bool? = true
         var generation: UInt64 = 1
@@ -397,15 +397,15 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-a")
 
         reconciler.accountDeparted()
-        local = false
-        remote = nil
+        local = nil
+        remote = false
         generation &+= 1
         reconciler.scopeToAccount("owner-b")
         reconciler.setTransportLive(true)
 
         XCTAssertTrue(await reconciler.reconcileIfReadable())
-        XCTAssertEqual(remote, false)
         XCTAssertEqual(local, false)
+        XCTAssertEqual(remote, false)
         XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-b")
     }
 
