@@ -913,6 +913,7 @@ extension ContentView {
             chatSearchTargetID = nil
             humanHandoffConversationId = conversation.id
             humanHandoffAgents = []
+            humanHandoffBusy = false
             humanHandoffError = nil
             if let bridge {
                 do {
