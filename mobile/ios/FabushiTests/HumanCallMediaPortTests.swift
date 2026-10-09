@@ -43,6 +43,51 @@ final class HumanCallMediaPortTests: XCTestCase {
         XCTAssertNil(port.storedPreferences().cameraId)
     }
 
+    @MainActor
+    func testRuntimeFallbackNeverRewritesStoredMediaIntent() throws {
+        let suiteName = "HumanCallMediaPortTests.runtime-fallback"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let port = HumanCallMediaPort(defaults: defaults)
+        let devices = [
+            HumanCallMediaDevice(id: "mic-built-in", name: "Built-in microphone", kind: .microphone),
+            HumanCallMediaDevice(id: "camera-front", name: "Front camera", kind: .camera),
+        ]
+
+        XCTAssertEqual(
+            HumanCallMediaPort.resolvedDeviceId(
+                preferredId: port.storedPreferences().microphoneId,
+                kind: .microphone,
+                devices: devices
+            ),
+            "mic-built-in"
+        )
+        XCTAssertNil(port.storedPreferences().microphoneId)
+
+        port.setPreferredDeviceId("mic-removed", kind: .microphone)
+        XCTAssertEqual(
+            HumanCallMediaPort.resolvedDeviceId(
+                preferredId: port.storedPreferences().microphoneId,
+                kind: .microphone,
+                devices: devices
+            ),
+            "mic-built-in"
+        )
+        XCTAssertEqual(port.storedPreferences().microphoneId, "mic-removed")
+
+        XCTAssertEqual(
+            HumanCallMediaPort.resolvedDeviceId(
+                preferredId: port.storedPreferences().cameraId,
+                kind: .camera,
+                devices: devices
+            ),
+            "camera-front"
+        )
+        XCTAssertNil(port.storedPreferences().cameraId)
+    }
+
 
 }
 

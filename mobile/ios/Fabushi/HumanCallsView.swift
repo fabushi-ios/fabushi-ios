@@ -798,8 +798,9 @@ internal struct HumanCallsView: View {
             selectedMicrophoneId = microphone.id
         }
         if let cameraId = peer.activeCameraDeviceId ?? preferences.cameraId {
+            // Runtime fallback is call-local state, not a replacement for the
+            // user's stored "system default" or stale explicit preference.
             selectedCameraId = cameraId
-            mediaPort.setPreferredDeviceId(cameraId, kind: .camera)
         }
         try await updateMediaStateOrThrow(call: call)
         guard peerConnection === peer, activeMediaCallId == call.id else {
@@ -1100,8 +1101,9 @@ internal struct HumanCallsView: View {
             guard peerConnection === peer, activeMediaCallId == call.id else { return }
             cameraEnabled = next
             if let activeCameraId = peer.activeCameraDeviceId {
+                // Enabling video may resolve a concrete device for this call,
+                // but only an explicit device selection changes the preference.
                 selectedCameraId = activeCameraId
-                mediaPort.setPreferredDeviceId(activeCameraId, kind: .camera)
             }
             await updateMediaState(call: call)
         } catch HumanCallPeerConnection.Failure.staleOperation {

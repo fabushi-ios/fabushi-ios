@@ -191,11 +191,12 @@ internal final class HumanCallMediaPort {
         } ?? availableInputs.first
 
         guard let selected else {
-            setPreferredDeviceId(nil, kind: .microphone)
             return nil
         }
         try audioSession.setPreferredInput(selected)
-        setPreferredDeviceId(selected.uid, kind: .microphone)
+        // Runtime resolution must not rewrite the user's stored intent.
+        // A nil preference remains "system default", and a stale explicit
+        // preference remains explicit while this call safely falls back.
         return HumanCallMediaDevice(
             id: selected.uid,
             name: selected.portName,
