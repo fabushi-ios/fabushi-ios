@@ -275,6 +275,20 @@ internal struct GrokMobileShell: View {
         )
     }
 
+    var isRosterPrivacyBlocked: Bool {
+        isMobileRosterPrivacyBlocked(
+            access: accessCoverAccess,
+            failure: accessRosterSnapshot.failure
+        )
+    }
+
+    var rosterStatusKind: MobileRosterStatusKind? {
+        MobileRosterStatusProjection.project(
+            roster: accessRosterSnapshot,
+            bots: bots
+        )
+    }
+
     @MainActor
     func retryCoordinatorConnection() {
         guard !connectionRetrying else { return }

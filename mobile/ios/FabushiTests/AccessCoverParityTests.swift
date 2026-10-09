@@ -629,4 +629,83 @@ final class AccessCoverParityTests: XCTestCase {
         )
     }
 
+    func testRosterPrivacyBlockRecognizesAccessAndLegacyTransportSignals() {
+        XCTAssertTrue(
+            isMobileRosterPrivacyBlocked(
+                access: .init(state: .unavailable, reason: .teamPrivacyMode),
+                failure: nil
+            )
+        )
+        XCTAssertTrue(
+            isMobileRosterPrivacyBlocked(
+                access: .unknown,
+                failure: .init(
+                    code: "CLOUD_AGENT_STORAGE_DISABLED",
+                    message: nil,
+                    transportKind: nil
+                )
+            )
+        )
+        XCTAssertTrue(
+            isMobileRosterPrivacyBlocked(
+                access: .unknown,
+                failure: .init(
+                    code: "other",
+                    message: nil,
+                    transportKind: "no_storage"
+                )
+            )
+        )
+        XCTAssertFalse(
+            isMobileRosterPrivacyBlocked(
+                access: .unknown,
+                failure: .init(
+                    code: "network",
+                    message: nil,
+                    transportKind: "network"
+                )
+            )
+        )
+    }
+
+    func testRosterStatusProjectionDistinguishesEmptyAndAllHidden() {
+        let complete = AccessRosterSnapshot(
+            bots: [],
+            hasCompleteRoster: true,
+            isShowingRestoredRoster: false,
+            loadState: .ready,
+            failure: nil,
+            isFetching: false,
+            confirmedFetches: 1,
+            transport: .connected
+        )
+        XCTAssertEqual(
+            MobileRosterStatusProjection.project(roster: complete, bots: []),
+            .empty
+        )
+
+        let hidden = MobileBotSummary(
+            id: "hidden",
+            name: "Hidden",
+            description: "",
+            hidden: true
+        )
+        XCTAssertEqual(
+            MobileRosterStatusProjection.project(
+                roster: .init(
+                    bots: [hidden],
+                    hasCompleteRoster: true,
+                    isShowingRestoredRoster: false,
+                    loadState: .ready,
+                    failure: nil,
+                    isFetching: false,
+                    confirmedFetches: 1,
+                    transport: .connected
+                ),
+                bots: [hidden]
+            ),
+            .allHidden
+        )
+    }
+
 }

@@ -102,6 +102,14 @@ extension GrokMobileShell {
                         sectionTitle("Board")
                         botRow(MobileBotSummary(id: "mahayana-assistant", name: "Mahayana", description: "Ready to help"), subtitle: "that's the only new one.", badge: "Board")
 
+                        if let rosterStatusKind,
+                           rosterStatusKind == .empty || rosterStatusKind == .allHidden {
+                            MobileRosterStatusView(
+                                kind: rosterStatusKind,
+                                onShowHiddenBots: { hiddenChatsOpen = true }
+                            )
+                        }
+
                         if !bots.isEmpty {
                             if agentSidebarSections.isEmpty {
                                 sectionTitle("Bots  \(filteredBots.count)")
@@ -176,21 +184,30 @@ extension GrokMobileShell {
                 }
             }
 
-            AccessCoverView(
-                access: accessCoverComposition.access,
-                isVisible: accessCoverComposition.isVisible,
-                onOpenAccess: {
-                    _ = openExternalURL(ACCESS_ONBOARDING_URL)
-                }
-            )
+            if isRosterPrivacyBlocked {
+                MobileRosterPrivacyBlockedView(
+                    onSignOut: { await model.logout() },
+                    onOpenSettings: {
+                        _ = openExternalURL(ROSTER_PRIVACY_SETTINGS_URL)
+                    }
+                )
+            } else {
+                AccessCoverView(
+                    access: accessCoverComposition.access,
+                    isVisible: accessCoverComposition.isVisible,
+                    onOpenAccess: {
+                        _ = openExternalURL(ACCESS_ONBOARDING_URL)
+                    }
+                )
 
-            MobileCoordinatorConnectionNotice(
-                snapshot: coordinatorConnectionSnapshot,
-                onRetry: retryCoordinatorConnection
-            )
-            .padding(.horizontal, 18)
-            .padding(.bottom, 18)
-            .frame(maxHeight: .infinity, alignment: .bottom)
+                MobileCoordinatorConnectionNotice(
+                    snapshot: coordinatorConnectionSnapshot,
+                    onRetry: retryCoordinatorConnection
+                )
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+            }
         }
         .confirmationDialog("Create", isPresented: $composeOpen, titleVisibility: .visible) {
             Button("New Bot") {
