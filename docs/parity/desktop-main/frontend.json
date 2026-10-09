@@ -4257,7 +4257,7 @@
       "desktop_blob_sha": "02c34ddaee843b976303640bbc52a308ecf53042",
       "desktop_responsibility": "Desktop-only Node contract test bundle that exercises tool-result projection, global keyboard shortcut ownership, and Computer shell projection. The test harness itself is not a shipping iOS responsibility; equivalent native production owners require focused XCTest evidence.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Regression-only Desktop contract coverage keeps tool-result cards, global keyboard shortcuts and remote Computer shell projections stable; on iOS those same user-visible behaviors are guarded by native focused tests rather than this Node harness.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "mobile/ios/FabushiTests/MobileHardwareKeyboardParityTests.swift; mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; native tool-result focused tests",
       "ios_language": "Swift / SwiftUI",
@@ -4265,7 +4265,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/window-chrome/hardware-keyboard.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift; source/mahayana-agent-coordinator/client-side-tool-v2-relay.swift",
       "test_evidence": "mobile/ios/FabushiTests/MobileHardwareKeyboardParityTests.swift; mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; iOS exact-HEAD unit-test job remains authoritative for native replacements.",
-      "notes": "Exact Desktop blob 02c34ddaee843b976303640bbc52a308ecf53042 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying."
+      "notes": "Exact Desktop blob 02c34ddaee843b976303640bbc52a308ecf53042 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-state-models.contract.test.ts",
@@ -4873,7 +4874,7 @@
       "desktop_blob_sha": "d6bf52a04d9e5d5d016ff714df08c99db3aebdce",
       "desktop_responsibility": "Desktop CSS presentation for the notification tray stack, error cards, count/detail/actions, dismiss/copy controls and entry animation.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Notification tray entries remain readable and actionable with clear error emphasis, counts/details, copy/dismiss controls and compact stacked presentation; iOS renders that effect with native SwiftUI styling.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell.swift",
       "ios_language": "Swift / SwiftUI",
@@ -4881,7 +4882,8 @@
       "implementation_status": "mapped",
       "production_evidence": "Native SwiftUI notification-tray presentation is composed in the existing GrokMobileShell owner together with the mapped notification-host lifecycle; CSS itself is not copied to iOS.",
       "test_evidence": "Current native notification-host row remains mapped and must obtain focused shipping-path tests/current-head Actions before this presentation row can be promoted.",
-      "notes": "Exact Desktop blob d6bf52a04d9e5d5d016ff714df08c99db3aebdce reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying."
+      "notes": "Exact Desktop blob d6bf52a04d9e5d5d016ff714df08c99db3aebdce reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/notification-host.tsx",
@@ -4903,7 +4905,7 @@
       "desktop_blob_sha": "31e70d3af5322fc70d3aee0eed853a785ef13ee4",
       "desktop_responsibility": "Desktop root-shell loading presentation: full-surface loading state, centered progress mark/copy, and reduced-motion-safe behavior.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Users see a full-surface loading state while the product root initializes, with a centered progress indicator and motion-safe presentation.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/FabushiSceneRoot.swift",
       "ios_language": "Swift / SwiftUI",
@@ -4911,7 +4913,8 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift and frontend/src/production/ProductionRenderer.view.swift use native SwiftUI root loading/error/content composition and ProgressView rather than Desktop CSS.",
       "test_evidence": "Existing root-shell/error-boundary current-head tests plus exact-HEAD Actions; native ProgressView inherits platform Reduce Motion behavior instead of CSS media queries.",
-      "notes": "Exact Desktop blob 31e70d3af5322fc70d3aee0eed853a785ef13ee4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying."
+      "notes": "Exact Desktop blob 31e70d3af5322fc70d3aee0eed853a785ef13ee4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/root-shell-state.tsx",
@@ -4933,7 +4936,7 @@
       "desktop_blob_sha": "142b69df0b7ed835e7f5bd123955565403fa3468",
       "desktop_responsibility": "Desktop visual placement/shape contract for the compact window connection status indicator.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Users can distinguish current connection state through a compact, unobtrusive status indicator positioned in the app chrome; iOS renders this in native shell layout.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/root-resilience/connection-state.swift",
       "ios_language": "Swift / SwiftUI",
@@ -4941,7 +4944,8 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/root-resilience/connection-state.swift and frontend/src/production/GrokMobileShell+Home.swift render the native compact connection state without fixed Electron titlebar CSS.",
       "test_evidence": "Existing root connection-state focused tests and current-head Actions cover connected/connecting/disconnected projection.",
-      "notes": "Exact Desktop blob 142b69df0b7ed835e7f5bd123955565403fa3468 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying."
+      "notes": "Exact Desktop blob 142b69df0b7ed835e7f5bd123955565403fa3468 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/status-badge.tsx",
@@ -4963,7 +4967,7 @@
       "desktop_blob_sha": "9f50cbcd9aa6da8d8b56cb291b627fe427165f72",
       "desktop_responsibility": "Desktop Electron-only draggable titlebar/window-control CSS: app-region drag geometry, minimize/maximize/close button sizing, hover and destructive-close styling.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Desktop users get draggable custom window chrome and native-like minimize/maximize/close affordances; iOS replaces that entire window-management effect with system scene/navigation chrome.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "frontend/src/production/FabushiSceneRoot.swift; mobile/ios/Fabushi/FabushiApp.swift",
       "ios_language": "Swift / SwiftUI",
@@ -4971,7 +4975,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "iOS uses UIKit/SwiftUI scene, safe-area and system navigation/window chrome; there is no Electron draggable titlebar or minimize/maximize/close control surface to port.",
       "test_evidence": "Native iOS scene/safe-area UI acceptance replaces Desktop CSS/window-control tests.",
-      "notes": "Exact Desktop blob 9f50cbcd9aa6da8d8b56cb291b627fe427165f72 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying."
+      "notes": "Exact Desktop blob 9f50cbcd9aa6da8d8b56cb291b627fe427165f72 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/view.tsx",
@@ -5098,7 +5103,7 @@
       "desktop_blob_sha": "0b13169cc738523e48554ae51a81709f10c1a491",
       "desktop_responsibility": "Desktop Node contract-test harness for source-failure records, immutable recovered entrypoints, snapshot-store lifecycle, and the recovered-entrypoint inventory.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Regression-only Desktop contract coverage keeps source failures structured, recovered entrypoints stable, snapshot-store lifecycle deterministic and surface inventory unique; iOS verifies those effects in native runtime/feature tests.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "native iOS runtime/feature focused tests over FabushiRuntime, Swift feature owners and shipping composition",
       "ios_language": "Swift / XCTest",
@@ -5106,7 +5111,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/ios-main/FabushiRuntime.swift; frontend/src/production/GrokMobileShell.swift; native feature owners referenced by their ledger rows",
       "test_evidence": "Current iOS focused unit/UI suites and exact-HEAD architecture/build jobs replace this Desktop-only node:test file.",
-      "notes": "Exact Desktop blob 0b13169cc738523e48554ae51a81709f10c1a491 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; test harness is replaced, while each tested product contract remains tracked independently."
+      "notes": "Exact Desktop blob 0b13169cc738523e48554ae51a81709f10c1a491 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; test harness is replaced, while each tested product contract remains tracked independently.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/snapshot-store.ts",
@@ -5143,7 +5149,7 @@
       "desktop_blob_sha": "ae1a770e1e973005731f090fbd507a210a272acd",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Desktop floating panels can be dragged without triggering header buttons, remain clamped inside the visible viewport after resize, stop cleanly on Escape/blur/pointer loss and dispose listeners; iOS uses native panel/gesture containment instead.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI sheet/fullScreenCover/DragGesture and per-feature native panel layouts",
       "ios_language": "Swift / SwiftUI",
@@ -5151,14 +5157,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI sheet/fullScreenCover/DragGesture and per-feature native panel layouts",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob ae1a770e1e973005731f090fbd507a210a272acd reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob ae1a770e1e973005731f090fbd507a210a272acd reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/overlay-primitives.tsx",
       "desktop_blob_sha": "84881097e54a3b6daa9e32942ec66988718e7676",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Modal and floating feature surfaces preserve dismissal ownership, focus containment/restoration, nested-layer Escape/backdrop behavior, accessibility roles and scroll isolation; iOS delegates those effects to SwiftUI/UIKit presentation primitives.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI sheet/fullScreenCover/confirmationDialog/Menu plus native focus and accessibility semantics",
       "ios_language": "Swift / SwiftUI",
@@ -5166,14 +5173,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI sheet/fullScreenCover/confirmationDialog/Menu plus native focus and accessibility semantics",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 84881097e54a3b6daa9e32942ec66988718e7676 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 84881097e54a3b6daa9e32942ec66988718e7676 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-floating-primitives.css",
       "desktop_blob_sha": "5d9521ef1ba621b398c6c62fe081b431bb0a065e",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Menus/tooltips remain visually legible, bounded, focus-visible, disabled-state aware and reduced-motion safe; iOS uses native Menu/Popover/sheet styling and accessibility.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI Menu/Popover/sheet native presentation",
       "ios_language": "Swift / SwiftUI",
@@ -5181,14 +5189,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/Popover/sheet native presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 5d9521ef1ba621b398c6c62fe081b431bb0a065e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 5d9521ef1ba621b398c6c62fe081b431bb0a065e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-floating-primitives.tsx",
       "desktop_blob_sha": "c4515218e59f1fab364200b223e3bf9c13e7385f",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Feature menus/tooltips own correct floating placement, child-layer dismissal, keyboard/focus and accessibility behavior; iOS uses native Menu/Popover/sheet presentation instead of DOM floating layers.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI Menu/Popover/sheet native presentation",
       "ios_language": "Swift / SwiftUI",
@@ -5196,14 +5205,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/Popover/sheet native presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob c4515218e59f1fab364200b223e3bf9c13e7385f reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob c4515218e59f1fab364200b223e3bf9c13e7385f reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-form-primitives.css",
       "desktop_blob_sha": "3a44687258529ff4a10045508ad671ae79b9f2f2",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Inputs, text areas, checkboxes, switches and tabs expose clear focus, disabled, invalid and selected states with reduced-motion-safe transitions; iOS uses native form controls.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI TextField/TextEditor/Toggle/Picker native controls",
       "ios_language": "Swift / SwiftUI",
@@ -5211,14 +5221,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI TextField/TextEditor/Toggle/Picker native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 3a44687258529ff4a10045508ad671ae79b9f2f2 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 3a44687258529ff4a10045508ad671ae79b9f2f2 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-form-primitives.tsx",
       "desktop_blob_sha": "6562e203a3c8501248aa971427375607012b48c4",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Feature forms get reusable accessible input, textarea, checkbox, switch and tab semantics without inventing per-feature interaction rules; iOS uses SwiftUI native controls.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI TextField/TextEditor/Toggle/Picker native controls",
       "ios_language": "Swift / SwiftUI",
@@ -5226,14 +5237,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI TextField/TextEditor/Toggle/Picker native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 6562e203a3c8501248aa971427375607012b48c4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 6562e203a3c8501248aa971427375607012b48c4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-icon-registry.ts",
       "desktop_blob_sha": "7581aa3dc9e7bf55b0d73d21cc9f7ac1971fce04",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Desktop feature surfaces resolve semantic icon names to the shipped platform glyph set with consistent sizing/color aliases; iOS resolves the same semantic intent through SF Symbols or app assets.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SF Symbols and asset-catalog icons selected by each native feature surface",
       "ios_language": "Swift / SwiftUI",
@@ -5241,14 +5253,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SF Symbols and asset-catalog icons selected by each native feature surface",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 7581aa3dc9e7bf55b0d73d21cc9f7ac1971fce04 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 7581aa3dc9e7bf55b0d73d21cc9f7ac1971fce04 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-kit-primitives.css",
       "desktop_blob_sha": "3d127c77fc5d8d1c6132fa903b5d86d8332f8379",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Buttons, icon buttons and chips preserve selected/destructive/disabled/focus/pressed presentation and motion preferences; iOS uses native SwiftUI control styles.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI Button/Label/ProgressView and feature-owned native controls",
       "ios_language": "Swift / SwiftUI",
@@ -5256,14 +5269,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Button/Label/ProgressView and feature-owned native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 3d127c77fc5d8d1c6132fa903b5d86d8332f8379 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 3d127c77fc5d8d1c6132fa903b5d86d8332f8379 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-kit-primitives.tsx",
       "desktop_blob_sha": "e34cfc6b11d869710b4bd01ce37ebbdadcd8d978",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Feature surfaces receive consistent button/icon/chip interaction and accessibility semantics from the shared Desktop kit; iOS composes native Button/Label controls in each shipping feature.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI Button/Label/ProgressView and feature-owned native controls",
       "ios_language": "Swift / SwiftUI",
@@ -5271,14 +5285,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Button/Label/ProgressView and feature-owned native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob e34cfc6b11d869710b4bd01ce37ebbdadcd8d978 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob e34cfc6b11d869710b4bd01ce37ebbdadcd8d978 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-menu-item.css",
       "desktop_blob_sha": "0b8e91bd43506d33fb686414628708a4075a2c0d",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Menu rows clearly expose focus, selection, disabled state, leading/trailing metadata and ellipsized descriptions; iOS uses native Menu/List row presentation.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI Menu/List/Button native row presentation",
       "ios_language": "Swift / SwiftUI",
@@ -5286,14 +5301,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/List/Button native row presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 0b8e91bd43506d33fb686414628708a4075a2c0d reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 0b8e91bd43506d33fb686414628708a4075a2c0d reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-menu-item.tsx",
       "desktop_blob_sha": "d6cf40d433db08bdcd85735da71ea0f5bf965b39",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Menus expose accessible selectable/disabled rows with leading/trailing content and keyboard/focus behavior; iOS uses native Menu/List/Button semantics.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI Menu/List/Button native row presentation",
       "ios_language": "Swift / SwiftUI",
@@ -5301,14 +5317,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/List/Button native row presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob d6cf40d433db08bdcd85735da71ea0f5bf965b39 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob d6cf40d433db08bdcd85735da71ea0f5bf965b39 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-status-primitives.css",
       "desktop_blob_sha": "107c6ece8d3d4c4d8fe8f7f556188078b2ab6f46",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Progress/status indicators visibly communicate determinate or indeterminate work and respect reduced-motion preferences; iOS uses native ProgressView/status presentation.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI ProgressView/status labels and platform Reduce Motion behavior",
       "ios_language": "Swift / SwiftUI",
@@ -5316,14 +5333,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI ProgressView/status labels and platform Reduce Motion behavior",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 107c6ece8d3d4c4d8fe8f7f556188078b2ab6f46 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 107c6ece8d3d4c4d8fe8f7f556188078b2ab6f46 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-status-primitives.tsx",
       "desktop_blob_sha": "94e329140841d4a1b142f2405a05b37c6098002c",
       "desktop_responsibility": "Desktop shared React/DOM presentation primitive used by feature surfaces; its platform-independent user effect is consumed through each feature owner, while DOM portals/CSS/focus/pointer mechanics are framework-specific.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Feature surfaces can present consistent progress/status/menu-divider semantics without duplicating state behavior; iOS uses native ProgressView and feature-owned status views.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "SwiftUI ProgressView/status labels and feature-owned status composition",
       "ios_language": "Swift / SwiftUI",
@@ -5331,14 +5349,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI ProgressView/status labels and feature-owned status composition",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 94e329140841d4a1b142f2405a05b37c6098002c reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative."
+      "notes": "Exact Desktop blob 94e329140841d4a1b142f2405a05b37c6098002c reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/upstream.ts",
       "desktop_blob_sha": "865e563fea6c4b4ac4456596109478d826621991",
       "desktop_responsibility": "Desktop recovered-renderer bootstrap that fetches a dev reconstruction manifest, injects recovered CSS and dynamically imports the Vite-served upstream renderer.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Desktop development/recovered builds boot the reconstructed renderer and its styles exactly once; native iOS instead starts the compiled Swift shipping root directly.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "mobile/ios/project.yml; frontend/src/production/FabushiSceneRoot.swift",
       "ios_language": "Swift / XcodeGen",
@@ -5346,14 +5365,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml; frontend/src/production/FabushiSceneRoot.swift",
       "test_evidence": "GitHub Actions Xcode project generation/build and shipping-root UI acceptance replace the Desktop recovered-renderer bootstrap.",
-      "notes": "Exact Desktop blob 865e563fea6c4b4ac4456596109478d826621991 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61."
+      "notes": "Exact Desktop blob 865e563fea6c4b4ac4456596109478d826621991 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/tsconfig.json",
       "desktop_blob_sha": "668d3ab8d2beb7dc82c64eea76e52ca7d1b7e8ba",
       "desktop_responsibility": "Desktop TypeScript compiler configuration for the React/Vite renderer.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Desktop renderer sources are typechecked under a strict modern TypeScript/DOM contract; iOS gets the equivalent compile-time safety from Swift 6/Xcode settings.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "mobile/ios/project.yml",
       "ios_language": "XcodeGen / Swift compiler settings",
@@ -5361,14 +5381,15 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml (SWIFT_VERSION 6.0, iOS deployment target, source graph)",
       "test_evidence": "Current-head Xcode generation and Swift build/test jobs.",
-      "notes": "Exact Desktop blob 668d3ab8d2beb7dc82c64eea76e52ca7d1b7e8ba reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61."
+      "notes": "Exact Desktop blob 668d3ab8d2beb7dc82c64eea76e52ca7d1b7e8ba reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/vite.config.ts",
       "desktop_blob_sha": "d43c7209b0d5cf2c8788dedd8446480d9eebb5e9",
       "desktop_responsibility": "Desktop Vite dev/build configuration for recovered Electron renderer assets, dev health endpoint/upstream asset serving and local control proxy.",
       "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
+      "desktop_visible_effect": "Desktop renderer development/build resolves recovered assets, health/control endpoints and relative packaged chunks; native iOS gets an installable app bundle and testable source graph from XcodeGen/Xcode instead.",
       "ios_disposition": "not-applicable-with-replacement",
       "ios_target_path": "mobile/ios/project.yml; .github/workflows",
       "ios_language": "XcodeGen / GitHub Actions",
@@ -5376,7 +5397,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml; current iOS GitHub Actions workflows",
       "test_evidence": "Exact-head architecture, Xcode generation, unit/UI, device-archive and protected-account jobs.",
-      "notes": "Exact Desktop blob d43c7209b0d5cf2c8788dedd8446480d9eebb5e9 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61."
+      "notes": "Exact Desktop blob d43c7209b0d5cf2c8788dedd8446480d9eebb5e9 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     }
   ]
 }
