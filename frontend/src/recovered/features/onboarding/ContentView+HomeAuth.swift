@@ -328,7 +328,7 @@ extension ContentView {
 
                     Text("Character color").font(.caption).foregroundStyle(.secondary)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 10) {
-                        ForEach(AvatarImagePolicy.colors, id: \.id) { color in
+                        ForEach(MobileOnboardingCharacterCatalog.colors, id: \.id) { color in
                             Button {
                                 onboardingDraft.color = color.id
                                 onboardingDraft.pickedTemplateId = nil
@@ -350,7 +350,7 @@ extension ContentView {
 
                     Text("Character shape").font(.caption).foregroundStyle(.secondary)
                     LazyVGrid(columns: Array(repeating: GridItem(.adaptive(minimum: 72)), count: 1), spacing: 8) {
-                        ForEach(AvatarImagePolicy.shapes, id: \.self) { shape in
+                        ForEach(MobileOnboardingCharacterCatalog.shapeIds, id: \.self) { shape in
                             Button(shape.capitalized) {
                                 onboardingDraft.shape = shape
                                 onboardingDraft.pickedTemplateId = nil
@@ -365,20 +365,33 @@ extension ContentView {
                     Text("Suggestions").font(.headline)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
-                            ForEach(MobileOnboardingSuggestion.selected(for: onboardingDailyTools)) { choice in
+                            let suggestions = MobileOnboardingSuggestion.selected(for: onboardingDailyTools)
+                            let identities = MobileOnboardingSuggestion.identities(for: suggestions)
+                            ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, choice in
+                                let identity = identities[index]
                                 Button {
                                     onboardingDraft.name = choice.suggestion.name
                                     onboardingDraft.description = choice.renderedDescription
+                                    onboardingDraft.color = identity.color
+                                    onboardingDraft.shape = identity.shape
                                     onboardingDraft.pickedTemplateId = choice.suggestion.id
                                 } label: {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(choice.suggestion.name).font(.headline)
-                                        Text(choice.renderedDescription)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .multilineTextAlignment(.leading)
+                                    HStack(alignment: .top, spacing: 10) {
+                                        LoginBlob(
+                                            color: onboardingColor(identity.color),
+                                            width: 40,
+                                            height: 40,
+                                            rotation: 0
+                                        )
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(choice.suggestion.name).font(.headline)
+                                            Text(choice.renderedDescription)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .multilineTextAlignment(.leading)
+                                        }
                                     }
-                                    .frame(width: 190, alignment: .leading)
+                                    .frame(width: 220, alignment: .leading)
                                     .padding()
                                 }
                                 .buttonStyle(.bordered)
