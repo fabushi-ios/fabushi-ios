@@ -82,13 +82,15 @@ extension GrokMobileShell {
                   reconnectGeneration == expectedReconnect
             else { return }
 
-            bots = live
-            AccessRosterPersistence.save(live, accountScopeKey: expectedScope)
+            hiddenChatsController.ingestAgents(live)
+            let projected = hiddenChatsController.projectAgents(live)
+            bots = projected
+            AccessRosterPersistence.save(projected, accountScopeKey: expectedScope)
             accessRosterSnapshot = AccessRosterSnapshotProjection.complete(
-                live,
+                projected,
                 previous: accessRosterSnapshot
             )
-            reconcileRosterSelection(with: live, isComplete: true)
+            reconcileRosterSelection(with: projected, isComplete: true)
             accessCoverAccess = .init(state: .granted, reason: .none)
             accessCoverFirstBox = FirstBoxGate.project(
                 previous: accessCoverFirstBox,
@@ -343,18 +345,57 @@ extension GrokMobileShell {
 
     @MainActor
     func setBotHidden(_ bot: MobileBotSummary, hidden: Bool) async {
-        guard !bot.isGroup, bot.miniAppId == nil, !botActionBusy else { return }
-        botActionBusy = true
+        guard !bot.isGroup,
+              bot.miniAppId == nil,
+              !hiddenChatsController.isPending(bot.id)
+        else { return }
+
         botActionError = nil
-        defer { botActionBusy = false }
         do {
-            bots = try await GrokMobileBotService(bridge: bridge)
-                .setBotHidden(id: bot.id, hidden: hidden)
+            try await hiddenChatsController.setAgentHidden(
+                agentId: bot.id,
+                isHidden: hidden,
+                readAgent: { id in bots.first(where: { $0.id == id }) },
+                onOptimisticChange: { id, nextHidden in
+                    applyHiddenProjection(agentId: id, hidden: nextHidden)
+                },
+                call: { id, nextHidden in
+                    try await GrokMobileBotService(bridge: bridge)
+                        .setBotHiddenMutation(id: id, hidden: nextHidden)
+                },
+                onRollback: { id, _, previousHidden in
+                    applyHiddenProjection(agentId: id, hidden: previousHidden)
+                }
+            )
         } catch {
-            botActionError = hidden
-                ? "隐藏 Bot 失败：\(error.localizedDescription)"
-                : "恢复 Bot 失败：\(error.localizedDescription)"
+            if MobileHiddenChatsMutationController.isTransportFailure(error) {
+                botActionError = "连接暂时不可用；隐藏状态已保留，将在重连后自动重试。"
+            } else {
+                botActionError = hidden
+                    ? "隐藏 Bot 失败：\(error.localizedDescription)"
+                    : "恢复 Bot 失败：\(error.localizedDescription)"
+            }
         }
+    }
+
+    @MainActor
+    func applyHiddenProjection(agentId: String, hidden: Bool) {
+        guard let index = bots.firstIndex(where: { $0.id == agentId }) else { return }
+        bots[index] = bots[index].replacingHidden(hidden)
+    }
+
+    @MainActor
+    func retryHeldHiddenChatMutations() {
+        hiddenChatsController.noteReconnect(
+            call: { id, hidden in
+                try await GrokMobileBotService(bridge: bridge)
+                    .setBotHiddenMutation(id: id, hidden: hidden)
+            },
+            onRollback: { id, _, previousHidden in
+                applyHiddenProjection(agentId: id, hidden: previousHidden)
+                botActionError = "重连后恢复隐藏状态失败，已回滚到服务器状态。"
+            }
+        )
     }
 
     @MainActor
