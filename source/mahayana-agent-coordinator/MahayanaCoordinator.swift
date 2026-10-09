@@ -157,6 +157,12 @@ final class IOSHostSettingsReconciler {
     }
 
     func scopeToAccount(_ scope: String) {
+        if accountScope == scope {
+            if transportLive {
+                scheduleReconcile()
+            }
+            return
+        }
         invalidateInFlight(resetFieldSession: true)
         accountScope = scope
         lastSuccessfulAccountScope = nil
