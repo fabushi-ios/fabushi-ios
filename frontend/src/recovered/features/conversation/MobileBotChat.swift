@@ -207,6 +207,7 @@ internal struct MobileReplyReferenceResolution: Equatable {
 internal func mobileStableReplyTargetID(_ entry: MobileChatMessage) -> String? {
     guard entry.kind == .message,
           !entry.streaming,
+          entry.optimisticDeliveryPhase == nil,
           let raw = entry.canonicalMessageId
     else { return nil }
     let targetID = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -322,7 +323,8 @@ internal func mobileReplyReferenceComposerLabel(
         return "Photo"
     case .file(let url, let name):
         let value = name?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value?.isEmpty == false ? value! : mobileReplyReferenceBasename(url)
+        if let value, !value.isEmpty { return value }
+        return mobileReplyReferenceBasename(url)
     case .link(let url):
         return mobileReplyReferenceLinkHost(url)
     case .missing:
@@ -342,7 +344,7 @@ internal func mobileReplyReferenceQuoteLabel(
     case .file(let url, let name):
         let value = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         return mobileReplyReferenceTruncatedText(
-            value?.isEmpty == false ? value! : mobileReplyReferenceBasename(url),
+            value.flatMap { $0.isEmpty ? nil : $0 } ?? mobileReplyReferenceBasename(url),
             limit: 96
         )
     case .link(let url):
