@@ -58,7 +58,15 @@ extension GrokMobileShell {
                 kind: .openSettings
             ),
         ]
-        if commandPaletteComputerUpdateAction != nil {
+        if commandPaletteComputerQueued {
+            actions.append(.init(
+                id: "cancel-computer-update",
+                label: "Cancel queued Computer update",
+                keywords: ["box", "image", "machine", "cancel", "queued", "shared"],
+                detail: "Updates",
+                kind: .cancelComputerUpdate
+            ))
+        } else if commandPaletteComputerUpdateAction != nil {
             actions.append(.init(
                 id: "update-computer",
                 label: "Update Fabushi's Computer",
@@ -269,6 +277,8 @@ extension GrokMobileShell {
             case .updateComputer:
                 guard let action = commandPaletteComputerUpdateAction else { return }
                 beginCommandPaletteComputerConfirmation(action)
+            case .cancelComputerUpdate:
+                cancelQueuedCommandPaletteComputerUpdate()
             }
         }
     }
