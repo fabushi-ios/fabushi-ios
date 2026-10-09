@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import SwiftUI
 
 internal enum MobileSettingsLocale: String, CaseIterable, Identifiable {
@@ -323,5 +324,79 @@ internal struct MobileUiPreferences: Equatable {
         return [
             "ar", "ckb", "dv", "fa", "he", "ku", "ps", "sd", "ug", "ur", "yi",
         ].contains(String(language))
+    }
+}
+
+
+/// The single iOS owner for app-local presentation preferences.
+///
+/// This owner persists only presentation choices. System accessibility remains
+/// the baseline and account/Host policy is never copied into this store.
+@MainActor
+@Observable
+internal final class MobileUiPreferencesStore {
+    static let shared = MobileUiPreferencesStore()
+
+    private let defaults: UserDefaults
+    private(set) var preferences: MobileUiPreferences
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let storedScale: Double
+        if defaults.object(forKey: MobileUiPreferences.textScaleDefaultsKey) == nil {
+            storedScale = 1
+        } else {
+            storedScale = defaults.double(forKey: MobileUiPreferences.textScaleDefaultsKey)
+        }
+        preferences = MobileUiPreferences(
+            localeRaw: defaults.string(forKey: MobileUiPreferences.localeDefaultsKey)
+                ?? MobileSettingsLocale.system.rawValue,
+            directionRaw: defaults.string(forKey: MobileUiPreferences.directionDefaultsKey)
+                ?? MobileSettingsDirection.auto.rawValue,
+            textScale: storedScale,
+            reducedMotion: defaults.bool(forKey: MobileUiPreferences.reducedMotionDefaultsKey),
+            highContrast: defaults.bool(forKey: MobileUiPreferences.highContrastDefaultsKey)
+        )
+    }
+
+    func setLocale(_ locale: MobileSettingsLocale) {
+        replace(locale: locale)
+    }
+
+    func setDirection(_ direction: MobileSettingsDirection) {
+        replace(direction: direction)
+    }
+
+    func setTextScale(_ textScale: Double) {
+        replace(textScale: textScale)
+    }
+
+    func setReducedMotion(_ reducedMotion: Bool) {
+        replace(reducedMotion: reducedMotion)
+    }
+
+    func setHighContrast(_ highContrast: Bool) {
+        replace(highContrast: highContrast)
+    }
+
+    private func replace(
+        locale: MobileSettingsLocale? = nil,
+        direction: MobileSettingsDirection? = nil,
+        textScale: Double? = nil,
+        reducedMotion: Bool? = nil,
+        highContrast: Bool? = nil
+    ) {
+        preferences = MobileUiPreferences(
+            localeRaw: (locale ?? preferences.locale).rawValue,
+            directionRaw: (direction ?? preferences.direction).rawValue,
+            textScale: textScale ?? preferences.textScale,
+            reducedMotion: reducedMotion ?? preferences.reducedMotion,
+            highContrast: highContrast ?? preferences.highContrast
+        )
+        defaults.set(preferences.locale.rawValue, forKey: MobileUiPreferences.localeDefaultsKey)
+        defaults.set(preferences.direction.rawValue, forKey: MobileUiPreferences.directionDefaultsKey)
+        defaults.set(preferences.textScale, forKey: MobileUiPreferences.textScaleDefaultsKey)
+        defaults.set(preferences.reducedMotion, forKey: MobileUiPreferences.reducedMotionDefaultsKey)
+        defaults.set(preferences.highContrast, forKey: MobileUiPreferences.highContrastDefaultsKey)
     }
 }
