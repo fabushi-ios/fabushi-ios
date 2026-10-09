@@ -217,6 +217,81 @@ final class MahayanaCoordinator {
         settingsStore?.load() ?? emptySandSettings()
     }
 
+    struct UiPreferencesProjection: Equatable, Sendable {
+        let locale: String
+        let direction: String
+        let reducedMotion: Bool
+        let highContrast: Bool
+        let textScale: Double
+    }
+
+    struct CallMediaPreferencesProjection: Equatable, Sendable {
+        let microphoneId: String?
+        let cameraId: String?
+    }
+
+    func uiPreferencesProjection() -> UiPreferencesProjection {
+        let value = settingsStore?.getUiPreferences()
+            ?? normalizeSandUiPreferences(
+                locale: nil,
+                direction: nil,
+                reducedMotion: nil,
+                highContrast: nil,
+                textScale: nil
+            )
+        return .init(
+            locale: value.locale,
+            direction: value.direction.rawValue,
+            reducedMotion: value.reducedMotion,
+            highContrast: value.highContrast,
+            textScale: value.textScale
+        )
+    }
+
+    func updateUiPreferences(
+        locale: String,
+        direction: String,
+        reducedMotion: Bool,
+        highContrast: Bool,
+        textScale: Double
+    ) -> UiPreferencesProjection {
+        guard let settingsStore else { return uiPreferencesProjection() }
+        settingsStore.setUiPreferences(
+            normalizeSandUiPreferences(
+                locale: locale,
+                direction: direction,
+                reducedMotion: reducedMotion,
+                highContrast: highContrast,
+                textScale: textScale
+            )
+        )
+        return uiPreferencesProjection()
+    }
+
+    func callMediaPreferencesProjection() -> CallMediaPreferencesProjection {
+        let value = settingsStore?.getCallMediaPreferences()
+            ?? normalizeSandCallMediaPreferences(microphoneId: nil, cameraId: nil)
+        return .init(
+            microphoneId: value.microphoneId,
+            cameraId: value.cameraId
+        )
+    }
+
+    func updateCallMediaPreferences(
+        microphoneId: String?,
+        cameraId: String?
+    ) -> CallMediaPreferencesProjection {
+        guard let settingsStore else { return callMediaPreferencesProjection() }
+        settingsStore.setCallMediaPreferences(
+            normalizeSandCallMediaPreferences(
+                microphoneId: microphoneId,
+                cameraId: cameraId
+            )
+        )
+        return callMediaPreferencesProjection()
+    }
+
+
     func experimentSnapshot() -> SandExperimentSnapshot? {
         experimentService?.getSnapshot()
     }
