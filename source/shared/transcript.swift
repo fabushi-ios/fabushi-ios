@@ -101,9 +101,10 @@ private func resolveTranscriptBranchRoot(
 }
 
 func getMainTranscriptEntries(_ entries: [TranscriptEntry]) -> [TranscriptEntry] {
-    let byId = Dictionary(uniqueKeysWithValues: entries.compactMap { entry in
-        entry.id.map { ($0, entry) }
-    })
+    var byId: [String: TranscriptEntry] = [:]
+    for entry in entries {
+        if let id = entry.id { byId[id] = entry }
+    }
     let hasThread = entries.contains {
         isBranchedTranscriptEntry($0) && resolveTranscriptBranchRoot($0, byId: byId) != nil
     }
@@ -114,9 +115,10 @@ func getMainTranscriptEntries(_ entries: [TranscriptEntry]) -> [TranscriptEntry]
 }
 
 func getThreadTranscriptEntries(_ entries: [TranscriptEntry], rootId: String) -> [TranscriptEntry] {
-    let byId = Dictionary(uniqueKeysWithValues: entries.compactMap { entry in
-        entry.id.map { ($0, entry) }
-    })
+    var byId: [String: TranscriptEntry] = [:]
+    for entry in entries {
+        if let id = entry.id { byId[id] = entry }
+    }
     guard byId[rootId] != nil else { return [] }
     var children: [String: [String]] = [:]
     for candidate in entries {
