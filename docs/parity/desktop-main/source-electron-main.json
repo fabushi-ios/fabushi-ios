@@ -11,11 +11,11 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Access/paywall/team-policy UI is driven by the current authenticated account only; stale access responses from a replaced/login-in-progress account cannot overwrite the visible gate.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/access/cover/model.swift; frontend/src/production/GrokMobileShell+Bots.swift",
+      "ios_target_path": "frontend/src/recovered/features/access/cover/model.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native AccessCoverModel preserves the exact state/reason wire mapping. GrokMobileShell refreshAccessRoster owns the account-scoped access fetch lifecycle and fences completions by accessRosterGeneration, mobileAccountScopeKey and reconnectGeneration rather than an Electron reader closure.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/access/cover/model.swift (wire projection/checking/unknown/copy); frontend/src/production/GrokMobileShell+Bots.swift (account/reconnect/generation-fenced access+roster refresh); frontend/src/production/GrokMobileShell.swift (single access state owner).",
+      "production_evidence": "frontend/src/recovered/features/access/cover/model.swift (exact wire projection/checking/unknown/copy) is the concrete shipping target required by the ledger; frontend/src/production/GrokMobileShell+Bots.swift additionally owns account/reconnect/generation-fenced access+roster refresh, and GrokMobileShell.swift remains the single access state owner.",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift and current-head architecture/build/protected acceptance; current exact-head Actions required before verified.",
       "notes": "Exact Desktop access.ts@94f20c2ef465d57329d6b57558ca4954454fe66e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. No second auth/access store introduced; native lifecycle uses the existing roster/account owner."
     },
