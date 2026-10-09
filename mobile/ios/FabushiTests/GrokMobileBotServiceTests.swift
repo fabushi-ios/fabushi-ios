@@ -589,4 +589,74 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
 
+
+    func testAgentReplyReferencePreviewMatchesDesktopAndFailsClosed() {
+        var text = MobileChatMessage(
+            id: "history:m-1",
+            role: .assistant,
+            text: "  A reply\nwith   normalized spacing  ",
+            canonicalMessageId: "m-1"
+        )
+        XCTAssertEqual(mobileStableReplyTargetID(text), "m-1")
+        XCTAssertEqual(
+            mobileReplyReferenceQuoteLabel(mobileReplyReferencePreview(for: text)),
+            "A reply with normalized spacing"
+        )
+
+        var image = MobileChatMessage(
+            id: "history:m-2",
+            role: .assistant,
+            text: "",
+            canonicalMessageId: "m-2"
+        )
+        image.attachmentURL = "https://example.invalid/photo.png"
+        XCTAssertEqual(
+            mobileReplyReferencePreview(for: image),
+            .image(url: "https://example.invalid/photo.png")
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(mobileReplyReferencePreview(for: image)),
+            "Photo"
+        )
+
+        var linkMessage = MobileChatMessage(
+            id: "history:m-3",
+            role: .user,
+            text: "",
+            canonicalMessageId: "m-3"
+        )
+        linkMessage.attachmentURL = "https://docs.example.invalid/path"
+        XCTAssertEqual(
+            mobileReplyReferencePreview(for: linkMessage),
+            .link(url: "https://docs.example.invalid/path")
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(mobileReplyReferencePreview(for: linkMessage)),
+            "docs.example.invalid"
+        )
+
+        let missing = mobileResolveReplyReference(
+            targetID: "deleted-message",
+            entries: [text, image, linkMessage]
+        )
+        XCTAssertFalse(missing.isResolved)
+        XCTAssertEqual(missing.preview, .missing)
+        XCTAssertEqual(mobileReplyReferenceQuoteLabel(missing.preview), "(deleted)")
+
+        text.streaming = true
+        XCTAssertNil(mobileStableReplyTargetID(text))
+        text.streaming = false
+        text.optimisticDeliveryPhase = .pending
+        XCTAssertNil(mobileStableReplyTargetID(text))
+        text.optimisticDeliveryPhase = .acceptedAwaitingEcho
+        XCTAssertNil(mobileStableReplyTargetID(text))
+        text.optimisticDeliveryPhase = nil
+        XCTAssertEqual(mobileStableReplyTargetID(text), "m-1")
+
+        var noCanonical = text
+        noCanonical.canonicalMessageId = nil
+        XCTAssertNil(mobileStableReplyTargetID(noCanonical))
+    }
+
+
 }
