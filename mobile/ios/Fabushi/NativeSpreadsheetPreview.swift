@@ -63,9 +63,9 @@ struct NativeDelimitedSpreadsheet: Equatable {
         while index < characters.count && rows.count < maxRows {
             let character = characters[index]
             if quoted {
-                if character == """ {
-                    if index + 1 < characters.count, characters[index + 1] == """ {
-                        field.append("""); index += 1
+                if character == "\"" {
+                    if index + 1 < characters.count, characters[index + 1] == "\"" {
+                        field.append("\""); index += 1
                     } else {
                         quoted = false
                     }
@@ -76,7 +76,7 @@ struct NativeDelimitedSpreadsheet: Equatable {
                 index += 1
                 continue
             }
-            if character == """ && field.isEmpty {
+            if character == "\"" && field.isEmpty {
                 quoted = true; hasContent = true; index += 1; continue
             }
             if character == delimiter {
@@ -102,8 +102,8 @@ struct NativeDelimitedSpreadsheet: Equatable {
         var index = 0
         while index < characters.count {
             let character = characters[index]
-            if character == """ {
-                if quoted, index + 1 < characters.count, characters[index + 1] == """ { index += 1 }
+            if character == "\"" {
+                if quoted, index + 1 < characters.count, characters[index + 1] == "\"" { index += 1 }
                 else { quoted.toggle() }
                 hasContent = true
                 index += 1
