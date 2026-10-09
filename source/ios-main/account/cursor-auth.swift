@@ -48,7 +48,12 @@ enum IOSCursorAuthError: Error, LocalizedError, Equatable {
 }
 
 @MainActor
-final class IOSCursorCredentialStore: IOSMachineIDSecretStore {
+protocol IOSCursorCredentialStoring: IOSMachineIDSecretStore {
+    func deleteSecret(_ key: String) async throws
+}
+
+@MainActor
+final class IOSCursorCredentialStore: IOSCursorCredentialStoring {
     private let service: String
 
     init(service: String = "com.ombhrum.fabushi.cursor") {
@@ -118,31 +123,56 @@ final class IOSCursorAuthService {
         let verifier: String
     }
 
-    private let store: IOSCursorCredentialStore
+    private let store: any IOSCursorCredentialStoring
     private let session: URLSession
     private let backendURL: URL
     private let websiteURL: URL
     private let machineIDResolver: IOSMachineIDResolver
     private let authTelemetry: IOSAuthTelemetryRelay
+    private let sessionSettlementShipper: IOSCursorSessionSettlementShipper
     private var pending: [String: PendingLogin] = [:]
     private var refreshFailureCount = 0
     private var refreshDegradedSinceMs: Int64?
     private var statusObserver: StatusObserver?
     private var statusObserverGeneration: UInt64 = 0
+    private var credentialsRevoked = false
+    private var signoutSettled = false
+    private var keychainUnavailableSettled = false
 
     init(
-        store: IOSCursorCredentialStore = .init(),
+        store: any IOSCursorCredentialStoring = IOSCursorCredentialStore(),
         session: URLSession = .shared,
         backendURL: URL = URL(string: getConfiguredBackendUrl())!,
         websiteURL: URL = URL(string: "https://cursor.com")!,
-        authTelemetry: IOSAuthTelemetryRelay = .init()
+        authTelemetry: IOSAuthTelemetryRelay = .init(),
+        structuredLogRequestExecutor: IOSCursorStructuredLogBackend.RequestExecutor? = nil
     ) {
         self.store = store
         self.session = session
         self.backendURL = backendURL
         self.websiteURL = websiteURL
-        self.machineIDResolver = IOSMachineIDResolver(secrets: store)
+        let machineIDResolver = IOSMachineIDResolver(secrets: store)
+        self.machineIDResolver = machineIDResolver
         self.authTelemetry = authTelemetry
+        self.sessionSettlementShipper = IOSCursorSessionSettlementShipper(
+            backendURL: backendURL,
+            getMachineID: {
+                try await machineIDResolver.getOrCreate()
+            },
+            session: session,
+            requestExecutor: structuredLogRequestExecutor,
+            reportFailure: { operation, error in
+                authTelemetry.report(.init(
+                    stream: .session,
+                    level: .warn,
+                    metadata: [
+                        "phase": "settlement_ship_failed",
+                        "operation": operation,
+                        "error_type": String(reflecting: type(of: error)),
+                    ]
+                ))
+            }
+        )
     }
 
     func setStatusObserver(_ observer: StatusObserver?) {
@@ -166,6 +196,9 @@ final class IOSCursorAuthService {
     }
 
     func status() async -> IOSCursorAuthStatus {
+        guard !credentialsRevoked else {
+            return .init(loggedIn: false)
+        }
         guard let token = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
               !token.isEmpty,
               let refreshToken = try? await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
@@ -253,6 +286,9 @@ final class IOSCursorAuthService {
         }
         try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: accessToken)
         try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: refreshToken)
+        credentialsRevoked = false
+        signoutSettled = false
+        keychainUnavailableSettled = false
         pending.removeValue(forKey: attemptId)
         let settled = await status()
         publishStatus(settled)
@@ -278,6 +314,9 @@ final class IOSCursorAuthService {
     }
 
     func getValidAccessToken(backendURL requestedBackendURL: String? = nil) async throws -> String {
+        guard !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
         let resolved = requestedBackendURL.flatMap(URL.init(string:)) ?? backendURL
         let access: String?
         let refresh: String?
@@ -348,8 +387,12 @@ final class IOSCursorAuthService {
             try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: nextRefresh)
         } catch {
             authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            await shipKeychainUnavailableOnce(accessToken: nextAccess)
             throw error
         }
+        credentialsRevoked = false
+        signoutSettled = false
+        keychainUnavailableSettled = false
         if nextRefresh != refresh {
             authTelemetry.report(iosCursorSessionTelemetry(.rotationRescued))
         }
@@ -383,19 +426,82 @@ final class IOSCursorAuthService {
         signinCause: String
     ) async throws {
         pending.removeAll()
-        do {
-            try await store.deleteSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
-            try await store.deleteSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
-        } catch {
-            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
-            throw error
+
+        // Freeze the departing account credential before revocation/deletion.
+        // This is the only token the terminal settlement is allowed to use.
+        let departingAccessToken = await readDepartingSessionToken()
+        credentialsRevoked = true
+
+        var deletionErrors: [Error] = []
+        for key in [
+            IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+            IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY,
+        ] {
+            do {
+                try await store.deleteSecret(key)
+            } catch {
+                deletionErrors.append(error)
+            }
         }
-        authTelemetry.report(iosCursorSessionTelemetry(.signedOut(
+        let durable = deletionErrors.isEmpty
+
+        let localProjection = iosCursorSessionTelemetry(.signedOut(
             cause: sessionCause,
-            durable: true
+            durable: durable
+        ))
+        authTelemetry.report(localProjection)
+        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(
+            cause: durable ? signinCause : "retained_after_failed_logout"
         )))
-        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: signinCause)))
         publishStatus(.init(loggedIn: false))
+
+        if let departingAccessToken, !signoutSettled {
+            signoutSettled = true
+            await sessionSettlementShipper.ship(.signedOut(
+                cause: sessionCause,
+                durable: durable,
+                accessToken: departingAccessToken
+            ))
+        }
+
+        if !durable {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            if let departingAccessToken {
+                await shipKeychainUnavailableOnce(accessToken: departingAccessToken)
+            }
+            // Both deletes were attempted and terminal settlement was emitted
+            // with the frozen token before surfacing the real Keychain failure.
+            throw deletionErrors[0]
+        }
+    }
+
+    private func readDepartingSessionToken() async -> String? {
+        do {
+            guard let access = try await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
+                  !access.isEmpty,
+                  let refresh = try await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
+                  !refresh.isEmpty
+            else { return nil }
+            return access
+        } catch {
+            authTelemetry.report(.init(
+                stream: .session,
+                level: .warn,
+                metadata: [
+                    "phase": "session_settlement_read_failed",
+                    "error_type": String(reflecting: type(of: error)),
+                ]
+            ))
+            return nil
+        }
+    }
+
+    private func shipKeychainUnavailableOnce(accessToken: String) async {
+        guard !keychainUnavailableSettled else { return }
+        keychainUnavailableSettled = true
+        await sessionSettlementShipper.ship(.keychainUnavailable(
+            accessToken: accessToken
+        ))
     }
 
     private func secureRandomBytes(count: Int) throws -> Data {
