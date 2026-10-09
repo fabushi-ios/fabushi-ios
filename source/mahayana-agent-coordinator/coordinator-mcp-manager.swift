@@ -1179,6 +1179,37 @@ final class CoordinatorMcpSurface {
         case "coordinator.mcp.cursorAuth.status":
             return .handled(projectCursorAuthStatus(await cursorAuth.status()))
 
+        case "transcribeAudio":
+            guard (await cursorAuth.status()).loggedIn else {
+                throw IOSCursorAuthError.signInRequired
+            }
+            guard let rawAudio = params["audio"] as? [Any], !rawAudio.isEmpty else {
+                throw SandMcpConfigError("transcribeAudio requires non-empty audio bytes.")
+            }
+            var bytes = [UInt8]()
+            bytes.reserveCapacity(rawAudio.count)
+            for value in rawAudio {
+                guard let number = value as? NSNumber,
+                      CFGetTypeID(number) != CFBooleanGetTypeID(),
+                      number.intValue >= 0,
+                      number.intValue <= 255
+                else {
+                    throw SandMcpConfigError("transcribeAudio requires byte-valued audio.")
+                }
+                bytes.append(UInt8(number.intValue))
+            }
+            let mimeType = nonEmptyString(params["mimeType"]) ?? "audio/webm"
+            let language = nonEmptyString(params["language"])
+            let result = try await dashboard.transcribeAudio(
+                audio: Data(bytes),
+                mimeType: mimeType,
+                language: language
+            )
+            return .handled([
+                "text": result.text,
+                "transcriptionTimeMs": result.transcriptionTimeMs,
+            ])
+
         case "getCursorPrReviewPreferences":
             guard (await cursorAuth.status()).loggedIn else {
                 return .handled([

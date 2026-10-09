@@ -138,17 +138,18 @@
     {
       "desktop_path": "source/electron-main/account/cursor-transcribe.ts",
       "desktop_blob_sha": "374ac5658035a3c1231fb5d006522d68740daf5f",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Provide lazy Cursor AiService audio transcription with canonical access-token and durable machine-id credentials; reject empty audio, strip MIME parameters, default language to en-US, enforce a 60 second request deadline, and return text plus transcriptionTimeMs.",
       "desktop_owner": "platform-main",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Desktop-compatible transcribeAudio callers receive authoritative Cursor transcription while malformed empty audio fails immediately and MIME/language defaults remain stable.",
+      "ios_disposition": "direct-port",
+      "ios_target_path": "source/ios-main/account/cursor-dashboard-client.swift",
+      "ios_language": "Swift / URLSession / protobuf",
+      "ios_platform_delta": "The backend transport is retained for Desktop RPC parity and reuses the single IOSCursorAuthService/IOSCursorDashboardClient owned by CoordinatorMcpSurface. This is distinct from the existing Apple on-device OfflineSpeechTranscriber used by the native composer; no second auth or audio state store is introduced.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-main/account/cursor-dashboard-client.swift transcribeAudio sends AiService/TranscribeAudio with exact protobuf fields and 60s deadline; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift handles the canonical transcribeAudio main-RPC method through the existing signed-in Cursor owner.",
+      "test_evidence": "mobile/ios/FabushiTests/CursorTranscribeParityTests.swift covers exact AiService route, protobuf request fields, MIME stripping, default en-US, 60s timeout, response projection and pre-network empty-audio rejection. Current exact-head Actions required before verified.",
+      "notes": "Exact Desktop cursor-transcribe.ts@374ac5658035a3c1231fb5d006522d68740daf5f and generated TranscribeAudioRequest/Response wire fields reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Desktop main-edge caller also confirmed Uint8Array/ArrayBuffer non-empty validation and audio/webm default. Native OfflineSpeechTranscriber remains the iOS composer owner.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "source/electron-main/account/env-descriptor-account-binding.ts",

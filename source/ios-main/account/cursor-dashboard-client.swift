@@ -162,6 +162,35 @@ private enum IOSCursorDashboardProto {
         return data
     }
 
+    static func transcribeAudioRequest(
+        audio: Data,
+        mimeType: String,
+        language: String
+    ) -> Data {
+        var data = Data()
+        appendBytesField(1, audio, to: &data)
+        appendBytesField(2, Data(mimeType.utf8), to: &data)
+        appendBytesField(3, Data(language.utf8), to: &data)
+        return data
+    }
+
+    static func decodeTranscribeAudioResponse(_ data: Data) throws -> IOSCursorTranscriptionResult {
+        var reader = Reader(data)
+        var text = ""
+        var transcriptionTimeMs: Int64 = 0
+        for (field, value) in try reader.readFields() {
+            switch (field, value) {
+            case (1, .bytes(let bytes)):
+                text = String(data: bytes, encoding: .utf8) ?? ""
+            case (2, .varint(let raw)):
+                transcriptionTimeMs = Int64(bitPattern: raw)
+            default:
+                break
+            }
+        }
+        return .init(text: text, transcriptionTimeMs: transcriptionTimeMs)
+    }
+
     static func prReviewUserSettingsRequest() -> Data {
         Data()
     }
@@ -434,6 +463,11 @@ struct IOSCloudAgentComposerInfo: Equatable, Sendable {
 
     var isActive: Bool { status == 1 || status == 4 }
     var isError: Bool { status == 3 || status == 5 || permanentError != nil }
+}
+
+struct IOSCursorTranscriptionResult: Equatable, Sendable {
+    let text: String
+    let transcriptionTimeMs: Int64
 }
 
 struct IOSCursorSandBoxRecreateResult: Equatable, Sendable {
@@ -834,6 +868,34 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             timeoutMs: timeoutMs
         )
         return try IOSCursorDashboardProto.decodeTeams(response)
+    }
+
+    func transcribeAudio(
+        audio: Data,
+        mimeType: String,
+        language: String? = nil,
+        timeoutMs: Int = 60_000
+    ) async throws -> IOSCursorTranscriptionResult {
+        guard !audio.isEmpty else {
+            throw IOSCursorDashboardError(message: "Cannot transcribe empty audio.")
+        }
+        let normalizedMimeType = mimeType
+            .split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? mimeType
+        let normalizedLanguage = language?.isEmpty == false ? language! : "en-US"
+        let response = try await protoRPC(
+            "TranscribeAudio",
+            service: "AiService",
+            body: IOSCursorDashboardProto.transcribeAudioRequest(
+                audio: audio,
+                mimeType: normalizedMimeType,
+                language: normalizedLanguage
+            ),
+            timeoutMs: timeoutMs
+        )
+        return try IOSCursorDashboardProto.decodeTranscribeAudioResponse(response)
     }
 
     func getPrReviewPreferences(timeoutMs: Int = 10_000) async throws -> SandPrReviewPreferences {
