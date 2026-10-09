@@ -26,7 +26,230 @@ private final class TestCoordinatorPort: CoordinatorPort {
     }
 }
 
+@MainActor
+private final class TestHostSettingsRequester: MahayanaHostRequesting, @unchecked Sendable {
+    var remoteSeen: Bool?
+    var requests: [(String, [String: Any])] = []
+    var failReads = false
+    var failWrites = false
+
+    func request(
+        method: String,
+        params: [String: Any]
+    ) async throws -> MahayanaHostJSONResult {
+        requests.append((method, params))
+        if method == "getHostSettings" {
+            if failReads { throw NSError(domain: "host-settings", code: 503) }
+            return .init(value: [
+                "hasSeenOnboarding": remoteSeen.map { $0 as Any } ?? NSNull(),
+            ])
+        }
+        if method == "setHostSettings" {
+            if failWrites { throw NSError(domain: "host-settings", code: 503) }
+            guard let settings = params["settings"] as? [String: Any],
+                  let raw = settings["hasSeenOnboarding"]
+            else {
+                throw NSError(domain: "host-settings", code: 400)
+            }
+            if raw is NSNull {
+                remoteSeen = nil
+            } else if let value = raw as? Bool {
+                remoteSeen = value
+            } else {
+                throw NSError(domain: "host-settings", code: 422)
+            }
+            return .init(value: [
+                "hasSeenOnboarding": remoteSeen.map { $0 as Any } ?? NSNull(),
+            ])
+        }
+        throw NSError(domain: "host-settings", code: 404)
+    }
+}
+
+@MainActor
+private final class HostSettingsReadGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private(set) var started = false
+
+    func wait() async {
+        started = true
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func open() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+@MainActor
+private func yieldHostSettingsWork() async {
+    for _ in 0..<16 {
+        await Task.yield()
+    }
+}
+
 final class CoordinatorContractTests: XCTestCase {
+    @MainActor
+    func testHostSettingsSupervisorTypedRoutePreservesFalseAndPushesTrue() async throws {
+        let host = TestHostSettingsRequester()
+        host.remoteSeen = false
+        let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
+
+        XCTAssertEqual(
+            try await supervisor.readHostSettings(),
+            .init(hasSeenOnboarding: false)
+        )
+        XCTAssertEqual(
+            try await supervisor.pushHostSettings(.init(hasSeenOnboarding: true)),
+            .init(hasSeenOnboarding: true)
+        )
+        XCTAssertEqual(host.remoteSeen, true)
+        XCTAssertEqual(host.requests.map(\.0), ["getHostSettings", "setHostSettings"])
+    }
+
+    @MainActor
+    func testHostSettingsReconcilerAbsorbsRemoteTrueAndFalseWhenLocalMissing() async {
+        var local: Bool?
+        var remote: Bool? = true
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            readRemote: { .init(hasSeenOnboarding: remote) },
+            pushRemote: {
+                remote = $0.hasSeenOnboarding
+                return .init(hasSeenOnboarding: remote)
+            },
+            hostGeneration: { 1 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+        await yieldHostSettingsWork()
+        XCTAssertEqual(local, true)
+
+        local = nil
+        remote = false
+        reconciler.setTransportLive(false)
+        reconciler.setTransportLive(true)
+        await yieldHostSettingsWork()
+        XCTAssertEqual(local, false)
+    }
+
+    @MainActor
+    func testHostSettingsReconcilerWritesExistingLocalValueBackToRemote() async {
+        var local: Bool? = true
+        var remote: Bool? = false
+        var pushes: [Bool?] = []
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            readRemote: { .init(hasSeenOnboarding: remote) },
+            pushRemote: {
+                pushes.append($0.hasSeenOnboarding)
+                remote = $0.hasSeenOnboarding
+                return .init(hasSeenOnboarding: remote)
+            },
+            hostGeneration: { 2 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+        await yieldHostSettingsWork()
+
+        XCTAssertEqual(remote, true)
+        XCTAssertEqual(pushes, [true])
+    }
+
+    @MainActor
+    func testHostSettingsReconcilerFencesReadAndWriteWhileTransportDown() async {
+        var reads = 0
+        var pushes = 0
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { true },
+            writeLocal: { _ in },
+            readRemote: {
+                reads += 1
+                return .init(hasSeenOnboarding: false)
+            },
+            pushRemote: { value in
+                pushes += 1
+                return value
+            },
+            hostGeneration: { 3 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(false)
+
+        XCTAssertFalse(await reconciler.reconcileIfReadable())
+        XCTAssertFalse(await reconciler.pushLocalIfWritable(false))
+        XCTAssertEqual(reads, 0)
+        XCTAssertEqual(pushes, 0)
+    }
+
+    @MainActor
+    func testHostSettingsReconcilerDropsStaleResultAfterAccountSwitch() async {
+        var local: Bool?
+        let gate = HostSettingsReadGate()
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            readRemote: {
+                await gate.wait()
+                return .init(hasSeenOnboarding: true)
+            },
+            pushRemote: { $0 },
+            hostGeneration: { 4 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+
+        for _ in 0..<32 where !gate.started {
+            await Task.yield()
+        }
+        XCTAssertTrue(gate.started)
+
+        reconciler.scopeToAccount("owner-b")
+        reconciler.setTransportLive(false)
+        gate.open()
+        await yieldHostSettingsWork()
+
+        XCTAssertNil(local)
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+    }
+
+    @MainActor
+    func testHostSettingsReconcilerFailureDoesNotFabricateCompletion() async {
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { nil },
+            writeLocal: { _ in XCTFail("failed remote read must not repaint local state") },
+            readRemote: { throw NSError(domain: "host-settings", code: 503) },
+            pushRemote: { $0 },
+            hostGeneration: { 5 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+        await yieldHostSettingsWork()
+
+        XCTAssertNil(reconciler.lastSuccessfulAccountScope)
+    }
+
+    func testCanonicalSettingsAccountDepartureClearsOnboardingOwner() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SandSettingsStore(
+            settingsPath: directory.appendingPathComponent("settings.json").path
+        )
+        store.scopeToAccount("owner-a")
+        store.setHasSeenOnboarding(true)
+        XCTAssertEqual(store.getHasSeenOnboarding(), true)
+
+        store.clearAccountScope()
+
+        XCTAssertNil(store.getHasSeenOnboarding())
+    }
+
     func testCurrentMainCoordinatorMethodRegistriesIncludeCanonicalMethods() {
         for method in [
             "fetchLinkMetadata",
