@@ -131,6 +131,7 @@ extension ContentView {
             AccountMenuView(
                 model: model,
                 avatar: AnyView(avatar),
+                conversationId: selectedConversation?.id,
                 onClose: { profileMenuPresented = false },
                 onRequestSignOut: { signOutConfirmationPresented = true },
                 onOpenRemoteComputer: {
