@@ -656,12 +656,12 @@ impl AppHost {
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
             "getHostSettings" => {
-                let settings = self
+                let has_seen_onboarding = self
                     .feature
-                    .host_settings_snapshot_direct()
+                    .host_settings_onboarding_seen_direct()
                     .map_err(|error| AppHostError::Operation(error.to_string()))?;
                 Ok(json!({
-                    "hasSeenOnboarding": settings.has_seen_onboarding,
+                    "hasSeenOnboarding": has_seen_onboarding,
                 }))
             }
             "setHostSettings" => {
@@ -687,12 +687,12 @@ impl AppHost {
                         ));
                     }
                 };
-                let settings = self
+                let has_seen_onboarding = self
                     .feature
                     .set_has_seen_onboarding_direct(value)
                     .map_err(|error| AppHostError::Operation(error.to_string()))?;
                 Ok(json!({
-                    "hasSeenOnboarding": settings.has_seen_onboarding,
+                    "hasSeenOnboarding": has_seen_onboarding,
                 }))
             }
             "feature.settings.localToolPermission" => {
