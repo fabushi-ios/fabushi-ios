@@ -1464,7 +1464,7 @@ internal struct MobileBotChat: View {
 
             if let respondedValue = projection.respondedValue {
                 Label(
-                    getWidgetAnswerLabel(widget: widget, answerValue: respondedValue),
+                    getWidgetAnswerLabel(widget, answer: respondedValue),
                     systemImage: "checkmark.circle.fill"
                 )
                 .font(.caption.weight(.semibold))
