@@ -91,7 +91,7 @@ final class MobileAgentNetworkParityTests: XCTestCase {
     func testAccountReconnectAndRosterFenceRejectsStaleResults() {
         let roster = [bot("a"), bot("b")]
         let fence = MobileAgentNetworkFence.capture(accountScopeKey: "account-1", reconnectGeneration: 4, roster: roster)
-        XCTAssertTrue(fence.matches(accountScopeKey: "account-1", reconnectGeneration: 4, roster: roster.reversed()))
+        XCTAssertTrue(fence.matches(accountScopeKey: "account-1", reconnectGeneration: 4, roster: Array(roster.reversed())))
         XCTAssertFalse(fence.matches(accountScopeKey: "account-2", reconnectGeneration: 4, roster: roster))
         XCTAssertFalse(fence.matches(accountScopeKey: "account-1", reconnectGeneration: 5, roster: roster))
         XCTAssertFalse(fence.matches(accountScopeKey: "account-1", reconnectGeneration: 4, roster: [bot("a")]))
