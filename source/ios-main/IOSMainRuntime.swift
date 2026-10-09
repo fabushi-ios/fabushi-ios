@@ -65,6 +65,13 @@ final class IOSMainRuntime {
                         "error": String(error.localizedDescription.prefix(512)),
                     ]
                 )
+            },
+            mcpAuthTelemetryReporter: { projection in
+                reporter.report(
+                    projection.stream == .session ? .desktopSession : .desktopSignin,
+                    level: projection.level,
+                    metadata: projection.metadata
+                )
             }
         )
         self.coordinator = coordinator

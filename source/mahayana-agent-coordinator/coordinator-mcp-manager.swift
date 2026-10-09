@@ -667,13 +667,16 @@ final class CoordinatorMcpSurface {
     static func make(
         hostSupervisor: MahayanaLocalHostSupervisor,
         settingsStore: SandSettingsStore,
-        reportFailure: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in }
+        reportFailure: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
+        reportAuthTelemetry: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
     ) -> CoordinatorMcpSurface {
         let port = CoordinatorMcpHostPort(
             hostSupervisor: hostSupervisor,
             settingsStore: settingsStore
         )
-        let cursorAuth = IOSCursorAuthService()
+        let authTelemetry = IOSAuthTelemetryRelay()
+        authTelemetry.attach(reportAuthTelemetry)
+        let cursorAuth = IOSCursorAuthService(authTelemetry: authTelemetry)
         let credentials = AccountMcpCredentials(
             getAccessToken: { backendURL in
                 try await cursorAuth.getValidAccessToken(backendURL: backendURL)

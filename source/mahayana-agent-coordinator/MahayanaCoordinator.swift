@@ -68,7 +68,8 @@ final class MahayanaCoordinator {
         experimentService: SandExperimentService? = nil,
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
         mcpSurface: CoordinatorMcpSurface? = nil,
-        mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in }
+        mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
+        mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
@@ -79,7 +80,8 @@ final class MahayanaCoordinator {
             self.mcpSurface = CoordinatorMcpSurface.make(
                 hostSupervisor: hostSupervisor,
                 settingsStore: settingsStore,
-                reportFailure: mcpFailureReporter
+                reportFailure: mcpFailureReporter,
+                reportAuthTelemetry: mcpAuthTelemetryReporter
             )
         } else {
             self.mcpSurface = nil
@@ -103,7 +105,8 @@ final class MahayanaCoordinator {
         featureHostTest: Bool = false,
         passkeyProvider: (any PasskeyProviding)? = nil,
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
-        mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in }
+        mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
+        mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
     ) throws -> MahayanaCoordinator {
         let experimentCacheDirectory = appDataDirectory
             .appendingPathComponent("experiments", isDirectory: true)
@@ -124,7 +127,8 @@ final class MahayanaCoordinator {
             ),
             experimentService: experimentService,
             devControlAdapter: devControlAdapter,
-            mcpFailureReporter: mcpFailureReporter
+            mcpFailureReporter: mcpFailureReporter,
+            mcpAuthTelemetryReporter: mcpAuthTelemetryReporter
         )
     }
 

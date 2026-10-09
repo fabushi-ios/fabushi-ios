@@ -123,7 +123,10 @@ final class IOSCursorAuthService {
     private let backendURL: URL
     private let websiteURL: URL
     private let machineIDResolver: IOSMachineIDResolver
+    private let authTelemetry: IOSAuthTelemetryRelay
     private var pending: [String: PendingLogin] = [:]
+    private var refreshFailureCount = 0
+    private var refreshDegradedSinceMs: Int64?
     private var statusObserver: StatusObserver?
     private var statusObserverGeneration: UInt64 = 0
 
@@ -131,13 +134,15 @@ final class IOSCursorAuthService {
         store: IOSCursorCredentialStore = .init(),
         session: URLSession = .shared,
         backendURL: URL = URL(string: getConfiguredBackendUrl())!,
-        websiteURL: URL = URL(string: "https://cursor.com")!
+        websiteURL: URL = URL(string: "https://cursor.com")!,
+        authTelemetry: IOSAuthTelemetryRelay = .init()
     ) {
         self.store = store
         self.session = session
         self.backendURL = backendURL
         self.websiteURL = websiteURL
         self.machineIDResolver = IOSMachineIDResolver(secrets: store)
+        self.authTelemetry = authTelemetry
     }
 
     func setStatusObserver(_ observer: StatusObserver?) {
@@ -197,6 +202,7 @@ final class IOSCursorAuthService {
             throw IOSCursorAuthError.invalidLoginResponse
         }
         pending[attemptId] = .init(uuid: uuid, verifier: verifier)
+        authTelemetry.report(iosCursorSigninTelemetry(.loginStarted))
         return .init(attemptId: attemptId, loginURL: loginURL)
     }
 
@@ -220,12 +226,20 @@ final class IOSCursorAuthService {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("true", forHTTPHeaderField: "local-cli-mode")
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
+            throw error
+        }
         guard let http = response as? HTTPURLResponse else {
             throw IOSCursorAuthError.invalidLoginResponse
         }
         if http.statusCode == 404 { return nil }
         guard (200..<300).contains(http.statusCode) else {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
             throw IOSCursorAuthError.loginRejected(http.statusCode)
         }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -234,6 +248,7 @@ final class IOSCursorAuthService {
               let refreshToken = object["refreshToken"] as? String,
               !refreshToken.isEmpty
         else {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
             throw IOSCursorAuthError.invalidLoginResponse
         }
         try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: accessToken)
@@ -241,18 +256,21 @@ final class IOSCursorAuthService {
         pending.removeValue(forKey: attemptId)
         let settled = await status()
         publishStatus(settled)
+        authTelemetry.report(iosCursorSigninTelemetry(.loginCompleted))
         return settled
     }
 
     func cancelLogin(attemptId: String) {
-        pending.removeValue(forKey: attemptId)
+        if pending.removeValue(forKey: attemptId) != nil {
+            authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: "forced")))
+        }
     }
 
     func logout() async throws {
-        pending.removeAll()
-        try await store.deleteSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
-        try await store.deleteSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
-        publishStatus(.init(loggedIn: false))
+        try await clearCredentials(
+            sessionCause: .userAction,
+            signinCause: "user_logout"
+        )
     }
 
     func getMachineID() async throws -> String {
@@ -261,11 +279,16 @@ final class IOSCursorAuthService {
 
     func getValidAccessToken(backendURL requestedBackendURL: String? = nil) async throws -> String {
         let resolved = requestedBackendURL.flatMap(URL.init(string:)) ?? backendURL
-        guard let access = try await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
-              !access.isEmpty,
-              let refresh = try await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
-              !refresh.isEmpty
-        else {
+        let access: String?
+        let refresh: String?
+        do {
+            access = try await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+            refresh = try await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
+        } catch {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            throw error
+        }
+        guard let access, !access.isEmpty, let refresh, !refresh.isEmpty else {
             throw IOSCursorAuthError.signInRequired
         }
         if !shouldRefreshAccessToken(resolved.absoluteString, accessToken: access) {
@@ -281,12 +304,25 @@ final class IOSCursorAuthService {
             "grant_type": "refresh_token",
             "refresh_token": refresh,
         ])
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            let nsError = error as NSError
+            noteRefreshFailure(.network(String(nsError.code)))
+            throw error
+        }
         guard let http = response as? HTTPURLResponse else {
+            noteRefreshFailure(.badPayload)
             throw IOSCursorAuthError.invalidLoginResponse
         }
         guard (200..<300).contains(http.statusCode) else {
-            try? await logout()
+            noteRefreshFailure(.httpStatus(http.statusCode))
+            try? await clearCredentials(
+                sessionCause: .sessionRevoked,
+                signinCause: "session_expired"
+            )
             throw IOSCursorAuthError.tokenRefreshFailed(http.statusCode)
         }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -294,7 +330,11 @@ final class IOSCursorAuthService {
               let nextAccess = object["access_token"] as? String,
               !nextAccess.isEmpty
         else {
-            try? await logout()
+            noteRefreshFailure(.badPayload)
+            try? await clearCredentials(
+                sessionCause: .unparseable,
+                signinCause: "session_expired"
+            )
             throw IOSCursorAuthError.invalidLoginResponse
         }
         let nextRefresh: String
@@ -303,10 +343,59 @@ final class IOSCursorAuthService {
         } else {
             nextRefresh = refresh
         }
-        try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: nextAccess)
-        try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: nextRefresh)
+        do {
+            try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: nextAccess)
+            try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: nextRefresh)
+        } catch {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            throw error
+        }
+        if nextRefresh != refresh {
+            authTelemetry.report(iosCursorSessionTelemetry(.rotationRescued))
+        }
+        noteRefreshRecovered()
         publishStatus(await status())
         return nextAccess
+    }
+
+    private func noteRefreshFailure(_ failure: IOSCursorSessionRefreshFailure) {
+        refreshFailureCount = min(10_000, refreshFailureCount + 1)
+        if refreshDegradedSinceMs == nil {
+            refreshDegradedSinceMs = Int64(Date().timeIntervalSince1970 * 1_000)
+        }
+        authTelemetry.report(iosCursorSessionTelemetry(.refreshFailed(failure)))
+    }
+
+    private func noteRefreshRecovered() {
+        guard refreshFailureCount > 0 else { return }
+        let now = Int64(Date().timeIntervalSince1970 * 1_000)
+        let degraded = max(0, now - (refreshDegradedSinceMs ?? now))
+        authTelemetry.report(iosCursorSessionTelemetry(.refreshRecovered(
+            consecutiveFailures: refreshFailureCount,
+            degradedMs: Int(min(Int64(Int.max), degraded))
+        )))
+        refreshFailureCount = 0
+        refreshDegradedSinceMs = nil
+    }
+
+    private func clearCredentials(
+        sessionCause: IOSCursorSessionSignoutCause,
+        signinCause: String
+    ) async throws {
+        pending.removeAll()
+        do {
+            try await store.deleteSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+            try await store.deleteSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
+        } catch {
+            authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
+            throw error
+        }
+        authTelemetry.report(iosCursorSessionTelemetry(.signedOut(
+            cause: sessionCause,
+            durable: true
+        )))
+        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: signinCause)))
+        publishStatus(.init(loggedIn: false))
     }
 
     private func secureRandomBytes(count: Int) throws -> Data {

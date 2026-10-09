@@ -171,4 +171,84 @@ final class IOSLifecycleParityTests: XCTestCase {
         XCTAssertEqual(records.map(\.level), [.info, .warn])
         XCTAssertEqual(reporter.bufferedCount, 0)
     }
+
+    func testAuthSessionTelemetryMatchesDesktopErrorTaxonomyAndBuckets() {
+        let http = iosCursorSessionTelemetry(.refreshFailed(.httpStatus(503)))
+        XCTAssertEqual(http.stream, .session)
+        XCTAssertEqual(http.level, .warn)
+        XCTAssertEqual(http.metadata["error_code"], "SAND-E0214")
+        XCTAssertEqual(http.metadata["http_status"], "503")
+        XCTAssertEqual(http.metadata["error_retryable"], "true")
+
+        let network = iosCursorSessionTelemetry(.refreshFailed(.network("-1009")))
+        XCTAssertEqual(network.metadata["error_code"], "SAND-E0215")
+        XCTAssertEqual(network.metadata["errno"], "-1009")
+
+        let bad = iosCursorSessionTelemetry(.refreshFailed(.badPayload))
+        XCTAssertEqual(bad.metadata["error_code"], "SAND-E0216")
+
+        let recovered = iosCursorSessionTelemetry(.refreshRecovered(
+            consecutiveFailures: 20_000,
+            degradedMs: 30_000
+        ))
+        XCTAssertEqual(recovered.metadata["consecutive_failures"], "10000")
+        XCTAssertEqual(recovered.metadata["degraded_ms"], "60000")
+
+        let revoked = iosCursorSessionTelemetry(.signedOut(
+            cause: .sessionRevoked,
+            durable: true
+        ))
+        XCTAssertEqual(revoked.metadata["error_code"], "SAND-E0217")
+        XCTAssertEqual(revoked.metadata["error_retryable"], "false")
+
+        let policy = iosCursorSessionTelemetry(.signedOut(cause: .policy, durable: true))
+        XCTAssertEqual(policy.metadata["error_code"], "SAND-E0218")
+
+        let keychain = iosCursorSessionTelemetry(.keychainUnavailable)
+        XCTAssertEqual(keychain.metadata["error_code"], "SAND-E0219")
+    }
+
+    @MainActor
+    func testAuthTelemetryRelayBuffersAtMostSixteenAndFlushesInOrder() {
+        let relay = IOSAuthTelemetryRelay()
+        for index in 0..<20 {
+            relay.report(iosCursorSigninTelemetry(.gate("gate-\(index)")))
+        }
+        XCTAssertEqual(relay.pendingCount, 16)
+
+        var records: [IOSAuthTelemetryProjection] = []
+        relay.attach { records.append($0) }
+        XCTAssertEqual(records.count, 16)
+        XCTAssertEqual(records.first?.metadata["gate"], "gate-0")
+        XCTAssertEqual(records.last?.metadata["gate"], "gate-15")
+        XCTAssertEqual(relay.pendingCount, 0)
+    }
+
+    func testSigninTelemetryUsesBoundedCanonicalPhasesAndCauses() {
+        XCTAssertEqual(
+            iosCursorSigninTelemetry(.loginStarted).metadata,
+            ["phase": "login_started"]
+        )
+        XCTAssertEqual(
+            iosCursorSigninTelemetry(.loginCompleted).metadata,
+            ["phase": "login_completed"]
+        )
+        XCTAssertEqual(
+            iosCursorSigninTelemetry(.loginFailed(cause: "policy_refused")).metadata,
+            ["phase": "login_failed", "cause": "policy_refused"]
+        )
+        XCTAssertEqual(
+            iosCursorSigninTelemetry(.signedOut(cause: "session_expired")).metadata,
+            ["phase": "signed_out", "cause": "session_expired"]
+        )
+        XCTAssertEqual(
+            iosCursorSigninTelemetry(.gate("onboarding")).metadata,
+            ["phase": "boot_gate", "gate": "onboarding"]
+        )
+        XCTAssertEqual(
+            iosCursorSigninTelemetry(.consult("fresh")).metadata,
+            ["phase": "account_consult", "outcome": "fresh"]
+        )
+    }
+
 }

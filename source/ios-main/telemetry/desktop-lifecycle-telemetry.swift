@@ -13,6 +13,8 @@ enum IOSLifecycleTelemetryFamily: String, CaseIterable, Equatable, Sendable {
     case coordinatorHandoff
     case localExecLifecycle
     case uncleanExit
+    case desktopSession
+    case desktopSignin
 }
 
 struct IOSLifecycleTelemetryRecord: Equatable, Sendable {

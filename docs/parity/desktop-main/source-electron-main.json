@@ -193,10 +193,10 @@
       "ios_target_path": "source/ios-main/coordinator/coordinator-telemetry.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Current iOS Coordinator lifecycle/handoff telemetry does not implement the Desktop auth-session error taxonomy, degraded bucket projection or pre-install reporter buffer; keep mapped until the auth owner emits equivalent events into the existing telemetry pipeline.",
-      "implementation_status": "mapped",
-      "production_evidence": "Existing source/ios-main/coordinator/coordinator-telemetry.swift and IOSLifecycleReporter provide the native telemetry owner, but the exact auth-session/signin settlement semantics listed for this Desktop row are not yet composed.",
-      "test_evidence": "Requires focused native telemetry projection/settlement tests plus current-head shipping-path Actions before implemented/verified promotion.",
-      "notes": "Exact Desktop source reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; no equivalence inferred from telemetry filenames alone.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-main/coordinator/coordinator-telemetry.swift implements SAND-E0214..0219 auth-session projections, capped failure/degraded buckets, signout causes and a 16-event pre-attach relay; source/ios-main/account/cursor-auth.swift emits refresh failure/recovery/rotation/keychain/signout events from the shipping Cursor auth owner; IOSMainRuntime routes them through the existing lifecycle telemetry owner as desktopSession.",
+      "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift covers auth error taxonomy, retryability, caps/buckets, canonical signin phases/causes, and exact 16-event relay behavior. Current exact-head Actions are still required before verified.",
+      "notes": "Exact Desktop source reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -225,10 +225,10 @@
       "ios_target_path": "source/ios-main/coordinator/coordinator-telemetry.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS has onboarding/auth status and lifecycle reporting, but no same-head evidence of the exact signin gate/outcome taxonomy plus buffered reporter; keep mapped until integrated into the existing telemetry owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "Existing source/ios-main/coordinator/coordinator-telemetry.swift and IOSLifecycleReporter provide the native telemetry owner, but the exact auth-session/signin settlement semantics listed for this Desktop row are not yet composed.",
-      "test_evidence": "Requires focused native telemetry projection/settlement tests plus current-head shipping-path Actions before implemented/verified promotion.",
-      "notes": "Exact Desktop source reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; no equivalence inferred from telemetry filenames alone.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-main/coordinator/coordinator-telemetry.swift implements canonical signin phases, signed-out causes, boot-gate/account-consult projections and a 16-event pre-attach relay; source/ios-main/account/cursor-auth.swift emits login start/completion/failure/cancel/logout/session-expiry events; IOSMainRuntime routes them through the existing lifecycle telemetry owner as desktopSignin.",
+      "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift covers auth error taxonomy, retryability, caps/buckets, canonical signin phases/causes, and exact 16-event relay behavior. Current exact-head Actions are still required before verified.",
+      "notes": "Exact Desktop source reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
