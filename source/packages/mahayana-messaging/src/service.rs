@@ -182,12 +182,12 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 "trusted assistant projection requires the authenticated Human to belong to the target conversation".into(),
             ));
         }
-        if let Some(existing_actor) = self.engine.state().actors.get(&assistant_id)
-            && !matches!(existing_actor.kind, ActorKind::Assistant | ActorKind::Bot)
-        {
-            return Err(MessagingServiceError::UnauthorizedCommand(
-                "trusted assistant projection cannot reuse a non-Agent actor identity".into(),
-            ));
+        if let Some(existing_actor) = self.engine.state().actors.get(&assistant_id) {
+            if !matches!(existing_actor.kind, ActorKind::Assistant | ActorKind::Bot) {
+                return Err(MessagingServiceError::UnauthorizedCommand(
+                    "trusted assistant projection cannot reuse a non-Agent actor identity".into(),
+                ));
+            }
         }
 
         let content = MessageContent::Text {
