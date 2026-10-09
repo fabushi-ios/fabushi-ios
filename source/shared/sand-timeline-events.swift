@@ -42,6 +42,6 @@ func buildTimelineEventWakePrompt(_ events: [SandTimelineEvent]) -> String {
         "\(TIMELINE_EVENT_WAKE_CUE) Something about this conversation just changed.",
         "This is a system event recorded in your timeline, not the user typing in this app, and possibly something you did yourself.",
     ] + lines + [
-        "If it is worth acknowledging to the user, send a message; otherwise it is fine to stay silent.",
+        "If it is worth acknowledging to the user, reply with SendMessage; otherwise it is fine to stay silent.",
     ]).joined(separator: "\n")
 }
