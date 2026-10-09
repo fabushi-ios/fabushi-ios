@@ -30,6 +30,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let menuButtonText: String?
     let isGroup: Bool
     let memberIds: [String]
+    let conversationPartnerIds: [String]
     let isSharedRoom: Bool
 
     init(
@@ -56,6 +57,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         menuButtonText: String? = nil,
         isGroup: Bool = false,
         memberIds: [String] = [],
+        conversationPartnerIds: [String] = [],
         isSharedRoom: Bool = false
     ) {
         self.id = id
@@ -81,6 +83,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         self.menuButtonText = menuButtonText
         self.isGroup = isGroup
         self.memberIds = memberIds
+        self.conversationPartnerIds = conversationPartnerIds
         self.isSharedRoom = isSharedRoom
     }
 }
