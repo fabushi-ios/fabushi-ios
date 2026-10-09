@@ -67,6 +67,10 @@ internal struct GrokMobileShell: View {
     @State var commandPaletteComputerQueued = false
     @State var commandPaletteComputerConfirmation: MobileCommandPaletteComputerUpdateAction?
     @State var commandPaletteComputerGeneration = 0
+    @State var rootNotificationTrays: [MobileRootNotificationTray] = []
+    @State var rootNotificationActionPending: Set<String> = []
+    @State var rootNotificationActionNotice: [String: MobileRootNotificationActionNotice] = [:]
+    @State var rootNotificationCopiedRequestID: String?
     @State var promptFocusGeneration = 0
 
     @ViewBuilder
@@ -84,6 +88,12 @@ internal struct GrokMobileShell: View {
         }
         .overlay(alignment: .topLeading) {
             rootHardwareKeyboardShortcuts
+        }
+        .overlay(alignment: .top) {
+            rootNotificationStack
+        }
+        .task(id: rootNotificationLifecycleKey) {
+            await runRootNotificationLifecycle()
         }
         .task(id: "\(mobileAccountScopeKey)|\(selectedBot?.id ?? "")") {
             hiddenChatsController.setScope(
@@ -103,6 +113,10 @@ internal struct GrokMobileShell: View {
         .onDisappear {
             commandPaletteComputerGeneration &+= 1
             commandPaletteComputerQueued = false
+            rootNotificationTrays = []
+            rootNotificationActionPending.removeAll()
+            rootNotificationActionNotice.removeAll()
+            rootNotificationCopiedRequestID = nil
             hiddenChatsController.dispose()
         }
         .sheet(item: $groupMembersTarget) { group in
