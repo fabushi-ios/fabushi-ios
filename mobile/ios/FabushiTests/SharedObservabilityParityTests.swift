@@ -6,6 +6,31 @@ private struct ObservabilityRateLimitError: ConnectErrorLike {
     let connectMetadata: [String: String]
 }
 
+private actor StructuredLogSubmitGate {
+    private var continuation: CheckedContinuation<StructuredLogReceipt, Never>?
+    private var suspended = false
+
+    func submit(_ logs: [StructuredLogEntry]) async -> StructuredLogReceipt {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            self.suspended = true
+        }
+    }
+
+    func waitUntilSuspended() async {
+        while !suspended {
+            await Task.yield()
+        }
+    }
+
+    func resume(processed: Int, dropped: Int = 0) {
+        let continuation = self.continuation
+        self.continuation = nil
+        self.suspended = false
+        continuation?.resume(returning: .init(logsProcessed: processed, logsDropped: dropped))
+    }
+}
+
 private actor StructuredLogRecorder {
     private var batches: [[StructuredLogEntry]] = []
 
@@ -363,6 +388,52 @@ final class SharedObservabilityParityTests: XCTestCase {
         XCTAssertEqual(batch.first?.metadata["feature"], "chat")
         XCTAssertEqual(batch.first?.metadata["account"], "account-1")
         XCTAssertEqual(batch.first?.key, "sand")
+    }
+
+    func testStructuredLogClearPendingFencesStaleInFlightCompletion() async {
+        let gate = StructuredLogSubmitGate()
+        let transport = StructuredLogTransport(
+            key: "sand",
+            platformTags: [:],
+            submit: { logs in
+                await gate.submit(logs)
+            }
+        )
+
+        await transport.enqueue(.info, message: "old", timestampMs: 1_000)
+        let oldFlush = Task { await transport.flushNow(nowMs: 1_000) }
+        await gate.waitUntilSuspended()
+
+        await transport.clearPending()
+        await transport.enqueue(.info, message: "new", timestampMs: 2_000)
+        await gate.resume(processed: 1)
+        XCTAssertTrue(await oldFlush.value)
+
+        let checkpoint = await transport.captureCheckpoint()
+        XCTAssertEqual(checkpoint.records.map(\.message), ["new"])
+        XCTAssertTrue(checkpoint.counters.values.allSatisfy { $0.observed == 0 && $0.acknowledgedThrough == 0 })
+    }
+
+    func testStructuredLogOverflowPrefersHostAndBoxDiagnosticEntries() async {
+        let transport = StructuredLogTransport(
+            key: "sand",
+            platformTags: [:],
+            submit: { logs in
+                .init(logsProcessed: logs.count, logsDropped: 0)
+            }
+        )
+
+        await transport.enqueue(.info, message: "keep-oldest", timestampMs: 1)
+        await transport.enqueue(.info, message: HOST_LOG_EVENT, timestampMs: 2)
+        for index in 0..<(MAX_BUFFER_SIZE - 1) {
+            await transport.enqueue(.info, message: "regular-\(index)", timestampMs: Int64(index + 3))
+        }
+
+        let checkpoint = await transport.captureCheckpoint()
+        XCTAssertEqual(checkpoint.records.count, MAX_BUFFER_SIZE)
+        XCTAssertTrue(checkpoint.records.contains { $0.message == "keep-oldest" })
+        XCTAssertFalse(checkpoint.records.contains { $0.message == HOST_LOG_EVENT })
+        XCTAssertEqual(checkpoint.counters["overflow_evicted"]?.observed, 1)
     }
 
     func testStructuredLogTransportExpiresReplayAndCapsOverflow() async {
