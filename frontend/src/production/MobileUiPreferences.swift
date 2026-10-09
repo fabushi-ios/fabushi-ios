@@ -55,10 +55,16 @@ internal struct MobileSettingsAccessibilityCopy: Equatable {
     let accessibilityCountOne: String
     let accessibilityCountOther: String
 
-    func accessibilityCount(_ count: Int) -> String {
+    func accessibilityCount(
+        _ count: Int,
+        formattedCount: String? = nil
+    ) -> String {
         let safeCount = max(0, count)
         return (safeCount == 1 ? accessibilityCountOne : accessibilityCountOther)
-            .replacingOccurrences(of: "{count}", with: String(safeCount))
+            .replacingOccurrences(
+                of: "{count}",
+                with: formattedCount ?? String(safeCount)
+            )
     }
 }
 
@@ -216,6 +222,21 @@ internal struct MobileUiPreferences: Equatable {
             ? max(0, requestedOffset)
             : requestedOffset
         return sizes[min(max(index + offset, 0), sizes.count - 1)]
+    }
+
+    func localizedAccessibilityCount(
+        _ count: Int,
+        systemIdentifier: String = Locale.autoupdatingCurrent.identifier
+    ) -> String {
+        let safeCount = max(0, count)
+        let locale = resolvedLocale(systemIdentifier: systemIdentifier)
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .decimal
+        let formattedCount = formatter.string(from: NSNumber(value: safeCount))
+            ?? String(safeCount)
+        return accessibilityCopy(systemIdentifier: systemIdentifier)
+            .accessibilityCount(safeCount, formattedCount: formattedCount)
     }
 
     func accessibilityCopy(
