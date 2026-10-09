@@ -80,7 +80,7 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
         XCTAssertEqual(entries.map(\.id), ["bot:g"])
     }
 
-    func testComputerUpdateProjectionFailsClosedAndPreservesBusyOverride() {
+    func testComputerUpdateProjectionUsesAccountWideRosterAndFailsClosed() {
         let agent = bot("agent", name: "Agent")
         let available = RemoteComputerAgentBoxSnapshot(
             agentID: agent.id,
@@ -88,22 +88,12 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
             vncURL: nil,
             imageUpdateAvailable: true
         )
-        let idle = RemoteComputerHostActivitySnapshot(
-            agentID: agent.id,
-            runningComputerSubagentIDs: [],
-            isComputerUseTaskActive: false
-        )
-        let busy = RemoteComputerHostActivitySnapshot(
-            agentID: agent.id,
-            runningComputerSubagentIDs: ["computer-subagent"],
-            isComputerUseTaskActive: true
-        )
 
         XCTAssertEqual(
             MobileCommandPaletteComputerUpdateProjection.action(
                 agent: agent,
                 status: available,
-                activity: idle,
+                workingAgentNames: [],
                 isPending: false,
                 isQueued: false
             ),
@@ -113,7 +103,7 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
             MobileCommandPaletteComputerUpdateProjection.action(
                 agent: agent,
                 status: available,
-                activity: busy,
+                workingAgentNames: ["Writer"],
                 isPending: false,
                 isQueued: false
             ),
@@ -123,7 +113,7 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
             MobileCommandPaletteComputerUpdateProjection.action(
                 agent: agent,
                 status: available,
-                activity: idle,
+                workingAgentNames: [],
                 isPending: true,
                 isQueued: false
             )
@@ -132,7 +122,7 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
             MobileCommandPaletteComputerUpdateProjection.action(
                 agent: agent,
                 status: available,
-                activity: idle,
+                workingAgentNames: [],
                 isPending: false,
                 isQueued: true
             )
@@ -146,7 +136,7 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
                     vncURL: nil,
                     imageUpdateAvailable: false
                 ),
-                activity: idle,
+                workingAgentNames: [],
                 isPending: false,
                 isQueued: false
             )
@@ -155,26 +145,52 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
             MobileCommandPaletteComputerUpdateProjection.action(
                 agent: bot("group", name: "Group", isGroup: true),
                 status: available,
-                activity: idle,
+                workingAgentNames: [],
                 isPending: false,
                 isQueued: false
             )
         )
-        XCTAssertNil(
-            MobileCommandPaletteComputerUpdateProjection.action(
-                agent: agent,
-                status: available,
-                activity: .init(
-                    agentID: "different-agent",
-                    runningComputerSubagentIDs: [],
-                    isComputerUseTaskActive: false
-                ),
-                isPending: false,
-                isQueued: false
-            )
+
+        let idle = [
+            bot("idle", name: "Idle"),
+            bot("group", name: "Group", isGroup: true),
+        ]
+        XCTAssertTrue(
+            MobileCommandPaletteComputerUpdateProjection.workingAgentNames(idle).isEmpty
+        )
+
+        let running = MobileBotSummary(
+            id: "running",
+            name: "Writer",
+            description: "",
+            isRunning: true
+        )
+        let runningTwo = MobileBotSummary(
+            id: "running-two",
+            name: "Researcher",
+            description: "",
+            isRunning: true
+        )
+        XCTAssertEqual(
+            MobileCommandPaletteComputerUpdateProjection.workingAgentNames(
+                [agent, running, runningTwo]
+            ),
+            ["Writer", "Researcher"]
+        )
+        XCTAssertEqual(
+            MobileCommandPaletteComputerUpdateProjection.confirmationDelaySeconds,
+            3
+        )
+        XCTAssertEqual(
+            MobileCommandPaletteComputerUpdateProjection.workingTitle(["Writer", "Researcher"]),
+            "Update while agents are working?"
+        )
+        XCTAssertTrue(
+            MobileCommandPaletteComputerUpdateProjection
+                .workingDescription(["Writer", "Researcher"])
+                .contains("are working on Fabushi's computer")
         )
     }
-
 
     func testRootNotificationProjectionValidatesActionsAndDedupeCount() {
         let tray = projectMobileRootNotificationTray([
