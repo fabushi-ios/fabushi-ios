@@ -135,8 +135,8 @@ func statusFromBoxListStatus(
         .init(
             status: "error",
             statusDetail: unavailable
-                ? "Grok Bot's computer unreachable"
-                : "Not reported by Grok Bot's computer"
+                ? "Fabushi's computer unreachable"
+                : "Not reported by Fabushi's computer"
         )
     }
 }
