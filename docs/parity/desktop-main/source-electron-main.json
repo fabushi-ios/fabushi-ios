@@ -28,11 +28,12 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/ios-main/account/account-authorization.swift; CoordinatorAccountRuntime account-scope owner",
       "ios_language": "Swift",
-      "ios_platform_delta": "IOSAccountAuthorizer already adopts the settled Host slot and local-human/account scope without creating a second auth source. Exact review did not establish an iOS equivalent for Desktop's descriptor-backed existing-durable-data claim and foreign-onboarding-mirror abandonment at this owner boundary, so the row remains mapped/fail-closed until that lifecycle is proven or implemented.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/ios-main/account/account-authorization.swift (settled Host slot -> canonical account/local-human scope); wider durable-data/onboarding claim owner not yet proven in this review.",
-      "test_evidence": "Requires focused account replacement/startup durable-data tests plus current-head protected account acceptance before implemented/verified promotion.",
-      "notes": "Exact Desktop account-authorization.ts@5470896e1a623e69ec3b326cb08a5fb9865fb737 and iOS account-authorization.swift@b30335dbace12b2a6253f32af1d001d2c7e3b1e6 reviewed. Do not infer parity from filename alone; durable-data claim / foreign onboarding mirror semantics are the remaining gap."
+      "ios_platform_delta": "IOSAccountAuthorizer adopts only the settled Rust Host account slot; SandSettingsStore.scopeToAccount is the single settings owner. Its first unscoped claim preserves legacy durable account settings, while a replacement foreign scope clears MCP custom instructions, disabled tools, agent default model and onboarding mirror before adopting the new scope. Desktop descriptor/devBox binding remains covered by the adjacent not-applicable-with-replacement row rather than duplicated on iOS.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-main/account/account-authorization.swift -> IOSAccountAuthorizer; source/ios-main/IOSMainRuntime.swift composes it after Host-settled auth; MahayanaCoordinator.updateAccountSettingsScope routes into the existing SandSettingsStore.scopeToAccount owner.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift covers first unscoped durable-settings claim, foreign-account replacement clearing including hasSeenOnboarding, local-human identity adoption, direct store replacement behavior and Coordinator composition. Current exact-head Actions remain required before verified.",
+      "notes": "Exact Desktop account-authorization.ts@5470896e1a623e69ec3b326cb08a5fb9865fb737 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native iOS preserves the product effect through the existing Host slot + SandSettingsStore owner; it does not introduce a second auth/account store.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "source/electron-main/account/cursor-auth-wiring.ts",
