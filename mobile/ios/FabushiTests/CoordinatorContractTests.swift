@@ -138,13 +138,14 @@ final class CoordinatorContractTests: XCTestCase {
     }
 
     @MainActor
-    func testHostSettingsReconcilerWritesExistingLocalValueBackToRemote() async {
+    func testHostSettingsReconcilerRepaintsExistingLocalFromExplicitRemoteValue() async {
         var local: Bool? = true
         var remote: Bool? = false
         var pushes: [Bool?] = []
         let reconciler = IOSHostSettingsReconciler(
             readLocal: { local },
             writeLocal: { local = $0 },
+            clearLocal: { local = nil },
             readRemote: { .init(hasSeenOnboarding: remote) },
             pushRemote: {
                 pushes.append($0.hasSeenOnboarding)
@@ -157,8 +158,45 @@ final class CoordinatorContractTests: XCTestCase {
         reconciler.setTransportLive(true)
         await yieldHostSettingsWork()
 
+        XCTAssertEqual(local, false)
+        XCTAssertEqual(remote, false)
+        XCTAssertTrue(pushes.isEmpty)
+    }
+
+    @MainActor
+    func testHostSettingsReconcilerWritesDownTransportLocalAnswerBackWhenRemoteIsUnwritten() async {
+        var local: Bool?
+        var remote: Bool?
+        var pushes: [Bool?] = []
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { local },
+            writeLocal: { local = $0 },
+            clearLocal: { local = nil },
+            readRemote: { .init(hasSeenOnboarding: remote) },
+            pushRemote: {
+                pushes.append($0.hasSeenOnboarding)
+                remote = $0.hasSeenOnboarding
+                return .init(hasSeenOnboarding: remote)
+            },
+            hostGeneration: { 6 }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(false)
+
+        reconciler.scheduleLocalWrite(true)
+        await yieldHostSettingsWork()
+
+        XCTAssertEqual(local, true)
+        XCTAssertNil(remote)
+        XCTAssertTrue(pushes.isEmpty)
+
+        reconciler.setTransportLive(true)
+        await yieldHostSettingsWork()
+
+        XCTAssertEqual(local, true)
         XCTAssertEqual(remote, true)
         XCTAssertEqual(pushes, [true])
+        XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-a")
     }
 
     @MainActor
