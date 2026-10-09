@@ -198,6 +198,7 @@ final class FabushiRuntime {
     @ObservationIgnored private let cloudAgentWakeWatcher: IOSCloudAgentWakeWatcher
     @ObservationIgnored private var wasBackgrounded = false
     @ObservationIgnored private var resumeTask: Task<Void, Never>?
+    @ObservationIgnored private var connectionRetryTask: Task<Void, Never>?
     #if DEBUG
     @ObservationIgnored private var devControlsPreload: IOSDevControlsPreload?
     #endif
@@ -299,6 +300,22 @@ final class FabushiRuntime {
 
     func memoryPressureReceived() {
         main.memoryPressureReceived()
+    }
+
+    func retryConnection() async {
+        if let connectionRetryTask {
+            await connectionRetryTask.value
+            return
+        }
+        resumeTask?.cancel()
+        let task = Task { [weak self] in
+            await self?.resyncAfterLifecycleRecovery(reason: "user-retry")
+        }
+        connectionRetryTask = task
+        await task.value
+        if connectionRetryTask != nil {
+            connectionRetryTask = nil
+        }
     }
 
     func handleOpenURL(_ url: URL) {

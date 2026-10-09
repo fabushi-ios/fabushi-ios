@@ -11,6 +11,7 @@ internal struct ProductionRenderer: View {
     let bridge: IOSPreloadBridge
     let appAgentSurface: FabushiAppAgentSurface
     var reconnectGeneration: Int = 0
+    let onRetryConnection: @MainActor () async -> Void
 
     var body: some View {
         GrokMobileShell(
@@ -18,7 +19,8 @@ internal struct ProductionRenderer: View {
             messaging: messaging,
             bridge: bridge,
             appAgentSurface: appAgentSurface,
-            reconnectGeneration: reconnectGeneration
+            reconnectGeneration: reconnectGeneration,
+            onRetryConnection: onRetryConnection
         )
     }
 }

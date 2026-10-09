@@ -214,7 +214,10 @@ private struct FabushiProductionSceneRoot: View {
                 messaging: runtime.messaging,
                 bridge: runtime.bridge,
                 appAgentSurface: runtime.appAgentSurface,
-                reconnectGeneration: runtime.reconnectGeneration
+                reconnectGeneration: runtime.reconnectGeneration,
+                onRetryConnection: {
+                    await runtime.retryConnection()
+                }
             )
             .task {
                 await runtime.start()

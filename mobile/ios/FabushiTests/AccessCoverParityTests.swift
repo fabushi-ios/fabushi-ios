@@ -525,4 +525,108 @@ final class AccessCoverParityTests: XCTestCase {
         )
     }
 
+    func testCoordinatorConnectionProjectionMatchesRootResiliencePhases() {
+        let connected = AccessRosterSnapshot(
+            bots: [MobileBotSummary(id: "a", name: "A", description: "")],
+            hasCompleteRoster: true,
+            isShowingRestoredRoster: false,
+            loadState: .ready,
+            failure: nil,
+            isFetching: false,
+            confirmedFetches: 1,
+            transport: .connected
+        )
+        XCTAssertEqual(
+            MobileCoordinatorConnectionProjection.project(
+                loggedIn: true,
+                access: .init(state: .granted, reason: .none),
+                roster: connected,
+                firstBox: .init(isAwaitingFirstBox: false, hasReachedBox: true),
+                isRetrying: false
+            ).phase,
+            .connected
+        )
+
+        let connecting = AccessRosterSnapshot(
+            bots: [],
+            hasCompleteRoster: false,
+            isShowingRestoredRoster: false,
+            loadState: .loading,
+            failure: nil,
+            isFetching: true,
+            confirmedFetches: 0,
+            transport: .connecting
+        )
+        XCTAssertEqual(
+            MobileCoordinatorConnectionProjection.project(
+                loggedIn: true,
+                access: .checking,
+                roster: connecting,
+                firstBox: .initial,
+                isRetrying: false
+            ).phase,
+            .loading
+        )
+
+        let networkFailure = AccessRosterFailure(
+            code: "network",
+            message: "offline",
+            transportKind: "network"
+        )
+        let down = AccessRosterSnapshot(
+            bots: [],
+            hasCompleteRoster: false,
+            isShowingRestoredRoster: false,
+            loadState: .error,
+            failure: networkFailure,
+            isFetching: false,
+            confirmedFetches: 0,
+            transport: .down
+        )
+        XCTAssertEqual(
+            MobileCoordinatorConnectionProjection.project(
+                loggedIn: true,
+                access: .unknown,
+                roster: down,
+                firstBox: .initial,
+                isRetrying: false
+            ).phase,
+            .unreachable
+        )
+        XCTAssertEqual(
+            MobileCoordinatorConnectionProjection.project(
+                loggedIn: true,
+                access: .unknown,
+                roster: down,
+                firstBox: .init(isAwaitingFirstBox: false, hasReachedBox: true),
+                isRetrying: true
+            ),
+            .init(
+                phase: .reconnecting,
+                isRetrying: true,
+                failureCode: "network"
+            )
+        )
+        XCTAssertEqual(
+            MobileCoordinatorConnectionProjection.project(
+                loggedIn: false,
+                access: .unknown,
+                roster: down,
+                firstBox: .initial,
+                isRetrying: false
+            ).phase,
+            .hidden
+        )
+        XCTAssertEqual(
+            MobileCoordinatorConnectionProjection.project(
+                loggedIn: true,
+                access: .init(state: .unavailable, reason: .teamPrivacyMode),
+                roster: down,
+                firstBox: .initial,
+                isRetrying: false
+            ).phase,
+            .hidden
+        )
+    }
+
 }

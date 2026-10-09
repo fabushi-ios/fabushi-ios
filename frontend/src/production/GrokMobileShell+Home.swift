@@ -183,6 +183,14 @@ extension GrokMobileShell {
                     _ = openExternalURL(ACCESS_ONBOARDING_URL)
                 }
             )
+
+            MobileCoordinatorConnectionNotice(
+                snapshot: coordinatorConnectionSnapshot,
+                onRetry: retryCoordinatorConnection
+            )
+            .padding(.horizontal, 18)
+            .padding(.bottom, 18)
+            .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .confirmationDialog("Create", isPresented: $composeOpen, titleVisibility: .visible) {
             Button("New Bot") {

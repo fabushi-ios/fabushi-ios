@@ -6,6 +6,7 @@ internal struct GrokMobileShell: View {
     let bridge: IOSPreloadBridge
     let appAgentSurface: FabushiAppAgentSurface
     var reconnectGeneration: Int = 0
+    let onRetryConnection: @MainActor () async -> Void
     @Environment(\.openURL) var openExternalURL
 
     @State var query = ""
@@ -33,6 +34,7 @@ internal struct GrokMobileShell: View {
     @State var accessCoverFirstBox = FirstBoxGateState.initial
     @State var accessCoverAccess = AccessCoverSandAccess.checking
     @State var accessRosterGeneration = 0
+    @State var connectionRetrying = false
     @State var rosterSelection = AccessRosterSelectionState.empty
     @State var rosterSelectionScopeKey = ""
     @State var pinnedBotIdOrder: [String] = []
@@ -261,6 +263,26 @@ internal struct GrokMobileShell: View {
             firstBox: accessCoverFirstBox,
             isComputerRebuildLocked: remoteComputerAgentTarget != nil
         )
+    }
+
+    var coordinatorConnectionSnapshot: MobileCoordinatorConnectionSnapshot {
+        MobileCoordinatorConnectionProjection.project(
+            loggedIn: model.loggedIn,
+            access: accessCoverAccess,
+            roster: accessRosterSnapshot,
+            firstBox: accessCoverFirstBox,
+            isRetrying: connectionRetrying
+        )
+    }
+
+    @MainActor
+    func retryCoordinatorConnection() {
+        guard !connectionRetrying else { return }
+        connectionRetrying = true
+        Task { @MainActor in
+            await onRetryConnection()
+            connectionRetrying = false
+        }
     }
 
     @MainActor
