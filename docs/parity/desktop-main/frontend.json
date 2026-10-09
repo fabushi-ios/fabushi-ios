@@ -3567,17 +3567,17 @@
     {
       "desktop_path": "frontend/src/recovered/features/error-boundary/view.tsx",
       "desktop_blob_sha": "b86ed73f0c4b2e932cbcd7f923ea8cd09a08181c",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "renderer",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Owns the Desktop root error boundary surface: format diagnostic context, keep the failure UI visible, offer reload/retry, and copy diagnostics without turning clipboard failure into a second application failure.",
+      "desktop_owner": "renderer / root error boundary",
+      "desktop_visible_effect": "A root rendering failure replaces the normal product surface with a full-window error message, a reload action, and copyable diagnostics; clipboard failure leaves the error surface intact.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "frontend/src/production/FabushiSceneRoot.swift; source/ios-main/FabushiRuntime.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "SwiftUI owns one FabushiRuntimeLifecycle at the existing production scene root. FabushiRuntime construction now throws instead of fatalError; only the ready state renders the existing ProductionRenderer, while initialization/root failures render one native full-screen recovery surface. Retry reconstructs only the same runtime owner through the lifecycle factory, and UIPasteboard copy failure is contained without replacing the failure state.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/FabushiSceneRoot.swift defines FabushiRuntimeLifecycle, FabushiRootFailure, the native full-screen error surface, stable accessibility identifiers/labels, retry, and fail-contained diagnostics copy; source/ios-main/FabushiRuntime.swift exposes throwing initialization and no longer terminates the process with fatalError.",
+      "test_evidence": "mobile/ios/FabushiTests/ErrorBoundaryParityTests.swift covers construction failure, retry factory ownership, diagnostics copy success/failure, root failure remaining outside ProductionRenderer, and accessibility identifiers/labels.",
+      "notes": "Reviewed against Desktop main exact blob b86ed73f0c4b2e932cbcd7f923ea8cd09a08181c. Implemented only; do not promote to verified until the same exact iOS HEAD completes current-head architecture/protected acceptance evidence."
     },
     {
       "desktop_path": "frontend/src/recovered/features/feedback/overlay/view.tsx",
