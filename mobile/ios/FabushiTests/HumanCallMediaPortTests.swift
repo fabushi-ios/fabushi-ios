@@ -18,6 +18,32 @@ final class HumanCallMediaPortTests: XCTestCase {
         XCTAssertEqual(HumanCallMediaPermission.prompt.rawValue, "prompt")
         XCTAssertEqual(HumanCallMediaPermission.notRequested.rawValue, "not-requested")
     }
+    @MainActor
+    func testStoredMediaPreferenceKeepsSystemDefaultDistinctFromRuntimeFallback() {
+        let suiteName = "HumanCallMediaPortTests.media-preferences"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Unable to create isolated UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let port = HumanCallMediaPort(defaults: defaults)
+        XCTAssertNil(port.storedPreferences().microphoneId)
+        XCTAssertNil(port.storedPreferences().cameraId)
+
+        port.setPreferredDeviceId("mic-test", kind: .microphone)
+        port.setPreferredDeviceId("camera-test", kind: .camera)
+        XCTAssertEqual(port.storedPreferences().microphoneId, "mic-test")
+        XCTAssertEqual(port.storedPreferences().cameraId, "camera-test")
+
+        port.setPreferredDeviceId(nil, kind: .microphone)
+        port.setPreferredDeviceId(nil, kind: .camera)
+        XCTAssertNil(port.storedPreferences().microphoneId)
+        XCTAssertNil(port.storedPreferences().cameraId)
+    }
+
+
 }
 
 extension HumanCallMediaPortTests {
