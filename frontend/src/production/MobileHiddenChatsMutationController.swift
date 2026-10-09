@@ -144,7 +144,7 @@ final class MobileHiddenChatsMutationController {
         reset()
     }
 
-    static func isTransportFailure(_ error: Error) -> Bool {
+    nonisolated static func isTransportFailure(_ error: Error) -> Bool {
         if let portError = error as? IOSCoordinatorPortClient.PortError {
             return portError.code == "source/transport-failure"
                 || portError.code == "port-settled"
