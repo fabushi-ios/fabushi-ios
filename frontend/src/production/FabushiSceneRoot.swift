@@ -199,7 +199,7 @@ private struct FabushiProductionSceneRoot: View {
     @Environment(\.layoutDirection) private var systemLayoutDirection
     @Environment(\.dynamicTypeSize) private var systemDynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-    @Environment(\.accessibilityDifferentiateWithoutColor) private var systemDifferentiateWithoutColor
+    @Environment(\.colorSchemeContrast) private var systemColorSchemeContrast
 
     @ViewBuilder
     var body: some View {
@@ -253,8 +253,8 @@ private struct FabushiProductionSceneRoot: View {
                 systemReduceMotion || uiPreferencesStore.preferences.reducedMotion
             )
             .environment(
-                \.accessibilityDifferentiateWithoutColor,
-                systemDifferentiateWithoutColor || uiPreferencesStore.preferences.highContrast
+                \.colorSchemeContrast,
+                uiPreferencesStore.preferences.highContrast ? .increased : systemColorSchemeContrast
             )
             .task {
                 await runtime.start()
