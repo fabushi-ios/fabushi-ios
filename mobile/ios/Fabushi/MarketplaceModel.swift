@@ -694,6 +694,7 @@ func decodeMobileAutoReviewInstructions(_ value: Any) throws -> SandAutoReviewIn
 struct MobileConfigurationSettingsSnapshot: Equatable {
     let autoReview: SandAutoReviewInstructions
     let inferenceProvider: SandInferenceProvider
+    let privacyModeEnabled: Bool
 }
 
 func appendMobileAutoReviewAllowRule(
@@ -1960,18 +1961,22 @@ final class MarketplaceModel {
     }
 
     func loadConfigurationSettings() async throws -> MobileConfigurationSettingsSnapshot {
-        let review = try await bridge.request(method: "getAutoReviewInstructions")
-        let provider = try await bridge.request(method: "getInferenceProvider")
-        let autoReview = try decodeMobileAutoReviewInstructions(review.value)
-        guard let object = provider.value as? [String: Any],
+        async let review = bridge.request(method: "getAutoReviewInstructions")
+        async let provider = bridge.request(method: "getInferenceProvider")
+        async let privacy = bridge.request(method: "getCursorPrivacyModeEnabled")
+        let (reviewResult, providerResult, privacyResult) = try await (review, provider, privacy)
+        let autoReview = try decodeMobileAutoReviewInstructions(reviewResult.value)
+        guard let object = providerResult.value as? [String: Any],
               let rawProvider = object["provider"] as? String,
-              let inferenceProvider = SandInferenceProvider(rawValue: rawProvider)
+              let inferenceProvider = SandInferenceProvider(rawValue: rawProvider),
+              let privacyModeEnabled = privacyResult.value as? Bool
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         return .init(
             autoReview: autoReview,
-            inferenceProvider: inferenceProvider
+            inferenceProvider: inferenceProvider,
+            privacyModeEnabled: privacyModeEnabled
         )
     }
 

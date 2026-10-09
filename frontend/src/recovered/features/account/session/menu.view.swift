@@ -293,6 +293,7 @@ struct AccountSettingsView: View {
     @State private var configurationGeneration = 0
     @State private var autoReviewSettings = DEFAULT_SAND_AUTO_REVIEW_INSTRUCTIONS
     @State private var inferenceProvider: SandInferenceProvider = .fabushi
+    @State private var privacyModeEnabled = true
     @State private var ruleDraft = ""
     @State private var ruleBehavior: SandAutoReviewInstructionBehavior = .allow
     @State private var editingRule: SandAutoReviewInstructionRow?
@@ -351,6 +352,23 @@ struct AccountSettingsView: View {
                 mediaDevicesSection
 
                 configurationSections
+
+                Section("隐私") {
+                    LabeledContent(
+                        "Privacy Mode",
+                        value: privacyModeEnabled ? "已启用" : "已关闭"
+                    )
+                    .accessibilityIdentifier("settings-privacy-mode-status")
+
+                    Text(
+                        privacyModeEnabled
+                            ? "账号当前禁止将使用数据或代码库数据用于训练；此状态由 Cursor 账号服务端权威返回。"
+                            : "账号当前允许至少一种训练数据用途；请在 Cursor 账号隐私设置中更改。"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("settings-privacy-mode-description")
+                }
 
                 Section("支持") {
                     Button {
@@ -776,6 +794,7 @@ struct AccountSettingsView: View {
             else { return }
             autoReviewSettings = snapshot.autoReview
             inferenceProvider = snapshot.inferenceProvider
+            privacyModeEnabled = snapshot.privacyModeEnabled
             editingRule = editingRule.flatMap {
                 reconcileSandAutoReviewInstructionRow(
                     snapshot.autoReview,

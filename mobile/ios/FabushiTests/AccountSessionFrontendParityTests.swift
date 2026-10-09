@@ -2,6 +2,15 @@ import XCTest
 @testable import Fabushi
 
 final class AccountSessionFrontendParityTests: XCTestCase {
+    func testMobileConfigurationSnapshotCarriesServerAuthoritativePrivacyProjection() {
+        let snapshot = MobileConfigurationSettingsSnapshot(
+            autoReview: DEFAULT_SAND_AUTO_REVIEW_INSTRUCTIONS,
+            inferenceProvider: .fabushi,
+            privacyModeEnabled: false
+        )
+        XCTAssertFalse(snapshot.privacyModeEnabled)
+    }
+
     func testSignInPhaseKeepsActiveBrowserAttemptAheadOfBusyFlag() {
         XCTAssertEqual(
             AccountSignInPhase.resolve(attemptID: "attempt-12345678", busy: true),
