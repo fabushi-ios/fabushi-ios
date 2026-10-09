@@ -205,6 +205,7 @@ extension MobileBotSummary {
             menuButtonText: menuButtonText,
             isGroup: isGroup,
             memberIds: memberIds,
+            conversationPartnerIds: conversationPartnerIds,
             isSharedRoom: isSharedRoom
         )
     }
