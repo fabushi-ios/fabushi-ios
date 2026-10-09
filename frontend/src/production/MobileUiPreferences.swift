@@ -167,7 +167,11 @@ internal struct MobileUiPreferences: Equatable {
     }
 
     var activeAccessibilityPreferenceCount: Int {
-        Int(reducedMotion) + Int(highContrast) + Int(textScale != 1)
+        var count = 0
+        if reducedMotion { count += 1 }
+        if highContrast { count += 1 }
+        if textScale != 1 { count += 1 }
+        return count
     }
 
     func resolvedLocaleIdentifier(
