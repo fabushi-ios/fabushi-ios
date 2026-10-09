@@ -312,7 +312,7 @@ final class MahayanaCoordinator {
         }
     }
 
-    static func isClientPauseBlockedMethod(_ method: String) -> Bool {
+    nonisolated static func isClientPauseBlockedMethod(_ method: String) -> Bool {
         switch method {
         case "forceReconnectGateway",
              "resolveGatewayConnection",
