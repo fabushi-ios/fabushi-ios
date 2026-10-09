@@ -64,7 +64,7 @@ private func iosBoundedBoxVisibilityToken(_ value: Any?) -> String? {
     guard let value = value as? String,
           !value.isEmpty,
           value.count <= 128,
-          value.range(of: #"^[0-9A-Za-z._:|\\-]+$"#, options: .regularExpression) != nil
+          value.range(of: #"^[0-9A-Za-z._:|\-]+$"#, options: .regularExpression) != nil
     else { return nil }
     return value
 }
@@ -215,7 +215,7 @@ final class IOSBoxVisibilityTracker {
         else { return }
 
         let value = stageElapsed.doubleValue
-        guard value.isFinite, value >= 0 else { return }
+        guard value.isFinite, value >= 0, value <= Double(Int64.max) else { return }
 
         var metadata = [
             "kind": kind,
