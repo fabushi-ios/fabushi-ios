@@ -394,6 +394,16 @@ internal func mobileBotForwardMessageId(
           !sourceConversationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else { return nil }
 
+    let hasText = !entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        || !(entry.sendMessageTextProjection?.content
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    let hasAttachment = entry.attachmentProjection != nil
+        || !(entry.attachmentURL?
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        || !(entry.attachmentBatchId?
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    guard hasText || hasAttachment else { return nil }
+
     let messageId = rawMessageId.trimmingCharacters(in: .whitespacesAndNewlines)
     return messageId.isEmpty ? nil : messageId
 }
