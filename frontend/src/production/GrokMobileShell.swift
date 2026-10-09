@@ -62,11 +62,12 @@ internal struct GrokMobileShell: View {
     @State var commandPaletteLinkStatus: MobileCommandPaletteProviderStatus = .idle
     @State var commandPaletteAgentID: String?
     @State var commandPaletteComputerStatus: RemoteComputerAgentBoxSnapshot?
-    @State var commandPaletteComputerActivity = RemoteComputerHostActivitySnapshot.empty
     @State var commandPaletteComputerPending = false
     @State var commandPaletteComputerQueued = false
     @State var commandPaletteComputerConfirmation: MobileCommandPaletteComputerUpdateAction?
+    @State var commandPaletteComputerConfirmationSeconds = 0
     @State var commandPaletteComputerGeneration = 0
+    @State var commandPaletteComputerRebuildOwner: RemoteComputerRebuildOwner?
     @State var rootNotificationTrays: [MobileRootNotificationTray] = []
     @State var rootNotificationActionPending: Set<String> = []
     @State var rootNotificationActionNotice: [String: MobileRootNotificationActionNotice] = [:]
@@ -113,6 +114,9 @@ internal struct GrokMobileShell: View {
         .onDisappear {
             commandPaletteComputerGeneration &+= 1
             commandPaletteComputerQueued = false
+            commandPaletteComputerConfirmationSeconds = 0
+            commandPaletteComputerRebuildOwner?.dispose()
+            commandPaletteComputerRebuildOwner = nil
             rootNotificationTrays = []
             rootNotificationActionPending.removeAll()
             rootNotificationActionNotice.removeAll()
@@ -272,27 +276,54 @@ internal struct GrokMobileShell: View {
             commandPaletteComputerConfirmationTitle,
             isPresented: Binding(
                 get: { commandPaletteComputerConfirmation != nil },
-                set: { if !$0 { commandPaletteComputerConfirmation = nil } }
+                set: {
+                    if !$0 {
+                        commandPaletteComputerConfirmation = nil
+                        commandPaletteComputerConfirmationSeconds = 0
+                    }
+                }
             ),
             titleVisibility: .visible
         ) {
             if commandPaletteComputerConfirmation == .busyOverride {
-                Button("Update when done") {
+                Button(
+                    commandPaletteComputerConfirmationSeconds > 0
+                        ? "Update when done (\(commandPaletteComputerConfirmationSeconds))"
+                        : commandPaletteComputerWorkingAgentNames.count > 1
+                            ? "Update when agents are done"
+                            : "Update when done"
+                ) {
                     commandPaletteComputerConfirmation = nil
+                    commandPaletteComputerConfirmationSeconds = 0
                     queueCommandPaletteComputerUpdate()
                 }
-                Button("Update anyway", role: .destructive) {
+                .disabled(commandPaletteComputerConfirmationSeconds > 0)
+                Button(
+                    commandPaletteComputerConfirmationSeconds > 0
+                        ? "Update anyway (\(commandPaletteComputerConfirmationSeconds))"
+                        : "Update anyway",
+                    role: .destructive
+                ) {
                     commandPaletteComputerConfirmation = nil
+                    commandPaletteComputerConfirmationSeconds = 0
                     Task { await performCommandPaletteComputerUpdate(force: true) }
                 }
+                .disabled(commandPaletteComputerConfirmationSeconds > 0)
             } else if commandPaletteComputerConfirmation == .ready {
-                Button("Update Fabushi's Computer") {
+                Button(
+                    commandPaletteComputerConfirmationSeconds > 0
+                        ? "Update Fabushi's Computer (\(commandPaletteComputerConfirmationSeconds))"
+                        : "Update Fabushi's Computer"
+                ) {
                     commandPaletteComputerConfirmation = nil
+                    commandPaletteComputerConfirmationSeconds = 0
                     Task { await performCommandPaletteComputerUpdate(force: false) }
                 }
+                .disabled(commandPaletteComputerConfirmationSeconds > 0)
             }
             Button("Cancel", role: .cancel) {
                 commandPaletteComputerConfirmation = nil
+                commandPaletteComputerConfirmationSeconds = 0
             }
         } message: {
             Text(commandPaletteComputerConfirmationMessage)
