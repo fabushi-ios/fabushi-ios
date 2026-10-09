@@ -76,10 +76,18 @@ internal enum MobileCommandPaletteComputerUpdateAction: String, Equatable {
 }
 
 internal enum MobileCommandPaletteComputerUpdateProjection {
+    static let confirmationDelaySeconds = 3
+
+    static func workingAgentNames(_ bots: [MobileBotSummary]) -> [String] {
+        bots
+            .filter { !$0.isGroup && $0.isRunning }
+            .map(\.name)
+    }
+
     static func action(
         agent: MobileBotSummary?,
         status: RemoteComputerAgentBoxSnapshot?,
-        activity: RemoteComputerHostActivitySnapshot,
+        workingAgentNames: [String],
         isPending: Bool,
         isQueued: Bool
     ) -> MobileCommandPaletteComputerUpdateAction? {
@@ -93,13 +101,23 @@ internal enum MobileCommandPaletteComputerUpdateProjection {
         else {
             return nil
         }
+        return workingAgentNames.isEmpty ? .ready : .busyOverride
+    }
 
-        if let activityAgentID = activity.agentID,
-           activityAgentID != agent.id
-        {
-            return nil
+    static func workingTitle(_ names: [String]) -> String {
+        names.count > 1 ? "Update while agents are working?" : "An agent is working"
+    }
+
+    static func workingDescription(_ names: [String]) -> String {
+        let cleaned = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if cleaned.count > 1 {
+            let visible = Array(cleaned.prefix(2))
+            let suffix = cleaned.count > 2 ? ", and \(cleaned.count - 2) other agents" : ""
+            return "\(visible.joined(separator: ", "))\(suffix) are working on Fabushi's computer right now. Updating recreates the computer and interrupts their current turns. Files and logins are kept."
         }
-        return activity.isActive ? .busyOverride : .ready
+        let name = cleaned.first
+        return "\(name.map { "\($0) is" } ?? "An agent is") working right now. Waiting lets its current turn finish. Updating now recreates the computer and interrupts it. Files and logins are kept either way."
     }
 }
 
