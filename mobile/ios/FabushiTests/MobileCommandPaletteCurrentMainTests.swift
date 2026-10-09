@@ -79,4 +79,100 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
 
         XCTAssertEqual(entries.map(\.id), ["bot:g"])
     }
+
+    func testComputerUpdateProjectionFailsClosedAndPreservesBusyOverride() {
+        let agent = bot("agent", name: "Agent")
+        let available = RemoteComputerAgentBoxSnapshot(
+            agentID: agent.id,
+            state: "running",
+            vncURL: nil,
+            imageUpdateAvailable: true
+        )
+        let idle = RemoteComputerHostActivitySnapshot(
+            agentID: agent.id,
+            runningComputerSubagentIDs: [],
+            isComputerUseTaskActive: false
+        )
+        let busy = RemoteComputerHostActivitySnapshot(
+            agentID: agent.id,
+            runningComputerSubagentIDs: ["computer-subagent"],
+            isComputerUseTaskActive: true
+        )
+
+        XCTAssertEqual(
+            MobileCommandPaletteComputerUpdateProjection.action(
+                agent: agent,
+                status: available,
+                activity: idle,
+                isPending: false,
+                isQueued: false
+            ),
+            .ready
+        )
+        XCTAssertEqual(
+            MobileCommandPaletteComputerUpdateProjection.action(
+                agent: agent,
+                status: available,
+                activity: busy,
+                isPending: false,
+                isQueued: false
+            ),
+            .busyOverride
+        )
+        XCTAssertNil(
+            MobileCommandPaletteComputerUpdateProjection.action(
+                agent: agent,
+                status: available,
+                activity: idle,
+                isPending: true,
+                isQueued: false
+            )
+        )
+        XCTAssertNil(
+            MobileCommandPaletteComputerUpdateProjection.action(
+                agent: agent,
+                status: available,
+                activity: idle,
+                isPending: false,
+                isQueued: true
+            )
+        )
+        XCTAssertNil(
+            MobileCommandPaletteComputerUpdateProjection.action(
+                agent: agent,
+                status: .init(
+                    agentID: agent.id,
+                    state: "running",
+                    vncURL: nil,
+                    imageUpdateAvailable: false
+                ),
+                activity: idle,
+                isPending: false,
+                isQueued: false
+            )
+        )
+        XCTAssertNil(
+            MobileCommandPaletteComputerUpdateProjection.action(
+                agent: bot("group", name: "Group", isGroup: true),
+                status: available,
+                activity: idle,
+                isPending: false,
+                isQueued: false
+            )
+        )
+        XCTAssertNil(
+            MobileCommandPaletteComputerUpdateProjection.action(
+                agent: agent,
+                status: available,
+                activity: .init(
+                    agentID: "different-agent",
+                    runningComputerSubagentIDs: [],
+                    isComputerUseTaskActive: false
+                ),
+                isPending: false,
+                isQueued: false
+            )
+        )
+    }
+
 }
