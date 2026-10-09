@@ -68,7 +68,7 @@ internal struct FabushiRootFailure: Equatable {
             "Fabushi iOS root failure",
             "Context: \(context)",
             "Error type: \(String(reflecting: type(of: error)))",
-            "Description: \(String(describing: error))",
+            "Description: \(error.localizedDescription)",
             "Domain: \(nsError.domain)",
             "Code: \(nsError.code)",
         ].joined(separator: "\n")
