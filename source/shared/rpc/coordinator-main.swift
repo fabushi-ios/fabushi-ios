@@ -3,8 +3,10 @@ import Foundation
 enum CoordinatorMainMethodRegistry {
     static let methods: Set<String> = [
         "uploadAttachment", "readAttachmentImage", "readAttachmentText", "readAttachmentChunk",
-        "getHostSettings", "setHostSettings", "setBoxSecrets", "refreshMcp", "listBoxMcpServers",
-        "updateForeverBox", "setWindowFocused", "getHostStatus", "listAgents", "createAgent",
+        "fetchLinkMetadata", "getHostSettings", "setHostSettings", "setBoxSecrets", "refreshMcp",
+        "reportConnectorAuth", "reportMcpDiscoveryFailed", "loadBoxMcpServers", "listBoxMcpServers",
+        "listBoxMcpToolsRaw", "executeBoxMcpToolRaw", "updateForeverBox", "setWindowFocused",
+        "getHostStatus", "listAgents", "createAgent",
         "deleteAgents", "getConversationOutline", "getSubagents", "setDevGatewayOffline",
         "setGatewayPaused"
     ]
