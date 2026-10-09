@@ -26,7 +26,7 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "A newly authenticated account cannot silently inherit another account's durable onboarding/custom-instruction state, while first-start existing data may be explicitly claimed only under the startup policy.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/account/account-authorization.swift; CoordinatorAccountRuntime account-scope owner",
+      "ios_target_path": "source/ios-main/account/account-authorization.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "IOSAccountAuthorizer adopts only the settled Rust Host account slot; SandSettingsStore.scopeToAccount is the single settings owner. Its first unscoped claim preserves legacy durable account settings, while a replacement foreign scope clears MCP custom instructions, disabled tools, agent default model and onboarding mirror before adopting the new scope. Desktop descriptor/devBox binding remains covered by the adjacent not-applicable-with-replacement row rather than duplicated on iOS.",
       "implementation_status": "implemented",
