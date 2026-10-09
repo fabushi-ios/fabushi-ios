@@ -2069,13 +2069,13 @@
       "desktop_owner": "renderer / transcript-card listener integration provider over Coordinator listener/MCP owners",
       "desktop_visible_effect": "GitHub/Slack listener cards show checking/connected state and let the user start the correct account OAuth flow without stale scope results overwriting the active card.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-product/src/lib.rs; mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Rust + Swift / SwiftUI",
       "ios_platform_delta": "Authoritative listener/connector state remains in the existing Rust FeatureHost/Product owners. SwiftUI replaces useSyncExternalStore with visibility-scoped 5s refresh, account/Agent task fencing, and the existing ASWebAuthenticationSession/MCP callback owner; OAuth URLs are HTTPS-only and account transitions cancel/fence stale authorization.",
       "implementation_status": "implemented",
       "production_evidence": "FeatureHost production ListenerList overlays live connector truth and ListenerConnect routes non-Git platforms through the canonical ConnectorConnect/MCP OAuth owner. MarketplaceModel now projects listener.listed state, scopes refresh/connect to the authenticated account, fences OAuth generations, and MobileBotChat renders a real Connect/Connected card with a visibility-lifetime 5s refresh.",
       "test_evidence": "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift covers transcript listener platform projection, Host integration field filtering, and HTTPS-only authorization URL validation; same-head GitHub Actions build/protected acceptance remains required before verified.",
-      "notes": "IOS-MAIN-DEP-LISTENER-INTEGRATIONS-20261009: exact Desktop blob 0a0498e8cac1f1ffae850591e30528a02b65cc81 and its listener-connect leaf were read against Desktop main. No parallel connection/runtime owner was introduced; keep at implemented until current-head CI plus aggregate dependency review close.",
+      "notes": "IOS-MAIN-DEP-LISTENER-INTEGRATIONS-20261009: exact Desktop blob 0a0498e8cac1f1ffae850591e30528a02b65cc81 and its listener-connect leaf were read against Desktop main. No parallel connection/runtime owner was introduced; keep at implemented until current-head CI plus aggregate dependency review close. Ledger target normalized to the single shipping source owner required by strict architecture validation; collaborating owners remain documented in production evidence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -2085,13 +2085,13 @@
       "desktop_owner": "renderer / transcript-card interaction owner",
       "desktop_visible_effect": "Users can reply, start or open a thread, copy eligible message text, and react from message affordances while branched replies stay out of the main transcript.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift; source/shared/transcript.swift; source/shared/transcript-threads.swift",
+      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "SwiftUI contextMenu, sheets and native UIPasteboard replace DOM hover/focus/context-menu mechanics. Existing branched transcript helpers remain the single thread state owner; iOS has no separate renderer read-only mode on this authenticated Bot chat surface.",
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat filters branched replies from the main feed, exposes Reply/Start Thread/Copy/React, renders View thread reply counts, and opens a native thread sheet over the same transcript entries. Conversation history topology is preserved by the canonical Rust Host contract.",
       "test_evidence": "SharedWorkflowTranscriptParityTests.testMobileTranscriptMessageActionsProjectMainThreadCountsAndCopySemantics plus existing transcript thread/reaction tests; current-head Actions/device acceptance pending.",
-      "notes": "IOS-MAIN-DEP-MESSAGE-ACTIONS-20261009: exact Desktop blob 517029e6b5addca641f1a53b6f3e149c404d0ba8 reviewed. DOM-only focus restoration/selection exclusion is replaced by native menu semantics; keep implemented until same-head CI/UI acceptance.",
+      "notes": "IOS-MAIN-DEP-MESSAGE-ACTIONS-20261009: exact Desktop blob 517029e6b5addca641f1a53b6f3e149c404d0ba8 reviewed. DOM-only focus restoration/selection exclusion is replaced by native menu semantics; keep implemented until same-head CI/UI acceptance. Ledger target normalized to the single shipping source owner required by strict architecture validation; collaborating owners remain documented in production evidence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -2101,13 +2101,13 @@
       "desktop_owner": "renderer / transcript-card root composition boundary",
       "desktop_visible_effect": "Every transcript card renders against the same active account/Agent scope and shared interaction/provider state.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/ios-preload/preload.swift",
+      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "SwiftUI value/environment composition plus the single IOSPreloadBridge/MarketplaceModel replaces the React root-provider mount contract. Scoped tasks are keyed by Bot/account identity and share existing Rust FeatureHost owners.",
       "implementation_status": "mapped",
       "production_evidence": "MobileBotChat is the single native transcript composition, receives the one IOSPreloadBridge and MarketplaceModel from GrokMobileShell, and scopes listener/history tasks to the selected Bot/account instead of constructing per-leaf runtime owners.",
       "test_evidence": "Current semantic/UI and same-head build acceptance remain pending; leaf-specific responsibilities stay independently tracked.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-MOUNT-20261009: exact Desktop blob 4632eaf7659c8e2c01021b5b7f4e434a0ee09750 reviewed; mechanism adapted to native SwiftUI composition.",
+      "notes": "IOS-MAIN-DEP-TRANSCRIPT-MOUNT-20261009: exact Desktop blob 4632eaf7659c8e2c01021b5b7f4e434a0ee09750 reviewed; mechanism adapted to native SwiftUI composition. Ledger target normalized to the single shipping source owner required by strict architecture validation; collaborating owners remain documented in production evidence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
