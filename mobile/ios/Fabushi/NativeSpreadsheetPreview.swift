@@ -204,7 +204,12 @@ private struct NativeDelimitedSpreadsheetPreview: View {
                 }
             }
             .frame(width: 44, height: 34)
-            .overlay(Rectangle().stroke(.separator.opacity(0.45), lineWidth: 0.5))
+            .overlay(
+                Rectangle().stroke(
+                    Color(uiColor: .separator).opacity(0.45),
+                    lineWidth: 0.5
+                )
+            )
 
             ForEach(0..<columnCount, id: \.self) { column in
                 let value = column < values.count ? values[column] : ""
@@ -219,7 +224,12 @@ private struct NativeDelimitedSpreadsheetPreview: View {
                         .padding(.horizontal, 6).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .overlay(Rectangle().stroke(.separator.opacity(0.45), lineWidth: 0.5))
+                .overlay(
+                Rectangle().stroke(
+                    Color(uiColor: .separator).opacity(0.45),
+                    lineWidth: 0.5
+                )
+            )
                 .accessibilityLabel(isHeader ? (value.isEmpty ? "Column \(column + 1)" : value) : "\(headerValue(column)) row \(row + 1)")
                 .accessibilityValue(value)
             }
