@@ -701,6 +701,7 @@ struct GrokMobileBotService {
                     menuButtonText: installedBot.menuButtonText ?? canonical.menuButtonText,
                     isGroup: canonical.isGroup,
                     memberIds: canonical.memberIds,
+                    conversationPartnerIds: canonical.conversationPartnerIds,
                     isSharedRoom: canonical.isSharedRoom
                 )
             } else {
@@ -807,6 +808,16 @@ struct GrokMobileBotService {
         return legacy == "grok" || legacy == "grok bot" ? "Fabushi" : configuredName
     }
 
+    static func parseConversationPartnerIds(_ row: [String: Any]) -> [String] {
+        guard let raw = row["conversationPartnerIds"] as? [String] else { return [] }
+        var seen = Set<String>()
+        return raw.compactMap { value in
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalized.isEmpty, seen.insert(normalized).inserted else { return nil }
+            return normalized
+        }
+    }
+
     static func parseBot(_ row: [String: Any]) -> MobileBotSummary? {
         guard let id = row["id"] as? String, !id.isEmpty else { return nil }
         let explicitMiniAppId = (row["miniAppId"] as? String)?
@@ -839,7 +850,8 @@ struct GrokMobileBotService {
             isRunning: summary.isRunning,
             draftPrompt: summary.draftPrompt,
             miniAppId: miniAppId,
-            menuButtonText: menuText?.isEmpty == false ? menuText : (miniAppId == nil ? nil : "打开应用")
+            menuButtonText: menuText?.isEmpty == false ? menuText : (miniAppId == nil ? nil : "打开应用"),
+            conversationPartnerIds: parseConversationPartnerIds(row)
         )
     }
 
@@ -873,6 +885,7 @@ struct GrokMobileBotService {
             draftPrompt: summary.draftPrompt,
             isGroup: true,
             memberIds: memberIds,
+            conversationPartnerIds: parseConversationPartnerIds(row),
             isSharedRoom: false
         )
     }
