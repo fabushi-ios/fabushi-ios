@@ -495,4 +495,30 @@ final class CoordinatorContractTests: XCTestCase {
         )
     }
 
+
+    func testClientPauseBlocksRemoteConnectRecreateAndCredentialMethods() {
+        for method in [
+            "forceReconnectGateway",
+            "resolveGatewayConnection",
+            "ensureForeverBox",
+            "computer.agentBox.ensure",
+            "getBoxMigrationStatus",
+            "updateComputer",
+            "forceRecreateComputer",
+            "mintLocalExecDaemonCredential",
+            "spawnLocalExecDaemon",
+        ] {
+            XCTAssertTrue(
+                MahayanaCoordinator.isClientPauseBlockedMethod(method),
+                "\(method) must fail closed while client pause is active"
+            )
+        }
+        for method in ["listAgents", "feature.auth.status", "platform.request"] {
+            XCTAssertFalse(
+                MahayanaCoordinator.isClientPauseBlockedMethod(method),
+                "\(method) must not be blocked by the remote-computer pause gate"
+            )
+        }
+    }
+
 }
