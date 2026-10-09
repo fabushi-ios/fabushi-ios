@@ -102,7 +102,7 @@ enum AccessRosterSnapshotProjection {
 
 enum AccessRosterPersistence {
     static let schemaVersion = 3
-    private static let keyPrefix = "fabushi.ios.roster.last-roster.v2:"
+    private static let keyPrefix = "fabushi.ios.roster.last-roster.v3:"
 
     private struct Envelope: Codable {
         let schemaVersion: Int
