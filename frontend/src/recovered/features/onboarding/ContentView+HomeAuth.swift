@@ -355,8 +355,10 @@ extension ContentView {
                                 onboardingDraft.shape = shape
                                 onboardingDraft.pickedTemplateId = nil
                             }
-                            .buttonStyle(onboardingDraft.normalized.shape == shape ? .borderedProminent : .bordered)
+                            .buttonStyle(.bordered)
+                            .tint(onboardingDraft.normalized.shape == shape ? .accentColor : .secondary)
                             .accessibilityLabel("\(shape) shape")
+                            .accessibilityValue(onboardingDraft.normalized.shape == shape ? "Selected" : "Not selected")
                         }
                     }
 
@@ -509,7 +511,7 @@ extension ContentView {
             }
             do {
                 let service = GrokMobileBotService(bridge: bridge)
-                let existing = try await service.loadCanonicalRoster()
+                let existing = try await service.loadOnboardingAgents()
                 try Task.checkCancellation()
                 guard generation == onboardingOperationGeneration,
                       model.loggedIn,
