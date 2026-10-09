@@ -98,12 +98,12 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         leaveMarketplaceForBotHome(in: app)
         XCTAssertTrue(grokHome.waitForExistence(timeout: 15))
 
-        let botLabel = app.staticTexts["全球法布施"].firstMatch
+        let botEntry = app.buttons["grok-mobile-miniapp-bot-global-dharma"]
         XCTAssertTrue(
-            scrollToElement(botLabel, in: app, maxSwipes: 8),
-            "Installing 全球法布施 must project its Bot into the message area"
+            scrollToElement(botEntry, in: app, maxSwipes: 8),
+            "Installing 全球法布施 must project its canonical Mini App Bot into the message area"
         )
-        botLabel.tap()
+        botEntry.tap()
 
         let botChat = app.descendants(matching: .any)["mobile-bot-chat"]
         XCTAssertTrue(botChat.waitForExistence(timeout: 15))
