@@ -15272,7 +15272,8 @@ mod tests {
 
     #[test]
     fn canonical_assistant_profile_projects_fabushi_identity() {
-        let bot = default_bots()
+        let mut bots = default_bots();
+        let bot = bots
             .remove("mahayana-assistant")
             .expect("canonical assistant");
         let context = render_native_turn_identity_context(None, Some(&bot))
