@@ -84,8 +84,8 @@ final class MobileSignedInOnboardingParityTests: XCTestCase {
             "Workspace", "Slack", "Notion", "Salesforce", "Microsoft 365",
         ])
         XCTAssertEqual(Array(MobileOnboardingTool.all.suffix(5).map(\.label)), [
-            "Mixpanel", "Snowflake", "Databricks", "Mailchimp",
-        ].suffix(5))
+            "Amplitude", "Mixpanel", "Snowflake", "Databricks", "Mailchimp",
+        ])
         XCTAssertEqual(MobileOnboardingTool.filtered("micro").map(\.label), ["Microsoft 365"])
         XCTAssertEqual(MobileOnboardingTool.filtered("  slack ").map(\.label), ["Slack"])
     }
