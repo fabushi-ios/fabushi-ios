@@ -93,6 +93,12 @@ struct MobileOnboardingTool: Identifiable, Equatable, Sendable {
     }
 }
 
+struct MobileOnboardingSuggestionChoice: Identifiable, Equatable, Sendable {
+    let suggestion: MobileOnboardingSuggestion
+    let renderedDescription: String
+    var id: String { suggestion.id }
+}
+
 struct MobileOnboardingSuggestion: Identifiable, Equatable, Sendable {
     enum Eligibility: Equatable, Sendable {
         case universal
@@ -139,13 +145,16 @@ struct MobileOnboardingSuggestion: Identifiable, Equatable, Sendable {
         .init(id:"data-scientist",name:"Data Scientist",description:"Answers data questions with real {tool} queries and charts",eligibility:.selectedTools(["Tableau","Hex","Amplitude","Mixpanel","Snowflake","Databricks"])),
     ]
 
-    static func selected(for tools: [String], limit: Int = 10) -> [(suggestion: Self, renderedDescription: String)] {
-        var output: [(Self, String)] = []
+    static func selected(for tools: [String], limit: Int = 10) -> [MobileOnboardingSuggestionChoice] {
+        var output: [MobileOnboardingSuggestionChoice] = []
         var used = Set<String>()
 
         func append(_ suggestion: Self, tool: String?) {
             guard output.count < limit, used.insert(suggestion.id).inserted else { return }
-            output.append((suggestion, suggestion.description.replacingOccurrences(of: "{tool}", with: tool ?? "")))
+            output.append(.init(
+                suggestion: suggestion,
+                renderedDescription: suggestion.description.replacingOccurrences(of: "{tool}", with: tool ?? "")
+            ))
         }
 
         for tool in tools {
