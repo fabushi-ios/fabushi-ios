@@ -749,6 +749,100 @@ fn account_boundary_requires_runtime_reset(
     initialized && active_account_id != next_account_id
 }
 
+const APPROVAL_PRESENTATION_SECRET_KEYS: &[&str] = &[
+    "authorization",
+    "apikey",
+    "api_key",
+    "api-key",
+    "credential",
+    "password",
+    "secret",
+    "token",
+];
+
+fn approval_presentation_key_is_secret(value: &str) -> bool {
+    let normalized = value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    APPROVAL_PRESENTATION_SECRET_KEYS.iter().any(|key| {
+        let key = key
+            .chars()
+            .filter(|ch| ch.is_ascii_alphanumeric())
+            .collect::<String>()
+            .to_ascii_lowercase();
+        normalized.contains(&key)
+    })
+}
+
+fn approval_presentation_text_looks_sensitive(value: &str) -> bool {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.contains("bearer ")
+        || APPROVAL_PRESENTATION_SECRET_KEYS
+            .iter()
+            .any(|key| lower.contains(&key.to_ascii_lowercase()))
+    {
+        return true;
+    }
+    trimmed.chars().count() >= 24
+        && !trimmed.chars().any(char::is_whitespace)
+        && trimmed
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || "_+/-=.".contains(ch))
+}
+
+fn approval_presentation_safe_text(value: &str, max_chars: usize) -> String {
+    let normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if approval_presentation_text_looks_sensitive(&normalized) {
+        return "…".into();
+    }
+    normalized.chars().take(max_chars).collect()
+}
+
+fn approval_presentation_safe_value(value: &Value, key: Option<&str>, depth: usize) -> Value {
+    if key.is_some_and(approval_presentation_key_is_secret) {
+        return Value::String("…".into());
+    }
+    match value {
+        Value::String(value) => Value::String(approval_presentation_safe_text(value, 240)),
+        Value::Null | Value::Bool(_) | Value::Number(_) => value.clone(),
+        Value::Array(items) if depth >= 3 => Value::String(format!("[{} items]", items.len())),
+        Value::Object(_) if depth >= 3 => Value::String("{…}".into()),
+        Value::Array(items) => Value::Array(
+            items
+                .iter()
+                .take(12)
+                .map(|entry| approval_presentation_safe_value(entry, None, depth + 1))
+                .collect(),
+        ),
+        Value::Object(object) => Value::Object(
+            object
+                .iter()
+                .take(24)
+                .map(|(entry_key, entry)| {
+                    (
+                        entry_key.chars().take(80).collect(),
+                        approval_presentation_safe_value(entry, Some(entry_key), depth + 1),
+                    )
+                })
+                .collect(),
+        ),
+    }
+}
+
+fn approval_presentation_safe_details(details: &Value) -> String {
+    let safe = approval_presentation_safe_value(details, None, 0);
+    approval_presentation_safe_text(
+        &serde_json::to_string(&safe).unwrap_or_else(|_| "{…}".into()),
+        1200,
+    )
+}
+
 pub struct FeatureHostController {
     config: HostConfig,
     info: HostInfo,
@@ -9160,11 +9254,12 @@ impl FeatureHostController {
             .and_then(serde_json::Value::as_str)
             .unwrap_or(title.as_str())
             .to_string();
+        let display_title = approval_presentation_safe_text(&title, 240);
         let reason = details
             .get("reason")
             .and_then(serde_json::Value::as_str)
-            .map(str::to_string)
-            .unwrap_or_else(|| details.to_string());
+            .map(|value| approval_presentation_safe_text(value, 1200))
+            .unwrap_or_else(|| approval_presentation_safe_details(&details));
 
         let settings = self.state()?.settings.clone();
         let is_local_tool_request = details.get("command").is_some()
@@ -9226,8 +9321,8 @@ impl FeatureHostController {
                         ApprovalDecision::AllowSession => "allow-session",
                         ApprovalDecision::Deny => "deny",
                     },
-                    "title": title,
-                    "capability": capability,
+                    "title": display_title,
+                    "capability": approval_presentation_safe_text(&capability, 160),
                 }),
             );
             self.state()?.events.push_back(HostEvent::AgentStep {
@@ -9270,24 +9365,24 @@ impl FeatureHostController {
             kind: details
                 .get("kind")
                 .and_then(Value::as_str)
-                .map(str::to_string),
+                .map(|value| approval_presentation_safe_text(value, 120)),
             subject: details
                 .get("subject")
                 .or_else(|| details.get("command"))
                 .and_then(Value::as_str)
-                .map(str::to_string),
+                .map(|value| approval_presentation_safe_text(value, 500)),
             detail: details
                 .get("detail")
                 .and_then(Value::as_str)
-                .map(str::to_string),
+                .map(|value| approval_presentation_safe_text(value, 1200)),
             proposed_rule: details
                 .get("proposedRule")
                 .and_then(Value::as_str)
-                .map(str::to_string),
+                .map(|value| approval_presentation_safe_text(value, 500)),
             location: details
                 .get("location")
                 .and_then(Value::as_str)
-                .map(str::to_string),
+                .map(|value| approval_presentation_safe_text(value, 300)),
         })
     }
 
@@ -14369,6 +14464,68 @@ fn persist_remote_computer_device_secrets(
     std::fs::rename(&temp, path).map_err(|error| {
         FeatureHostError::Contract(format!("commit remote device secret: {error}"))
     })
+}
+
+#[cfg(test)]
+mod approval_presentation_redaction_tests {
+    use super::*;
+
+    #[test]
+    fn approval_details_redact_nested_secrets_before_presentation() {
+        let details = json!({
+            "command": "curl https://example.test -H Authorization:Bearer super-secret-token",
+            "headers": {
+                "authorization": "Bearer top-secret-value",
+                "x-api-key": "0123456789abcdefghijklmnopqrstuvwxyz"
+            },
+            "nested": [{"password": "hunter2", "safe": "repository main"}],
+            "safe": "run release checks"
+        });
+        let rendered = approval_presentation_safe_details(&details);
+        assert!(!rendered.contains("super-secret-token"));
+        assert!(!rendered.contains("top-secret-value"));
+        assert!(!rendered.contains("0123456789abcdefghijklmnopqrstuvwxyz"));
+        assert!(!rendered.contains("hunter2"));
+        assert!(rendered.contains("run release checks"));
+    }
+
+    #[test]
+    fn approval_visible_strings_fail_closed_when_they_look_sensitive() {
+        assert_eq!(
+            approval_presentation_safe_text(
+                "TOKEN=0123456789abcdefghijklmnopqrstuvwxyz",
+                500
+            ),
+            "…"
+        );
+        assert_eq!(
+            approval_presentation_safe_text("Bearer abcdefghijklmnopqrstuvwxyz", 500),
+            "…"
+        );
+        assert_eq!(
+            approval_presentation_safe_text("Run release checks in the repository", 500),
+            "Run release checks in the repository"
+        );
+    }
+
+    #[test]
+    fn approval_redaction_does_not_mutate_raw_matching_details() {
+        let details = json!({
+            "kind": "local-tool",
+            "command": "deploy --token raw-secret-value",
+            "reason": "Deploy the current release"
+        });
+        let safe = approval_presentation_safe_value(&details, None, 0);
+        assert_eq!(
+            details.get("command").and_then(Value::as_str),
+            Some("deploy --token raw-secret-value")
+        );
+        assert_ne!(safe.get("command"), details.get("command"));
+        assert_eq!(
+            safe.get("reason").and_then(Value::as_str),
+            Some("Deploy the current release")
+        );
+    }
 }
 
 #[cfg(test)]
