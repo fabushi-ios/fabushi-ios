@@ -149,7 +149,7 @@ internal struct HumanCallsView: View {
     @State private var actionCallId: String?
     @State private var errorText: String?
     @State private var refreshGeneration = 0
-    @State private var mediaPort = HumanCallMediaPort()
+    @Environment(\.humanCallMediaPort) private var mediaPort
     @State private var peerConnection: HumanCallPeerConnection?
     @State private var activeMediaCallId: String?
     @State private var activeMediaGeneration: Int?
@@ -474,6 +474,13 @@ internal struct HumanCallsView: View {
     }
 
     private func refreshMediaDevices() {
+        guard let mediaPort else {
+            mediaDevices = []
+            selectedMicrophoneId = nil
+            selectedCameraId = nil
+            screenShareAvailable = false
+            return
+        }
         mediaDevices = mediaPort.devices()
         let preferences = mediaPort.resolvedPreferences()
         selectedMicrophoneId = preferences.microphoneId
@@ -557,7 +564,10 @@ internal struct HumanCallsView: View {
     }
 
     private func start(_ conversation: ConversationSummary, video: Bool) async {
-        guard let bridge else { return }
+        guard let bridge, let mediaPort else {
+            errorText = "通话媒体运行时不可用。"
+            return
+        }
         let participantIds = conversation.participants
             .map(\.actorId)
             .filter { !$0.isEmpty }
@@ -625,7 +635,10 @@ internal struct HumanCallsView: View {
     }
 
     private func accept(_ call: HumanCallSessionRecord, video: Bool) async {
-        guard let bridge else { return }
+        guard let bridge, let mediaPort else {
+            errorText = "通话媒体运行时不可用。"
+            return
+        }
         actionCallId = call.id
         defer { actionCallId = nil }
         var callToFail: HumanCallSessionRecord? = call
@@ -670,7 +683,13 @@ internal struct HumanCallsView: View {
         enableVideo: Bool,
         iceRestart: Bool = false
     ) async throws {
-        guard let bridge else { return }
+        guard let bridge, let mediaPort else {
+            throw NSError(
+                domain: "Fabushi.HumanCall",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "通话媒体运行时不可用。"]
+            )
+        }
         closeActiveMedia()
         refreshMediaDevices()
         let preferences = mediaPort.resolvedPreferences()
@@ -1087,6 +1106,10 @@ internal struct HumanCallsView: View {
 
     private func setCameraEnabled(_ next: Bool, call: HumanCallSessionRecord) async {
         guard let peer = peerConnection, activeMediaCallId == call.id else { return }
+        guard let mediaPort else {
+            errorText = "通话媒体运行时不可用。"
+            return
+        }
         do {
             if next {
                 let permissions = await mediaPort.requestPermissions(audio: false, video: true)
@@ -1166,6 +1189,10 @@ internal struct HumanCallsView: View {
         call: HumanCallSessionRecord
     ) async {
         guard peerConnection != nil, activeMediaCallId == call.id else { return }
+        guard let mediaPort else {
+            errorText = "通话媒体运行时不可用。"
+            return
+        }
         do {
             let selected = try mediaPort.selectMicrophone(deviceId: device.id)
             guard activeMediaCallId == call.id else { return }
@@ -1182,6 +1209,10 @@ internal struct HumanCallsView: View {
         call: HumanCallSessionRecord
     ) async {
         guard let peer = peerConnection, activeMediaCallId == call.id else { return }
+        guard let mediaPort else {
+            errorText = "通话媒体运行时不可用。"
+            return
+        }
         do {
             let selected = try mediaPort.selectCamera(deviceId: device.id)
             selectedCameraId = selected.id
