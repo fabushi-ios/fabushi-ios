@@ -8107,6 +8107,38 @@ impl FeatureHostController {
         Ok(secret)
     }
 
+    /// Return the existing persisted Host settings snapshot for native Main
+    /// reconciliation. This reuses the FeatureHost settings owner.
+    pub fn host_settings_snapshot_direct(
+        &self,
+    ) -> Result<ProductHostSettings, FeatureHostError> {
+        let state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state.settings.clone())
+    }
+
+    /// Update only the account-scoped onboarding field and write through the
+    /// existing FeatureHost settings.json persistence.
+    pub fn set_has_seen_onboarding_direct(
+        &self,
+        value: Option<bool>,
+    ) -> Result<ProductHostSettings, FeatureHostError> {
+        let settings = {
+            let mut state = self.state()?;
+            ensure_open(&state)?;
+            state.settings.has_seen_onboarding = value;
+            state.settings.clone()
+        };
+        if let Some(path) = self.settings_path.as_deref() {
+            persist_product_host_settings(path, &settings)?;
+        }
+        self.state()?.events.push_back(HostEvent::SettingsChanged {
+            timestamp: timestamp(),
+            settings: settings.clone(),
+        });
+        Ok(settings)
+    }
+
     /// Main settings are canonical on iOS; the Host receives this bounded
     /// runtime projection before execution so approval matching has one owner.
     pub fn set_auto_review_rules_direct(
@@ -16085,6 +16117,41 @@ mod tests {
                 &settings,
             )
             .expect("current target accepted");
+    }
+
+    #[test]
+    fn direct_onboarding_host_settings_projection_preserves_true_false_and_clear() {
+        let controller = controller();
+        drain(&controller);
+
+        assert_eq!(
+            controller
+                .host_settings_snapshot_direct()
+                .expect("read initial host settings")
+                .has_seen_onboarding,
+            None
+        );
+        assert_eq!(
+            controller
+                .set_has_seen_onboarding_direct(Some(true))
+                .expect("set onboarding true")
+                .has_seen_onboarding,
+            Some(true)
+        );
+        assert_eq!(
+            controller
+                .set_has_seen_onboarding_direct(Some(false))
+                .expect("set onboarding false")
+                .has_seen_onboarding,
+            Some(false)
+        );
+        assert_eq!(
+            controller
+                .set_has_seen_onboarding_direct(None)
+                .expect("clear onboarding")
+                .has_seen_onboarding,
+            None
+        );
     }
 
     #[test]
