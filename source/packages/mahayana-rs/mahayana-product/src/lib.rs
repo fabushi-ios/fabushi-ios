@@ -2330,6 +2330,7 @@ impl MahayanaProductClient {
             }),
             None,
         )?;
+        sanitize_server_auth_external_urls(&mut response, &self.api_base_url)?;
         let attempt_id = required_identifier(&response, "attemptId")?.to_string();
         let poll_secret = required_string(&response, "pollSecret")?.to_string();
         self.save_browser_login_poll_secret(&attempt_id, &poll_secret)?;
@@ -2344,11 +2345,13 @@ impl MahayanaProductClient {
         let Some(poll_secret) = self.load_browser_login_poll_secret(&attempt_id)? else {
             return Ok(json!({"status": "expired"}));
         };
-        self.post_json(
+        let mut response = self.post_json(
             &format!("/api/auth/browser/attempts/{attempt_id}/reopen"),
             json!({"pollSecret": poll_secret}),
             None,
-        )
+        )?;
+        sanitize_server_auth_external_urls(&mut response, &self.api_base_url)?;
+        Ok(response)
     }
 
     fn browser_login_cancel(&self, request: &Value) -> Result<Value, ProductError> {
@@ -3269,6 +3272,54 @@ fn validate_marketplace_site_manifest(
     matches
         .then_some(())
         .ok_or_else(|| "plugin manifest does not match release metadata".to_string())
+}
+
+fn server_accepted_auth_external_url(
+    value: &str,
+    expected_origin: &str,
+) -> Result<String, ProductError> {
+    let url = url::Url::parse(value.trim())
+        .map_err(|_| ProductError::Response("browser login URL is invalid".into()))?;
+    let expected = url::Url::parse(expected_origin.trim())
+        .map_err(|_| ProductError::Configuration("product API base URL is invalid".into()))?;
+    let web_scheme = |scheme: &str| scheme == "http" || scheme == "https";
+    if !web_scheme(url.scheme())
+        || !web_scheme(expected.scheme())
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || !expected.username().is_empty()
+        || expected.password().is_some()
+        || url.origin() != expected.origin()
+    {
+        return Err(ProductError::Response(
+            "browser login URL is outside the configured first-party origin".into(),
+        ));
+    }
+    Ok(url.to_string())
+}
+
+fn sanitize_server_auth_external_urls(
+    response: &mut Value,
+    expected_origin: &str,
+) -> Result<(), ProductError> {
+    let Some(object) = response.as_object_mut() else {
+        return Err(ProductError::Response(
+            "browser login response must be an object".into(),
+        ));
+    };
+    for key in ["loginUrl", "authorizationUrl"] {
+        let Some(value) = object.get(key) else {
+            continue;
+        };
+        let raw = value.as_str().ok_or_else(|| {
+            ProductError::Response(format!("browser login response field {key} is invalid"))
+        })?;
+        object.insert(
+            key.to_string(),
+            Value::String(server_accepted_auth_external_url(raw, expected_origin)?),
+        );
+    }
+    Ok(())
 }
 
 fn https_deployment_url(value: &str) -> Result<String, ProductError> {
@@ -5351,6 +5402,52 @@ mod tests {
             .expect("remove skill");
         assert!(!client.skills_root().join("skill-real-runtime").exists());
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn browser_login_urls_are_restricted_to_the_configured_first_party_origin() {
+        let expected = "https://api.ombhrum.com";
+        assert_eq!(
+            server_accepted_auth_external_url(
+                "https://api.ombhrum.com/auth/browser?attempt=1",
+                expected,
+            )
+            .expect("same-origin login URL"),
+            "https://api.ombhrum.com/auth/browser?attempt=1"
+        );
+        for rejected in [
+            "https://evil.example/auth/browser",
+            "http://api.ombhrum.com/auth/browser",
+            "https://user@api.ombhrum.com/auth/browser",
+            "javascript:alert(1)",
+        ] {
+            assert!(
+                server_accepted_auth_external_url(rejected, expected).is_err(),
+                "unexpected accepted URL: {rejected}"
+            );
+        }
+    }
+
+    #[test]
+    fn browser_login_response_sanitizer_rejects_foreign_urls() {
+        let mut accepted = json!({
+            "attemptId": "attempt-1",
+            "loginUrl": "https://api.ombhrum.com/auth/browser#continue",
+        });
+        sanitize_server_auth_external_urls(&mut accepted, "https://api.ombhrum.com")
+            .expect("same-origin response");
+        assert_eq!(
+            accepted["loginUrl"],
+            "https://api.ombhrum.com/auth/browser#continue"
+        );
+
+        let mut rejected = json!({
+            "attemptId": "attempt-2",
+            "authorizationUrl": "https://attacker.invalid/login",
+        });
+        assert!(
+            sanitize_server_auth_external_urls(&mut rejected, "https://api.ombhrum.com").is_err()
+        );
     }
 
     #[test]
