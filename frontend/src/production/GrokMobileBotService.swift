@@ -58,15 +58,21 @@ struct GrokMobileBotService {
         name: String,
         description: String,
         avatarShape: String,
-        avatarColor: String
+        avatarColor: String,
+        origin: String = "user",
+        isKickstartRequested: Bool = false,
+        templateId: String? = nil,
+        requestId: String? = nil
     ) async throws -> [MobileBotSummary] {
-        let requestId = "ios-mobile-bot-create-\(UUID().uuidString.lowercased())"
         let command = try Self.createCommand(
             name: name,
             description: description,
             avatarShape: avatarShape,
             avatarColor: avatarColor,
-            requestId: requestId
+            requestId: requestId ?? "ios-mobile-bot-create-\(UUID().uuidString.lowercased())",
+            origin: origin,
+            isKickstartRequested: isKickstartRequested,
+            templateId: templateId
         )
         _ = try await bridge.request(
             method: "feature.execute",
@@ -80,7 +86,10 @@ struct GrokMobileBotService {
         description: String,
         avatarShape: String,
         avatarColor: String,
-        requestId: String
+        requestId: String,
+        origin: String = "user",
+        isKickstartRequested: Bool = false,
+        templateId: String? = nil
     ) throws -> [String: Any] {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -100,14 +109,23 @@ struct GrokMobileBotService {
                 userInfo: [NSLocalizedDescriptionKey: "Agent 角色无效"]
             )
         }
-        return [
+        var command: [String: Any] = [
             "type": "bot.create",
             "requestId": requestId,
             "name": String(trimmedName.prefix(72)),
-            "description": String(trimmedDescription.prefix(240)),
+            "description": String(trimmedDescription.prefix(2_000)),
             "avatarShape": avatarShape,
             "avatarColor": avatarColor,
+            "origin": origin,
+            "isKickstartRequested": isKickstartRequested,
         ]
+        if let templateId {
+            let normalizedTemplateId = templateId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !normalizedTemplateId.isEmpty {
+                command["templateId"] = normalizedTemplateId
+            }
+        }
+        return command
     }
 
     func renameBot(id: String, name: String) async throws -> [MobileBotSummary] {
