@@ -453,13 +453,11 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native Swift value types preserve normalization/fuzzy search/tab semantics; individual Bots stay in Agents and Host-owned Bot groups project into Groups. Current-main roster de-duplication preserves the first palette slot while replacing the stale object with the newest canonical row.",
-      "implementation_status": "mapped",
-      "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift; exact-current-head GitHub Actions required before any implemented/verified promotion",
-      "notes": "Current-main re-review against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 (previous 798cf51d96cb1cb98cf657af212bb47274ccb701) found the direct delta adds canonical Agent de-duplication: retain the first list slot for an id but replace its stale roster object with the newest row. iOS previously kept the first object and could display stale Agent identity after roster replacement. The shipping GrokMobileCommandPaletteModel now mirrors newest-row replacement and focused tests assert both stable ordering and newest identity. Historical verified evidence remains historical only; dependency/shared-contract/main-active-spec review is still open, so this row remains mapped behind the current-main review fence.",
-      "historical_implementation_status": "verified",
-      "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review"
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift is the shipping native command-palette projection. It normalizes/fuzzy-ranks entries, preserves the first slot while replacing duplicate bot identity with the newest roster row, excludes hidden bots from the default palette, and appends matching hidden bots only after visible scored results during search; existing GrokMobileShell command-palette composition remains the single navigation owner.",
+      "test_evidence": "mobile/ios/FabushiTests/MobileCommandPaletteCurrentMainTests.swift covers hidden-default exclusion, visible-before-hidden search ordering, hidden-group search, and duplicate roster identity retaining the first slot with the newest row. Current exact-HEAD Actions/provenance are still required before verified.",
+      "notes": "Exact Desktop command-palette-model.ts@8f3ac50a132c2b2e050a51ccc911b81dca897b21 reread at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The current-main hidden-agent/dedup semantics exposed a real iOS production bug and were fixed in the existing model; source-level current-main review is closed for this row only.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-provider.ts",
