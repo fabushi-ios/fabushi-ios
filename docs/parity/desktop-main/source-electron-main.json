@@ -1862,17 +1862,17 @@
     {
       "desktop_path": "source/electron-main/prefs/host-settings-fields.ts",
       "desktop_blob_sha": "70b39227c0dbcd3af9a4dd0787667be3477a95e3",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "IOS-MAIN-HOST-SETTINGS-ONBOARDING-001 — keep onboarding completion account-scoped under the canonical settings owner and reconcile it with the connected computer settings surface",
       "desktop_owner": "platform-main",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "A signed-in user who already completed onboarding stays past onboarding for the same account; account changes cannot inherit another account's completion state.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/shared/node/settings/sand-settings-store.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS uses the existing SandSettingsStore account scope as the sole local owner and Coordinator requests instead of Electron MainEdge/IPC. Legacy UserDefaults is read only as a one-time migration source. Desktop BoxSettingsField remote absorb/backfill transport is not yet implemented on iOS and remains an explicit open dependency.",
+      "implementation_status": "mapped",
+      "production_evidence": "SandSettingsStore get/set/clearHasSeenOnboarding plus scopeToAccount own the account-scoped state; commit 5931bc81d845045782c12708a1c21eaf83ea7e49 adds getOnboardingSeen/setOnboardingSeen Coordinator routes; commit 4a3db1913a6793cb72d7a9ceaa055132d4097f41 routes MarketplaceModel startup/completion through that owner with generation/account fencing and one-time legacy migration.",
+      "test_evidence": "SharedSettingsParityTests already covers foreign-account clearing; commit d23cf8a2c21cb146b8acd3ac5cf55df11f4ccdcd adds direct Coordinator get/set onboarding route and account-switch coverage. Current-head GitHub Actions and remote computer settings absorb/backfill acceptance remain pending.",
+      "notes": "Current Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 / blob 70b39227c0dbcd3af9a4dd0787667be3477a95e3 reviewed. Local canonical ownership and account fencing are implemented, but the Desktop Box stream isReadable/absorbFromBox/writeback semantics do not yet have current-head iOS transport evidence, so this row intentionally stays mapped rather than implemented/verified."
     },
     {
       "desktop_path": "source/electron-main/prefs/settings-ipc.ts",
