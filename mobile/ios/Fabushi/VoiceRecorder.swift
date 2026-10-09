@@ -11,7 +11,14 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
     private(set) var isRecording = false
     private(set) var elapsedSeconds: Int = 0
     private(set) var didReachMaximumDuration = false
+    private(set) var waveformLevel: Double = 0
     var errorMessage: String?
+
+    static func normalizedWaveformLevel(decibels: Float) -> Double {
+        let floorDb: Float = -60
+        let clamped = min(0, max(floorDb, decibels))
+        return Double((clamped - floorDb) / -floorDb)
+    }
 
     static func shouldTranscribe(duration: TimeInterval) -> Bool {
         duration >= minimumRecordingDuration
@@ -58,13 +65,18 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
             outputURL = url
             elapsedSeconds = 0
             didReachMaximumDuration = false
+            waveformLevel = 0
             isRecording = true
             timer?.invalidate()
             timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                 Task { @MainActor in
                     guard let self, let recorder = self.recorder, self.isRecording else { return }
+                    recorder.updateMeters()
                     let duration = recorder.currentTime
                     self.elapsedSeconds = Int(duration)
+                    self.waveformLevel = Self.normalizedWaveformLevel(
+                        decibels: recorder.averagePower(forChannel: 0)
+                    )
                     if Self.reachedMaximumDuration(duration) {
                         self.didReachMaximumDuration = true
                         self.timer?.invalidate()
@@ -86,6 +98,7 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
         timer = nil
         isRecording = false
         didReachMaximumDuration = false
+        waveformLevel = 0
         self.recorder = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
 
@@ -108,6 +121,7 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
         timer = nil
         isRecording = false
         didReachMaximumDuration = false
+        waveformLevel = 0
         if let outputURL { try? FileManager.default.removeItem(at: outputURL) }
         recorder = nil
         outputURL = nil

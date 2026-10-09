@@ -709,6 +709,9 @@ internal struct MobileBotChat: View {
                     Circle().fill(Color.red).frame(width: 8, height: 8)
                     Text("正在录音 \(voiceRecorder.elapsedSeconds / 60):\(String(format: "%02d", voiceRecorder.elapsedSeconds % 60))")
                         .font(.caption.weight(.semibold))
+                    MobileVoiceWaveform(level: voiceRecorder.waveformLevel)
+                        .frame(width: 58, height: 18)
+                        .accessibilityHidden(true)
                 }
                 Spacer()
                 Button("取消") { cancelVoiceInput() }
@@ -721,6 +724,25 @@ internal struct MobileBotChat: View {
                 guard reachedMaximum, !transcribingVoice else { return }
                 Task { await finishVoiceInput() }
             }
+        }
+    }
+
+    private struct MobileVoiceWaveform: View {
+        let level: Double
+
+        var body: some View {
+            HStack(alignment: .center, spacing: 2) {
+                ForEach(0..<9, id: \.self) { index in
+                    let emphasis = 0.55 + Double((index * 7) % 5) * 0.11
+                    Capsule()
+                        .fill(.secondary)
+                        .frame(
+                            width: 3,
+                            height: max(3, 16 * (0.18 + min(1, level) * emphasis))
+                        )
+                }
+            }
+            .animation(.easeOut(duration: 0.16), value: level)
         }
     }
 
