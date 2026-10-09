@@ -175,4 +175,123 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
         )
     }
 
+
+    func testRootNotificationProjectionValidatesActionsAndDedupeCount() {
+        let tray = projectMobileRootNotificationTray([
+            "kind": "error",
+            "id": "tray-1",
+            "title": "Provider busy",
+            "detail": "Retry later",
+            "requestId": "request-1",
+            "errorKind": "provider_overloaded",
+            "count": 3,
+            "actions": [
+                [
+                    "kind": "open-url",
+                    "label": "Status",
+                    "url": "https://status.example.com",
+                ],
+                [
+                    "kind": "open-url",
+                    "label": "Blocked",
+                    "url": "file:///private/secret",
+                ],
+                [
+                    "kind": "dashboard-action",
+                    "label": "Retry",
+                    "action": "retry-provider",
+                    "args": ["provider": "cursor"],
+                    "successMessage": "Retry requested",
+                ],
+            ],
+        ])
+
+        XCTAssertEqual(tray?.id, "tray-1")
+        XCTAssertEqual(tray?.requestID, "request-1")
+        XCTAssertEqual(tray?.errorKind, "provider_overloaded")
+        XCTAssertEqual(tray?.count, 3)
+        XCTAssertEqual(tray?.actions.map(\.label), ["Status", "Retry"])
+
+        guard let first = tray?.actions.first else {
+            return XCTFail("expected validated open-url action")
+        }
+        if case .openURL(let url) = first.kind {
+            XCTAssertEqual(url.absoluteString, "https://status.example.com")
+        } else {
+            XCTFail("expected open-url action")
+        }
+
+        guard let last = tray?.actions.last else {
+            return XCTFail("expected validated dashboard action")
+        }
+        if case .dashboard(let action, let args, let successMessage) = last.kind {
+            XCTAssertEqual(action, "retry-provider")
+            XCTAssertEqual(args["provider"] as? String, "cursor")
+            XCTAssertEqual(successMessage, "Retry requested")
+        } else {
+            XCTFail("expected dashboard action")
+        }
+    }
+
+    func testRootNotificationReducerUsesHostChangedEventsAsSourceOfTruth() {
+        let initial = projectMobileRootNotificationTrays([
+            [
+                "kind": "error",
+                "id": "tray-1",
+                "title": "First",
+            ],
+        ])
+        XCTAssertEqual(initial.map(\.id), ["tray-1"])
+
+        let pushed = reduceMobileRootNotificationEvent(
+            initial,
+            event: [
+                "type": "tray.changed",
+                "action": "pushed",
+                "tray": [
+                    "kind": "error",
+                    "id": "tray-2",
+                    "title": "Second",
+                ],
+            ]
+        )
+        XCTAssertEqual(pushed.map(\.id), ["tray-1", "tray-2"])
+
+        let updated = reduceMobileRootNotificationEvent(
+            pushed,
+            event: [
+                "type": "tray.changed",
+                "action": "pushed",
+                "tray": [
+                    "kind": "error",
+                    "id": "tray-2",
+                    "title": "Second updated",
+                    "count": 2,
+                ],
+            ]
+        )
+        XCTAssertEqual(updated.count, 2)
+        XCTAssertEqual(updated.last?.title, "Second updated")
+        XCTAssertEqual(updated.last?.count, 2)
+
+        let dismissed = reduceMobileRootNotificationEvent(
+            updated,
+            event: [
+                "type": "tray.changed",
+                "action": "dismissed",
+                "id": "tray-1",
+            ]
+        )
+        XCTAssertEqual(dismissed.map(\.id), ["tray-2"])
+
+        let cleared = reduceMobileRootNotificationEvent(
+            dismissed,
+            event: [
+                "type": "tray.changed",
+                "action": "cleared",
+            ]
+        )
+        XCTAssertTrue(cleared.isEmpty)
+    }
+
 }
