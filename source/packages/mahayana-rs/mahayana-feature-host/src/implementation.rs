@@ -9661,7 +9661,7 @@ impl FeatureHostController {
             dismiss,
             later_user_turn_exists,
         )?;
-        self.runtime()?.replace_conversation_message(updated)?;
+        self.runtime()?.replace_conversation_message(ConversationId(conversation_id.clone()), updated)?;
 
         let operation_id = if dismiss {
             None
@@ -9697,7 +9697,7 @@ impl FeatureHostController {
             match started {
                 Ok(operation_id) => {
                     if operation_id != requested_operation_id {
-                        let _ = self.runtime()?.replace_conversation_message(original);
+                        let _ = self.runtime()?.replace_conversation_message(ConversationId(conversation_id.clone()), original);
                         return Err(FeatureHostError::Contract(
                             "widget response operation identity drifted".into(),
                         ));
@@ -9715,7 +9715,7 @@ impl FeatureHostController {
                     Some(operation_id)
                 }
                 Err(error) => {
-                    let _ = self.runtime()?.replace_conversation_message(original);
+                    let _ = self.runtime()?.replace_conversation_message(ConversationId(conversation_id.clone()), original);
                     return Err(error.into());
                 }
             }
