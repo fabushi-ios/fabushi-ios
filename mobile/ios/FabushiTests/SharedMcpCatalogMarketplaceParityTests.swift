@@ -264,4 +264,17 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
         XCTAssertFalse(result.includesPrivateMarketplaces)
         XCTAssertEqual(result.plugins.map(\.pluginId), ["1"])
     }
+    func testMarketplaceLogoRegistryPreservesExactStringMembership() {
+        CursorMarketplaceLogoRegistry.shared.resetForTesting()
+        defer { CursorMarketplaceLogoRegistry.shared.resetForTesting() }
+
+        rememberPluginLogoUrl("")
+        rememberPluginLogoUrl("https://cdn.example.test/logo.png")
+
+        XCTAssertTrue(isKnownPluginLogoUrl(""))
+        XCTAssertTrue(isKnownPluginLogoUrl("https://cdn.example.test/logo.png"))
+        XCTAssertFalse(isKnownPluginLogoUrl("https://cdn.example.test/other.png"))
+    }
+
+
 }
