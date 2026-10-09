@@ -80,6 +80,13 @@ struct SandStoredSettings: Codable, Equatable, Sendable {
     var inferenceProvider: SandInferenceProvider?
     var inferenceRouterUsage: SandInferenceRouterUsage?
     var boxRuntime: SandBoxRuntime?
+    var uiLocale: String?
+    var uiDirection: String?
+    var reducedMotion: Bool?
+    var highContrast: Bool?
+    var textScale: Double?
+    var callMicrophoneId: String?
+    var callCameraId: String?
     var mcpCustomInstructionsAccountScope: String?
     var pinnedAgentIds: [String]?
     var sidebarSections: [SandStoredSidebarSection]?
@@ -164,6 +171,24 @@ private func normalizeStoredSettings(_ decoded: SandStoredSettings) -> SandStore
     if value.mcpCustomInstructionsAccountScope?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
         value.mcpCustomInstructionsAccountScope = nil
     }
+    let ui = normalizeSandUiPreferences(
+        locale: value.uiLocale,
+        direction: value.uiDirection,
+        reducedMotion: value.reducedMotion,
+        highContrast: value.highContrast,
+        textScale: value.textScale
+    )
+    value.uiLocale = ui.locale
+    value.uiDirection = ui.direction.rawValue
+    value.reducedMotion = ui.reducedMotion
+    value.highContrast = ui.highContrast
+    value.textScale = ui.textScale
+    let media = normalizeSandCallMediaPreferences(
+        microphoneId: value.callMicrophoneId,
+        cameraId: value.callCameraId
+    )
+    value.callMicrophoneId = media.microphoneId
+    value.callCameraId = media.cameraId
     return value
 }
 
@@ -239,6 +264,13 @@ private func parseStoredSettingsObject(_ rawValue: Any) -> SandStoredSettings? {
     if let runtime = raw["boxRuntime"] as? String {
         value.boxRuntime = SandBoxRuntime(rawValue: runtime)
     }
+    value.uiLocale = raw["uiLocale"] as? String
+    value.uiDirection = raw["uiDirection"] as? String
+    value.reducedMotion = raw["reducedMotion"] as? Bool
+    value.highContrast = raw["highContrast"] as? Bool
+    value.textScale = (raw["textScale"] as? NSNumber)?.doubleValue
+    value.callMicrophoneId = raw["callMicrophoneId"] as? String
+    value.callCameraId = raw["callCameraId"] as? String
     value.mcpCustomInstructionsAccountScope = raw["mcpCustomInstructionsAccountScope"] as? String
     value.pinnedAgentIds = storedStringArray(raw["pinnedAgentIds"])
 
@@ -354,6 +386,44 @@ final class SandSettingsStore: @unchecked Sendable {
 
     func setThemePreference(_ value: FabushiThemePreference) {
         update { $0.themePreference = value.rawValue }
+    }
+
+    func getUiPreferences() -> SandUiPreferences {
+        let settings = load()
+        return normalizeSandUiPreferences(
+            locale: settings.uiLocale,
+            direction: settings.uiDirection,
+            reducedMotion: settings.reducedMotion,
+            highContrast: settings.highContrast,
+            textScale: settings.textScale
+        )
+    }
+
+    func setUiPreferences(_ value: SandUiPreferences) {
+        let ui = normalizeSandUiPreferences(value)
+        update {
+            $0.uiLocale = ui.locale
+            $0.uiDirection = ui.direction.rawValue
+            $0.reducedMotion = ui.reducedMotion
+            $0.highContrast = ui.highContrast
+            $0.textScale = ui.textScale
+        }
+    }
+
+    func getCallMediaPreferences() -> SandCallMediaPreferences {
+        let settings = load()
+        return normalizeSandCallMediaPreferences(
+            microphoneId: settings.callMicrophoneId,
+            cameraId: settings.callCameraId
+        )
+    }
+
+    func setCallMediaPreferences(_ value: SandCallMediaPreferences) {
+        let media = normalizeSandCallMediaPreferences(value)
+        update {
+            $0.callMicrophoneId = media.microphoneId
+            $0.callCameraId = media.cameraId
+        }
     }
 
     func getBoxRuntime() -> SandBoxRuntime { load().boxRuntime ?? DEFAULT_SAND_BOX_RUNTIME }
