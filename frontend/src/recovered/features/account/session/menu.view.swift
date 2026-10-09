@@ -790,7 +790,7 @@ struct AccountSettingsView: View {
     private func requestMediaPermissions() {
         guard !mediaBusy else { return }
         guard let mediaPort else {
-            actionError = "通话媒体运行时不可用。"
+            actionError = shellCopy.mediaRuntimeUnavailable
             return
         }
         mediaBusy = true
