@@ -6,6 +6,10 @@ internal let mobileMermaidLineCap = 1_024
 internal let mobileMermaidNodeCap = 256
 internal let mobileMermaidEdgeCap = 512
 internal let mobileMermaidLabelCharacterCap = 512
+internal let mobileMermaidRenderCacheLimit = 64
+internal let mobileMermaidMinZoom: CGFloat = 0.1
+internal let mobileMermaidMaxZoom: CGFloat = 8
+internal let mobileMermaidZoomStep: CGFloat = 1.4
 
 internal enum MobileMermaidParseError: LocalizedError, Equatable, Sendable {
     case empty
@@ -506,6 +510,55 @@ internal func parseMobileMermaidDiagram(_ source: String) throws -> MobileMermai
     throw MobileMermaidParseError.unsupportedDiagram(kind)
 }
 
+internal enum MobileMermaidRenderResult: Equatable, Sendable {
+    case ready(MobileMermaidDiagram)
+    case failed(MobileMermaidParseError)
+}
+
+internal actor MobileMermaidRenderQueue {
+    static let shared = MobileMermaidRenderQueue(capacity: mobileMermaidRenderCacheLimit)
+
+    private let capacity: Int
+    private var cache: [String: MobileMermaidRenderResult] = [:]
+    private var order: [String] = []
+
+    init(capacity: Int) {
+        self.capacity = max(1, capacity)
+    }
+
+    func resolve(source: String, theme: String) -> MobileMermaidRenderResult {
+        let key = theme + "\u{0}" + source
+        if let cached = cache[key] {
+            if let index = order.firstIndex(of: key) {
+                order.remove(at: index)
+            }
+            order.append(key)
+            return cached
+        }
+
+        let result: MobileMermaidRenderResult
+        do {
+            result = .ready(try parseMobileMermaidDiagram(source))
+        } catch let error as MobileMermaidParseError {
+            result = .failed(error)
+        } catch {
+            result = .failed(.malformed(error.localizedDescription))
+        }
+
+        cache[key] = result
+        order.append(key)
+        while order.count > capacity {
+            let oldest = order.removeFirst()
+            cache.removeValue(forKey: oldest)
+        }
+        return result
+    }
+
+    func entryCount() -> Int {
+        cache.count
+    }
+}
+
 private struct MobileMermaidGraphLayout {
     static let nodeWidth: CGFloat = 150
     static let nodeHeight: CGFloat = 54
@@ -787,54 +840,140 @@ private struct MobileMermaidDiagramSurface: View {
     }
 }
 
+internal func mobileMermaidNaturalSize(_ diagram: MobileMermaidDiagram) -> CGSize {
+    switch diagram {
+    case .graph(let direction, let nodes, let edges):
+        return MobileMermaidGraphLayout(
+            nodes: nodes,
+            edges: edges,
+            direction: direction
+        ).size
+    case .sequence(let participants, let messages):
+        let laneWidth: CGFloat = 145
+        let top: CGFloat = 52
+        let messageGap: CGFloat = 56
+        return CGSize(
+            width: max(360, CGFloat(participants.count) * laneWidth + 40),
+            height: max(180, top + CGFloat(max(1, messages.count)) * messageGap + 48)
+        )
+    case .pie:
+        return CGSize(width: 444, height: 206)
+    }
+}
+
+internal func mobileMermaidFitScale(
+    diagram: CGSize,
+    viewport: CGSize
+) -> CGFloat {
+    guard diagram.width > 0, diagram.height > 0,
+          viewport.width > 0, viewport.height > 0
+    else { return 1 }
+    let raw = min(viewport.width / diagram.width, viewport.height / diagram.height)
+    guard raw.isFinite, raw > 0 else { return mobileMermaidMinZoom }
+    return min(1, max(mobileMermaidMinZoom, min(mobileMermaidMaxZoom, raw)))
+}
+
 private struct MobileMermaidFullscreenView: View {
     let diagram: MobileMermaidDiagram
     let onClose: () -> Void
     @State private var scale: CGFloat = 1
     @GestureState private var liveMagnification: CGFloat = 1
 
+    private var naturalSize: CGSize {
+        mobileMermaidNaturalSize(diagram)
+    }
+
     private var effectiveScale: CGFloat {
-        min(8, max(0.1, scale * liveMagnification))
+        min(
+            mobileMermaidMaxZoom,
+            max(mobileMermaidMinZoom, scale * liveMagnification)
+        )
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView([.horizontal, .vertical]) {
-                MobileMermaidDiagramSurface(diagram: diagram)
-                    .scaleEffect(effectiveScale, anchor: .topLeading)
-                    .padding(24)
-            }
-            .background(Color(uiColor: .systemBackground))
-            .simultaneousGesture(
-                MagnificationGesture()
-                    .updating($liveMagnification) { value, state, _ in state = value }
-                    .onEnded { value in scale = min(8, max(0.1, scale * value)) }
-            )
-            .navigationTitle("Diagram")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close", action: onClose)
-                }
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        scale = max(0.1, scale / 1.4)
-                    } label: {
-                        Image(systemName: "minus.magnifyingglass")
+        GeometryReader { geometry in
+            NavigationStack {
+                ScrollViewReader { scrollProxy in
+                    ScrollView([.horizontal, .vertical]) {
+                        MobileMermaidDiagramSurface(diagram: diagram)
+                            .scaleEffect(effectiveScale, anchor: .topLeading)
+                            .frame(
+                                width: naturalSize.width * effectiveScale,
+                                height: naturalSize.height * effectiveScale,
+                                alignment: .topLeading
+                            )
+                            .padding(24)
+                            .id("mobile-mermaid-origin")
                     }
-                    .accessibilityLabel("Zoom out")
-                    Button {
-                        scale = min(8, scale * 1.4)
-                    } label: {
-                        Image(systemName: "plus.magnifyingglass")
+                    .background(Color(uiColor: .systemBackground))
+                    .simultaneousGesture(
+                        MagnificationGesture()
+                            .updating($liveMagnification) { value, state, _ in
+                                state = value
+                            }
+                            .onEnded { value in
+                                scale = min(
+                                    mobileMermaidMaxZoom,
+                                    max(mobileMermaidMinZoom, scale * value)
+                                )
+                            }
+                    )
+                    .navigationTitle("Diagram")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Close", action: onClose)
+                        }
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            Button {
+                                scale = max(
+                                    mobileMermaidMinZoom,
+                                    scale / mobileMermaidZoomStep
+                                )
+                            } label: {
+                                Image(systemName: "minus.magnifyingglass")
+                            }
+                            .accessibilityLabel("Zoom out")
+
+                            Button {
+                                scale = min(
+                                    mobileMermaidMaxZoom,
+                                    scale * mobileMermaidZoomStep
+                                )
+                            } label: {
+                                Image(systemName: "plus.magnifyingglass")
+                            }
+                            .accessibilityLabel("Zoom in")
+
+                            Button {
+                                scale = mobileMermaidFitScale(
+                                    diagram: naturalSize,
+                                    viewport: CGSize(
+                                        width: max(1, geometry.size.width - 48),
+                                        height: max(1, geometry.size.height - 96)
+                                    )
+                                )
+                                DispatchQueue.main.async {
+                                    scrollProxy.scrollTo(
+                                        "mobile-mermaid-origin",
+                                        anchor: .topLeading
+                                    )
+                                }
+                            } label: {
+                                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            }
+                            .accessibilityLabel("Fit diagram")
+                        }
                     }
-                    .accessibilityLabel("Zoom in")
-                    Button {
-                        scale = 1
-                    } label: {
-                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .onAppear {
+                        scale = mobileMermaidFitScale(
+                            diagram: naturalSize,
+                            viewport: CGSize(
+                                width: max(1, geometry.size.width - 48),
+                                height: max(1, geometry.size.height - 96)
+                            )
+                        )
                     }
-                    .accessibilityLabel("Fit diagram")
                 }
             }
         }
@@ -851,12 +990,17 @@ internal struct MobileMermaidDiagramView: View {
     let source: String
     let renderScopeID: String
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var state: LoadState = .loading
     @State private var activeRequestID = ""
     @State private var fullscreen = false
 
     private var requestID: String {
         renderScopeID + "\u{1f}" + source
+    }
+
+    private var renderRequestID: String {
+        requestID + "\u{1e}" + (colorScheme == .dark ? "dark" : "light")
     }
 
     var body: some View {
@@ -908,22 +1052,22 @@ internal struct MobileMermaidDiagramView: View {
                 )
             }
         }
-        .task(id: requestID) {
-            let request = requestID
+        .task(id: renderRequestID) {
+            let request = renderRequestID
             activeRequestID = request
             state = .loading
-            do {
-                let currentSource = source
-                let diagram = try await Task.detached(priority: .userInitiated) {
-                    try parseMobileMermaidDiagram(currentSource)
-                }.value
-                try Task.checkCancellation()
-                guard activeRequestID == request, requestID == request else { return }
+            let result = await MobileMermaidRenderQueue.shared.resolve(
+                source: source,
+                theme: colorScheme == .dark ? "dark" : "light"
+            )
+            guard !Task.isCancelled,
+                  activeRequestID == request,
+                  renderRequestID == request
+            else { return }
+            switch result {
+            case .ready(let diagram):
                 state = .ready(diagram)
-            } catch is CancellationError {
-                return
-            } catch {
-                guard !Task.isCancelled, activeRequestID == request, requestID == request else { return }
+            case .failed(let error):
                 state = .failed(error.localizedDescription)
             }
         }

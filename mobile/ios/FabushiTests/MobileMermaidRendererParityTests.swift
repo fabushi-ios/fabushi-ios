@@ -129,4 +129,44 @@ final class MobileMermaidRendererParityTests: XCTestCase {
             )
         )
     }
+    func testRenderQueueSerializesAndKeepsCacheBounded() async {
+        let queue = MobileMermaidRenderQueue(capacity: 4)
+        for index in 0..<10 {
+            _ = await queue.resolve(
+                source: "flowchart TD\nA\(index)-->B\(index)",
+                theme: index.isMultiple(of: 2) ? "light" : "dark"
+            )
+        }
+        let count = await queue.entryCount()
+        XCTAssertEqual(count, 4)
+    }
+
+    func testNaturalSizeAndFitScaleUseViewportBounds() throws {
+        let diagram = try parseMobileMermaidDiagram(
+            """
+            flowchart LR
+            A[Start] --> B[Middle]
+            B --> C[Done]
+            """
+        )
+        let natural = mobileMermaidNaturalSize(diagram)
+        XCTAssertGreaterThan(natural.width, 0)
+        XCTAssertGreaterThan(natural.height, 0)
+
+        let fit = mobileMermaidFitScale(
+            diagram: CGSize(width: 1_000, height: 500),
+            viewport: CGSize(width: 500, height: 500)
+        )
+        XCTAssertEqual(fit, 0.5, accuracy: 0.001)
+        XCTAssertEqual(
+            mobileMermaidFitScale(
+                diagram: CGSize(width: 100, height: 100),
+                viewport: CGSize(width: 500, height: 500)
+            ),
+            1,
+            accuracy: 0.001
+        )
+    }
+
+
 }
