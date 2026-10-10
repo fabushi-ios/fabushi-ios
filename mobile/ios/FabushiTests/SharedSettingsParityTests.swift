@@ -578,6 +578,74 @@ final class SharedSettingsParityTests: XCTestCase {
     }
 
     @MainActor
+    func testCoordinatorOwnsTimeZoneAndLocalToolPermissionFacades() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        store.setUserTimeZone("America/Los_Angeles")
+        store.setLocalToolPermissionCeiling("ask")
+        let host = SettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+
+        let initialZone = try await coordinator.request(method: "getTimeZone")
+        let initialZoneObject = try XCTUnwrap(initialZone.value as? [String: Any])
+        XCTAssertEqual(initialZoneObject["detectedTimeZone"] as? String, "America/Los_Angeles")
+        XCTAssertTrue(initialZoneObject["overrideTimeZone"] is NSNull)
+
+        let updatedZone = try await coordinator.request(
+            method: "setTimeZoneOverride",
+            params: ["timeZone": "Asia/Tokyo"]
+        )
+        XCTAssertEqual(
+            (updatedZone.value as? [String: Any])?["overrideTimeZone"] as? String,
+            "Asia/Tokyo"
+        )
+        XCTAssertEqual(store.getUserTimeZone(), "Asia/Tokyo")
+
+        do {
+            _ = try await coordinator.request(
+                method: "setTimeZoneOverride",
+                params: ["timeZone": "Mars/Olympus"]
+            )
+            XCTFail("invalid IANA zones must fail closed")
+        } catch {
+            XCTAssertEqual(store.getUserTimeZoneOverride(), "Asia/Tokyo")
+        }
+
+        XCTAssertEqual(
+            try await coordinator.request(method: "getLocalToolPermission").value as? String,
+            "ask"
+        )
+        XCTAssertEqual(
+            try await coordinator.request(method: "getLocalToolPermissionCeiling").value as? String,
+            "ask"
+        )
+        XCTAssertEqual(
+            try await coordinator.request(
+                method: "setLocalToolPermission",
+                params: ["permission": "never"]
+            ).value as? String,
+            "never"
+        )
+        XCTAssertEqual(store.getLocalToolPermission(), "never")
+
+        do {
+            _ = try await coordinator.request(
+                method: "setLocalToolPermission",
+                params: ["permission": "always"]
+            )
+            XCTFail("admin ceiling must reject a less restrictive permission")
+        } catch {
+            XCTAssertEqual(store.getLocalToolPermission(), "never")
+        }
+    }
+
+    @MainActor
     func testCoordinatorInferenceProviderFacadeUsesCanonicalSettingsStore() async throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

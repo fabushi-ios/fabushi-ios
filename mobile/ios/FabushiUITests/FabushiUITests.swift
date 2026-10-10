@@ -160,6 +160,15 @@ final class FabushiUITests: XCTestCase {
             app.descendants(matching: .any)["settings-auto-review-rule-behavior"].exists
         )
         XCTAssertTrue(app.buttons["settings-auto-review-rule-save"].exists)
+
+        XCTAssertTrue(
+            scrollToElement(app.descendants(matching: .any)["settings-time-zone"], in: app),
+            "Expected canonical time-zone control in shipping Settings."
+        )
+        XCTAssertTrue(
+            scrollToElement(app.descendants(matching: .any)["settings-local-tool-permission"], in: app),
+            "Expected canonical local-execution permission control in shipping Settings."
+        )
     }
 
     @MainActor

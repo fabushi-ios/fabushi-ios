@@ -96,6 +96,37 @@ struct AccountMenuView: View {
     @State private var actionError: String?
     @Environment(\.mobileUiPreferencesStore) private var uiPreferencesStore
 
+    private struct AdvancedCopy {
+        let section: String
+        let timeZone: String
+        let automaticTimeZone: String
+        let localExecution: String
+        let localExecutionDescription: String
+        let permissionAlways: String
+        let permissionAsk: String
+        let permissionNever: String
+        let maximum: String
+    }
+
+    private var advancedCopy: AdvancedCopy {
+        switch (uiPreferencesStore?.preferences ?? MobileUiPreferences()).locale {
+        case .zhHans:
+            return .init(section: "高级", timeZone: "时区", automaticTimeZone: "自动", localExecution: "本地执行权限", localExecutionDescription: "控制 Agent 在此设备上使用本地工具前是否需要询问。", permissionAlways: "始终允许", permissionAsk: "先询问", permissionNever: "从不允许", maximum: "管理员上限")
+        case .zhHant:
+            return .init(section: "進階", timeZone: "時區", automaticTimeZone: "自動", localExecution: "本機執行權限", localExecutionDescription: "控制 Agent 在此裝置使用本機工具前是否需要詢問。", permissionAlways: "一律允許", permissionAsk: "先詢問", permissionNever: "永不允許", maximum: "管理員上限")
+        case .ja:
+            return .init(section: "詳細設定", timeZone: "タイムゾーン", automaticTimeZone: "自動", localExecution: "ローカル実行権限", localExecutionDescription: "このデバイスでローカルツールを使う前に Agent が確認するかを制御します。", permissionAlways: "常に許可", permissionAsk: "先に確認", permissionNever: "許可しない", maximum: "管理者上限")
+        case .ko:
+            return .init(section: "고급", timeZone: "시간대", automaticTimeZone: "자동", localExecution: "로컬 실행 권한", localExecutionDescription: "Agent가 이 기기에서 로컬 도구를 사용하기 전에 물어볼지 제어합니다.", permissionAlways: "항상 허용", permissionAsk: "먼저 묻기", permissionNever: "허용 안 함", maximum: "관리자 한도")
+        case .ar:
+            return .init(section: "متقدم", timeZone: "المنطقة الزمنية", automaticTimeZone: "تلقائي", localExecution: "إذن التنفيذ المحلي", localExecutionDescription: "يتحكم فيما إذا كان على Agent طلب الإذن قبل استخدام الأدوات المحلية على هذا الجهاز.", permissionAlways: "السماح دائمًا", permissionAsk: "اسأل أولًا", permissionNever: "عدم السماح", maximum: "حد المسؤول")
+        case .he:
+            return .init(section: "מתקדם", timeZone: "אזור זמן", automaticTimeZone: "אוטומטי", localExecution: "הרשאת ביצוע מקומית", localExecutionDescription: "קובע אם Agent צריך לשאול לפני שימוש בכלים מקומיים במכשיר הזה.", permissionAlways: "לאפשר תמיד", permissionAsk: "לשאול קודם", permissionNever: "לא לאפשר", maximum: "מגבלת מנהל")
+        case .en, .system:
+            return .init(section: "Advanced", timeZone: "Time zone", automaticTimeZone: "Automatic", localExecution: "Local execution permission", localExecutionDescription: "Controls whether Agent must ask before using local tools on this device.", permissionAlways: "Always allow", permissionAsk: "Ask first", permissionNever: "Never allow", maximum: "Admin maximum")
+        }
+    }
+
     private var shellCopy: MobileSettingsShellCopy {
         (uiPreferencesStore?.preferences ?? MobileUiPreferences()).shellCopy()
     }
@@ -299,6 +330,14 @@ struct AccountSettingsView: View {
     @State private var autoReviewSettings = DEFAULT_SAND_AUTO_REVIEW_INSTRUCTIONS
     @State private var inferenceProvider: SandInferenceProvider = .fabushi
     @State private var privacyModeEnabled = true
+    @State private var timeZoneState = MobileTimeZoneSettingsState(
+        detectedTimeZone: nil,
+        overrideTimeZone: nil
+    )
+    @State private var localToolPermissionState = MobileLocalToolPermissionState(
+        permission: SAND_DEFAULT_LOCAL_TOOL_PERMISSION,
+        ceiling: nil
+    )
     @State private var ruleDraft = ""
     @State private var ruleBehavior: SandAutoReviewInstructionBehavior = .allow
     @State private var editingRule: SandAutoReviewInstructionRow?
@@ -656,6 +695,52 @@ struct AccountSettingsView: View {
                     .accessibilityIdentifier("settings-inference-provider-usage")
             }
 
+            Section(advancedCopy.section) {
+                Picker(
+                    advancedCopy.timeZone,
+                    selection: Binding(
+                        get: { timeZoneState.overrideTimeZone ?? "" },
+                        set: { beginTimeZoneUpdate($0.isEmpty ? nil : $0) }
+                    )
+                ) {
+                    let autoLabel = timeZoneState.detectedTimeZone.map {
+                        "\(advancedCopy.automaticTimeZone) · \($0.replacingOccurrences(of: "_", with: " "))"
+                    } ?? advancedCopy.automaticTimeZone
+                    Text(autoLabel).tag("")
+                    ForEach(TimeZone.knownTimeZoneIdentifiers, id: \.self) { zone in
+                        Text(zone.replacingOccurrences(of: "_", with: " ")).tag(zone)
+                    }
+                }
+                .disabled(configurationSaving)
+                .accessibilityIdentifier("settings-time-zone")
+
+                Picker(
+                    advancedCopy.localExecution,
+                    selection: Binding(
+                        get: { localToolPermissionState.permission },
+                        set: { beginLocalToolPermissionUpdate($0) }
+                    )
+                ) {
+                    ForEach(SAND_LOCAL_TOOL_PERMISSIONS, id: \.self) { permission in
+                        Text(localToolPermissionLabel(permission))
+                            .tag(permission)
+                            .disabled(localToolPermissionExceedsCeiling(permission))
+                    }
+                }
+                .disabled(configurationSaving)
+                .accessibilityIdentifier("settings-local-tool-permission")
+
+                Text(advancedCopy.localExecutionDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let ceiling = localToolPermissionState.ceiling {
+                    Text("\(advancedCopy.maximum): \(localToolPermissionLabel(ceiling))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-local-tool-permission-ceiling")
+                }
+            }
+
             Section(localizedFeatureCopy.autoReviewTitle) {
                 Toggle(
                     localizedFeatureCopy.autoReviewDescription,
@@ -830,6 +915,8 @@ struct AccountSettingsView: View {
             autoReviewSettings = snapshot.autoReview
             inferenceProvider = snapshot.inferenceProvider
             privacyModeEnabled = snapshot.privacyModeEnabled
+            timeZoneState = snapshot.timeZone
+            localToolPermissionState = snapshot.localToolPermission
             editingRule = editingRule.flatMap {
                 reconcileSandAutoReviewInstructionRow(
                     snapshot.autoReview,
@@ -843,6 +930,88 @@ struct AccountSettingsView: View {
             else { return }
             configurationLoading = false
             actionError = error.localizedDescription
+        }
+    }
+
+    private func localToolPermissionLabel(
+        _ permission: SandLocalToolPermission
+    ) -> String {
+        switch permission {
+        case "always": advancedCopy.permissionAlways
+        case "never": advancedCopy.permissionNever
+        default: advancedCopy.permissionAsk
+        }
+    }
+
+    private func localToolPermissionExceedsCeiling(
+        _ permission: SandLocalToolPermission
+    ) -> Bool {
+        guard let ceiling = localToolPermissionState.ceiling,
+              let requestedRank = SAND_LOCAL_TOOL_PERMISSION_RANK[permission],
+              let ceilingRank = SAND_LOCAL_TOOL_PERMISSION_RANK[ceiling]
+        else { return false }
+        return requestedRank > ceilingRank
+    }
+
+    @MainActor
+    private func beginTimeZoneUpdate(_ next: String?) {
+        guard !configurationSaving, next != timeZoneState.overrideTimeZone else { return }
+        configurationGeneration = configurationGeneration == Int.max
+            ? 1
+            : configurationGeneration + 1
+        let generation = configurationGeneration
+        let accountKey = model.settingsNoticeAccountKey
+        configurationSaving = true
+        Task { @MainActor in
+            do {
+                let saved = try await model.updateTimeZoneOverride(next)
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                timeZoneState = saved
+                configurationSaving = false
+            } catch {
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                configurationSaving = false
+                actionError = error.localizedDescription
+            }
+        }
+    }
+
+    @MainActor
+    private func beginLocalToolPermissionUpdate(
+        _ next: SandLocalToolPermission
+    ) {
+        guard !configurationSaving,
+              next != localToolPermissionState.permission,
+              !localToolPermissionExceedsCeiling(next)
+        else { return }
+        configurationGeneration = configurationGeneration == Int.max
+            ? 1
+            : configurationGeneration + 1
+        let generation = configurationGeneration
+        let accountKey = model.settingsNoticeAccountKey
+        configurationSaving = true
+        Task { @MainActor in
+            do {
+                let saved = try await model.updateLocalToolPermission(next)
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                localToolPermissionState = .init(
+                    permission: saved,
+                    ceiling: localToolPermissionState.ceiling
+                )
+                configurationSaving = false
+            } catch {
+                guard generation == configurationGeneration,
+                      accountKey == model.settingsNoticeAccountKey
+                else { return }
+                configurationSaving = false
+                actionError = error.localizedDescription
+            }
         }
     }
 

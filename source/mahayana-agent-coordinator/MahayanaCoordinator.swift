@@ -648,6 +648,65 @@ final class MahayanaCoordinator {
             hostSettingsReconciler?.scheduleLocalWrite(seen)
             return JSONResult(value: seen)
         }
+        if method == "getTimeZone" {
+            guard let settingsStore else { throw CoordinatorError.unavailable }
+            let detected = settingsStore.getDetectedUserTimeZone()
+                ?? TimeZone.autoupdatingCurrent.identifier
+            if settingsStore.getDetectedUserTimeZone() == nil {
+                settingsStore.setUserTimeZone(detected)
+            }
+            return JSONResult(value: [
+                "detectedTimeZone": detected,
+                "overrideTimeZone": settingsStore.getUserTimeZoneOverride() ?? NSNull(),
+            ])
+        }
+        if method == "setTimeZoneOverride" {
+            guard let settingsStore else { throw CoordinatorError.unavailable }
+            let raw = params["timeZone"]
+            let override: String?
+            if raw == nil || raw is NSNull {
+                override = nil
+            } else if let string = raw as? String {
+                let normalized = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !normalized.isEmpty, TimeZone(identifier: normalized) != nil else {
+                    throw CoordinatorError.requestFailed("Unknown IANA time zone.")
+                }
+                override = normalized
+            } else {
+                throw CoordinatorError.invalidParams
+            }
+            settingsStore.setUserTimeZoneOverride(override)
+            let detected = settingsStore.getDetectedUserTimeZone()
+                ?? TimeZone.autoupdatingCurrent.identifier
+            if settingsStore.getDetectedUserTimeZone() == nil {
+                settingsStore.setUserTimeZone(detected)
+            }
+            return JSONResult(value: [
+                "detectedTimeZone": detected,
+                "overrideTimeZone": settingsStore.getUserTimeZoneOverride() ?? NSNull(),
+            ])
+        }
+        if method == "getLocalToolPermission" {
+            guard let settingsStore else { throw CoordinatorError.unavailable }
+            return JSONResult(value: settingsStore.getLocalToolPermission())
+        }
+        if method == "getLocalToolPermissionCeiling" {
+            guard let settingsStore else { throw CoordinatorError.unavailable }
+            return JSONResult(value: settingsStore.getLocalToolPermissionCeiling() ?? NSNull())
+        }
+        if method == "setLocalToolPermission" {
+            guard let settingsStore,
+                  let raw = params["permission"] as? String,
+                  isSandLocalToolPermission(raw)
+            else { throw CoordinatorError.invalidParams }
+            let ceiling = settingsStore.getLocalToolPermissionCeiling()
+            guard resolveSandLocalToolPermission(raw, adminCeiling: ceiling) == raw else {
+                throw CoordinatorError.requestFailed("Local tool permission exceeds the administrator ceiling.")
+            }
+            settingsStore.setLocalToolPermission(raw)
+            return JSONResult(value: settingsStore.getLocalToolPermission())
+        }
+
         if method == "getAutoReviewInstructions" {
             return JSONResult(value: autoReviewInstructionsObject())
         }

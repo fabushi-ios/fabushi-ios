@@ -691,10 +691,22 @@ func decodeMobileAutoReviewInstructions(_ value: Any) throws -> SandAutoReviewIn
     )
 }
 
+struct MobileTimeZoneSettingsState: Equatable {
+    let detectedTimeZone: String?
+    let overrideTimeZone: String?
+}
+
+struct MobileLocalToolPermissionState: Equatable {
+    let permission: SandLocalToolPermission
+    let ceiling: SandLocalToolPermission?
+}
+
 struct MobileConfigurationSettingsSnapshot: Equatable {
     let autoReview: SandAutoReviewInstructions
     let inferenceProvider: SandInferenceProvider
     let privacyModeEnabled: Bool
+    let timeZone: MobileTimeZoneSettingsState
+    let localToolPermission: MobileLocalToolPermissionState
 }
 
 func appendMobileAutoReviewAllowRule(
@@ -1965,20 +1977,101 @@ final class MarketplaceModel {
         async let review = bridge.request(method: "getAutoReviewInstructions")
         async let provider = bridge.request(method: "getInferenceProvider")
         async let privacy = bridge.request(method: "getCursorPrivacyModeEnabled")
-        let (reviewResult, providerResult, privacyResult) = try await (review, provider, privacy)
+        async let timeZone = bridge.request(method: "getTimeZone")
+        async let localPermission = bridge.request(method: "getLocalToolPermission")
+        async let localCeiling = bridge.request(method: "getLocalToolPermissionCeiling")
+        let (
+            reviewResult,
+            providerResult,
+            privacyResult,
+            timeZoneResult,
+            localPermissionResult,
+            localCeilingResult
+        ) = try await (
+            review,
+            provider,
+            privacy,
+            timeZone,
+            localPermission,
+            localCeiling
+        )
         let autoReview = try decodeMobileAutoReviewInstructions(reviewResult.value)
         guard let object = providerResult.value as? [String: Any],
               let rawProvider = object["provider"] as? String,
               let inferenceProvider = SandInferenceProvider(rawValue: rawProvider),
-              let privacyModeEnabled = privacyResult.value as? Bool
+              let privacyModeEnabled = privacyResult.value as? Bool,
+              let timeZoneObject = timeZoneResult.value as? [String: Any],
+              let rawPermission = localPermissionResult.value as? String,
+              isSandLocalToolPermission(rawPermission)
         else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let detectedTimeZone = (timeZoneObject["detectedTimeZone"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let overrideTimeZone = (timeZoneObject["overrideTimeZone"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let ceiling: SandLocalToolPermission?
+        if localCeilingResult.value is NSNull {
+            ceiling = nil
+        } else if let rawCeiling = localCeilingResult.value as? String,
+                  isSandLocalToolPermission(rawCeiling) {
+            ceiling = rawCeiling
+        } else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         return .init(
             autoReview: autoReview,
             inferenceProvider: inferenceProvider,
-            privacyModeEnabled: privacyModeEnabled
+            privacyModeEnabled: privacyModeEnabled,
+            timeZone: .init(
+                detectedTimeZone: detectedTimeZone?.isEmpty == false ? detectedTimeZone : nil,
+                overrideTimeZone: overrideTimeZone?.isEmpty == false ? overrideTimeZone : nil
+            ),
+            localToolPermission: .init(
+                permission: rawPermission,
+                ceiling: ceiling
+            )
         )
+    }
+
+    func updateTimeZoneOverride(
+        _ timeZone: String?
+    ) async throws -> MobileTimeZoneSettingsState {
+        var params: [String: Any] = [:]
+        params["timeZone"] = timeZone ?? NSNull()
+        let result = try await bridge.request(
+            method: "setTimeZoneOverride",
+            params: params
+        )
+        guard let object = result.value as? [String: Any] else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let detected = (object["detectedTimeZone"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let override = (object["overrideTimeZone"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return .init(
+            detectedTimeZone: detected?.isEmpty == false ? detected : nil,
+            overrideTimeZone: override?.isEmpty == false ? override : nil
+        )
+    }
+
+    func updateLocalToolPermission(
+        _ permission: SandLocalToolPermission
+    ) async throws -> SandLocalToolPermission {
+        guard isSandLocalToolPermission(permission) else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let result = try await bridge.request(
+            method: "setLocalToolPermission",
+            params: ["permission": permission]
+        )
+        guard let authoritative = result.value as? String,
+              isSandLocalToolPermission(authoritative)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return authoritative
     }
 
     func updateAutoReviewSettings(
