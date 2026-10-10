@@ -138,6 +138,28 @@ internal struct MobileConversationOutlineScope: Equatable, Sendable {
     }
 }
 
+internal func mergeMobileOutlineSubagents(
+    historical: [MobileBotSubagent],
+    running: [MobileAsyncTask]
+) -> [MobileBotSubagent] {
+    var order: [String] = []
+    var byId: [String: MobileBotSubagent] = [:]
+    for subagent in historical {
+        if byId[subagent.subagentId] == nil { order.append(subagent.subagentId) }
+        byId[subagent.subagentId] = subagent
+    }
+    for task in running where task.kind == "subagent" {
+        if byId[task.id] == nil { order.append(task.id) }
+        byId[task.id] = .init(
+            subagentId: task.id,
+            subagentType: task.subagentType ?? "subagent",
+            title: task.label,
+            status: "running"
+        )
+    }
+    return order.compactMap { byId[$0] }
+}
+
 @MainActor
 internal struct MobileConversationOutlinePanel: View {
     let agentId: String
@@ -176,22 +198,10 @@ internal struct MobileConversationOutlinePanel: View {
     }
 
     private var mergedSubagents: [MobileBotSubagent] {
-        var order: [String] = []
-        var byId: [String: MobileBotSubagent] = [:]
-        for subagent in historicalSubagents {
-            if byId[subagent.subagentId] == nil { order.append(subagent.subagentId) }
-            byId[subagent.subagentId] = subagent
-        }
-        for task in runningSubagents where task.kind == "subagent" {
-            if byId[task.id] == nil { order.append(task.id) }
-            byId[task.id] = .init(
-                subagentId: task.id,
-                subagentType: task.subagentType ?? "subagent",
-                title: task.label,
-                status: "running"
-            )
-        }
-        return order.compactMap { byId[$0] }
+        mergeMobileOutlineSubagents(
+            historical: historicalSubagents,
+            running: runningSubagents
+        )
     }
 
     private var selectedRunningSubagent: MobileBotSubagent? {
