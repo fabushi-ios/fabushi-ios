@@ -148,4 +148,69 @@ final class SharedMessagingCoreParityTests: XCTestCase {
         XCTAssertEqual(SendAcceptanceContract.nonceDigestMismatch, "send/nonce-digest-mismatch")
         XCTAssertEqual(SendAcceptanceContract.hostAccountSlot, "host")
     }
+    func testHumanMediaProjectionUsesOnlyExplicitDurableGroupIdentity() {
+        func mediaMessage(
+            id: String,
+            group: String?,
+            index: Int?,
+            count: Int?,
+            outgoing: Bool
+        ) -> ChatMessage {
+            var message = ChatMessage(
+                id: id,
+                conversationId: "conversation-1",
+                text: "media",
+                contentType: "photo",
+                mediaFileName: "\(id).jpg",
+                mediaBlobId: "blob-\(id)",
+                mediaMimeType: "image/jpeg",
+                mediaSizeBytes: 10,
+                contactName: nil,
+                latitude: nil,
+                longitude: nil,
+                pollQuestion: nil,
+                pollOptions: [],
+                pollMultipleAnswers: false,
+                isOutgoing: outgoing,
+                time: "10:00",
+                replyToMessageId: nil,
+                forwardOrigin: nil,
+                reactions: [],
+                deliveryState: "delivered",
+                isEdited: false,
+                isPinned: false
+            )
+            message.mediaGroupId = group
+            message.mediaGroupIndex = index
+            message.mediaGroupCount = count
+            message.mediaAttachments = [
+                ChatMediaAttachment(
+                    id: id,
+                    messageId: id,
+                    contentType: "photo",
+                    fileName: "\(id).jpg",
+                    blobId: "blob-\(id)",
+                    mimeType: "image/jpeg",
+                    sizeBytes: 10,
+                    groupIndex: index
+                )
+            ]
+            message.groupedMessageIds = [id]
+            return message
+        }
+
+        let first = mediaMessage(id: "m1", group: "g", index: 0, count: 2, outgoing: true)
+        let second = mediaMessage(id: "m2", group: "g", index: 1, count: 2, outgoing: true)
+        let unrelated = mediaMessage(id: "m3", group: nil, index: nil, count: nil, outgoing: true)
+        let otherSender = mediaMessage(id: "m4", group: "g", index: 0, count: 2, outgoing: false)
+
+        let projected = projectHumanMediaGroups([second, unrelated, first, otherSender])
+        XCTAssertEqual(projected.count, 3)
+        let gallery = try! XCTUnwrap(projected.first(where: { $0.mediaGroupId == "g" && $0.isOutgoing }))
+        XCTAssertEqual(gallery.mediaAttachments.map(\.messageId), ["m1", "m2"])
+        XCTAssertEqual(gallery.groupedMessageIds, ["m1", "m2"])
+        XCTAssertEqual(projected.filter { $0.id == "m3" }.count, 1)
+        XCTAssertEqual(projected.filter { $0.id == "m4" }.count, 1)
+    }
+
 }

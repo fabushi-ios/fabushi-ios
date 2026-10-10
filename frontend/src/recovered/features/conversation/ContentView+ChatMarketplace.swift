@@ -559,7 +559,8 @@ internal struct ForwardMessageSheet: View {
 
 extension ContentView {
     func chatView(_ conversation: ConversationSummary) -> some View {
-        let messages = messaging.messagesByConversation[conversation.id] ?? []
+        let canonicalMessages = messaging.messagesByConversation[conversation.id] ?? []
+        let messages = projectHumanMediaGroups(canonicalMessages)
         let normalizedSearchQuery = chatSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let localSearchEntries = messages.map {
             ChatSearchEntry(
@@ -1018,19 +1019,46 @@ extension ContentView {
                 forwardMessage = nil
             }
         }
-        .fileImporter(isPresented: $attachmentPickerPresented, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
-            guard case let .success(urls) = result, let url = urls.first else { return }
-            let accessed = url.startAccessingSecurityScopedResource()
-            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        .fileImporter(
+            isPresented: $attachmentPickerPresented,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            guard case let .success(urls) = result, !urls.isEmpty else { return }
+            guard urls.count <= 64 else {
+                model.message = "一次最多发送 64 个附件"
+                return
+            }
             do {
-                let data = try Data(contentsOf: url)
-                let values = try? url.resourceValues(forKeys: [.contentTypeKey])
-                let mime = values?.contentType?.preferredMIMEType ?? "application/octet-stream"
-                Task {
-                    do { try await messaging.sendAttachment(conversationId: conversation.id, fileName: url.lastPathComponent, mimeType: mime, data: data) }
-                    catch { model.message = "附件发送失败：\(error.localizedDescription)" }
+                var attachments: [OutgoingChatAttachment] = []
+                attachments.reserveCapacity(urls.count)
+                for url in urls {
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                    let data = try Data(contentsOf: url)
+                    let values = try? url.resourceValues(forKeys: [.contentTypeKey])
+                    attachments.append(
+                        OutgoingChatAttachment(
+                            fileName: url.lastPathComponent,
+                            mimeType: values?.contentType?.preferredMIMEType
+                                ?? "application/octet-stream",
+                            data: data
+                        )
+                    )
                 }
-            } catch { model.message = "读取附件失败：\(error.localizedDescription)" }
+                Task {
+                    do {
+                        try await messaging.sendAttachments(
+                            conversationId: conversation.id,
+                            attachments: attachments
+                        )
+                    } catch {
+                        model.message = "附件发送失败：\(error.localizedDescription)"
+                    }
+                }
+            } catch {
+                model.message = "读取附件失败：\(error.localizedDescription)"
+            }
         }
         .sheet(isPresented: $locationSharePresented) {
             NavigationStack {

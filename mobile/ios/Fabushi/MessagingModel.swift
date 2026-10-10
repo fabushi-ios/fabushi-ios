@@ -115,6 +115,23 @@ internal func projectChatReactionToggle(
     return next
 }
 
+internal struct ChatMediaAttachment: Identifiable, Equatable, Sendable {
+    let id: String
+    let messageId: String
+    let contentType: String
+    let fileName: String?
+    let blobId: String?
+    let mimeType: String?
+    let sizeBytes: Int
+    let groupIndex: Int?
+}
+
+internal struct OutgoingChatAttachment: Equatable, Sendable {
+    let fileName: String
+    let mimeType: String
+    let data: Data
+}
+
 internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let id: String
     let conversationId: String
@@ -138,7 +155,72 @@ internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let deliveryState: String
     let isEdited: Bool
     let isPinned: Bool
+    var mediaGroupId: String? = nil
+    var mediaGroupIndex: Int? = nil
+    var mediaGroupCount: Int? = nil
+    var mediaAttachments: [ChatMediaAttachment] = []
+    var groupedMessageIds: [String] = []
 }
+
+internal func projectHumanMediaGroups(_ messages: [ChatMessage]) -> [ChatMessage] {
+    struct GroupKey: Hashable {
+        let conversationId: String
+        let outgoing: Bool
+        let groupId: String
+        let count: Int
+    }
+
+    func key(for message: ChatMessage) -> GroupKey? {
+        guard let groupId = message.mediaGroupId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !groupId.isEmpty,
+              let count = message.mediaGroupCount,
+              count > 1,
+              let index = message.mediaGroupIndex,
+              index >= 0,
+              index < count,
+              !message.mediaAttachments.isEmpty
+        else { return nil }
+        return GroupKey(
+            conversationId: message.conversationId,
+            outgoing: message.isOutgoing,
+            groupId: groupId,
+            count: count
+        )
+    }
+
+    var members: [GroupKey: [ChatMessage]] = [:]
+    for message in messages {
+        if let groupKey = key(for: message) {
+            members[groupKey, default: []].append(message)
+        }
+    }
+
+    var emitted = Set<GroupKey>()
+    var result: [ChatMessage] = []
+    for message in messages {
+        guard let groupKey = key(for: message),
+              let groupMembers = members[groupKey],
+              groupMembers.count > 1
+        else {
+            result.append(message)
+            continue
+        }
+        guard emitted.insert(groupKey).inserted else { continue }
+
+        let ordered = groupMembers.sorted {
+            let left = $0.mediaGroupIndex ?? Int.max
+            let right = $1.mediaGroupIndex ?? Int.max
+            if left != right { return left < right }
+            return $0.id < $1.id
+        }
+        var projected = message
+        projected.mediaAttachments = ordered.flatMap(\.mediaAttachments)
+        projected.groupedMessageIds = ordered.map(\.id)
+        result.append(projected)
+    }
+    return result
+}
+
 
 internal func reconcileMessagingSyncBaseline(
     current: [String: [ChatMessage]],
@@ -349,38 +431,147 @@ final class MessagingModel {
         ])
     }
 
-    func sendAttachment(conversationId: String, fileName: String, mimeType: String, data: Data) async throws {
-        guard !data.isEmpty else { throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空文件") }
+    func sendAttachment(
+        conversationId: String,
+        fileName: String,
+        mimeType: String,
+        data: Data
+    ) async throws {
+        try await sendAttachments(
+            conversationId: conversationId,
+            attachments: [
+                OutgoingChatAttachment(
+                    fileName: fileName,
+                    mimeType: mimeType,
+                    data: data
+                )
+            ]
+        )
+    }
+
+    func sendAttachments(
+        conversationId: String,
+        attachments: [OutgoingChatAttachment]
+    ) async throws {
+        guard !attachments.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空附件组")
+        }
+        guard attachments.count <= 64 else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("一次最多发送 64 个附件")
+        }
+        guard attachments.allSatisfy({ !$0.data.isEmpty }) else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空文件")
+        }
         try await ensureIdentity()
-        let blobId = "blob-\(UUID().uuidString.lowercased())"
-        let createdAt = Int64(Date().timeIntervalSince1970 * 1000)
-        _ = try await execute(command: [
-            "type": "beginBlobUpload",
-            "metadata": ["id": blobId, "fileName": fileName, "mimeType": mimeType, "sizeBytes": data.count, "contentHash": NSNull(), "createdAtMs": createdAt],
-        ])
-        let chunkSize = 512 * 1024
-        var offset = 0
-        while offset < data.count {
-            let end = min(data.count, offset + chunkSize)
-            let chunk = data.subdata(in: offset..<end)
-            _ = try await execute(command: ["type": "appendBlobChunk", "blobId": blobId, "offset": offset, "dataBase64": chunk.base64EncodedString()])
-            offset = end
+
+        struct UploadedAttachment {
+            let input: OutgoingChatAttachment
+            let blobId: String
+            let content: [String: Any]
         }
-        _ = try await execute(command: ["type": "finishBlobUpload", "blobId": blobId])
-        let media: [String: Any] = ["id": blobId, "fileName": fileName, "mimeType": mimeType, "sizeBytes": data.count, "remoteUrl": "fabushi-blob://\(blobId)"]
-        let caption: [String: Any] = ["text": "", "entities": []]
-        let content: [String: Any]
-        if mimeType.hasPrefix("image/") {
-            content = ["type": "photo", "data": ["media": media, "caption": caption, "spoiler": false]]
-        } else if mimeType.hasPrefix("video/") {
-            content = ["type": "video", "data": ["media": media, "caption": caption, "spoiler": false, "streaming": true]]
-        } else {
-            content = ["type": "document", "data": ["media": media, "caption": caption]]
+
+        var uploaded: [UploadedAttachment] = []
+        do {
+            for attachment in attachments {
+                let blobId = "blob-\(UUID().uuidString.lowercased())"
+                let createdAt = Int64(Date().timeIntervalSince1970 * 1000)
+                _ = try await execute(command: [
+                    "type": "beginBlobUpload",
+                    "metadata": [
+                        "id": blobId,
+                        "fileName": attachment.fileName,
+                        "mimeType": attachment.mimeType,
+                        "sizeBytes": attachment.data.count,
+                        "contentHash": NSNull(),
+                        "createdAtMs": createdAt,
+                    ],
+                ])
+                let chunkSize = 512 * 1024
+                var offset = 0
+                while offset < attachment.data.count {
+                    try Task.checkCancellation()
+                    let end = min(attachment.data.count, offset + chunkSize)
+                    let chunk = attachment.data.subdata(in: offset..<end)
+                    _ = try await execute(command: [
+                        "type": "appendBlobChunk",
+                        "blobId": blobId,
+                        "offset": offset,
+                        "dataBase64": chunk.base64EncodedString(),
+                    ])
+                    offset = end
+                }
+                _ = try await execute(command: ["type": "finishBlobUpload", "blobId": blobId])
+                let media: [String: Any] = [
+                    "id": blobId,
+                    "fileName": attachment.fileName,
+                    "mimeType": attachment.mimeType,
+                    "sizeBytes": attachment.data.count,
+                    "remoteUrl": "fabushi-blob://\(blobId)",
+                ]
+                let caption: [String: Any] = ["text": "", "entities": []]
+                let content: [String: Any]
+                if attachment.mimeType.hasPrefix("image/") {
+                    content = [
+                        "type": "photo",
+                        "data": ["media": media, "caption": caption, "spoiler": false],
+                    ]
+                } else if attachment.mimeType.hasPrefix("video/") {
+                    content = [
+                        "type": "video",
+                        "data": [
+                            "media": media,
+                            "caption": caption,
+                            "spoiler": false,
+                            "streaming": true,
+                        ],
+                    ]
+                } else {
+                    content = [
+                        "type": "document",
+                        "data": ["media": media, "caption": caption],
+                    ]
+                }
+                uploaded.append(.init(input: attachment, blobId: blobId, content: content))
+            }
+        } catch {
+            for item in uploaded {
+                _ = try? await execute(command: ["type": "deleteBlob", "blobId": item.blobId])
+            }
+            throw error
         }
-        _ = try await execute(command: [
-            "type": "sendMessage", "conversationId": conversationId, "clientMessageId": "ios:\(UUID().uuidString.lowercased())",
-            "content": content, "replyToMessageId": NSNull(), "threadRootMessageId": NSNull(), "scheduledAtMs": NSNull(), "silent": false, "protectedContent": false,
-        ])
+
+        let groupId = attachments.count > 1
+            ? UUID().uuidString.lowercased()
+            : nil
+        var sentCount = 0
+        do {
+            for (index, item) in uploaded.enumerated() {
+                try Task.checkCancellation()
+                let clientMessageId: String
+                if let groupId {
+                    clientMessageId = "ios-media-group:\(groupId):\(index):\(uploaded.count)"
+                } else {
+                    clientMessageId = "ios:\(UUID().uuidString.lowercased())"
+                }
+                _ = try await execute(command: [
+                    "type": "sendMessage",
+                    "conversationId": conversationId,
+                    "clientMessageId": clientMessageId,
+                    "content": item.content,
+                    "replyToMessageId": NSNull(),
+                    "threadRootMessageId": NSNull(),
+                    "scheduledAtMs": NSNull(),
+                    "silent": false,
+                    "protectedContent": false,
+                ])
+                sentCount += 1
+            }
+        } catch {
+            for item in uploaded.dropFirst(sentCount) {
+                _ = try? await execute(command: ["type": "deleteBlob", "blobId": item.blobId])
+            }
+            throw error
+        }
     }
 
     func setMessagePinned(conversationId: String, messageId: String, pinned: Bool) async {
@@ -952,11 +1143,29 @@ final class MessagingModel {
         else { return nil }
         let contentType = content["type"] as? String ?? "unknown"
         let data = content["data"] as? [String: Any] ?? [:]
-        let media = data["media"] as? [String: Any]
-        let mediaFileName = media?["fileName"] as? String
-        let mediaBlobId = media?["id"] as? String
+        let directMedia = data["media"] as? [String: Any]
+        let rawAttachments =
+            (raw["attachments"] as? [[String: Any]])
+            ?? (data["attachments"] as? [[String: Any]])
+            ?? []
+        let attachmentMedia = rawAttachments.compactMap { attachment -> (String, [String: Any])? in
+            let projectedType = (attachment["type"] as? String) ?? contentType
+            if let nested = attachment["media"] as? [String: Any] {
+                return (projectedType, nested)
+            }
+            if attachment["id"] is String || attachment["blobId"] is String {
+                return (projectedType, attachment)
+            }
+            return nil
+        }
+        let media = directMedia ?? attachmentMedia.first?.1
+        let mediaFileName = (media?["fileName"] as? String) ?? (media?["name"] as? String)
+        let mediaBlobId = (media?["id"] as? String) ?? (media?["blobId"] as? String)
         let mediaMimeType = media?["mimeType"] as? String
-        let mediaSizeBytes = (media?["sizeBytes"] as? NSNumber)?.intValue ?? 0
+        let mediaSizeBytes =
+            (media?["sizeBytes"] as? NSNumber)?.intValue
+            ?? (media?["size"] as? NSNumber)?.intValue
+            ?? 0
         let contactName = data["displayName"] as? String
         let latitude = (data["latitude"] as? NSNumber)?.doubleValue
         let longitude = (data["longitude"] as? NSNumber)?.doubleValue
@@ -994,11 +1203,53 @@ final class MessagingModel {
             }
             return "sent"
         }()
-        return ChatMessage(
+        var parsed = ChatMessage(
             id: id, conversationId: conversationId, text: text, contentType: contentType, mediaFileName: mediaFileName, mediaBlobId: mediaBlobId, mediaMimeType: mediaMimeType, mediaSizeBytes: mediaSizeBytes, contactName: contactName, latitude: latitude, longitude: longitude, pollQuestion: pollQuestion, pollOptions: pollOptions, pollMultipleAnswers: pollMultipleAnswers, isOutgoing: senderId == actorId, time: Self.timeLabel(createdAt),
             replyToMessageId: raw["replyToMessageId"] as? String, forwardOrigin: raw["forwardOrigin"] as? String, reactions: reactions,
             deliveryState: deliveryState, isEdited: raw["editedAtMs"] is NSNumber, isPinned: raw["pinned"] as? Bool ?? false
         )
+        let mediaGroup = raw["mediaGroup"] as? [String: Any]
+        parsed.mediaGroupId = mediaGroup?["id"] as? String
+        parsed.mediaGroupIndex = (mediaGroup?["index"] as? NSNumber)?.intValue
+        parsed.mediaGroupCount = (mediaGroup?["count"] as? NSNumber)?.intValue
+        if !attachmentMedia.isEmpty {
+            parsed.mediaAttachments = attachmentMedia.enumerated().compactMap { offset, entry in
+                let projectedMedia = entry.1
+                guard let blobId =
+                    (projectedMedia["id"] as? String)
+                    ?? (projectedMedia["blobId"] as? String)
+                else { return nil }
+                return ChatMediaAttachment(
+                    id: "\(id)#\(offset)#\(blobId)",
+                    messageId: id,
+                    contentType: entry.0,
+                    fileName: (projectedMedia["fileName"] as? String)
+                        ?? (projectedMedia["name"] as? String),
+                    blobId: blobId,
+                    mimeType: projectedMedia["mimeType"] as? String,
+                    sizeBytes:
+                        (projectedMedia["sizeBytes"] as? NSNumber)?.intValue
+                        ?? (projectedMedia["size"] as? NSNumber)?.intValue
+                        ?? 0,
+                    groupIndex: parsed.mediaGroupIndex
+                )
+            }
+        } else if let mediaBlobId {
+            parsed.mediaAttachments = [
+                ChatMediaAttachment(
+                    id: "\(id)#\(mediaBlobId)",
+                    messageId: id,
+                    contentType: contentType,
+                    fileName: mediaFileName,
+                    blobId: mediaBlobId,
+                    mimeType: mediaMimeType,
+                    sizeBytes: mediaSizeBytes,
+                    groupIndex: parsed.mediaGroupIndex
+                )
+            ]
+        }
+        parsed.groupedMessageIds = [id]
+        return parsed
     }
 
     private static func timeLabel(_ milliseconds: Int64) -> String {

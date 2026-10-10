@@ -44,6 +44,30 @@ internal func isNativePdfAttachment(mimeType: String?, fileName: String?) -> Boo
     return URL(fileURLWithPath: fileName).pathExtension.lowercased() == "pdf"
 }
 
+internal func mediaViewerAttachments(for message: ChatMessage) -> [ChatMediaAttachment] {
+    if !message.mediaAttachments.isEmpty {
+        return message.mediaAttachments
+    }
+    guard let blobId = message.mediaBlobId else { return [] }
+    return [
+        ChatMediaAttachment(
+            id: "\(message.id)#\(blobId)",
+            messageId: message.id,
+            contentType: message.contentType,
+            fileName: message.mediaFileName,
+            blobId: blobId,
+            mimeType: message.mediaMimeType,
+            sizeBytes: message.mediaSizeBytes,
+            groupIndex: message.mediaGroupIndex
+        )
+    ]
+}
+
+internal func clampedMediaAttachmentIndex(_ index: Int, count: Int) -> Int {
+    guard count > 0 else { return 0 }
+    return min(max(0, index), count - 1)
+}
+
 private struct NativePDFPreview: UIViewRepresentable {
     let url: URL
 
@@ -76,6 +100,7 @@ struct MediaViewer: View {
     @State private var loading = true
     @State private var loadGeneration = 0
     @State private var imageTransform = NativeMediaImageTransform()
+    @State private var selectedAttachmentIndex = 0
     @GestureState private var imageMagnification: CGFloat = 1
     @GestureState private var imageDragTranslation: CGSize = .zero
 
@@ -85,7 +110,7 @@ struct MediaViewer: View {
                 Color.black.ignoresSafeArea()
                 content
             }
-            .navigationTitle(message.mediaFileName ?? mediaTitle)
+            .navigationTitle(selectedAttachment?.fileName ?? mediaTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -98,8 +123,67 @@ struct MediaViewer: View {
                 }
             }
         }
-        .task(id: message.id) { await load() }
+        .safeAreaInset(edge: .bottom) {
+            if attachments.count > 1 {
+                attachmentFilmstrip
+            }
+        }
+        .task(id: selectedAttachment?.id ?? message.id) { await load() }
         .onDisappear { invalidateLoadAndCleanUp() }
+    }
+
+    private var attachments: [ChatMediaAttachment] {
+        mediaViewerAttachments(for: message)
+    }
+
+    private var selectedAttachment: ChatMediaAttachment? {
+        guard !attachments.isEmpty else { return nil }
+        let index = clampedMediaAttachmentIndex(
+            selectedAttachmentIndex,
+            count: attachments.count
+        )
+        return attachments[index]
+    }
+
+    private var attachmentFilmstrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Array(attachments.enumerated()), id: \.element.id) { index, attachment in
+                    Button {
+                        selectedAttachmentIndex = index
+                    } label: {
+                        VStack(spacing: 3) {
+                            Image(systemName: attachment.contentType == "photo"
+                                ? "photo"
+                                : attachment.contentType == "video"
+                                    ? "video"
+                                    : "doc")
+                            Text(attachment.fileName ?? "附件 \(index + 1)")
+                                .font(.caption2)
+                                .lineLimit(1)
+                        }
+                        .frame(width: 88, height: 52)
+                        .background(
+                            index == clampedMediaAttachmentIndex(
+                                selectedAttachmentIndex,
+                                count: attachments.count
+                            )
+                                ? Color.accentColor.opacity(0.28)
+                                : Color.white.opacity(0.08),
+                            in: RoundedRectangle(cornerRadius: 8)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .accessibilityLabel(
+                        "附件 \(index + 1)，\(attachment.fileName ?? attachment.contentType)"
+                    )
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .background(.ultraThinMaterial)
     }
 
     @ViewBuilder
@@ -109,7 +193,7 @@ struct MediaViewer: View {
         } else if let errorMessage {
             ContentUnavailableView("无法打开媒体", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
                 .foregroundStyle(.white)
-        } else if message.contentType == "photo", let data, let image = UIImage(data: data) {
+        } else if selectedAttachment?.contentType == "photo", let data, let image = UIImage(data: data) {
             GeometryReader { proxy in
                 Image(uiImage: image)
                     .resizable()
@@ -143,32 +227,32 @@ struct MediaViewer: View {
                     .onTapGesture(count: 2) {
                         resetImageTransform()
                     }
-                    .accessibilityLabel(message.mediaFileName ?? "Image preview")
+                    .accessibilityLabel(selectedAttachment?.fileName ?? "Image preview")
                     .accessibilityHint("Pinch to zoom, drag to pan, double tap to fit")
             }
-        } else if message.contentType == "video", let localURL {
+        } else if selectedAttachment?.contentType == "video", let localURL {
             VideoPlayer(player: AVPlayer(url: localURL)).ignoresSafeArea(edges: .bottom)
-        } else if isNativePdfAttachment(mimeType: message.mediaMimeType, fileName: message.mediaFileName),
+        } else if isNativePdfAttachment(mimeType: selectedAttachment?.mimeType, fileName: selectedAttachment?.fileName),
                   let localURL {
             NativePDFPreview(url: localURL)
                 .ignoresSafeArea(edges: .bottom)
-                .accessibilityLabel(message.mediaFileName ?? "PDF document")
+                .accessibilityLabel(selectedAttachment?.fileName ?? "PDF document")
         } else if isNativeSpreadsheetAttachment(
-            mimeType: message.mediaMimeType,
-            fileName: message.mediaFileName
+            mimeType: selectedAttachment?.mimeType,
+            fileName: selectedAttachment?.fileName
         ), let data, let localURL {
             NativeSpreadsheetPreview(
                 data: data,
                 url: localURL,
-                fileName: message.mediaFileName,
-                mimeType: message.mediaMimeType
+                fileName: selectedAttachment?.fileName,
+                mimeType: selectedAttachment?.mimeType
             )
         } else if let localURL {
             VStack(spacing: 18) {
                 Image(systemName: "doc.fill").font(.system(size: 64)).foregroundStyle(.orange)
-                Text(message.mediaFileName ?? "文件").font(.title3.bold()).foregroundStyle(.white)
-                if let mime = message.mediaMimeType { Text(mime).font(.caption).foregroundStyle(.secondary) }
-                Text(ByteCountFormatter.string(fromByteCount: Int64(message.mediaSizeBytes), countStyle: .file)).foregroundStyle(.secondary)
+                Text(selectedAttachment?.fileName ?? "文件").font(.title3.bold()).foregroundStyle(.white)
+                if let mime = selectedAttachment?.mimeType { Text(mime).font(.caption).foregroundStyle(.secondary) }
+                Text(ByteCountFormatter.string(fromByteCount: Int64(selectedAttachment?.sizeBytes ?? 0), countStyle: .file)).foregroundStyle(.secondary)
                 ShareLink(item: localURL) { Label("导出或用其他 App 打开", systemImage: "square.and.arrow.up") }
                     .buttonStyle(.borderedProminent)
             }.padding()
@@ -193,7 +277,7 @@ struct MediaViewer: View {
     }
 
     private var mediaTitle: String {
-        switch message.contentType {
+        switch selectedAttachment?.contentType ?? message.contentType {
         case "photo": "图片"
         case "video": "视频"
         default: "文件"
@@ -213,28 +297,31 @@ struct MediaViewer: View {
         defer {
             if generation == loadGeneration { loading = false }
         }
-        guard let blobId = message.mediaBlobId, message.mediaSizeBytes > 0 else {
+        guard let attachment = selectedAttachment,
+              let blobId = attachment.blobId,
+              attachment.sizeBytes > 0
+        else {
             errorMessage = "媒体文件不可用"
             return
         }
-        if isNativePdfAttachment(mimeType: message.mediaMimeType, fileName: message.mediaFileName),
-           message.mediaSizeBytes > nativePdfPreviewByteCap {
+        if isNativePdfAttachment(mimeType: attachment.mimeType, fileName: attachment.fileName),
+           attachment.sizeBytes > nativePdfPreviewByteCap {
             errorMessage = "PDF 超过 25 MB，无法在 Fabushi 内预览"
             return
         }
         if isNativeSpreadsheetAttachment(
-            mimeType: message.mediaMimeType,
-            fileName: message.mediaFileName
-        ), message.mediaSizeBytes > nativeSpreadsheetPreviewByteCap {
+            mimeType: attachment.mimeType,
+            fileName: attachment.fileName
+        ), attachment.sizeBytes > nativeSpreadsheetPreviewByteCap {
             errorMessage = "Spreadsheet 超过 25 MB，无法在 Fabushi 内预览；可导出后打开。"
             return
         }
         do {
-            let bytes = try await messaging.loadBlob(blobId: blobId, sizeBytes: message.mediaSizeBytes)
+            let bytes = try await messaging.loadBlob(blobId: blobId, sizeBytes: attachment.sizeBytes)
             guard generation == loadGeneration, !Task.isCancelled else { return }
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent("fabushi-media", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let safeName = (message.mediaFileName ?? "media-\(message.id)").replacingOccurrences(of: "/", with: "-")
+            let safeName = (attachment.fileName ?? "media-\(attachment.messageId)").replacingOccurrences(of: "/", with: "-")
             let url = directory.appendingPathComponent("\(generation)-\(safeName)")
             try bytes.write(to: url, options: .atomic)
             guard generation == loadGeneration, !Task.isCancelled else {
