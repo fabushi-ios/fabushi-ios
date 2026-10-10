@@ -392,7 +392,8 @@ final class SharedSettingsParityTests: XCTestCase {
         reconciler.scopeToAccount("owner-a")
         reconciler.setTransportLive(true)
 
-        XCTAssertTrue(await reconciler.reconcileIfReadable())
+        let reconciledRemoteTrue = await reconciler.reconcileIfReadable()
+        XCTAssertTrue(reconciledRemoteTrue)
         XCTAssertEqual(local, true)
         XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-a")
 
@@ -403,7 +404,8 @@ final class SharedSettingsParityTests: XCTestCase {
         reconciler.scopeToAccount("owner-b")
         reconciler.setTransportLive(true)
 
-        XCTAssertTrue(await reconciler.reconcileIfReadable())
+        let reconciledRemoteFalse = await reconciler.reconcileIfReadable()
+        XCTAssertTrue(reconciledRemoteFalse)
         XCTAssertEqual(local, false)
         XCTAssertEqual(remote, false)
         XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-b")
@@ -433,21 +435,25 @@ final class SharedSettingsParityTests: XCTestCase {
         )
         reconciler.scopeToAccount("owner-a")
 
-        XCTAssertFalse(await reconciler.pushLocalIfWritable(true))
+        let pushedWhileOffline = await reconciler.pushLocalIfWritable(true)
+        XCTAssertFalse(pushedWhileOffline)
         XCTAssertEqual(local, true)
         XCTAssertNil(remote)
         XCTAssertEqual(remoteReads, 0)
         XCTAssertEqual(remoteWrites, 0)
 
         reconciler.setTransportLive(true)
-        XCTAssertTrue(await reconciler.reconcileIfReadable())
+        let reconciledAfterReconnect = await reconciler.reconcileIfReadable()
+        XCTAssertTrue(reconciledAfterReconnect)
         XCTAssertEqual(remote, true)
         XCTAssertGreaterThanOrEqual(remoteReads, 1)
         XCTAssertGreaterThanOrEqual(remoteWrites, 1)
 
         reconciler.setTransportLive(false)
-        XCTAssertFalse(await reconciler.reconcileIfReadable())
-        XCTAssertFalse(await reconciler.pushLocalIfWritable(false))
+        let reconciledWhileOffline = await reconciler.reconcileIfReadable()
+        XCTAssertFalse(reconciledWhileOffline)
+        let pushedFalseWhileOffline = await reconciler.pushLocalIfWritable(false)
+        XCTAssertFalse(pushedFalseWhileOffline)
         XCTAssertEqual(local, false)
         XCTAssertEqual(remote, true)
     }
@@ -485,7 +491,8 @@ final class SharedSettingsParityTests: XCTestCase {
 
         reconciler.accountDeparted()
         XCTAssertFalse(reconciler.isReadable)
-        XCTAssertFalse(await reconciler.reconcileIfReadable())
+        let reconciledAfterDeparture = await reconciler.reconcileIfReadable()
+        XCTAssertFalse(reconciledAfterDeparture)
         XCTAssertNil(reconciler.lastSuccessfulAccountScope)
     }
 
@@ -509,7 +516,8 @@ final class SharedSettingsParityTests: XCTestCase {
         reconciler.scopeToAccount("owner-a")
         reconciler.setTransportLive(true)
 
-        XCTAssertFalse(await reconciler.reconcileIfReadable())
+        let reconciledFailure = await reconciler.reconcileIfReadable()
+        XCTAssertFalse(reconciledFailure)
         XCTAssertNil(local)
         XCTAssertNil(reconciler.lastSuccessfulAccountScope)
     }
