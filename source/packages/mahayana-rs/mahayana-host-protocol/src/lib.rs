@@ -2785,6 +2785,10 @@ pub enum HostEvent {
         count: usize,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         location: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        scope: Option<MemoryScope>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<String>,
     },
     #[serde(rename = "memory.changed")]
     MemoryChanged {
@@ -2794,6 +2798,10 @@ pub enum HostEvent {
         action: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         memory: Option<MemoryRecord>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        scope: Option<MemoryScope>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<String>,
     },
     #[serde(rename = "tray.listed")]
     TrayListed {

@@ -4726,10 +4726,16 @@ impl FeatureHostController {
                     memories,
                     count,
                     location: Some(memory_dir.to_string_lossy().into_owned()),
+                    scope: Some(scope),
+                    project,
                 });
             }
             MemoryAction::Add { content, kind } => {
                 let memory = add_memory(&memory_dir, &content, now_millis(), kind)?;
+                crate::memory_metadata::mark_explicit(&memory_dir, &content)
+                    .map_err(|error| FeatureHostError::Contract(format!(
+                        "mark explicit memory metadata: {error}"
+                    )))?;
                 self.state()?.events.push_back(HostEvent::MemoryChanged {
                     timestamp: timestamp(),
                     agent_id,
@@ -4740,28 +4746,73 @@ impl FeatureHostController {
                     }
                     .into(),
                     memory,
+                    scope: Some(scope),
+                    project,
                 });
             }
             MemoryAction::Remove { id } => {
+                let removed_content = list_memories(&memory_dir, 1000)?
+                    .into_iter()
+                    .find(|memory| memory.id == id)
+                    .map(|memory| memory.content);
                 let removed = remove_memory(&memory_dir, &id)?;
+                if removed {
+                    if let Some(content) = removed_content.as_deref() {
+                        crate::memory_metadata::mark_explicit_removal(&memory_dir, content)
+                            .map_err(|error| FeatureHostError::Contract(format!(
+                                "mark removed memory metadata: {error}"
+                            )))?;
+                    }
+                }
                 self.state()?.events.push_back(HostEvent::MemoryChanged {
                     timestamp: timestamp(),
                     agent_id,
                     action: if removed { "removed" } else { "notFound" }.into(),
                     memory: None,
+                    scope: Some(scope),
+                    project,
                 });
             }
             MemoryAction::Clear => {
+                let existing = list_memories(&memory_dir, 1000)?;
+                for memory in &existing {
+                    crate::memory_metadata::mark_explicit_removal(
+                        &memory_dir,
+                        &memory.content,
+                    )
+                    .map_err(|error| FeatureHostError::Contract(format!(
+                        "mark cleared memory metadata: {error}"
+                    )))?;
+                }
+                let dreaming = memory_dir.join(".dreaming");
                 if memory_dir.exists() {
-                    std::fs::remove_dir_all(&memory_dir).map_err(|error| {
-                        FeatureHostError::Contract(format!("clear memory: {error}"))
-                    })?;
+                    for entry in std::fs::read_dir(&memory_dir)
+                        .map_err(|error| FeatureHostError::Contract(format!(
+                            "read memory for clear: {error}"
+                        )))?
+                        .filter_map(Result::ok)
+                    {
+                        if entry.path() == dreaming {
+                            continue;
+                        }
+                        let path = entry.path();
+                        let result = if path.is_dir() {
+                            std::fs::remove_dir_all(&path)
+                        } else {
+                            std::fs::remove_file(&path)
+                        };
+                        result.map_err(|error| FeatureHostError::Contract(format!(
+                            "clear memory: {error}"
+                        )))?;
+                    }
                 }
                 self.state()?.events.push_back(HostEvent::MemoryChanged {
                     timestamp: timestamp(),
                     agent_id,
                     action: "cleared".into(),
                     memory: None,
+                    scope: Some(scope),
+                    project,
                 });
             }
         }
@@ -13143,7 +13194,7 @@ fn memory_dedupe_key(content: &str) -> String {
     normalize_memory_content(content).to_lowercase()
 }
 
-fn memory_id_for(content: &str) -> String {
+pub(crate) fn memory_id_for(content: &str) -> String {
     sha1_digest(memory_dedupe_key(content).as_bytes())
         .iter()
         .take(8)
