@@ -577,6 +577,18 @@ extension GrokMobileShell {
     }
 
     @MainActor
+    func toggleAgentSidebarSectionCollapsed(
+        _ section: MobileAgentSidebarSection
+    ) async {
+        let next = MobileAgentSidebarSections.togglingCollapsed(
+            agentSidebarSections,
+            sectionId: section.id
+        )
+        guard next != agentSidebarSections else { return }
+        _ = await applyAgentSidebarSections(next)
+    }
+
+    @MainActor
     func moveAgentSidebarSection(
         _ section: MobileAgentSidebarSection,
         offset: Int

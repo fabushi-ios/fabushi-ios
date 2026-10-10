@@ -577,12 +577,14 @@ extension GrokMobileShell {
                                             section,
                                             count: sectionBots.count
                                         )
-                                        ForEach(sectionBots) { bot in
-                                            botRow(
-                                                bot,
-                                                subtitle: mobileBotHomeSubtitle(bot),
-                                                badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
-                                            )
+                                        if !section.isCollapsed {
+                                            ForEach(sectionBots) { bot in
+                                                botRow(
+                                                    bot,
+                                                    subtitle: mobileBotHomeSubtitle(bot),
+                                                    badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -780,9 +782,23 @@ extension GrokMobileShell {
         count: Int
     ) -> some View {
         HStack(spacing: 8) {
-            Text("\(section.name)  \(count)")
-                .font(.system(size: 16))
+            Button {
+                Task { await toggleAgentSidebarSectionCollapsed(section) }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: section.isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                    Text("\(section.name)  \(count)")
+                        .font(.system(size: 16))
+                }
                 .foregroundStyle(Color.black.opacity(0.42))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(botActionBusy)
+            .accessibilityLabel(section.isCollapsed ? "Expand \(section.name)" : "Collapse \(section.name)")
+            .accessibilityValue("\(count) bots")
+            .accessibilityIdentifier("agent-section-collapse-\(section.id)")
             Spacer()
             Menu {
                 Button {

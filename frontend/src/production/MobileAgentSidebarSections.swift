@@ -91,6 +91,22 @@ enum MobileAgentSidebarSections {
         return normalized(sections).filter { $0.id != sectionId }
     }
 
+    static func togglingCollapsed(
+        _ sections: [MobileAgentSidebarSection],
+        sectionId: String
+    ) -> [MobileAgentSidebarSection] {
+        guard sectionId != "__agents__" else { return normalized(sections) }
+        let rows = normalized(sections)
+        guard rows.contains(where: { $0.id == sectionId }) else { return rows }
+        return rows.map { section in
+            var next = section
+            if next.id == sectionId {
+                next.isCollapsed.toggle()
+            }
+            return next
+        }
+    }
+
     static func moving(
         _ sections: [MobileAgentSidebarSection],
         sectionId: String,

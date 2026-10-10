@@ -3300,11 +3300,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/MobileAgentSidebarSections.swift",
       "ios_language": "Swift + Host/sidebar persistence",
-      "ios_platform_delta": "iOS has account-scoped durable sidebar sections with isCollapsed in the canonical model/fallback and Host-authoritative pin order through GrokMobileBotService. However the current Home section renderer does not yet consume/toggle isCollapsed, and mention/emoji recents are not unified into this mobile owner.",
+      "ios_platform_delta": "iOS already owns durable Host-authoritative sidebar sections with account-scoped fallback, pin ordering and an isCollapsed field. Shipping Home now consumes isCollapsed, exposes an accessible chevron toggle per real section, hides/restores section Bot rows, and persists every toggle through the existing setHostSidebarSections owner with its optimistic rollback/reload behavior. Desktop mention/emoji recents are still maintained by existing composer-specific owners rather than one unified ui-agent-refs slice, so the aggregate responsibility remains mapped.",
       "implementation_status": "mapped",
-      "production_evidence": "MobileAgentSidebarSections persists account-scoped normalized section state; GrokMobileShell+Bots loads/updates Host sections and pin order with fail-safe fallback.",
-      "test_evidence": "Mobile sidebar/Host tests cover section normalization/persistence and pin actions; collapse UI plus mention/emoji recents migration still require focused evidence.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-COLLAPSE-STATE-20261009: exact Desktop source reviewed; durable section substrate exists, aggregate ui-agent-refs parity incomplete.",
+      "production_evidence": "frontend/src/production/MobileAgentSidebarSections.swift (normalized/canonical/foundation/fallback plus togglingCollapsed); GrokMobileShell+Home.swift consumes isCollapsed and exposes the shipping toggle; GrokMobileShell+Bots.swift routes the toggle through applyAgentSidebarSections -> setHostSidebarSections and account-scoped fallback.",
+      "test_evidence": "mobile/ios/FabushiTests/MobileAgentSidebarSectionsTests.swift covers targeted toggle, canonical round-trip and account-isolated fallback persistence. Existing Bot/Host tests cover section mutation owner. Mention/emoji-recents unification and final exact-head UI/CI evidence remain open.",
+      "notes": "IOS-MAIN-DEP-SIDEBAR-COLLAPSE-STATE-20261011: collapse UI/state is production-composed on descendant of 61114fcb1642deb4e1e7ba24803d95463e4bfb20 through the existing Host owner; no second sidebar persistence layer was added. Keep mapped because the same Desktop responsibility also owns unified mention/emoji recents, which remain a separate open delta.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
