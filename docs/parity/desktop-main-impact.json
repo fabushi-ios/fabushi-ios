@@ -4179,6 +4179,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-editor-pr-reference-provider-implemented-pending-exact-head-ci",
         "finding": "Desktop PR editor provider derives transcript rich-text/plain URL candidates plus cloud-agent watcher metadata, dedupes by PR number with node>cloud>text precedence and releases watchers on scope/dispose. Shipping iOS MobileBotChat matches that projection, uses the existing account+Agent-scoped cloud-agent .task owner with cancellation and post-await scope checks, inserts durable prReference rich text through the one composer owner, and adds account/Agent switch focused fencing tests. Same-final-HEAD ordinary/protected evidence is still pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/editor-suggestion-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-editor-suggestion-provider-implemented-pending-exact-head-ci",
+        "finding": "Desktop suggestion state machine owns trusted Agent/everyone/workflow projection, fuzzy + recent ranking, emoji recents, keyboard selection, account/Agent request cancellation and non-connected transport fail-closed behavior. Shipping iOS MobileBotChat now owns the equivalent single native state machine, including MCP/PR integration; GrokMobileShell passes the canonical root Coordinator connection phase, so loading/reconnecting/unreachable clear transient suggestion rows immediately while durable selected references remain. Reconnect/request generations prevent stale writes, account/Agent/disappear invalidate the owner, and focused tests cover emoji recency and transport/account/Agent fail-closed behavior. Exact-head CI is pending."
       }
     ]
   },
