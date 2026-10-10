@@ -18031,10 +18031,14 @@ mod reserved_session_roster_tests {
             name: "Visible Agent".into(),
             description: String::new(),
             title: String::new(),
-            avatar_shape: String::new(),
-            avatar_color: String::new(),
             hidden: false,
-            ..Default::default()
+            avatar: None,
+            avatar_shape: None,
+            avatar_color: None,
+            notifications_enabled: true,
+            notify_on_updates: true,
+            unread: false,
+            conversation_id: Some("codex:agent:visible-agent".into()),
         };
         persist_bots(&bot_path, &BTreeMap::from([(bot.id.clone(), bot.clone())]))
             .expect("persist canonical bot roster");
