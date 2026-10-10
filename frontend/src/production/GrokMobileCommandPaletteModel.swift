@@ -57,6 +57,7 @@ internal enum MobileCommandPaletteActionKind: String {
     case createBot
     case openWorkspace
     case openContacts
+    case openGroupMembers
     case openChannels
     case openSettings
     case updateComputer
@@ -69,6 +70,42 @@ internal struct MobileCommandPaletteAction: Identifiable {
     let keywords: [String]
     let detail: String
     let kind: MobileCommandPaletteActionKind
+}
+
+internal enum MobileCommandPaletteRootProjection {
+    static func actions(
+        activeAgent: MobileBotSummary?,
+        hasChannels: Bool
+    ) -> [MobileCommandPaletteAction] {
+        guard let activeAgent else { return [] }
+        var actions: [MobileCommandPaletteAction] = []
+        if activeAgent.isGroup && !activeAgent.isSharedRoom {
+            actions.append(.init(
+                id: "info-members",
+                label: "Members",
+                keywords: ["people", "group", "participants"],
+                detail: "Current chat",
+                kind: .openGroupMembers
+            ))
+        }
+        if hasChannels {
+            actions.append(.init(
+                id: "info-channels",
+                label: "Channels",
+                keywords: ["messaging", "platforms", "connect"],
+                detail: "Current chat",
+                kind: .openChannels
+            ))
+        }
+        actions.append(.init(
+            id: "info-settings",
+            label: "Chat Settings",
+            keywords: ["details", "notifications"],
+            detail: "Current chat",
+            kind: .openSettings
+        ))
+        return actions
+    }
 }
 
 internal enum MobileCommandPaletteComputerUpdateAction: String, Equatable {
@@ -231,6 +268,7 @@ internal enum MobileCommandPaletteEntry: Identifiable {
             case .createBot: return "plus.circle"
             case .openWorkspace: return "rectangle.grid.1x2"
             case .openContacts: return "person.2"
+            case .openGroupMembers: return "person.3"
             case .openChannels: return "megaphone"
             case .openSettings: return "gearshape"
             case .updateComputer: return "desktopcomputer"
