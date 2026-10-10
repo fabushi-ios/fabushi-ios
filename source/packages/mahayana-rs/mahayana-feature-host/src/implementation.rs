@@ -1173,6 +1173,7 @@ impl FeatureHostController {
             host_config.runtime.data_dir.as_deref(),
             host_config.product_storage_passphrase.clone(),
         );
+        let memory_synthesis_enabled = host_config.memory_synthesis_enabled.unwrap_or(true);
         let runtime = MahayanaHost::create(host_config)?;
         let info = HostInfo {
             runtime_version: format!("mahayana-abi-{}", runtime.status().runtime_abi_version),
@@ -1180,7 +1181,7 @@ impl FeatureHostController {
             platform,
         };
         let mut state = FeatureState::default();
-        state.memory_synthesis_enabled = true;
+        state.memory_synthesis_enabled = memory_synthesis_enabled;
         if let Some(path) = settings_path.as_deref() {
             state.settings = load_product_host_settings(path);
             // The bundled Computer Use MCP independently rereads this canonical
