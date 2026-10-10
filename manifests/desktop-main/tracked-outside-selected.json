@@ -676,9 +676,9 @@
       "type": "blob",
       "sha": "bcee7a0b16cfa98eb0a6f67da8c3ee08eef77d3e",
       "size": 51777,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-active-product-architecture-spec",
+      "coverage_status": "reviewed-active-upstream-product-spec",
+      "reason": "Active Desktop FBCP-001 Revision 7 is an upstream product/architecture requirement, not a runtime asset. It requires complete responsibility/source closure, existing-owner-first composition, one canonical product root, service-backed communication/calls/payments/search/accessibility/recovery and exact-head GitHub Actions evidence. iOS preserves these applicable invariants through the canonical Desktop-main iOS parity spec and selected 7,950-row responsibility ledger; no historical Desktop acceptance or Telegram network implementation is inherited. This review records the requirement source only and does not promote any iOS responsibility to verified."
     },
     {
       "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
@@ -686,9 +686,9 @@
       "type": "blob",
       "sha": "2223e63455806b5fb6faeefedf07f6eab670f361",
       "size": 301355,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-active-historical-parity-spec",
+      "coverage_status": "reviewed-upstream-architecture-provenance",
+      "reason": "Active Desktop parity/recovery spec documents the architecture boundaries and failure modes that produced current Fabushi owners: Rust-owned execution/durable state, typed pushed runtime events, bounded provider progress/cancellation, MCP product completeness, low-power lifecycle and exact packaged evidence. Its old Grok/PR baselines are provenance, not current iOS authority. Applicable responsibilities are independently represented by current Desktop-main source rows and iOS Coordinator/Host/Runner, MCP, runtime projection and lifecycle owners; historical completion claims are not inherited."
     },
     {
       "path": "docs/specs/post-1.2.74-agent-architecture-cutover.md",
@@ -696,9 +696,9 @@
       "type": "blob",
       "sha": "02f617fdd6b2d6de27fcf67a61476aacdf449513",
       "size": 25170,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-agent-architecture-cutover-spec",
+      "coverage_status": "reviewed-upstream-architecture-provenance",
+      "reason": "Active Desktop cutover spec defines sole Agent root, typed identity, Rust-owned conversation execution/durable state, CapabilityBroker, ComputerControlLease, event-driven power behavior, design-system discipline and exact-source/release gates. PR #14/version-specific release sequencing is historical Desktop process, while the owner boundaries remain relevant architecture provenance. iOS maps the applicable boundaries into its native SwiftUI + Coordinator/Host/Runner + repository-owned Rust composition and must prove them through current ledgers and exact-head Actions; this document itself has no iOS shipping code."
     },
     {
       "path": "docs/specs/spec-first-ai-development.md",
@@ -706,9 +706,9 @@
       "type": "blob",
       "sha": "4948ce2700bbf56b6c32bb7acec1a18d5110fe21",
       "size": 6996,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "repository-development-governance",
+      "coverage_status": "reviewed-governance-applied",
+      "reason": "Repository-wide Desktop Spec-first/No-Spec-No-Code governance. It carries no runtime responsibility but requires durable requirements, ownership, failure modes, verification and evidence before product-affecting implementation. iOS applies the same discipline through its AGENTS.md, current Desktop-main parity spec and task-specific native specs; no product capability is waived."
     },
     {
       "path": "docs/specs/structured-log-facade-audit-20260930.md",
@@ -716,9 +716,9 @@
       "type": "blob",
       "sha": "8a6fe47c5fb6bc98ebe349f98190e442821c509c",
       "size": 73201,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-observability-owner-audit",
+      "coverage_status": "reviewed-active-observability-contract",
+      "reason": "Desktop audit records the canonical structured-log facade and producer-to-Host ownership for runtime/queue/tool/MCP/Box/turn diagnostics, including redaction, typed event mapping and exact-head evidence. iOS does not copy the Desktop JSONL/Electron transport, but observability, secret redaction, unique runtime owner and diagnostic settlement are applicable responsibilities and remain tracked in the selected ledger/native runtime telemetry owners. Historical per-commit green evidence in this audit is provenance only and cannot satisfy current iOS exact-head acceptance."
     },
     {
       "path": "docs/specs/telegram-desktop-rust-equivalence-migration.md",
@@ -726,9 +726,9 @@
       "type": "blob",
       "sha": "439c9a3871a31f007cc914227d4ce5aa5fa87a09",
       "size": 25742,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-active-telegram-migration-contract",
+      "coverage_status": "reviewed-upstream-requirements-only",
+      "reason": "Active TDRP-001 Revision 9 governs a separate Desktop Telegram-source migration and explicitly remains incomplete. iOS does not inherit Telegram source authority, its inventory, build graph or product branding. Only responsibilities that actually land in canonical bhrumom/fabushi-desktop@main enter the iOS Desktop-main inventory/ledger and are reimplemented in iOS-owned owners. The contract's existing-owner-first, single-root, typed-capability, service/recovery/security and evidence principles are relevant governance context, but TDRP status is not an iOS completion signal."
     },
     {
       "path": "native/mahayana-messaging/Cargo.lock",
