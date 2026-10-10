@@ -6,6 +6,15 @@ extension GrokMobileShell {
         return bots.first { $0.id == commandPaletteAgentID && !$0.isGroup }
     }
 
+    var commandPaletteRootAgent: MobileBotSummary? {
+        guard let commandPaletteAgentID else { return nil }
+        return bots.first { $0.id == commandPaletteAgentID }
+    }
+
+    var commandPaletteHasChannels: Bool {
+        messaging.conversations.contains { $0.kind == .channel }
+    }
+
     var commandPaletteComputerWorkingAgentNames: [String] {
         MobileCommandPaletteComputerUpdateProjection.workingAgentNames(bots)
     }
@@ -21,6 +30,9 @@ extension GrokMobileShell {
     }
 
     var commandPaletteActions: [MobileCommandPaletteAction] {
+        // iOS keeps a small set of additive global native actions, but Desktop
+        // current-chat commands are projected separately and fail closed when
+        // there is no active Agent.
         var actions: [MobileCommandPaletteAction] = [
             .init(
                 id: "create-bot",
@@ -38,26 +50,16 @@ extension GrokMobileShell {
             ),
             .init(
                 id: "open-contacts",
-                label: "Members / Contacts",
-                keywords: ["members", "contacts", "people"],
+                label: "Contacts",
+                keywords: ["contacts", "people"],
                 detail: "Views",
                 kind: .openContacts
             ),
-            .init(
-                id: "open-channels",
-                label: "Channels",
-                keywords: ["channels", "groups"],
-                detail: "Views",
-                kind: .openChannels
-            ),
-            .init(
-                id: "open-settings",
-                label: "Chat Settings",
-                keywords: ["chat", "settings", "preferences"],
-                detail: "Views",
-                kind: .openSettings
-            ),
         ]
+        actions.append(contentsOf: MobileCommandPaletteRootProjection.actions(
+            activeAgent: commandPaletteRootAgent,
+            hasChannels: commandPaletteHasChannels
+        ))
         if commandPaletteComputerQueued {
             actions.append(.init(
                 id: "cancel-computer-update",
@@ -270,6 +272,12 @@ extension GrokMobileShell {
                 openLegacySection(nil)
             case .openContacts:
                 openLegacySection(.contacts)
+            case .openGroupMembers:
+                guard let agent = commandPaletteRootAgent,
+                      agent.isGroup,
+                      !agent.isSharedRoom
+                else { return }
+                groupMembersTarget = agent
             case .openChannels:
                 openLegacySection(.channels)
             case .openSettings:
