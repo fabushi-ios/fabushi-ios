@@ -1,0 +1,54 @@
+name: iOS Desktop main full source closure
+
+on:
+  workflow_dispatch:
+    inputs:
+      ios_sha:
+        description: Exact iOS source SHA to check for full release completeness.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  full-desktop-main-closure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact iOS source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ios_sha }}
+          fetch-depth: 1
+      - name: Verify expected exact iOS source
+        env:
+          IOS_EXPECTED_HEAD: ${{ inputs.ios_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+      - name: Resolve current Desktop-main snapshot
+        id: upstream
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          data=json.load(open("manifests/desktop-main-authority.json"))
+          print("sha="+data["commit"])
+          PY
+      - name: Checkout exact Desktop main source
+        uses: actions/checkout@v4
+        with:
+          repository: bhrumom/fabushi-desktop
+          ref: ${{ steps.upstream.outputs.sha }}
+          path: desktop-main-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Require complete current-main inventory responsibility and release evidence
+        env:
+          IOS_EXPECTED_HEAD: ${{ inputs.ios_sha }}
+        run: python3 scripts/check-desktop-main-ios-architecture.py --strict --complete --desktop-checkout desktop-main-source
+      - name: Require live main unchanged at completion
+        if: always()
+        env:
+          IOS_EXPECTED_HEAD: ${{ inputs.ios_sha }}
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "bhrumom/fabushi",
+  "sourceCommit": "f1033a095bba7cf909fa212a6e8b7f2a099ae821",
+  "imports": [
+    "third_party/mahayana/mahayana-rs -> source/packages/mahayana-rs",
+    "third_party/mahayana/codex-rs -> source/packages/codex-rs",
+    "native/mahayana-messaging -> source/packages/mahayana-messaging"
+  ],
+  "normalBuildRequiresSourceRepository": false
+}

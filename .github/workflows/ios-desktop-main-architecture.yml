@@ -1,0 +1,258 @@
+name: iOS Desktop main architecture parity
+
+on:
+  pull_request:
+
+concurrency:
+  group: ios-desktop-main-architecture-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IOS_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+      - name: Resolve canonical Desktop-main authority lock
+        id: desktop-main-lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          lock=json.loads(Path("manifests/desktop-main-authority.json").read_text())
+          assert lock["repository"]=="bhrumom/fabushi-desktop" and lock["branch"]=="main"
+          print("sha="+lock["commit"])
+          PY
+      - name: Checkout exact Desktop main snapshot (source-only evidence)
+        uses: actions/checkout@v4
+        with:
+          repository: bhrumom/fabushi-desktop
+          ref: ${{ steps.desktop-main-lock.outputs.sha }}
+          path: desktop-main-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify live Desktop-main authority and full tracked source tree
+        run: python3 scripts/check-desktop-main-ios-architecture.py --strict --desktop-checkout desktop-main-source
+      - name: Test fail-closed Desktop-main source authority contracts
+        run: python3 -m unittest discover -s tests -p 'test_desktop_main_authority.py'
+      - name: Verify App Store readiness gate script
+        run: python3 .github/scripts/wait-app-store-build.py --self-test
+      - name: Test protected-session login preparation
+        run: node --test .github/scripts/prepare-ios-ci-session.test.mjs
+
+      - name: Verify Desktop main remained unchanged through job
+        if: always()
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
+  rust-host:
+    needs: architecture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+      - name: Verify live Desktop main at job start
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+      - name: Install Linux dependencies for Rust Host graph
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libxkbcommon-dev
+      - name: Test canonical Rust Host Runner composition
+        run: cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-host --lib --profile ci --features mobile-embedded
+      - name: Test iOS-owned Rust Host modules and canonical messaging core
+        run: |
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-feature-host --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host-mobile --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-messaging/Cargo.toml
+      - name: Test native MCP, persistence telemetry, Runtime projection, and protected account contracts
+        run: |
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-kernel --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-model --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-native-engine --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-native-agent --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-runtime --lib --profile ci
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-platform-client --lib --profile ci
+
+      - name: Verify Desktop main remained unchanged through job
+        if: always()
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
+  build-and-test:
+    needs:
+      - architecture
+      - rust-host
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+      - name: Verify live Desktop main at job start
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+      - name: Require iOS-owned Rust product source
+        shell: bash
+        run: test -f source/packages/mahayana-rs/Cargo.toml
+      - name: Install tools
+        run: |
+          brew install xcodegen
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+      - name: Verify strict Desktop-main architecture baseline
+        run: python3 scripts/check-desktop-main-ios-architecture.py --strict --authority-only
+      - name: Test iOS-owned Rust internal/runtime modules
+        run: cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host-mobile --lib --profile ci
+      - name: Build native runtime for simulator
+        run: scripts/build-mahayana-ios.sh iphonesimulator arm64
+      - name: Generate Xcode project
+        working-directory: mobile/ios
+        run: xcodegen generate
+      - name: Select simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for xs in d.values() for x in xs if x["name"].startswith("iPhone")))')"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Unit tests
+        working-directory: mobile/ios
+        env:
+          FABUSHI_UNIT_TEST_HOST: '1'
+        run: |
+          xcodebuild test \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -only-testing:FabushiTests \
+            CODE_SIGNING_ALLOWED=NO
+      - name: UI tests
+        working-directory: mobile/ios
+        run: |
+          xcodebuild test \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -only-testing:FabushiUITests \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Verify Desktop main remained unchanged through job
+        if: always()
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
+  device-archive:
+    needs:
+      - architecture
+      - rust-host
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$IOS_EXPECTED_HEAD"
+          git show -s --format='source_sha=%H source_tree=%T' HEAD
+      - name: Verify live Desktop main at job start
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+      - name: Install device build tools
+        run: |
+          command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+          rustup target add aarch64-apple-ios
+      - name: Build iOS-owned Rust runtime for physical devices
+        run: scripts/build-mahayana-ios.sh iphoneos arm64
+      - name: Generate Xcode project
+        working-directory: mobile/ios
+        run: xcodegen generate
+      - name: Archive generic iOS device build without signing
+        working-directory: mobile/ios
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/Fabushi-unsigned.xcarchive"
+          xcodebuild archive \
+            -project Fabushi.xcodeproj \
+            -scheme Fabushi \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=''
+          test -d "$RUNNER_TEMP/Fabushi-unsigned.xcarchive"
+      - name: Package unsigned archive evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+          test "$SOURCE_SHA" = "$IOS_EXPECTED_HEAD"
+          DESKTOP_HEAD_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["commit"])')"
+          DESKTOP_TREE_SHA="$(python3 -c 'import json; print(json.load(open("manifests/desktop-main-authority.json"))["rootTreeSha"])')"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DESKTOP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DESKTOP_TREE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          mkdir -p device-archive-evidence
+          # GITHUB_SHA is the PR merge ref, not the exact source we checked out.
+          ARCHIVE_NAME="Fabushi-unsigned-${SOURCE_SHA}.xcarchive.zip"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/Fabushi-unsigned.xcarchive" \
+            "device-archive-evidence/$ARCHIVE_NAME"
+          {
+            printf 'IOS_HEAD_SHA=%s\n' "$SOURCE_SHA"
+            printf 'IOS_EXPECTED_HEAD_SHA=%s\n' "$IOS_EXPECTED_HEAD"
+            printf 'IOS_TREE_SHA=%s\n' "$SOURCE_TREE"
+            printf 'DESKTOP_HEAD_SHA=%s\n' "$DESKTOP_HEAD_SHA"
+            printf 'DESKTOP_TREE_SHA=%s\n' "$DESKTOP_TREE_SHA"
+            printf 'RUN_ID=%s\n' "$GITHUB_RUN_ID"
+            printf 'RUN_ATTEMPT=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'WORKFLOW_EVENT_SHA=%s\n' "$GITHUB_SHA"
+            printf 'REPOSITORY=%s\n' "$GITHUB_REPOSITORY"
+            printf 'ARTIFACT_NAME=fabushi-ios-device-archive-%s\n' "$SOURCE_SHA"
+            printf 'ARCHIVE_FILE=%s\n' "$ARCHIVE_NAME"
+            printf 'EVIDENCE_KIND=unsigned-generic-ios-device-archive\n'
+            printf 'INSTALL_UPGRADE_EXPORT_NOT_PROVEN=true\n'
+          } > device-archive-evidence/source.env
+          (
+            cd device-archive-evidence
+            shasum -a 256 "$ARCHIVE_NAME" source.env > SHA256SUMS.txt
+            shasum -a 256 -c SHA256SUMS.txt
+          )
+      - name: Upload device archive evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: fabushi-ios-device-archive-${{ github.event.pull_request.head.sha }}
+          path: device-archive-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify Desktop main remained unchanged through job
+        if: always()
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only

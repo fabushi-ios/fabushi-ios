@@ -88,6 +88,91 @@ internal struct ChatReaction: Equatable, Sendable {
     let chosenByMe: Bool
 }
 
+internal func projectChatReactionToggle(
+    _ reactions: [ChatReaction],
+    reaction: String,
+    enabled: Bool
+) -> [ChatReaction] {
+    guard !reaction.isEmpty else { return reactions }
+    var next = reactions
+    if let index = next.firstIndex(where: { $0.reaction == reaction }) {
+        let current = next[index]
+        if current.chosenByMe == enabled { return reactions }
+        let count = max(0, current.count + (enabled ? 1 : -1))
+        if count == 0 {
+            next.remove(at: index)
+        } else {
+            next[index] = ChatReaction(
+                reaction: current.reaction,
+                count: count,
+                chosenByMe: enabled
+            )
+        }
+        return next
+    }
+    guard enabled else { return reactions }
+    next.append(ChatReaction(reaction: reaction, count: 1, chosenByMe: true))
+    return next
+}
+
+internal struct ChatMediaAttachment: Identifiable, Equatable, Sendable {
+    let id: String
+    let messageId: String
+    let contentType: String
+    let fileName: String?
+    let blobId: String?
+    let mimeType: String?
+    let sizeBytes: Int
+    let groupIndex: Int?
+}
+
+internal struct OutgoingChatAttachment: Equatable, Sendable {
+    let fileName: String
+    let mimeType: String
+    let data: Data
+}
+
+internal struct HumanMediaGroupRetryPlan: Equatable, Sendable {
+    let groupId: String
+    let nextIndex: Int
+    let totalCount: Int
+}
+
+internal enum HumanMediaGroupSendError: LocalizedError {
+    case partial(plan: HumanMediaGroupRetryPlan, message: String)
+
+    var retryPlan: HumanMediaGroupRetryPlan {
+        switch self {
+        case .partial(let plan, _): plan
+        }
+    }
+
+    var errorDescription: String? {
+        switch self {
+        case .partial(let plan, let message):
+            return "附件组已发送 \(plan.nextIndex)/\(plan.totalCount)，可从失败位置继续：\(message)"
+        }
+    }
+}
+
+internal func humanMediaGroupClientMessageId(groupId: String, index: Int, totalCount: Int) -> String {
+    "ios-media-group:\(groupId):\(index):\(totalCount)"
+}
+
+internal func validatedHumanMediaGroupRetryStart(
+    _ plan: HumanMediaGroupRetryPlan?,
+    attachmentCount: Int
+) -> Int? {
+    guard let plan else { return 0 }
+    guard attachmentCount > 1,
+          plan.totalCount == attachmentCount,
+          !plan.groupId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          plan.nextIndex >= 0,
+          plan.nextIndex < attachmentCount
+    else { return nil }
+    return plan.nextIndex
+}
+
 internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let id: String
     let conversationId: String
@@ -107,10 +192,117 @@ internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let time: String
     let replyToMessageId: String?
     let forwardOrigin: String?
-    let reactions: [ChatReaction]
+    var reactions: [ChatReaction]
     let deliveryState: String
     let isEdited: Bool
     let isPinned: Bool
+    var mediaGroupId: String? = nil
+    var mediaGroupIndex: Int? = nil
+    var mediaGroupCount: Int? = nil
+    var mediaAttachments: [ChatMediaAttachment] = []
+    var groupedMessageIds: [String] = []
+}
+
+internal func projectHumanMediaGroups(_ messages: [ChatMessage]) -> [ChatMessage] {
+    struct GroupKey: Hashable {
+        let conversationId: String
+        let outgoing: Bool
+        let groupId: String
+        let count: Int
+    }
+
+    func key(for message: ChatMessage) -> GroupKey? {
+        guard let groupId = message.mediaGroupId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !groupId.isEmpty,
+              let count = message.mediaGroupCount,
+              count > 1,
+              let index = message.mediaGroupIndex,
+              index >= 0,
+              index < count,
+              !message.mediaAttachments.isEmpty
+        else { return nil }
+        return GroupKey(
+            conversationId: message.conversationId,
+            outgoing: message.isOutgoing,
+            groupId: groupId,
+            count: count
+        )
+    }
+
+    var members: [GroupKey: [ChatMessage]] = [:]
+    for message in messages {
+        if let groupKey = key(for: message) {
+            members[groupKey, default: []].append(message)
+        }
+    }
+
+    var emitted = Set<GroupKey>()
+    var result: [ChatMessage] = []
+    for message in messages {
+        guard let groupKey = key(for: message),
+              let groupMembers = members[groupKey],
+              groupMembers.count > 1
+        else {
+            result.append(message)
+            continue
+        }
+        guard emitted.insert(groupKey).inserted else { continue }
+
+        let ordered = groupMembers.sorted {
+            let left = $0.mediaGroupIndex ?? Int.max
+            let right = $1.mediaGroupIndex ?? Int.max
+            if left != right { return left < right }
+            return $0.id < $1.id
+        }
+        var projected = message
+        projected.mediaAttachments = ordered.flatMap(\.mediaAttachments)
+        projected.groupedMessageIds = ordered.map(\.id)
+        result.append(projected)
+    }
+    return result
+}
+
+
+internal func reconcileMessagingSyncBaseline(
+    current: [String: [ChatMessage]],
+    incoming: [String: [ChatMessage]],
+    observedBeforeBaseline: [String: Set<String>]
+) -> [String: [ChatMessage]] {
+    var reconciled = incoming
+    for (conversationId, observedIds) in observedBeforeBaseline where !observedIds.isEmpty {
+        let currentMessages = current[conversationId] ?? []
+        var baseline = reconciled[conversationId] ?? []
+        let incomingIds = Set(baseline.map(\.id))
+        let arrivedBeforeBaseline = currentMessages.filter { message in
+            observedIds.contains(message.id) && !incomingIds.contains(message.id)
+        }
+        if !arrivedBeforeBaseline.isEmpty {
+            baseline.append(contentsOf: arrivedBeforeBaseline)
+            reconciled[conversationId] = baseline
+        }
+    }
+    return reconciled
+}
+
+internal struct ForwardDestinationRequest: Identifiable, Equatable, Sendable {
+    var id: String { conversationId }
+    let conversationId: String
+    let clientMessageId: String
+}
+
+internal struct ForwardSettlement: Identifiable, Equatable, Sendable {
+    var id: String { conversationId }
+    let conversationId: String
+    let sent: Bool
+    let error: String?
+}
+
+internal struct MessagingConversationSearchResult: Identifiable, Equatable, Sendable {
+    let id: String
+    let conversationId: String
+    let snippet: String
+    let timestampMs: Int64?
+    let score: Int
 }
 
 @MainActor
@@ -121,18 +313,20 @@ final class MessagingModel {
     private(set) var folders: [MessagingFolder] = []
     private(set) var draftsByConversation: [String: MessagingDraft] = [:]
     private(set) var messagesByConversation: [String: [ChatMessage]] = [:]
+    private(set) var searchAuthorByMessageId: [String: String] = [:]
     private(set) var typingActorByConversation: [String: String] = [:]
     private(set) var loading = false
     private(set) var errorMessage: String?
 
-    private let host: MahayanaHost
+    private let bridge: IOSPreloadBridge
     private var actorId = ""
     private var displayName = "当前用户"
     private let deviceId = "ios:native"
     private let sessionId = "account-session:ios-native"
+    private var reactionMutationGeneration: [String: Int] = [:]
 
-    init(host: MahayanaHost) {
-        self.host = host
+    init(bridge: IOSPreloadBridge) {
+        self.bridge = bridge
     }
 
     var currentActorId: String { actorId }
@@ -151,6 +345,13 @@ final class MessagingModel {
 
     func createDirect(contact: MessagingContact) async throws -> ConversationSummary? {
         try await ensureIdentity()
+        if let existing = conversations.first(where: { conversation in
+            conversation.kind == .direct
+                && conversation.participants.contains(where: { $0.actorId == actorId })
+                && conversation.participants.contains(where: { $0.actorId == contact.id })
+        }) {
+            return existing
+        }
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         let id = "direct:\(UUID().uuidString.lowercased())"
         let participants: [[String: Any]] = [
@@ -164,7 +365,7 @@ final class MessagingModel {
 
     func createConversation(kind: ConversationKind, title: String, description: String = "", participantActorIds: [String] = []) async throws -> ConversationSummary? {
         guard kind == .group || kind == .channel else {
-            throw MahayanaHost.HostError.requestFailed("私聊请从联系人列表发起")
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("私聊请从联系人列表发起")
         }
         try await ensureIdentity()
         let now = Int64(Date().timeIntervalSince1970 * 1000)
@@ -239,9 +440,9 @@ final class MessagingModel {
         let chunkSize = 1024 * 1024
         while offset < sizeBytes {
             let requested = min(chunkSize, sizeBytes - offset)
-            let response = try await host.request(method: "feature.messaging.blob.read", params: ["blobId": blobId, "offset": offset, "length": requested])
+            let response = try await bridge.request(method: "feature.messaging.blob.read", params: ["blobId": blobId, "offset": offset, "length": requested])
             guard let object = response.value as? [String: Any], let encoded = object["dataBase64"] as? String, let chunk = Data(base64Encoded: encoded), !chunk.isEmpty else {
-                throw MahayanaHost.HostError.invalidResponse
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
             result.append(chunk)
             offset += chunk.count
@@ -250,7 +451,7 @@ final class MessagingModel {
     }
 
     func sendVoice(conversationId: String, fileName: String, mimeType: String, data: Data, waveform: [UInt8] = []) async throws {
-        guard !data.isEmpty else { throw MahayanaHost.HostError.requestFailed("不能发送空语音") }
+        guard !data.isEmpty else { throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空语音") }
         try await ensureIdentity()
         let blobId = "voice-\(UUID().uuidString.lowercased())"
         let createdAt = Int64(Date().timeIntervalSince1970 * 1000)
@@ -271,38 +472,180 @@ final class MessagingModel {
         ])
     }
 
-    func sendAttachment(conversationId: String, fileName: String, mimeType: String, data: Data) async throws {
-        guard !data.isEmpty else { throw MahayanaHost.HostError.requestFailed("不能发送空文件") }
+    func sendAttachment(
+        conversationId: String,
+        fileName: String,
+        mimeType: String,
+        data: Data
+    ) async throws {
+        try await sendAttachments(
+            conversationId: conversationId,
+            attachments: [
+                OutgoingChatAttachment(
+                    fileName: fileName,
+                    mimeType: mimeType,
+                    data: data
+                )
+            ]
+        )
+    }
+
+    func sendAttachments(
+        conversationId: String,
+        attachments: [OutgoingChatAttachment],
+        retryPlan: HumanMediaGroupRetryPlan? = nil
+    ) async throws {
+        guard !attachments.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空附件组")
+        }
+        guard attachments.count <= 64 else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("一次最多发送 64 个附件")
+        }
+        guard attachments.allSatisfy({ !$0.data.isEmpty }) else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空文件")
+        }
+        guard let retryStart = validatedHumanMediaGroupRetryStart(
+            retryPlan,
+            attachmentCount: attachments.count
+        ) else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("附件组重试状态已失效")
+        }
+        let groupId: String? = attachments.count > 1
+            ? (retryPlan?.groupId ?? UUID().uuidString.lowercased())
+            : nil
         try await ensureIdentity()
-        let blobId = "blob-\(UUID().uuidString.lowercased())"
-        let createdAt = Int64(Date().timeIntervalSince1970 * 1000)
-        _ = try await execute(command: [
-            "type": "beginBlobUpload",
-            "metadata": ["id": blobId, "fileName": fileName, "mimeType": mimeType, "sizeBytes": data.count, "contentHash": NSNull(), "createdAtMs": createdAt],
-        ])
-        let chunkSize = 512 * 1024
-        var offset = 0
-        while offset < data.count {
-            let end = min(data.count, offset + chunkSize)
-            let chunk = data.subdata(in: offset..<end)
-            _ = try await execute(command: ["type": "appendBlobChunk", "blobId": blobId, "offset": offset, "dataBase64": chunk.base64EncodedString()])
-            offset = end
+
+        struct UploadedAttachment {
+            let input: OutgoingChatAttachment
+            let originalIndex: Int
+            let blobId: String
+            let content: [String: Any]
         }
-        _ = try await execute(command: ["type": "finishBlobUpload", "blobId": blobId])
-        let media: [String: Any] = ["id": blobId, "fileName": fileName, "mimeType": mimeType, "sizeBytes": data.count, "remoteUrl": "fabushi-blob://\(blobId)"]
-        let caption: [String: Any] = ["text": "", "entities": []]
-        let content: [String: Any]
-        if mimeType.hasPrefix("image/") {
-            content = ["type": "photo", "data": ["media": media, "caption": caption, "spoiler": false]]
-        } else if mimeType.hasPrefix("video/") {
-            content = ["type": "video", "data": ["media": media, "caption": caption, "spoiler": false, "streaming": true]]
-        } else {
-            content = ["type": "document", "data": ["media": media, "caption": caption]]
+
+        var uploaded: [UploadedAttachment] = []
+        do {
+            for (originalIndex, attachment) in attachments.enumerated().dropFirst(retryStart) {
+                let blobId = "blob-\(UUID().uuidString.lowercased())"
+                let createdAt = Int64(Date().timeIntervalSince1970 * 1000)
+                _ = try await execute(command: [
+                    "type": "beginBlobUpload",
+                    "metadata": [
+                        "id": blobId,
+                        "fileName": attachment.fileName,
+                        "mimeType": attachment.mimeType,
+                        "sizeBytes": attachment.data.count,
+                        "contentHash": NSNull(),
+                        "createdAtMs": createdAt,
+                    ],
+                ])
+                let chunkSize = 512 * 1024
+                var offset = 0
+                while offset < attachment.data.count {
+                    try Task.checkCancellation()
+                    let end = min(attachment.data.count, offset + chunkSize)
+                    let chunk = attachment.data.subdata(in: offset..<end)
+                    _ = try await execute(command: [
+                        "type": "appendBlobChunk",
+                        "blobId": blobId,
+                        "offset": offset,
+                        "dataBase64": chunk.base64EncodedString(),
+                    ])
+                    offset = end
+                }
+                _ = try await execute(command: ["type": "finishBlobUpload", "blobId": blobId])
+                let media: [String: Any] = [
+                    "id": blobId,
+                    "fileName": attachment.fileName,
+                    "mimeType": attachment.mimeType,
+                    "sizeBytes": attachment.data.count,
+                    "remoteUrl": "fabushi-blob://\(blobId)",
+                ]
+                let caption: [String: Any] = ["text": "", "entities": []]
+                let content: [String: Any]
+                if attachment.mimeType.hasPrefix("image/") {
+                    content = [
+                        "type": "photo",
+                        "data": ["media": media, "caption": caption, "spoiler": false],
+                    ]
+                } else if attachment.mimeType.hasPrefix("video/") {
+                    content = [
+                        "type": "video",
+                        "data": [
+                            "media": media,
+                            "caption": caption,
+                            "spoiler": false,
+                            "streaming": true,
+                        ],
+                    ]
+                } else {
+                    content = [
+                        "type": "document",
+                        "data": ["media": media, "caption": caption],
+                    ]
+                }
+                uploaded.append(.init(
+                    input: attachment,
+                    originalIndex: originalIndex,
+                    blobId: blobId,
+                    content: content
+                ))
+            }
+        } catch {
+            for item in uploaded {
+                _ = try? await execute(command: ["type": "deleteBlob", "blobId": item.blobId])
+            }
+            if let groupId {
+                throw HumanMediaGroupSendError.partial(
+                    plan: .init(groupId: groupId, nextIndex: retryStart, totalCount: attachments.count),
+                    message: error.localizedDescription
+                )
+            }
+            throw error
         }
-        _ = try await execute(command: [
-            "type": "sendMessage", "conversationId": conversationId, "clientMessageId": "ios:\(UUID().uuidString.lowercased())",
-            "content": content, "replyToMessageId": NSNull(), "threadRootMessageId": NSNull(), "scheduledAtMs": NSNull(), "silent": false, "protectedContent": false,
-        ])
+
+        var sentCount = 0
+        do {
+            for item in uploaded {
+                try Task.checkCancellation()
+                let clientMessageId: String
+                if let groupId {
+                    clientMessageId = humanMediaGroupClientMessageId(
+                        groupId: groupId,
+                        index: item.originalIndex,
+                        totalCount: attachments.count
+                    )
+                } else {
+                    clientMessageId = "ios:\(UUID().uuidString.lowercased())"
+                }
+                _ = try await execute(command: [
+                    "type": "sendMessage",
+                    "conversationId": conversationId,
+                    "clientMessageId": clientMessageId,
+                    "content": item.content,
+                    "replyToMessageId": NSNull(),
+                    "threadRootMessageId": NSNull(),
+                    "scheduledAtMs": NSNull(),
+                    "silent": false,
+                    "protectedContent": false,
+                ])
+                sentCount += 1
+            }
+        } catch {
+            for item in uploaded.dropFirst(sentCount) {
+                _ = try? await execute(command: ["type": "deleteBlob", "blobId": item.blobId])
+            }
+            if let groupId {
+                throw HumanMediaGroupSendError.partial(
+                    plan: .init(
+                        groupId: groupId,
+                        nextIndex: min(attachments.count - 1, retryStart + sentCount),
+                        totalCount: attachments.count
+                    ),
+                    message: error.localizedDescription
+                )
+            }
+            throw error
+        }
     }
 
     func setMessagePinned(conversationId: String, messageId: String, pinned: Bool) async {
@@ -397,23 +740,202 @@ final class MessagingModel {
     }
 
     func setReaction(conversationId: String, messageId: String, reaction: String, enabled: Bool) async {
-        try? await ensureIdentity()
-        try? await execute(command: [
-            "type": "setReaction",
-            "conversationId": conversationId,
-            "messageId": messageId,
-            "reaction": ["reaction": reaction, "count": enabled ? 1 : 0, "chosenByMe": enabled, "recentActorIds": enabled ? [actorId] : []],
-        ])
+        do {
+            try await ensureIdentity()
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+
+        guard let messageIndex = messagesByConversation[conversationId]?.firstIndex(where: { $0.id == messageId }),
+              let previous = messagesByConversation[conversationId]?[messageIndex].reactions
+        else { return }
+
+        let optimistic = projectChatReactionToggle(
+            previous,
+            reaction: reaction,
+            enabled: enabled
+        )
+        guard optimistic != previous else { return }
+
+        let key = "\(conversationId)\u{1f}\(messageId)\u{1f}\(reaction)"
+        let generation = (reactionMutationGeneration[key] ?? 0) + 1
+        reactionMutationGeneration[key] = generation
+        messagesByConversation[conversationId]?[messageIndex].reactions = optimistic
+
+        do {
+            try await execute(command: [
+                "type": "setReaction",
+                "conversationId": conversationId,
+                "messageId": messageId,
+                "reaction": [
+                    "reaction": reaction,
+                    "count": enabled ? 1 : 0,
+                    "chosenByMe": enabled,
+                    "recentActorIds": enabled ? [actorId] : [],
+                ],
+            ])
+        } catch {
+            if reactionMutationGeneration[key] == generation,
+               let currentIndex = messagesByConversation[conversationId]?.firstIndex(where: { $0.id == messageId }),
+               messagesByConversation[conversationId]?[currentIndex].reactions == optimistic
+            {
+                messagesByConversation[conversationId]?[currentIndex].reactions = previous
+            }
+            errorMessage = error.localizedDescription
+        }
     }
 
-    func forwardMessage(sourceConversationId: String, messageId: String, destinationConversationId: String) async {
-        try? await executeAfterIdentity([
+    static func conversationSearchCommand(
+        conversationId: String,
+        query: String,
+        limit: Int = 200
+    ) -> [String: Any]? {
+        let conversationId = conversationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !conversationId.isEmpty, !query.isEmpty else { return nil }
+        return [
+            "type": "search",
+            "query": [
+                "text": query,
+                "scope": "conversation",
+                "conversationId": conversationId,
+                "senderId": NSNull(),
+                "fromMs": NSNull(),
+                "toMs": NSNull(),
+                "limit": max(1, min(limit, 200)),
+            ],
+        ]
+    }
+
+    static func conversationSearchResults(
+        from envelopes: [[String: Any]],
+        conversationId: String
+    ) -> [MessagingConversationSearchResult] {
+        for envelope in envelopes {
+            guard let event = envelope["event"] as? [String: Any],
+                  event["type"] as? String == "searchResults",
+                  let rows = event["results"] as? [[String: Any]]
+            else { continue }
+            return rows.compactMap { row in
+                guard row["kind"] as? String == "message",
+                      let id = row["id"] as? String,
+                      !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      let resultConversationId = row["conversationId"] as? String,
+                      resultConversationId == conversationId
+                else { return nil }
+                let timestampMs = (row["timestampMs"] as? NSNumber)?.int64Value
+                let score = (row["score"] as? NSNumber)?.intValue ?? 0
+                return MessagingConversationSearchResult(
+                    id: id,
+                    conversationId: resultConversationId,
+                    snippet: row["snippet"] as? String ?? "",
+                    timestampMs: timestampMs,
+                    score: score
+                )
+            }
+        }
+        return []
+    }
+
+    func searchConversationMessages(
+        conversationId: String,
+        query: String,
+        limit: Int = 200
+    ) async throws -> [MessagingConversationSearchResult] {
+        guard let command = Self.conversationSearchCommand(
+            conversationId: conversationId,
+            query: query,
+            limit: limit
+        ) else { return [] }
+        try await ensureIdentity()
+        let envelopes = try await execute(command: command)
+        return Self.conversationSearchResults(
+            from: envelopes,
+            conversationId: conversationId
+        )
+    }
+
+    func searchForwardRecipients(
+        sourceConversationId: String,
+        messageId: String,
+        query: String,
+        limit: Int = 100
+    ) async throws -> [ConversationSummary] {
+        try await ensureIdentity()
+        let envelopes = try await execute(command: [
+            "type": "listForwardRecipients",
+            "sourceConversationId": sourceConversationId,
+            "messageId": messageId,
+            "query": query,
+            "limit": max(1, min(limit, 100)),
+        ])
+        for envelope in envelopes {
+            guard let event = envelope["event"] as? [String: Any],
+                  event["type"] as? String == "forwardRecipients",
+                  let rows = event["recipients"] as? [[String: Any]]
+            else { continue }
+            return rows.compactMap(parseConversation)
+        }
+        return []
+    }
+
+    func forwardMessage(
+        sourceConversationId: String,
+        messageId: String,
+        destination: ForwardDestinationRequest,
+        dropSenderNames: Bool,
+        dropCaptions: Bool
+    ) async throws {
+        try await executeAfterIdentity([
             "type": "forwardMessage",
             "sourceConversationId": sourceConversationId,
             "messageId": messageId,
-            "destinationConversationId": destinationConversationId,
-            "clientMessageId": "ios:\(UUID().uuidString.lowercased())",
+            "destinationConversationId": destination.conversationId,
+            "clientMessageId": destination.clientMessageId,
+            "silent": false,
+            "privacy": [
+                "dropSenderNames": dropSenderNames || dropCaptions,
+                "dropCaptions": dropCaptions,
+            ],
         ])
+    }
+
+    func forwardMessageBatch(
+        sourceConversationId: String,
+        messageId: String,
+        destinations: [ForwardDestinationRequest],
+        dropSenderNames: Bool,
+        dropCaptions: Bool
+    ) async -> [ForwardSettlement] {
+        var settlements: [ForwardSettlement] = []
+        for destination in destinations {
+            do {
+                try await forwardMessage(
+                    sourceConversationId: sourceConversationId,
+                    messageId: messageId,
+                    destination: destination,
+                    dropSenderNames: dropSenderNames,
+                    dropCaptions: dropCaptions
+                )
+                settlements.append(
+                    ForwardSettlement(
+                        conversationId: destination.conversationId,
+                        sent: true,
+                        error: nil
+                    )
+                )
+            } catch {
+                settlements.append(
+                    ForwardSettlement(
+                        conversationId: destination.conversationId,
+                        sent: false,
+                        error: error.localizedDescription
+                    )
+                )
+            }
+        }
+        return settlements
     }
 
     func startTyping(_ conversationId: String) async {
@@ -436,16 +958,16 @@ final class MessagingModel {
 
     private func ensureIdentity() async throws {
         guard actorId.isEmpty else { return }
-        let auth = try await host.request(method: "feature.auth.status")
+        let auth = try await bridge.request(method: "feature.auth.status")
         if let object = auth.value as? [String: Any], let user = object["user"] as? [String: Any] {
             displayName = (user["nickname"] as? String) ?? (user["username"] as? String) ?? displayName
         }
-        let access = try await host.request(
+        let access = try await bridge.request(
             method: "feature.messaging.access.issue",
             params: ["deviceId": deviceId, "sessionId": sessionId, "scopes": ["messaging", "calls", "blobsRead", "blobsWrite", "payments", "miniApps"]]
         )
         guard let object = access.value as? [String: Any], let resolvedActor = object["actorId"] as? String, !resolvedActor.isEmpty else {
-            throw MahayanaHost.HostError.invalidResponse
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         actorId = resolvedActor
         _ = try await execute(command: [
@@ -478,15 +1000,21 @@ final class MessagingModel {
             ],
             "command": command,
         ]
-        let result = try await host.request(method: "feature.messaging.execute", params: ["requestId": requestId, "envelope": envelope])
+        let result = try await bridge.request(method: "feature.messaging.execute", params: ["requestId": requestId, "envelope": envelope])
         guard let root = result.value as? [String: Any], let envelopes = root["envelopes"] as? [[String: Any]] else {
-            throw MahayanaHost.HostError.invalidResponse
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         apply(envelopes)
         return envelopes
     }
 
     private func apply(_ envelopes: [[String: Any]]) {
+        // A live message event can race ahead of a later syncBatch in the same
+        // bridge settlement. Track only events observed in this apply pass so
+        // the authoritative baseline cannot erase them while stale cached rows
+        // from previous passes are still allowed to disappear.
+        var observedBeforeSyncByConversation: [String: Set<String>] = [:]
+
         for envelope in envelopes {
             guard let event = envelope["event"] as? [String: Any], let type = event["type"] as? String else { continue }
             switch type {
@@ -496,13 +1024,46 @@ final class MessagingModel {
                 contacts = (event["actors"] as? [[String: Any]] ?? []).compactMap(parseContact)
                 folders = (event["folders"] as? [[String: Any]] ?? []).compactMap(parseFolder)
                 draftsByConversation = Dictionary(uniqueKeysWithValues: (event["drafts"] as? [[String: Any]] ?? []).compactMap(parseDraft).map { ($0.conversationId, $0) })
-                let messages = (event["messages"] as? [[String: Any]] ?? []).compactMap(parseMessage)
-                messagesByConversation = Dictionary(grouping: messages, by: \.conversationId)
+                let rawMessages = event["messages"] as? [[String: Any]] ?? []
+                let messages = rawMessages.compactMap(parseMessage)
+                let incomingByConversation = Dictionary(grouping: messages, by: \.conversationId)
+                let previousAuthors = searchAuthorByMessageId
+                messagesByConversation = reconcileMessagingSyncBaseline(
+                    current: messagesByConversation,
+                    incoming: incomingByConversation,
+                    observedBeforeBaseline: observedBeforeSyncByConversation
+                )
+                var incomingAuthors = Dictionary(
+                    uniqueKeysWithValues: rawMessages.compactMap { raw -> (String, String)? in
+                        guard let id = raw["id"] as? String,
+                              let senderId = raw["senderId"] as? String,
+                              let author = Self.searchAuthorName(
+                                senderId: senderId,
+                                currentActorId: actorId,
+                                contacts: contacts
+                              )
+                        else { return nil }
+                        return (id, author)
+                    }
+                )
+                for observedIds in observedBeforeSyncByConversation.values {
+                    for messageId in observedIds where incomingAuthors[messageId] == nil {
+                        if let author = previousAuthors[messageId] {
+                            incomingAuthors[messageId] = author
+                        }
+                    }
+                }
+                searchAuthorByMessageId = incomingAuthors
+                observedBeforeSyncByConversation.removeAll(keepingCapacity: true)
             case "conversationChanged":
                 if let raw = event["conversation"] as? [String: Any], let conversation = parseConversation(raw) { upsert(conversation) }
             case "conversationParticipantChanged":
                 if let removedActorId = event["removedActorId"] as? String, removedActorId == actorId, let raw = event["conversation"] as? [String: Any], let id = raw["id"] as? String {
-                    conversations.removeAll { $0.id == id }; messagesByConversation.removeValue(forKey: id); draftsByConversation.removeValue(forKey: id)
+                    conversations.removeAll { $0.id == id }
+                    let removedMessageIds = Set(messagesByConversation[id, default: []].map(\.id))
+                    searchAuthorByMessageId = searchAuthorByMessageId.filter { !removedMessageIds.contains($0.key) }
+                    messagesByConversation.removeValue(forKey: id)
+                    draftsByConversation.removeValue(forKey: id)
                 } else if let raw = event["conversation"] as? [String: Any], let conversation = parseConversation(raw) { upsert(conversation) }
             case "markedUnreadChanged":
                 guard let conversationId = event["conversationId"] as? String else { continue }
@@ -523,10 +1084,25 @@ final class MessagingModel {
                     var list = messagesByConversation[message.conversationId] ?? []
                     if let index = list.firstIndex(where: { $0.id == message.id }) { list[index] = message } else { list.append(message) }
                     messagesByConversation[message.conversationId] = list.sorted { $0.time < $1.time }
+                    observedBeforeSyncByConversation[message.conversationId, default: []].insert(message.id)
+                    if let senderId = raw["senderId"] as? String,
+                       let author = Self.searchAuthorName(
+                        senderId: senderId,
+                        currentActorId: actorId,
+                        contacts: contacts
+                       )
+                    {
+                        searchAuthorByMessageId[message.id] = author
+                    } else {
+                        searchAuthorByMessageId.removeValue(forKey: message.id)
+                    }
                 }
             case "messagesDeleted":
                 guard let id = event["conversationId"] as? String, let ids = event["messageIds"] as? [String] else { continue }
                 messagesByConversation[id]?.removeAll { ids.contains($0.id) }
+                for messageId in ids {
+                    searchAuthorByMessageId.removeValue(forKey: messageId)
+                }
             case "typingChanged":
                 guard let conversationId = event["conversationId"] as? String, let typingActorId = event["actorId"] as? String else { continue }
                 if typingActorId == actorId || event["action"] is NSNull || event["action"] == nil {
@@ -571,6 +1147,15 @@ final class MessagingModel {
             "historyVisibility": "allMembers", "topics": [], "folderIds": [], "archived": false, "pinned": false, "markedUnread": false,
             "createdAtMs": now, "updatedAtMs": now,
         ]
+    }
+
+    static func searchAuthorName(
+        senderId: String,
+        currentActorId: String,
+        contacts: [MessagingContact]
+    ) -> String? {
+        if senderId == currentActorId { return "You" }
+        return contacts.first(where: { $0.id == senderId })?.displayName
     }
 
     private func parseContact(_ raw: [String: Any]) -> MessagingContact? {
@@ -632,11 +1217,29 @@ final class MessagingModel {
         else { return nil }
         let contentType = content["type"] as? String ?? "unknown"
         let data = content["data"] as? [String: Any] ?? [:]
-        let media = data["media"] as? [String: Any]
-        let mediaFileName = media?["fileName"] as? String
-        let mediaBlobId = media?["id"] as? String
+        let directMedia = data["media"] as? [String: Any]
+        let rawAttachments =
+            (raw["attachments"] as? [[String: Any]])
+            ?? (data["attachments"] as? [[String: Any]])
+            ?? []
+        let attachmentMedia = rawAttachments.compactMap { attachment -> (String, [String: Any])? in
+            let projectedType = (attachment["type"] as? String) ?? contentType
+            if let nested = attachment["media"] as? [String: Any] {
+                return (projectedType, nested)
+            }
+            if attachment["id"] is String || attachment["blobId"] is String {
+                return (projectedType, attachment)
+            }
+            return nil
+        }
+        let media = directMedia ?? attachmentMedia.first?.1
+        let mediaFileName = (media?["fileName"] as? String) ?? (media?["name"] as? String)
+        let mediaBlobId = (media?["id"] as? String) ?? (media?["blobId"] as? String)
         let mediaMimeType = media?["mimeType"] as? String
-        let mediaSizeBytes = (media?["sizeBytes"] as? NSNumber)?.intValue ?? 0
+        let mediaSizeBytes =
+            (media?["sizeBytes"] as? NSNumber)?.intValue
+            ?? (media?["size"] as? NSNumber)?.intValue
+            ?? 0
         let contactName = data["displayName"] as? String
         let latitude = (data["latitude"] as? NSNumber)?.doubleValue
         let longitude = (data["longitude"] as? NSNumber)?.doubleValue
@@ -674,11 +1277,53 @@ final class MessagingModel {
             }
             return "sent"
         }()
-        return ChatMessage(
+        var parsed = ChatMessage(
             id: id, conversationId: conversationId, text: text, contentType: contentType, mediaFileName: mediaFileName, mediaBlobId: mediaBlobId, mediaMimeType: mediaMimeType, mediaSizeBytes: mediaSizeBytes, contactName: contactName, latitude: latitude, longitude: longitude, pollQuestion: pollQuestion, pollOptions: pollOptions, pollMultipleAnswers: pollMultipleAnswers, isOutgoing: senderId == actorId, time: Self.timeLabel(createdAt),
             replyToMessageId: raw["replyToMessageId"] as? String, forwardOrigin: raw["forwardOrigin"] as? String, reactions: reactions,
             deliveryState: deliveryState, isEdited: raw["editedAtMs"] is NSNumber, isPinned: raw["pinned"] as? Bool ?? false
         )
+        let mediaGroup = raw["mediaGroup"] as? [String: Any]
+        parsed.mediaGroupId = mediaGroup?["id"] as? String
+        parsed.mediaGroupIndex = (mediaGroup?["index"] as? NSNumber)?.intValue
+        parsed.mediaGroupCount = (mediaGroup?["count"] as? NSNumber)?.intValue
+        if !attachmentMedia.isEmpty {
+            parsed.mediaAttachments = attachmentMedia.enumerated().compactMap { offset, entry in
+                let projectedMedia = entry.1
+                guard let blobId =
+                    (projectedMedia["id"] as? String)
+                    ?? (projectedMedia["blobId"] as? String)
+                else { return nil }
+                return ChatMediaAttachment(
+                    id: "\(id)#\(offset)#\(blobId)",
+                    messageId: id,
+                    contentType: entry.0,
+                    fileName: (projectedMedia["fileName"] as? String)
+                        ?? (projectedMedia["name"] as? String),
+                    blobId: blobId,
+                    mimeType: projectedMedia["mimeType"] as? String,
+                    sizeBytes:
+                        (projectedMedia["sizeBytes"] as? NSNumber)?.intValue
+                        ?? (projectedMedia["size"] as? NSNumber)?.intValue
+                        ?? 0,
+                    groupIndex: parsed.mediaGroupIndex
+                )
+            }
+        } else if let mediaBlobId {
+            parsed.mediaAttachments = [
+                ChatMediaAttachment(
+                    id: "\(id)#\(mediaBlobId)",
+                    messageId: id,
+                    contentType: contentType,
+                    fileName: mediaFileName,
+                    blobId: mediaBlobId,
+                    mimeType: mediaMimeType,
+                    sizeBytes: mediaSizeBytes,
+                    groupIndex: parsed.mediaGroupIndex
+                )
+            ]
+        }
+        parsed.groupedMessageIds = [id]
+        return parsed
     }
 
     private static func timeLabel(_ milliseconds: Int64) -> String {

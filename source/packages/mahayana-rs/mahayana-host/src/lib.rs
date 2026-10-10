@@ -1,0 +1,908 @@
+//! Direct Rust host API for the long-lived Mahayana Runtime.
+//!
+//! Native shells such as Electron, Swift, and Kotlin should depend on this crate.
+//! The C/JSON ABI is the stable boundary used by native host adapters.
+
+use fabushi_official_miniapps::OFFICIAL_PLUGIN_IDS;
+use fabushi_official_miniapps::app_definition;
+use mahayana_agent::UnavailableAgentBackend;
+#[cfg(feature = "codex-compat")]
+use mahayana_agent_codex::CodexAgentBackend;
+#[cfg(feature = "codex-compat")]
+use mahayana_agent_codex::CodexAgentConfig;
+#[cfg(feature = "codex-compat")]
+use mahayana_conversation::ConversationProvider;
+use mahayana_core::ApprovalDecision;
+use mahayana_core::ApprovalId;
+use mahayana_core::BuildProfile;
+use mahayana_core::ConversationId;
+use mahayana_core::ModelProviderMode;
+use mahayana_core::OperationId;
+use mahayana_core::RuntimeCommand;
+use mahayana_core::RuntimeConfig;
+use mahayana_core::RuntimeEvent;
+use mahayana_core::RuntimeResponse;
+use mahayana_core::RuntimeStatus;
+use mahayana_conversation::ResumeConversationOperationRequest;
+use mahayana_conversation::SendMessageRequest;
+use mahayana_kernel::EngineBackend;
+use mahayana_mcp_runtime::NativeMcpRegistry;
+use mahayana_miniapp::EntitlementChecker;
+use mahayana_miniapp::MiniAppConversationProvider;
+use mahayana_miniapp::MiniAppDefinition;
+use mahayana_model::ModelCredentialResolver;
+use mahayana_model::ModelError;
+use mahayana_model::ResponsesModelConfig;
+use mahayana_model::ResponsesModelRuntime;
+use mahayana_native_agent::NativeAgentBackend;
+use mahayana_native_agent::NativeAgentConfig;
+use mahayana_native_engine::NativeEngine;
+use mahayana_native_engine::NativeEngineConfig;
+use mahayana_native_engine::ProcessExecution;
+use mahayana_platform_core::HostPlatform;
+use mahayana_product::MahayanaProductClient;
+use mahayana_product::ProductError;
+use mahayana_product::default_mahayana_home;
+use mahayana_product::default_product_surface_state_path;
+use mahayana_runtime_core::MahayanaRuntime;
+use mahayana_runtime_core::RuntimeBuilder;
+use mahayana_runtime_core::RuntimeError;
+use mahayana_social::MahayanaSocialConversationProvider;
+use mahayana_telegram::TelegramConversationProvider;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::env;
+use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct HostCreateConfig {
+    #[serde(flatten)]
+    pub runtime: RuntimeConfig,
+    pub product_session_path: Option<PathBuf>,
+    pub product_surface_state_path: Option<PathBuf>,
+    /// Shared automation store used by CLI and native application shells.
+    pub automation_path: Option<PathBuf>,
+    pub codex_home: Option<PathBuf>,
+    /// Optional Mahayana CLI used only for desktop argv helper dispatch.
+    pub codex_executable_path: Option<PathBuf>,
+    pub cwd: Option<PathBuf>,
+    /// Existing embedded Telegram client created by the platform login flow.
+    pub telegram_client_id: Option<u64>,
+    pub telegram_self_user_id: Option<i64>,
+    pub host_platform: Option<HostPlatform>,
+    pub mini_apps: Vec<MiniAppDefinition>,
+    pub use_codex_account: bool,
+    /// Provider credential supplied by the native OS secret bridge. It is
+    /// intentionally excluded from serialized Host configuration.
+    #[serde(skip)]
+    pub model_bearer_token: Option<String>,
+    /// Stable OS-protected storage passphrase injected by native mobile shells.
+    /// It is process-memory only and is never serialized into Host config.
+    #[serde(skip)]
+    pub product_storage_passphrase: Option<String>,
+    #[serde(skip)]
+    pub model_wire_api: mahayana_model::responses::ResponsesWireApi,
+    #[serde(skip)]
+    pub process_execution: ProcessExecution,
+    /// Tests and constrained hosts may opt out of inherited local plugins.
+    pub inherit_installed_plugins: Option<bool>,
+    /// iOS-adapted owner for Desktop's authenticated `sand_memory_dreaming`
+    /// gate. `None` preserves the shipping default (enabled); `Some(false)`
+    /// means the synthesis service is not active and turn settlement must use
+    /// the legacy extraction/episode path under the same Feature Host owner.
+    pub memory_synthesis_enabled: Option<bool>,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct HostError {
+    message: String,
+}
+
+impl HostError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+impl From<RuntimeError> for HostError {
+    fn from(error: RuntimeError) -> Self {
+        Self::new(error.to_string())
+    }
+}
+
+/// Long-lived process-local host shared by every presentation surface.
+#[derive(Clone)]
+pub struct MahayanaHost {
+    runtime: Arc<MahayanaRuntime>,
+    product_client: MahayanaProductClient,
+}
+
+impl MahayanaHost {
+    pub fn create(config: HostCreateConfig) -> Result<Self, HostError> {
+        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+        let product_client = match (
+            config.product_session_path.clone(),
+            config.product_surface_state_path.clone(),
+        ) {
+            (Some(session_path), Some(surface_state_path)) => {
+                match config.product_storage_passphrase.clone() {
+                    Some(passphrase) => {
+                        MahayanaProductClient::new_with_surface_state_path_and_storage_passphrase(
+                            api_base_url.clone(),
+                            session_path,
+                            surface_state_path,
+                            passphrase,
+                        )
+                    }
+                    None => MahayanaProductClient::new_with_surface_state_path(
+                        api_base_url.clone(),
+                        session_path,
+                        surface_state_path,
+                    ),
+                }
+            }
+            (Some(session_path), None) => {
+                MahayanaProductClient::new(api_base_url.clone(), session_path)
+            }
+            (None, Some(surface_state_path)) => MahayanaProductClient::new_with_surface_state_path(
+                api_base_url,
+                default_product_session_path(),
+                surface_state_path,
+            ),
+            (None, None) => MahayanaProductClient::default(),
+        };
+        Ok(Self {
+            runtime: Arc::new(build_runtime(config, product_client.clone())?),
+            product_client,
+        })
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn create_with_engine_backend_for_test(
+        config: HostCreateConfig,
+        backend: Arc<dyn EngineBackend>,
+    ) -> Result<Self, HostError> {
+        let api_base_url = env::var("MAHAYANA_API_BASE_URL")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "https://api.ombhrum.com".to_string());
+        let product_client = match (
+            config.product_session_path.clone(),
+            config.product_surface_state_path.clone(),
+        ) {
+            (Some(session_path), Some(surface_state_path)) => {
+                MahayanaProductClient::new_with_surface_state_path(
+                    api_base_url.clone(),
+                    session_path,
+                    surface_state_path,
+                )
+            }
+            (Some(session_path), None) => {
+                MahayanaProductClient::new(api_base_url.clone(), session_path)
+            }
+            (None, Some(surface_state_path)) => MahayanaProductClient::new_with_surface_state_path(
+                api_base_url,
+                default_product_session_path(),
+                surface_state_path,
+            ),
+            (None, None) => MahayanaProductClient::default(),
+        };
+        let runtime = RuntimeBuilder::new(config.runtime)
+            .with_engine_backend(backend)?
+            .build()?;
+        Ok(Self {
+            runtime: Arc::new(runtime),
+            product_client,
+        })
+    }
+
+    pub fn status(&self) -> RuntimeStatus {
+        self.runtime.status()
+    }
+
+    /// Prepare a conversation provider/session before its first user prompt.
+    /// The warmup performs no model inference and writes no transcript content.
+    pub fn warmup_conversation(
+        &self,
+        conversation_id: ConversationId,
+    ) -> Result<(), HostError> {
+        self.runtime
+            .warmup_conversation(conversation_id)
+            .map_err(HostError::from)
+    }
+
+    pub fn conversation_history(
+        &self,
+        conversation_id: ConversationId,
+        limit: u32,
+    ) -> Result<Vec<mahayana_core::Message>, HostError> {
+        self.runtime
+            .conversation_history(conversation_id, limit)
+            .map_err(HostError::from)
+    }
+
+    pub fn replace_conversation_message(
+        &self,
+        conversation_id: ConversationId,
+        message: mahayana_core::Message,
+    ) -> Result<bool, HostError> {
+        self.runtime
+            .replace_conversation_message(conversation_id, message)
+            .map_err(HostError::from)
+    }
+
+    pub fn execute(&self, command: RuntimeCommand) -> Result<RuntimeResponse, HostError> {
+        self.runtime.execute(command).map_err(HostError::from)
+    }
+
+    pub fn receive(&self, timeout: Duration) -> Result<Option<RuntimeEvent>, HostError> {
+        self.runtime.receive(timeout).map_err(HostError::from)
+    }
+
+    pub fn interrupt(&self, operation_id: OperationId) -> Result<RuntimeResponse, HostError> {
+        self.execute(RuntimeCommand::Interrupt { operation_id })
+    }
+
+    pub fn start_recoverable_message(
+        &self,
+        request: SendMessageRequest,
+    ) -> Result<OperationId, HostError> {
+        self.runtime
+            .start_recoverable_message(request)
+            .map_err(HostError::from)
+    }
+
+    pub fn suspend_operation(
+        &self,
+        operation_id: OperationId,
+        reason: Option<String>,
+    ) -> Result<(), HostError> {
+        self.runtime
+            .suspend_operation(operation_id, reason)
+            .map_err(HostError::from)
+    }
+
+    pub fn resume_operation(
+        &self,
+        request: ResumeConversationOperationRequest,
+    ) -> Result<(), HostError> {
+        self.runtime.resume_operation(request).map_err(HostError::from)
+    }
+
+    pub fn resolve_approval(
+        &self,
+        approval_id: ApprovalId,
+        decision: ApprovalDecision,
+        payload: serde_json::Value,
+    ) -> Result<RuntimeResponse, HostError> {
+        self.execute(RuntimeCommand::ResolveApproval {
+            approval_id,
+            decision,
+            payload,
+        })
+    }
+
+    /// Execute a first-party account, social, or marketplace request while
+    /// keeping bearer and refresh credentials inside Rust-owned storage.
+    pub fn product_execute(
+        &self,
+        request_type: &str,
+        request: &serde_json::Value,
+    ) -> Result<serde_json::Value, HostError> {
+        self.product_client
+            .execute(request_type, request)
+            .map_err(|error| HostError::new(error.to_string()))
+    }
+
+    /// Revoke and remove the Rust-owned product session without exposing any
+    /// bearer or refresh credential to the host UI.
+    pub fn clear_session(&self) -> Result<serde_json::Value, HostError> {
+        let response = self.product_execute("mahayana.auth.logout", &serde_json::json!({}))?;
+        self.runtime.reset_session().map_err(HostError::from)?;
+        Ok(response)
+    }
+
+    /// Drop all account-bound runtime state when the product session changes.
+    pub fn reset_session(&self) -> Result<(), HostError> {
+        self.runtime.reset_session().map_err(HostError::from)
+    }
+}
+
+/// Canonical Rust-owned account session shared by the Mahayana CLI and native
+/// desktop shell. Presentation code receives only UI-safe account fields.
+pub fn default_product_surface_path() -> PathBuf {
+    default_product_surface_state_path()
+}
+
+pub fn default_automation_path() -> PathBuf {
+    default_mahayana_home().join("automations.json")
+}
+
+pub fn default_product_session_path() -> PathBuf {
+    let shared = default_mahayana_home().join("session.json");
+    if shared.is_file() {
+        return shared;
+    }
+
+    // Releases before the native app-group migration stored the account in
+    // ~/.mahayana. Keep that signed-in account usable on first launch; the
+    // desktop shell copies it into its Rust-owned app-data session and never
+    // exposes credentials to React.
+    if let Some(home) = std::env::var_os("HOME") {
+        let legacy = PathBuf::from(home).join(".mahayana").join("session.json");
+        if legacy.is_file() {
+            return legacy;
+        }
+    }
+    shared
+}
+
+struct NativeRunnerComposition {
+    engine_backend: Arc<dyn EngineBackend>,
+    agent_backend: Arc<dyn mahayana_agent::AgentBackend>,
+}
+
+impl NativeRunnerComposition {
+    fn from_engine(
+        native_engine: Arc<NativeEngine>,
+        profile: mahayana_kernel::RuntimeProfile,
+        cwd: PathBuf,
+        mcp_registry: NativeMcpRegistry,
+    ) -> Self {
+        let engine_backend: Arc<dyn EngineBackend> = native_engine.clone();
+        let agent_backend: Arc<dyn mahayana_agent::AgentBackend> =
+            Arc::new(NativeAgentBackend::new(
+                native_engine,
+                NativeAgentConfig {
+                    profile,
+                    workspace_root: Some(cwd),
+                    mcp_registry,
+                },
+            ));
+        Self {
+            engine_backend,
+            agent_backend,
+        }
+    }
+
+    fn compose(
+        model_runtime: Arc<dyn mahayana_model::ModelRuntime>,
+        engine_config: NativeEngineConfig,
+        profile: mahayana_kernel::RuntimeProfile,
+        cwd: PathBuf,
+        mcp_registry: NativeMcpRegistry,
+    ) -> Result<Self, HostError> {
+        let native_engine = Arc::new(
+            NativeEngine::new(model_runtime, engine_config)
+                .map_err(|error| HostError::new(error.to_string()))?,
+        );
+        Ok(Self::from_engine(
+            native_engine,
+            profile,
+            cwd,
+            mcp_registry,
+        ))
+    }
+}
+
+fn build_runtime(
+    create: HostCreateConfig,
+    product_client: MahayanaProductClient,
+) -> Result<MahayanaRuntime, HostError> {
+    let mut runtime_config = create.runtime.clone();
+    if runtime_config.remote_agent_enabled {
+        return Err(RuntimeError::RemoteAgentForbidden.into());
+    }
+    #[cfg(all(feature = "mobile-embedded", not(feature = "desktop-full")))]
+    {
+        runtime_config.build_profile = BuildProfile::MobileEmbedded;
+    }
+    let host_platform = create
+        .host_platform
+        .unwrap_or(match runtime_config.build_profile {
+            BuildProfile::DesktopFull => HostPlatform::Desktop,
+            BuildProfile::MobileEmbedded => HostPlatform::Mobile,
+            BuildProfile::WebWasm => HostPlatform::Web,
+        });
+    let inherit_installed_plugins = create.inherit_installed_plugins.unwrap_or(
+        matches!(runtime_config.build_profile, BuildProfile::DesktopFull) && !cfg!(test),
+    );
+    let configured_mini_apps = merge_installed_mini_apps(
+        create.mini_apps.clone(),
+        create.cwd.as_deref(),
+        inherit_installed_plugins,
+    );
+    let mini_apps = merge_official_mini_apps(configured_mini_apps);
+    let session_token = product_client.session_token().ok();
+
+    let data_dir = runtime_config.data_dir.clone();
+    let cwd = if let Some(cwd) = create.cwd.clone() {
+        Some(cwd)
+    } else if let Some(workspace_root) = runtime_config.workspace_roots.first().cloned() {
+        Some(workspace_root)
+    } else if let Some(data_dir) = data_dir.as_ref() {
+        let generated = data_dir.join("workspace");
+        std::fs::create_dir_all(&generated).map_err(|error| {
+            HostError::new(format!(
+                "create application workspace {}: {error}",
+                generated.display()
+            ))
+        })?;
+        Some(generated)
+    } else {
+        std::env::current_dir().ok()
+    };
+    if runtime_config.workspace_roots.is_empty()
+        && let Some(cwd) = cwd.as_ref()
+    {
+        runtime_config.workspace_roots.push(cwd.clone());
+    }
+
+    let mut builder = RuntimeBuilder::new(runtime_config.clone());
+    #[cfg(feature = "codex-compat")]
+    let mut compatibility_conversation_providers: Vec<Arc<dyn ConversationProvider>> = Vec::new();
+    if let Some(token) = session_token.as_ref() {
+        let provider = Arc::new(MahayanaSocialConversationProvider::new(
+            product_client.clone(),
+            Some(token.clone()),
+        ));
+        #[cfg(feature = "codex-compat")]
+        compatibility_conversation_providers
+            .push(Arc::clone(&provider) as Arc<dyn ConversationProvider>);
+        builder = builder.with_provider(provider)?;
+    }
+    if let Some(telegram_client_id) = create.telegram_client_id {
+        let provider = Arc::new(TelegramConversationProvider::from_client_id(
+            telegram_client_id,
+            create.telegram_self_user_id.unwrap_or_default(),
+        ));
+        #[cfg(feature = "codex-compat")]
+        compatibility_conversation_providers
+            .push(Arc::clone(&provider) as Arc<dyn ConversationProvider>);
+        builder = builder.with_provider(provider)?;
+    }
+
+    #[cfg(feature = "codex-compat")]
+    if std::env::var("MAHAYANA_AGENT_ENGINE").ok().as_deref() == Some("codex")
+        && matches!(
+            runtime_config.build_profile,
+            BuildProfile::DesktopFull | BuildProfile::MobileEmbedded
+        )
+    {
+        let cwd = cwd
+            .clone()
+            .ok_or_else(|| HostError::new("current working directory is unavailable"))?;
+        let codex_home = create
+            .codex_home
+            .clone()
+            .or_else(|| data_dir.clone().map(|path| path.join("codex")))
+            .or_else(default_codex_home_if_available)
+            .ok_or_else(|| {
+                HostError::new("Codex compatibility mode requires an application data directory")
+            })?;
+        let responses_base_url = runtime_config
+            .model
+            .base_url
+            .clone()
+            .ok_or_else(|| HostError::new("Mahayana Responses base URL is required"))?;
+        let settings = CodexAgentConfig {
+            codex_home,
+            inherit_installed_plugins,
+            cwd,
+            workspace_roots: runtime_config.workspace_roots.clone(),
+            model: runtime_config.model.model.clone(),
+            responses_base_url,
+            use_codex_account: create.use_codex_account,
+            product_session_token: session_token.clone(),
+            sandbox_mode: codex_protocol::config_types::SandboxMode::WorkspaceWrite,
+            approval_policy: codex_protocol::protocol::AskForApproval::OnRequest,
+            codex_executable_path: create.codex_executable_path.clone(),
+            conversation_providers: compatibility_conversation_providers,
+        };
+        return builder
+            .build_with_agent_backend_and(
+                || async move {
+                    let backend = CodexAgentBackend::start(settings).await?;
+                    Ok(Arc::new(backend) as Arc<dyn mahayana_agent::AgentBackend>)
+                },
+                move |builder, backend| {
+                    let provider = MiniAppConversationProvider::new_for_platform_with_entitlements(
+                        backend,
+                        mini_apps,
+                        host_platform,
+                        Some(Arc::new(PlatformEntitlementChecker {
+                            client: product_client,
+                        })),
+                    )?;
+                    builder.with_provider(Arc::new(provider))
+                },
+            )
+            .map_err(HostError::from);
+    }
+
+    #[cfg(any(feature = "desktop-full", feature = "mobile-embedded"))]
+    if matches!(
+        runtime_config.build_profile,
+        BuildProfile::DesktopFull | BuildProfile::MobileEmbedded
+    ) {
+        let cwd = cwd.ok_or_else(|| HostError::new("current working directory is unavailable"))?;
+        let base_url = runtime_config
+            .model
+            .base_url
+            .clone()
+            .ok_or_else(|| HostError::new("Mahayana model base URL is required"))?;
+        let configured_model_token = create.model_bearer_token.clone();
+        let model_provider = runtime_config.model.provider;
+        let credential_client = product_client.clone();
+        let credential_resolver: ModelCredentialResolver = Arc::new(move || {
+            if matches!(model_provider, ModelProviderMode::UserConfiguredRemote) {
+                return Ok(configured_model_token.clone());
+            }
+            match credential_client.session_token() {
+                Ok(token) => Ok(Some(token)),
+                Err(ProductError::NotLoggedIn | ProductError::SessionExpired) => Ok(None),
+                Err(error) => Err(ModelError::Inference(format!(
+                    "unable to resolve Mahayana model credential: {error}"
+                ))),
+            }
+        });
+        let model_runtime = Arc::new(
+            ResponsesModelRuntime::new(ResponsesModelConfig {
+                base_url,
+                default_model: runtime_config.model.model.clone(),
+                bearer_token: if matches!(
+                    runtime_config.model.provider,
+                    ModelProviderMode::UserConfiguredRemote
+                ) {
+                    create.model_bearer_token.clone()
+                } else {
+                    session_token.clone()
+                },
+                provider_mode: runtime_config.model.provider,
+                wire_api: create.model_wire_api,
+            })
+            .map_err(|error| HostError::new(error.to_string()))?
+            .with_credential_resolver(credential_resolver),
+        );
+        let mut engine_config = match runtime_config.build_profile {
+            BuildProfile::DesktopFull => {
+                NativeEngineConfig::desktop(runtime_config.model.model.clone())
+            }
+            BuildProfile::MobileEmbedded | BuildProfile::WebWasm => {
+                NativeEngineConfig::embedded(runtime_config.model.model.clone())
+            }
+        };
+        engine_config.process_execution = create.process_execution.clone();
+        engine_config.session_state_path = runtime_config
+            .data_dir
+            .as_ref()
+            .map(|root| root.join("provider-neutral-assistant-session.json"));
+        let mcp_roots = runtime_config
+            .workspace_roots
+            .iter()
+            .map(|root| root.join(".agents/plugins/plugins"))
+            .collect::<Vec<_>>();
+        let mcp_registry = NativeMcpRegistry::new(mcp_roots, session_token.clone());
+        let runner_composition = NativeRunnerComposition::compose(
+            model_runtime,
+            engine_config,
+            match runtime_config.build_profile {
+                BuildProfile::DesktopFull => mahayana_kernel::RuntimeProfile::DesktopFull,
+                BuildProfile::MobileEmbedded => mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                BuildProfile::WebWasm => mahayana_kernel::RuntimeProfile::WebWasm,
+            },
+            cwd,
+            mcp_registry,
+        )?;
+        let miniapp = MiniAppConversationProvider::new_for_platform_with_entitlements(
+            Arc::clone(&runner_composition.agent_backend),
+            mini_apps,
+            host_platform,
+            Some(Arc::new(PlatformEntitlementChecker {
+                client: product_client,
+            })),
+        )
+        .map_err(|error| HostError::new(error.to_string()))?;
+        return builder
+            .with_engine_backend(runner_composition.engine_backend)?
+            .with_agent_control_backend(runner_composition.agent_backend)
+            .with_provider(Arc::new(miniapp))?
+            .build()
+            .map_err(HostError::from);
+    }
+
+    let unavailable_reason = "this platform build has no native Mahayana Agent backend";
+    let backend: Arc<dyn mahayana_agent::AgentBackend> =
+        Arc::new(UnavailableAgentBackend::new(unavailable_reason));
+    let miniapp = MiniAppConversationProvider::new_for_platform_with_entitlements(
+        Arc::clone(&backend),
+        mini_apps,
+        host_platform,
+        Some(Arc::new(PlatformEntitlementChecker {
+            client: product_client,
+        })),
+    )
+    .map_err(|error| HostError::new(error.to_string()))?;
+    builder
+        .with_agent_backend(backend)?
+        .with_provider(Arc::new(miniapp))?
+        .build()
+        .map_err(HostError::from)
+}
+
+fn merge_installed_mini_apps(
+    mut configured: Vec<MiniAppDefinition>,
+    cwd: Option<&Path>,
+    inherit_installed_plugins: bool,
+) -> Vec<MiniAppDefinition> {
+    if !inherit_installed_plugins {
+        return configured;
+    }
+    let Some(cwd) = cwd else {
+        return configured;
+    };
+    let marketplace_path = cwd.join(".agents/plugins/marketplace.json");
+    let Ok(source) = fs::read_to_string(marketplace_path) else {
+        return configured;
+    };
+    let Ok(marketplace) = serde_json::from_str::<serde_json::Value>(&source) else {
+        return configured;
+    };
+    let mut known = configured
+        .iter()
+        .map(|definition| definition.plugin_id.clone())
+        .collect::<BTreeSet<_>>();
+    let Some(entries) = marketplace
+        .get("plugins")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return configured;
+    };
+    for entry in entries {
+        if entry
+            .pointer("/source/source")
+            .and_then(serde_json::Value::as_str)
+            != Some("local")
+            || entry
+                .pointer("/policy/installation")
+                .and_then(serde_json::Value::as_str)
+                == Some("NOT_AVAILABLE")
+        {
+            continue;
+        }
+        let Some(plugin_id) = entry
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+        else {
+            continue;
+        };
+        if known.contains(plugin_id) {
+            continue;
+        }
+        let manifest_path = cwd
+            .join(".agents/plugins/plugins")
+            .join(plugin_id)
+            .join(".codex-plugin/plugin.json");
+        let Ok(manifest_source) = fs::read_to_string(manifest_path) else {
+            continue;
+        };
+        let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&manifest_source) else {
+            continue;
+        };
+        if manifest.get("name").and_then(serde_json::Value::as_str) != Some(plugin_id) {
+            continue;
+        }
+        known.insert(plugin_id.to_string());
+        configured.push(MiniAppDefinition {
+            plugin_id: plugin_id.to_string(),
+            title: plugin_id.to_string(),
+            pinned: false,
+        });
+    }
+    configured
+}
+
+fn merge_official_mini_apps(
+    configured: impl IntoIterator<Item = MiniAppDefinition>,
+) -> Vec<MiniAppDefinition> {
+    let mut definitions = configured
+        .into_iter()
+        .map(|definition| (definition.plugin_id.clone(), definition))
+        .collect::<BTreeMap<_, _>>();
+    for plugin_id in OFFICIAL_PLUGIN_IDS {
+        let definition = app_definition(plugin_id).expect("official plugin definition");
+        let pinned = definitions
+            .get(plugin_id)
+            .is_some_and(|definition| definition.pinned);
+        definitions.insert(
+            plugin_id.to_string(),
+            MiniAppDefinition {
+                plugin_id: definition.id,
+                title: definition.title,
+                pinned,
+            },
+        );
+    }
+    definitions.into_values().collect()
+}
+
+#[cfg(all(feature = "codex-compat", feature = "desktop-full"))]
+fn default_codex_home() -> PathBuf {
+    default_mahayana_home().join("codex")
+}
+
+#[cfg(feature = "codex-compat")]
+fn default_codex_home_if_available() -> Option<PathBuf> {
+    #[cfg(feature = "desktop-full")]
+    {
+        #[allow(clippy::needless_return)]
+        return Some(default_codex_home());
+    }
+    #[cfg(not(feature = "desktop-full"))]
+    {
+        None
+    }
+}
+
+#[derive(Clone)]
+struct PlatformEntitlementChecker {
+    client: MahayanaProductClient,
+}
+
+#[async_trait::async_trait]
+impl EntitlementChecker for PlatformEntitlementChecker {
+    async fn has_entitlement(&self, plugin_id: &str, capability: &str) -> Result<bool, String> {
+        let client = self.client.clone();
+        let plugin_id = plugin_id.to_string();
+        let capability = capability.to_string();
+        tokio::task::spawn_blocking(move || client.entitlement(&plugin_id, &capability))
+            .await
+            .map_err(|error| error.to_string())?
+            .map(|entitlement| entitlement.is_some())
+            .map_err(|error| error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_config() -> HostCreateConfig {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-host-test-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).expect("create isolated Host root");
+        HostCreateConfig {
+            runtime: RuntimeConfig {
+                data_dir: Some(root.join("runtime")),
+                ..RuntimeConfig::default()
+            },
+            product_session_path: Some(root.join("product-session.json")),
+            mini_apps: vec![MiniAppDefinition {
+                plugin_id: "test-miniapp".to_string(),
+                title: "Test MiniApp".to_string(),
+                pinned: false,
+            }],
+            inherit_installed_plugins: Some(false),
+            ..HostCreateConfig::default()
+        }
+    }
+
+
+    struct NoopModelRuntime;
+
+    #[async_trait::async_trait]
+    impl mahayana_model::ModelRuntime for NoopModelRuntime {
+        async fn infer(
+            &self,
+            _request: mahayana_model::ModelRequest,
+            _events: mahayana_model::SharedModelEventSink,
+        ) -> Result<(), mahayana_model::ModelError> {
+            Err(mahayana_model::ModelError::Unavailable(
+                "composition identity test does not run inference".into(),
+            ))
+        }
+
+        fn provider_mode(&self) -> ModelProviderMode {
+            ModelProviderMode::LocalModel
+        }
+    }
+
+    #[test]
+    fn native_runner_composition_shares_one_engine_owner() {
+        let engine = Arc::new(
+            NativeEngine::new(
+                Arc::new(NoopModelRuntime),
+                NativeEngineConfig::embedded("composition-test"),
+            )
+            .expect("create native engine"),
+        );
+        let before = Arc::strong_count(&engine);
+        let composition = NativeRunnerComposition::from_engine(
+            Arc::clone(&engine),
+            mahayana_kernel::RuntimeProfile::MobileEmbedded,
+            PathBuf::from("."),
+            NativeMcpRegistry::new(Vec::new(), None),
+        );
+
+        assert_eq!(before, 1);
+        assert_eq!(
+            Arc::as_ptr(&composition.engine_backend) as *const (),
+            Arc::as_ptr(&engine) as *const (),
+            "Runtime engine backend must be the exact NativeEngine owned by the composition"
+        );
+        assert_eq!(
+            Arc::strong_count(&engine),
+            3,
+            "the same NativeEngine must be retained by the Runtime backend and NativeAgent"
+        );
+        drop(composition);
+        assert_eq!(Arc::strong_count(&engine), 1);
+    }
+
+    #[test]
+    fn fresh_app_data_creates_generated_workspace_before_provider_warmup() {
+        let config = test_config();
+        let generated_workspace = config
+            .runtime
+            .data_dir
+            .as_ref()
+            .expect("runtime data dir")
+            .join("workspace");
+        assert!(!generated_workspace.exists());
+
+        let host = MahayanaHost::create(config).expect("create host");
+        assert!(generated_workspace.is_dir());
+        host.warmup_conversation(ConversationId(
+            mahayana_core::MAHAYANA_AI_CONVERSATION_ID.to_string(),
+        ))
+        .expect("warm up provider against generated workspace");
+    }
+
+    #[test]
+    fn direct_host_creates_executes_receives_and_clones() {
+        let host = MahayanaHost::create(test_config()).expect("create host");
+        let cloned = host.clone();
+        let status = cloned
+            .execute(RuntimeCommand::Status)
+            .expect("execute status");
+        let encoded = serde_json::to_value(status).expect("serialize status");
+        assert_eq!(encoded["runtimeAbiVersion"], 1);
+        assert_eq!(encoded["remoteAgentEnabled"], false);
+
+        let ready = host
+            .receive(Duration::from_millis(10))
+            .expect("receive ready")
+            .expect("ready event");
+        let encoded = serde_json::to_value(ready).expect("serialize event");
+        assert_eq!(encoded["@type"], "mahayana.runtime.ready");
+    }
+
+    #[test]
+    fn create_rejects_remote_agent_gateway() {
+        let mut config = test_config();
+        config.runtime.remote_agent_enabled = true;
+        let error = MahayanaHost::create(config)
+            .err()
+            .expect("remote agent must be rejected");
+        assert!(error.to_string().contains("remote Agent"));
+    }
+}

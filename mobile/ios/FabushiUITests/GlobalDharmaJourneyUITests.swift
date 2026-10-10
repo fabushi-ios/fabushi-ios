@@ -24,6 +24,15 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
 
     @MainActor
     func testGlobalDharmaMarketplaceBotWebMcpCommerceJourney() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let protectedSession = environment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"],
+              !protectedSession.isEmpty
+        else {
+            throw XCTSkip(
+                "Requires the protected, bounded Fabushi CI account session injected into the UI test runner"
+            )
+        }
+
         let app = XCUIApplication()
         configureRealCIEnvironment(for: app)
         app.launch()
@@ -89,16 +98,16 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         leaveMarketplaceForBotHome(in: app)
         XCTAssertTrue(grokHome.waitForExistence(timeout: 15))
 
-        let botLabel = app.staticTexts["全球法布施"].firstMatch
+        let botEntry = app.buttons["grok-mobile-miniapp-bot-global-dharma"]
         XCTAssertTrue(
-            scrollToElement(botLabel, in: app, maxSwipes: 8),
-            "Installing 全球法布施 must project its Bot into the message area"
+            scrollToElement(botEntry, in: app, maxSwipes: 8),
+            "Installing 全球法布施 must project its canonical Mini App Bot into the message area"
         )
-        botLabel.tap()
+        botEntry.tap()
 
         let botChat = app.descendants(matching: .any)["mobile-bot-chat"]
         XCTAssertTrue(botChat.waitForExistence(timeout: 15))
-        let openApp = app.buttons["mobile-bot-open-app"]
+        let openApp = app.buttons["mobile-bot-open-miniapp"]
         XCTAssertTrue(openApp.waitForExistence(timeout: 8), "Global Dharma Bot must expose 打开应用")
         mark("botVisible", true)
         checkpoint("040-global-dharma-bot")
@@ -106,7 +115,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         let draft = app.textFields["mobile-bot-draft"]
         XCTAssertTrue(draft.waitForExistence(timeout: 8))
         draft.tap()
-        draft.typeText("请通过 WebMCP 启动本地转经轮，并把当前操作状态同步到小程序界面。")
+        draft.typeText("请通过 WebMCP 查看当前运行状态，并把当前操作状态同步到小程序界面。")
         let send = app.buttons["mobile-bot-send"]
         XCTAssertTrue(send.waitForExistence(timeout: 8))
         send.tap()
@@ -148,8 +157,12 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             sharedRuntime.waitForExistence(timeout: 30),
             "Opening the Global Dharma Web UI must restore the canonical account-scoped runtime and complete the read-only WebMCP status bridge"
         )
-        let revisionText = String(sharedRuntime.label.dropFirst(sharedRuntimePrefix.count))
-        guard let revision = Int(revisionText), revision > 0 else {
+        let revisionSuffix = sharedRuntime.label.dropFirst(sharedRuntimePrefix.count)
+        let revisionDigits = revisionSuffix.prefix(while: { $0.isNumber })
+        guard !revisionDigits.isEmpty,
+              let revision = Int(revisionDigits),
+              revision > 0
+        else {
             XCTFail("Bot/Web UI synchronization must expose a positive canonical runtime revision, got: \(sharedRuntime.label)")
             return
         }
@@ -168,8 +181,12 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             buy.tap()
             mark("purchaseTapped", true)
             XCTAssertTrue(
+                buy.isEnabled,
+                "Protected acceptance requires a real purchase/authorization path. If StoreKit/provider checkout is unavailable in this CI environment, commerce remains blocked rather than using synthetic entitlement state."
+            )
+            XCTAssertTrue(
                 allowed.waitForExistence(timeout: 60),
-                "Canonical test-mode purchase did not project an allowed server entitlement"
+                "Real purchase/authorization did not project an allowed service entitlement"
             )
             checkpoint("070-purchase-entitlement")
         } else {
@@ -198,20 +215,38 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
     @MainActor
     private func configureRealCIEnvironment(for app: XCUIApplication) {
         let environment = ProcessInfo.processInfo.environment
-        if let session = environment["FABUSHI_CI_APP_SESSION_IN_SIMULATOR"], !session.isEmpty {
-            app.launchEnvironment["FABUSHI_CI_ACCOUNT_SESSION_FILE"] = session
+        if let session = environment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"], !session.isEmpty {
+            app.launchEnvironment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"] = session
         }
-        if let sourceSHA = environment["FABUSHI_E2E_SOURCE_SHA"], !sourceSHA.isEmpty {
-            app.launchEnvironment["GITHUB_SHA"] = sourceSHA
+        guard let rawAPIBaseURL = environment["FABUSHI_CI_API_BASE_URL"] else {
+            XCTFail("Protected Fabushi CI API/model base is missing")
+            return
         }
+        let apiBaseURL = rawAPIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !apiBaseURL.isEmpty, apiBaseURL.lowercased().hasPrefix("https://") else {
+            XCTFail("Protected Fabushi API/model base must use HTTPS")
+            return
+        }
+        app.launchEnvironment["FABUSHI_API_BASE_URL"] = apiBaseURL
+        app.launchEnvironment["MAHAYANA_API_BASE_URL"] = apiBaseURL
+        app.launchEnvironment["FABUSHI_RESPONSES_URL"] = apiBaseURL
+        XCTAssertNotEqual(
+            environment["FABUSHI_FEATURE_HOST_TEST"],
+            "1",
+            "Protected acceptance must never enable the synthetic/test commerce rail"
+        )
+        app.launchEnvironment["FABUSHI_FEATURE_HOST_TEST"] = "0"
         for key in [
             "GITHUB_ACTIONS", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_JOB",
             "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_OS", "RUNNER_ARCH",
-            "FABUSHI_API_BASE_URL", "FABUSHI_DEVICE_NAME"
+            "FABUSHI_DEVICE_NAME"
         ] {
             if let value = environment[key], !value.isEmpty {
                 app.launchEnvironment[key] = value
             }
+        }
+        if let sourceSHA = environment["FABUSHI_E2E_SOURCE_SHA"], sourceSHA.count == 40 {
+            app.launchEnvironment["GITHUB_SHA"] = sourceSHA
         }
     }
 
@@ -287,6 +322,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         persistState()
     }
 
+    @MainActor
     private func checkpoint(_ name: String) {
         let screenshot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)
@@ -303,12 +339,20 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
     }
 
     private func persistState() {
-        guard let path = ProcessInfo.processInfo.environment["FABUSHI_E2E_STATE_FILE"], !path.isEmpty,
-              JSONSerialization.isValidJSONObject(state),
-              let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys])
+        guard JSONSerialization.isValidJSONObject(state),
+              let data = try? JSONSerialization.data(
+                withJSONObject: state,
+                options: [.prettyPrinted, .sortedKeys]
+              )
         else { return }
-        let url = URL(fileURLWithPath: path)
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
+
+        // UI tests execute inside the Simulator test-runner sandbox, so a
+        // GitHub-runner workspace path is not a valid evidence transport.
+        // Emit only this non-sensitive boolean/revision state to stdout; the
+        // workflow decodes the final marker back into state.json on the host.
+        let marker = "FABUSHI_E2E_STATE_BASE64=\(data.base64EncodedString())\n"
+        if let markerData = marker.data(using: .utf8) {
+            FileHandle.standardOutput.write(markerData)
+        }
     }
 }

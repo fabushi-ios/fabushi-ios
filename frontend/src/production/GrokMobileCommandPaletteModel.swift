@@ -1,0 +1,639 @@
+import Foundation
+
+internal enum MobileCommandPaletteTab: String, CaseIterable, Identifiable {
+    case all
+    case messages
+    case agents
+    case groups
+    case files
+    case links
+    case routines
+    case actions
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .messages: "Messages"
+        case .agents: "Bots & Chats"
+        case .groups: "Groups"
+        case .files: "Files"
+        case .links: "Links"
+        case .routines: "Routines"
+        case .actions: "Actions"
+        }
+    }
+}
+
+internal enum MobileCommandPaletteProviderStatus: Equatable {
+    case idle
+    case loading
+    case ready
+    case empty
+    case failed(String)
+    case unavailable
+    case cancelled
+}
+
+internal struct MobileCommandPaletteLinkMetadata: Equatable {
+    let title: String?
+    let description: String?
+    let hostname: String?
+}
+
+internal struct MobileCommandPaletteRoutine: Identifiable, Equatable {
+    let agentId: String
+    let automationId: String
+    let name: String
+    let triggerDescription: String
+    let createdAt: Double
+    let lastRunAt: Double?
+
+    var id: String { "routine:\(agentId):\(automationId)" }
+}
+
+internal enum MobileCommandPaletteActionKind: String {
+    case createBot
+    case openWorkspace
+    case openContacts
+    case openGroupMembers
+    case openChannels
+    case openSettings
+    case updateComputer
+    case cancelComputerUpdate
+}
+
+internal struct MobileCommandPaletteAction: Identifiable {
+    let id: String
+    let label: String
+    let keywords: [String]
+    let detail: String
+    let kind: MobileCommandPaletteActionKind
+}
+
+internal enum MobileCommandPaletteRootProjection {
+    static func actions(
+        activeAgent: MobileBotSummary?,
+        hasChannels: Bool
+    ) -> [MobileCommandPaletteAction] {
+        guard let activeAgent else { return [] }
+        var actions: [MobileCommandPaletteAction] = []
+        if activeAgent.isGroup && !activeAgent.isSharedRoom {
+            actions.append(.init(
+                id: "info-members",
+                label: "Members",
+                keywords: ["people", "group", "participants"],
+                detail: "Current chat",
+                kind: .openGroupMembers
+            ))
+        }
+        if hasChannels {
+            actions.append(.init(
+                id: "info-channels",
+                label: "Channels",
+                keywords: ["messaging", "platforms", "connect"],
+                detail: "Current chat",
+                kind: .openChannels
+            ))
+        }
+        actions.append(.init(
+            id: "info-settings",
+            label: "Chat Settings",
+            keywords: ["details", "notifications"],
+            detail: "Current chat",
+            kind: .openSettings
+        ))
+        return actions
+    }
+}
+
+internal enum MobileCommandPaletteComputerUpdateAction: String, Equatable {
+    case ready
+    case busyOverride = "busy-override"
+}
+
+internal enum MobileCommandPaletteComputerUpdateProjection {
+    static let confirmationDelaySeconds = 3
+
+    static func workingAgentNames(_ bots: [MobileBotSummary]) -> [String] {
+        bots
+            .filter { !$0.isGroup && $0.isRunning }
+            .map(\.name)
+    }
+
+    static func action(
+        agent: MobileBotSummary?,
+        status: RemoteComputerAgentBoxSnapshot?,
+        workingAgentNames: [String],
+        isPending: Bool,
+        isQueued: Bool
+    ) -> MobileCommandPaletteComputerUpdateAction? {
+        guard let agent,
+              !agent.isGroup,
+              let status,
+              status.agentID == agent.id,
+              status.imageUpdateAvailable,
+              !isPending,
+              !isQueued
+        else {
+            return nil
+        }
+        return workingAgentNames.isEmpty ? .ready : .busyOverride
+    }
+
+    static func workingTitle(_ names: [String]) -> String {
+        names.count > 1 ? "Update while agents are working?" : "An agent is working"
+    }
+
+    static func workingDescription(_ names: [String]) -> String {
+        let cleaned = names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if cleaned.count > 1 {
+            let visible = Array(cleaned.prefix(2))
+            let suffix = cleaned.count > 2 ? ", and \(cleaned.count - 2) other agents" : ""
+            return "\(visible.joined(separator: ", "))\(suffix) are working on Fabushi's computer right now. Updating recreates the computer and interrupts their current turns. Files and logins are kept."
+        }
+        let name = cleaned.first
+        return "\(name.map { "\($0) is" } ?? "An agent is") working right now. Waiting lets its current turn finish. Updating now recreates the computer and interrupts it. Files and logins are kept either way."
+    }
+}
+
+internal struct MobileCommandPaletteMessage: Identifiable {
+    let conversationId: String
+    let messageId: String
+    let conversationTitle: String
+    let snippet: String
+    let isOutgoing: Bool
+
+    var id: String { "message:\(conversationId):\(messageId)" }
+}
+
+internal struct MobileCommandPaletteFile: Identifiable {
+    let conversationId: String
+    let messageId: String
+    let conversationTitle: String
+    let fileName: String
+    let kind: String
+
+    var id: String { "file:\(conversationId):\(messageId)" }
+}
+
+internal struct MobileCommandPaletteLink: Identifiable {
+    let conversationId: String
+    let messageId: String
+    let conversationTitle: String
+    let url: String
+    var metadataTitle: String? = nil
+    var metadataDescription: String? = nil
+
+    var id: String { "link:\(conversationId):\(messageId):\(url)" }
+
+    var displayURL: String {
+        guard let parsed = URL(string: url), let host = parsed.host else { return url }
+        let path = parsed.path == "/" ? "" : parsed.path
+        return host + path
+    }
+}
+
+internal enum MobileCommandPaletteEntry: Identifiable {
+    case bot(MobileBotSummary)
+    case conversation(ConversationSummary)
+    case message(MobileCommandPaletteMessage)
+    case file(MobileCommandPaletteFile)
+    case link(MobileCommandPaletteLink)
+    case routine(MobileCommandPaletteRoutine)
+    case action(MobileCommandPaletteAction)
+
+    var id: String {
+        switch self {
+        case .bot(let bot): "bot:\(bot.id)"
+        case .conversation(let conversation): "conversation:\(conversation.id)"
+        case .message(let message): message.id
+        case .file(let file): file.id
+        case .link(let link): link.id
+        case .routine(let routine): routine.id
+        case .action(let action): "action:\(action.id)"
+        }
+    }
+
+    var accessibilityKey: String {
+        String(id.map { character in
+            character.isASCII && (character.isLetter || character.isNumber || "-._".contains(character)) ? character : "-"
+        })
+    }
+
+    var label: String {
+        switch self {
+        case .bot(let bot): bot.name
+        case .conversation(let conversation): conversation.title
+        case .message(let message): message.snippet
+        case .file(let file): file.fileName
+        case .link(let link): link.metadataTitle ?? link.displayURL
+        case .routine(let routine): routine.name
+        case .action(let action): action.label
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .bot(let bot):
+            return bot.description.isEmpty ? "Bot" : bot.description
+        case .conversation(let conversation):
+            return conversation.kind == .channel ? "Channel" : conversation.kind == .group ? "Group" : "Chat"
+        case .message(let message):
+            return "\(message.isOutgoing ? "You in" : "In") \(message.conversationTitle)"
+        case .file(let file):
+            return "\(file.conversationTitle) · \(file.kind.capitalized)"
+        case .link(let link):
+            return link.metadataDescription ?? link.conversationTitle
+        case .routine(let routine):
+            return routine.triggerDescription.isEmpty ? "Routine" : routine.triggerDescription
+        case .action(let action):
+            return action.detail
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .bot: return "sparkles"
+        case .conversation(let conversation):
+            return conversation.kind == .channel ? "megaphone" : conversation.kind == .group ? "person.3" : "bubble.left.and.bubble.right"
+        case .message: return "quote.bubble"
+        case .file: return "doc"
+        case .link: return "link"
+        case .routine: return "clock.arrow.circlepath"
+        case .action(let action):
+            switch action.kind {
+            case .createBot: return "plus.circle"
+            case .openWorkspace: return "rectangle.grid.1x2"
+            case .openContacts: return "person.2"
+            case .openGroupMembers: return "person.3"
+            case .openChannels: return "megaphone"
+            case .openSettings: return "gearshape"
+            case .updateComputer: return "desktopcomputer"
+            case .cancelComputerUpdate: return "xmark.circle"
+            }
+        }
+    }
+}
+
+internal enum GrokMobileCommandPaletteModel {
+    private static let maximumFuzzySpanMultiplier = 3
+
+    static func normalizeSearch(_ value: String) -> String {
+        let folded = value.folding(
+            options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive],
+            locale: Locale.current
+        ).lowercased()
+        var result = ""
+        var pendingSeparator = false
+        for character in folded {
+            if character.isLetter || character.isNumber {
+                if pendingSeparator && !result.isEmpty { result.append(" ") }
+                result.append(character)
+                pendingSeparator = false
+            } else {
+                pendingSeparator = true
+            }
+        }
+        return result
+    }
+
+    static func searchTokens(_ value: String) -> [String] {
+        let normalized = normalizeSearch(value)
+        return normalized.isEmpty ? [] : normalized.split(separator: " ").map(String.init)
+    }
+
+    static func fuzzyScore(value: String, query: String) -> Double? {
+        guard !query.isEmpty else { return 0 }
+        let originalCharacters = Array(value)
+        let valueCharacters = Array(value.lowercased())
+        let queryCharacters = Array(query.lowercased())
+        var score = 0
+        var queryIndex = 0
+        var previousMatch = -2
+        var firstMatch = -1
+        var lastMatch = -1
+
+        for index in valueCharacters.indices where queryIndex < queryCharacters.count {
+            guard valueCharacters[index] == queryCharacters[queryIndex] else { continue }
+            if firstMatch < 0 { firstMatch = index }
+            let previousCharacter = index > 0 ? valueCharacters[index - 1] : nil
+            let boundary = index == 0 || previousCharacter == " " || previousCharacter == "-" || previousCharacter == "_" || previousCharacter == "/" || previousCharacter == "."
+            let camelBoundary = index > 0
+                && originalCharacters[index - 1].isLowercase
+                && originalCharacters[index].isUppercase
+            var characterScore = 1
+            if boundary || camelBoundary { characterScore += 4 }
+            if previousMatch == index - 1 { characterScore += 3 }
+            score += characterScore
+            previousMatch = index
+            lastMatch = index
+            queryIndex += 1
+        }
+
+        guard queryIndex == queryCharacters.count else { return nil }
+        guard lastMatch - firstMatch + 1 <= queryCharacters.count * maximumFuzzySpanMultiplier else { return nil }
+        return Double(score) - Double(firstMatch) * 0.1 - Double(valueCharacters.count) * 0.02
+    }
+
+    static func messages(
+        conversations: [ConversationSummary],
+        messagesByConversation: [String: [ChatMessage]]
+    ) -> [MobileCommandPaletteMessage] {
+        var rows: [MobileCommandPaletteMessage] = []
+        for conversation in conversations where !conversation.isArchived {
+            for message in (messagesByConversation[conversation.id] ?? []).reversed() {
+                let snippet = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !snippet.isEmpty else { continue }
+                rows.append(.init(
+                    conversationId: conversation.id,
+                    messageId: message.id,
+                    conversationTitle: conversation.title,
+                    snippet: snippet,
+                    isOutgoing: message.isOutgoing
+                ))
+            }
+        }
+        return rows
+    }
+
+    static func files(
+        conversations: [ConversationSummary],
+        messagesByConversation: [String: [ChatMessage]]
+    ) -> [MobileCommandPaletteFile] {
+        var rows: [MobileCommandPaletteFile] = []
+        for conversation in conversations where !conversation.isArchived {
+            for message in (messagesByConversation[conversation.id] ?? []).reversed() {
+                guard let fileName = message.mediaFileName, !fileName.isEmpty else { continue }
+                rows.append(.init(
+                    conversationId: conversation.id,
+                    messageId: message.id,
+                    conversationTitle: conversation.title,
+                    fileName: fileName,
+                    kind: fileKind(message: message)
+                ))
+            }
+        }
+        return rows
+    }
+
+    static func links(
+        conversations: [ConversationSummary],
+        messagesByConversation: [String: [ChatMessage]]
+    ) -> [MobileCommandPaletteLink] {
+        var rows: [MobileCommandPaletteLink] = []
+        var seen = Set<String>()
+        for conversation in conversations where !conversation.isArchived {
+            for message in (messagesByConversation[conversation.id] ?? []).reversed() {
+                for url in extractHTTPLinks(message.text) {
+                    guard seen.insert(url).inserted else { continue }
+                    rows.append(.init(
+                        conversationId: conversation.id,
+                        messageId: message.id,
+                        conversationTitle: conversation.title,
+                        url: url
+                    ))
+                }
+            }
+        }
+        return rows
+    }
+
+    static func entries(
+        bots: [MobileBotSummary],
+        conversations: [ConversationSummary],
+        messagesByConversation: [String: [ChatMessage]],
+        actions: [MobileCommandPaletteAction],
+        routines: [MobileCommandPaletteRoutine] = [],
+        linkMetadata: [String: MobileCommandPaletteLinkMetadata] = [:],
+        query: String,
+        tab: MobileCommandPaletteTab
+    ) -> [MobileCommandPaletteEntry] {
+        let uniqueBots = deduplicatedBots(bots)
+        let conversationEntries = conversations
+            .filter { !$0.isArchived }
+            .map(MobileCommandPaletteEntry.conversation)
+        let visibleBotEntries = uniqueBots
+            .filter { !$0.hidden }
+            .map(MobileCommandPaletteEntry.bot)
+        let hiddenBotEntries = uniqueBots
+            .filter(\.hidden)
+            .map(MobileCommandPaletteEntry.bot)
+        let actionEntries = actions.map(MobileCommandPaletteEntry.action)
+        let messageEntries = messages(conversations: conversations, messagesByConversation: messagesByConversation)
+            .map(MobileCommandPaletteEntry.message)
+        let fileEntries = files(conversations: conversations, messagesByConversation: messagesByConversation)
+            .map(MobileCommandPaletteEntry.file)
+        let linkEntries = links(conversations: conversations, messagesByConversation: messagesByConversation)
+            .map { link -> MobileCommandPaletteEntry in
+                var enriched = link
+                enriched.metadataTitle = linkMetadata[link.url]?.title
+                enriched.metadataDescription = linkMetadata[link.url]?.description
+                return .link(enriched)
+            }
+        let routineEntries = routines.map(MobileCommandPaletteEntry.routine)
+
+        let base = (visibleBotEntries + conversationEntries + fileEntries + linkEntries + routineEntries + messageEntries + actionEntries)
+            .filter { matches(tab: tab, entry: $0) }
+        let tokens = searchTokens(query)
+        if tokens.isEmpty {
+            if tab == .all {
+                return (visibleBotEntries + conversationEntries + actionEntries).prefix(100).map { $0 }
+            }
+            return base.prefix(100).map { $0 }
+        }
+
+        let normalizedQuery = tokens.joined(separator: " ")
+        func scored(_ entries: [MobileCommandPaletteEntry]) -> [(Int, Double, MobileCommandPaletteEntry)] {
+            entries.enumerated().compactMap { index, entry in
+                guard let value = score(entry: entry, tokens: tokens, normalizedQuery: normalizedQuery) else { return nil }
+                return (index, value, entry)
+            }.sorted {
+                if $0.1 == $1.1 { return $0.0 < $1.0 }
+                return $0.1 > $1.1
+            }
+        }
+
+        let visibleScored = scored(base)
+        let hiddenScored = scored(hiddenBotEntries.filter { matches(tab: tab, entry: $0) })
+        return (visibleScored + hiddenScored).prefix(100).map { $0.2 }
+    }
+
+
+    static func linkMetadata(from value: Any) -> MobileCommandPaletteLinkMetadata? {
+        guard let row = value as? [String: Any] else { return nil }
+        func clean(_ key: String) -> String? {
+            guard let raw = row[key] as? String else { return nil }
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }
+        let metadata = MobileCommandPaletteLinkMetadata(
+            title: clean("title"),
+            description: clean("description"),
+            hostname: clean("hostname")
+        )
+        return metadata.title == nil && metadata.description == nil && metadata.hostname == nil ? nil : metadata
+    }
+
+    static func routines(from value: Any) -> [MobileCommandPaletteRoutine] {
+        guard let rows = value as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
+        return rows.compactMap { row in
+            guard let agentId = row["agentId"] as? String,
+                  !agentId.isEmpty,
+                  let automation = row["automation"] as? [String: Any],
+                  let automationId = automation["id"] as? String,
+                  !automationId.isEmpty,
+                  let name = automation["name"] as? String,
+                  let triggerDescription = automation["triggerDescription"] as? String,
+                  let created = automation["createdAt"] as? NSNumber
+            else { return nil }
+            let identity = "\(agentId):\(automationId)"
+            guard seen.insert(identity).inserted else { return nil }
+            let lastRunAt = (automation["lastRunAt"] as? NSNumber)?.doubleValue
+            return MobileCommandPaletteRoutine(
+                agentId: agentId,
+                automationId: automationId,
+                name: name,
+                triggerDescription: triggerDescription,
+                createdAt: created.doubleValue,
+                lastRunAt: lastRunAt
+            )
+        }
+    }
+
+    private static func deduplicatedBots(_ bots: [MobileBotSummary]) -> [MobileBotSummary] {
+        var deduplicated: [MobileBotSummary] = []
+        var indexById: [String: Int] = [:]
+        for bot in bots {
+            if let existingIndex = indexById[bot.id] {
+                // Desktop current-main preserves the original palette slot while
+                // replacing a stale roster object with the newest canonical row.
+                deduplicated[existingIndex] = bot
+            } else {
+                indexById[bot.id] = deduplicated.count
+                deduplicated.append(bot)
+            }
+        }
+        return deduplicated
+    }
+
+    private static func matches(tab: MobileCommandPaletteTab, entry: MobileCommandPaletteEntry) -> Bool {
+        switch tab {
+        case .all: return true
+        case .messages:
+            if case .message = entry { return true }
+            return false
+        case .agents:
+            if case .bot(let bot) = entry { return !bot.isGroup }
+            if case .conversation(let conversation) = entry {
+                return conversation.kind == .direct || conversation.kind == .savedMessages || conversation.kind == .secret
+            }
+            return false
+        case .groups:
+            if case .bot(let bot) = entry { return bot.isGroup && !bot.isSharedRoom }
+            if case .conversation(let conversation) = entry {
+                return conversation.kind == .group || conversation.kind == .channel
+            }
+            return false
+        case .files:
+            if case .file = entry { return true }
+            return false
+        case .links:
+            if case .link = entry { return true }
+            return false
+        case .routines:
+            if case .routine = entry { return true }
+            return false
+        case .actions:
+            if case .action = entry { return true }
+            return false
+        }
+    }
+
+    private static func score(
+        entry: MobileCommandPaletteEntry,
+        tokens: [String],
+        normalizedQuery: String
+    ) -> Double? {
+        let label = normalizeSearch(entry.label)
+        let candidates = [label] + entryKeywords(entry).map(normalizeSearch)
+        var total = 0.0
+        for token in tokens {
+            var best: Double?
+            for candidate in candidates {
+                guard let value = fuzzyScore(value: candidate, query: token) else { continue }
+                if best == nil || value > best! { best = value }
+            }
+            guard let best else { return nil }
+            total += best
+        }
+        return total + (fuzzyScore(value: label, query: normalizedQuery) ?? 0)
+    }
+
+    private static func entryKeywords(_ entry: MobileCommandPaletteEntry) -> [String] {
+        switch entry {
+        case .bot(let bot):
+            return [bot.description, "bot", "agent"]
+        case .conversation(let conversation):
+            return [conversation.description, conversation.preview, conversation.kind.rawValue]
+        case .message(let message):
+            // Desktop message search receives focused backend snippets. The iOS
+            // adapter projects the canonical local transcript directly, so add
+            // lexical candidates to prevent an earlier URL character from
+            // consuming the bounded fuzzy match for a later exact word.
+            return [message.conversationTitle, message.snippet] + searchTokens(message.snippet)
+        case .file(let file):
+            return [file.conversationTitle, file.kind, (file.fileName as NSString).pathExtension]
+        case .link(let link):
+            return [link.conversationTitle, link.url, link.metadataTitle ?? "", link.metadataDescription ?? ""]
+        case .routine(let routine):
+            return [routine.agentId, routine.triggerDescription, "routine", "automation"]
+        case .action(let action):
+            return action.keywords
+        }
+    }
+
+    private static func fileKind(message: ChatMessage) -> String {
+        switch message.contentType {
+        case "photo": return "image"
+        case "video": return "video"
+        case "audio": return "audio"
+        case "voice": return "audio"
+        case "document":
+            let ext = ((message.mediaFileName ?? "") as NSString).pathExtension.lowercased()
+            if ext == "pdf" { return "pdf" }
+            if ["md", "markdown"].contains(ext) { return "markdown" }
+            if ["csv", "tsv", "xls", "xlsx"].contains(ext) { return "table" }
+            if ext == "json" { return "json" }
+            if ["txt", "log"].contains(ext) { return "text" }
+            if ["zip", "tar", "gz", "7z", "rar"].contains(ext) { return "archive" }
+            return "document"
+        default:
+            if message.mediaMimeType?.hasPrefix("image/") == true { return "image" }
+            if message.mediaMimeType?.hasPrefix("video/") == true { return "video" }
+            if message.mediaMimeType?.hasPrefix("audio/") == true { return "audio" }
+            return "file"
+        }
+    }
+
+    private static func extractHTTPLinks(_ text: String) -> [String] {
+        guard let expression = try? NSRegularExpression(pattern: #"https?://[^\s<>"']+"#, options: [.caseInsensitive]) else {
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        let trailing = CharacterSet(charactersIn: ".,;:!?)]}>'\"")
+        return expression.matches(in: text, range: range).compactMap { match in
+            guard let swiftRange = Range(match.range, in: text) else { return nil }
+            let raw = String(text[swiftRange]).trimmingCharacters(in: trailing)
+            guard let url = URL(string: raw),
+                  let scheme = url.scheme?.lowercased(),
+                  (scheme == "http" || scheme == "https"),
+                  url.host?.isEmpty == false
+            else { return nil }
+            return url.absoluteString
+        }
+    }
+}

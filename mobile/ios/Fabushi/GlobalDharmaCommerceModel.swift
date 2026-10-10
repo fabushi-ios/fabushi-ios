@@ -62,7 +62,7 @@ final class GlobalDharmaCommerceModel {
 
     var canBuyLifetime: Bool {
         guard let lifetimeOffer else { return false }
-        return !accessAllowed && lifetimeOffer.matchesCanonicalLifetime && (canonicalLedgerTestMode || lifetimeOffer.appleStoreAvailable) && !busy
+        return !accessAllowed && lifetimeOffer.matchesCanonicalLifetime && lifetimeOffer.appleStoreAvailable && !busy
     }
 
     var lifetimePriceLabel: String {
@@ -70,24 +70,21 @@ final class GlobalDharmaCommerceModel {
         return "¥\(lifetimeOffer.amount / 100)"
     }
 
-    private let host: MahayanaHost
+    private let bridge: IOSPreloadBridge
     private let platformBaseURL: URL
     private let paymentBaseURL: URL
     private let session: URLSession
-    private let canonicalLedgerTestMode: Bool
 
     init(
-        host: MahayanaHost,
-        platformBaseURL: URL = URL(string: "https://api.ombhrum.com")!,
+        bridge: IOSPreloadBridge,
+        platformBaseURL: URL? = nil,
         paymentBaseURL: URL = URL(string: "https://pay.ombhrum.com")!,
-        session: URLSession = .shared,
-        canonicalLedgerTestMode: Bool? = nil
+        session: URLSession = .shared
     ) {
-        self.host = host
-        self.platformBaseURL = platformBaseURL
+        self.bridge = bridge
+        self.platformBaseURL = platformBaseURL ?? Self.resolvePlatformBaseURL()
         self.paymentBaseURL = paymentBaseURL
         self.session = session
-        self.canonicalLedgerTestMode = canonicalLedgerTestMode ?? Self.detectCanonicalLedgerTestMode()
     }
 
     func refresh() async {
@@ -96,13 +93,9 @@ final class GlobalDharmaCommerceModel {
             if accessAllowed {
                 message = "本地转经轮已买断 · 权限有效"
             } else if let lifetimeOffer, lifetimeOffer.matchesCanonicalLifetime {
-                if canonicalLedgerTestMode {
-                    message = "\(lifetimePriceLabel) 测试买断 · canonical ledger（不真实扣款）"
-                } else {
-                    message = lifetimeOffer.appleStoreAvailable
-                        ? "本地转经轮买断 \(lifetimePriceLabel)"
-                        : "\(lifetimePriceLabel) 买断 · App Store 商品尚未激活"
-                }
+                message = lifetimeOffer.appleStoreAvailable
+                    ? "本地转经轮买断 \(lifetimePriceLabel)"
+                    : "\(lifetimePriceLabel) 买断 · App Store 商品尚未激活"
             } else {
                 message = "本地转经轮权限未开通"
             }
@@ -126,10 +119,6 @@ final class GlobalDharmaCommerceModel {
             }
             guard let offer = lifetimeOffer else { throw GlobalDharmaCommerceError.lifetimeOfferMissing }
             guard offer.matchesCanonicalLifetime else { throw GlobalDharmaCommerceError.lifetimeOfferMismatch }
-            if canonicalLedgerTestMode {
-                try await purchaseLifetimeThroughCanonicalLedger()
-                return
-            }
             guard offer.appleStoreAvailable else { throw GlobalDharmaCommerceError.appleStoreNotConfigured }
 
             message = "正在创建 Fabushi Pay 订单…"
@@ -189,8 +178,8 @@ final class GlobalDharmaCommerceModel {
             let storeKit = FabushiPayStoreKit(
                 serviceBaseURL: paymentBaseURL,
                 session: session,
-                accessTokenProvider: { @MainActor [host] in
-                    try await Self.currentAccessToken(from: host)
+                accessTokenProvider: { @MainActor [bridge] in
+                    try await Self.currentAccessToken(from: bridge)
                 }
             )
             let receipt = try await storeKit.purchaseAdvancedCommerce(
@@ -220,10 +209,6 @@ final class GlobalDharmaCommerceModel {
         defer { busy = false }
         do {
             try applyEntitlement(try await fetchEntitlement())
-            if canonicalLedgerTestMode {
-                try await restoreLifetimeThroughCanonicalLedger()
-                return
-            }
             if accessAllowed {
                 message = "永久权限已在当前 Fabushi 账号生效"
                 return
@@ -233,8 +218,8 @@ final class GlobalDharmaCommerceModel {
             let storeKit = FabushiPayStoreKit(
                 serviceBaseURL: paymentBaseURL,
                 session: session,
-                accessTokenProvider: { @MainActor [host] in
-                    try await Self.currentAccessToken(from: host)
+                accessTokenProvider: { @MainActor [bridge] in
+                    try await Self.currentAccessToken(from: bridge)
                 }
             )
             let receipt = try await storeKit.restore(expectedSku: Self.lifetimeSku)
@@ -245,53 +230,6 @@ final class GlobalDharmaCommerceModel {
         } catch {
             message = "恢复未完成：\(error.localizedDescription)"
         }
-    }
-
-    func fetchCanonicalSharedRuntime() async throws -> [String: Any] {
-        let runtime = try await requestJSON(
-            baseURL: platformBaseURL,
-            path: "/v1/miniapps/\(Self.miniAppId)/runtime",
-            method: "GET"
-        )
-        guard runtime["protocol"] as? String == "fabushi.miniapp.runtime.v1",
-              runtime["miniAppId"] as? String == Self.miniAppId,
-              let revision = (runtime["revision"] as? NSNumber)?.int64Value,
-              revision >= 0,
-              runtime["state"] is [String: Any]
-        else { throw GlobalDharmaCommerceError.invalidResponse }
-        return runtime
-    }
-
-    private func purchaseLifetimeThroughCanonicalLedger() async throws {
-        message = "CI 测试模式：通过 canonical ledger 购买 ¥1080 买断权益（不真实扣款）…"
-        let purchase = try await requestJSON(
-            baseURL: platformBaseURL,
-            path: "/v1/plugins/\(Self.miniAppId)/commerce/purchase",
-            method: "POST",
-            body: [
-                "sku": Self.lifetimeSku,
-                "idempotencyKey": "ios-ci-global-dharma-lifetime-\(UUID().uuidString.lowercased())",
-            ]
-        )
-        if let paymentId = purchase["paymentId"] as? String, UUID(uuidString: paymentId) != nil {
-            lastPaymentId = paymentId
-        }
-        try applyEntitlement(try await fetchEntitlement())
-        guard accessAllowed else { throw GlobalDharmaCommerceError.entitlementNotGranted }
-        message = "测试购买完成 · canonical server entitlement 已生效 · 未发生真实扣款"
-    }
-
-    private func restoreLifetimeThroughCanonicalLedger() async throws {
-        message = "CI 测试模式：从 canonical purchase ledger 恢复权益（不访问 StoreKit）…"
-        _ = try await requestJSON(
-            baseURL: platformBaseURL,
-            path: "/v1/purchases/restore",
-            method: "POST",
-            body: [:]
-        )
-        try applyEntitlement(try await fetchEntitlement())
-        guard accessAllowed else { throw GlobalDharmaCommerceError.entitlementNotGranted }
-        message = "测试恢复完成 · canonical server entitlement 已确认"
     }
 
     private func fetchEntitlement() async throws -> [String: Any] {
@@ -315,17 +253,20 @@ final class GlobalDharmaCommerceModel {
         }
     }
 
-    nonisolated static func detectCanonicalLedgerTestMode(
+
+    nonisolated static func resolvePlatformBaseURL(
         environment: [String: String] = ProcessInfo.processInfo.environment
-    ) -> Bool {
-        guard environment["GITHUB_ACTIONS"] == "true",
-              environment["GITHUB_REPOSITORY"] == "bhrumom/fabushi",
-              let sessionFile = environment["FABUSHI_CI_ACCOUNT_SESSION_FILE"],
-              !sessionFile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let sha = environment["GITHUB_SHA"],
-              sha.count == 40
-        else { return false }
-        return true
+    ) -> URL {
+        for key in ["FABUSHI_API_BASE_URL", "MAHAYANA_API_BASE_URL"] {
+            guard let raw = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty,
+                  let url = URL(string: raw),
+                  url.scheme?.lowercased() == "https",
+                  url.host?.isEmpty == false
+            else { continue }
+            return url
+        }
+        return URL(string: "https://api.ombhrum.com")!
     }
 
     nonisolated static func parseLifetimeOffer(_ object: [String: Any]) -> GlobalDharmaLifetimeOffer? {
@@ -354,7 +295,7 @@ final class GlobalDharmaCommerceModel {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
             throw GlobalDharmaCommerceError.invalidResponse
         }
-        let token = try await Self.currentAccessToken(from: host)
+        let token = try await Self.currentAccessToken(from: bridge)
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -376,8 +317,8 @@ final class GlobalDharmaCommerceModel {
         return object
     }
 
-    private static func currentAccessToken(from host: MahayanaHost) async throws -> String {
-        let result = try await host.request(method: "feature.auth.deviceAgentSession")
+    private static func currentAccessToken(from bridge: IOSPreloadBridge) async throws -> String {
+        let result = try await bridge.request(method: "feature.auth.deviceAgentSession")
         guard let object = result.value as? [String: Any],
               let token = object["accessToken"] as? String,
               token.count >= 24,

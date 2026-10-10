@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "group": "source-local-exec-daemon",
+  "rowCount": 3,
+  "rows": [
+    {
+      "desktop_path": "source/local-exec-daemon/invariant-violation-log.ts",
+      "desktop_blob_sha": "be19a2eefaba7bd0b736fc4ec25f0bc00ff45996",
+      "desktop_responsibility": "Emit a stable structured invariant-violation event for local-exec daemon invariant failures.",
+      "desktop_owner": "local-runner",
+      "desktop_visible_effect": "Invariant failures produce machine-readable local-exec diagnostics without inventing a second runtime behavior.",
+      "ios_disposition": "direct-port",
+      "ios_target_path": "source/local-exec-daemon/invariant-violation-log.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Swift JSONSerialization replaces Node JSON.stringify/stdout injection while preserving event/name JSONL semantics.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/local-exec-daemon/invariant-violation-log.swift defines sand.local_exec_daemon.invariant_violation and deterministic JSONL construction/write.",
+      "test_evidence": "Current exact-HEAD Swift build/tests required; no status promotion to verified until same-head evidence.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: exact Desktop blob be19a2eefaba7bd0b736fc4ec25f0bc00ff45996 reviewed; existing native port is semantically aligned."
+    },
+    {
+      "desktop_path": "source/local-exec-daemon/main.ts",
+      "desktop_blob_sha": "6ed3c317002ffcc0c6d745cb4751491ed81e82e0",
+      "desktop_responsibility": "Own Desktop standalone daemon entry identity, lifetime, signal-driven bounded shutdown, crash/invariant reporting and production-executor composition.",
+      "desktop_owner": "local-runner",
+      "desktop_visible_effect": "The Desktop daemon cannot start without a generation-bound entry identity; it shuts down predictably, clears lifecycle state and reports fatal/invariant failures.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/local-exec-daemon/production-executor.swift; source/shared/local-exec-process-identity.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS does not spawn a standalone Node daemon. Coordinator actor lifetime replaces process lifetime, process identity remains a shared contract for remote/local-runner evidence, and execution uses the native/RemoteRunner split.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "IOSLocalExecSupervisor is actor-owned; IOSProductionLocalExecutor is the shipping route owner; source/shared/local-exec-process-identity.swift retains generation identity semantics where process-backed runners are involved.",
+      "test_evidence": "CoordinatorAdapterTests local-exec supervisor routing plus SharedPermissionsAndNotificationsParityTests process identity and production routing tests; descendant exact-HEAD Actions required.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: standalone Node process lifecycle is platform-inapplicable with explicit actor/RemoteRunner replacement; no user capability is waived."
+    },
+    {
+      "desktop_path": "source/local-exec-daemon/production-executor.ts",
+      "desktop_blob_sha": "ab36e8824bd960750bcf6e0f7b386ed524609244",
+      "desktop_responsibility": "Bind the production generated Exec codec and controlled manager to shell-stream/background-shell/read/list resources with cancellation, path guards and file-size bounds.",
+      "desktop_owner": "local-runner",
+      "desktop_visible_effect": "The shipping Desktop daemon executes only the canonical generated protocol/resource graph; missing mandatory runtime bindings fail construction rather than falling back to a substitute.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/local-exec-daemon/production-executor.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "iOS replaces arbitrary on-device shell/file execution with an allowlisted native capability runner plus RemoteRunner for shell/process/box semantics. Unknown methods are rejected rather than treated as remote-capable.",
+      "implementation_status": "implemented",
+      "production_evidence": "29e8ec92009b00cf59a80a1e194a7bd90fa7cbf1 adds a strict requiresRemoteRunner gate in IOSProductionLocalExecutor, preserving the local/remote boundary and preventing arbitrary method escalation.",
+      "test_evidence": "0f572d6d17bc3858ce200ab9db4a2bddabcde04a adds testProductionLocalExecRejectsUnknownMethodsBeforeRemoteDispatch and proves shell.exec remains the one expected remote route; descendant exact-HEAD Actions required.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: exact Desktop production executor reviewed against iOS platform replacement; real routing defect fixed, status implemented pending CI."
+    }
+  ]
+}

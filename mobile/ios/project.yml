@@ -3,6 +3,13 @@ options:
   bundleIdPrefix: com.ombhrum
   deploymentTarget:
     iOS: '17.0'
+packages:
+  LiveKitWebRTC:
+    url: https://github.com/livekit/webrtc-xcframework.git
+    exactVersion: 150.7871.02
+  SwiftMath:
+    url: https://github.com/mgriebling/SwiftMath.git
+    exactVersion: 1.7.3
 settings:
   base:
     SWIFT_VERSION: '6.0'
@@ -11,18 +18,57 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CLANG_ENABLE_MODULES: YES
     HEADER_SEARCH_PATHS:
-      - $(SRCROOT)/../native/include
+      - $(SRCROOT)/../../source/host/include
     LIBRARY_SEARCH_PATHS:
-      - $(SRCROOT)/Frameworks
+      - $(SRCROOT)/../../build/rust/$(PLATFORM_NAME)
     OTHER_LDFLAGS:
       - $(inherited)
       - -lmahayana_app_host
+    MARKETING_VERSION: 1.2.65
+    CURRENT_PROJECT_VERSION: 34
 targets:
   Fabushi:
     type: application
     platform: iOS
+    dependencies:
+      - package: LiveKitWebRTC
+        product: LiveKitWebRTC
+      - package: SwiftMath
+        product: SwiftMath
+      - target: FabushiBroadcastUpload
+        embed: true
     sources:
       - path: Fabushi
+        excludes:
+          - MahayanaHost.swift
+      - path: ../../frontend
+      - path: ../../source/internal
+      - path: ../../source/mime-types.types.swift
+      - path: ../../source/shared
+      - path: ../../source/ios-dev-controls
+      - path: ../../source/host/MahayanaHostRuntime.swift
+      - path: ../../source/mahayana-agent-coordinator
+      - path: ../../source/ios-main
+      - path: ../../source/ios-preload
+      - path: ../../source/local-exec-daemon
+      - path: ../../source/box-exec-daemon
+      - path: ../../source/packages/agent-client/agent-client-errors.swift
+      - path: ../../source/packages/context/core.swift
+      - path: ../../source/packages/context/abort-reason.swift
+      - path: ../../source/packages/context/logger.swift
+      - path: ../../source/packages/context/otel.swift
+      - path: ../../source/packages/metrics/index.swift
+      - path: ../../source/packages/prompt-jsx/prompt-runtime.swift
+      - path: ../../source/packages/shell-exec/event-loop-pressure.swift
+      - path: ../../source/packages/shell-exec/types.swift
+      - path: ../../source/packages/shell-exec/output-suppression.swift
+      - path: ../../source/packages/shell-exec/env-filter.swift
+      - path: ../../source/packages/shell-exec/sandbox/network-policy-utils.swift
+    preBuildScripts:
+      - name: Build iOS-owned Mahayana runtime
+        script: |
+          "$SRCROOT/../../scripts/build-mahayana-ios.sh" "$PLATFORM_NAME" "${CURRENT_ARCH:-arm64}"
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ombhrum.fabushi
@@ -30,10 +76,14 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.lifestyle
         SWIFT_OBJC_BRIDGING_HEADER: $(SRCROOT)/Fabushi/Fabushi-Bridging-Header.h
         GENERATE_INFOPLIST_FILE: YES
-        MARKETING_VERSION: 1.2.65
-        CURRENT_PROJECT_VERSION: 34
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: '1,2'
+        CODE_SIGN_ENTITLEMENTS: Fabushi/Fabushi.entitlements
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
     info:
       path: Fabushi/Info.plist
       properties:
@@ -43,8 +93,14 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
         NSLocationWhenInUseUsageDescription: 用于在聊天中按你的选择分享当前位置。
-        NSMicrophoneUsageDescription: 用于在聊天中按你的操作录制并发送语音消息。
+        NSMicrophoneUsageDescription: 用于在聊天中按你的操作录制语音消息或语音输入。
+        NSCameraUsageDescription: 用于你主动发起或接听视频通话时采集相机画面。
+        NSSpeechRecognitionUsageDescription: 用于在设备本地把你的语音输入转成可编辑文字，不使用网络转写回退。
         CFBundleIconName: AppIcon
+        UIBackgroundModes:
+          - audio
+          - voip
+          - remote-notification
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
@@ -61,6 +117,25 @@ targets:
         - FabushiTests
         - FabushiUITests
       gatherCoverageData: true
+  FabushiBroadcastUpload:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: FabushiBroadcastUpload
+      - path: Fabushi/HumanCallBroadcastIPC.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ombhrum.fabushi.broadcast
+        CODE_SIGN_ENTITLEMENTS: FabushiBroadcastUpload/FabushiBroadcastUpload.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+    info:
+      path: FabushiBroadcastUpload/Info.plist
+      properties:
+        CFBundleDisplayName: Fabushi 屏幕共享
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
   FabushiTests:
     type: bundle.unit-test
     platform: iOS

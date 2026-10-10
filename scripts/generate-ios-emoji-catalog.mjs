@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const PACKAGE = "emojibase-data@17.0.0";
+const DESKTOP_ASSETS = {
+  compact: { file: "compact-C8-lyxgK.js", bytes: 571490, sha256: "a163448dab9eeeb2eba2e743625ae925eac5d2d70f919c3396897c5f042ba39c" },
+  messages: { file: "messages-ByIkiGdI.js", bytes: 5892, sha256: "982d1fb9ed0b0f95155c30c327738f055e2c1a512cef219f7c20d49b978f2628" },
+  iamcal: { file: "iamcal-CEyh6ide.js", bytes: 47901, sha256: "69f6164afb9487768f9e9da137005c546a472059d24b7244ed1b90320fcee9f1" },
+  emojibase: { file: "emojibase-Bc-csq5x.js", bytes: 170339, sha256: "0a5a09ad69567774c7988c1e85a77f5a406d66ffff0b0bdbcb55e14e2a144ba2" },
+};
+const SOURCES = {
+  compact: "en/compact.json",
+  messages: "en/messages.json",
+  iamcal: "en/shortcodes/iamcal.json",
+  emojibase: "en/shortcodes/emojibase.json",
+};
+const CATEGORY = {
+  "smileys-emotion": "people",
+  "people-body": "people",
+  "animals-nature": "nature",
+  "food-drink": "food",
+  "travel-places": "travel",
+  activities: "activities",
+  objects: "objects",
+  symbols: "symbols",
+  flags: "flags",
+};
+
+const outputArg = process.argv.indexOf("--output");
+const provenanceArg = process.argv.indexOf("--provenance");
+if (outputArg < 0 || provenanceArg < 0 || !process.argv[outputArg + 1] || !process.argv[provenanceArg + 1]) {
+  throw new Error("usage: generate-ios-emoji-catalog.mjs --output <swift> --provenance <json>");
+}
+const output = resolve(process.argv[outputArg + 1]);
+const provenanceOutput = resolve(process.argv[provenanceArg + 1]);
+const work = mkdtempSync(join(tmpdir(), "fabushi-emoji-"));
+
+function sha256(buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+function asArray(value) {
+  return value == null ? [] : typeof value === "string" ? [value] : value;
+}
+function unique(values) {
+  return [...new Set(values)];
+}
+function labelFor(value) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+function normalizeNative(value) {
+  return value.replace(/(\p{Emoji_Presentation})\uFE0F/gu, "$1");
+}
+function swiftString(value) {
+  return '"' + String(value)
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("\n", "\\n")
+    .replaceAll("\r", "\\r")
+    .replaceAll("\t", "\\t") + '"';
+}
+function swiftArray(values) {
+  return "[" + values.map(swiftString).join(", ") + "]";
+}
+function fileFact(path) {
+  const bytes = readFileSync(path);
+  return { bytes: bytes.length, sha256: sha256(bytes) };
+}
+
+try {
+  const tarballName = execFileSync("npm", ["pack", PACKAGE, "--silent"], {
+    cwd: work,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+  }).trim().split(/\r?\n/).at(-1);
+  if (!tarballName) throw new Error("npm pack did not return a tarball");
+  execFileSync("tar", ["-xzf", tarballName], { cwd: work, stdio: "inherit" });
+
+  const root = join(work, "package");
+  const raw = {};
+  const parsed = {};
+  const sourceFacts = {};
+  for (const [key, relative] of Object.entries(SOURCES)) {
+    const path = join(root, relative);
+    raw[key] = readFileSync(path, "utf8");
+    parsed[key] = JSON.parse(raw[key]);
+    sourceFacts[key] = { path: relative, ...fileFact(path) };
+  }
+
+  const groupsByOrder = new Map(parsed.messages.groups.map((group) => [group.order, group]));
+  const projected = [];
+  let baseCount = 0;
+  let skinCount = 0;
+  const groupCounts = {};
+
+  function project(rawEmoji, groupKey, isSkinVariant, baseHexcode) {
+    const shortcodes = unique([
+      ...asArray(parsed.iamcal[rawEmoji.hexcode]),
+      ...asArray(parsed.emojibase[rawEmoji.hexcode]),
+    ]);
+    const id = shortcodes[0] ?? rawEmoji.hexcode;
+    const name = labelFor(rawEmoji.label);
+    const native = normalizeNative(rawEmoji.unicode);
+    const search = [
+      rawEmoji.label,
+      id,
+      ...shortcodes,
+      ...(rawEmoji.tags ?? []),
+      ...asArray(rawEmoji.emoticon),
+    ].join(" ").toLowerCase();
+    const category = CATEGORY[groupKey];
+    if (!category) return;
+    projected.push({
+      id,
+      name,
+      native,
+      category,
+      shortcodes,
+      search,
+      hexcode: rawEmoji.hexcode,
+      baseHexcode,
+      isSkinVariant,
+    });
+    groupCounts[groupKey] = (groupCounts[groupKey] ?? 0) + 1;
+  }
+
+  for (const rawEmoji of parsed.compact) {
+    if (rawEmoji.group == null) continue;
+    const group = groupsByOrder.get(rawEmoji.group);
+    if (!group || group.key === "component" || !CATEGORY[group.key]) continue;
+    baseCount += 1;
+    project(rawEmoji, group.key, false, null);
+    for (const skin of rawEmoji.skins ?? []) {
+      skinCount += 1;
+      project(skin, group.key, true, rawEmoji.hexcode);
+    }
+  }
+
+  const lines = [];
+  lines.push("// Generated by scripts/generate-ios-emoji-catalog.mjs. DO NOT EDIT.");
+  lines.push("// Source: emojibase-data@17.0.0 (MIT), English compact/messages/iamcal/emojibase datasets.");
+  lines.push("// Desktop authority: frontend/src/recovered/features/conversation/cards/transcript-card/emoji-catalog.ts");
+  lines.push("");
+  lines.push('internal let mobileDesktopEmojiCatalogSourcePackage = "emojibase-data@17.0.0"');
+  lines.push("internal let mobileDesktopEmojiCatalog: [MobileReactionCatalogItem] = [");
+  for (const item of projected) {
+    lines.push("    .init(");
+    lines.push("        id: " + swiftString(item.id) + ",");
+    lines.push("        emoji: " + swiftString(item.native) + ",");
+    lines.push("        name: " + swiftString(item.name) + ",");
+    lines.push("        category: ." + item.category + ",");
+    lines.push("        shortcodes: " + swiftArray(item.shortcodes) + ",");
+    lines.push("        search: " + swiftString(item.search) + ",");
+    lines.push("        hexcode: " + swiftString(item.hexcode) + ",");
+    lines.push("        baseHexcode: " + (item.baseHexcode == null ? "nil" : swiftString(item.baseHexcode)) + ",");
+    lines.push("        isSkinVariant: " + String(item.isSkinVariant));
+    lines.push("    ),");
+  }
+  lines.push("]");
+  lines.push("");
+  writeFileSync(output, lines.join("\n"), "utf8");
+
+  const provenance = {
+    generator: "scripts/generate-ios-emoji-catalog.mjs",
+    package: PACKAGE,
+    sourceFiles: sourceFacts,
+    desktopRuntimeAssets: DESKTOP_ASSETS,
+    counts: {
+      compactRecords: parsed.compact.length,
+      baseEntries: baseCount,
+      skinVariants: skinCount,
+      projectedEntries: projected.length,
+      groups: groupCounts,
+    },
+    metadata: {
+      groups: parsed.messages.groups,
+      skinTones: parsed.messages.skinTones,
+      subgroups: parsed.messages.subgroups,
+    },
+    generated: fileFact(output),
+  };
+  writeFileSync(provenanceOutput, JSON.stringify(provenance, null, 2) + "\n", "utf8");
+  process.stdout.write(JSON.stringify(provenance, null, 2) + "\n");
+} finally {
+  rmSync(work, { recursive: true, force: true });
+}

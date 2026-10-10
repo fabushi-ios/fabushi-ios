@@ -4,15 +4,12 @@ import WebKit
 
 struct GlobalDharmaMiniAppView: View {
     let model: MarketplaceModel
-    let host: MahayanaHost
-
     @Environment(\.dismiss) private var dismiss
-    @State private var bridge: GlobalDharmaMiniAppBridge
+    @State private var miniAppBridge: GlobalDharmaMiniAppBridge
 
-    init(model: MarketplaceModel, host: MahayanaHost) {
+    init(model: MarketplaceModel, bridge: IOSPreloadBridge) {
         self.model = model
-        self.host = host
-        _bridge = State(initialValue: GlobalDharmaMiniAppBridge(host: host))
+        _miniAppBridge = State(initialValue: GlobalDharmaMiniAppBridge(bridge: bridge))
     }
 
     var body: some View {
@@ -32,7 +29,7 @@ struct GlobalDharmaMiniAppView: View {
             .background(.ultraThinMaterial)
 
             GlobalDharmaWebView(
-                bridge: bridge,
+                bridge: miniAppBridge,
                 accountName: model.accountName,
                 accountEmail: model.accountEmail,
                 loggedIn: model.loggedIn
@@ -134,7 +131,7 @@ private struct GlobalDharmaWebView: UIViewRepresentable {
                     switch action {
                     case "tool":
                         guard let name = body["name"] as? String else {
-                            throw MahayanaHost.HostError.requestFailed("Missing WebMCP tool name")
+                            throw MahayanaCoordinator.CoordinatorError.requestFailed("Missing WebMCP tool name")
                         }
                         let input = body["input"] as? [String: Any] ?? [:]
                         if Self.requiresApproval(name), !(await requestApproval(name: name)) {
@@ -161,7 +158,7 @@ private struct GlobalDharmaWebView: UIViewRepresentable {
                         ])
                     case "purchaseLifetime":
                         guard bridge.testCommerceEnabled else {
-                            throw MahayanaHost.HostError.requestFailed("生产支付 rail 必须走 provider checkout；当前不会绕过真实支付 provider")
+                            throw MahayanaCoordinator.CoordinatorError.requestFailed("生产支付 rail 必须走 provider checkout；当前不会绕过真实支付 provider")
                         }
                         let key = pendingPurchaseKey ?? "ios-global-dharma-lifetime-\(UUID().uuidString.lowercased())"
                         pendingPurchaseKey = key
@@ -182,7 +179,7 @@ private struct GlobalDharmaWebView: UIViewRepresentable {
                             "result": ["allowed": state.allowed, "reason": state.reason, "message": state.allowed ? "权益恢复完成" : "恢复完成，但没有有效的本地转经轮权益"],
                         ])
                     default:
-                        throw MahayanaHost.HostError.requestFailed("Unsupported Global Dharma host action")
+                        throw MahayanaCoordinator.CoordinatorError.requestFailed("Unsupported Global Dharma host action")
                     }
                 } catch {
                     resolve(webView: webView, requestId: requestId, payload: ["ok": false, "error": error.localizedDescription])

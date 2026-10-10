@@ -1,0 +1,3 @@
+import Foundation
+
+let DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES = 1_000

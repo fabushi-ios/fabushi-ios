@@ -1,0 +1,824 @@
+import XCTest
+@testable import Fabushi
+
+final class GrokMobileBotServiceTests: XCTestCase {
+    func testHumanHandoffPromptKeepsOnlyTheMostRecentTwentyTranscriptLines() throws {
+        let lines = (1...23).map { "Human \($0): message \($0)" }
+        let prompt = try XCTUnwrap(
+            GrokMobileBotService.humanHandoffPrompt(
+                conversationTitle: "Family",
+                transcriptLines: lines
+            )
+        )
+        XCTAssertFalse(prompt.contains("Human 1: message 1"))
+        XCTAssertFalse(prompt.contains("Human 3: message 3"))
+        XCTAssertTrue(prompt.contains("Human 4: message 4"))
+        XCTAssertTrue(prompt.contains("Human 23: message 23"))
+        XCTAssertTrue(prompt.contains("Human conversation: Family"))
+        XCTAssertTrue(prompt.contains("Preserve the Human/Agent distinction"))
+    }
+
+    func testHumanHandoffCommandUsesTypedHostContractAndFailsClosed() throws {
+        let command = try XCTUnwrap(
+            GrokMobileBotService.humanHandoffCommand(
+                requestId: "handoff-1",
+                agentId: "agent-1",
+                humanConversationId: "direct:human-1",
+                prompt: "Continue this Human conversation."
+            )
+        )
+        XCTAssertEqual(command["type"] as? String, "chat.handoffHuman")
+        XCTAssertEqual(command["requestId"] as? String, "handoff-1")
+        XCTAssertEqual(command["agentId"] as? String, "agent-1")
+        XCTAssertEqual(command["humanConversationId"] as? String, "direct:human-1")
+        XCTAssertEqual(command["text"] as? String, "Continue this Human conversation.")
+        XCTAssertNil(
+            GrokMobileBotService.humanHandoffCommand(
+                requestId: "handoff-2",
+                agentId: "",
+                humanConversationId: "direct:human-1",
+                prompt: "context"
+            )
+        )
+        XCTAssertNil(
+            GrokMobileBotService.humanHandoffPrompt(
+                conversationTitle: "Empty",
+                transcriptLines: ["   "]
+            )
+        )
+    }
+
+    @MainActor
+    func testMergePrefersInstalledMiniAppProjectionForSameBot() {
+        let surface = [
+            MobileBotSummary(
+                id: "global-dharma-bot",
+                name: "Surface",
+                description: "surface",
+                miniAppId: nil,
+                menuButtonText: nil
+            ),
+            MobileBotSummary(
+                id: "plain-bot",
+                name: "Plain",
+                description: "plain"
+            ),
+        ]
+        let installed = [
+            MobileBotSummary(
+                id: "global-dharma-bot",
+                name: "全球法布施",
+                description: "installed",
+                miniAppId: GlobalDharmaMiniAppBridge.globalDharmaId,
+                menuButtonText: "打开应用"
+            ),
+        ]
+
+        let merged = GrokMobileBotService.mergeBots(installed, surface)
+
+        XCTAssertEqual(merged.first?.id, "global-dharma-bot")
+        XCTAssertEqual(merged.first?.name, "全球法布施")
+        XCTAssertEqual(merged.first?.miniAppId, GlobalDharmaMiniAppBridge.globalDharmaId)
+        XCTAssertEqual(merged.count, 2)
+    }
+
+    @MainActor
+    func testParseBotAppliesGlobalDharmaMiniAppFallback() throws {
+        let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "global-dharma-bot",
+            "displayName": "全球法布施",
+            "description": "Dharma",
+        ]))
+
+        XCTAssertEqual(bot.name, "全球法布施")
+        XCTAssertEqual(bot.miniAppId, GlobalDharmaMiniAppBridge.globalDharmaId)
+        XCTAssertEqual(bot.menuButtonText, "打开应用")
+    }
+
+    @MainActor
+    func testLegacyGrokRosterNamesProjectAsFabushiWithoutChangingOtherNames() throws {
+        let grok = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "legacy-grok",
+            "name": "  Grok Bot  ",
+        ]))
+        XCTAssertEqual(grok.name, "Fabushi")
+
+        let group = try XCTUnwrap(GrokMobileBotService.parseGroup([
+            "id": "legacy-group",
+            "name": "GROK",
+            "memberIds": ["agent-1"],
+        ]))
+        XCTAssertEqual(group.name, "Fabushi")
+
+        let custom = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "custom",
+            "name": "Grok Research",
+        ]))
+        XCTAssertEqual(custom.name, "Grok Research")
+    }
+
+    @MainActor
+    func testRosterProjectionPreservesDesktopHiddenSidebarAliases() throws {
+        let canonical = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "hidden-canonical",
+            "name": "Canonical",
+            "isHiddenFromSidebar": true,
+        ]))
+        XCTAssertTrue(canonical.hidden)
+
+        let legacy = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "hidden-legacy",
+            "name": "Legacy",
+            "hiddenFromSidebar": true,
+        ]))
+        XCTAssertTrue(legacy.hidden)
+
+        let group = try XCTUnwrap(GrokMobileBotService.parseGroup([
+            "id": "hidden-group",
+            "name": "Hidden group",
+            "memberIds": ["agent-1"],
+            "isHiddenFromSidebar": true,
+        ]))
+        XCTAssertTrue(group.hidden)
+
+        let visible = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "visible",
+            "name": "Visible",
+        ]))
+        XCTAssertFalse(visible.hidden)
+    }
+
+    @MainActor
+    func testParseBotProjectsCanonicalAgentRowState() throws {
+        let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-1",
+            "name": "Research",
+            "description": "Verify",
+            "hidden": true,
+            "unread": false,
+            "hasUnread": true,
+            "conversationId": "conversation:agent-1",
+            "lastEntry": ["kind": "text", "text": "Latest answer"],
+            "lastMessageId": "message-9",
+            "lastMessagePreview": "stale preview",
+            "updatedAt": 1_797_777_123_456 as Int64,
+            "isComposingMessage": true,
+            "isRunning": true,
+            "draftPrompt": "continue",
+            "awaitingUserResponse": ["reason": "Needs approval"],
+        ]))
+        XCTAssertTrue(bot.hidden)
+        XCTAssertTrue(bot.unread)
+        XCTAssertEqual(bot.conversationId, "conversation:agent-1")
+        XCTAssertEqual(bot.lastEntry, .text("Latest answer"))
+        XCTAssertEqual(bot.lastMessageId, "message-9")
+        XCTAssertEqual(bot.lastMessagePreview, "Latest answer")
+        XCTAssertEqual(bot.updatedAtMs, 1_797_777_123_456)
+        XCTAssertTrue(bot.isComposingMessage)
+        XCTAssertTrue(bot.isRunning)
+        XCTAssertEqual(bot.draftPrompt, "continue")
+        XCTAssertEqual(bot.waitingReason, "Needs approval")
+        XCTAssertEqual(mobileBotHomeSubtitle(bot), "正在输入…")
+    }
+
+    @MainActor
+    func testAgentSummaryProjectionCoversAttachmentLinkAndFallbackSemantics() throws {
+        let attachment = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-files",
+            "name": "Files",
+            "lastEntry": [
+                "kind": "attachment",
+                "count": 2,
+                "kinds": ["image": 1, "pdf": 1],
+            ],
+        ]))
+        XCTAssertEqual(attachment.lastEntry, .attachment(count: 2, kinds: ["image": 1, "pdf": 1]))
+        XCTAssertEqual(attachment.lastMessagePreview, "Sent 2 files")
+
+        let link = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-link",
+            "name": "Links",
+            "lastEntry": ["kind": "link", "url": "https://example.invalid"],
+            "lastMessagePreview": "Canonical link preview",
+        ]))
+        XCTAssertEqual(link.lastEntry, .link("https://example.invalid"))
+        XCTAssertEqual(link.lastMessagePreview, "Canonical link preview")
+
+        let legacy = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-legacy",
+            "name": "Legacy",
+            "lastEntry": ["message": ["content": "Legacy host text"]],
+        ]))
+        XCTAssertEqual(legacy.lastEntry, .text("Legacy host text"))
+        XCTAssertEqual(legacy.lastMessagePreview, "Legacy host text")
+    }
+
+    func testAgentHomeSubtitleUsesDesktopActivityPrecedence() {
+        XCTAssertEqual(
+            mobileBotHomeSubtitle(MobileBotSummary(
+                id: "waiting",
+                name: "Waiting",
+                description: "Description",
+                lastMessagePreview: "Last message",
+                waitingReason: "Needs confirmation"
+            )),
+            "Needs confirmation"
+        )
+        XCTAssertEqual(
+            mobileBotHomeSubtitle(MobileBotSummary(
+                id: "preview",
+                name: "Preview",
+                description: "Description",
+                lastMessagePreview: "Last message",
+                isRunning: true
+            )),
+            "Last message"
+        )
+        XCTAssertEqual(
+            mobileBotHomeSubtitle(MobileBotSummary(
+                id: "running",
+                name: "Running",
+                description: "Description",
+                isRunning: true
+            )),
+            "正在运行…"
+        )
+    }
+
+    func testPinnedBotProjectionPreservesCanonicalHostOrderAndFailsClosed() {
+        XCTAssertEqual(
+            GrokMobileBotService.canonicalPinnedBotIds(from: ["bot-b", "bot-a", "bot-b"] as [Any]),
+            ["bot-b", "bot-a"]
+        )
+        XCTAssertNil(GrokMobileBotService.canonicalPinnedBotIds(from: ["bot-a", 42] as [Any]))
+        XCTAssertNil(GrokMobileBotService.canonicalPinnedBotIds(from: [""] as [Any]))
+    }
+
+    func testPinnedBotNativeReorderPreservesDesktopStoredOrderSemantics() {
+        let ids = ["bot-a", "bot-b", "bot-c"]
+        XCTAssertEqual(
+            GrokMobileBotService.movedPinnedBotIds(ids, movedId: "bot-b", offset: -1),
+            ["bot-b", "bot-a", "bot-c"]
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.movedPinnedBotIds(ids, movedId: "bot-b", offset: 1),
+            ["bot-a", "bot-c", "bot-b"]
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.movedPinnedBotIds(ids, movedId: "bot-a", offset: -1),
+            ids
+        )
+    }
+
+    @MainActor
+    func testAgentRowMutationsUseCanonicalHostCommands() {
+        let hidden = GrokMobileBotService.setHiddenCommand(
+            id: "agent-1",
+            hidden: true,
+            requestId: "hidden-1"
+        )
+        XCTAssertEqual(hidden["type"] as? String, "bot.setHidden")
+        XCTAssertEqual(hidden["id"] as? String, "agent-1")
+        XCTAssertEqual(hidden["hidden"] as? Bool, true)
+
+        let unread = GrokMobileBotService.setUnreadCommand(
+            id: "agent-1",
+            unread: true,
+            requestId: "unread-1"
+        )
+        XCTAssertEqual(unread["type"] as? String, "bot.update")
+        XCTAssertEqual(unread["id"] as? String, "agent-1")
+        XCTAssertEqual(unread["unread"] as? Bool, true)
+    }
+
+    @MainActor
+    func testAsyncTaskProjectionPreservesHostIdentity() throws {
+        let task = try XCTUnwrap(GrokMobileBotService.parseAsyncTask([
+            "id": "shell-1",
+            "kind": "shell",
+            "label": "Run validation",
+            "detail": "cargo test",
+            "resourceId": "process-1",
+        ]))
+        XCTAssertEqual(task.id, "shell-1")
+        XCTAssertEqual(task.kind, "shell")
+        XCTAssertEqual(task.label, "Run validation")
+        XCTAssertEqual(task.detail, "cargo test")
+        XCTAssertEqual(task.resourceId, "process-1")
+    }
+
+    func testNativeAgentSectionMoveEligibilityMatchesDesktopAgentRowActions() {
+        XCTAssertTrue(MobileAgentSidebarSections.canAssign(isPinned: false, isHidden: false))
+        XCTAssertFalse(MobileAgentSidebarSections.canAssign(isPinned: true, isHidden: false))
+        XCTAssertFalse(MobileAgentSidebarSections.canAssign(isPinned: false, isHidden: true))
+        XCTAssertFalse(MobileAgentSidebarSections.canAssign(isPinned: true, isHidden: true))
+    }
+
+    func testNativeAgentSectionsMoveMembershipWithoutDuplicateOwnership() throws {
+        let initial = [
+            MobileAgentSidebarSection(id: "one", name: "One", agentIds: ["agent-1", "agent-2"]),
+            MobileAgentSidebarSection(id: "two", name: "Two", agentIds: ["agent-3"]),
+        ]
+        let moved = MobileAgentSidebarSections.assigning(
+            agentId: "agent-1",
+            to: "two",
+            in: initial
+        )
+        XCTAssertEqual(moved[0].agentIds, ["agent-2"])
+        XCTAssertEqual(moved[1].agentIds, ["agent-3", "agent-1"])
+
+        let unassigned = MobileAgentSidebarSections.assigning(
+            agentId: "agent-1",
+            to: nil,
+            in: moved
+        )
+        XCTAssertFalse(unassigned.flatMap(\.agentIds).contains("agent-1"))
+    }
+
+    func testNativeAgentSectionsCanonicalHostProjectionRejectsMalformedRows() {
+        let rows: [[String: Any]] = [
+            ["id": "one", "name": "One", "agentIds": ["a", "b"], "isCollapsed": true],
+            ["id": "__agents__", "name": "Unassigned", "agentIds": []],
+            ["id": "two", "name": "Two", "agentIds": ["b", "c"]],
+        ]
+        let canonical = MobileAgentSidebarSections.canonical(from: rows)
+        XCTAssertEqual(canonical?.map(\.id), ["one", "two"])
+        XCTAssertEqual(canonical?.first?.agentIds, ["a", "b"])
+        XCTAssertEqual(canonical?.last?.agentIds, ["c"])
+        XCTAssertEqual(canonical?.first?.isCollapsed, true)
+        XCTAssertNil(MobileAgentSidebarSections.canonical(from: [
+            ["id": "broken", "name": "Broken", "agentIds": 42]
+        ] as [[String: Any]]))
+    }
+
+    func testNativeAgentSectionRenameRemoveAndReorderMatchDesktopStateModel() throws {
+        let base = [
+            MobileAgentSidebarSection(id: "one", name: "One", agentIds: ["a"]),
+            MobileAgentSidebarSection(id: "two", name: "Two", agentIds: ["b"]),
+        ]
+        let renamed = try XCTUnwrap(MobileAgentSidebarSections.renamed(
+            base,
+            sectionId: "one",
+            name: "  Research  "
+        ))
+        XCTAssertEqual(renamed[0].name, "Research")
+        XCTAssertEqual(
+            MobileAgentSidebarSections.moving(renamed, sectionId: "one", offset: 1).map(\.id),
+            ["two", "one"]
+        )
+        XCTAssertEqual(
+            MobileAgentSidebarSections.removing(renamed, sectionId: "one").map(\.id),
+            ["two"]
+        )
+    }
+
+    func testNativeAgentSectionsCreateAndNormalizeLikeDesktopSidebar() throws {
+        let created = try XCTUnwrap(MobileAgentSidebarSections.creating(
+            name: "  Research  ",
+            with: "agent-1",
+            in: [
+                MobileAgentSidebarSection(id: "old", name: "Old", agentIds: ["agent-1", "agent-2"])
+            ],
+            id: "stable"
+        ))
+        XCTAssertEqual(created.first?.id, "section-stable")
+        XCTAssertEqual(created.first?.name, "Research")
+        XCTAssertEqual(created.first?.agentIds, ["agent-1"])
+        XCTAssertEqual(created[1].agentIds, ["agent-2"])
+
+        let normalized = MobileAgentSidebarSections.normalized([
+            MobileAgentSidebarSection(id: " one ", name: "One", agentIds: ["a", "a", "b"]),
+            MobileAgentSidebarSection(id: "one", name: "Duplicate", agentIds: ["c"]),
+            MobileAgentSidebarSection(id: "two", name: "Two", agentIds: ["b", "c"]),
+        ])
+        XCTAssertEqual(normalized.map(\.id), ["one", "two"])
+        XCTAssertEqual(normalized[0].agentIds, ["a", "b"])
+        XCTAssertEqual(normalized[1].agentIds, ["c"])
+    }
+
+    @MainActor
+    func testParseBotRejectsMissingIdentity() {
+        XCTAssertNil(GrokMobileBotService.parseBot(["name": "Missing id"]))
+    }
+    @MainActor
+    func testDeleteConfirmationCopyDistinguishesBotAndGroupDestruction() {
+        let bot = MobileBotSummary(id: "bot-1", name: "Research", description: "")
+        let group = MobileBotSummary(
+            id: "group-1",
+            name: "Study Group",
+            description: "",
+            isGroup: true,
+            memberIds: ["bot-1"]
+        )
+
+        XCTAssertEqual(
+            mobileBotDeleteDescription(bot),
+            "这会永久删除该 Bot 及其聊天记录。此操作无法撤销。"
+        )
+        XCTAssertEqual(
+            mobileBotDeleteDescription(group),
+            "这会永久删除该群组及其聊天记录。群组中的 Bots 不会被删除，仍可单独使用。此操作无法撤销。"
+        )
+    }
+
+    func testCommittedMobileBotNameMatchesDesktopRenameRule() {
+        XCTAssertNil(committedMobileBotName(initialValue: "Research", draftValue: " Research "))
+        XCTAssertNil(committedMobileBotName(initialValue: "Research", draftValue: "   "))
+        XCTAssertEqual(
+            committedMobileBotName(initialValue: "Research", draftValue: "  Release Bot  "),
+            "Release Bot"
+        )
+    }
+
+    @MainActor
+    func testAgentCreateCommandCommitsDesktopAvatarIdentityAtomically() throws {
+        let command = try GrokMobileBotService.createCommand(
+            name: "  New chat  ",
+            description: "  Research assistant  ",
+            avatarShape: "wedge",
+            avatarColor: "cyan",
+            requestId: "create-1"
+        )
+        XCTAssertEqual(command["type"] as? String, "bot.create")
+        XCTAssertEqual(command["requestId"] as? String, "create-1")
+        XCTAssertEqual(command["name"] as? String, "New chat")
+        XCTAssertEqual(command["description"] as? String, "Research assistant")
+        XCTAssertEqual(command["avatarShape"] as? String, "wedge")
+        XCTAssertEqual(command["avatarColor"] as? String, "cyan")
+
+        XCTAssertThrowsError(try GrokMobileBotService.createCommand(
+            name: "Agent",
+            description: "",
+            avatarShape: "not-a-shape",
+            avatarColor: "cyan",
+            requestId: "create-bad-shape"
+        ))
+        XCTAssertThrowsError(try GrokMobileBotService.createCommand(
+            name: "Agent",
+            description: "",
+            avatarShape: "wedge",
+            avatarColor: "not-a-color",
+            requestId: "create-bad-color"
+        ))
+    }
+
+    @MainActor
+    func testBotMutationCommandsUseCanonicalFeatureHostContracts() {
+        let longName = String(repeating: "a", count: 90)
+        let rename = GrokMobileBotService.renameCommand(
+            id: "agent-1",
+            name: longName,
+            requestId: "rename-1"
+        )
+        XCTAssertEqual(rename["type"] as? String, "bot.update")
+        XCTAssertEqual(rename["requestId"] as? String, "rename-1")
+        XCTAssertEqual(rename["id"] as? String, "agent-1")
+        XCTAssertEqual((rename["name"] as? String)?.count, 72)
+
+        let duplicate = GrokMobileBotService.duplicateCommand(
+            id: "agent-1",
+            requestId: "clone-1"
+        )
+        XCTAssertEqual(duplicate["type"] as? String, "bot.clone")
+        XCTAssertEqual(duplicate["id"] as? String, "agent-1")
+
+        let delete = GrokMobileBotService.deleteCommand(
+            id: "agent-1",
+            requestId: "delete-1"
+        )
+        XCTAssertEqual(delete["type"] as? String, "bot.delete")
+        XCTAssertEqual(delete["id"] as? String, "agent-1")
+    }
+
+    @MainActor
+    func testParseGroupProjectsCanonicalMembershipFields() throws {
+        let group = try XCTUnwrap(GrokMobileBotService.parseGroup([
+            "id": "group-1",
+            "name": "Research Room",
+            "description": "Cross-check",
+            "memberIds": ["bot-a", "bot-b"],
+        ]))
+        XCTAssertTrue(group.isGroup)
+        XCTAssertFalse(group.isSharedRoom)
+        XCTAssertEqual(group.memberIds, ["bot-a", "bot-b"])
+        XCTAssertNil(group.miniAppId)
+    }
+
+    @MainActor
+    func testParseGroupFailsClosedForInvalidMembership() {
+        XCTAssertNil(GrokMobileBotService.parseGroup([
+            "id": "group-empty", "name": "Empty", "memberIds": [],
+        ]))
+        XCTAssertNil(GrokMobileBotService.parseGroup([
+            "id": "group-too-large",
+            "name": "Too large",
+            "memberIds": (0...6).map { "bot-\($0)" },
+        ]))
+        XCTAssertNil(GrokMobileBotService.parseGroup([
+            "id": "group-duplicate",
+            "name": "Duplicate",
+            "memberIds": ["bot-a", "bot-a"],
+        ]))
+    }
+
+    @MainActor
+    func testGroupUpdateCommandUsesCanonicalHostContract() {
+        let command = GrokMobileBotService.groupUpdateCommand(
+            id: "group-1",
+            memberIds: ["bot-a", "bot-b"],
+            requestId: "group-update-1"
+        )
+        XCTAssertEqual(command["type"] as? String, "group.update")
+        XCTAssertEqual(command["id"] as? String, "group-1")
+        XCTAssertEqual(command["requestId"] as? String, "group-update-1")
+        XCTAssertEqual(command["memberIds"] as? [String], ["bot-a", "bot-b"])
+    }
+
+    @MainActor
+    func testSettingsProjectionAndCommandsUseCanonicalHostFields() throws {
+        let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-1",
+            "name": "Research",
+            "description": "Verify sources",
+            "title": "Research assistant",
+            "notifyOnUpdates": false,
+        ]))
+        XCTAssertEqual(bot.title, "Research assistant")
+        XCTAssertFalse(bot.notifyOnUpdatesEnabled)
+
+        let individual = GrokMobileBotService.agentProfileUpdateCommand(
+            id: "agent-1",
+            isGroup: false,
+            name: "Renamed",
+            title: "New title",
+            description: "New description",
+            requestId: "profile-1"
+        )
+        XCTAssertEqual(individual["type"] as? String, "bot.update")
+        XCTAssertEqual(individual["name"] as? String, "Renamed")
+        XCTAssertEqual(individual["title"] as? String, "New title")
+        XCTAssertEqual(individual["description"] as? String, "New description")
+
+        let group = GrokMobileBotService.agentProfileUpdateCommand(
+            id: "group-1",
+            isGroup: true,
+            name: "Room",
+            title: "Must not cross the group boundary",
+            description: "Coordination",
+            requestId: "profile-2"
+        )
+        XCTAssertEqual(group["type"] as? String, "group.update")
+        XCTAssertNil(group["title"])
+
+        let notifications = GrokMobileBotService.agentNotificationUpdateCommand(
+            id: "agent-1",
+            isEnabled: true,
+            requestId: "notify-1"
+        )
+        XCTAssertEqual(notifications["type"] as? String, "bot.update")
+        XCTAssertEqual(notifications["notifyOnUpdates"] as? Bool, true)
+    }
+
+    @MainActor
+    func testInstalledMiniAppMergePreservesCanonicalSettingsProjection() throws {
+        let surface = MobileBotSummary(
+            id: "global-dharma-bot",
+            name: "Host name",
+            description: "Host description",
+            title: "Canonical title",
+            notifyOnUpdatesEnabled: false,
+            lastEntry: .text("Canonical last message"),
+            lastMessageId: "message-1",
+            lastMessagePreview: "Canonical last message",
+            updatedAtMs: 1_797_777_100_000,
+            isComposingMessage: true,
+            waitingReason: "Waiting",
+            isRunning: true,
+            draftPrompt: "Draft"
+        )
+        let installed = MobileBotSummary(
+            id: "global-dharma-bot",
+            name: "全球法布施",
+            description: "Installed metadata",
+            miniAppId: GlobalDharmaMiniAppBridge.globalDharmaId,
+            menuButtonText: "打开应用"
+        )
+
+        let merged = try XCTUnwrap(GrokMobileBotService.mergeBots([installed], [surface]).first)
+        XCTAssertEqual(merged.name, "全球法布施")
+        XCTAssertEqual(merged.title, "Canonical title")
+        XCTAssertFalse(merged.notifyOnUpdatesEnabled)
+        XCTAssertEqual(merged.lastEntry, .text("Canonical last message"))
+        XCTAssertEqual(merged.lastMessageId, "message-1")
+        XCTAssertEqual(merged.lastMessagePreview, "Canonical last message")
+        XCTAssertEqual(merged.updatedAtMs, 1_797_777_100_000)
+        XCTAssertTrue(merged.isComposingMessage)
+        XCTAssertEqual(merged.waitingReason, "Waiting")
+        XCTAssertTrue(merged.isRunning)
+        XCTAssertEqual(merged.draftPrompt, "Draft")
+        XCTAssertEqual(merged.miniAppId, GlobalDharmaMiniAppBridge.globalDharmaId)
+    }
+
+
+
+    func testBotSubagentHistoryDecoderKeepsDesktopStatusesAndDropsMalformedRows() throws {
+        let decoded = GrokMobileBotService.parseSubagents([
+            [
+                "subagentId": "sub-running",
+                "subagentType": "task",
+                "title": "Research",
+                "status": "running",
+            ],
+            [
+                "subagentId": "sub-done",
+                "subagentType": "task",
+                "title": "Completed research",
+                "status": "done",
+            ],
+            [
+                "subagentId": "sub-error",
+                "subagentType": "ci",
+                "title": "Investigate CI",
+                "status": "error",
+            ],
+            [
+                "subagentId": "sub-aborted",
+                "subagentType": "task",
+                "title": "",
+                "status": "aborted",
+            ],
+            [
+                "subagentId": "bad-status",
+                "subagentType": "task",
+                "title": "Bad",
+                "status": "completed",
+            ],
+            [
+                "subagentId": "",
+                "subagentType": "task",
+                "title": "Missing id",
+                "status": "done",
+            ],
+        ])
+
+        XCTAssertEqual(decoded.map(\.subagentId), [
+            "sub-running", "sub-done", "sub-error", "sub-aborted",
+        ])
+        XCTAssertEqual(decoded.map(\.status), ["running", "done", "error", "aborted"])
+
+        let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-a",
+            "name": "Agent A",
+            "subagents": [
+                [
+                    "subagentId": "sub-done",
+                    "subagentType": "task",
+                    "title": "Completed research",
+                    "status": "done",
+                ],
+            ],
+        ]))
+        XCTAssertEqual(bot.subagents.first?.subagentId, "sub-done")
+        XCTAssertEqual(bot.subagents.first?.status, "done")
+    }
+
+    func testAgentReplyReferencePreviewMatchesDesktopAndFailsClosed() {
+        var text = MobileChatMessage(
+            id: "history:m-1",
+            role: .assistant,
+            text: "  A reply\nwith   normalized spacing  ",
+            canonicalMessageId: "m-1"
+        )
+        XCTAssertEqual(mobileStableReplyTargetID(text), "m-1")
+        XCTAssertEqual(
+            mobileReplyReferenceQuoteLabel(mobileReplyReferencePreview(for: text)),
+            "A reply with normalized spacing"
+        )
+
+        var image = MobileChatMessage(
+            id: "history:m-2",
+            role: .assistant,
+            text: "",
+            canonicalMessageId: "m-2"
+        )
+        image.attachmentURL = "https://example.invalid/photo.png"
+        XCTAssertEqual(
+            mobileReplyReferencePreview(for: image),
+            .image(url: "https://example.invalid/photo.png")
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(mobileReplyReferencePreview(for: image)),
+            "Photo"
+        )
+
+        var file = MobileChatMessage(
+            id: "history:m-file",
+            role: .assistant,
+            text: "",
+            canonicalMessageId: "m-file"
+        )
+        file.attachmentURL = "https://example.invalid/report.pdf"
+        file.attachmentFileName = "Quarterly report.pdf"
+        XCTAssertEqual(
+            mobileReplyReferencePreview(for: file),
+            .file(
+                url: "https://example.invalid/report.pdf",
+                name: "Quarterly report.pdf"
+            )
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceQuoteLabel(mobileReplyReferencePreview(for: file)),
+            "Quarterly report.pdf"
+        )
+
+        var linkMessage = MobileChatMessage(
+            id: "history:m-3",
+            role: .user,
+            text: "",
+            canonicalMessageId: "m-3"
+        )
+        linkMessage.attachmentURL = "https://docs.example.invalid/path"
+        XCTAssertEqual(
+            mobileReplyReferencePreview(for: linkMessage),
+            .link(url: "https://docs.example.invalid/path")
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(mobileReplyReferencePreview(for: linkMessage)),
+            "docs.example.invalid"
+        )
+
+        let resolved = mobileResolveReplyReference(
+            targetID: "m-1",
+            entries: [text, image, file, linkMessage]
+        )
+        XCTAssertTrue(resolved.isResolved)
+        XCTAssertEqual(resolved.targetID, "m-1")
+        XCTAssertEqual(
+            resolved.preview,
+            .assistantText("A reply with normalized spacing")
+        )
+
+        let missing = mobileResolveReplyReference(
+            targetID: "deleted-message",
+            entries: [text, image, file, linkMessage]
+        )
+        XCTAssertFalse(missing.isResolved)
+        XCTAssertEqual(missing.preview, .missing)
+        XCTAssertEqual(mobileReplyReferenceQuoteLabel(missing.preview), "(deleted)")
+
+        text.streaming = true
+        XCTAssertNil(mobileStableReplyTargetID(text))
+        text.streaming = false
+        text.optimisticDeliveryPhase = .pending
+        XCTAssertNil(mobileStableReplyTargetID(text))
+        text.optimisticDeliveryPhase = .acceptedAwaitingEcho
+        XCTAssertNil(mobileStableReplyTargetID(text))
+        text.optimisticDeliveryPhase = nil
+        XCTAssertEqual(mobileStableReplyTargetID(text), "m-1")
+
+        var noCanonical = text
+        noCanonical.canonicalMessageId = nil
+        XCTAssertNil(mobileStableReplyTargetID(noCanonical))
+    }
+
+
+
+    func testAgentFindIndexesAuthorAndAttachmentFilenameWithoutThreadLeakage() {
+        var assistant = MobileChatMessage(
+            id: "history:m-1",
+            role: .assistant,
+            text: "Quarterly summary",
+            canonicalMessageId: "m-1"
+        )
+        assistant.attachmentFileName = "metrics-q4.xlsx"
+
+        let user = MobileChatMessage(
+            id: "history:m-2",
+            role: .user,
+            text: "Please review",
+            canonicalMessageId: "m-2"
+        )
+
+        var threadOnly = MobileChatMessage(
+            id: "history:m-3",
+            role: .assistant,
+            text: "Thread secret",
+            canonicalMessageId: "m-3",
+            replyToMessageId: "m-1"
+        )
+        threadOnly.branched = true
+
+        let searchable = mobileBotChatSearchEntries(
+            [assistant, user, threadOnly],
+            botName: "Researcher"
+        )
+
+        XCTAssertEqual(searchable.map(\.id), ["history:m-1", "history:m-2"])
+        XCTAssertTrue(searchable[0].text.contains("Quarterly summary"))
+        XCTAssertTrue(searchable[0].text.contains("Researcher"))
+        XCTAssertTrue(searchable[0].text.contains("metrics-q4.xlsx"))
+        XCTAssertTrue(searchable[1].text.contains("You"))
+        XCTAssertFalse(searchable.contains { $0.text.contains("Thread secret") })
+    }
+
+}

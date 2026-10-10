@@ -1,0 +1,75 @@
+name: iOS emoji catalog generation
+
+on:
+  push:
+    branches:
+      - spec/grok-bot-018-ios-parity-20260922
+    paths:
+      - scripts/generate-ios-emoji-catalog.mjs
+      - .github/workflows/ios-emoji-catalog-generation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Verify exact source
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate pinned Desktop-parity emoji catalog
+        run: |
+          mkdir -p "$RUNNER_TEMP/fabushi-emoji"
+          node scripts/generate-ios-emoji-catalog.mjs \
+            --output "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift" \
+            --provenance "$RUNNER_TEMP/fabushi-emoji/provenance.json"
+
+      - name: Stage generated iOS-owned catalog
+        run: |
+          cp "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift" \
+            frontend/src/recovered/features/conversation/GeneratedDesktopEmojiCatalog.swift
+          cp "$RUNNER_TEMP/fabushi-emoji/provenance.json" \
+            manifests/desktop-main-emoji-catalog-provenance.json
+
+      - name: Verify generated catalog is substantial and pinned
+        run: |
+          grep -q 'mobileDesktopEmojiCatalogSourcePackage = "emojibase-data@17.0.0"' "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift"
+          test "$(wc -c < "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift")" -gt 500000
+          node -e 'const p=require(process.argv[1]); if (p.counts.projectedEntries < 1000 || p.counts.skinVariants < 100) process.exit(1)' "$RUNNER_TEMP/fabushi-emoji/provenance.json"
+
+      - name: Commit generated iOS-owned catalog
+        if: github.event_name == 'push'
+        run: |
+          if test -z "$(git status --porcelain -- \
+            frontend/src/recovered/features/conversation/GeneratedDesktopEmojiCatalog.swift \
+            manifests/desktop-main-emoji-catalog-provenance.json)"; then
+            echo "Generated catalog already matches source."
+            exit 0
+          fi
+          git config user.name "fabushi-ios-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            frontend/src/recovered/features/conversation/GeneratedDesktopEmojiCatalog.swift \
+            manifests/desktop-main-emoji-catalog-provenance.json
+          git commit -m "build(ios): refresh generated emoji catalog"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Upload generated catalog and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-emoji-catalog-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift
+            ${{ runner.temp }}/fabushi-emoji/provenance.json
+          if-no-files-found: error
+          retention-days: 14

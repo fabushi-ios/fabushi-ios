@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "group": "source-internal",
+  "rowCount": 2,
+  "rows": [
+    {
+      "desktop_path": "source/internal/host-extensions.ts",
+      "desktop_blob_sha": "ca6e7e4e0816cd9e31f57b44a8953b93d0425a8c",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "internal",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    },
+    {
+      "desktop_path": "source/internal/scheduling.ts",
+      "desktop_blob_sha": "68565201ee278fa935ccbdc74a0286db77f1ec18",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "internal",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+    }
+  ]
+}

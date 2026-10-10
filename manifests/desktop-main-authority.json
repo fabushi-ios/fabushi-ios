@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "authorityMode": "live-main",
+  "repository": "bhrumom/fabushi-desktop",
+  "branch": "main",
+  "commit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
+  "rootTreeSha": "ed56d351521842550b541f37de3d567f027eeda9",
+  "observedAt": "2026-10-11",
+  "previousSourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "inventory": {
+    "selectedRoots": [
+      "frontend/**",
+      "source/**"
+    ],
+    "selectedFileCount": 7951,
+    "fullTrackedCount": 8174,
+    "gitlinkCount": 0,
+    "nonselectedCount": 223,
+    "fullTreeSha256": "45dfa17041424a90ce6fe9c31ff7113c73d332d2fb1a60a627bd1ac9af6562c5",
+    "selectedTreeSha256": "85adf0b64c517cfdc72a1d52078977683748714a5ec893a8d30b992d7052febc",
+    "manifestIndex": "manifests/desktop-main-reference-index.json",
+    "ledgerIndex": "docs/parity/desktop-main-index.json",
+    "nonselectedRegister": "manifests/desktop-main/tracked-outside-selected.json",
+    "impactRegister": "docs/parity/desktop-main-impact.json"
+  },
+  "baselineReady": false,
+  "dependenciesReviewed": false,
+  "completenessAccepted": false,
+  "acceptanceAccepted": false,
+  "notes": "Incremental live-main rebaseline to 92fcc2b0 after Remote Computer mobile-session reconciliation landed. Git identities are current; the RCS server responsibility was audited against the native iOS shipping call graph, while affected aggregate owners/dependencies and full source/release acceptance remain open."
+}
