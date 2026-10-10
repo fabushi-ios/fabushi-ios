@@ -902,6 +902,61 @@ mod tests {
     }
 
     #[test]
+    fn resumes_intent_marker_after_crash_before_quarantine() {
+        let path = temp_path("blob-recovery-intent");
+        fs::write(&path, b"not-a-sqlite-database").unwrap();
+        let quarantine = PathBuf::from(format!("{}.corrupt-intent", path.display()));
+        let intent = path_with_suffix(&quarantine, ".intent");
+        fs::write(&intent, b"").unwrap();
+
+        let db = ConversationBlobDb::open(&path, 500).unwrap();
+        assert!(db.quick_check().unwrap());
+        assert_eq!(
+            db.migration_state(),
+            ConversationBlobMigrationState::RecoveryRebuilt
+        );
+        assert!(!intent.exists());
+        assert!(quarantine.exists());
+    }
+
+    #[test]
+    fn clears_stale_replacement_without_pending_marker() {
+        let path = temp_path("blob-recovery-stale-replacement");
+        {
+            let db = ConversationBlobDb::open(&path, 500).unwrap();
+            db.set_blob_hex("live", b"payload").unwrap();
+        }
+        let stale = PathBuf::from(format!("{}.corrupt-old.replacement", path.display()));
+        fs::write(&stale, b"stale").unwrap();
+
+        let reopened = ConversationBlobDb::open(&path, 500).unwrap();
+        assert_eq!(
+            reopened.get_blob_hex("live").unwrap().as_deref(),
+            Some(b"payload".as_slice())
+        );
+        assert!(!stale.exists());
+    }
+
+    #[test]
+    fn unavailable_source_is_not_quarantined_as_corruption() {
+        let path = temp_path("blob-recovery-unavailable");
+        fs::create_dir_all(&path).unwrap();
+
+        let error = ConversationBlobDb::open(&path, 500).unwrap_err();
+        assert_eq!(error.code, "SAND_BLOB_RECOVERY_SOURCE_UNAVAILABLE");
+        assert!(path.is_dir());
+        let parent = path.parent().unwrap();
+        let base = path.file_name().unwrap().to_string_lossy().to_string();
+        let recovery_markers = fs::read_dir(parent)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| name.starts_with(&format!("{base}.corrupt-")))
+            .count();
+        assert_eq!(recovery_markers, 0);
+    }
+
+    #[test]
     fn resumes_pending_recovery_and_installs_completed_replacement() {
         let path = temp_path("blob-recovery-resume");
         let quarantine = PathBuf::from(format!("{}.corrupt-resume", path.display()));
