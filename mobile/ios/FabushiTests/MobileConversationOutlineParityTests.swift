@@ -55,5 +55,26 @@ final class MobileConversationOutlineParityTests: XCTestCase {
             reconnectGeneration: 8,
             generation: 3
         ))
+        XCTAssertFalse(scope.accepts(
+            accountKey: "acct-a",
+            parentAgentId: "agent-b",
+            selectedAgentId: "sub-a",
+            reconnectGeneration: 7,
+            generation: 3
+        ))
+        XCTAssertFalse(scope.accepts(
+            accountKey: "acct-a",
+            parentAgentId: "agent-a",
+            selectedAgentId: "sub-b",
+            reconnectGeneration: 7,
+            generation: 3
+        ))
+        XCTAssertFalse(scope.accepts(
+            accountKey: "acct-a",
+            parentAgentId: "agent-a",
+            selectedAgentId: "sub-a",
+            reconnectGeneration: 7,
+            generation: 4
+        ))
     }
 }
