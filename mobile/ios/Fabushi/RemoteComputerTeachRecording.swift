@@ -432,10 +432,18 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
     @Published private(set) var isWorking = false
     @Published private(set) var errorMessage: String?
 
+    private struct PendingStart {
+        let generation: Int
+        let agentID: String
+        let task: Task<TeachRecordingStatus, Error>
+    }
+
     private let source: any RemoteComputerTeachRecordingSourcing
     private let capture: any RemoteComputerTeachCapturing
     private var generation = 0
     private var timerTask: Task<Void, Never>?
+    private var pendingStart: PendingStart?
+    private var cleanupTask: Task<Void, Never>?
     private var disposed = false
 
     init(
@@ -480,6 +488,11 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
 
     func start(agentID: String, entryPoint: String) async {
         guard !disposed, !isWorking else { return }
+        if let cleanupTask {
+            await cleanupTask.value
+        }
+        guard !disposed, !isWorking else { return }
+
         generation &+= 1
         let expectedGeneration = generation
         let previous = status
@@ -494,11 +507,23 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
         isWorking = true
         errorMessage = nil
 
-        do {
-            let remote = try await source.start(
+        let startTask = Task { @MainActor [source] in
+            try await source.start(
                 agentID: agentID,
                 entryPoint: entryPoint
             )
+        }
+        pendingStart = .init(
+            generation: expectedGeneration,
+            agentID: agentID,
+            task: startTask
+        )
+
+        do {
+            let remote = try await startTask.value
+            if pendingStart?.generation == expectedGeneration {
+                pendingStart = nil
+            }
             guard !disposed, generation == expectedGeneration else { return }
             guard let path = remote.capturePath, !path.isEmpty else {
                 throw IOSRemoteComputerTeachRecordingSource.SourceError.invalidResponse
@@ -510,6 +535,9 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
             }
             publish(remote)
         } catch {
+            if pendingStart?.generation == expectedGeneration {
+                pendingStart = nil
+            }
             if generation == expectedGeneration, !disposed {
                 await capture.stop(save: false)
                 _ = try? await source.stop(agentID: agentID, save: false)
@@ -555,30 +583,63 @@ final class RemoteComputerTeachRecordingOwner: ObservableObject {
 
     func reset() {
         guard !disposed else { return }
-        generation &+= 1
+        let staleStart = pendingStart
         let activeAgent = status.state == .recording ? status.agentId : nil
+        let previousCleanup = cleanupTask
+        generation &+= 1
+        pendingStart = nil
         status = IDLE_TEACH_RECORDING_STATUS
         armed = nil
         cancelTimer()
         errorMessage = nil
         isWorking = false
-        Task { @MainActor [weak self] in
-            guard let self else { return }
+        cleanupTask = Task { @MainActor [source, capture] in
+            if let previousCleanup {
+                await previousCleanup.value
+            }
             await capture.stop(save: false)
-            if let activeAgent {
-                _ = try? await source.stop(agentID: activeAgent, save: false)
+            if let staleStart {
+                _ = try? await staleStart.task.value
+                _ = try? await source.stop(
+                    agentID: staleStart.agentID,
+                    save: false
+                )
+            } else if let activeAgent {
+                _ = try? await source.stop(
+                    agentID: activeAgent,
+                    save: false
+                )
             }
         }
     }
 
     func dispose() {
         guard !disposed else { return }
+        let staleStart = pendingStart
+        let activeAgent = status.state == .recording ? status.agentId : nil
+        let previousCleanup = cleanupTask
         disposed = true
         generation &+= 1
+        pendingStart = nil
         cancelTimer()
         armed = nil
-        Task { @MainActor [capture] in
+        cleanupTask = Task { @MainActor [source, capture] in
+            if let previousCleanup {
+                await previousCleanup.value
+            }
             await capture.stop(save: false)
+            if let staleStart {
+                _ = try? await staleStart.task.value
+                _ = try? await source.stop(
+                    agentID: staleStart.agentID,
+                    save: false
+                )
+            } else if let activeAgent {
+                _ = try? await source.stop(
+                    agentID: activeAgent,
+                    save: false
+                )
+            }
         }
     }
 
