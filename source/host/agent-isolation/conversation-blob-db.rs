@@ -164,7 +164,7 @@ fn sqlite_primary_code(error: &rusqlite::Error) -> Option<i32> {
 }
 
 fn is_sqlite_corrupt_error(error: &rusqlite::Error) -> bool {
-    matches!(sqlite_primary_code(error), Some(11 | 26))
+    matches!(sqlite_primary_code(error), Some(11) | Some(26))
 }
 
 fn is_sqlite_io_error(error: &rusqlite::Error) -> bool {
