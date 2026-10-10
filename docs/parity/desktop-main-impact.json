@@ -3627,6 +3627,30 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-agent-settings-implemented-pending-exact-head-ci",
         "finding": "The shipping MobileBotAgentSettingsSheet is the native replacement for the Desktop Agent Settings panel. It exposes name/title/description editing, omits title and notification controls for groups, exposes update notifications for individual Agents, keeps local drafts separate from authoritative roster state, surfaces mutation failure, disables concurrent mutations, and routes profile/notification changes through GrokMobileBotService to bot.update/group.update before authoritative roster reload. Current exact-head unit/UI/protected evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/shared-room/bridge.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-shared-room-implemented-pending-exact-head-ci",
+        "finding": "Desktop typed sharing bridge maps to the closed six-method Rust AppHost sharing RPC surface. Required room/request/Agent identities and approval booleans fail closed before Host dispatch, generic platform.request does not gain /sand bearer access, and SwiftUI receives only projected sharing state/invite results. Current exact-head Rust/protected evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/shared-room/controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-shared-room-implemented-pending-exact-head-ci",
+        "finding": "Desktop lifecycle generation, transport reset, guarded refresh and per-key pending mutations map to MobileBotSharedRoomSheet/Trigger Task cancellation plus account+Agent+generation fences and per-operation task keys. Distinct operations may proceed independently while duplicate keys are fenced; stale scope completions cannot overwrite the current room. Host state remains authoritative after state mutations. Current exact-head Swift/UI/protected evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/shared-room/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-shared-room-implemented-pending-exact-head-ci",
+        "finding": "Current Desktop all-or-nothing sharing projection maps to GrokMobileSharedRoomModel and the Rust product boundary. Malformed room/member/request/typing/invite identities fail closed; host status, self-owned Agent membership, candidate filtering and room-specific pending requests are derived from canonical Host state rather than synthesized locally. Current exact-head focused/protected evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/shared-room/trigger.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-shared-room-implemented-pending-exact-head-ci",
+        "finding": "Shipping Agent Settings uses MobileBotSharedRoomTrigger as the native replacement. The management entry is rendered only when Host-projected sharing is enabled and the selected Agent resolves to a real room, and it exposes the room-scoped pending join-request count before opening the management sheet. No local room is fabricated. Current exact-head UI/protected evidence is pending."
       }
     ]
   },
