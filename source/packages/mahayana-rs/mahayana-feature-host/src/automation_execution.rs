@@ -153,6 +153,7 @@ impl FeatureHostController {
         // Do not bypass an earlier failed restore by starting a fresh run.
         if self.state()?.routine_executions.is_empty() { self.restore_routine_executions()?; }
         let account_key = self.routine_account_key()?;
+        let user_time_zone = self.host_settings_user_timezone_direct()?;
         let mut state = self.state()?; ensure_open(&state)?;
         if self.config.mode == HostMode::Production && (!state.session_active || account_key.is_none()) {
             return Err(FeatureHostError::Contract("routine requires an active authenticated account".into()));
@@ -170,7 +171,13 @@ impl FeatureHostController {
                 if matches!(trigger, RoutineTrigger::Schedule) {
                     let item = state.automations.get_mut(id).expect("validated automation");
                     let saved = item.trigger.clone().unwrap_or_else(|| AutomationTrigger::Schedule { schedule: item.schedule.clone() });
-                    item.next_run_at_ms = automation_next_run(&saved, &item.schedule, item.enabled, now_millis());
+                    item.next_run_at_ms = automation_next_run(
+                        &saved,
+                        &item.schedule,
+                        item.enabled,
+                        now_millis(),
+                        user_time_zone.as_deref(),
+                    );
                     self.persist_automations(&state.automations)?;
                 }
                 return Ok(RoutineAdmission::Suppressed(operation_id));
@@ -191,7 +198,13 @@ impl FeatureHostController {
         let item = state.automations.get_mut(id).expect("validated automation");
         item.last_run_at_ms = Some(now);
         let saved = item.trigger.clone().unwrap_or_else(|| AutomationTrigger::Schedule { schedule: item.schedule.clone() });
-        item.next_run_at_ms = automation_next_run(&saved, &item.schedule, item.enabled, now);
+        item.next_run_at_ms = automation_next_run(
+            &saved,
+            &item.schedule,
+            item.enabled,
+            now,
+            user_time_zone.as_deref(),
+        );
         item.runs.push(AutomationRunSummary { id: run_id.clone(), status: AutomationRunStatus::Running, started_at: now, detail: None, event: routine_event_label(&execution.trigger) });
         let snapshot = item.clone();
         // Preserve the existing listener projection contract on this same,
@@ -642,7 +655,10 @@ mod routine_execution_tests {
     #[test]
     fn routine_pending_wake_recreate_keeps_identity_and_settles_only_once() {
         let fixture = Fixture::new(); fixture.schedule("daily"); let run_id = fixture.pending("daily");
-        { let mut state = fixture.host.state().expect("state"); state.routine_executions.clear(); state.routine_epoch += 1; state.automations = load_automations(fixture.host.automation_path.as_ref().expect("path")); }
+        { let mut state = fixture.host.state().expect("state"); state.routine_executions.clear(); state.routine_epoch += 1; state.automations = load_automations(
+                fixture.host.automation_path.as_ref().expect("path"),
+                None,
+            ); }
         fixture.host.restore_routine_executions().expect("restore actual journal"); assert_eq!(fixture.host.state().expect("state").routine_executions[&run_id].phase, RoutinePhase::Pending);
         fixture.host.set_routine_quiescing(false).expect("resume"); fixture.host.advance_pending_routine().expect("wake");
         fixture.host.finish_automation_run("daily", &run_id, AutomationRunStatus::Error, Some("late failure".into()), "failed").expect("stale terminal");
