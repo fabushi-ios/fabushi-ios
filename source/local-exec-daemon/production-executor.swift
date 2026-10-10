@@ -43,11 +43,21 @@ actor IOSProductionLocalExecutor {
             return try await localBackend.execute(capability: capability, params: params)
         }
 
+        guard Self.requiresRemoteRunner(normalized) else {
+            throw LocalCapabilityRunner.RunnerError.unsupported(normalized)
+        }
+
         let remoteParams = ShellExecEnvironmentFilter.sanitizeRemoteRunnerParams(params)
         return try await remoteRunner.dispatch(
             method: "local-exec.\(normalized)",
             params: remoteParams
         )
+    }
+
+    private static func requiresRemoteRunner(_ method: String) -> Bool {
+        method.hasPrefix("shell.")
+            || method.hasPrefix("process.")
+            || method.hasPrefix("box.")
     }
 
     private static func localCapability(for method: String) -> LocalCapabilityRunner.Capability? {
