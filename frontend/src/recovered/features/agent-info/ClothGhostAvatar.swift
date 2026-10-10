@@ -272,7 +272,7 @@ internal struct MobileAgentAvatar: View {
         let members = Array(bot.memberIds.prefix(bot.memberIds.count > 4 ? 3 : 4))
         let memberSize = size * 0.56
         ZStack {
-            ForEach(Array(members.enumerated()), id: .offset) { index, memberId in
+            ForEach(Array(members.enumerated()), id: \.offset) { index, memberId in
                 personaAvatar(
                     agentId: memberId,
                     shape: nil,
