@@ -208,3 +208,63 @@ fn media_and_poll_sends_follow_conversation_message_permissions() {
         Err(EngineError::SenderNotParticipant { conversation_id: id, .. }) if id == conversation_id
     ));
 }
+
+#[test]
+fn structured_media_client_id_becomes_durable_group_metadata() {
+    let mut engine = MessagingEngine::new();
+    let owner = ActorId::new("human:owner");
+    engine
+        .execute(Command::UpsertActor {
+            actor: Actor::human(owner.0.clone(), "Owner"),
+        })
+        .unwrap();
+    let conversation_id = ConversationId::new("direct:media-group");
+    engine
+        .execute(Command::UpsertConversation {
+            conversation: Conversation::direct(
+                conversation_id.0.clone(),
+                "Media group",
+                vec![participant("human:owner", ParticipantRole::Owner)],
+                1,
+            ),
+        })
+        .unwrap();
+
+    let events = engine
+        .execute(Command::QueueMessage {
+            conversation_id,
+            local_message_id: MessageId::new("local:media-group:0"),
+            client_message_id: ClientMessageId(
+                "ios-media-group:group_123:0:2".into()
+            ),
+            sender_id: owner,
+            content: MessageContent::Photo {
+                media: media("photo:grouped", None),
+                caption: FormattedText::plain(""),
+                spoiler: false,
+            },
+            reply_to_message_id: None,
+            thread_root_message_id: None,
+            created_at_ms: 2,
+            scheduled_at_ms: None,
+            silent: false,
+            protected_content: false,
+        })
+        .unwrap();
+
+    let queued = events
+        .iter()
+        .find_map(|event| match event {
+            Event::MessageQueued { message } => Some(message),
+            _ => None,
+        })
+        .expect("grouped media must queue a message");
+    assert_eq!(
+        queued.media_group,
+        Some(MediaGroupMetadata {
+            id: "group_123".into(),
+            index: 0,
+            count: 2,
+        })
+    );
+}
