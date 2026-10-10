@@ -30,6 +30,8 @@ use codex_app_server_protocol::McpServerToolCallParams;
 use codex_app_server_protocol::McpServerToolCallResponse;
 use codex_app_server_protocol::PluginInstallParams;
 use codex_app_server_protocol::PluginInstallResponse;
+use codex_app_server_protocol::PluginListParams;
+use codex_app_server_protocol::PluginListResponse;
 use codex_app_server_protocol::PluginInstalledParams;
 use codex_app_server_protocol::PluginInstalledResponse;
 use codex_app_server_protocol::PluginReadParams;
@@ -765,8 +767,11 @@ impl CodexAgentInner {
                     .await;
             }
         }
-        let interrupt_after_response =
-            params.namespace.as_deref() == Some("mahayana") && params.tool == "request_box_help";
+        let interrupt_after_response = params.namespace.as_deref() == Some("mahayana")
+            && matches!(
+                params.tool.as_str(),
+                "request_box_help" | "install_plugin" | "mcp_oauth_connect"
+            );
         let thread_id = params.thread_id.clone();
         let turn_id = params.turn_id.clone();
         let response = self.execute_dynamic_tool(params).await;
@@ -979,6 +984,34 @@ impl CodexAgentInner {
         }
     }
 
+    async fn agent_plugin_catalog(&self) -> Result<PluginListResponse, String> {
+        self.requests
+            .request_typed(ClientRequest::PluginList {
+                request_id: self.request_id(),
+                params: PluginListParams {
+                    cwds: None,
+                    marketplace_kinds: None,
+                },
+            })
+            .await
+            .map_err(|error| format!("plugin catalog unavailable: {error}"))
+    }
+
+    async fn agent_mcp_status_snapshot(&self, thread_id: Option<String>) -> Result<ListMcpServerStatusResponse, String> {
+        self.requests
+            .request_typed(ClientRequest::McpServerStatusList {
+                request_id: self.request_id(),
+                params: ListMcpServerStatusParams {
+                    cursor: None,
+                    limit: Some(200),
+                    detail: Some(McpServerStatusDetail::ToolsAndAuthOnly),
+                    thread_id,
+                },
+            })
+            .await
+            .map_err(|error| format!("MCP status unavailable: {error}"))
+    }
+
     async fn execute_dynamic_tool(&self, params: DynamicToolCallParams) -> DynamicToolCallResponse {
         if params.namespace.as_deref() != Some("mahayana") {
             return dynamic_tool_error("不支持的工具命名空间");
@@ -1017,6 +1050,232 @@ impl CodexAgentInner {
                     return dynamic_tool_error(&error.to_string());
                 }
                 Ok(json!({"status":"awaiting_user","instruction":instruction}))
+            }
+            "search_plugins" => {
+                let query = params
+                    .arguments
+                    .get("query")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .trim()
+                    .to_ascii_lowercase();
+                let catalog = match self.agent_plugin_catalog().await {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&error),
+                };
+                let mut plugins = Vec::new();
+                for marketplace in catalog.marketplaces {
+                    for plugin in marketplace.plugins {
+                        let display_name = plugin
+                            .interface
+                            .as_ref()
+                            .and_then(|interface| interface.display_name.clone())
+                            .unwrap_or_else(|| plugin.name.clone());
+                        let description = plugin
+                            .interface
+                            .as_ref()
+                            .and_then(|interface| interface.short_description.clone())
+                            .unwrap_or_default();
+                        let haystack = format!(
+                            "{} {} {} {}",
+                            plugin.id,
+                            plugin.name,
+                            display_name,
+                            plugin.keywords.join(" ")
+                        )
+                        .to_ascii_lowercase();
+                        if !query.is_empty() && !haystack.contains(&query) {
+                            continue;
+                        }
+                        plugins.push(json!({
+                            "id": plugin.id,
+                            "name": plugin.name,
+                            "displayName": display_name,
+                            "description": description,
+                            "marketplace": marketplace.name,
+                            "installed": plugin.installed,
+                            "enabled": plugin.enabled,
+                            "keywords": plugin.keywords,
+                        }));
+                        if plugins.len() >= 30 {
+                            break;
+                        }
+                    }
+                    if plugins.len() >= 30 {
+                        break;
+                    }
+                }
+                Ok(json!({"plugins": plugins, "truncated": plugins.len() >= 30}))
+            }
+            "get_plugin" => {
+                let Some(token) = required_string_argument(&params.arguments, "pluginId") else {
+                    return dynamic_tool_error("pluginId is required");
+                };
+                let catalog = match self.agent_plugin_catalog().await {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&error),
+                };
+                let mut read_params = None;
+                'marketplaces: for marketplace in catalog.marketplaces {
+                    for plugin in marketplace.plugins {
+                        if plugin.id == token || plugin.name == token {
+                            read_params = Some(PluginReadParams {
+                                marketplace_path: marketplace.path.clone(),
+                                remote_marketplace_name: marketplace
+                                    .path
+                                    .is_none()
+                                    .then(|| marketplace.name.clone()),
+                                plugin_name: plugin.name,
+                            });
+                            break 'marketplaces;
+                        }
+                    }
+                }
+                let Some(read_params) = read_params else {
+                    return dynamic_tool_error("plugin is not present in the current catalog");
+                };
+                let detail: PluginReadResponse = match self
+                    .requests
+                    .request_typed(ClientRequest::PluginRead {
+                        request_id: self.request_id(),
+                        params: read_params,
+                    })
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&format!("plugin detail unavailable: {error}")),
+                };
+                let plugin = detail.plugin;
+                let display_name = plugin
+                    .summary
+                    .interface
+                    .as_ref()
+                    .and_then(|interface| interface.display_name.clone())
+                    .unwrap_or_else(|| plugin.summary.name.clone());
+                Ok(json!({
+                    "id": plugin.summary.id,
+                    "name": plugin.summary.name,
+                    "displayName": display_name,
+                    "description": plugin.description,
+                    "installed": plugin.summary.installed,
+                    "enabled": plugin.summary.enabled,
+                    "mcpServers": plugin.mcp_servers,
+                    "skills": plugin.skills,
+                    "appsCount": plugin.apps.len(),
+                    "runtimeVariants": plugin.runtime_variants,
+                }))
+            }
+            "install_plugin" => {
+                let Some(token) = required_string_argument(&params.arguments, "pluginId") else {
+                    return dynamic_tool_error("pluginId is required");
+                };
+                let catalog = match self.agent_plugin_catalog().await {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&error),
+                };
+                let mut install_params = None;
+                let mut resolved_id = None;
+                'marketplaces: for marketplace in catalog.marketplaces {
+                    for plugin in marketplace.plugins {
+                        if plugin.id == token || plugin.name == token {
+                            resolved_id = Some(plugin.id);
+                            install_params = Some(PluginInstallParams {
+                                marketplace_path: marketplace.path.clone(),
+                                remote_marketplace_name: marketplace
+                                    .path
+                                    .is_none()
+                                    .then(|| marketplace.name.clone()),
+                                plugin_name: plugin.name,
+                            });
+                            break 'marketplaces;
+                        }
+                    }
+                }
+                let Some(install_params) = install_params else {
+                    return dynamic_tool_error("plugin is not present in the current catalog");
+                };
+                let installed: PluginInstallResponse = match self
+                    .requests
+                    .request_typed(ClientRequest::PluginInstall {
+                        request_id: self.request_id(),
+                        params: install_params,
+                    })
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&format!("plugin install failed: {error}")),
+                };
+                Ok(json!({
+                    "installed": true,
+                    "pluginId": resolved_id,
+                    "authPolicy": installed.auth_policy,
+                    "appsNeedingAuthCount": installed.apps_needing_auth.len(),
+                    "turnStoppedAfterMutation": true,
+                }))
+            }
+            "mcp_status" => {
+                let snapshot = match self
+                    .agent_mcp_status_snapshot(Some(params.thread_id.clone()))
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&error),
+                };
+                let servers = snapshot
+                    .data
+                    .into_iter()
+                    .map(|server| {
+                        let mut tools = server.tools.keys().cloned().collect::<Vec<_>>();
+                        tools.sort();
+                        json!({
+                            "name": server.name,
+                            "authStatus": server.auth_status,
+                            "tools": tools,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                Ok(json!({"servers": servers}))
+            }
+            "mcp_oauth_connect" => {
+                let Some(requested_server) = required_string_argument(&params.arguments, "server") else {
+                    return dynamic_tool_error("server is required");
+                };
+                let snapshot = match self
+                    .agent_mcp_status_snapshot(Some(params.thread_id.clone()))
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&error),
+                };
+                let Some(server) = snapshot
+                    .data
+                    .into_iter()
+                    .find(|server| server.name == requested_server)
+                else {
+                    return dynamic_tool_error("server is not installed in the current runtime");
+                };
+                let response: McpServerOauthLoginResponse = match self
+                    .requests
+                    .request_typed(ClientRequest::McpServerOauthLogin {
+                        request_id: self.request_id(),
+                        params: McpServerOauthLoginParams {
+                            name: server.name.clone(),
+                            thread_id: Some(params.thread_id.clone()),
+                            scopes: None,
+                            timeout_secs: None,
+                        },
+                    })
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(error) => return dynamic_tool_error(&format!("MCP OAuth could not start: {error}")),
+                };
+                Ok(json!({
+                    "status": "awaiting_user",
+                    "server": server.name,
+                    "authorizationUrl": response.authorization_url,
+                    "turnStoppedAfterMutation": true,
+                }))
             }
             "list_conversations" => {
                 let mut conversations = Vec::new();
@@ -2945,6 +3204,61 @@ fn mahayana_dynamic_tools() -> Vec<DynamicToolSpec> {
                 defer_loading: false,
             }),
             DynamicToolNamespaceTool::Function(DynamicToolFunctionSpec {
+                name: "search_plugins".into(),
+                description: "Search the current Fabushi plugin catalog. Results are bounded and expose product metadata only.".into(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "maxLength": 120}
+                    },
+                    "additionalProperties": false
+                }),
+                defer_loading: false,
+            }),
+            DynamicToolNamespaceTool::Function(DynamicToolFunctionSpec {
+                name: "get_plugin".into(),
+                description: "Inspect one catalog plugin before deciding whether to install it.".into(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {"pluginId": {"type": "string", "minLength": 1}},
+                    "required": ["pluginId"],
+                    "additionalProperties": false
+                }),
+                defer_loading: false,
+            }),
+            DynamicToolNamespaceTool::Function(DynamicToolFunctionSpec {
+                name: "install_plugin".into(),
+                description: "Install one catalog plugin through Fabushi's canonical Codex app-server owner. This successful mutation ends the current turn so authentication or follow-up changes happen only after the user/runtime settles.".into(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {"pluginId": {"type": "string", "minLength": 1}},
+                    "required": ["pluginId"],
+                    "additionalProperties": false
+                }),
+                defer_loading: false,
+            }),
+            DynamicToolNamespaceTool::Function(DynamicToolFunctionSpec {
+                name: "mcp_status".into(),
+                description: "List installed MCP servers with authentication state and tool names without exposing credentials or local config secrets.".into(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                }),
+                defer_loading: false,
+            }),
+            DynamicToolNamespaceTool::Function(DynamicToolFunctionSpec {
+                name: "mcp_oauth_connect".into(),
+                description: "Start OAuth for one installed MCP server. The successful request ends this turn while the user completes authentication.".into(),
+                input_schema: json!({
+                    "type": "object",
+                    "properties": {"server": {"type": "string", "minLength": 1}},
+                    "required": ["server"],
+                    "additionalProperties": false
+                }),
+                defer_loading: false,
+            }),
+            DynamicToolNamespaceTool::Function(DynamicToolFunctionSpec {
                 name: "list_conversations".into(),
                 description: "列出当前大乘 Runtime 中可供 Codex 接入的联系人会话。".into(),
                 input_schema: json!({
@@ -3140,6 +3454,45 @@ mod tests {
                 .map(Vec::len),
             Some(4)
         );
+    }
+
+    #[test]
+    fn mahayana_dynamic_tools_expose_agent_mcp_lifecycle_without_raw_config_fields() {
+        let value = serde_json::to_value(mahayana_dynamic_tools()).expect("serialize tools");
+        let tools = value
+            .get(0)
+            .and_then(|namespace| namespace.get("tools"))
+            .and_then(Value::as_array)
+            .expect("dynamic tool namespace");
+        for name in [
+            "search_plugins",
+            "get_plugin",
+            "install_plugin",
+            "mcp_status",
+            "mcp_oauth_connect",
+        ] {
+            assert!(
+                tools
+                    .iter()
+                    .any(|tool| tool.get("name").and_then(Value::as_str) == Some(name)),
+                "missing {name}"
+            );
+        }
+        let oauth = tools
+            .iter()
+            .find(|tool| tool.get("name").and_then(Value::as_str) == Some("mcp_oauth_connect"))
+            .expect("oauth tool");
+        let schema = oauth
+            .get("inputSchema")
+            .or_else(|| oauth.get("input_schema"))
+            .expect("oauth schema");
+        assert_eq!(
+            schema["required"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert!(schema["properties"].get("headers").is_none());
+        assert!(schema["properties"].get("token").is_none());
+        assert!(schema["properties"].get("config").is_none());
     }
 
     #[test]
