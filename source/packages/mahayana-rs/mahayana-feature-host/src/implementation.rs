@@ -3541,6 +3541,7 @@ impl FeatureHostController {
                 conversation_id: conversation_id.clone(),
                 sender_id: sender_actor_id.clone(),
                 content,
+                media_group: None,
                 reply_to_message_id: reply_to_message_id.clone(),
                 thread_root_message_id: None,
                 forward_origin: None,

@@ -22,7 +22,7 @@ uuid.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 url.workspace = true
 xml-rs = "0.8.29"
-zip = { workspace = true, default-features = false, features = ["deflate"] }
+zip = { workspace = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"
