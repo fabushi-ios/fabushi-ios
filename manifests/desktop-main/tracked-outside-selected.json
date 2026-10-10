@@ -16,9 +16,9 @@
       "type": "blob",
       "sha": "1c366cc0a12183eb2c3845edeec5eeb5947ee1d5",
       "size": 7109,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-ci-contract",
+      "coverage_status": "reviewed-with-ios-replacement",
+      "reason": "Desktop renderer/typecheck/Electron E2E exact-head CI contract. iOS does not reuse Electron jobs; replacement evidence is .github/workflows/ios-desktop-main-architecture.yml plus ios-desktop-main-completeness.yml and protected-session UI acceptance. Desktop workflow remains an upstream verification dependency, not iOS shipping code."
     },
     {
       "path": ".github/workflows/grok-architecture-migrate.yml",
@@ -26,9 +26,9 @@
       "type": "blob",
       "sha": "a115a37c7adcc0af2decd14c1c073ba3181209d9",
       "size": 2414,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-migration-workflow",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "PR20-era Grok reference import workflow with write access to the old Desktop migration branch. It is not an iOS runtime/build dependency. iOS replacement is live Desktop-main authority/rebaseline in ios-desktop-main-architecture.yml; no source-import automation is inherited."
     },
     {
       "path": ".github/workflows/grok-rust-parity-finalize.yml",
@@ -36,9 +36,9 @@
       "type": "blob",
       "sha": "a48bde089045aa4cfefa902710b74b463d95c53d",
       "size": 2726,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-rust-finalization-workflow",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "PR20-era workflow that tested Desktop Host Rust then mutated the old architecture manifest. iOS must not inherit that manifest promotion mechanism; replacement is current exact-head Rust Host/iOS-owned module gates in ios-desktop-main-architecture.yml and completeness acceptance."
     },
     {
       "path": ".github/workflows/pr20-verify-once.yml",
@@ -46,9 +46,9 @@
       "type": "blob",
       "sha": "a05bce7d23a5fd0fc88b3076d6afe4a1f27a15d9",
       "size": 970,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-pr20-verification-workflow",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Old PR20 architecture inventory/renderer verification workflow. It has no iOS shipping role; current iOS authority and build/test gates replace it and must stay tied to final exact HEAD."
     },
     {
       "path": ".github/workflows/release-macos-main.yml",
@@ -56,9 +56,9 @@
       "type": "blob",
       "sha": "de18d5cb8ba51c71a34a69c8cdaadedd6916112e",
       "size": 21451,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-release-contract",
+      "coverage_status": "reviewed-with-ios-release-replacement",
+      "reason": "Desktop macOS signing/notarization/installer/updater acceptance is platform-specific. iOS release replacement is ios-store-delivery.yml plus ios-desktop-main-completeness.yml archive/signing/device/TestFlight/App Store gates; product/release semantics remain required but macOS packaging steps are not copied."
     },
     {
       "path": ".github/workflows/rust-desktop-runtime.yml",
@@ -66,9 +66,9 @@
       "type": "blob",
       "sha": "a0cff860fac981805863868f9ac2e1ce101a9657",
       "size": 13738,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-runtime-ci-contract",
+      "coverage_status": "reviewed-with-ios-runtime-replacement",
+      "reason": "Desktop canonical Rust Host/Coordinator/Runner and runtime CI is relevant as upstream behavior evidence, but its macOS/desktop graph is not directly runnable on iOS. Replacement is the iOS architecture rust-host job and completeness Rust/device gates against iOS-owned sources."
     },
     {
       "path": ".github/workflows/tdrp-external-url-auth-responsibility.yml",
@@ -76,9 +76,9 @@
       "type": "blob",
       "sha": "a47532498d3f3d7cc4fd7ab96f05423016715b56",
       "size": 6690,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-security-ci-contract",
+      "coverage_status": "reviewed-with-ios-focused-replacement",
+      "reason": "Desktop TDRP exact-origin/external-auth privilege test is a security dependency. iOS replacement is source/shared/external-url-policy.swift plus first-party auth sanitation in Rust product owner and focused SharedSettingsParityTests/current exact-head Actions; Electron ownership checks are platform-specific."
     },
     {
       "path": ".github/workflows/tdrp-revision9-authority.yml",
@@ -86,9 +86,9 @@
       "type": "blob",
       "sha": "2d2cc9feffac73afc9674b4c84ac1d536d9fa64f",
       "size": 26983,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-telegram-migration-authority-workflow",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "TDRP Telegram source-authority/inventory workflow governs a separate Desktop migration project and its upstream lock. It is not an iOS product runtime dependency. Any product responsibilities that land in canonical Desktop main are independently captured by the iOS Desktop-main authority inventory; no Telegram authority state is inherited."
     },
     {
       "path": ".github/workflows/tdrp-search-responsibility.yml",
@@ -96,9 +96,9 @@
       "type": "blob",
       "sha": "9b82dab2f13f7982257a7a47869297b83ae99594",
       "size": 5572,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-search-ci-contract",
+      "coverage_status": "reviewed-with-ios-focused-replacement",
+      "reason": "Desktop canonical Search replacement/dedupe CI carries a product responsibility, not a reusable iOS workflow. iOS must satisfy the corresponding native search responsibility through current ledger rows, focused Swift/UI tests and final exact-head completeness evidence."
     },
     {
       "path": "AGENTS.md",
@@ -106,9 +106,9 @@
       "type": "blob",
       "sha": "f0e01c5814472398f770ab053700c92bd1968988",
       "size": 9944,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "repository-governance",
+      "coverage_status": "reviewed-governance-applied",
+      "reason": "Repository-wide Desktop spec-first/existing-owner/exact-evidence governance was read as active upstream process context. iOS follows its own AGENTS.md/current parity Spec while preserving these applicable discipline requirements; this file is not copied as production code."
     },
     {
       "path": "DESKTOP_SOURCE_CLOSURE.md",
@@ -116,9 +116,9 @@
       "type": "blob",
       "sha": "d17c9d27f29f0dc97ca36bdeb7439f923ddbe2a9",
       "size": 3096,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-provenance-contract",
+      "coverage_status": "reviewed-dependency-provenance",
+      "reason": "Documents Desktop restored monorepo dependencies and provenance needed for standalone Desktop builds. iOS must independently account for responsibilities from those restored sources through the 7,950-row ledger and its own repository-owned implementations; Desktop checkout coupling is not allowed."
     },
     {
       "path": "MIGRATION_SOURCE.md",
@@ -126,9 +126,9 @@
       "type": "blob",
       "sha": "d91bdfd50f9d16df823b0cb64c51b12b945d5c5f",
       "size": 294,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-export-provenance",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Records an older Desktop export source commit/boundary and contains no runtime behavior or credentials. Current iOS authority is live bhrumom/fabushi-desktop@main, so this historical export metadata is provenance-only and cannot override the live authority lock."
     },
     {
       "path": "README.md",
