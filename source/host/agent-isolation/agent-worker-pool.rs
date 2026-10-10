@@ -22,11 +22,15 @@ pub struct AgentWorkerDescription {
     pub agent_id: String,
     pub blob_db_path: PathBuf,
     pub idle_for_ms: u64,
+    pub active_operations: usize,
+    pub next_request_id: u64,
 }
 
 #[derive(Debug)]
 struct PoolState {
     workers: HashMap<PathBuf, WorkerLane>,
+    active_ops: HashMap<PathBuf, usize>,
+    next_request_ids: HashMap<PathBuf, u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +73,8 @@ impl AgentWorkerPool {
             sweep_interval: Duration::from_millis(sweep_interval_ms.max(1)),
             state: Arc::new(Mutex::new(PoolState {
                 workers: HashMap::new(),
+                active_ops: HashMap::new(),
+                next_request_ids: HashMap::new(),
             })),
             sweep_started: Arc::new(AtomicBool::new(false)),
             closed: Arc::new(AtomicBool::new(false)),
@@ -99,7 +105,7 @@ impl AgentWorkerPool {
             .workers
             .iter()
             .filter_map(|(path, lane)| {
-                if Arc::strong_count(lane) != 1 {
+                if state.active_ops.get(path).copied().unwrap_or(0) != 0 {
                     return None;
                 }
                 let worker = lane.lock().ok()?;
@@ -109,6 +115,8 @@ impl AgentWorkerPool {
 
         for path in candidates {
             if let Some(lane) = state.workers.remove(&path) {
+                state.active_ops.remove(&path);
+                state.next_request_ids.remove(&path);
                 if let Ok(mut worker) = lane.lock() {
                     let _ = worker.close();
                 }
@@ -152,7 +160,7 @@ impl AgentWorkerPool {
                         .workers
                         .iter()
                         .filter_map(|(path, lane)| {
-                            if Arc::strong_count(lane) != 1 {
+                            if state.active_ops.get(path).copied().unwrap_or(0) != 0 {
                                 return None;
                             }
                             let worker = lane.lock().ok()?;
@@ -161,7 +169,12 @@ impl AgentWorkerPool {
                         .collect::<Vec<_>>();
                     candidates
                         .into_iter()
-                        .filter_map(|path| state.workers.remove(&path))
+                        .filter_map(|path| {
+                            let lane = state.workers.remove(&path);
+                            state.active_ops.remove(&path);
+                            state.next_request_ids.remove(&path);
+                            lane
+                        })
                         .collect::<Vec<_>>()
                 };
 
@@ -182,7 +195,7 @@ impl AgentWorkerPool {
                 .workers
                 .iter()
                 .filter_map(|(path, lane)| {
-                    if Arc::strong_count(lane) != 1 {
+                    if state.active_ops.get(path).copied().unwrap_or(0) != 0 {
                         return None;
                     }
                     let worker = lane.lock().ok()?;
@@ -198,6 +211,8 @@ impl AgentWorkerPool {
                 ));
             };
             if let Some(lane) = state.workers.remove(&path) {
+                state.active_ops.remove(&path);
+                state.next_request_ids.remove(&path);
                 let mut worker = lane
                     .lock()
                     .map_err(|_| Self::poisoned("agent store lane"))?;
@@ -253,10 +268,103 @@ impl AgentWorkerPool {
             legacy_blob_db_path.map(Path::to_path_buf),
         )?;
         let lane = Arc::new(Mutex::new(worker));
-        state.workers.insert(blob_db_path, lane.clone());
+        state.workers.insert(blob_db_path.clone(), lane.clone());
+        state.active_ops.entry(blob_db_path.clone()).or_insert(0);
+        state.next_request_ids.entry(blob_db_path).or_insert(2);
         drop(state);
         self.start_sweep();
         Ok(lane)
+    }
+
+    fn retain_operation(&self, blob_db_path: &Path) -> Result<(), ConversationBlobRecoveryError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| Self::poisoned("agent worker pool"))?;
+        *state
+            .active_ops
+            .entry(blob_db_path.to_path_buf())
+            .or_insert(0) += 1;
+        Ok(())
+    }
+
+    fn release_operation(&self, blob_db_path: &Path) -> Result<(), ConversationBlobRecoveryError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| Self::poisoned("agent worker pool"))?;
+        if let Some(active) = state.active_ops.get_mut(blob_db_path) {
+            *active = active.saturating_sub(1);
+            if *active == 0 && !state.workers.contains_key(blob_db_path) {
+                state.active_ops.remove(blob_db_path);
+            }
+        }
+        Ok(())
+    }
+
+    fn next_request_id(&self, blob_db_path: &Path) -> Result<u64, ConversationBlobRecoveryError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| Self::poisoned("agent worker pool"))?;
+        let next = state
+            .next_request_ids
+            .get_mut(blob_db_path)
+            .ok_or_else(|| ConversationBlobRecoveryError::new(
+                "SAND_AGENT_WORKER_UNAVAILABLE",
+                format!("agent store lane {} has no request identity", blob_db_path.display()),
+            ))?;
+        let request_id = *next;
+        *next = next.saturating_add(1);
+        Ok(request_id)
+    }
+
+    fn invalidate_failed_lane(&self, blob_db_path: &Path, error: &ConversationBlobRecoveryError) {
+        if error.code != "SAND_AGENT_STORE_WORKER_CLOSED"
+            && error.code != "SAND_AGENT_WORKER_POOL_POISONED"
+        {
+            return;
+        }
+        if let Ok(mut state) = self.state.lock() {
+            let lane = state.workers.remove(blob_db_path);
+            state.active_ops.remove(blob_db_path);
+            state.next_request_ids.remove(blob_db_path);
+            lane;
+            state.next_request_ids.remove(blob_db_path);
+            if state.active_ops.get(blob_db_path).copied().unwrap_or(0) == 0 {
+                state.active_ops.remove(blob_db_path);
+            }
+        }
+    }
+
+    fn with_worker_operation<T, F>(
+        &self,
+        agent_id: &str,
+        blob_db_path: &Path,
+        legacy_blob_db_path: Option<&Path>,
+        operation: F,
+    ) -> Result<T, ConversationBlobRecoveryError>
+    where
+        F: FnOnce(&mut AgentStoreWorker, u64) -> Result<T, ConversationBlobRecoveryError>,
+    {
+        self.retain_operation(blob_db_path)?;
+        let result = (|| {
+            let lane = self.ensure(agent_id, blob_db_path, legacy_blob_db_path)?;
+            let request_id = self.next_request_id(blob_db_path)?;
+            let mut worker = lane
+                .lock()
+                .map_err(|_| Self::poisoned("agent store lane"))?;
+            operation(&mut worker, request_id)
+        })();
+        let release = self.release_operation(blob_db_path);
+        if let Err(error) = &result {
+            self.invalidate_failed_lane(blob_db_path, error);
+        }
+        match (result, release) {
+            (Err(error), _) => Err(error),
+            (Ok(_), Err(error)) => Err(error),
+            (Ok(value), Ok(())) => Ok(value),
+        }
     }
 
     pub fn active_worker_count(&self) -> Result<usize, ConversationBlobRecoveryError> {
@@ -275,7 +383,7 @@ impl AgentWorkerPool {
             .lock()
             .map_err(|_| Self::poisoned("agent worker pool"))?;
         let mut descriptions = Vec::with_capacity(state.workers.len());
-        for lane in state.workers.values() {
+        for (path, lane) in &state.workers {
             let worker = lane
                 .lock()
                 .map_err(|_| Self::poisoned("agent store lane"))?;
@@ -286,6 +394,8 @@ impl AgentWorkerPool {
                     .idle_for()
                     .as_millis()
                     .min(u64::MAX as u128) as u64,
+                active_operations: state.active_ops.get(path).copied().unwrap_or(0),
+                next_request_id: state.next_request_ids.get(path).copied().unwrap_or(1),
             });
         }
         descriptions.sort_by(|left, right| left.blob_db_path.cmp(&right.blob_db_path));
@@ -298,11 +408,12 @@ impl AgentWorkerPool {
         blob_db_path: &Path,
         legacy_blob_db_path: Option<&Path>,
     ) -> Result<Option<Vec<u8>>, ConversationBlobRecoveryError> {
-        let lane = self.ensure(agent_id, blob_db_path, legacy_blob_db_path)?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.find_latest_root_blob_id()
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            legacy_blob_db_path,
+            |worker, _request_id| worker.find_latest_root_blob_id(),
+        )
     }
 
     pub fn mark_checkpoint_root(
@@ -312,11 +423,12 @@ impl AgentWorkerPool {
         blob_id: &[u8],
         legacy_blob_db_path: Option<&Path>,
     ) -> Result<(), ConversationBlobRecoveryError> {
-        let lane = self.ensure(agent_id, blob_db_path, legacy_blob_db_path)?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.mark_checkpoint_root(blob_id)
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            legacy_blob_db_path,
+            |worker, _request_id| worker.mark_checkpoint_root(blob_id),
+        )
     }
 
     pub fn clear_blobs(
@@ -325,11 +437,12 @@ impl AgentWorkerPool {
         blob_db_path: &Path,
         legacy_blob_db_path: Option<&Path>,
     ) -> Result<(), ConversationBlobRecoveryError> {
-        let lane = self.ensure(agent_id, blob_db_path, legacy_blob_db_path)?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.clear_blobs()
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            legacy_blob_db_path,
+            |worker, _request_id| worker.clear_blobs(),
+        )
     }
 
     pub fn clear_stale_checkpoint_roots(
@@ -339,11 +452,12 @@ impl AgentWorkerPool {
         retained_root_id_hex: &str,
         legacy_blob_db_path: Option<&Path>,
     ) -> Result<usize, ConversationBlobRecoveryError> {
-        let lane = self.ensure(agent_id, blob_db_path, legacy_blob_db_path)?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.clear_stale_checkpoint_roots(retained_root_id_hex)
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            legacy_blob_db_path,
+            |worker, _request_id| worker.clear_stale_checkpoint_roots(retained_root_id_hex),
+        )
     }
 
     pub fn collect_conversation_garbage<Decoder>(
@@ -358,14 +472,17 @@ impl AgentWorkerPool {
     where
         Decoder: BlobReferenceDecoder,
     {
-        let lane = self.ensure(agent_id, blob_db_path, legacy_blob_db_path)?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.collect_conversation_garbage(
-            retained_root_id_hex,
-            pending_write_retention_ms,
-            decoder,
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            legacy_blob_db_path,
+            |worker, _request_id| {
+                worker.collect_conversation_garbage(
+                    retained_root_id_hex,
+                    pending_write_retention_ms,
+                    decoder,
+                )
+            },
         )
     }
 
@@ -376,31 +493,47 @@ impl AgentWorkerPool {
         retained_root_id_hex: &str,
         legacy_blob_db_path: &Path,
     ) -> Result<LegacyBlobRetirementVerdict, ConversationBlobRecoveryError> {
-        let lane = self.ensure(agent_id, blob_db_path, Some(legacy_blob_db_path))?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.verify_legacy_blob_retirement(retained_root_id_hex, legacy_blob_db_path)
+        self.with_worker_operation(
+            agent_id,
+            blob_db_path,
+            Some(legacy_blob_db_path),
+            |worker, _request_id| {
+                worker.verify_legacy_blob_retirement(retained_root_id_hex, legacy_blob_db_path)
+            },
+        )
     }
 
     pub fn flush_store(
         &self,
         blob_db_path: &Path,
     ) -> Result<(), ConversationBlobRecoveryError> {
-        let lane = {
-            let state = self
-                .state
+        self.retain_operation(blob_db_path)?;
+        let result = (|| {
+            let lane = {
+                let state = self
+                    .state
+                    .lock()
+                    .map_err(|_| Self::poisoned("agent worker pool"))?;
+                state.workers.get(blob_db_path).cloned()
+            };
+            let Some(lane) = lane else {
+                return Ok(());
+            };
+            let _request_id = self.next_request_id(blob_db_path)?;
+            let mut worker = lane
                 .lock()
-                .map_err(|_| Self::poisoned("agent worker pool"))?;
-            state.workers.get(blob_db_path).cloned()
-        };
-        let Some(lane) = lane else {
-            return Ok(());
-        };
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.flush()
+                .map_err(|_| Self::poisoned("agent store lane"))?;
+            worker.flush()
+        })();
+        let release = self.release_operation(blob_db_path);
+        if let Err(error) = &result {
+            self.invalidate_failed_lane(blob_db_path, error);
+        }
+        match (result, release) {
+            (Err(error), _) => Err(error),
+            (Ok(_), Err(error)) => Err(error),
+            (Ok(()), Ok(())) => Ok(()),
+        }
     }
 
     pub fn close_store(
@@ -430,6 +563,8 @@ impl AgentWorkerPool {
                 .state
                 .lock()
                 .map_err(|_| Self::poisoned("agent worker pool"))?;
+            state.active_ops.clear();
+            state.next_request_ids.clear();
             state.workers.drain().map(|(_, lane)| lane).collect::<Vec<_>>()
         };
         for lane in workers {
@@ -452,15 +587,12 @@ impl AgentWorkerBlobPool for AgentWorkerPool {
         blob_id: &[u8],
         legacy_blob_db_path: Option<&str>,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
-        let lane = self.ensure(
+        self.with_worker_operation(
             agent_id,
             Path::new(blob_db_path),
             legacy_blob_db_path.map(Path::new),
-        )?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.get_blob(blob_id)
+            |worker, _request_id| worker.get_blob(blob_id),
+        )
     }
 
     async fn set_blob(
@@ -471,15 +603,12 @@ impl AgentWorkerBlobPool for AgentWorkerPool {
         blob_data: &[u8],
         legacy_blob_db_path: Option<&str>,
     ) -> Result<(), Self::Error> {
-        let lane = self.ensure(
+        self.with_worker_operation(
             agent_id,
             Path::new(blob_db_path),
             legacy_blob_db_path.map(Path::new),
-        )?;
-        let mut worker = lane
-            .lock()
-            .map_err(|_| Self::poisoned("agent store lane"))?;
-        worker.set_blob(blob_id, blob_data)
+            |worker, _request_id| worker.set_blob(blob_id, blob_data),
+        )
     }
 }
 
@@ -523,6 +652,11 @@ mod tests {
         assert_eq!(pool.active_worker_count().unwrap(), 1);
         let descriptions = pool.describe_workers().unwrap();
         assert_eq!(descriptions[0].agent_id, "agent-a");
+        assert_eq!(descriptions[0].active_operations, 0);
+        assert_eq!(
+            descriptions[0].next_request_id, 4,
+            "implicit init + set + get consume correlated request identities",
+        );
     }
 
     #[test]
@@ -553,6 +687,42 @@ mod tests {
             pool.describe_workers().unwrap()[0].blob_db_path,
             second
         );
+    }
+
+    #[test]
+    fn capacity_never_evicts_an_explicitly_active_lane() {
+        let dir = temp_dir();
+        let first = dir.join("active.sqlite");
+        let second = dir.join("second.sqlite");
+        let pool = AgentWorkerPool::new(500, u64::MAX, 1);
+
+        pool.retain_operation(&first).unwrap();
+        let lane = pool.ensure("agent-a", &first, None).unwrap();
+        drop(lane);
+        let error = pool.ensure("agent-b", &second, None).unwrap_err();
+        assert_eq!(error.code, "SAND_AGENT_WORKER_POOL_CAPACITY");
+        pool.release_operation(&first).unwrap();
+
+        pool.ensure("agent-b", &second, None).unwrap();
+        assert_eq!(pool.describe_workers().unwrap()[0].blob_db_path, second);
+    }
+
+    #[test]
+    fn closed_lane_failure_propagates_and_next_request_rebuilds_lane() {
+        let dir = temp_dir();
+        let db = dir.join("closed.sqlite");
+        let pool = AgentWorkerPool::new(500, u64::MAX, 2);
+        let original = pool.ensure("agent-a", &db, None).unwrap();
+        original.lock().unwrap().close().unwrap();
+
+        let error = pool
+            .find_latest_root_blob_id("agent-a", &db, None)
+            .unwrap_err();
+        assert_eq!(error.code, "SAND_AGENT_STORE_WORKER_CLOSED");
+
+        let replacement = pool.ensure("agent-a", &db, None).unwrap();
+        assert!(!Arc::ptr_eq(&original, &replacement));
+        assert_eq!(pool.describe_workers().unwrap()[0].next_request_id, 2);
     }
 
     #[test]
