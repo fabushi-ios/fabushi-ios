@@ -273,7 +273,14 @@ mod tests {
 
     #[test]
     fn evidence_mode_cleanup_removes_pending_episode_state() {
-        let root = std::env::temp_dir().join(format!("fabushi-turn-memory-{}-{}", std::process::id(), crate::implementation::now_millis()));
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-turn-memory-{}-{nonce}",
+            std::process::id()
+        ));
         let memory_dir = root.join("memory");
         let turn = EpisodeTurn { ts: 1, user: "u".into(), agent: "a".into() };
         record_pending_episode_turn(&memory_dir, &turn).expect("record");
