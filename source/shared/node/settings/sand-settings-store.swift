@@ -760,15 +760,24 @@ final class SandSettingsStore: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         var current = loadLocked()
         guard current.mcpCustomInstructionsAccountScope == scope else { return false }
-        let candidate = SandStoredComposerSubmission(
-            nonce: nonce, agentId: agentId,
-            createdAtMs: max(0, createdAtMs), commandJSON: commandJSON
-        )
         var rows = current.composerSubmissionQueue ?? []
         if let index = rows.firstIndex(where: { $0.nonce == nonce }) {
+            let candidate = SandStoredComposerSubmission(
+                nonce: nonce,
+                agentId: agentId,
+                createdAtMs: rows[index].createdAtMs,
+                commandJSON: commandJSON
+            )
             if rows[index] == candidate { return true }
             rows[index] = candidate
-        } else { rows.append(candidate) }
+        } else {
+            rows.append(SandStoredComposerSubmission(
+                nonce: nonce,
+                agentId: agentId,
+                createdAtMs: max(0, createdAtMs),
+                commandJSON: commandJSON
+            ))
+        }
         current.composerSubmissionQueue = rows
         try persistLocked(current)
         return true

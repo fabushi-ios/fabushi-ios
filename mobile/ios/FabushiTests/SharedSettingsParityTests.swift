@@ -945,8 +945,15 @@ final class SharedSettingsParityTests: XCTestCase {
         let two = #"{"agentId":"agent-1","requestId":"nonce-2","text":"second","type":"chat.send"}"#
         XCTAssertTrue(try store.enqueueComposerSubmission(nonce: "nonce-1", agentId: "agent-1", createdAtMs: 10, commandJSON: one, expectedAccountScope: "owner-a"))
         XCTAssertTrue(try store.enqueueComposerSubmission(nonce: "nonce-2", agentId: "agent-1", createdAtMs: 20, commandJSON: two, expectedAccountScope: "owner-a"))
-        XCTAssertTrue(try store.enqueueComposerSubmission(nonce: "nonce-1", agentId: "agent-1", createdAtMs: 10, commandJSON: one, expectedAccountScope: "owner-a"))
-        XCTAssertEqual(store.composerSubmissions(expectedAccountScope: "owner-a", agentId: "agent-1").map(\.nonce), ["nonce-1", "nonce-2"])
+        let updatedOne = #"{"agentId":"agent-1","requestId":"nonce-1","text":"first-updated","type":"chat.send"}"#
+        XCTAssertTrue(try store.enqueueComposerSubmission(
+            nonce: "nonce-1", agentId: "agent-1", createdAtMs: 999,
+            commandJSON: updatedOne, expectedAccountScope: "owner-a"
+        ))
+        let ordered = store.composerSubmissions(expectedAccountScope: "owner-a", agentId: "agent-1")
+        XCTAssertEqual(ordered.map(\.nonce), ["nonce-1", "nonce-2"])
+        XCTAssertEqual(ordered.first?.createdAtMs, 10)
+        XCTAssertEqual(ordered.first?.commandJSON, updatedOne)
         let restored = SandSettingsStore(settingsPath: path.path)
         XCTAssertEqual(restored.composerSubmissions(expectedAccountScope: "owner-a").map(\.nonce), ["nonce-1", "nonce-2"])
         XCTAssertTrue(try restored.removeComposerSubmission(nonce: "nonce-1", expectedAccountScope: "owner-a"))

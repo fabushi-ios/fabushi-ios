@@ -6437,6 +6437,20 @@ internal struct MobileBotChat: View {
               !oldNonce.isEmpty
         else { return }
 
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedBot = bot.id
+        do {
+            _ = try await bridge.request(
+                method: "native.composerQueue.remove",
+                params: ["nonce": oldNonce]
+            )
+        } catch {
+            guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id else { return }
+            errorText = "Failed send could not be retired before retry: \(error.localizedDescription)"
+            return
+        }
+        guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id else { return }
+
         let logicalNonce = mobileAcknowledgementLogicalNonce(oldNonce)
         let freshNonce = mobileAcknowledgementRetryNonce(
             logicalNonce: logicalNonce,
