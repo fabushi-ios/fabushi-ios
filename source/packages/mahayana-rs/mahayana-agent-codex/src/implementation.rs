@@ -2929,7 +2929,7 @@ fn mahayana_dynamic_tools() -> Vec<DynamicToolSpec> {
                 defer_loading: false,
             }),
             DynamicToolNamespaceTool::Function(DynamicToolFunctionSpec {
-                name: "request_box_help".into()
+                name: "request_box_help".into(),
                 description: "Hand control to the user for a step only they can safely do, such as login, SSO, passkey, 2FA, captcha, or payment confirmation. This turn ends after the request and resumes automatically after the user returns control.".into(),
                 input_schema: json!({
                     "type": "object",
