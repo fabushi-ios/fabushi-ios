@@ -164,6 +164,7 @@ internal func mobileReactionPickerNextIndex(
 internal enum MobileEditorSuggestionCategory: String, Equatable {
     case assistants
     case automations
+    case tools
     case emoji
 }
 
@@ -186,6 +187,8 @@ internal struct MobileEditorSuggestionItem: Identifiable, Equatable {
     var triggerSchedule: String?
     var triggerEnabled: Bool?
     var keywords: [String] = []
+    var iconURL: String?
+    var mcpReference: MobileComposerMcpReference?
 }
 
 internal struct MobileEditorSuggestionContext: Equatable {
@@ -278,6 +281,176 @@ internal func projectMobileEditorWorkflowSuggestions(
     }
 }
 
+private func mobileEditorMcpSafeAccountLabel(_ value: String) -> String {
+    String(
+        value
+            .filter { !["\"", "'", "`", "[", "]", "{", "}", "(", ")", "<", ">"].contains(String($0)) }
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+            .prefix(64)
+    )
+}
+
+private func mobileEditorMcpStatusLabel(_ server: MarketplaceMcpServer) -> String {
+    switch server.status {
+    case "connected": return "connected"
+    case "needsAuth": return "needs auth"
+    case "error": return "error"
+    case "initializing": return "connecting"
+    case "disconnected": return "disconnected"
+    case "disabledByTeamAdminPolicy": return "disabled"
+    default: return server.accountKey == DEFAULT_MCP_ACCOUNT_KEY
+        ? server.statusDetail ?? ""
+        : server.accountKey
+    }
+}
+
+private func mobileEditorMcpCatalogEntry(
+    server: MarketplaceMcpServer,
+    catalog: [MobileConnectorCatalogEntry]
+) -> MobileConnectorCatalogEntry? {
+    let candidates = [
+        server.serverIdentifier,
+        server.name,
+        server.serverId,
+        server.rowServerIdentifier ?? "",
+    ].map(normalizeMobileConnectorName)
+    return catalog.first { entry in
+        [entry.id, entry.name, entry.displayName]
+            .map(normalizeMobileConnectorName)
+            .contains { candidates.contains($0) }
+    }
+}
+
+internal func projectMobileEditorMcpSuggestions(
+    servers: [MarketplaceMcpServer],
+    catalog: [MobileConnectorCatalogEntry]
+) -> [MobileEditorSuggestionItem] {
+    var seen = Set<String>()
+    return servers.compactMap { server in
+        let serverIdentifier = server.serverIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        let serverId = server.serverId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let accountKey = server.accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !serverIdentifier.isEmpty,
+              !serverId.isEmpty,
+              !accountKey.isEmpty,
+              seen.insert(serverIdentifier).inserted
+        else { return nil }
+
+        let safeAccount = mobileEditorMcpSafeAccountLabel(accountKey)
+        let label = accountKey == DEFAULT_MCP_ACCOUNT_KEY
+            ? server.name
+            : "\(server.name) (\(safeAccount))"
+        let subtitle = mobileEditorMcpStatusLabel(server)
+        let metadata = mobileEditorMcpCatalogEntry(server: server, catalog: catalog)
+        let reference = MobileComposerMcpReference(
+            workflowReferenceID: "mcp:\(serverId)",
+            serverId: serverId,
+            serverIdentifier: serverIdentifier,
+            accountKey: accountKey,
+            label: label,
+            status: server.status,
+            iconURL: metadata?.iconURL
+        )
+        return .init(
+            id: "mcp:\(serverIdentifier)",
+            category: .tools,
+            label: label,
+            subtitle: subtitle.isEmpty ? nil : subtitle,
+            insertion: "@\(label)",
+            keywords: [label, serverIdentifier, accountKey, subtitle],
+            iconURL: metadata?.iconURL,
+            mcpReference: reference
+        )
+    }
+}
+
+internal func projectScopedMobileEditorMcpSuggestions(
+    servers: [MarketplaceMcpServer],
+    catalog: [MobileConnectorCatalogEntry],
+    ownedAccountKey: String,
+    currentAccountKey: String,
+    ownedAgentID: String,
+    currentAgentID: String
+) -> [MobileEditorSuggestionItem] {
+    guard !ownedAccountKey.isEmpty,
+          !ownedAgentID.isEmpty,
+          ownedAccountKey == currentAccountKey,
+          ownedAgentID == currentAgentID
+    else { return [] }
+    return projectMobileEditorMcpSuggestions(servers: servers, catalog: catalog)
+}
+
+internal func pruneMobileComposerMcpReferences(
+    draft: String,
+    references: [MobileComposerMcpReference]
+) -> [MobileComposerMcpReference] {
+    var seen = Set<String>()
+    return references.filter { reference in
+        draft.contains("@\(reference.label)")
+            && seen.insert(reference.workflowReferenceID).inserted
+    }
+}
+
+internal func mobileComposerRichText(
+    draft: String,
+    references: [MobileComposerMcpReference]
+) -> String? {
+    let active = pruneMobileComposerMcpReferences(draft: draft, references: references)
+    guard !active.isEmpty else { return nil }
+
+    struct Match {
+        let range: Range<String.Index>
+        let reference: MobileComposerMcpReference
+    }
+    var matches = active.compactMap { reference -> Match? in
+        guard let range = draft.range(of: "@\(reference.label)") else { return nil }
+        return Match(range: range, reference: reference)
+    }
+    matches.sort { $0.range.lowerBound < $1.range.lowerBound }
+
+    var content: [[String: Any]] = []
+    var cursor = draft.startIndex
+    for match in matches {
+        guard match.range.lowerBound >= cursor else { continue }
+        if cursor < match.range.lowerBound {
+            content.append([
+                "type": "text",
+                "text": String(draft[cursor..<match.range.lowerBound]),
+            ])
+        }
+        var attrs: [String: Any] = [
+            "id": match.reference.workflowReferenceID,
+            "label": match.reference.label,
+        ]
+        if let iconURL = match.reference.iconURL, !iconURL.isEmpty {
+            attrs["iconUrl"] = iconURL
+        }
+        content.append([
+            "type": "workflowReference",
+            "attrs": attrs,
+        ])
+        cursor = match.range.upperBound
+    }
+    if cursor < draft.endIndex {
+        content.append(["type": "text", "text": String(draft[cursor...])])
+    }
+    guard content.contains(where: { $0["type"] as? String == "workflowReference" }) else {
+        return nil
+    }
+    let document: [String: Any] = [
+        "type": "doc",
+        "content": [[
+            "type": "paragraph",
+            "content": content,
+        ]],
+    ]
+    guard JSONSerialization.isValidJSONObject(document),
+          let data = try? JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+    else { return nil }
+    return String(data: data, encoding: .utf8)
+}
+
 internal func mobileEditorSuggestionContext(
     _ draft: String
 ) -> MobileEditorSuggestionContext? {
@@ -367,13 +540,14 @@ internal func mobileEditorSuggestionRows(
     context: MobileEditorSuggestionContext?,
     assistants: [MobileEditorSuggestionItem],
     workflows: [MobileEditorSuggestionItem],
+    mcpReferences: [MobileEditorSuggestionItem] = [],
     recentKeys: [String] = []
 ) -> [MobileEditorSuggestionItem] {
     guard let context else { return [] }
     let source: [MobileEditorSuggestionItem]
     switch context.trigger {
     case "@":
-        source = assistants + workflows.filter { $0.triggerSchedule != nil }
+        source = assistants + workflows.filter { $0.triggerSchedule != nil } + mcpReferences
     case "/":
         source = workflows.filter { $0.triggerSchedule == nil }
     case ":":
@@ -1516,6 +1690,8 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerCategory: MobileReactionPickerCategory = .all
     @State private var reactionPickerRecentIds: [String] = []
     @State private var editorSuggestionWorkflows: [MobileEditorSuggestionItem] = []
+    @State private var editorSuggestionMcpReferences: [MobileEditorSuggestionItem] = []
+    @State private var composerMcpReferences: [MobileComposerMcpReference] = []
     @State private var editorSuggestionStatus: MobileEditorSuggestionSourceStatus = .idle
     @State private var editorSuggestionGeneration = 0
     @State private var editorSuggestionActiveIndex: Int?
@@ -1594,6 +1770,12 @@ internal struct MobileBotChat: View {
         }
         .task(id: editorSuggestionScopeFingerprint) {
             await refreshEditorSuggestions()
+        }
+        .onChange(of: model.mcpServers) { _, _ in
+            adoptEditorMcpReferencesFromModel()
+        }
+        .onChange(of: model.connectorCatalog) { _, _ in
+            adoptEditorMcpReferencesFromModel()
         }
         .onChange(of: bot.id) { _, _ in
             resetAcknowledgementScope()
@@ -2234,6 +2416,7 @@ internal struct MobileBotChat: View {
             context: editorSuggestionContext,
             assistants: editorSuggestionAssistants,
             workflows: editorSuggestionWorkflows,
+            mcpReferences: editorSuggestionMcpReferences,
             recentKeys: editorSuggestionRecents
         )
     }
@@ -2278,12 +2461,26 @@ internal struct MobileBotChat: View {
                                     chooseEditorSuggestion(item)
                                 } label: {
                                     HStack(spacing: 9) {
-                                        Image(systemName: item.category == .assistants
-                                            ? "person.crop.circle"
-                                            : item.category == .automations
-                                                ? "bolt.circle"
-                                                : "face.smiling")
+                                        if item.category == .tools,
+                                           let rawIconURL = item.iconURL,
+                                           let iconURL = URL(string: rawIconURL) {
+                                            AsyncImage(url: iconURL) { image in
+                                                image.resizable().scaledToFit()
+                                            } placeholder: {
+                                                Image(systemName: "puzzlepiece.extension")
+                                            }
+                                            .frame(width: 18, height: 18)
                                             .foregroundStyle(.secondary)
+                                        } else {
+                                            Image(systemName: item.category == .assistants
+                                                ? "person.crop.circle"
+                                                : item.category == .automations
+                                                    ? "bolt.circle"
+                                                    : item.category == .tools
+                                                        ? "puzzlepiece.extension"
+                                                        : "face.smiling")
+                                                .foregroundStyle(.secondary)
+                                        }
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(item.label)
                                                 .lineLimit(1)
@@ -2369,7 +2566,11 @@ internal struct MobileBotChat: View {
                     Color.black.opacity(0.055),
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                 )
-                .onChange(of: draft) { _, _ in
+                .onChange(of: draft) { _, nextDraft in
+                    composerMcpReferences = pruneMobileComposerMcpReferences(
+                        draft: nextDraft,
+                        references: composerMcpReferences
+                    )
                     normalizeEditorSuggestionSelection()
                 }
 
@@ -2402,6 +2603,12 @@ internal struct MobileBotChat: View {
     private func chooseEditorSuggestion(_ item: MobileEditorSuggestionItem) {
         guard let context = editorSuggestionContext else { return }
         draft = applyMobileEditorSuggestion(draft: draft, context: context, item: item)
+        if let reference = item.mcpReference {
+            composerMcpReferences = pruneMobileComposerMcpReferences(
+                draft: draft,
+                references: composerMcpReferences + [reference]
+            )
+        }
         let key = "\(item.category.rawValue):\(item.id)"
         editorSuggestionRecents = [key] + editorSuggestionRecents.filter { $0 != key }
         editorSuggestionRecents = Array(editorSuggestionRecents.prefix(50))
@@ -2424,7 +2631,24 @@ internal struct MobileBotChat: View {
         editorSuggestionGeneration &+= 1
         editorSuggestionStatus = .cancelled
         editorSuggestionWorkflows = []
+        editorSuggestionMcpReferences = []
+        composerMcpReferences = []
         editorSuggestionActiveIndex = nil
+    }
+
+    @MainActor
+    private func adoptEditorMcpReferencesFromModel() {
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedAgent = bot.id
+        editorSuggestionMcpReferences = projectScopedMobileEditorMcpSuggestions(
+            servers: model.mcpServers,
+            catalog: model.connectorCatalog,
+            ownedAccountKey: ownedAccount,
+            currentAccountKey: model.settingsNoticeAccountKey,
+            ownedAgentID: ownedAgent,
+            currentAgentID: bot.id
+        )
+        normalizeEditorSuggestionSelection()
     }
 
     @MainActor
@@ -2437,11 +2661,15 @@ internal struct MobileBotChat: View {
         guard !ownedAccount.isEmpty, !ownedAgent.isEmpty else {
             editorSuggestionStatus = .unavailable
             editorSuggestionWorkflows = []
+            editorSuggestionMcpReferences = []
             return
         }
 
-        let previous = editorSuggestionWorkflows
+        let previousWorkflows = editorSuggestionWorkflows
+        let previousMcp = editorSuggestionMcpReferences
+        var sourceFailed = false
         editorSuggestionStatus = .loading
+
         let requestId = "ios-editor-workflow-list-\(UUID().uuidString.lowercased())"
         do {
             _ = try await bridge.request(
@@ -2468,21 +2696,55 @@ internal struct MobileBotChat: View {
                   let rows = event["workflows"] as? [[String: Any]]
             else { return }
             editorSuggestionWorkflows = projectMobileEditorWorkflowSuggestions(rows)
-            editorSuggestionStatus = editorSuggestionWorkflows.isEmpty ? .empty : .ready
-            normalizeEditorSuggestionSelection()
         } catch is CancellationError {
             guard generation == editorSuggestionGeneration else { return }
-            editorSuggestionStatus = .cancelled
-            editorSuggestionWorkflows = previous
+            editorSuggestionWorkflows = previousWorkflows
+            sourceFailed = true
         } catch {
             guard generation == editorSuggestionGeneration,
                   model.settingsNoticeAccountKey == ownedAccount,
                   bot.id == ownedAgent,
                   reconnectGeneration == ownedReconnect
             else { return }
-            editorSuggestionStatus = .failed
-            editorSuggestionWorkflows = previous
+            editorSuggestionWorkflows = previousWorkflows
+            sourceFailed = true
         }
+
+        do {
+            let snapshot = try await model.refreshMcpReferenceSnapshot()
+            guard generation == editorSuggestionGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedAgent,
+                  reconnectGeneration == ownedReconnect
+            else { return }
+            editorSuggestionMcpReferences = projectScopedMobileEditorMcpSuggestions(
+                servers: snapshot.servers,
+                catalog: snapshot.catalog,
+                ownedAccountKey: ownedAccount,
+                currentAccountKey: model.settingsNoticeAccountKey,
+                ownedAgentID: ownedAgent,
+                currentAgentID: bot.id
+            )
+        } catch is CancellationError {
+            guard generation == editorSuggestionGeneration else { return }
+            editorSuggestionMcpReferences = previousMcp
+            sourceFailed = true
+        } catch {
+            guard generation == editorSuggestionGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedAgent,
+                  reconnectGeneration == ownedReconnect
+            else { return }
+            editorSuggestionMcpReferences = previousMcp
+            sourceFailed = true
+        }
+
+        if editorSuggestionWorkflows.isEmpty && editorSuggestionMcpReferences.isEmpty {
+            editorSuggestionStatus = sourceFailed ? .failed : .empty
+        } else {
+            editorSuggestionStatus = .ready
+        }
+        normalizeEditorSuggestionSelection()
     }
 
     @ViewBuilder
@@ -5147,6 +5409,7 @@ internal struct MobileBotChat: View {
         requestId: String,
         text: String,
         attachments: [MobileComposerAttachment],
+        mcpReferences: [MobileComposerMcpReference],
         replyTarget: String?,
         sendAsFork: Bool,
         priorNonces: [String] = []
@@ -5165,6 +5428,7 @@ internal struct MobileBotChat: View {
         row.optimisticNonce = requestId
         row.optimisticPriorNonces = priorNonces
         row.optimisticAttachments = attachments
+        row.optimisticMcpReferences = mcpReferences
         entries.append(row)
     }
 
@@ -5173,6 +5437,8 @@ internal struct MobileBotChat: View {
         requestId: String,
         text: String,
         attachments: [MobileComposerAttachment],
+        mcpReferences: [MobileComposerMcpReference],
+        richText: String?,
         replyTarget: String?,
         sendAsFork: Bool
     ) async {
@@ -5229,6 +5495,23 @@ internal struct MobileBotChat: View {
             if !attachments.isEmpty {
                 command["attachments"] = attachments.map(mobileComposerAttachmentCommandPayload)
             }
+            if !mcpReferences.isEmpty {
+                command["mcpReferences"] = mcpReferences.map { reference in
+                    var row: [String: Any] = [
+                        "id": reference.workflowReferenceID,
+                        "serverId": reference.serverId,
+                        "serverIdentifier": reference.serverIdentifier,
+                        "accountKey": reference.accountKey,
+                        "label": reference.label,
+                        "status": reference.status,
+                    ]
+                    if let iconURL = reference.iconURL, !iconURL.isEmpty {
+                        row["iconUrl"] = iconURL
+                    }
+                    return row
+                }
+            }
+            if let richText, !richText.isEmpty { command["richText"] = richText }
             if let replyTarget { command["replyToMessageId"] = replyTarget }
             let result = try await bridge.request(
                 method: "feature.execute",
@@ -5291,18 +5574,25 @@ internal struct MobileBotChat: View {
               !voiceRecorder.isRecording,
               !transcribingVoice
         else { return }
-        if bot.miniAppId != nil && !attachments.isEmpty {
-            errorText = "Attachments aren't supported by this Mini App chat."
+        let mcpReferences = pruneMobileComposerMcpReferences(
+            draft: text,
+            references: composerMcpReferences
+        )
+        if bot.miniAppId != nil && (!attachments.isEmpty || !mcpReferences.isEmpty) {
+            errorText = "Attachments and MCP references aren't supported by this Mini App chat."
             return
         }
+        let richText = mobileComposerRichText(draft: text, references: mcpReferences)
         let requestId = "ios-mobile-bot-chat-\(UUID().uuidString.lowercased())"
         composerRecovery = .init(
             requestId: requestId,
             text: text,
-            attachments: attachments
+            attachments: attachments,
+            mcpReferences: mcpReferences
         )
         draft = ""
         composerAttachments = []
+        composerMcpReferences = []
         busy = true
         errorText = nil
         let replyTarget = replyTargetId
@@ -5313,6 +5603,7 @@ internal struct MobileBotChat: View {
             requestId: requestId,
             text: text,
             attachments: attachments,
+            mcpReferences: mcpReferences,
             replyTarget: replyTarget,
             sendAsFork: sendAsFork
         )
@@ -5320,6 +5611,8 @@ internal struct MobileBotChat: View {
             requestId: requestId,
             text: text,
             attachments: attachments,
+            mcpReferences: mcpReferences,
+            richText: richText,
             replyTarget: replyTarget,
             sendAsFork: sendAsFork
         )
@@ -5343,10 +5636,15 @@ internal struct MobileBotChat: View {
         )
         let priorNonces = entry.optimisticPriorNonces + [oldNonce]
         entries.removeAll { $0.id == entry.id }
+        let retryReferences = pruneMobileComposerMcpReferences(
+            draft: entry.text,
+            references: entry.optimisticMcpReferences
+        )
         composerRecovery = .init(
             requestId: freshNonce,
             text: entry.text,
-            attachments: entry.optimisticAttachments
+            attachments: entry.optimisticAttachments,
+            mcpReferences: retryReferences
         )
         busy = true
         errorText = nil
@@ -5354,6 +5652,7 @@ internal struct MobileBotChat: View {
             requestId: freshNonce,
             text: entry.text,
             attachments: entry.optimisticAttachments,
+            mcpReferences: retryReferences,
             replyTarget: entry.replyToMessageId,
             sendAsFork: entry.branched,
             priorNonces: priorNonces
@@ -5362,6 +5661,8 @@ internal struct MobileBotChat: View {
             requestId: freshNonce,
             text: entry.text,
             attachments: entry.optimisticAttachments,
+            mcpReferences: retryReferences,
+            richText: mobileComposerRichText(draft: entry.text, references: retryReferences),
             replyTarget: entry.replyToMessageId,
             sendAsFork: entry.branched
         )
