@@ -153,6 +153,14 @@ internal struct ForwardSettlement: Identifiable, Equatable, Sendable {
     let error: String?
 }
 
+internal struct MessagingConversationSearchResult: Identifiable, Equatable, Sendable {
+    let id: String
+    let conversationId: String
+    let snippet: String
+    let timestampMs: Int64?
+    let score: Int
+}
+
 @MainActor
 @Observable
 final class MessagingModel {
@@ -483,6 +491,76 @@ final class MessagingModel {
             }
             errorMessage = error.localizedDescription
         }
+    }
+
+    static func conversationSearchCommand(
+        conversationId: String,
+        query: String,
+        limit: Int = 200
+    ) -> [String: Any]? {
+        let conversationId = conversationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !conversationId.isEmpty, !query.isEmpty else { return nil }
+        return [
+            "type": "search",
+            "query": [
+                "text": query,
+                "scope": "conversation",
+                "conversationId": conversationId,
+                "senderId": NSNull(),
+                "fromMs": NSNull(),
+                "toMs": NSNull(),
+                "limit": max(1, min(limit, 200)),
+            ],
+        ]
+    }
+
+    static func conversationSearchResults(
+        from envelopes: [[String: Any]],
+        conversationId: String
+    ) -> [MessagingConversationSearchResult] {
+        for envelope in envelopes {
+            guard let event = envelope["event"] as? [String: Any],
+                  event["type"] as? String == "searchResults",
+                  let rows = event["results"] as? [[String: Any]]
+            else { continue }
+            return rows.compactMap { row in
+                guard row["kind"] as? String == "message",
+                      let id = row["id"] as? String,
+                      !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      let resultConversationId = row["conversationId"] as? String,
+                      resultConversationId == conversationId
+                else { return nil }
+                let timestampMs = (row["timestampMs"] as? NSNumber)?.int64Value
+                let score = (row["score"] as? NSNumber)?.intValue ?? 0
+                return MessagingConversationSearchResult(
+                    id: id,
+                    conversationId: resultConversationId,
+                    snippet: row["snippet"] as? String ?? "",
+                    timestampMs: timestampMs,
+                    score: score
+                )
+            }
+        }
+        return []
+    }
+
+    func searchConversationMessages(
+        conversationId: String,
+        query: String,
+        limit: Int = 200
+    ) async throws -> [MessagingConversationSearchResult] {
+        guard let command = Self.conversationSearchCommand(
+            conversationId: conversationId,
+            query: query,
+            limit: limit
+        ) else { return [] }
+        try await ensureIdentity()
+        let envelopes = try await execute(command: command)
+        return Self.conversationSearchResults(
+            from: envelopes,
+            conversationId: conversationId
+        )
     }
 
     func searchForwardRecipients(

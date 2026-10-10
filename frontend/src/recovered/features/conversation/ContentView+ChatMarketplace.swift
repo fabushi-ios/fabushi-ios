@@ -525,44 +525,80 @@ internal struct ForwardMessageSheet: View {
 extension ContentView {
     func chatView(_ conversation: ConversationSummary) -> some View {
         let messages = messaging.messagesByConversation[conversation.id] ?? []
-        let searchMatches = chatSearchMatches(
-            messages.map {
-                ChatSearchEntry(
-                    id: $0.id,
-                    text: chatSearchText(
-                        for: $0,
-                        author: messaging.searchAuthorByMessageId[$0.id]
-                    )
+        let normalizedSearchQuery = chatSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let localSearchEntries = messages.map {
+            ChatSearchEntry(
+                id: $0.id,
+                text: chatSearchText(
+                    for: $0,
+                    author: messaging.searchAuthorByMessageId[$0.id]
                 )
-            },
+            )
+        }
+        let durableSearchEntries = chatSearchRemoteResults.map {
+            ChatSearchEntry(id: $0.id, text: $0.snippet)
+        }
+        let searchMatches = chatSearchMatches(
+            normalizedSearchQuery.isEmpty ? localSearchEntries : durableSearchEntries,
             query: chatSearchQuery
         )
+        let selectedDurableSearchResult = chatSearchTargetID.flatMap { targetId in
+            chatSearchRemoteResults.first(where: { $0.id == targetId })
+        }
         return NavigationStack {
             ZStack {
                 Color(red: 0.055, green: 0.06, blue: 0.07).ignoresSafeArea()
                 VStack(spacing: 0) {
                     if chatSearchPresented {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                            TextField("搜索此聊天", text: $chatSearchQuery)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .onChange(of: chatSearchQuery) { _, _ in
-                                    chatSearchMatchIndex = nil
-                                    chatSearchTargetID = nil
+                        VStack(spacing: 4) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                                TextField("搜索此聊天", text: $chatSearchQuery)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .onChange(of: chatSearchQuery) { _, value in
+                                        runHumanChatSearch(conversation: conversation, query: value)
+                                    }
+                                if !normalizedSearchQuery.isEmpty {
+                                    Text(searchMatches.isEmpty ? "0 / 0" : "\((chatSearchMatchIndex ?? 0) + 1) / \(searchMatches.count)")
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                    Button { navigateChatSearch(matches: searchMatches, delta: -1) } label: { Image(systemName: "chevron.up") }
+                                        .disabled(searchMatches.isEmpty)
+                                    Button { navigateChatSearch(matches: searchMatches, delta: 1) } label: { Image(systemName: "chevron.down") }
+                                        .disabled(searchMatches.isEmpty)
+                                    Button { chatSearchQuery = "" } label: { Image(systemName: "xmark.circle.fill") }
                                 }
-                            if !chatSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                Text(searchMatches.isEmpty ? "0 / 0" : "\((chatSearchMatchIndex ?? -1) + 1) / \(searchMatches.count)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                                Button { navigateChatSearch(matches: searchMatches, delta: -1) } label: { Image(systemName: "chevron.up") }
-                                    .disabled(searchMatches.isEmpty)
-                                Button { navigateChatSearch(matches: searchMatches, delta: 1) } label: { Image(systemName: "chevron.down") }
-                                    .disabled(searchMatches.isEmpty)
-                                Button { chatSearchQuery = "" } label: { Image(systemName: "xmark.circle.fill") }
+                            }
+                            if chatSearchLoading {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .accessibilityLabel("正在搜索完整聊天记录")
+                                    .accessibilityIdentifier("human-chat-search-loading")
+                            } else if let chatSearchError {
+                                Text(chatSearchError)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityIdentifier("human-chat-search-error")
+                            } else if let selectedDurableSearchResult {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "text.magnifyingglass")
+                                        .foregroundStyle(.secondary)
+                                    Text(selectedDurableSearchResult.snippet)
+                                        .font(.caption)
+                                        .lineLimit(2)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("搜索结果 \(selectedDurableSearchResult.snippet)")
+                                .accessibilityIdentifier("human-chat-search-result-preview")
                             }
                         }
-                        .padding(.horizontal, 12).frame(height: 40).background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12)).padding(8)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(8)
                     }
                     if let pinnedId = conversation.pinnedMessageIds.last, let pinned = messaging.messagesByConversation[conversation.id]?.first(where: { $0.id == pinnedId }) {
                         HStack(spacing: 9) {
@@ -1068,6 +1104,60 @@ extension ContentView {
                 guard humanHandoffConversationId == conversation.id else { return }
                 humanHandoffBusy = false
                 humanHandoffError = "Agent 接手失败：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    @MainActor
+    func runHumanChatSearch(
+        conversation: ConversationSummary,
+        query: String
+    ) {
+        chatSearchGeneration = chatSearchGeneration == Int.max ? 1 : chatSearchGeneration + 1
+        let generation = chatSearchGeneration
+        let conversationId = conversation.id
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        chatSearchMatchIndex = nil
+        chatSearchTargetID = nil
+        chatSearchRemoteResults = []
+        chatSearchError = nil
+
+        guard !normalizedQuery.isEmpty else {
+            chatSearchLoading = false
+            return
+        }
+
+        chatSearchLoading = true
+        Task { @MainActor in
+            do {
+                let results = try await messaging.searchConversationMessages(
+                    conversationId: conversationId,
+                    query: normalizedQuery,
+                    limit: 200
+                )
+                guard chatSearchGeneration == generation,
+                      selectedConversation?.id == conversationId,
+                      chatSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines) == normalizedQuery
+                else { return }
+
+                chatSearchRemoteResults = results
+                chatSearchLoading = false
+                let matches = chatSearchMatches(
+                    results.map { ChatSearchEntry(id: $0.id, text: $0.snippet) },
+                    query: normalizedQuery
+                )
+                if let first = matches.first {
+                    chatSearchMatchIndex = 0
+                    chatSearchTargetID = first.entryId
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard chatSearchGeneration == generation,
+                      selectedConversation?.id == conversationId
+                else { return }
+                chatSearchLoading = false
+                chatSearchError = "完整聊天记录搜索失败：\(error.localizedDescription)"
             }
         }
     }
