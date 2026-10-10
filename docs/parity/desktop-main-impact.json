@@ -2811,6 +2811,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-implemented-pending-exact-head",
         "finding": "Desktop current-main extends message find-in-chat indexing from body-only to body + author + attachment filenames while keeping the same account/agent scope, wrap navigation, generation reset, close, and dispose semantics. ProductionRenderer is the shipping owner: Agent transcripts feed the controller directly; Human searches use searchHumanMessages with account/agent/query generation fencing. Native iOS Agent shipping MobileBotChat builds ChatSearchEntry values from the canonical main transcript with body, You/Bot author, and attachmentFileName, and testAgentFindIndexesAuthorAndAttachmentFilenameWithoutThreadLeakage exercises that production composition while excluding thread-only rows. Human MessagingModel separately maintains canonical sender display names and conversation-scoped durable search. Verification remains pending descendant exact-head Actions and global source/dependency closure."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/rich-text-editor.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-replacement-pending-ime-acceptance",
+        "finding": "Desktop current-main adds Web/ProseMirror IME composition fencing (compositionstart/compositionend), prevents Enter/Escape and external setContent synchronization while composition is active, and sets dir=auto. Native iOS shipping MobileBotChat uses SwiftUI TextField(axis:.vertical) bound directly to the canonical draft, so there is no DOM/ProseMirror transaction or setContent owner to port; UIKit/SwiftUI owns marked-text composition and bidirectional text. The equivalent product requirement is retained: marked text must not be prematurely submitted or overwritten during account/Agent/draft transitions. This row remains pending exact-head Xcode/UI evidence with an IME composition acceptance case; no verified promotion is claimed."
       }
     ]
   },
