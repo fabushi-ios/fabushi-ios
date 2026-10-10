@@ -6,6 +6,16 @@ internal enum MobileBotLastEntry: Equatable, Sendable {
     case link(String)
 }
 
+internal enum MobileAgentAvatarState: String, Equatable, Sendable {
+    case idle
+    case thinking
+    case searching
+    case working
+    case loading
+    case sending
+    case orbit
+}
+
 internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -25,6 +35,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let isComposingMessage: Bool
     let waitingReason: String?
     let isRunning: Bool
+    let avatarState: MobileAgentAvatarState
     let draftPrompt: String?
     let miniAppId: String?
     let menuButtonText: String?
@@ -52,6 +63,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         isComposingMessage: Bool = false,
         waitingReason: String? = nil,
         isRunning: Bool = false,
+        avatarState: MobileAgentAvatarState = .idle,
         draftPrompt: String? = nil,
         miniAppId: String? = nil,
         menuButtonText: String? = nil,
@@ -78,6 +90,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         self.isComposingMessage = isComposingMessage
         self.waitingReason = waitingReason
         self.isRunning = isRunning
+        self.avatarState = avatarState
         self.draftPrompt = draftPrompt
         self.miniAppId = miniAppId
         self.menuButtonText = menuButtonText
@@ -110,6 +123,7 @@ extension MobileBotSummary {
             isComposingMessage: isComposingMessage,
             waitingReason: waitingReason,
             isRunning: isRunning,
+            avatarState: avatarState,
             draftPrompt: draftPrompt,
             miniAppId: miniAppId,
             menuButtonText: menuButtonText,

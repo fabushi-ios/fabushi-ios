@@ -149,4 +149,157 @@ final class AvatarEditorParityTests: XCTestCase {
         XCTAssertEqual(parsed.avatarShape, "cloud")
         XCTAssertEqual(parsed.avatarColor, "violet")
     }
+
+    func testNativeAvatarDispatcherMatchesDesktopPrecedenceAndDeterministicFallbacks() {
+        let persona = MobileBotSummary(id: "agent-1", name: "Agent", description: "")
+        XCTAssertEqual(mobileAgentAvatarKind(persona), .persona)
+        XCTAssertEqual(mobileResolvePersonaColor(agentId: "agent-1", override: nil), "red")
+        XCTAssertEqual(mobileResolvePersonaShape(agentId: "agent-1", override: nil), "blob")
+        XCTAssertEqual(
+            mobileResolvePersonaColor(agentId: "global-dharma-bot", override: nil),
+            "violet"
+        )
+        XCTAssertEqual(
+            mobileResolvePersonaShape(agentId: "global-dharma-bot", override: nil),
+            "hex"
+        )
+        XCTAssertEqual(
+            mobileResolvePersonaColor(agentId: "agent-1", override: "black"),
+            "black"
+        )
+        XCTAssertEqual(
+            mobileResolvePersonaShape(agentId: "agent-1", override: "cloud"),
+            "cloud"
+        )
+
+        let group = MobileBotSummary(
+            id: "group-1",
+            name: "Group",
+            description: "",
+            isGroup: true,
+            memberIds: ["a", "b"]
+        )
+        XCTAssertEqual(mobileAgentAvatarKind(group), .group)
+
+        let shared = MobileBotSummary(
+            id: "room-1",
+            name: "Room",
+            description: "",
+            isGroup: true,
+            memberIds: ["a", "b"],
+            isSharedRoom: true
+        )
+        XCTAssertEqual(mobileAgentAvatarKind(shared), .sharedRoom)
+
+        let custom = MobileBotSummary(
+            id: "room-1",
+            name: "Room",
+            description: "",
+            avatarDataURL: "data:image/png;base64,AAAA",
+            isGroup: true,
+            memberIds: ["a", "b"],
+            isSharedRoom: true
+        )
+        XCTAssertEqual(mobileAgentAvatarKind(custom), .photo)
+    }
+
+    func testAvatarActivityProjectionMatchesDesktopPriority() {
+        XCTAssertEqual(
+            GrokMobileBotService.avatarState(
+                currentActivity: ["kind": "tool", "tool": "WebSearch"],
+                awaitingUserResponsePresent: false,
+                isComposingMessage: false,
+                isRunning: false
+            ),
+            .searching
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.avatarState(
+                currentActivity: ["kind": "tool", "tool": "SendToAgent"],
+                awaitingUserResponsePresent: false,
+                isComposingMessage: false,
+                isRunning: false
+            ),
+            .sending
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.avatarState(
+                currentActivity: ["verb": "waiting"],
+                awaitingUserResponsePresent: false,
+                isComposingMessage: false,
+                isRunning: false
+            ),
+            .orbit
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.avatarState(
+                currentActivity: ["verb": "coding"],
+                awaitingUserResponsePresent: false,
+                isComposingMessage: false,
+                isRunning: false
+            ),
+            .working
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.avatarState(
+                currentActivity: ["kind": "thinking"],
+                awaitingUserResponsePresent: true,
+                isComposingMessage: true,
+                isRunning: true
+            ),
+            .idle
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.avatarState(
+                currentActivity: nil,
+                awaitingUserResponsePresent: false,
+                isComposingMessage: true,
+                isRunning: true
+            ),
+            .thinking
+        )
+    }
+
+    func testRosterProjectionAndMiniAppMergePreserveAvatarAuthority() throws {
+        let parsed = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-avatar",
+            "name": "Avatar Agent",
+            "description": "",
+            "avatar": "data:image/png;base64,AAAA",
+            "avatarShape": "cloud",
+            "avatarColor": "violet",
+            "isSharedRoom": true,
+            "currentActivity": ["kind": "tool", "tool": "WebSearch"],
+        ]))
+        XCTAssertTrue(parsed.isSharedRoom)
+        XCTAssertEqual(parsed.avatarState, .searching)
+
+        let canonical = MobileBotSummary(
+            id: "mini-1",
+            name: "Canonical",
+            description: "canonical",
+            avatarDataURL: "data:image/png;base64,AAAA",
+            avatarShape: "cloud",
+            avatarColor: "violet",
+            isRunning: true,
+            avatarState: .working,
+            miniAppId: "canonical-app",
+            isSharedRoom: true
+        )
+        let installed = MobileBotSummary(
+            id: "mini-1",
+            name: "Installed",
+            description: "installed",
+            miniAppId: "installed-app"
+        )
+        let merged = GrokMobileBotService.mergeBots([installed], [canonical])
+        let value = try XCTUnwrap(merged.first)
+        XCTAssertEqual(value.avatarDataURL, canonical.avatarDataURL)
+        XCTAssertEqual(value.avatarShape, "cloud")
+        XCTAssertEqual(value.avatarColor, "violet")
+        XCTAssertEqual(value.avatarState, .working)
+        XCTAssertTrue(value.isSharedRoom)
+        XCTAssertEqual(value.miniAppId, "installed-app")
+    }
+
 }

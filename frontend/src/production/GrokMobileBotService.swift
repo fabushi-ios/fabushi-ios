@@ -785,6 +785,9 @@ struct GrokMobileBotService {
                     name: installedBot.name,
                     description: installedBot.description,
                     title: canonical.title,
+                    avatarDataURL: canonical.avatarDataURL,
+                    avatarShape: canonical.avatarShape,
+                    avatarColor: canonical.avatarColor,
                     notifyOnUpdatesEnabled: canonical.notifyOnUpdatesEnabled,
                     hidden: canonical.hidden,
                     unread: canonical.unread,
@@ -796,6 +799,7 @@ struct GrokMobileBotService {
                     isComposingMessage: canonical.isComposingMessage,
                     waitingReason: canonical.waitingReason,
                     isRunning: canonical.isRunning,
+                    avatarState: canonical.avatarState,
                     draftPrompt: canonical.draftPrompt,
                     miniAppId: installedBot.miniAppId ?? canonical.miniAppId,
                     menuButtonText: installedBot.menuButtonText ?? canonical.menuButtonText,
@@ -879,6 +883,50 @@ struct GrokMobileBotService {
         return nil
     }
 
+    static func avatarState(
+        currentActivity: Any?,
+        awaitingUserResponsePresent: Bool,
+        isComposingMessage: Bool,
+        isRunning: Bool
+    ) -> MobileAgentAvatarState {
+        if awaitingUserResponsePresent { return .idle }
+        if let activity = currentActivity as? [String: Any] {
+            let kind = activity["kind"] as? String
+            let tool = activity["tool"] as? String
+            let verb = activity["verb"] as? String
+
+            if kind == "thinking" { return .thinking }
+            if kind == "tool", tool == "SendToAgent" { return .sending }
+
+            switch verb {
+            case "thinking": return .thinking
+            case "searching", "browsing", "reading", "connecting": return .searching
+            case "writing", "coding", "running-commands", "on-its-computer",
+                 "on-your-computer", "working":
+                return .working
+            case "generating": return .loading
+            case "messaging", "waiting": return .orbit
+            case "sending": return .sending
+            default: break
+            }
+
+            if let tool {
+                if tool == "WebSearch" || tool == "WebFetch" || tool.hasPrefix("browser_") {
+                    return .searching
+                }
+                if tool == "GenerateImage" { return .loading }
+                if tool == "SendToAgent" || tool == "UpdateAgent" { return .sending }
+                if tool == "Task" || tool == "Await" || tool == "CheckSubagent" {
+                    return .orbit
+                }
+                return .working
+            }
+        }
+        if isComposingMessage { return .thinking }
+        if isRunning { return .working }
+        return .idle
+    }
+
     static func summaryProjection(_ row: [String: Any]) -> (
         lastEntry: MobileBotLastEntry?,
         lastMessageId: String?,
@@ -887,18 +935,30 @@ struct GrokMobileBotService {
         isComposingMessage: Bool,
         waitingReason: String?,
         isRunning: Bool,
+        avatarState: MobileAgentAvatarState,
         draftPrompt: String?
     ) {
         let lastEntry = parseLastEntry(row["lastEntry"])
-        let awaiting = row["awaitingUserResponse"] as? [String: Any]
+        let awaitingRaw = row["awaitingUserResponse"]
+        let awaiting = awaitingRaw as? [String: Any]
+        let awaitingPresent = awaitingRaw != nil && !(awaitingRaw is NSNull)
+        let isComposingMessage = row["isComposingMessage"] as? Bool ?? false
+        let isRunning = row["isRunning"] as? Bool ?? false
+        let waitingReason = (awaiting?["reason"] as? String) ?? (row["waitingReason"] as? String)
         return (
             lastEntry,
             row["lastMessageId"] as? String,
             derivedLastMessage(lastEntry: lastEntry, fallback: row["lastMessagePreview"]),
             int64Value(row["updatedAt"]),
-            row["isComposingMessage"] as? Bool ?? false,
-            (awaiting?["reason"] as? String) ?? (row["waitingReason"] as? String),
-            row["isRunning"] as? Bool ?? false,
+            isComposingMessage,
+            waitingReason,
+            isRunning,
+            avatarState(
+                currentActivity: row["currentActivity"],
+                awaitingUserResponsePresent: awaitingPresent,
+                isComposingMessage: isComposingMessage,
+                isRunning: isRunning
+            ),
             row["draftPrompt"] as? String
         )
     }
@@ -948,10 +1008,12 @@ struct GrokMobileBotService {
             isComposingMessage: summary.isComposingMessage,
             waitingReason: summary.waitingReason,
             isRunning: summary.isRunning,
+            avatarState: summary.avatarState,
             draftPrompt: summary.draftPrompt,
             miniAppId: miniAppId,
             menuButtonText: menuText?.isEmpty == false ? menuText : (miniAppId == nil ? nil : "打开应用"),
-            conversationPartnerIds: parseConversationPartnerIds(row)
+            conversationPartnerIds: parseConversationPartnerIds(row),
+            isSharedRoom: row["isSharedRoom"] as? Bool ?? false
         )
     }
 
@@ -982,11 +1044,12 @@ struct GrokMobileBotService {
             isComposingMessage: summary.isComposingMessage,
             waitingReason: summary.waitingReason,
             isRunning: summary.isRunning,
+            avatarState: summary.avatarState,
             draftPrompt: summary.draftPrompt,
             isGroup: true,
             memberIds: memberIds,
             conversationPartnerIds: parseConversationPartnerIds(row),
-            isSharedRoom: false
+            isSharedRoom: row["isSharedRoom"] as? Bool ?? false
         )
     }
 }

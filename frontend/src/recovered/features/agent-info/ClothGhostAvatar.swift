@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 private enum MobileGhostPalette {
     static let colors: [Color] = [
@@ -132,5 +133,174 @@ internal struct ClothGhostAvatar: View {
         .frame(width: size, height: size)
         .accessibilityLabel("Bot 头像")
         .accessibilityIdentifier("cloth-ghost-avatar")
+    }
+}
+
+
+internal enum MobileAgentAvatarKind: Equatable {
+    case photo
+    case sharedRoom
+    case group
+    case persona
+}
+
+internal func mobileAgentAvatarKind(_ bot: MobileBotSummary) -> MobileAgentAvatarKind {
+    if let dataURL = bot.avatarDataURL,
+       !dataURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        return .photo
+    }
+    if bot.isSharedRoom { return .sharedRoom }
+    if bot.isGroup { return .group }
+    return .persona
+}
+
+private func mobilePersonaHash(_ value: String) -> UInt32 {
+    var hash: UInt32 = 2_166_136_261
+    for unit in value.utf16 {
+        hash = (hash ^ UInt32(unit)) &* 16_777_619
+    }
+    return hash
+}
+
+private func mobilePersonaRandom(_ seed: UInt32) -> Double {
+    var value = seed
+    value = value &+ 1_831_565_813
+    var next = (value ^ (value >> 15)) &* (1 | value)
+    next = (next &+ ((next ^ (next >> 7)) &* (61 | next))) ^ next
+    next = next ^ (next >> 14)
+    return Double(next) / 4_294_967_296.0
+}
+
+internal func mobileResolvePersonaColor(agentId: String, override: String?) -> String {
+    let explicit = override?.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let explicit,
+       AvatarImagePolicy.colors.contains(where: { $0.id == explicit }) {
+        return explicit
+    }
+    let values = MobileOnboardingCharacterCatalog.colorIds
+    let constant: UInt32 = 2_654_435_769
+    let seed = mobilePersonaHash(agentId) ^ (1 &* constant)
+    let index = Int(mobilePersonaRandom(seed ^ constant) * Double(values.count))
+    return values.indices.contains(index) ? values[index] : "gray"
+}
+
+internal func mobileResolvePersonaShape(agentId: String, override: String?) -> String {
+    let explicit = override?.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let explicit, MobileOnboardingCharacterCatalog.shapeIds.contains(explicit) {
+        return explicit
+    }
+    var hash = mobilePersonaHash(agentId)
+    hash = (hash ^ (hash >> 16)) &* 73_244_475
+    hash = (hash ^ (hash >> 13)) &* 3_266_489_909
+    hash = hash ^ (hash >> 16)
+    let shapes = MobileOnboardingCharacterCatalog.shapeIds
+    return shapes[Int(hash % UInt32(shapes.count))]
+}
+
+private func mobileAgentAvatarImage(_ dataURL: String?) -> UIImage? {
+    guard let dataURL,
+          let data = AvatarImagePolicy.data(fromImageDataURL: dataURL)
+    else { return nil }
+    return UIImage(data: data)
+}
+
+private func mobileCharacterState(_ state: MobileAgentAvatarState) -> MobileOnboardingCharacterState {
+    switch state {
+    case .idle: return .idle
+    case .thinking: return .thinking
+    case .searching: return .searching
+    case .working: return .working
+    case .loading: return .loading
+    case .sending: return .sending
+    case .orbit: return .orbit
+    }
+}
+
+internal struct MobileAgentAvatar: View {
+    let bot: MobileBotSummary
+    var size: CGFloat = 44
+    var activeOverride = false
+
+    private var effectiveState: MobileAgentAvatarState {
+        activeOverride && bot.avatarState == .idle ? .working : bot.avatarState
+    }
+
+    var body: some View {
+        Group {
+            if let image = mobileAgentAvatarImage(bot.avatarDataURL) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else if bot.isSharedRoom {
+                ZStack {
+                    Circle().fill(Color.accentColor.opacity(0.14))
+                    Image(systemName: "globe.americas.fill")
+                        .font(.system(size: size * 0.48, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .frame(width: size, height: size)
+            } else if bot.isGroup {
+                groupAvatar
+            } else {
+                personaAvatar(
+                    agentId: bot.id,
+                    shape: bot.avatarShape,
+                    color: bot.avatarColor,
+                    state: effectiveState,
+                    size: size
+                )
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var groupAvatar: some View {
+        let members = Array(bot.memberIds.prefix(bot.memberIds.count > 4 ? 3 : 4))
+        let memberSize = size * 0.56
+        ZStack {
+            ForEach(Array(members.enumerated()), id: .offset) { index, memberId in
+                personaAvatar(
+                    agentId: memberId,
+                    shape: nil,
+                    color: nil,
+                    state: .idle,
+                    size: memberSize
+                )
+                .offset(
+                    x: index % 2 == 0 ? -size * 0.18 : size * 0.18,
+                    y: index < 2 ? -size * 0.18 : size * 0.18
+                )
+            }
+            if bot.memberIds.count > 4 {
+                Text("+\(bot.memberIds.count - 3)")
+                    .font(.system(size: max(8, size * 0.19), weight: .bold))
+                    .foregroundStyle(.primary)
+                    .frame(width: memberSize, height: memberSize)
+                    .background(.regularMaterial, in: Circle())
+                    .offset(x: size * 0.18, y: size * 0.18)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    @ViewBuilder
+    private func personaAvatar(
+        agentId: String,
+        shape: String?,
+        color: String?,
+        state: MobileAgentAvatarState,
+        size: CGFloat
+    ) -> some View {
+        MobileOnboardingCharacter(
+            colorId: mobileResolvePersonaColor(agentId: agentId, override: color),
+            shapeId: mobileResolvePersonaShape(agentId: agentId, override: shape),
+            size: size,
+            state: mobileCharacterState(state)
+        )
+        .frame(width: size, height: size)
     }
 }
