@@ -1796,6 +1796,7 @@ final class MarketplaceModel {
     var chatMessages: [MobileChatMessage] = []
     var chatBusy = false
     var activeOperationId: String?
+    var toolResultCardsByAgent: [String: [MobileToolResultCard]] = [:]
     let globalDharmaCommerce: GlobalDharmaCommerceModel
     @ObservationIgnored let settingsNoticeController = SettingsNoticeController()
 
@@ -1825,12 +1826,30 @@ final class MarketplaceModel {
     @ObservationIgnored private var mcpMutationSerial: [String: Int] = [:]
     @ObservationIgnored private var privateSkillRequestSerial = 0
     @ObservationIgnored private var privateSkillScopeGeneration = 0
+    @ObservationIgnored private let toolResultStore = MobileToolResultStore()
+    @ObservationIgnored private var toolResultRendererObserver: UUID?
 
     init(bridge: IOSPreloadBridge) {
         self.bridge = bridge
         globalDharmaBridge = GlobalDharmaMiniAppBridge(bridge: bridge)
         globalDharmaCommerce = GlobalDharmaCommerceModel(bridge: bridge)
         onboardingStep = MobileSignedInOnboardingStep.meet.rawValue
+        toolResultRendererObserver = bridge.addRendererEventObserver { [weak self] family, payload in
+            self?.consumeRendererEvent(family: family, payload: payload)
+        }
+    }
+
+    private func consumeRendererEvent(family: String, payload: CoordinatorPayload) {
+        guard family == ClientSideToolV2Transport.family,
+              let event = MobileToolResultRendererEvent.fromFoundation(payload.foundationValue),
+              toolResultStore.consume(event)
+        else { return }
+        toolResultCardsByAgent = toolResultStore.cardsByAgent
+    }
+
+    private func resetToolResultCards() {
+        toolResultStore.resetAll()
+        toolResultCardsByAgent = [:]
     }
 
     var settingsNoticeAccountKey: String {
@@ -2171,6 +2190,7 @@ final class MarketplaceModel {
 
         if previousMcpScope != globalDharmaAccountScope || !loggedIn {
             resetMcpState()
+            resetToolResultCards()
         }
 
         guard let user = auth?["user"] as? [String: Any] else {

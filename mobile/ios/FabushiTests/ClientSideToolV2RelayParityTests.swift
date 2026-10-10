@@ -11,6 +11,50 @@ private final class ClientSideToolRelayTestHost: MahayanaHostRequesting {
 }
 
 final class ClientSideToolV2RelayParityTests: XCTestCase {
+    private func protoVarint(_ value: UInt64) -> [UInt8] {
+        var value = value
+        var output = [UInt8]()
+        repeat {
+            var byte = UInt8(value & 0x7f)
+            value >>= 7
+            if value != 0 { byte |= 0x80 }
+            output.append(byte)
+        } while value != 0
+        return output
+    }
+
+    private func protoField(_ field: Int, varint: UInt64) -> [UInt8] {
+        protoVarint(UInt64(field << 3)) + protoVarint(varint)
+    }
+
+    private func protoField(_ field: Int, string: String) -> [UInt8] {
+        protoField(field, bytes: Array(string.utf8))
+    }
+
+    private func protoField(_ field: Int, bytes: [UInt8]) -> [UInt8] {
+        protoVarint(UInt64((field << 3) | 2)) + protoVarint(UInt64(bytes.count)) + bytes
+    }
+
+    private func rendererEvent(
+        kind: String,
+        agentId: String = "agent-tool",
+        sequence: Int,
+        messageType: String? = nil,
+        bytes: [UInt8]? = nil
+    ) -> MobileToolResultRendererEvent {
+        var object: [String: Any] = [
+            "version": 1,
+            "kind": kind,
+            "accountSlot": "host",
+            "agentId": agentId,
+            "epoch": "epoch-tool",
+            "sequence": sequence,
+        ]
+        object["messageType"] = messageType ?? NSNull()
+        object["bytes"] = bytes?.map(Int.init) ?? NSNull()
+        return MobileToolResultRendererEvent.fromFoundation(object)!
+    }
+
     private func callMessage(_ callID: String) -> ClientSideToolV2WireMessage {
         let id = Array(callID.utf8)
         return .init(
@@ -206,6 +250,130 @@ final class ClientSideToolV2RelayParityTests: XCTestCase {
         var replayedAfterShutdown = 0
         coordinator.setRendererEventSink { _, _ in replayedAfterShutdown += 1 }
         XCTAssertEqual(replayedAfterShutdown, 0)
+    }
+
+    @MainActor
+    func testToolResultProjectionMergesAuthoritativeShellAndEditProtobuf() {
+        let store = MobileToolResultStore()
+
+        let terminalParams = protoField(1, string: "printf hi")
+            + protoField(2, string: "/repo")
+            + protoField(5, varint: 0)
+        let shellCall = protoField(1, varint: 15)
+            + protoField(3, string: "shell-1")
+            + protoField(23, bytes: terminalParams)
+        XCTAssertTrue(store.consume(rendererEvent(
+            kind: "call",
+            sequence: 1,
+            messageType: "aiserver.v1.ClientSideToolV2Call",
+            bytes: shellCall
+        )))
+        XCTAssertEqual(store.cardsByAgent["agent-tool"]?.first?.status, .running)
+        XCTAssertEqual(store.cardsByAgent["agent-tool"]?.first?.command, "printf hi")
+        XCTAssertEqual(store.cardsByAgent["agent-tool"]?.first?.workingDirectory, "/repo")
+
+        let terminalResult = protoField(1, string: "hi")
+            + protoField(7, string: "/repo/next")
+            + protoField(9, varint: 1)
+            + protoField(12, string: "hi")
+        let shellResult = protoField(1, varint: 15)
+            + protoField(24, bytes: terminalResult)
+            + protoField(35, string: "shell-1")
+        XCTAssertTrue(store.consume(rendererEvent(
+            kind: "result",
+            sequence: 2,
+            messageType: "aiserver.v1.ClientSideToolV2Result",
+            bytes: shellResult
+        )))
+        let shell = store.cardsByAgent["agent-tool"]?.first
+        XCTAssertEqual(shell?.status, .success)
+        XCTAssertEqual(shell?.output, "hi")
+        XCTAssertEqual(shell?.workingDirectory, "/repo/next")
+        XCTAssertFalse(shell?.isStreaming ?? true)
+
+        let editParams = protoField(1, string: "Sources/App.swift")
+        let editCall = protoField(1, varint: 7)
+            + protoField(3, string: "edit-1")
+            + protoField(13, bytes: editParams)
+        XCTAssertTrue(store.consume(rendererEvent(
+            kind: "call",
+            sequence: 3,
+            messageType: "aiserver.v1.ClientSideToolV2Call",
+            bytes: editCall
+        )))
+        let chunk = protoField(1, string: "@@ -1 +1 @@\n-old\n+new\n")
+        let diff = protoField(1, bytes: chunk)
+        let editResultPayload = protoField(1, bytes: diff)
+            + protoField(2, varint: 1)
+        let editResult = protoField(1, varint: 7)
+            + protoField(10, bytes: editResultPayload)
+            + protoField(35, string: "edit-1")
+        XCTAssertTrue(store.consume(rendererEvent(
+            kind: "result",
+            sequence: 4,
+            messageType: "aiserver.v1.ClientSideToolV2Result",
+            bytes: editResult
+        )))
+        let edit = store.cardsByAgent["agent-tool"]?.first(where: { $0.toolCallId == "edit-1" })
+        XCTAssertEqual(edit?.kind, .fileEdit)
+        XCTAssertEqual(edit?.status, .success)
+        XCTAssertTrue(edit?.diff.contains("+new") == true)
+
+        XCTAssertTrue(store.consume(rendererEvent(kind: "reset", sequence: 5)))
+        XCTAssertNil(store.cardsByAgent["agent-tool"])
+    }
+
+    @MainActor
+    func testToolResultProjectionFailsClosedForOrphansUnsupportedAndPermissionErrors() {
+        let store = MobileToolResultStore()
+        let orphanResult = protoField(1, varint: 15)
+            + protoField(35, string: "missing")
+        XCTAssertFalse(store.consume(rendererEvent(
+            kind: "result",
+            sequence: 1,
+            messageType: "aiserver.v1.ClientSideToolV2Result",
+            bytes: orphanResult
+        )))
+
+        let unsupportedCall = protoField(1, varint: 5)
+            + protoField(3, string: "read-1")
+        XCTAssertFalse(store.consume(rendererEvent(
+            kind: "call",
+            sequence: 2,
+            messageType: "aiserver.v1.ClientSideToolV2Call",
+            bytes: unsupportedCall
+        )))
+
+        let terminalParams = protoField(1, string: "rm protected")
+        let shellCall = protoField(1, varint: 15)
+            + protoField(3, string: "shell-denied")
+            + protoField(23, bytes: terminalParams)
+        XCTAssertTrue(store.consume(rendererEvent(
+            kind: "call",
+            sequence: 3,
+            messageType: "aiserver.v1.ClientSideToolV2Call",
+            bytes: shellCall
+        )))
+        let error = protoField(1, string: "Permission denied: policy")
+        let shellError = protoField(1, varint: 15)
+            + protoField(8, bytes: error)
+            + protoField(35, string: "shell-denied")
+        XCTAssertTrue(store.consume(rendererEvent(
+            kind: "result",
+            sequence: 4,
+            messageType: "aiserver.v1.ClientSideToolV2Result",
+            bytes: shellError
+        )))
+        let denied = store.cardsByAgent["agent-tool"]?.first
+        XCTAssertEqual(denied?.status, .denied)
+        XCTAssertEqual(denied?.summary, "Permission denied: policy")
+
+        XCTAssertFalse(store.consume(rendererEvent(
+            kind: "result",
+            sequence: 4,
+            messageType: "aiserver.v1.ClientSideToolV2Result",
+            bytes: shellError
+        )))
     }
 
     @MainActor

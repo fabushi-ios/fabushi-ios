@@ -190,9 +190,14 @@ final class IOSPreloadBridge {
         let value: Any
     }
 
+    typealias RendererEventObserver = @MainActor (_ family: String, _ payload: CoordinatorPayload) -> Void
+
     private let server: RendererPortServer
     private let client: IOSCoordinatorPortClient
     private var featureEventBroker: IOSFeatureEventBroker?
+    private var rendererEventObservers: [UUID: RendererEventObserver] = [:]
+    private var bufferedRendererEvents: [(String, CoordinatorPayload)] = []
+    private let rendererEventBufferLimit = 256
 
     init(main: IOSMainRuntime) {
         let pair = InProcessCoordinatorPort.makePair(bootstrap: main.coordinatorBootstrap)
@@ -207,6 +212,9 @@ final class IOSPreloadBridge {
 
         self.server = server
         client = IOSCoordinatorPortClient(port: pair.client)
+        client.setEventHandler { [weak self] family, payload in
+            self?.routeRendererEvent(family: family, payload: payload)
+        }
         featureEventBroker = IOSFeatureEventBroker { [weak self] timeoutMilliseconds in
             guard let self else { throw CancellationError() }
             let result = try await self.requestPayload(
@@ -251,9 +259,41 @@ final class IOSPreloadBridge {
         return JSONResult(value: event.foundationValue)
     }
 
+    func addRendererEventObserver(_ observer: @escaping RendererEventObserver) -> UUID {
+        let id = UUID()
+        rendererEventObservers[id] = observer
+        if !bufferedRendererEvents.isEmpty {
+            let buffered = bufferedRendererEvents
+            bufferedRendererEvents.removeAll()
+            for (family, payload) in buffered {
+                observer(family, payload)
+            }
+        }
+        return id
+    }
+
+    func removeRendererEventObserver(_ id: UUID) {
+        rendererEventObservers.removeValue(forKey: id)
+    }
+
+    private func routeRendererEvent(family: String, payload: CoordinatorPayload) {
+        if rendererEventObservers.isEmpty {
+            bufferedRendererEvents.append((family, payload))
+            if bufferedRendererEvents.count > rendererEventBufferLimit {
+                bufferedRendererEvents.removeFirst(bufferedRendererEvents.count - rendererEventBufferLimit)
+            }
+            return
+        }
+        for observer in rendererEventObservers.values {
+            observer(family, payload)
+        }
+    }
+
     func shutdown() {
         featureEventBroker?.dispose()
         featureEventBroker = nil
+        rendererEventObservers.removeAll()
+        bufferedRendererEvents.removeAll()
         client.shutdown()
     }
 }
