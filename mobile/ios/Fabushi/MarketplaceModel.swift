@@ -3556,8 +3556,8 @@ final class MarketplaceModel {
         let wanted = normalizeMobileConnectorName(connector)
         guard !wanted.isEmpty else { return nil }
         return catalog.first { entry in
-            [entry.id, entry.name, entry.displayName] + entry.connectors
-                .contains { normalizeMobileConnectorName($0) == wanted }
+            let candidates = [entry.id, entry.name, entry.displayName] + entry.connectors
+            return candidates.contains { normalizeMobileConnectorName($0) == wanted }
         }
     }
 
