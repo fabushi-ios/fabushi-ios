@@ -4155,6 +4155,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-composer-draft-persistence-implemented-pending-exact-head-ci",
         "finding": "Desktop draft-state owns schema-v1 account-sensitive per-Agent client persistence for prompt+attachments plus a separate recovery payload, rejects corrupt/wrong-schema envelopes, fences account restoration, and preserves failed-send recovery without overwriting an active draft. iOS previously kept Bot drafts and newly added attachment drafts only in GrokMobileShell @State. Shipping iOS now persists a schema-v1 native MobileComposerDraftSnapshot in account+Agent hashed UserDefaults keys, validates every stored attachment/recovery, removes corrupt or obsolete data fail-closed, restores active drafts on conversation entry, promotes recovery only when no active draft exists, records text/attachment recovery before dispatch/retry, and clears that recovery only after canonical send acceptance. Focused tests cover account/Agent isolation, attachment-only recovery, clearing, corruption and schema mismatch. Exact-head Swift/UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/conversation-workspace-controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-controller-core-implemented-pending-exact-head-ci",
+        "finding": "Desktop workspace controller composes the mounted transcript lifecycle, load-older pagination, reply/thread state, reaction/approval actions, find navigation, draft ownership and reconnect/account generation invalidation. iOS already had canonical reply/thread openWindowed pagination, reactions, approvals, find-in-chat, retry fencing and openTail baseline, but main-conversation history stopped at the 200-message tail. Shipping MobileBotChat now reuses the canonical conversation.openWindowed Host command with beforeMessageId for bounded 200-message older pages, fences pagination by account+Agent+generation, rejects malformed windows, preserves the pre-prepend scroll anchor, exposes retryable native load/error state, de-duplicates projected entries, and resets pagination on account/Agent changes. Together with the separately reviewed native draft/outline/reaction/thread owners this closes the controller-level main-history omission. Focused page merge tests added; exact-head CI pending."
       }
     ]
   },

@@ -1394,6 +1394,20 @@ internal func mergeMobileComposerVoiceTranscript(
     return existing + separator + inserted
 }
 
+internal func mergeMobileConversationOlderPage(
+    older: [MobileChatMessage],
+    current: [MobileChatMessage]
+) -> [MobileChatMessage] {
+    var seen = Set(current.map(\.id))
+    var prefix: [MobileChatMessage] = []
+    prefix.reserveCapacity(older.count)
+    for entry in older {
+        guard seen.insert(entry.id).inserted else { continue }
+        prefix.append(entry)
+    }
+    return prefix + current
+}
+
 internal func mobileComposerAttachmentCommandPayload(
     _ attachment: MobileComposerAttachment
 ) -> [String: Any] {
@@ -1469,6 +1483,11 @@ internal struct MobileBotChat: View {
     @State private var localToolPermissionErrors: [String: String] = [:]
     @State private var transcriptBaselineGeneration = 0
     @State private var transcriptBaselineError: String?
+    @State private var transcriptPaginationGeneration = 0
+    @State private var transcriptOlderLoading = false
+    @State private var transcriptOlderExhausted = false
+    @State private var transcriptPaginationError: String?
+    @State private var transcriptPrependAnchorId: String?
     @State private var widgetGeneration = 0
     @State private var widgetPendingEntryIds: Set<String> = []
     @State private var widgetCustomAnswers: [String: String] = [:]
@@ -1546,6 +1565,11 @@ internal struct MobileBotChat: View {
             widgetCustomAnswers.removeAll()
             widgetErrors.removeAll()
             threadLoadGeneration &+= 1
+            transcriptPaginationGeneration &+= 1
+            transcriptOlderLoading = false
+            transcriptOlderExhausted = false
+            transcriptPaginationError = nil
+            transcriptPrependAnchorId = nil
             threadLoadingRootId = nil
             threadLoadError = nil
             threadRootId = nil
@@ -1557,6 +1581,11 @@ internal struct MobileBotChat: View {
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             resetAcknowledgementScope()
+            transcriptPaginationGeneration &+= 1
+            transcriptOlderLoading = false
+            transcriptOlderExhausted = false
+            transcriptPaginationError = nil
+            transcriptPrependAnchorId = nil
             cancelVoiceInput()
             invalidateComposerAttachmentStaging()
             invalidateReactionScope()
@@ -1841,6 +1870,33 @@ internal struct MobileBotChat: View {
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 7) {
+                    if !entries.isEmpty, bot.miniAppId == nil, !transcriptOlderExhausted {
+                        Button {
+                            Task { await loadOlderConversationEntries() }
+                        } label: {
+                            if transcriptOlderLoading {
+                                HStack(spacing: 7) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Loading earlier messages…")
+                                }
+                            } else {
+                                Label("Load earlier messages", systemImage: "arrow.up")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(transcriptOlderLoading)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("mobile-bot-load-older")
+                    }
+
+                    if let transcriptPaginationError {
+                        Text(transcriptPaginationError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .frame(maxWidth: .infinity)
+                            .accessibilityIdentifier("mobile-bot-load-older-error")
+                    }
+
                     if entries.isEmpty {
                         VStack(spacing: 13) {
                             MobileAgentAvatar(bot: bot, size: 82)
@@ -1921,7 +1977,10 @@ internal struct MobileBotChat: View {
             }
             .background(Color(red: 0.985, green: 0.985, blue: 0.975))
             .onChange(of: entries.count) { _, _ in
-                if findPresented, let match = currentFindMatch {
+                if let prependAnchor = transcriptPrependAnchorId {
+                    transcriptPrependAnchorId = nil
+                    proxy.scrollTo(prependAnchor, anchor: .top)
+                } else if findPresented, let match = currentFindMatch {
                     withAnimation(.easeOut(duration: 0.16)) {
                         proxy.scrollTo(match.entryId, anchor: .center)
                     }
@@ -4910,12 +4969,95 @@ internal struct MobileBotChat: View {
                 current: entries,
                 identitiesAtRequestStart: identitiesAtRequestStart
             )
+            transcriptOlderExhausted = rows.count < 200
+            transcriptPaginationError = nil
             transcriptBaselineError = nil
         } catch is CancellationError {
             return
         } catch {
             guard generation == transcriptBaselineGeneration, bot.id == ownedBotID else { return }
             transcriptBaselineError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func loadOlderConversationEntries() async {
+        guard !transcriptOlderLoading,
+              !transcriptOlderExhausted,
+              bot.miniAppId == nil,
+              let conversationId = bot.conversationId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !conversationId.isEmpty,
+              let beforeMessageId = entries.compactMap({ $0.canonicalMessageId }).first
+        else { return }
+
+        transcriptPaginationGeneration &+= 1
+        let generation = transcriptPaginationGeneration
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedBotId = bot.id
+        let oldFirstId = mobileMainTranscriptEntries(entries).first?.id
+        transcriptOlderLoading = true
+        transcriptPaginationError = nil
+        defer {
+            if generation == transcriptPaginationGeneration,
+               ownedAccount == model.settingsNoticeAccountKey,
+               ownedBotId == bot.id {
+                transcriptOlderLoading = false
+            }
+        }
+
+        let requestId = "ios-mobile-conversation-older-\(UUID().uuidString.lowercased())"
+        do {
+            _ = try await bridge.request(
+                method: "feature.execute",
+                params: [
+                    "command": [
+                        "type": "conversation.openWindowed",
+                        "requestId": requestId,
+                        "conversationId": conversationId,
+                        "beforeMessageId": beforeMessageId,
+                        "limit": 200,
+                    ],
+                ]
+            )
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 8_000
+            ) { event in
+                event["type"] as? String == "conversation.windowOpened"
+                    && event["requestId"] as? String == requestId
+                    && event["conversationId"] as? String == conversationId
+            }
+            guard generation == transcriptPaginationGeneration,
+                  ownedAccount == model.settingsNoticeAccountKey,
+                  ownedBotId == bot.id,
+                  let event = result.value as? [String: Any],
+                  let rows = event["messages"] as? [[String: Any]]
+            else { return }
+
+            var older: [MobileChatMessage] = []
+            for row in rows {
+                guard let projected = projectMobileConversationWindowEntries(row) else {
+                    throw NSError(
+                        domain: "Fabushi.MobileBotChat",
+                        code: 42,
+                        userInfo: [NSLocalizedDescriptionKey: "Host returned a malformed older conversation window"]
+                    )
+                }
+                older.append(contentsOf: projected)
+            }
+            if !older.isEmpty {
+                transcriptPrependAnchorId = oldFirstId
+                entries = mergeMobileConversationOlderPage(older: older, current: entries)
+            }
+            transcriptOlderExhausted = rows.count < 200
+            transcriptPaginationError = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard generation == transcriptPaginationGeneration,
+                  ownedAccount == model.settingsNoticeAccountKey,
+                  ownedBotId == bot.id
+            else { return }
+            transcriptPaginationError = error.localizedDescription
         }
     }
 
