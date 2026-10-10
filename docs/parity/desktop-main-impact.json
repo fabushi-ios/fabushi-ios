@@ -3321,6 +3321,42 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-ios-native-row-action-model-implemented-pending-exact-head-ci",
         "finding": "State-dependent row actions are derived from MobileBotSummary plus canonical Host pin/section state: hidden Bots are absent from the active menu, pin/unpin and ordering round-trip through Host settings, unread/hide/duplicate/delete use canonical Host mutations, and copy-conversation-id stays presentation-only. This is an iOS-native projection of the same action values, not a second lifecycle owner; exact-head CI remains pending."
+      },
+      {
+        "path": "frontend/src/production/CommandPalette.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-command-palette-implemented-pending-exact-head-ci",
+        "finding": "Current-main palette presentation/orchestration is mapped to the shipping SwiftUI command palette and GrokMobileCommandPaletteModel. Eight product tabs, canonical Bot/conversation/message/file/link/routine/action identities, normalized/fuzzy filtering, loading/unavailable states and activation are preserved; DOM focus trapping, virtual-list scrolling and desktop modifier-key mechanics are platform-specific and replaced by native controls. The current iOS action set is flat, so no second nested command owner is created. Focused GrokMobileCommandPaletteTests cover normalization, tab routing, canonical messaging projection, routines, link metadata and duplicate-roster freshness; final exact-head Actions remain required."
+      },
+      {
+        "path": "frontend/src/production/command-palette-link-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-link-provider-implemented-pending-final-exact-head-ci",
+        "finding": "Current-main link provider responsibility remains represented by canonical HTTP(S) links projected from MessagingModel and trusted getLinkMetadata enrichment. Swift Task/generation cancellation replaces Desktop request-id lifecycle without adding link storage ownership. Historical exact-head evidence exists but cannot satisfy the eventual final source chain; current/final exact-head CI is still required."
+      },
+      {
+        "path": "frontend/src/production/command-palette-message-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-message-provider-implemented-pending-final-exact-head-ci",
+        "finding": "Current-main message-search provider is adapted to search the canonical hydrated MessagingModel transcript directly, preserving exact conversation/message identity while avoiding a second cache. Focused tests exercise canonical message projection. Historical CI evidence is diagnostic only for final acceptance; current/final exact-head Actions are required."
+      },
+      {
+        "path": "frontend/src/production/command-palette-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-routine-provider-implemented-pending-final-exact-head-ci",
+        "finding": "Current-main routine provider maps to Host-owned listAllAutomations with Swift Task cancellation and fail-closed unavailable state; parsed entries preserve Agent/automation identity, name, trigger and recency. Focused tests cover canonical Host shape and unavailable behavior. Final exact-head CI remains required."
+      },
+      {
+        "path": "frontend/src/production/command-palette-search-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-file-provider-implemented-pending-final-exact-head-ci",
+        "finding": "Current-main file/media search responsibility is adapted to derive typed file results from canonical local message media fields, preserving conversation/message identity and excluding archived conversations instead of maintaining a second searchMedia cache. Focused command-palette tests cover this projection; final exact-head CI remains required."
+      },
+      {
+        "path": "frontend/src/production/command-palette-update-command.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-app-store-update-replacement",
+        "finding": "Desktop self-update command is not portable to App Store iOS. The shipping replacement keeps update status/check policy in IOSUpdateServiceWiring/SandUpdateService while binary install/upgrade is owned by App Store/TestFlight; Desktop quit-and-install/restart-install actions are explicitly not exposed. This is a platform replacement, not a waived user/release responsibility, and App Store/TestFlight AC evidence remains separately required."
       }
     ]
   },
