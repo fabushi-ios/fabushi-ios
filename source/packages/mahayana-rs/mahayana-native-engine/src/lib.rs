@@ -54,6 +54,8 @@ const MAX_REPLY_NUDGES: usize = 3;
 const REPLY_NUDGE_PROMPT: &str = "Your previous turn left the user without the result they're waiting on — you never called send_message that turn, or every send_message you tried failed to deliver. Deliver the result now by actually invoking the send_message tool. Plain assistant text is not user-visible for this turn; only a successful send_message satisfies delivery.";
 const CLOSING_SEND_NUDGE_PROMPT: &str = "Your previous turn already sent an acknowledgement, then continued with tool work, but ended without a follow-up send_message. The user can only see the earlier acknowledgement. If the work produced the result they are waiting on, deliver it now with a real send_message tool call. If work is genuinely unfinished, continue it and send the result when ready.";
 const DEFAULT_APPROVAL_TIMEOUT_MS: u64 = 120_000;
+const PROVIDER_CONTINUATION_MAX_ATTEMPTS: usize = 3;
+const PROVIDER_CONTINUATION_INITIAL_BACKOFF: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, Default)]
 pub enum ProcessExecution {
@@ -645,26 +647,47 @@ impl NativeEngine {
                 ModelCollector::streaming(Arc::clone(&events), operation_id.clone())
             });
             let sink: SharedModelEventSink = collector.clone();
-            let started = Instant::now();
-            let inference = self
-                .model
-                .infer(
-                    ModelRequest {
-                        model: self.config.model.clone(),
-                        input: Value::Array(session.history.clone()),
-                        metadata: json!({
-                            "instructions": model_instructions,
-                            "tools": declared_tools.clone(),
-                            "tool_choice": "auto",
-                            "parallel_tool_calls": false,
-                        }),
-                    },
-                    sink,
-                )
-                .await;
-            self.telemetry
-                .model_finished(started.elapsed(), inference.is_ok());
-            inference.map_err(model_error)?;
+            let post_tool_continuation = history_ends_with_tool_result(&session.history);
+            let model_request = ModelRequest {
+                model: self.config.model.clone(),
+                input: Value::Array(session.history.clone()),
+                metadata: json!({
+                    "instructions": model_instructions,
+                    "tools": declared_tools.clone(),
+                    "tool_choice": "auto",
+                    "parallel_tool_calls": false,
+                }),
+            };
+            let mut provider_attempt = 0usize;
+            loop {
+                provider_attempt = provider_attempt.saturating_add(1);
+                let started = Instant::now();
+                let inference = self
+                    .model
+                    .infer(model_request.clone(), Arc::clone(&sink))
+                    .await;
+                self.telemetry
+                    .model_finished(started.elapsed(), inference.is_ok());
+                match inference {
+                    Ok(()) => break,
+                    Err(error)
+                        if post_tool_continuation
+                            && provider_attempt < PROVIDER_CONTINUATION_MAX_ATTEMPTS
+                            && retryable_post_tool_provider_error(&error)
+                            && collector.text()?.is_empty()
+                            && collector.output()?.is_none() =>
+                    {
+                        ensure_operation_active(control)?;
+                        let exponent = provider_attempt.saturating_sub(1).min(3) as u32;
+                        let delay = PROVIDER_CONTINUATION_INITIAL_BACKOFF
+                            .saturating_mul(1_u32 << exponent)
+                            .min(Duration::from_secs(4));
+                        tokio::time::sleep(delay).await;
+                        continue;
+                    }
+                    Err(error) => return Err(model_error(error)),
+                }
+            }
             ensure_operation_active(control)?;
             self.apply_hooks(
                 HookPoint::AfterModel,
@@ -3366,6 +3389,25 @@ fn now_ms() -> i64 {
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX)
+}
+
+fn history_ends_with_tool_result(history: &[Value]) -> bool {
+    history
+        .last()
+        .and_then(|item| item.get("type"))
+        .and_then(Value::as_str)
+        == Some("function_call_output")
+}
+
+fn retryable_post_tool_provider_error(error: &ModelError) -> bool {
+    matches!(
+        error,
+        ModelError::Inference(message)
+            if message.contains("model transport failed")
+                || message.contains("model stream read failed")
+                || message.to_ascii_lowercase().contains("timed out")
+                || message.to_ascii_lowercase().contains("timeout")
+    )
 }
 
 fn model_error(error: ModelError) -> KernelError {
