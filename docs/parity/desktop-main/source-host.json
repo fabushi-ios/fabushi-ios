@@ -94,7 +94,7 @@
       "desktop_owner": "host",
       "desktop_visible_effect": "Desktop local computer actions run only while supervised and approved; stale gateway connections can refresh and daemon discovery is atomically published/cleared.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/local-exec-daemon/production-executor.swift; source/shared/local-tool-permission-machinery.swift",
+      "ios_target_path": "source/local-exec-daemon/production-executor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS cannot ship a free-standing process daemon. Allowlisted phone capabilities run in-process; shell/process/box semantics delegate through RemoteRunner; unknown methods now fail closed before transport.",
       "implementation_status": "implemented",
