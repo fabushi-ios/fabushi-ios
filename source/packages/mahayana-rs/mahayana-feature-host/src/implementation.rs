@@ -20513,18 +20513,23 @@ mod tests {
         controller.close().expect("close Host");
         assert!(controller.state().unwrap().legacy_memory_operations.is_empty());
 
+        let mut production_host_config = isolated_host_config("memory-account-fence");
+        production_host_config.memory_synthesis_enabled = Some(false);
         let production = FeatureHostController::create_with_host_config(
             HostConfig {
                 profile_id: format!("memory-account-fence-{}", Uuid::new_v4()),
                 mode: HostMode::Production,
             },
             SurfacePlatform::Ios,
-            isolated_host_config("memory-account-fence"),
+            production_host_config,
         )
         .expect("create production memory fence Host");
+        assert!(
+            !production.state().unwrap().memory_synthesis_enabled,
+            "canonical HostCreateConfig gate must disable synthesis in the shipping owner"
+        );
         *production.active_account_id.lock().unwrap() = Some("account-b".into());
         production.state().unwrap().session_active = true;
-        production.state().unwrap().memory_synthesis_enabled = false;
         let stale = PendingMemoryTurn {
             account_id: Some("account-a".into()),
             agent_id: "mahayana-assistant".into(),
