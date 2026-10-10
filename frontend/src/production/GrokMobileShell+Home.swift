@@ -774,12 +774,7 @@ extension GrokMobileShell {
                                         bot,
                                         isPinned: pinnedBotIds.contains(bot.id)
                                     )
-                                    MobileAgentAvatar(
-                                        bot: bot,
-                                        size: 42,
-                                        activeOverride: projection.isWorking,
-                                        badge: mobileSidebarAgentBadgeColor(projection.statusBadge)
-                                    )
+                                    MobileAgentAvatar(bot: bot, size: 42, activeOverride: projection.isWorking, badge: mobileSidebarAgentBadgeColor(projection.statusBadge))
                                     VStack(alignment: .leading, spacing: 2) {
                                         HStack(spacing: 5) {
                                             Text(bot.name)
@@ -952,12 +947,7 @@ extension GrokMobileShell {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    MobileAgentAvatar(
-                        bot: bot,
-                        size: 47,
-                        activeOverride: projection.isWorking,
-                        badge: mobileSidebarAgentBadgeColor(projection.statusBadge)
-                    )
+                    MobileAgentAvatar(bot: bot, size: 47, activeOverride: projection.isWorking, badge: mobileSidebarAgentBadgeColor(projection.statusBadge))
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 7) {
                             Text(bot.name)
