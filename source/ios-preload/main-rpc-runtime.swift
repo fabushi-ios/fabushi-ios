@@ -8,6 +8,27 @@ enum IOSRPCArgumentShape: String, Equatable, Sendable {
 enum IOSMainRPCRuntime {
     static let contractName = "main"
     static let eventFamily = "events"
+    static let eventNames: [String] = [
+        "box-migration",
+        "cursor-auth-changed",
+        "deep-link",
+        "dev-box-pull-progress",
+        "dev-box-rebuild",
+        "egress-tunnel-changed",
+        "egress-tunnel-status-changed",
+        "experiments-changed",
+        "focus-agent",
+        "force-onboarding",
+        "open-about",
+        "open-feedback",
+        "skip-onboarding",
+        "theme-changed",
+        "update-status",
+        "vnc-user-presence",
+        "window-state",
+        "webauthn-proxy-changed",
+        "zoom-factor-changed",
+    ]
     static let methodTable: [String: IOSRPCArgumentShape] = [
         "openExternal": .object,
         "submitFeedback": .object,
@@ -135,5 +156,17 @@ enum IOSMainRPCRuntime {
 
     static func isMethod(_ name: String) -> Bool {
         methodTable[name] != nil
+    }
+
+    static func isEvent(_ name: String) -> Bool {
+        eventNames.contains(name)
+    }
+
+    static func methodChannel(_ method: String) -> String {
+        IOSRPCEdgeRuntime.methodChannel(edge: contractName, method: method)
+    }
+
+    static func eventChannel(_ event: String) -> String {
+        IOSRPCEdgeRuntime.eventChannel(edge: contractName, event: event)
     }
 }
