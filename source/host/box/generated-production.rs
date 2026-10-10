@@ -12,6 +12,42 @@ pub mod agent_v1_generated {
     include!(concat!(env!("OUT_DIR"), "/agent.v1.serde.rs"));
 }
 
+pub fn decode_exec_server_json(
+    input: &str,
+) -> Result<agent_v1_generated::ExecServerMessage, serde_json::Error> {
+    serde_json::from_str(input)
+}
+
+pub fn encode_exec_server_json(
+    message: &agent_v1_generated::ExecServerMessage,
+) -> Result<String, serde_json::Error> {
+    serde_json::to_string(message)
+}
+
+pub fn decode_exec_client_json(
+    input: &str,
+) -> Result<agent_v1_generated::ExecClientMessage, serde_json::Error> {
+    serde_json::from_str(input)
+}
+
+pub fn encode_exec_client_json(
+    message: &agent_v1_generated::ExecClientMessage,
+) -> Result<String, serde_json::Error> {
+    serde_json::to_string(message)
+}
+
+pub fn decode_exec_control_json(
+    input: &str,
+) -> Result<agent_v1_generated::ExecClientControlMessage, serde_json::Error> {
+    serde_json::from_str(input)
+}
+
+pub fn encode_exec_control_json(
+    message: &agent_v1_generated::ExecClientControlMessage,
+) -> Result<String, serde_json::Error> {
+    serde_json::to_string(message)
+}
+
 pub fn canonical_exec_schema_has_field(field_number: u32, server: bool) -> bool {
     let fields: &[u32] = if server {
         &[
@@ -234,6 +270,115 @@ mod tests {
         let read = agent_v1_generated::ReadSuccess::default();
         assert!(!read.truncated);
         assert!(read.output_blob_id.is_none());
+    }
+
+    #[test]
+    fn generated_json_codec_round_trips_server_timeout_background_and_stdin() {
+        let shell = r#"{
+            "id": 7,
+            "execId": "exec-7",
+            "shellStreamArgs": {
+                "command": "echo hi",
+                "workingDirectory": "/workspace",
+                "timeout": 5000,
+                "hardTimeout": 30000,
+                "timeoutBehavior": "TIMEOUT_BEHAVIOR_BACKGROUND",
+                "closeStdin": false
+            }
+        }"#;
+        let decoded = decode_exec_server_json(shell).unwrap();
+        let encoded = encode_exec_server_json(&decoded).unwrap();
+        assert!(encoded.contains("\"shellStreamArgs\""));
+        assert!(encoded.contains("\"TIMEOUT_BEHAVIOR_BACKGROUND\""));
+
+        let stdin = r#"{
+            "id": 8,
+            "execId": "exec-8",
+            "writeShellStdinArgs": {
+                "shellId": 42,
+                "data": "hello",
+                "closeStdin": true
+            }
+        }"#;
+        let decoded = decode_exec_server_json(stdin).unwrap();
+        let encoded = encode_exec_server_json(&decoded).unwrap();
+        assert!(encoded.contains("\"writeShellStdinArgs\""));
+        assert!(encoded.contains("\"shellId\""));
+    }
+
+    #[test]
+    fn generated_json_codec_round_trips_client_stream_failures_and_read_blob() {
+        for payload in [
+            r#"{
+                "id": 3,
+                "execId": "exec-3",
+                "shellStream": {
+                    "rejected": {
+                        "command": "rm -rf /",
+                        "workingDirectory": "/workspace",
+                        "reason": "denied",
+                        "isReadonly": false
+                    }
+                }
+            }"#,
+            r#"{
+                "id": 4,
+                "execId": "exec-4",
+                "shellStream": {
+                    "permissionDenied": {
+                        "command": "cat secret",
+                        "workingDirectory": "/workspace",
+                        "error": "permission denied",
+                        "isReadonly": true
+                    }
+                }
+            }"#,
+            r#"{
+                "id": 5,
+                "execId": "exec-5",
+                "shellStream": {
+                    "sandboxUnsupported": {
+                        "command": "echo hi",
+                        "workingDirectory": "/workspace",
+                        "sandboxPolicyType": "network",
+                        "reason": "unsupported",
+                        "isReadonly": false
+                    }
+                }
+            }"#,
+            r#"{
+                "id": 6,
+                "execId": "exec-6",
+                "readResult": {
+                    "success": {
+                        "path": "/workspace/a.txt",
+                        "content": "hello",
+                        "totalLines": 1,
+                        "fileSize": "5",
+                        "truncated": true,
+                        "outputBlobId": "AQID",
+                        "rangeApplied": true
+                    }
+                }
+            }"#,
+        ] {
+            let decoded = decode_exec_client_json(payload).unwrap();
+            let encoded = encode_exec_client_json(&decoded).unwrap();
+            assert!(encoded.contains("\"execId\""));
+        }
+    }
+
+    #[test]
+    fn generated_control_codec_preserves_request_identity() {
+        for payload in [
+            r#"{ "heartbeat": { "id": 9 } }"#,
+            r#"{ "streamClose": { "id": 9 } }"#,
+            r#"{ "throw": { "id": 9, "error": "boom", "errorCode": "REMOTE" } }"#,
+        ] {
+            let decoded = decode_exec_control_json(payload).unwrap();
+            let encoded = encode_exec_control_json(&decoded).unwrap();
+            assert!(encoded.contains("9"));
+        }
     }
 
     #[test]
