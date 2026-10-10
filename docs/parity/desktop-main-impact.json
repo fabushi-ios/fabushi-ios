@@ -4190,6 +4190,30 @@
         "path": "frontend/src/recovered/features/conversation/workspace/editor-suggestion-production-adapter.ts",
         "status": "current-main-reviewed-native-editor-suggestion-adapter-implemented-pending-exact-head-ci",
         "finding": "Desktop production adapter binds mention/workflow/emoji sources, scope recents and skill icons into the prompt editor and disposes the controller with composer scope. Shipping iOS MobileBotChat now provides the equivalent single native adapter across @, /, # and : rows, renders workflow/tool icon URLs, isolates recency by App account + Agent instead of one View-global array, fails closed on non-connected transport, and fences refreshes by account/Agent/reconnect/request generation. Focused MobileComposerParityTests cover scoped recents, empty-query recent emoji, workflow icon projection and transport fencing. Exact-head CI remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/find-in-chat.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-find-in-chat-implemented-pending-exact-head-ci",
+        "finding": "Desktop find-in-chat search/navigation is production-composed in shipping MobileBotChat: ChatSearchModel-backed canonical fields, native find bar, wrapping previous/next, all/current match highlight and ScrollViewReader centering, with scoped close/reset lifecycle. Exact-head UI/CI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/pagination.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-pagination-implemented-pending-exact-head-ci",
+        "finding": "Desktop older-history paging maps to canonical conversation.openWindowed 200-message pages in MobileBotChat with exact request/conversation matching, malformed/repeated-anchor rejection, account+Agent+generation fencing, dedupe, retryable error state and prepend viewport-anchor restoration. Exact-head UI/CI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/reply-preview.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-reply-preview-implemented-pending-exact-head-ci",
+        "finding": "Shipping reply banner now resolves canonical target content instead of showing raw IDs and projects Desktop-equivalent compact text/photo/file/link/missing labels through the existing one reply/thread owner. Focused exact-head test covers resolver, labels and navigation policy; CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/referenced-message-preview.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-referenced-preview-implemented-pending-exact-head-ci",
+        "finding": "Shipping transcript referenced quote now reuses shared MarkdownPreview normalization, image/file/link/missing labels and a touch-native actionable control. Main-scope targets scroll to the exact row; absent/branched targets reuse bounded openThread history loading; Bot/account/dispose clears scroll intent. Exact-head UI/CI evidence pending."
       }
     ]
   },

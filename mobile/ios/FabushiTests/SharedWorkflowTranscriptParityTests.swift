@@ -2260,6 +2260,94 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(normalizeMobileConnectorNames(["GitHub", "git-hub", "Slack"]), ["GitHub", "Slack"])
     }
 
+    func testReplyReferencePreviewLabelsAndNavigationMatchDesktopSemantics() {
+        var main = MobileChatMessage(
+            id: "local-main",
+            role: .user,
+            text: "  hello\nworld  "
+        )
+        main.canonicalMessageId = "message-1"
+
+        var branched = MobileChatMessage(
+            id: "local-branch",
+            role: .assistant,
+            text: "branch reply"
+        )
+        branched.canonicalMessageId = "branch-1"
+        branched.branched = true
+
+        XCTAssertEqual(
+            mobileResolveReplyReference(
+                targetID: "message-1",
+                entries: [main, branched]
+            ).preview,
+            .userText("hello world")
+        )
+        XCTAssertEqual(
+            mobileResolveReplyReference(
+                targetID: "missing",
+                entries: [main, branched]
+            ).preview,
+            .missing
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceNavigation(
+                targetID: "message-1",
+                entries: [main, branched]
+            ),
+            .scroll(entryID: "local-main")
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceNavigation(
+                targetID: "branch-1",
+                entries: [main, branched]
+            ),
+            .openThread(rootID: "branch-1")
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceNavigation(
+                targetID: "missing",
+                entries: [main, branched]
+            ),
+            .openThread(rootID: "missing")
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceNavigation(targetID: "   ", entries: [main]),
+            .none
+        )
+
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(.image(url: "https://example.com/photo.png")),
+            "Photo"
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(
+                .file(url: "file:///tmp/report.pdf", name: nil)
+            ),
+            "report.pdf"
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(
+                .link(url: "https://docs.example.com/path")
+            ),
+            "docs.example.com"
+        )
+        XCTAssertEqual(mobileReplyReferenceComposerLabel(.missing), "Thread")
+        XCTAssertEqual(mobileReplyReferenceQuoteLabel(.missing), "(deleted)")
+        XCTAssertEqual(
+            mobileReplyReferenceQuoteLabel(
+                .assistantText("**Bold** [docs](https://example.com)\nnext")
+            ),
+            "Bold docs next"
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceComposerLabel(
+                .assistantText(String(repeating: "x", count: 48))
+            ).count,
+            40
+        )
+    }
+
     func testSecretRequestFenceRejectsAccountAgentAndGenerationReplacement() {
         let fence = MobileSecretRequestFence(
             accountKey: "account-a",

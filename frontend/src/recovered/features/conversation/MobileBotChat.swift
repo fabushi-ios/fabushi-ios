@@ -1425,6 +1425,12 @@ internal struct MobileReplyReferenceResolution: Equatable {
     let isResolved: Bool
 }
 
+internal enum MobileReplyReferenceNavigation: Equatable {
+    case scroll(entryID: String)
+    case openThread(rootID: String)
+    case none
+}
+
 internal func mobileStableReplyTargetID(_ entry: MobileChatMessage) -> String? {
     guard entry.kind == .message,
           !entry.streaming,
@@ -1533,6 +1539,20 @@ internal func mobileResolveReplyReference(
     )
 }
 
+internal func mobileReplyReferenceNavigation(
+    targetID: String,
+    entries: [MobileChatMessage]
+) -> MobileReplyReferenceNavigation {
+    let normalizedTargetID = targetID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalizedTargetID.isEmpty else { return .none }
+    if let target = mobileMainTranscriptEntries(entries).first(where: {
+        mobileStableReplyTargetID($0) == normalizedTargetID
+    }) {
+        return .scroll(entryID: target.id)
+    }
+    return .openThread(rootID: normalizedTargetID)
+}
+
 internal func mobileReplyReferenceComposerLabel(
     _ preview: MobileReplyReferencePreview
 ) -> String {
@@ -1558,7 +1578,10 @@ internal func mobileReplyReferenceQuoteLabel(
 ) -> String {
     switch preview {
     case .userText(let text), .assistantText(let text):
-        let label = mobileReplyReferenceTruncatedText(text, limit: 96)
+        let label = mobileReplyReferenceTruncatedText(
+            MarkdownPreview.toPreviewText(text),
+            limit: 96
+        )
         return label.isEmpty ? "(empty)" : label
     case .image:
         return "Photo"
@@ -2009,6 +2032,7 @@ internal struct MobileBotChat: View {
     @State private var asyncTasksPresented = false
     @State private var conversationOutlinePresented = false
     @State private var replyTargetId: String?
+    @State private var replyReferenceScrollEntryId: String?
     @State private var replyIsFork = false
     @State private var linkMetadataFocusRevision = 0
     @State private var threadRootId: String?
@@ -2146,6 +2170,7 @@ internal struct MobileBotChat: View {
             threadLoadingRootId = nil
             threadLoadError = nil
             threadRootId = nil
+            replyReferenceScrollEntryId = nil
             resetTranscriptDraftUI()
             resetSecretRequestUI()
             forwardMessage = nil
@@ -2159,6 +2184,7 @@ internal struct MobileBotChat: View {
             transcriptOlderExhausted = false
             transcriptPaginationError = nil
             transcriptPrependAnchorId = nil
+            replyReferenceScrollEntryId = nil
             cancelVoiceInput()
             invalidateComposerAttachmentStaging()
             invalidateReactionScope()
@@ -2179,6 +2205,7 @@ internal struct MobileBotChat: View {
             widgetPendingEntryIds.removeAll()
             threadLoadGeneration &+= 1
             threadLoadingRootId = nil
+            replyReferenceScrollEntryId = nil
             forwardMessage = nil
             closeFind()
             invalidateEditorSuggestions()
@@ -2587,6 +2614,13 @@ internal struct MobileBotChat: View {
             }
             .onChange(of: currentFindMatch?.entryId) { _, entryId in
                 guard findPresented, let entryId else { return }
+                withAnimation(.easeOut(duration: 0.16)) {
+                    proxy.scrollTo(entryId, anchor: .center)
+                }
+            }
+            .onChange(of: replyReferenceScrollEntryId) { _, entryId in
+                guard let entryId else { return }
+                replyReferenceScrollEntryId = nil
                 withAnimation(.easeOut(duration: 0.16)) {
                     proxy.scrollTo(entryId, anchor: .center)
                 }
@@ -3882,27 +3916,41 @@ internal struct MobileBotChat: View {
                 targetID: targetID,
                 entries: entries
             )
-            HStack(spacing: 5) {
-                switch resolution.preview {
-                case .image:
-                    Image(systemName: "photo")
-                case .file:
-                    Image(systemName: "doc")
-                case .link:
-                    Image(systemName: "link")
-                case .userText, .assistantText, .missing:
-                    Image(systemName: "arrowshape.turn.up.left")
+            Button {
+                switch mobileReplyReferenceNavigation(
+                    targetID: targetID,
+                    entries: entries
+                ) {
+                case .scroll(let entryID):
+                    replyReferenceScrollEntryId = entryID
+                case .openThread(let rootID):
+                    openThread(rootId: rootID)
+                case .none:
+                    break
                 }
-                Text(mobileReplyReferenceQuoteLabel(resolution.preview))
-                    .lineLimit(2)
+            } label: {
+                HStack(spacing: 5) {
+                    switch resolution.preview {
+                    case .image:
+                        Image(systemName: "photo")
+                    case .file:
+                        Image(systemName: "doc")
+                    case .link:
+                        Image(systemName: "link")
+                    case .userText, .assistantText, .missing:
+                        Image(systemName: "arrowshape.turn.up.left")
+                    }
+                    Text(mobileReplyReferenceQuoteLabel(resolution.preview))
+                        .lineLimit(2)
+                }
+                .font(.caption2)
+                .opacity(0.72)
             }
-            .font(.caption2)
-            .opacity(0.72)
-            .accessibilityElement(children: .combine)
+            .buttonStyle(.plain)
             .accessibilityLabel(
                 resolution.isResolved
-                    ? "Reply to \(mobileReplyReferenceQuoteLabel(resolution.preview))"
-                    : "Reply target deleted"
+                    ? "Jump to replied message, \(mobileReplyReferenceQuoteLabel(resolution.preview))"
+                    : "Open reply thread, target unavailable"
             )
             .accessibilityIdentifier(
                 Self.semanticId("mobile-bot-reply-reference-\(entry.id)")
