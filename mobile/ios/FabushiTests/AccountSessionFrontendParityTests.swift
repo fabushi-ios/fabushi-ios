@@ -26,7 +26,9 @@ final class AccountSessionFrontendParityTests: XCTestCase {
         let snapshot = MobileConfigurationSettingsSnapshot(
             autoReview: DEFAULT_SAND_AUTO_REVIEW_INSTRUCTIONS,
             inferenceProvider: .fabushi,
-            privacyModeEnabled: false
+            privacyModeEnabled: false,
+            timeZone: nil,
+            localToolPermission: nil
         )
         XCTAssertFalse(snapshot.privacyModeEnabled)
     }
