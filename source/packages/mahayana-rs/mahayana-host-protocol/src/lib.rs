@@ -66,6 +66,19 @@ pub struct AttachmentContext {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct McpComposerReference {
+    pub id: String,
+    pub server_id: String,
+    pub server_identifier: String,
+    pub account_key: String,
+    pub label: String,
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AttachmentStored {
     pub id: String,
     pub agent_id: String,
@@ -1148,6 +1161,10 @@ pub enum FeatureCommand {
         model: Option<String>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         attachments: Vec<AttachmentContext>,
+        #[serde(rename = "richText", default, skip_serializing_if = "Option::is_none")]
+        rich_text: Option<String>,
+        #[serde(rename = "mcpReferences", default, skip_serializing_if = "Vec::is_empty")]
+        mcp_references: Vec<McpComposerReference>,
         #[serde(
             rename = "replyToMessageId",
             default,
@@ -3234,6 +3251,22 @@ mod tests {
 
     #[test]
     fn command_json_is_compatible_with_the_react_contract() {
+        let chat: FeatureCommand = serde_json::from_str(
+            r#"{"type":"chat.send","requestId":"chat-1","text":"@GitHub inspect","agentId":"agent-a","richText":"{\"type\":\"doc\"}","mcpReferences":[{"id":"mcp:17","serverId":"17","serverIdentifier":"github","accountKey":"default","label":"GitHub","status":"connected"}]}"#,
+        )
+        .expect("decode chat command");
+        assert!(matches!(
+            chat,
+            FeatureCommand::ChatSend {
+                rich_text: Some(ref rich_text),
+                ref mcp_references,
+                ..
+            } if rich_text.contains("\"doc\"")
+                && mcp_references.len() == 1
+                && mcp_references[0].id == "mcp:17"
+                && mcp_references[0].server_identifier == "github"
+        ));
+
         let command: FeatureCommand = serde_json::from_str(
             r#"{"type":"capability.request","requestId":"req-1","miniAppId":"global-dharma","capability":"camera","reason":"scan scripture"}"#,
         )
