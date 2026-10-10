@@ -47,6 +47,28 @@ internal enum ForwardRecipientNavigation {
     }
 }
 
+internal func forwardPendingConversationIds(
+    selectedConversationIds: [String],
+    settlements: [String: ForwardSettlement]
+) -> [String] {
+    selectedConversationIds.filter { settlements[$0]?.sent != true }
+}
+
+internal func forwardDestinationRequests(
+    conversationIds: [String],
+    clientMessageIds: [String: String]
+) -> [ForwardDestinationRequest] {
+    conversationIds.compactMap { conversationId in
+        guard let clientMessageId = clientMessageIds[conversationId],
+              !clientMessageId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return ForwardDestinationRequest(
+            conversationId: conversationId,
+            clientMessageId: clientMessageId
+        )
+    }
+}
+
 internal struct ForwardMessageSheet: View {
     let sourceConversationId: String
     let messageId: String
@@ -75,7 +97,11 @@ internal struct ForwardMessageSheet: View {
     }
 
     private var pendingRecipients: [ConversationSummary] {
-        selectedInOrder.filter { settlements[$0.id]?.sent != true }
+        let pendingIds = Set(forwardPendingConversationIds(
+            selectedConversationIds: selectedInOrder.map(\.id),
+            settlements: settlements
+        ))
+        return selectedInOrder.filter { pendingIds.contains($0.id) }
     }
 
     private var sentCount: Int {
@@ -508,13 +534,10 @@ internal struct ForwardMessageSheet: View {
         for target in targets where clientMessageIds[target.id] == nil {
             clientMessageIds[target.id] = "ios-forward:\(UUID().uuidString.lowercased())"
         }
-        let requests = targets.compactMap { target -> ForwardDestinationRequest? in
-            guard let clientMessageId = clientMessageIds[target.id] else { return nil }
-            return ForwardDestinationRequest(
-                conversationId: target.id,
-                clientMessageId: clientMessageId
-            )
-        }
+        let requests = forwardDestinationRequests(
+            conversationIds: targets.map(\.id),
+            clientMessageIds: clientMessageIds
+        )
         let results = await messaging.forwardMessageBatch(
             sourceConversationId: sourceConversationId,
             messageId: messageId,
