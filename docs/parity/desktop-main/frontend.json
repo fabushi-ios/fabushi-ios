@@ -3234,14 +3234,15 @@
       "desktop_owner": "renderer / send-journal to approval-cleanup lifecycle seam",
       "desktop_visible_effect": "Stale approval prompts disappear after a successful new send/resend without converting a valid send into failure if cleanup itself fails; delete/cancel do not over-clear approvals.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
-      "ios_language": "Swift / SwiftUI + Host approval owner",
+      "ios_target_path": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
+      "ios_language": "Swift",
       "ios_platform_delta": "MobileBotChat has generation-fenced approval request resolution and the new optimistic-send lifecycle, but there is no evidence that accepted send/resend performs the exact post-journal clearApprovals lifecycle or separates cleanup failure from send success. This remains an explicit integration gap.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat is the current send/approval presentation owner; Host remains approval runtime owner. No duplicate approval store/lifecycle was added.",
-      "test_evidence": "Approval resolution and optimistic-send tests cover adjacent owners; send/resend-triggered cleanup and no-clear delete/cancel tests remain required.",
-      "notes": "IOS-MAIN-DEP-SEND-JOURNAL-APPROVAL-20261009: exact Desktop lifecycle reviewed; cleanup composition remains open.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "implemented",
+      "production_evidence": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift (resolveLocalToolPermissionWithApprovalLifecycle, clearLocalToolApprovalsAfterAcceptedSend, feature.execute success-gated cleanup, account/revision fencing, native.composerQueue owner); source/shared/node/settings/sand-settings-store.swift (durable account-scoped localToolApprovals + composerSubmissionQueue); mobile/ios/Fabushi/MarketplaceModel.swift (typed lifecycle bridge facade); frontend/src/recovered/features/conversation/MobileBotChat.swift (shipping send/offline queue/cancel/retry composition).",
+      "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift covers restart/account isolation, allow-once persistence, accepted-send cleanup, cleanup-persistence failure without flipping send success, rejected-send no-clear, queue cancel/remove no-clear, old-account late-cleanup fencing, queue persistence/order/dedup/account fencing. Exact-head GitHub Actions evidence remains required before verified.",
+      "notes": "IOS-MAIN-DEP-SEND-JOURNAL-APPROVAL-20261011: exact Desktop lifecycle and local-tool store/bridge callers re-read at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. iOS uses one Coordinator/settings owner: cleanup runs only after Host accepts chat.send; cancel/remove do not clear; account/revision fencing rejects late cleanup; cleanup failure is separately surfaced. Status is implemented, not verified, pending same-head Rust/Xcode/UI/protected evidence.",
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "ios_owner": "Mahayana Coordinator + account-scoped SandSettingsStore"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-agent-preview-content.tsx",
