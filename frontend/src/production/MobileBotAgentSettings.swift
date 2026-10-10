@@ -85,11 +85,23 @@ internal struct MobileBotAgentSettingsSheet: View {
             await marketplaceModel.refreshPrivateSkills()
         }
         .sheet(isPresented: $avatarEditorPresented) {
+            let editorScope = MobileAvatarEditorScope(
+                accountScopeKey: accountScopeKey,
+                agentId: currentAgent.id,
+                reconnectGeneration: reconnectGeneration
+            )
             MobileAvatarEditorSheet(
                 agent: currentAgent,
                 bridge: bridge,
-                onSaved: { updated in
-                    guard let authoritative = updated.first(where: { $0.id == currentAgent.id }) else {
+                scope: editorScope,
+                onSaved: { completedScope, updated in
+                    guard completedScope == MobileAvatarEditorScope(
+                        accountScopeKey: accountScopeKey,
+                        agentId: currentAgent.id,
+                        reconnectGeneration: reconnectGeneration
+                    ),
+                    let authoritative = updated.first(where: { $0.id == completedScope.agentId })
+                    else {
                         return
                     }
                     applyAuthoritative(authoritative)
@@ -108,8 +120,9 @@ internal struct MobileBotAgentSettingsSheet: View {
                 onClose: { channelsPresented = false }
             )
         }
-        .onChange(of: agent.id) { _, _ in invalidatePending() }
-        .onChange(of: accountScopeKey) { _, _ in invalidatePending() }
+        .onChange(of: agent.id) { _, _ in invalidateScopeDependentPresentation() }
+        .onChange(of: accountScopeKey) { _, _ in invalidateScopeDependentPresentation() }
+        .onChange(of: reconnectGeneration) { _, _ in invalidateScopeDependentPresentation() }
         .onDisappear {
             marketplaceModel.clearPrivateSkillAgentScope(agentId: currentAgent.id)
             invalidatePending()
@@ -439,6 +452,12 @@ internal struct MobileBotAgentSettingsSheet: View {
         guard accepts(fence) else { return }
         pending = nil
         mutationTask = nil
+    }
+
+    @MainActor
+    private func invalidateScopeDependentPresentation() {
+        avatarEditorPresented = false
+        invalidatePending()
     }
 
     @MainActor

@@ -2,10 +2,17 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+internal struct MobileAvatarEditorScope: Equatable, Sendable {
+    let accountScopeKey: String
+    let agentId: String
+    let reconnectGeneration: Int
+}
+
 internal struct MobileAvatarEditorSheet: View {
     let agent: MobileBotSummary
     let bridge: IOSPreloadBridge
-    let onSaved: ([MobileBotSummary]) -> Void
+    let scope: MobileAvatarEditorScope
+    let onSaved: (MobileAvatarEditorScope, [MobileBotSummary]) -> Void
     let onClose: () -> Void
 
     @State private var selectedPhoto: PhotosPickerItem?
@@ -23,11 +30,13 @@ internal struct MobileAvatarEditorSheet: View {
     init(
         agent: MobileBotSummary,
         bridge: IOSPreloadBridge,
-        onSaved: @escaping ([MobileBotSummary]) -> Void,
+        scope: MobileAvatarEditorScope,
+        onSaved: @escaping (MobileAvatarEditorScope, [MobileBotSummary]) -> Void,
         onClose: @escaping () -> Void
     ) {
         self.agent = agent
         self.bridge = bridge
+        self.scope = scope
         self.onSaved = onSaved
         self.onClose = onClose
         _selectedShape = State(initialValue: agent.avatarShape)
@@ -57,13 +66,15 @@ internal struct MobileAvatarEditorSheet: View {
             }
         }
         .accessibilityIdentifier("mobile-avatar-editor")
+        .onChange(of: scope) { _, _ in
+            invalidateOperation()
+            onClose()
+        }
         .onChange(of: selectedPhoto) { _, item in
             loadPhoto(item)
         }
         .onDisappear {
-            generation += 1
-            operationTask?.cancel()
-            operationTask = nil
+            invalidateOperation()
         }
     }
 
@@ -326,7 +337,7 @@ internal struct MobileAvatarEditorSheet: View {
                 )
                 try Task.checkCancellation()
                 guard token == generation else { return }
-                onSaved(updated)
+                onSaved(scope, updated)
                 onClose()
             } catch is CancellationError {
                 return
@@ -351,7 +362,7 @@ internal struct MobileAvatarEditorSheet: View {
                 )
                 try Task.checkCancellation()
                 guard token == generation else { return }
-                onSaved(updated)
+                onSaved(scope, updated)
                 onClose()
             } catch is CancellationError {
                 return
@@ -378,7 +389,7 @@ internal struct MobileAvatarEditorSheet: View {
                 )
                 try Task.checkCancellation()
                 guard token == generation else { return }
-                onSaved(updated)
+                onSaved(scope, updated)
                 onClose()
             } catch is CancellationError {
                 return
@@ -387,6 +398,14 @@ internal struct MobileAvatarEditorSheet: View {
                 failure = error.localizedDescription
             }
         }
+    }
+
+    @MainActor
+    private func invalidateOperation() {
+        generation += 1
+        operationTask?.cancel()
+        operationTask = nil
+        busy = false
     }
 
     @MainActor

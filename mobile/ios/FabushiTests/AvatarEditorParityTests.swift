@@ -2,6 +2,46 @@ import XCTest
 @testable import Fabushi
 
 final class AvatarEditorParityTests: XCTestCase {
+    func testEditorScopeFencesAccountAgentAndReconnectReplacement() {
+        let scope = MobileAvatarEditorScope(
+            accountScopeKey: "account-a",
+            agentId: "agent-a",
+            reconnectGeneration: 4
+        )
+        XCTAssertEqual(
+            scope,
+            MobileAvatarEditorScope(
+                accountScopeKey: "account-a",
+                agentId: "agent-a",
+                reconnectGeneration: 4
+            )
+        )
+        XCTAssertNotEqual(
+            scope,
+            MobileAvatarEditorScope(
+                accountScopeKey: "account-b",
+                agentId: "agent-a",
+                reconnectGeneration: 4
+            )
+        )
+        XCTAssertNotEqual(
+            scope,
+            MobileAvatarEditorScope(
+                accountScopeKey: "account-a",
+                agentId: "agent-b",
+                reconnectGeneration: 4
+            )
+        )
+        XCTAssertNotEqual(
+            scope,
+            MobileAvatarEditorScope(
+                accountScopeKey: "account-a",
+                agentId: "agent-a",
+                reconnectGeneration: 5
+            )
+        )
+    }
+
     func testCropMatchesDesktopZoomAndPanBounds() {
         let initial = AvatarImagePolicy.initialCrop(width: 1_000, height: 500)
         XCTAssertEqual(initial, .init(zoom: 1, centerX: 500, centerY: 250))

@@ -1180,7 +1180,11 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 with exact blob 6beb45368c7dc61bfdb7ffab3817d87c67e3552d. Native PhotosPicker/UIKit crop/generate/save/reset behavior remains implemented. This descendant repairs the missing Desktop production-adapter scope invariant by binding every editor to account+Agent+reconnect identity, cancelling/dismissing on scope replacement, and rejecting stale roster completion before parent state writeback.",
+      "ios_symbol": "MobileAvatarEditorSheet; MobileAvatarEditorScope; AvatarImagePolicy",
+      "ios_owner": "SwiftUI avatar editor presentation with canonical GrokMobileBotService/FeatureHost roster mutation owner; no second avatar store.",
+      "ios_runtime_entrypoint": "MobileBotAgentSettingsSheet -> MobileAvatarEditorSheet -> IOSPreloadBridge/GrokMobileBotService -> canonical FeatureHost bot.update/group.update",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/model.ts",
@@ -1195,7 +1199,11 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 with exact blob 8bd80652d49866af085cd62682919dce5b52367e. iOS pins the same 25 MiB source bound, 1024px normalization, 256px PNG output, 1x-5x zoom, crop geometry, shapes and colors using UIKit rather than DOM canvas. Exact-head tests remain required.",
+      "ios_symbol": "AvatarImagePolicy; MobileAvatarCrop",
+      "ios_owner": "Shared native avatar image policy and UIKit codec projection; canonical roster remains mutation truth.",
+      "ios_runtime_entrypoint": "MobileAvatarEditorSheet -> AvatarImagePolicy.normalizeSource/pngDataURL -> GrokMobileBotService",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/production-adapter.ts",
@@ -1210,7 +1218,11 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob 9b82de018f0d6779b2379874e394968b47d4edbf. The prior native implementation lacked the Desktop adapter's account/Agent scope disposal guarantee. This descendant adds MobileAvatarEditorScope, dismiss/cancel on account/Agent/reconnect replacement and a parent-side completed-scope equality check before authoritative roster projection. No second runtime owner is added.",
+      "ios_symbol": "MobileAvatarEditorScope; MobileBotAgentSettingsSheet avatar editor sheet wiring",
+      "ios_owner": "Agent Settings owns presentation scope; IOSPreloadBridge/Coordinator and FeatureHost own mutations and generation service.",
+      "ios_runtime_entrypoint": "MobileBotAgentSettingsSheet(accountScopeKey,reconnectGeneration,currentAgent) -> MobileAvatarEditorSheet(scope) -> bridge -> Host",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/view.tsx",
@@ -1225,7 +1237,11 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/ios-main/account/cursor-generate-image-client.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift; mobile/ios/FabushiTests/CursorGenerateImageClientTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs group_avatar_update_uses_same_canonical_host_sanitizer; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Source-level Avatar Editor responsibility is implemented across upload, bounded crop/zoom, 256px PNG export, clear/reset, Agent character staging, group upload, generation fencing, and concrete Cursor image generation. Keep below verified until current exact-head Rust/Swift/UI/device/protected evidence and artifacts succeed."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob 502caace3bdad7e69093faf3e50fcedb233cb545. SwiftUI replaces Bot/Generate/Upload DOM tabs with one native sheet while preserving generation, PhotosPicker ingest, crop/pan/zoom, reset/clear, character staging/commit, busy/error and close semantics. Paste/drop/file-dialog mechanics are replaced by the platform-native PhotosPicker. Scope replacement now closes the sheet fail-closed.",
+      "ios_symbol": "MobileAvatarEditorSheet",
+      "ios_owner": "Native SwiftUI avatar sheet consuming the canonical avatar image policy and Host roster owner.",
+      "ios_runtime_entrypoint": "Agent Settings profile section -> MobileAvatarEditorSheet",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/channels/model.ts",
@@ -1240,7 +1256,11 @@
       "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift; frontend/src/production/MobileBotAgentSettings.swift; source/shared/channels.swift",
       "test_evidence": "source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs; mobile/ios/FabushiTests/AgentChannelsParityTests.swift; mobile/ios/FabushiTests/SharedChannelsPersistenceParityTests.swift",
-      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Credentials are stored separately in the existing Mahayana encrypted secret backend and never serialized to Swift; metadata is account/Agent scoped. Current exact-head ordinary/protected CI and artifact provenance are still required before verified promotion."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob 26b1e5c7aa40e7a171f1b89354a3bddf8cc72d33. Strict connection projection, prior-snapshot retention, generation fencing and connect/disconnect/refresh semantics are present. Credentials remain in the encrypted Rust secret namespace and are never serialized back to Swift. Built-in unavailable connectors remain fail-closed.",
+      "ios_symbol": "AgentChannelStore; MobileAgentChannelsModel; MobileAgentChannelsPanel",
+      "ios_owner": "Rust FeatureHost AgentChannelStore owns account/Agent metadata and encrypted credentials; Swift only projects UI-safe connection state.",
+      "ios_runtime_entrypoint": "Agent Settings -> MobileAgentChannelsPanel -> IOSPreloadBridge get/connect/disconnect/refreshAgentChannels -> FeatureHost AgentChannelStore",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/channels/view.css",
@@ -1255,7 +1275,11 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift; frontend/src/production/MobileBotAgentSettings.swift",
       "test_evidence": "mobile/ios/FabushiTests/AgentChannelsParityTests.swift",
-      "notes": "Native presentation now ships from Agent Settings, but remains implemented rather than verified until same-head ordinary/protected acceptance succeeds."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob 2c96af5794d756d69878953538f9154fcc021e21. Native SwiftUI layout replaces Desktop CSS while preserving readable status hierarchy, secure credential input, disabled/pending states and setup-guide disclosure. Same-head UI/accessibility evidence remains pending.",
+      "ios_symbol": "MobileAgentChannelsPanel SwiftUI List/Section/SecureField presentation",
+      "ios_owner": "SwiftUI presentation over Host-owned channel state.",
+      "ios_runtime_entrypoint": "Agent Settings Channels button -> MobileAgentChannelsPanel",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/channels/view.tsx",
@@ -1270,7 +1294,11 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAgentChannelsPanel.swift; frontend/src/production/MobileBotAgentSettings.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs",
       "test_evidence": "mobile/ios/FabushiTests/AgentChannelsParityTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/channel_management.rs",
-      "notes": "The UI does not manufacture connector availability: built-in Discord/Slack manifests remain coming-soon until their real runtime connector support ships. Same-head CI is required before verified promotion."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob 16bb4ca2324bdc4bec42987affe99c33869daf53. The panel preserves loading/error-with-previous, per-platform status, SecureField connect/reconnect, refresh/disconnect and setup guidance. Its task identity includes Agent+account+reconnect, clears credential draft on scope change and fences stale completions. Discord/Slack remain coming-soon until real connector runtime support ships.",
+      "ios_symbol": "MobileAgentChannelsPanel",
+      "ios_owner": "Native Channels panel over Rust FeatureHost channel owner.",
+      "ios_runtime_entrypoint": "MobileBotAgentSettingsSheet -> MobileAgentChannelsPanel -> canonical channel RPCs",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/bridge.ts",
@@ -1282,10 +1310,14 @@
       "ios_target_path": "frontend/src/production/GrokMobileBotService.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "IOSPreloadBridge sends canonical group.list/group.update commands; Task cancellation and a view lifecycle generation fence discard stale mutation completions.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob b100644c8a181222bddd83369bf755cc5139880e. Existing Host-backed mutation wiring and account/reconnect generation fencing remain semantically equivalent. Historical verification on 14591c35 is diagnostic only; current descendant exact-head CI is required before verified promotion.",
+      "ios_symbol": "GrokMobileBotService.groupUpdateCommand; GrokMobileGroupMembersModel.MutationFence",
+      "ios_owner": "Canonical FeatureHost group.update owner with native account/reconnect generation fence.",
+      "ios_runtime_entrypoint": "MobileBotGroupMembersSheet -> GrokMobileBotService.updateGroupMembers -> feature.execute group.update -> FeatureHost",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/model.ts",
@@ -1297,10 +1329,14 @@
       "ios_target_path": "frontend/src/production/GrokMobileGroupMembersModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native model preserves isGroup/memberIds/isSharedRoom projection, individual-only candidates, max-six/min-one, shared-room fail-closed behavior, and pending mutation guards.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/recovered/features/agent-info/MobileBotSummary.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob 5f72bbc2c3ac035b9a6e28091ce8e8bd34a63c55. Individual-only candidate filtering, shared/nested rejection, maximum six/minimum one, current-group reconciliation and mutation fencing are implemented. Old 14591c35 evidence is historical only.",
+      "ios_symbol": "GrokMobileGroupMembersModel",
+      "ios_owner": "Native pure group-members projection over canonical roster; Host remains membership truth.",
+      "ios_runtime_entrypoint": "MobileBotGroupMembersSheet -> GrokMobileGroupMembersModel -> GrokMobileBotService/FeatureHost",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/route.ts",
@@ -1315,7 +1351,11 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/production/MobileBotGroupMembers.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Corrected the earlier not-applicable disposition after exact Desktop blob review showed real route semantics. Uses the existing canonical roster/conversation owners; no second group or navigation store."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob da39e969a1c3c98cf0c94a7b6a7c203e70dfeb86. iOS RouteScope requires local group + non-empty account scope + nonnegative reconnect generation and rejects stale route use; member-open targets are limited to current individual members.",
+      "ios_symbol": "GrokMobileGroupMembersModel.RouteScope; MobileBotGroupMembersSheet",
+      "ios_owner": "Agent/group navigation projection remains in the existing native roster/conversation owners.",
+      "ios_runtime_entrypoint": "Group Agent settings/info -> MobileBotGroupMembersSheet -> individual member chat navigation",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/view.css",
@@ -1327,10 +1367,14 @@
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native SwiftUI List/Section/Button presentation replaces CSS while preserving disabled/pending/destructive interaction semantics.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob fd5517e3f08ec4091f59071520525f6516b46815. Desktop footer spacing is presentation-only and replaced by native SwiftUI list/section spacing. Historical verification is not current exact-head evidence.",
+      "ios_symbol": "MobileBotGroupMembersSheet native List/Section layout",
+      "ios_owner": "SwiftUI presentation over canonical group roster owner.",
+      "ios_runtime_entrypoint": "Group settings/info -> MobileBotGroupMembersSheet",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/group-members/view.tsx",
@@ -1342,10 +1386,14 @@
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native sheet exposes members, individual-only add candidates, destructive remove confirmation, cap/minimum guidance, retryable failure state, pending guards, and lifecycle cancellation.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 exact blob 8f2416ffdc140869ec1ab8d6645ee745b79e3d04. Native UI preserves members/candidates, max-six add, minimum-one remove, destructive confirmation, pending/error state, and current-member navigation with account/reconnect fencing. Prior 14591c35 run remains historical only.",
+      "ios_symbol": "MobileBotGroupMembersSheet",
+      "ios_owner": "Native group-members sheet over GrokMobileGroupMembersModel and canonical Host group roster.",
+      "ios_runtime_entrypoint": "Group settings/info -> MobileBotGroupMembersSheet -> add/remove/open member actions",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/settings/model.ts",

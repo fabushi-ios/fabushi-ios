@@ -3537,6 +3537,78 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-async-task-surface-repaired-pending-exact-head-ci",
         "finding": "Native Async Tasks sheet preserves per-Agent task kind/detail/running state/age and empty/loading/error-with-previous behavior. This descendant fixes shipping literal '(kind)' and '(minutes)' placeholder output and adds focused formatting tests; exact-head UI/CI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/avatar-editor/controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-avatar-implemented-pending-exact-head-ci",
+        "finding": "Desktop controller generation/dispose semantics map to MobileAvatarEditorSheet operation generation plus a new account+Agent+reconnect MobileAvatarEditorScope. The native sheet cancels and dismisses on scope replacement, and the parent rejects stale onSaved roster results before applying them. Upload/generate/crop/save/clear/character operations remain owned by the canonical Host roster path. Exact-head Swift/UI/protected evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/avatar-editor/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-avatar-implemented-pending-exact-head-ci",
+        "finding": "AvatarImagePolicy is the native codec/policy replacement for the current Desktop model: 25 MiB source limit, 1024 longest-side normalization, 256x256 PNG, 1x-5x crop geometry and the same character catalog are pinned in production and focused XCTest. Exact-head CI remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/avatar-editor/production-adapter.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-scope-fence-repaired-pending-exact-head-ci",
+        "finding": "A real native scope-fencing gap was repaired. Desktop rebuilds/disposes the editor when account/Agent scope changes; iOS now carries an explicit accountScopeKey+agentId+reconnectGeneration token, cancels/dismisses on replacement, and only accepts onSaved results for the still-current token. Bridge/Host capability ownership stays unchanged. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/avatar-editor/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-avatar-implemented-pending-exact-head-ci",
+        "finding": "The shipping native sheet provides the applicable avatar interaction surface through Agent Settings: generate/upload, crop/pan/zoom, save/clear, character choices, busy/error state and native close semantics. Desktop drag/drop/paste/file-dialog mechanics are platform-adapted to PhotosPicker; account/Agent/reconnect replacement now dismisses stale UI. Exact-head UI/device evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/channels/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-channel-owner-implemented-pending-exact-head-ci",
+        "finding": "Current Desktop channel controller maps to a single Rust AgentChannelStore plus generation-fenced Swift projection. Account/Agent metadata is durable, tokens stay in the encrypted Host secret namespace, malformed replies fail closed, transient failures retain the previous view, and scope changes clear credential draft/state. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/channels/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-channel-owner-implemented-pending-exact-head-ci",
+        "finding": "Desktop CSS carries presentation only. SwiftUI List/Section/SecureField/Button is the native replacement for status hierarchy, pending/disabled states, secure credential entry and guide disclosure; no CSS mechanism is copied. Exact-head UI/accessibility evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/channels/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-channel-owner-implemented-pending-exact-head-ci",
+        "finding": "The native Channels surface is shipping from Agent Settings and remains fail-closed about availability. Agent/account/reconnect changes bump generation, clear pending credential input and reject stale results; connect/reconnect/refresh/disconnect route to the canonical Host channel owner. Built-in Discord/Slack are still coming-soon, so no fake connector capability is claimed. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/group-members/bridge.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-group-members-implemented-pending-exact-head-ci",
+        "finding": "Desktop typed setGroupMembers and lifecycle-generation fence map to canonical group.update plus GrokMobileGroupMembersModel account/reconnect fencing. No second group store is introduced. Historical green evidence is not reused as current exact-head verification; descendant CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/group-members/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-group-members-implemented-pending-exact-head-ci",
+        "finding": "Native model preserves current-main membership rules: only local groups, individual candidates, 1-6 hard bounds, no nested/shared-room mutation, and scope/generation fencing. Focused XCTest covers these rules; current exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/group-members/route.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-group-members-implemented-pending-exact-head-ci",
+        "finding": "Desktop group-info route identity is applicable and maps to native RouteScope: local group, account identity and reconnect generation must all still match before showing/using member navigation. Focused tests cover stale account/reconnect and outsider/nested member rejection. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/group-members/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-group-members-implemented-pending-exact-head-ci",
+        "finding": "Desktop CSS has no independent product state; native SwiftUI List/Section presentation replaces it while preserving the Members surface and controls. Current exact-head UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/group-members/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-group-members-implemented-pending-exact-head-ci",
+        "finding": "SwiftUI native group-members surface preserves current-main applicable interactions and constraints while routing all mutation truth through group.update. Remove confirmation, pending/failure state and member navigation are scoped to the current local group/account/reconnect generation. Exact-head UI/protected evidence pending."
       }
     ]
   },
