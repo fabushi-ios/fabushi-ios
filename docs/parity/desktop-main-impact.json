@@ -3836,7 +3836,7 @@
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/cloud-agent-provider.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-production-gap-open",
-        "finding": "Reviewed current-main provider contract: bcId-scoped getCloudAgentInfo, 5s live/60s recovery polling, terminal stop, account+agent scope generation fencing, Open in Cursor, plus branch/PR/files/line statistics. iOS already owns authenticated BackgroundComposer GetBackgroundComposerInfo via IOSCursorDashboardClient -> Coordinator MCP manager, but the shipping renderer/main RPC and MobileBotChat transcript projection do not expose send-message:cursor-agent, and IOSCloudAgentComposerInfo currently decodes only status/summary/permanentError rather than the richer branch/PR/stat fields. This remains an implementation gap; no verified/implemented promotion."
+        "finding": "Reviewed current-main provider contract: bcId-scoped GetBackgroundComposerInfo, 5s live/60s recovery polling, terminal stop, account+agent scope generation fencing, Open in Cursor, plus name/prompt/branch/PR/files/line statistics. Commit 919787b064a3d0a3cf5e50fe2d485da22608fbff extends IOSCursorDashboardClient/IOSCloudAgentComposerInfo using the authoritative current-main protobuf wire fields and adds focused decoder/fallback tests. The shipping MobileBotChat send-message:cursor-agent projection/native leaf plus provider polling/open lifecycle are still missing, so this remains a production integration gap and is not promoted to implemented/verified."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/connector-actions.ts",
@@ -3873,6 +3873,54 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-non-runtime-aggregate-accounted",
         "finding": "This file is an export barrel with no state machine, service call or user-visible effect of its own. Its exported responsibilities remain individually tracked in the same dependency closure (protocol/registry/widgets/cloud-agent/secret/attachment/text/mount/thread/reactions/feed/picker/resolver/views/timeline). It is source-accounted here without using N/A to hide any product capability."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/listener-integrations.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-listener-implemented-pending-exact-head-ci",
+        "finding": "Desktop owns demand-driven 5s listener polling, connect URL handoff, reconnect refresh, account+agent scope fencing and dispose. Shipping MobileBotChat now has a listenerScopeFingerprint bound to bot/account/visible listener platforms and a cancellable SwiftUI task that refreshes visible integrations every 5s only while the cards are mounted; connect uses the canonical model listener/OAuth owner and the existing HTTPS/external authorization handoff, with account/Bot task cancellation on scope replacement. Exact-head protected/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/message-actions.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-message-actions-implemented-pending-exact-head-ci",
+        "finding": "Desktop action anchor owns reply/thread/copy and reaction-action presentation only for eligible message/send-message/user-attachment rows, with read-only and delivery gates. Shipping MobileBotChat uses native context/menu/sheet presentation but preserves settled canonical-message gating, reply/thread navigation, copy projection, forward gating and reaction actions; non-message/read-only transcript rows do not acquire mutable actions. Native focus/context-menu mechanics replace DOM focus restoration. Exact-head Swift/UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/mount-contract.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-mount-dependent-gaps-open",
+        "finding": "Desktop root mount composes scope, registry, widget interactions, cloud-agent provider and leaf providers into one transcript-card owner. iOS uses the shipping MobileBotChat + shared projector/native leaf composition rather than a second web mount, and existing widget/listener/reaction owners are wired there. Overall mount parity cannot be promoted while send-message:cursor-agent and connector/connectors shipping leaves remain open; this entry intentionally inherits those production gaps."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/protocol.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-protocol-dependent-gaps-open",
+        "finding": "Current-main protocol strictly accepts send-message text/widget/cursor-agent/email-draft/slack-draft/auto-review-approval/listener-connect/secret-request/attachment/connector/connectors/local-tool-permission plus metadata/reactions and rejects malformed values. iOS shared/native projection already covers the implemented text/widget/draft/approval/listener/secret/attachment/permission responsibilities and fail-closed fallback, but cursor-agent and connector/connectors are not yet projected into native shipping leaves. Protocol closure remains open on those exact discriminants."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-actions.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-reactions-implemented-pending-exact-head-ci",
+        "finding": "Desktop projects valid emoji/by pairs, tracks 'me', sends reactToMessage optimistically, and fences account+agent generation while authoritative feed reconciliation owns truth. MobileBotChat projects canonical reactions, gates actions to settled canonical message IDs, performs the same optimistic add/remove, calls reactToMessage with entryId/agentId, fences the response by accountKey+agentId+generation, and replaces local reactions from the authoritative response. Transport errors intentionally retain optimistic state until transcript reconciliation. Exact-head tests pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-feed.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-reaction-feed-implemented-pending-exact-head-ci",
+        "finding": "Desktop feed adapter reconciles baseline/appended/updated reaction arrays, deduplicates unchanged fingerprints, clears on authoritative reset, and detaches/reconnects under scope generation. iOS receives the authoritative conversation baseline and live transcript.card/chat events through the canonical MobileBotChat pump, projects reactions by canonical message identity, and replaces optimistic reaction state on authoritative reactToMessage/transcript updates; bot/account changes invalidate reactionGeneration and reload the canonical baseline. Exact-head baseline/live UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-picker-handoff.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-adapted-reaction-handoff-implemented-pending-exact-head-ci",
+        "finding": "Desktop handoff validates agent scope, entry identity, reacted set, expansion callbacks and the content owner before opening the full picker. iOS replaces the React content/ref handoff with native @State reactionPickerTargetId/presentation bound to a settled actionable MobileChatMessage; changing account/Bot invalidates the reaction scope, and sheet dismissal owns the native lifecycle. This is an iOS-adapted presentation boundary, not a second reaction runtime."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-picker.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-reaction-picker-implemented-dependent-catalog-gap",
+        "finding": "Desktop quick reactions are 👍/👎/❤️/😂/🎉/😮 and grouped pills preserve first-seen emoji order, counts, self-selection and reactor identity. MobileBotChat uses the same six quick reactions, native pills, settled-message gating, More Reactions sheet, selected-state accessibility, keyboard grid navigation, category/search and custom emoji. Picker mechanics are implemented; complete built-in browse/search parity still depends on the separately open emoji-catalog aliases/skin/full-catalog gap."
       }
     ]
   },
