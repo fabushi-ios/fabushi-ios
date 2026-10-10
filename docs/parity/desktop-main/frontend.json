@@ -2792,11 +2792,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI + Rust Host",
-      "ios_platform_delta": "The native Host already uses chat.send requestId as the runtime client_message_id/durable user MessageId. iOS now preserves that exact ID on the Host user chat.message echo and MobileBotChat owns pending/accepted-awaiting-echo/failed optimistic state that settles only on the exact messageId. Desktop's explicit attachment-batch acknowledgement and fresh-nonce retry lineage remain open, so the row stays mapped rather than implemented.",
-      "implementation_status": "mapped",
-      "production_evidence": "mahayana-feature-host production_chat emits exact requestId as user messageId; MobileBotChat marks pending before dispatch, accepted-awaiting-echo after feature.execute acceptance, failed on request error, and applyMobileOptimisticUserEcho clears state only for the exact durable identity.",
-      "test_evidence": "SharedWorkflowTranscriptParityTests.testOptimisticUserEchoSettlesOnlyExactDurableMessageIdentity plus existing late-baseline optimistic reconciliation tests. Attachment-batch/retry-lineage coverage remains required.",
-      "notes": "IOS-MAIN-DEP-ACK-20261009: exact Desktop acknowledgement.ts reviewed. Closed false-delivered text-send state without a second send journal or ambiguous automatic retry.",
+      "ios_platform_delta": "The native Host uses chat.send requestId as the durable user message identity. MobileBotChat owns one account+Agent+nonce-scoped optimistic row with pending/dispatching/accepted-awaiting-echo/failed state, Desktop-compatible sand-resend-v1 fresh retry lineage, exact chat.message echo settlement, and attachment-only batch settlement by unique user-attachment transcript-card IDs carrying the same logical clientNonce. Text+attachment sends still settle on the user message echo exactly as Desktop does. Scope replacement/disposal is fenced by the existing account/Bot entry lifecycle.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (mobileAcknowledgementLogicalNonce/retryNonce, applyMobileOptimisticUserEcho, applyMobileOptimisticAttachmentEcho, retryFailedSend, shipping pump transcript.card/chat.message wiring); mobile/ios/Fabushi/MarketplaceModel.swift (MobileChatMessage optimistic scope/nonce/prior-nonce/attachment-echo state); canonical Rust Host chat.send uses requestId as durable user MessageId.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers exact account+Agent nonce echo, old/fresh retry lineage, attachment-only whole-batch settlement, duplicate attachment echo rejection, wrong-scope fencing and text+attachment waiting for the user-message echo. Same-final-HEAD Actions remain required before verified.",
+      "notes": "IOS-MAIN-DEP-ACK-20261011: full native acknowledgement responsibility is implemented without a second send journal; direct iOS sends transition pending→dispatching rather than Desktop queued, while accepted/failed/echo semantics and logical retry identity remain equivalent.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {

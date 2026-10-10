@@ -1381,6 +1381,127 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         )
     }
 
+    func testAttachmentOnlyAcknowledgementWaitsForWholeScopedBatchAndDeduplicatesEchoes() {
+        let oldNonce = "ios-mobile-bot-chat-attachment"
+        let retryNonce = mobileAcknowledgementRetryNonce(
+            logicalNonce: oldNonce,
+            retryToken: "retry-attachment"
+        )
+        var message = MobileChatMessage(
+            id: retryNonce,
+            role: .user,
+            text: "",
+            canonicalMessageId: retryNonce,
+            optimisticDeliveryPhase: .acceptedAwaitingEcho
+        )
+        message.optimisticAccountKey = "account-a"
+        message.optimisticAgentId = "agent-a"
+        message.optimisticNonce = retryNonce
+        message.optimisticPriorNonces = [oldNonce]
+        message.optimisticAttachments = [
+            .init(id: "local-a", name: "a.txt", path: "/staged/a.txt", mimeType: "text/plain", sizeBytes: 1),
+            .init(id: "local-b", name: "b.txt", path: "/staged/b.txt", mimeType: "text/plain", sizeBytes: 2),
+        ]
+        var messages = [message]
+
+        let first: [String: Any] = [
+            "type": "transcript.card",
+            "entryId": "upload-a",
+            "card": [
+                "kind": "user-attachment",
+                "id": "upload-a",
+                "file_path": "/staged/a.txt",
+                "clientNonce": oldNonce,
+            ],
+        ]
+        XCTAssertFalse(applyMobileOptimisticAttachmentEcho(
+            first,
+            accountKey: "account-b",
+            agentId: "agent-a",
+            messages: &messages
+        ))
+        XCTAssertFalse(applyMobileOptimisticAttachmentEcho(
+            first,
+            accountKey: "account-a",
+            agentId: "agent-b",
+            messages: &messages
+        ))
+        XCTAssertFalse(applyMobileOptimisticAttachmentEcho(
+            first,
+            accountKey: "account-a",
+            agentId: "agent-a",
+            messages: &messages
+        ))
+        XCTAssertEqual(messages[0].optimisticAcknowledgedAttachmentIds, Set(["upload-a"]))
+        XCTAssertEqual(messages[0].optimisticDeliveryPhase, .acceptedAwaitingEcho)
+
+        XCTAssertFalse(applyMobileOptimisticAttachmentEcho(
+            first,
+            accountKey: "account-a",
+            agentId: "agent-a",
+            messages: &messages
+        ))
+        XCTAssertEqual(messages[0].optimisticAcknowledgedAttachmentIds, Set(["upload-a"]))
+
+        let second: [String: Any] = [
+            "type": "transcript.card",
+            "entryId": "upload-b",
+            "card": [
+                "kind": "user-attachment",
+                "id": "upload-b",
+                "file_path": "/staged/b.txt",
+                "clientNonce": retryNonce,
+            ],
+        ]
+        XCTAssertTrue(applyMobileOptimisticAttachmentEcho(
+            second,
+            accountKey: "account-a",
+            agentId: "agent-a",
+            messages: &messages
+        ))
+        XCTAssertNil(messages[0].optimisticDeliveryPhase)
+        XCTAssertNil(messages[0].optimisticDeliveryError)
+        XCTAssertEqual(
+            messages[0].optimisticAcknowledgedAttachmentIds,
+            Set(["upload-a", "upload-b"])
+        )
+    }
+
+    func testAttachmentEchoDoesNotSettleTextAndAttachmentSendBeforeUserMessageEcho() {
+        var message = MobileChatMessage(
+            id: "nonce-text-attachment",
+            role: .user,
+            text: "caption",
+            canonicalMessageId: "nonce-text-attachment",
+            optimisticDeliveryPhase: .acceptedAwaitingEcho
+        )
+        message.optimisticAccountKey = "account-a"
+        message.optimisticAgentId = "agent-a"
+        message.optimisticNonce = "nonce-text-attachment"
+        message.optimisticAttachments = [
+            .init(id: "local-a", name: "a.txt", path: "/staged/a.txt", mimeType: nil, sizeBytes: 1),
+        ]
+        var messages = [message]
+        XCTAssertFalse(applyMobileOptimisticAttachmentEcho([
+            "type": "transcript.card",
+            "entryId": "upload-a",
+            "card": [
+                "kind": "user-attachment",
+                "id": "upload-a",
+                "file_path": "/staged/a.txt",
+                "clientNonce": "nonce-text-attachment",
+            ],
+        ], accountKey: "account-a", agentId: "agent-a", messages: &messages))
+        XCTAssertEqual(messages[0].optimisticDeliveryPhase, .acceptedAwaitingEcho)
+        XCTAssertTrue(applyMobileOptimisticUserEcho([
+            "type": "chat.message",
+            "role": "user",
+            "messageId": "nonce-text-attachment",
+            "text": "caption",
+        ], accountKey: "account-a", agentId: "agent-a", messages: &messages))
+        XCTAssertNil(messages[0].optimisticDeliveryPhase)
+    }
+
     func testNativeReactionPickerCatalogSearchCategoryAliasesSkinsRankingAndLimit() throws {
         XCTAssertEqual(mobileDesktopEmojiCatalogSourcePackage, "emojibase-data@17.0.0")
         XCTAssertEqual(mobileReactionCatalog.count, 3_944)

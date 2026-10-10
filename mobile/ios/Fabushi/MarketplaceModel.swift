@@ -791,6 +791,7 @@ struct MobileChatMessage: Identifiable, Equatable {
     var optimisticAgentId: String?
     var optimisticNonce: String?
     var optimisticPriorNonces: [String] = []
+    var optimisticAcknowledgedAttachmentIds: Set<String> = []
 }
 
 enum MobileAutoReviewResolution: String, Equatable {

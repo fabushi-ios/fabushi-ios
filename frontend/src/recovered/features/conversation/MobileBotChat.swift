@@ -940,6 +940,49 @@ internal func applyMobileOptimisticUserEcho(
     return true
 }
 
+@discardableResult
+internal func applyMobileOptimisticAttachmentEcho(
+    _ event: [String: Any],
+    accountKey: String,
+    agentId: String,
+    messages: inout [MobileChatMessage]
+) -> Bool {
+    guard event["type"] as? String == "transcript.card",
+          let card = event["card"] as? [String: Any],
+          card["kind"] as? String == "user-attachment",
+          let rawNonce = card["clientNonce"] as? String
+    else { return false }
+
+    let nonce = rawNonce.trimmingCharacters(in: .whitespacesAndNewlines)
+    let rawEntryId = (event["entryId"] as? String) ?? (card["id"] as? String)
+    let entryId = rawEntryId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !nonce.isEmpty, !entryId.isEmpty,
+          let index = messages.firstIndex(where: {
+              $0.role == .user
+                  && $0.optimisticDeliveryPhase != nil
+                  && $0.optimisticAccountKey == accountKey
+                  && $0.optimisticAgentId == agentId
+                  && $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                  && !$0.optimisticAttachments.isEmpty
+                  && mobileAcknowledgementRecordMatches($0, nonce: nonce)
+          })
+    else { return false }
+
+    guard !messages[index].optimisticAcknowledgedAttachmentIds.contains(entryId) else {
+        return false
+    }
+    messages[index].optimisticAcknowledgedAttachmentIds.insert(entryId)
+    guard messages[index].optimisticAcknowledgedAttachmentIds.count
+            >= messages[index].optimisticAttachments.count
+    else {
+        return false
+    }
+
+    messages[index].optimisticDeliveryPhase = nil
+    messages[index].optimisticDeliveryError = nil
+    return true
+}
+
 internal func projectMobileTranscriptCardWithFallback(
     event: [String: Any],
     operationId: String?
@@ -6424,6 +6467,12 @@ internal struct MobileBotChat: View {
                     let row = MobileChatMessage(id: id, role: .assistant, text: "", kind: .action, operationId: operationId, actionTitle: "Model", actionDetail: [provider, model].filter { !$0.isEmpty }.joined(separator: " · "), actionStatus: "completed")
                     if let index = entries.firstIndex(where: { $0.id == id }) { entries[index] = row } else { entries.append(row) }
                 case "transcript.card":
+                    _ = applyMobileOptimisticAttachmentEcho(
+                        event,
+                        accountKey: model.settingsNoticeAccountKey,
+                        agentId: bot.id,
+                        messages: &entries
+                    )
                     guard let row = projectMobileTranscriptCardWithFallback(
                         event: event,
                         operationId: eventOperationId
