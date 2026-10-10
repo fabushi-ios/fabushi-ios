@@ -1552,9 +1552,9 @@
       "type": "blob",
       "sha": "77a314c1c982da3aa85bb65165d80468b2663db3",
       "size": 6606,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "active-upstream-architecture-contract",
+      "coverage_status": "reviewed-upstream-architecture-provenance",
+      "reason": "Active FBCP architecture contract requires one product architecture, single-composition roots, existing-owner-first absorption, and typed capability integration rather than a Telegram/CommunicationCore subsystem. These constraints are applicable architectural provenance for iOS and align with its existing native ProductShell/Conversation/Coordinator/Host/Runner owners; no file-level implementation claim is inferred."
     },
     {
       "path": "projects/fabushi-communication-platform/canonical-screen-patterns.md",
@@ -1562,9 +1562,9 @@
       "type": "blob",
       "sha": "8b98f8fbd1eaed086c26f632a260744e18966ae3",
       "size": 6287,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "active-upstream-screen-pattern-contract",
+      "coverage_status": "reviewed-active-product-effect-provenance",
+      "reason": "Active screen-pattern contract defines canonical shell/workspace/profile/creation/search/marketplace/settings/call/media state and return behavior. iOS uses native screen patterns and responsive navigation as platform replacement; final UI/device/accessibility evidence remains pending."
     },
     {
       "path": "projects/fabushi-communication-platform/current-owner-inventory.md",
@@ -1572,9 +1572,9 @@
       "type": "blob",
       "sha": "d252cac8d8d6f8cb1a5b485788fef47a5866f9be",
       "size": 14553,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-owner-inventory-snapshot",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Explicit evidence snapshot captured against old main/PR #20 identities and self-invalidates when that head changes. Useful ownership provenance only; current iOS owner decisions must be re-read from live Desktop main and current iOS shipping call graphs."
     },
     {
       "path": "projects/fabushi-communication-platform/design-system.md",
@@ -1582,9 +1582,9 @@
       "type": "blob",
       "sha": "bab234e73227686ba978f6d0b332e2fc896488fa",
       "size": 8481,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "active-upstream-design-system-contract",
+      "coverage_status": "reviewed-active-product-effect-provenance",
+      "reason": "FDS-001 is an active Desktop visual-system contract. Its semantic hierarchy, identity consistency, accessibility, motion/state principles and no-bespoke-feature-system rule are applicable product effects; exact Desktop CSS/token geometry is platform-specific and replaced by iOS native design tokens/Dynamic Type/SwiftUI styling."
     },
     {
       "path": "projects/fabushi-communication-platform/management/spec-revision-2026-10-07.md",
@@ -1592,9 +1592,9 @@
       "type": "blob",
       "sha": "e67fbdcd71920cebd7da3c7e8a63966931b11e85",
       "size": 3819,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "upstream-spec-governance-record",
+      "coverage_status": "reviewed-governance-and-product-context",
+      "reason": "Governance record documenting the Revision 7 scope expansion, single-composition/UI/search/quality rules and GitHub Actions-only policy. It explicitly makes no implementation claim; retained as change provenance, not shipping evidence."
     },
     {
       "path": "projects/fabushi-communication-platform/management/tasks/P0-product-domain-and-telegram-absorption.md",
@@ -1602,9 +1602,9 @@
       "type": "blob",
       "sha": "9a3ee64f90df72ab3d0029f4866ff312a6b8971a",
       "size": 11357,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "upstream-requirements-task-contract",
+      "coverage_status": "reviewed-upstream-requirements-only",
+      "reason": "Active P0 execution contract requires full source/responsibility accounting, live owner resolution, no parallel runtime, native services, UI composition/search/design-system gates and exact-head evidence. It is requirements/planning input only; current iOS source closure and acceptance remain open."
     },
     {
       "path": "projects/fabushi-communication-platform/owner-resolution-matrix.md",
@@ -1612,9 +1612,9 @@
       "type": "blob",
       "sha": "7f822ccc57000501c47f1771499a68f93aa35aa8",
       "size": 42044,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "upstream-owner-planning-contract",
+      "coverage_status": "reviewed-upstream-architecture-provenance",
+      "reason": "Capability-to-owner planning matrix preserves owner-first and no-parallel-runtime intent, but its frozen Telegram and PR #20 identities are historical. Current iOS migration may use it only as provenance and must re-resolve each responsibility against live Desktop main and current native owners before implementation/verification."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/defect-regression-policy.md",
@@ -1792,9 +1792,9 @@
       "type": "blob",
       "sha": "283858bb70bab14e240da781a20e749ed1f1359e",
       "size": 6471,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "active-upstream-product-contract",
+      "coverage_status": "reviewed-active-upstream-product-spec",
+      "reason": "FBCP-001 Revision 7 is an active Desktop product/migration contract: preserve one Fabushi product, owner-first absorption, Coordinator/Host/Runner, unified Conversation/Search/UI composition, GitHub Actions-only verification, and no Telegram/provider parallel runtime. iOS uses the current Desktop-main iOS parity Spec and native SwiftUI/Rust owners as the platform-specific replacement; this file is normative upstream context, not proof of implementation."
     },
     {
       "path": "projects/fabushi-communication-platform/STATUS.md",
@@ -1802,9 +1802,9 @@
       "type": "blob",
       "sha": "d89b418e23e5612298dc0eab6371eba23b068a3c",
       "size": 1587,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-project-status-snapshot",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Status is dated 2026-10-02 / FBCP Revision 2 and explicitly records blocked/not-implemented historical progress. It is retained as provenance only and cannot override current Desktop main shipping owners or current iOS migration status."
     },
     {
       "path": "projects/fabushi-communication-platform/telegram-capability-graph.md",
@@ -1812,9 +1812,9 @@
       "type": "blob",
       "sha": "cfa1e6722f0e5f03c364608a1373a69cd2c36585",
       "size": 19677,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-upstream-research-index",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Telegram capability graph is source-research/planning provenance, not current Fabushi shipping authority. The iOS migration is Desktop-main responsibility driven and does not create a Telegram runtime/provider; capability findings remain useful only when revalidated against current Desktop responsibilities."
     },
     {
       "path": "projects/fabushi-communication-platform/ui-component-contract.md",
@@ -1822,9 +1822,9 @@
       "type": "blob",
       "sha": "be6058337d3268004c7b3d3325d61e18704bb9fd",
       "size": 5393,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "active-upstream-ui-component-contract",
+      "coverage_status": "reviewed-active-product-effect-provenance",
+      "reason": "Active canonical component contract is relevant product/interaction provenance: shared primitives/patterns, focus/IME/a11y/state ownership, and no feature-local duplicate roots. iOS replaces React/Sand mechanics with native SwiftUI/UIKit components while preserving equivalent semantics; this review does not claim all components verified."
     },
     {
       "path": "projects/fabushi-communication-platform/ui-information-architecture.md",
@@ -1832,9 +1832,9 @@
       "type": "blob",
       "sha": "d801aa149b7a5d4c2bcf38b64fee5e454e93b404",
       "size": 9075,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "active-upstream-ui-product-contract",
+      "coverage_status": "reviewed-active-product-effect-provenance",
+      "reason": "Active UI IA contract defines one Fabushi shell, canonical Conversation/Search/Creation/Profile composition, typed capability surfaces, state continuity, accessibility, keyboard and responsive behavior. On iOS these product effects are implemented through native SwiftUI/navigation/search owners rather than Desktop layout mechanics; current-head implementation/evidence remains separately gated."
     },
     {
       "path": "projects/fabushi-communication-platform/visual-acceptance.md",
@@ -1842,9 +1842,9 @@
       "type": "blob",
       "sha": "16855454ff7897f3aa205bc33f1672077e32955d",
       "size": 6899,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "active-upstream-ui-acceptance-contract",
+      "coverage_status": "reviewed-with-native-ios-release-replacement",
+      "reason": "FVA-001 defines fail-closed visual/interaction acceptance, temporal evidence, accessibility, localization, responsive and large-data expectations. Desktop screenshot matrices are replaced by current-head iPhone/iPad native UI/device acceptance, while equivalent state/temporal/a11y evidence remains mandatory and pending."
     },
     {
       "path": "projects/grok-fabu-parity/architecture-manifest.json",
