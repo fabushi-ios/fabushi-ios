@@ -476,9 +476,9 @@
       "type": "blob",
       "sha": "5bdac676f2ad1abfd66822918eafe14d70158e99",
       "size": 3575,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-ui-parity-test-contract",
+      "coverage_status": "reviewed-with-ios-focused-replacement",
+      "reason": "Desktop-only static/UI contract verifies OpenBot/Grok skin activation, deterministic BotMark identity, thinking/action/result transcript projection, structured assistant result surfaces and message actions. iOS does not execute this Node script; equivalent product responsibilities live in native SwiftUI messaging/agent surfaces and must be covered by iOS unit/UI/accessibility tests on the final exact HEAD. Visual identity/reduced-motion acceptance remains pending IOS-MAIN-AC-13."
     },
     {
       "path": "desktop/scripts/build-electron-runtime.mjs",
@@ -486,9 +486,9 @@
       "type": "blob",
       "sha": "38c04317bd10c30fef2d6be517dd9b41dbfb8925",
       "size": 2051,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-electron-runtime-build-script",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Bundles Electron main/preload and the Rust Coordinator carrier with esbuild for Node/Electron. iOS must not ship Electron or this bundle graph; replacement is the native Xcode target in mobile/ios/project.yml plus iOS-owned Rust prebuild through scripts/build-mahayana-ios.sh and the iOS architecture workflow."
     },
     {
       "path": "desktop/scripts/check-agent-workspace-boundary.mjs",
@@ -496,9 +496,9 @@
       "type": "blob",
       "sha": "a2ddb992fa459fd2328c924f9e39840a70f2f3d5",
       "size": 11145,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-architecture-boundary-gate",
+      "coverage_status": "reviewed-with-ios-runtime-replacement",
+      "reason": "Fail-closed Desktop architecture gate enforces Renderer -> Electron -> Coordinator -> Host -> Runner, single production roots, durable runtime state, capability audit and recovery. iOS replacement is scripts/check-desktop-main-ios-architecture.py plus ios-desktop-main-architecture.yml, with Swift/native adapters replacing Electron while preserving Coordinator/Host/Runner and single-owner constraints."
     },
     {
       "path": "desktop/scripts/check-app-agent-stable-rebase-contract.mjs",
@@ -506,9 +506,9 @@
       "type": "blob",
       "sha": "5821564394663e7511ac5d745eaca906ad7bdfc5",
       "size": 2191,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-app-agent-stale-generation-security-contract",
+      "coverage_status": "reviewed-with-ios-focused-replacement",
+      "reason": "Desktop App Agent contract keeps stale-generation actions fail-closed, allows only bounded identity-stable rebasing and forbids positional/route/screen drift. iOS native replacement is mobile/ios/Fabushi/FabushiAppAgentSurface.swift, which owns generation-scoped snapshots/actions and stale_app_surface_generation failure, together with focused App Agent surface tests/current exact-head CI. No Electron DOM rebasing layer is copied."
     },
     {
       "path": "desktop/scripts/check-desktop-bundle.mjs",
@@ -516,9 +516,9 @@
       "type": "blob",
       "sha": "c69612c23c01ba222b52cd7fbc9685df38eb078c",
       "size": 1772,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-renderer-bundle-boundary-gate",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Scans emitted Electron renderer assets for forbidden legacy runtime/UI markers. iOS has no emitted Vite renderer bundle; replacement is source/architecture closure against the native SwiftUI shipping composition and final Xcode archive, enforced by iOS architecture/completeness workflows rather than text scanning an Electron dist tree."
     },
     {
       "path": "desktop/scripts/check-electron-runtime-bundle.mjs",
@@ -526,9 +526,9 @@
       "type": "blob",
       "sha": "2aa0ce0f9ea0220c5cc6f63cc84a400bb65b8731",
       "size": 2047,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-electron-artifact-graph-gate",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Validates the co-staged Electron main/preload/Coordinator carrier/renderer artifact graph and app-host binary wiring. iOS replacement is the signed native app/archive graph produced from mobile/ios/project.yml with linked iOS-owned Rust runtime and verified by architecture, device-archive, completeness and store-delivery gates. Electron parentPort/app-host staging mechanics are not applicable."
     },
     {
       "path": "desktop/scripts/diagnose-desktop-bootstrap.mjs",
