@@ -464,6 +464,117 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         ))
     }
 
+    func testLocalToolPermissionTranscriptProjectionAndPolicySemantics() throws {
+        let pending = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "local-tool-entry",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "local-tool-permission",
+                        "ask": [
+                            "requestId": "local-request-1",
+                            "status": "pending",
+                            "action": "run-command",
+                            "target": "git status",
+                        ],
+                    ],
+                ],
+            ],
+            operationId: "op-local"
+        ))
+        XCTAssertEqual(pending.kind, .action)
+        XCTAssertEqual(pending.localToolPermissionRequestId, "local-request-1")
+        XCTAssertEqual(pending.localToolPermissionStatus, "pending")
+        XCTAssertEqual(pending.actionStatus, "pending")
+        XCTAssertTrue(pending.actionTitle?.contains("Allow Fabushi") == true)
+
+        let settled = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "local-tool-settled",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "local-tool-permission",
+                        "ask": [
+                            "requestId": "local-request-2",
+                            "status": "never",
+                            "action": NSNull(),
+                            "target": NSNull(),
+                        ],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+        XCTAssertEqual(settled.localToolPermissionStatus, "never")
+        XCTAssertEqual(
+            settled.actionDetail,
+            "Fabushi cannot run commands on your computer."
+        )
+
+        XCTAssertNil(projectMobileTranscriptCard(
+            event: [
+                "entryId": "bad-local-tool",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "local-tool-permission",
+                        "ask": ["requestId": " ", "status": "pending"],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+        XCTAssertNil(projectMobileTranscriptCard(
+            event: [
+                "entryId": "bad-local-tool-status",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "local-tool-permission",
+                        "ask": ["requestId": "r", "status": "bogus"],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+
+        XCTAssertEqual(mobileLocalToolPermissionFallbackResolution("always"), "allow-once")
+        XCTAssertEqual(mobileLocalToolPermissionFallbackResolution("never"), "deny")
+        XCTAssertEqual(mobileLocalToolPermissionFallbackResolution("allow-once"), "allow-once")
+        XCTAssertTrue(
+            mobileLocalToolPermissionAlwaysBlocked(
+                ceilingLoaded: false,
+                ceiling: nil
+            )
+        )
+        XCTAssertFalse(
+            mobileLocalToolPermissionAlwaysBlocked(
+                ceilingLoaded: true,
+                ceiling: nil
+            )
+        )
+        XCTAssertFalse(
+            mobileLocalToolPermissionAlwaysBlocked(
+                ceilingLoaded: true,
+                ceiling: "always"
+            )
+        )
+        XCTAssertTrue(
+            mobileLocalToolPermissionAlwaysBlocked(
+                ceilingLoaded: true,
+                ceiling: "ask"
+            )
+        )
+        XCTAssertTrue(
+            mobileLocalToolPermissionAlwaysBlocked(
+                ceilingLoaded: true,
+                ceiling: "never"
+            )
+        )
+    }
+
     func testNativeTranscriptCardsProjectRecoveredNoticePermissionAndTimelineSemantics() throws {
         let notice = try XCTUnwrap(projectMobileTranscriptCard(
             event: [

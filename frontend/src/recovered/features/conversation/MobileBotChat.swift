@@ -1308,6 +1308,11 @@ internal struct MobileBotChat: View {
     @State private var editorSuggestionActiveIndex: Int?
     @State private var editorSuggestionRecents: [String] = []
     @State private var approvalGeneration = 0
+    @State private var localToolPermissionGeneration = 0
+    @State private var localToolPermissionPendingEntryIds: Set<String> = []
+    @State private var localToolPermissionCeilings: [String: SandLocalToolPermission] = [:]
+    @State private var localToolPermissionCeilingLoadedEntryIds: Set<String> = []
+    @State private var localToolPermissionErrors: [String: String] = [:]
     @State private var transcriptBaselineGeneration = 0
     @State private var transcriptBaselineError: String?
     @State private var widgetGeneration = 0
@@ -1377,6 +1382,7 @@ internal struct MobileBotChat: View {
             invalidateReactionScope()
             resetCloudAgentState()
             approvalGeneration &+= 1
+            resetLocalToolPermissionUI()
             transcriptBaselineGeneration &+= 1
             transcriptBaselineError = nil
             widgetGeneration &+= 1
@@ -1396,6 +1402,7 @@ internal struct MobileBotChat: View {
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             invalidateReactionScope()
             resetCloudAgentState()
+            resetLocalToolPermissionUI()
             invalidateEditorSuggestions()
         }
         .onDisappear {
@@ -1403,6 +1410,7 @@ internal struct MobileBotChat: View {
             invalidateReactionScope()
             resetCloudAgentState()
             approvalGeneration &+= 1
+            resetLocalToolPermissionUI()
             transcriptBaselineGeneration &+= 1
             widgetGeneration &+= 1
             widgetPendingEntryIds.removeAll()
@@ -2521,6 +2529,8 @@ internal struct MobileBotChat: View {
                 cloudAgentCard(entry, bcId: bcId)
             } else if let connectors = entry.connectorNames {
                 connectorCard(entry, connectors: connectors)
+            } else if entry.localToolPermissionRequestId != nil {
+                localToolPermissionCard(entry)
             } else if let widget = mobileTranscriptWidgetProjection(entry) {
                 transcriptWidgetCard(entry, projection: widget)
             } else if let draft = mobileTranscriptDraftProjection(entry.canonicalTranscriptCard) {
@@ -3533,6 +3543,184 @@ internal struct MobileBotChat: View {
         .padding(10)
         .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-\\(bcId)"))
+    }
+
+    @MainActor
+    private func resetLocalToolPermissionUI() {
+        localToolPermissionGeneration &+= 1
+        localToolPermissionPendingEntryIds.removeAll()
+        localToolPermissionCeilings.removeAll()
+        localToolPermissionCeilingLoadedEntryIds.removeAll()
+        localToolPermissionErrors.removeAll()
+    }
+
+    @MainActor
+    private func loadLocalToolPermissionPolicy(for entry: MobileChatMessage) async {
+        guard entry.localToolPermissionStatus == "pending",
+              entry.localToolPermissionRequestId != nil
+        else { return }
+        let ownedGeneration = localToolPermissionGeneration
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedBotId = bot.id
+        do {
+            let state = try await model.loadLocalToolPermissionState()
+            guard !Task.isCancelled,
+                  localToolPermissionGeneration == ownedGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedBotId
+            else { return }
+            localToolPermissionCeilingLoadedEntryIds.insert(entry.id)
+            if let ceiling = state.ceiling {
+                localToolPermissionCeilings[entry.id] = ceiling
+            } else {
+                localToolPermissionCeilings.removeValue(forKey: entry.id)
+            }
+            localToolPermissionErrors.removeValue(forKey: entry.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled,
+                  localToolPermissionGeneration == ownedGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedBotId
+            else { return }
+            // Fail closed for the standing Always choice until policy can be read.
+            localToolPermissionCeilingLoadedEntryIds.remove(entry.id)
+            localToolPermissionCeilings.removeValue(forKey: entry.id)
+            localToolPermissionErrors[entry.id] = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func resolveLocalToolPermission(
+        _ entry: MobileChatMessage,
+        resolution: String
+    ) async {
+        guard entry.localToolPermissionStatus == "pending",
+              let requestId = entry.localToolPermissionRequestId,
+              mobileLocalToolPermissionResolutions.contains(resolution),
+              !localToolPermissionPendingEntryIds.contains(entry.id)
+        else { return }
+
+        let ownedGeneration = localToolPermissionGeneration
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedBotId = bot.id
+        localToolPermissionPendingEntryIds.insert(entry.id)
+        localToolPermissionErrors.removeValue(forKey: entry.id)
+        defer {
+            if localToolPermissionGeneration == ownedGeneration,
+               model.settingsNoticeAccountKey == ownedAccount,
+               bot.id == ownedBotId {
+                localToolPermissionPendingEntryIds.remove(entry.id)
+            }
+        }
+
+        do {
+            let authoritativeResolution = try await model.resolveLocalToolPermission(
+                entryId: entry.id,
+                requestId: requestId,
+                agentId: ownedBotId,
+                resolution: resolution
+            )
+            guard !Task.isCancelled,
+                  localToolPermissionGeneration == ownedGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedBotId,
+                  let index = entries.firstIndex(where: {
+                      $0.id == entry.id && $0.localToolPermissionRequestId == requestId
+                  })
+            else { return }
+            entries[index].localToolPermissionStatus = authoritativeResolution
+            entries[index].actionStatus = authoritativeResolution
+            entries[index].actionDetail = mobileLocalToolPermissionOutcomeText(authoritativeResolution)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled,
+                  localToolPermissionGeneration == ownedGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedBotId
+            else { return }
+            localToolPermissionErrors[entry.id] = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func localToolPermissionCard(_ entry: MobileChatMessage) -> some View {
+        let status = entry.localToolPermissionStatus ?? entry.actionStatus ?? "pending"
+        let pending = status == "pending"
+        let submitting = localToolPermissionPendingEntryIds.contains(entry.id)
+        let alwaysBlocked = mobileLocalToolPermissionAlwaysBlocked(
+            ceilingLoaded: localToolPermissionCeilingLoadedEntryIds.contains(entry.id),
+            ceiling: localToolPermissionCeilings[entry.id]
+        )
+
+        VStack(alignment: .leading, spacing: 10) {
+            if pending {
+                Text("Allow Fabushi and all agents to run commands on your local device?")
+                    .font(.subheadline.weight(.semibold))
+                Text("This applies to Fabushi and every agent. You can always change it in Settings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let error = localToolPermissionErrors[entry.id], !error.isEmpty {
+                    Text("Your answer didn’t go through. Check your connection and try again.")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .accessibilityHint(error)
+                }
+                HStack(spacing: 8) {
+                    Button("Always allow") {
+                        Task { await resolveLocalToolPermission(entry, resolution: "always") }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(submitting || alwaysBlocked)
+                    .help(alwaysBlocked ? "Always allow is unavailable until team policy permits it." : "")
+
+                    Button("Allow once") {
+                        Task { await resolveLocalToolPermission(entry, resolution: "allow-once") }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(submitting)
+
+                    Button("Never") {
+                        Task { await resolveLocalToolPermission(entry, resolution: "never") }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(submitting)
+
+                    Button("Deny once") {
+                        Task { await resolveLocalToolPermission(entry, resolution: "deny") }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(submitting)
+                    .keyboardShortcut(.cancelAction)
+                }
+            } else {
+                Text(mobileLocalToolPermissionOutcomeText(status))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Local tool permission")
+        .accessibilityIdentifier(Self.semanticId("mobile-bot-local-tool-permission-\(entry.id)"))
+        .task(
+            id: [
+                model.settingsNoticeAccountKey,
+                bot.id,
+                entry.id,
+                String(reconnectGeneration),
+                String(localToolPermissionGeneration),
+            ].joined(separator: "|")
+        ) {
+            await loadLocalToolPermissionPolicy(for: entry)
+        }
     }
 
     @ViewBuilder

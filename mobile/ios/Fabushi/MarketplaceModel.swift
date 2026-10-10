@@ -693,6 +693,8 @@ struct MobileChatMessage: Identifiable, Equatable {
     var actionDetail: String?
     var actionStatus: String?
     var listenerPlatform: String?
+    var localToolPermissionRequestId: String?
+    var localToolPermissionStatus: String?
     var cloudAgentBcId: String?
     var connectorNames: [String]?
     var connectorServerIdHint: String?
@@ -1231,6 +1233,45 @@ private func projectMobileTimelineEvent(
     }
 }
 
+internal let mobileLocalToolPermissionStatuses: Set<String> = [
+    "pending", "always", "never", "denied", "expired", "allow-once",
+]
+
+internal let mobileLocalToolPermissionResolutions: Set<String> = [
+    "always", "allow-once", "never", "deny",
+]
+
+internal func mobileLocalToolPermissionFallbackResolution(_ requested: String) -> String {
+    switch requested {
+    case "always": "allow-once"
+    case "never": "deny"
+    default: requested
+    }
+}
+
+internal func mobileLocalToolPermissionAlwaysBlocked(
+    ceilingLoaded: Bool,
+    ceiling: SandLocalToolPermission?
+) -> Bool {
+    guard ceilingLoaded else { return true }
+    guard let ceiling else { return false }
+    return (SAND_LOCAL_TOOL_PERMISSION_RANK["always"] ?? Int.max)
+        > (SAND_LOCAL_TOOL_PERMISSION_RANK[ceiling] ?? Int.min)
+}
+
+internal func mobileLocalToolPermissionOutcomeText(_ status: String) -> String {
+    switch status {
+    case "always":
+        "Fabushi can run commands on your computer."
+    case "never":
+        "Fabushi cannot run commands on your computer."
+    case "denied", "expired":
+        "Fabushi was not allowed to run commands on your computer."
+    default:
+        "Fabushi can run commands on your computer this time."
+    }
+}
+
 /// Native projection for the recovered Desktop transcript-card family.
 /// Unknown/malformed cards fail closed rather than becoming generic messages.
 func projectMobileTranscriptCard(
@@ -1347,6 +1388,32 @@ func projectMobileTranscriptCard(
                 actionTitle: "Connectors",
                 actionStatus: "waiting",
                 connectorNames: connectors,
+                createdAt: createdAt
+            )
+        }
+        if type == "local-tool-permission" {
+            guard let ask = message["ask"] as? [String: Any],
+                  let rawRequestId = ask["requestId"] as? String,
+                  let status = ask["status"] as? String,
+                  mobileLocalToolPermissionStatuses.contains(status)
+            else { return nil }
+            let requestId = rawRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !requestId.isEmpty else { return nil }
+            return MobileChatMessage(
+                id: entryId,
+                role: .assistant,
+                text: "",
+                kind: .action,
+                operationId: operationId,
+                actionTitle: status == "pending"
+                    ? "Allow Fabushi to run commands on this device?"
+                    : "Local tool permission",
+                actionDetail: status == "pending"
+                    ? "This applies to Fabushi and every agent. You can change it later in Settings."
+                    : mobileLocalToolPermissionOutcomeText(status),
+                actionStatus: status,
+                localToolPermissionRequestId: requestId,
+                localToolPermissionStatus: status,
                 createdAt: createdAt
             )
         }
@@ -2249,6 +2316,71 @@ final class MarketplaceModel {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         return authoritative
+    }
+
+    func loadLocalToolPermissionState() async throws -> MobileLocalToolPermissionState {
+        async let permissionResult = bridge.request(method: "getLocalToolPermission")
+        async let ceilingResult = bridge.request(method: "getLocalToolPermissionCeiling")
+        let (permissionReply, ceilingReply) = try await (permissionResult, ceilingResult)
+        guard let permission = permissionReply.value as? String,
+              isSandLocalToolPermission(permission)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let ceiling: SandLocalToolPermission?
+        if ceilingReply.value is NSNull {
+            ceiling = nil
+        } else if let value = ceilingReply.value as? String,
+                  isSandLocalToolPermission(value) {
+            ceiling = value
+        } else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return .init(permission: permission, ceiling: ceiling)
+    }
+
+    @discardableResult
+    func resolveLocalToolPermission(
+        entryId: String,
+        requestId: String,
+        agentId: String,
+        resolution requestedResolution: String
+    ) async throws -> String {
+        let normalizedEntryId = entryId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedRequestId = requestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedAgentId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedEntryId.isEmpty,
+              !normalizedRequestId.isEmpty,
+              !normalizedAgentId.isEmpty,
+              mobileLocalToolPermissionResolutions.contains(requestedResolution)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+
+        var resolution = requestedResolution
+        if requestedResolution == "always" || requestedResolution == "never" {
+            do {
+                let stored = try await updateLocalToolPermission(requestedResolution)
+                if stored != requestedResolution {
+                    resolution = mobileLocalToolPermissionFallbackResolution(requestedResolution)
+                }
+            } catch {
+                // Desktop parity: a durable Always/Never write that is rejected
+                // or unavailable degrades to the corresponding one-time answer.
+                resolution = mobileLocalToolPermissionFallbackResolution(requestedResolution)
+            }
+        }
+
+        _ = try await bridge.request(
+            method: "resolveLocalToolPermission",
+            params: [
+                "entryId": normalizedEntryId,
+                "requestId": normalizedRequestId,
+                "resolution": resolution,
+                "agentId": normalizedAgentId,
+            ]
+        )
+        return resolution
     }
 
     func updateAutoReviewSettings(
