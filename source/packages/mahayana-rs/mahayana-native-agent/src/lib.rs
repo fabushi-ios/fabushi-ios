@@ -339,7 +339,22 @@ impl KernelEventSink for NativeEventBridge {
                     },
                 }
             }
-            KernelEvent::ToolCompleted { tool, .. } if tool == "send_message" => return Ok(()),
+            KernelEvent::ToolCompleted {
+                tool,
+                output,
+                success,
+                ..
+            } if tool == "send_message" => {
+                if !success {
+                    return Ok(());
+                }
+                let Some(event) =
+                    native_send_message_event(&self.conversation_id, &output)
+                else {
+                    return Ok(());
+                };
+                event
+            }
             KernelEvent::ToolCompleted {
                 tool,
                 output,
@@ -733,6 +748,50 @@ impl AgentBackend for NativeAgentBackend {
     }
 }
 
+fn native_send_message_event(
+    conversation_id: &ConversationId,
+    output: &Value,
+) -> Option<AgentEvent> {
+    let text = output
+        .get("generatedMessage")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default();
+    let attachment = output
+        .get("generatedAttachment")
+        .cloned()
+        .filter(|value| !value.is_null());
+    if text.is_empty() && attachment.is_none() {
+        return None;
+    }
+    let tool_call_id = output
+        .get("toolCallId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("send-message");
+    let reply_to_message_id = output
+        .get("replyToMessageId")
+        .cloned()
+        .filter(|value| !value.is_null());
+    Some(AgentEvent::MessageCompleted {
+        message: Message {
+            id: MessageId::generated(&format!("mahayana-native-send:{tool_call_id}")),
+            conversation_id: conversation_id.clone(),
+            role: MessageRole::Assistant,
+            text: text.to_string(),
+            created_at_ms: now_ms(),
+            metadata: json!({
+                "engine": "mahayana-native",
+                "deliveryTool": "send_message",
+                "toolCallId": tool_call_id,
+                "generatedAttachment": attachment,
+                "replyToMessageId": reply_to_message_id,
+            }),
+        },
+    })
+}
+
 fn project_mcp_server_state(
     server_identifier: &str,
     plugin_id: &str,
@@ -922,6 +981,41 @@ fn to_i64(value: u64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_send_message_completion_becomes_the_canonical_visible_agent_message() {
+        let conversation_id = ConversationId::new("mahayana-ai:agent:test");
+        let event = native_send_message_event(
+            &conversation_id,
+            &json!({
+                "generatedMessage": "Final answer",
+                "generatedAttachment": {"name":"report.pdf","path":"files/report.pdf"},
+                "replyToMessageId": "user:42",
+                "toolCallId": "call-send-42"
+            }),
+        )
+        .expect("visible send_message event");
+        let AgentEvent::MessageCompleted { message } = event else {
+            panic!("send_message must become MessageCompleted");
+        };
+        assert_eq!(message.conversation_id, conversation_id);
+        assert_eq!(message.text, "Final answer");
+        assert_eq!(message.metadata["deliveryTool"], "send_message");
+        assert_eq!(message.metadata["toolCallId"], "call-send-42");
+        assert_eq!(message.metadata["generatedAttachment"]["name"], "report.pdf");
+        assert_eq!(message.metadata["replyToMessageId"], "user:42");
+    }
+
+    #[test]
+    fn native_send_message_projection_rejects_empty_success_payloads() {
+        assert!(
+            native_send_message_event(
+                &ConversationId::new("mahayana-ai:agent:test"),
+                &json!({"generatedMessage":"   ","generatedAttachment":null})
+            )
+            .is_none()
+        );
+    }
 
     #[test]
     fn command_and_entitlement_metadata_are_product_owned() {
