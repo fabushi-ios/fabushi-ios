@@ -18,6 +18,9 @@ pub struct TranscriptMirrorJob {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptMirrorDispatch {
     pub worker_index: usize,
+    /// Monotonic generation for the shard worker. A failed worker is restarted
+    /// before the next dispatch and therefore receives a new generation.
+    pub worker_generation: u64,
     pub job: TranscriptMirrorJob,
     /// Number of callers whose completion is represented by this write.
     pub waiter_count: usize,
@@ -60,6 +63,23 @@ struct ConversationLane {
     queued: Option<QueuedMirrorJob>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MirrorWorkerState {
+    generation: u64,
+    alive: bool,
+    active_dispatches: usize,
+}
+
+impl Default for MirrorWorkerState {
+    fn default() -> Self {
+        Self {
+            generation: 0,
+            alive: false,
+            active_dispatches: 0,
+        }
+    }
+}
+
 /// iOS-native equivalent of Grok's transcript mirror worker pool.
 ///
 /// Grok uses Node worker_threads. iOS must not emulate a background process or
@@ -72,6 +92,7 @@ pub struct TranscriptMirrorOffloadPool {
     max_workers: usize,
     closed: AtomicBool,
     lanes: Mutex<HashMap<String, ConversationLane>>,
+    workers: Mutex<Vec<MirrorWorkerState>>,
 }
 
 impl Default for TranscriptMirrorOffloadPool {
@@ -86,6 +107,7 @@ impl TranscriptMirrorOffloadPool {
             max_workers: max_workers.max(1),
             closed: AtomicBool::new(false),
             lanes: Mutex::new(HashMap::new()),
+            workers: Mutex::new(vec![MirrorWorkerState::default(); max_workers.max(1)]),
         }
     }
 
@@ -95,6 +117,41 @@ impl TranscriptMirrorOffloadPool {
             hash = hash.wrapping_mul(31).wrapping_add(unit as i32);
         }
         (hash.unsigned_abs() as usize) % self.max_workers
+    }
+
+    fn lease_worker(&self, worker_index: usize) -> Result<u64, TranscriptMirrorOffloadError> {
+        let mut workers = self
+            .workers
+            .lock()
+            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        let worker = workers
+            .get_mut(worker_index)
+            .ok_or(TranscriptMirrorOffloadError::StatePoisoned)?;
+        if !worker.alive {
+            worker.generation = worker.generation.saturating_add(1).max(1);
+            worker.alive = true;
+        }
+        worker.active_dispatches = worker.active_dispatches.saturating_add(1);
+        Ok(worker.generation)
+    }
+
+    fn settle_worker(
+        &self,
+        worker_index: usize,
+        failed: bool,
+    ) -> Result<(), TranscriptMirrorOffloadError> {
+        let mut workers = self
+            .workers
+            .lock()
+            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        let worker = workers
+            .get_mut(worker_index)
+            .ok_or(TranscriptMirrorOffloadError::StatePoisoned)?;
+        worker.active_dispatches = worker.active_dispatches.saturating_sub(1);
+        if failed {
+            worker.alive = false;
+        }
+        Ok(())
     }
 
     pub fn submit(
@@ -114,8 +171,10 @@ impl TranscriptMirrorOffloadPool {
         match lanes.entry(conversation_id) {
             Entry::Vacant(entry) => {
                 entry.insert(ConversationLane::default());
+                let worker_generation = self.lease_worker(worker_index)?;
                 Ok(TranscriptMirrorSubmission::Dispatch(TranscriptMirrorDispatch {
                     worker_index,
+                    worker_generation,
                     job,
                     waiter_count: 1,
                 }))
@@ -150,23 +209,89 @@ impl TranscriptMirrorOffloadPool {
         &self,
         conversation_id: &str,
     ) -> Result<Option<TranscriptMirrorDispatch>, TranscriptMirrorOffloadError> {
-        let mut lanes = self
-            .lanes
-            .lock()
-            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        self.complete_with_outcome(conversation_id, false)
+    }
 
-        let queued = lanes
-            .get_mut(conversation_id)
-            .and_then(|lane| lane.queued.take());
+    /// Settles one active dispatch. A failed shard is marked unhealthy before
+    /// the queued successor is leased, so the successor receives a fresh
+    /// worker generation instead of inheriting stale worker state.
+    pub fn complete_with_outcome(
+        &self,
+        conversation_id: &str,
+        worker_failed: bool,
+    ) -> Result<Option<TranscriptMirrorDispatch>, TranscriptMirrorOffloadError> {
+        let worker_index = self.worker_index_for(conversation_id);
+        let queued = {
+            let mut lanes = self
+                .lanes
+                .lock()
+                .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+            let queued = lanes
+                .get_mut(conversation_id)
+                .and_then(|lane| lane.queued.take());
+            if queued.is_none() {
+                lanes.remove(conversation_id);
+            }
+            queued
+        };
+
+        self.settle_worker(worker_index, worker_failed)?;
+
         if let Some(queued) = queued {
+            let worker_generation = self.lease_worker(worker_index)?;
             return Ok(Some(TranscriptMirrorDispatch {
-                worker_index: self.worker_index_for(conversation_id),
+                worker_index,
+                worker_generation,
                 job: queued.job,
                 waiter_count: queued.waiter_count,
             }));
         }
-        lanes.remove(conversation_id);
         Ok(None)
+    }
+
+    pub fn queued_waiter_count(
+        &self,
+        conversation_id: &str,
+    ) -> Result<usize, TranscriptMirrorOffloadError> {
+        let lanes = self
+            .lanes
+            .lock()
+            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        Ok(lanes
+            .get(conversation_id)
+            .and_then(|lane| lane.queued.as_ref())
+            .map(|queued| queued.waiter_count)
+            .unwrap_or(0))
+    }
+
+    pub fn active_worker_count(&self) -> Result<usize, TranscriptMirrorOffloadError> {
+        let workers = self
+            .workers
+            .lock()
+            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        Ok(workers.iter().filter(|worker| worker.alive).count())
+    }
+
+    pub fn active_dispatch_count(&self) -> Result<usize, TranscriptMirrorOffloadError> {
+        let workers = self
+            .workers
+            .lock()
+            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        Ok(workers.iter().map(|worker| worker.active_dispatches).sum())
+    }
+
+    pub fn worker_generation(
+        &self,
+        worker_index: usize,
+    ) -> Result<u64, TranscriptMirrorOffloadError> {
+        let workers = self
+            .workers
+            .lock()
+            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        workers
+            .get(worker_index)
+            .map(|worker| worker.generation)
+            .ok_or(TranscriptMirrorOffloadError::StatePoisoned)
     }
 
     pub fn active_lane_count(&self) -> Result<usize, TranscriptMirrorOffloadError> {
@@ -191,6 +316,16 @@ impl TranscriptMirrorOffloadPool {
             .map(|queued| queued.waiter_count)
             .sum();
         lanes.clear();
+        drop(lanes);
+
+        let mut workers = self
+            .workers
+            .lock()
+            .map_err(|_| TranscriptMirrorOffloadError::StatePoisoned)?;
+        for worker in workers.iter_mut() {
+            worker.alive = false;
+            worker.active_dispatches = 0;
+        }
         Ok(queued_waiters)
     }
 }
@@ -250,6 +385,60 @@ mod tests {
 
         assert!(pool.complete("conversation-a").unwrap().is_none());
         assert_eq!(pool.active_lane_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn tracks_queued_waiters_active_dispatches_and_live_workers() {
+        let pool = TranscriptMirrorOffloadPool::new(2);
+        let first = match pool.submit(job("conversation-a", 1)).unwrap() {
+            TranscriptMirrorSubmission::Dispatch(dispatch) => dispatch,
+            other => panic!("expected dispatch, got {other:?}"),
+        };
+        assert_eq!(first.worker_generation, 1);
+        assert_eq!(pool.active_worker_count().unwrap(), 1);
+        assert_eq!(pool.active_dispatch_count().unwrap(), 1);
+
+        pool.submit(job("conversation-a", 2)).unwrap();
+        pool.submit(job("conversation-a", 3)).unwrap();
+        assert_eq!(pool.queued_waiter_count("conversation-a").unwrap(), 2);
+        assert_eq!(pool.active_dispatch_count().unwrap(), 1);
+
+        let next = pool.complete("conversation-a").unwrap().unwrap();
+        assert_eq!(next.worker_generation, 1);
+        assert_eq!(next.waiter_count, 2);
+        assert_eq!(pool.active_dispatch_count().unwrap(), 1);
+        assert!(pool.complete("conversation-a").unwrap().is_none());
+        assert_eq!(pool.active_dispatch_count().unwrap(), 0);
+        assert_eq!(pool.active_worker_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn failed_worker_restarts_before_queued_successor_and_next_submission() {
+        let pool = TranscriptMirrorOffloadPool::new(1);
+        let first = match pool.submit(job("conversation-a", 1)).unwrap() {
+            TranscriptMirrorSubmission::Dispatch(dispatch) => dispatch,
+            other => panic!("expected dispatch, got {other:?}"),
+        };
+        assert_eq!(first.worker_generation, 1);
+        pool.submit(job("conversation-a", 2)).unwrap();
+
+        let restarted = pool
+            .complete_with_outcome("conversation-a", true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(restarted.worker_index, first.worker_index);
+        assert_eq!(restarted.worker_generation, 2);
+        assert_eq!(pool.worker_generation(first.worker_index).unwrap(), 2);
+        assert_eq!(pool.active_worker_count().unwrap(), 1);
+
+        assert!(pool.complete_with_outcome("conversation-a", true).unwrap().is_none());
+        assert_eq!(pool.active_worker_count().unwrap(), 0);
+
+        let third = match pool.submit(job("conversation-b", 3)).unwrap() {
+            TranscriptMirrorSubmission::Dispatch(dispatch) => dispatch,
+            other => panic!("expected dispatch, got {other:?}"),
+        };
+        assert_eq!(third.worker_generation, 3);
     }
 
     #[test]
