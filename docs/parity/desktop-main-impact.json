@@ -2907,6 +2907,162 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
         "finding": "Desktop window-chrome owner now installs data-platform even on Darwin/fullscreen and disposes it safely, while only non-Darwin/non-fullscreen states get caption CSS variables. UIKit/SwiftUI scene/safe-area/navigation chrome is the native replacement; physical-device orientation/safe-area evidence remains pending."
+      },
+      {
+        "path": "source/electron-main/account/cursor-auth-wiring.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-copy-only-account-owner-pending-aggregate",
+        "finding": "Exact blob 841163a1…→41d55e67… changes only the unsupported-dashboard fallback product name Grok Bot→Fabushi. Existing iOS single IOSCursorAuthService/CoordinatorMcpSurface account owner, local-tool ceiling synchronization and native Fabushi account surfaces remain the mapped shipping replacement; auth/session protocols are unchanged by this direct delta."
+      },
+      {
+        "path": "source/electron-main/account/cursor-auth.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-copy-only-auth-owner-pending-aggregate",
+        "finding": "Exact blob f35331df…→c2e4c953… changes only product-facing auth failure/wait text to Fabushi. PKCE, credential persistence, refresh/revoke/logout settlement and retained-credential safety semantics are unchanged. iOS keeps one Keychain-backed IOSCursorAuthService/IOSCursorCredentialStore owner and native localized Fabushi UI."
+      },
+      {
+        "path": "source/electron-main/adapters/main-rpc.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-call-media-composition-pending-aggregate",
+        "finding": "Exact blob a36a9ee9…→2ae92ffd… adds createDesktopCallMediaPort and injects it once into MainEdge. iOS does not copy Electron IPC: shipping HumanCallsView owns one HumanCallMediaPort over AVFoundation/ReplayKit, while IOSPreloadBridge/MahayanaCoordinator remain typed transport boundaries without duplicating media state."
+      },
+      {
+        "path": "source/electron-main/box/box-recreate-commands.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-copy-only-computer-owner-pending-aggregate",
+        "finding": "Exact blob 15087dd0…→85785ce4… only renames the unavailable reset guidance to Fabushi; preserveData/force/recreate/migration tracking semantics are unchanged. iOS maps these through CoordinatorMcpSurface→IOSCursorDashboardClient→RemoteComputerSurface with generation-fenced lifecycle state."
+      },
+      {
+        "path": "source/electron-main/call-media.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-media-owner-pending-aggregate",
+        "finding": "New Desktop native media adapter owns granted/denied/prompt/not-requested microphone/camera permission semantics plus trusted screen/window source discovery and deduplication. iOS HumanCallMediaPort preserves permission wire states, native microphone/camera selection and ReplayKit capability; Broadcast Upload Extension remains the separate cross-app screen-share lifecycle owner."
+      },
+      {
+        "path": "source/electron-main/coordinator/coordinator-executors.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-copy-only-webauthn-pending-aggregate",
+        "finding": "Exact old/new diff changes one WebAuthn confirmation sentence from Grok Bot to Fabushi; executor routing/state contracts are unchanged. iOS typed Coordinator adapters plus AuthenticationServices passkey provider retain the single native side-effect owner and already use Fabushi guidance."
+      },
+      {
+        "path": "source/electron-main/coordinator/production-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-local-human-identity-pending-aggregate",
+        "finding": "Current-main adds a substantive identity contract: after account authorization the settled account slot becomes processConfig.localHumanId, and transition cleanup clears it before replacement authorization. iOS IOSMainRuntime/CoordinatorAccountRuntime/IOSAccountAuthorizer/CoordinatorBootstrap already propagate the settled Host account identity fail-closed and never substitute DeviceId/session identity."
+      },
+      {
+        "path": "source/electron-main/dev/dev-controls-window.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-copy-only-dev-window-pending-aggregate",
+        "finding": "Exact direct delta changes only BrowserWindow title Grok Bot Dev Controls→Fabushi Dev Controls. iOS has no Electron dev window; existing DEBUG-only IOSDevControls/dev-controls gate is the native replacement and introduces no stale product window."
+      },
+      {
+        "path": "source/electron-main/foundations.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-foundation-contracts-pending-aggregate",
+        "finding": "Current-main tests add UI preference normalization/RTL, call-media preference persistence and native permission/display-source authority, MAS mic/camera declarations, disabled Desktop notification settings and Fabushi helper redaction. Applicable iOS owners are MobileUiPreferences/SandSettingsStore, HumanCallMediaPort/project.yml, native notification owner and process redaction; Desktop test mechanics are not copied."
+      },
+      {
+        "path": "source/electron-main/main-edge.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-main-edge-media-ui-prefs-pending-aggregate",
+        "finding": "Exact delta adds normalized get/set UI preferences, get/set call-media preferences, native permission requests and display source listing behind the trusted Main edge. iOS maps product effects to MobileUiPreferencesStore/SandSettingsStore and HumanCallMediaPort directly, preserving one canonical owner rather than emulating Electron IPC."
+      },
+      {
+        "path": "source/electron-main/main-production-services.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-bindings-pending-aggregate",
+        "finding": "Exact delta adds optional Electron desktopCapturer/systemPreferences bindings to the production service graph. iOS uses AVAudioSession/AVCaptureDevice/ReplayKit through the single HumanCallMediaPort production adapter; no second permission/capture authority is introduced."
+      },
+      {
+        "path": "source/electron-main/process-metrics/redaction.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-process-redaction-pending-aggregate",
+        "finding": "Exact delta expands the known-helper regex to Fabushi/Fabushi Lab while retaining legacy Grok Bot helper compatibility. iOS source/ios-main/process-metrics/redaction.swift already carries the same preserve-known/hash-original/redact-unknown invariant with focused parity tests."
+      },
+      {
+        "path": "source/electron-main/startup/startup-move-check.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-platform-replacement-pending-release",
+        "finding": "Exact direct delta is Grok Bot→Fabushi copy inside the macOS move-to-/Applications startup guard. iOS cannot self-relocate; signed App Store/TestFlight/device installation is the native replacement, so release/device evidence—not a fake move workflow—is required."
+      },
+      {
+        "path": "source/electron-preload/preload.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-preload-media-ui-prefs-pending-aggregate",
+        "finding": "Exact blob c9b7b301…→08815a48… adds callMedia request/list/get/set and uiPreferences get/set wrappers. Native SwiftUI does not need Electron contextBridge for Apple media/accessibility APIs; IOSPreloadBridge remains the narrow Coordinator/Host boundary while native media/UI preference owners are called directly."
+      },
+      {
+        "path": "source/host/Cargo.toml",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-host-dependency-graph-pending-rust-ci",
+        "finding": "Current-main adds fabushi-messaging-core and reqwest multipart. The iOS-owned Mahayana Rust workspace already depends on fabushi-messaging-core and enables reqwest multipart, so capability exists in the mobile Host graph; exact-head rust-host evidence is still required."
+      },
+      {
+        "path": "source/host/src/box/box_mcp.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-copy-only-box-mcp-pending-rust-ci",
+        "finding": "Exact delta changes only older-image MCP guidance to Fabushi branding. iOS repository-owned Box MCP adapter keeps numeric/text UNIMPLEMENTED classification and current Fabushi update guidance; exact-head rust-host evidence remains pending."
+      },
+      {
+        "path": "source/host/src/extensions/auth/auth_service.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-desktop-auth-copy-nonapplicable",
+        "finding": "Exact delta changes only Desktop Cursor/Sand inference-credential wait copy to Fabushi. Shipping iOS production pins first-party Fabushi provider/session credential and has no Desktop HostAuth wait surface; this remains not-applicable-with-replacement, not a missing auth state machine."
+      },
+      {
+        "path": "source/host/src/extensions/forever_box/runner_tools.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-readiness-owner-pending-rust-ci",
+        "finding": "Substantive fix removes the starting/preparing short-circuit so canonical HostBox.ensure_ready owns bounded readiness polling instead of exposing transient boot failures to the model. iOS RemoteRunner/LoopbackSandBox path already has no such status short-circuit and waits/retries at its canonical remote readiness boundary."
+      },
+      {
+        "path": "source/host/src/extensions/inference/codex_direct_responses.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-balanced-tool-replay-pending-rust-ci",
+        "finding": "Current-main filters orphan/incomplete provider function_call items and replays each executable call adjacent to its matching function_call_output, rejecting unmatched results. iOS mahayana-native-engine implements the same stable-call-id, no-upfront-provider-call and call/result adjacency invariants at the native model-to-tool boundary."
+      },
+      {
+        "path": "source/host/src/extensions/inference/production.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-production-provider-pin-pending-rust-ci",
+        "finding": "Current-main now pins either FABUSHI_PRODUCT_MODE=1 or SAND_PACKAGED=1 to the first-party Fabushi provider and only preserves alternate providers in development. iOS mahayana-app-host Production already forces Fabushi/FirstPartyDacheng while test mode permits injection."
+      },
+      {
+        "path": "source/host/src/extensions/inference/provider_session.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-fabushi-runtime-identity-pending-rust-ci",
+        "finding": "Current-main renames the Router system identity to Fabushi, labels plugin namespace accordingly, and injects explicit first-party Responses provider/model runtime metadata. iOS shipping prompt/provider projection already identifies Fabushi and first-party provider/model while keeping credentials in Host/Product ownership."
+      },
+      {
+        "path": "source/host/src/extensions/local_exec/gateway_local_exec_sand_box.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-desktop-copy-nonapplicable",
+        "finding": "Exact direct delta only renames Grok Bot→Fabushi in Desktop local-exec oversized-file/unavailable guidance. iOS local execution uses remote routing plus an explicit native allow-list and has no dependency on a co-located desktop app; no false desktop-app requirement is ported."
+      },
+      {
+        "path": "source/host/src/extensions/local_exec/local_exec_bridge.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-desktop-copy-nonapplicable",
+        "finding": "Exact direct delta only renames the unreachable local Desktop app guidance to Fabushi. iOS IOSLocalExecSupervisor routes shell/process/box remotely and LocalCapabilityRunner restricts local work to the native allow-list, so the Desktop-only failure surface is not applicable."
+      },
+      {
+        "path": "source/host/src/extensions/local_tool_permission/local_tool_permission_controller.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-desktop-copy-nonapplicable",
+        "finding": "Exact direct delta only updates the Desktop local-machine-unavailable product name. iOS permission/execution boundaries never rely on a co-located desktop app; remote routing plus native allow-list is the platform replacement."
+      },
+      {
+        "path": "source/host/src/extensions/session/agent_db.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-human-conversation-store-pending-rust-ci",
+        "finding": "Current-main adds Human-conversation store opening without synthetic Agent metadata, initialize-if-absent metadata, atomic transcript mutation and provisional→accepted identity settlement. iOS uses a dedicated fabushi-messaging-core SQLite owner with deterministic stable accepted message identity and idempotency-conflict rejection rather than mutating an Agent DB primary key."
+      },
+      {
+        "path": "source/host/src/extensions/session/call_session.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-call-session-owner-pending-rust-ci",
+        "finding": "New Host CallSessionStore owns durable SQLite call lifecycle, generation-fenced transitions, remote event watermarks, media/device state, ordered signaling, idempotent replay/conflict rejection and terminal guards. iOS direct-ports this Host-owned Rust store and routes it through mahayana-app-host-mobile; live transport/WebRTC remain separate owners."
       }
     ]
   },
