@@ -118,6 +118,37 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
     @MainActor
+    func testRosterProjectionPreservesDesktopHiddenSidebarAliases() throws {
+        let canonical = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "hidden-canonical",
+            "name": "Canonical",
+            "isHiddenFromSidebar": true,
+        ]))
+        XCTAssertTrue(canonical.hidden)
+
+        let legacy = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "hidden-legacy",
+            "name": "Legacy",
+            "hiddenFromSidebar": true,
+        ]))
+        XCTAssertTrue(legacy.hidden)
+
+        let group = try XCTUnwrap(GrokMobileBotService.parseGroup([
+            "id": "hidden-group",
+            "name": "Hidden group",
+            "memberIds": ["agent-1"],
+            "isHiddenFromSidebar": true,
+        ]))
+        XCTAssertTrue(group.hidden)
+
+        let visible = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "visible",
+            "name": "Visible",
+        ]))
+        XCTAssertFalse(visible.hidden)
+    }
+
+    @MainActor
     func testParseBotProjectsCanonicalAgentRowState() throws {
         let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
             "id": "agent-1",
