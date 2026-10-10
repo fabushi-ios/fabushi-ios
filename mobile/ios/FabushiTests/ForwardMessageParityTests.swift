@@ -222,4 +222,38 @@ final class ForwardMessageParityTests: XCTestCase {
         )
     }
 
+
+    func testRetryTargetsExcludeAlreadySentDestinations() {
+        let settlements: [String: ForwardSettlement] = [
+            "sent": .init(conversationId: "sent", sent: true, error: nil),
+            "failed": .init(conversationId: "failed", sent: false, error: "network"),
+        ]
+        XCTAssertEqual(
+            forwardPendingConversationIds(
+                selectedConversationIds: ["sent", "failed", "new"],
+                settlements: settlements
+            ),
+            ["failed", "new"]
+        )
+    }
+
+    func testRetryReusesStablePerDestinationClientIdentity() {
+        let ids = [
+            "failed": "ios-forward:stable-failed",
+            "new": "ios-forward:stable-new",
+        ]
+        let first = forwardDestinationRequests(
+            conversationIds: ["failed", "new"],
+            clientMessageIds: ids
+        )
+        let retry = forwardDestinationRequests(
+            conversationIds: ["failed"],
+            clientMessageIds: ids
+        )
+        XCTAssertEqual(first.map(\.clientMessageId), [
+            "ios-forward:stable-failed",
+            "ios-forward:stable-new",
+        ])
+        XCTAssertEqual(retry.map(\.clientMessageId), ["ios-forward:stable-failed"])
+    }
 }
