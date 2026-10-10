@@ -2823,6 +2823,90 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-not-applicable-with-native-replacement-pending-exact-head",
         "finding": "Exact current-main CSS delta is presentation-only: Darwin traffic-light/titlebar spacing plus prompt unicode-bidi:plaintext and font fallback. macOS window-control geometry has no iOS runtime analogue; native SwiftUI safe-area/navigation owns that effect. Prompt bidi/font behavior is now explicitly owned by MobileComposerUITextView using Dynamic Type/system fonts and natural writing direction, with focused UIKit and shipping UI evidence. No conversation protocol/state responsibility is waived; final iPhone/iPad layout/accessibility/device acceptance remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/org-chart/workspace/graph.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop current-main graph replaces fixed-size defaults with ResizeObserver live container geometry and feeds layoutWidth/layoutHeight through render, wheel zoom and pan. Shipping iOS FabushiAgentNetworkView uses GeometryReader/Canvas and native gestures over the canonical bots/relationship roster, with open routing back through selectBotForConversation. Native focused geometry/routing tests exist; exact-head Actions/device evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/recovered-foundations.contract.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop test-only current-main contract asserts graph container measurement and live wheel geometry stay synchronized. The source-regex/node:test mechanism is non-portable; native MobileAgentNetworkParityTests over FabushiAgentNetworkView/MobileAgentNetworkLayout are the replacement. No production responsibility is invented for this test row."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/auto-review.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop direct delta localizes Auto-review panel copy while retaining the same canonical autoReviewInstructions mutation contract. Shipping iOS AccountSettingsView already exposes localized Auto-review enable/add/edit/delete behavior through MarketplaceModel/Coordinator/SandSettingsStore with account/generation fencing and shared bounds. Keep mapped pending exact-head UI/protected evidence."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/computer-view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop direct delta is Fabushi branding only; guarded Computer busy/queued/blocked/update/reset semantics remain unchanged. iOS retains a single canonical RemoteComputerSurface owner. Settings discoverability/real-device lifecycle evidence remains open."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/desktop-surface.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop current-main Settings composition adds UI preferences, call-media preferences/permission requests and privacy status to one live snapshot. Shipping iOS AccountSettingsView now composes MobileUiPreferencesStore, HumanCallMediaPort, server-authoritative privacy, advanced/Auto-review state and typed SettingsNoticeController feedback without a second settings owner. Exact-head UI/device and aggregate closure remain pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/desktop.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop snapshot adapter adds privacyModeEnabled/uiPreferences/callMediaPreferences and typed setUiPreferences/setCallMediaPreferences. iOS distributes these across canonical Coordinator/SandSettingsStore, HumanCallMediaPort and server privacy owners, then composes them in AccountSettingsView with account/generation fencing. Status remains mapped pending dependency/shared and exact-head acceptance."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/localization.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop adds the Settings localization owner for system/en/zh-Hans/zh-Hant/ja/ko/ar/he plus RTL/text-scale/reduced-motion/high-contrast/media/privacy copy. Shipping MobileUiPreferences/MobileUiPreferencesStore and AccountSettingsView provide the native equivalent and persist only through SandSettingsStore; focused localization tests exist. Exact-head UI/device evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/notice.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop current-main changes success notices to polite status and errors to assertive alerts. Native SettingsNoticeController/SettingsNoticeView now use scoped typed events plus UIAccessibility announcements with immediate error and delayed success priority while preserving 6s/3.5s visual expiry. Exact-head VoiceOver/device evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/panels.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop panels add localized UI/accessibility controls, media device preferences/permissions, privacy status and advanced settings, while retaining account/usage/update/Computer owners. Shipping iOS AccountSettingsView exposes equivalent native sections over MobileUiPreferencesStore, HumanCallMediaPort and Coordinator/SandSettingsStore; release/platform tails remain pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/updates.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop updates.ts direct current-main delta is Grok→Fabushi presentation only; the underlying Electron self-updater/egress lifecycle is platform-specific. iOS correctly keeps App Store/TestFlight as the app-update owner and does not introduce a second self-updater. Verification waits on signed archive/distribution evidence."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop Settings CSS adds robust font fallback, accessibility-status styling and keyboard focus-visible outline only. CSS is not portable; native SwiftUI/UIKit typography, Dynamic Type and platform focus/accessibility are the replacement. Final iPhone/iPad accessibility acceptance remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/settings/overlay/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop Settings shell localizes dialog, section and close labels while preserving modal/focus behavior. Shipping AccountSettingsView consumes MobileUiPreferences-selected native copy in NavigationStack/Form. Same-head UI/device/accessibility and aggregate Settings closure remain pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/window-chrome/model.contract.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop test-only contract now guards data-platform install/cleanup for Darwin/Windows/fullscreen. The fake DOM/CSS variable mechanism is Desktop-only; iOS replacement is native safe-area/orientation/navigation acceptance. No production row is fabricated."
+      },
+      {
+        "path": "frontend/src/recovered/features/window-chrome/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-pending-exact-head-and-aggregate-closure",
+        "finding": "Desktop window-chrome owner now installs data-platform even on Darwin/fullscreen and disposes it safely, while only non-Darwin/non-fullscreen states get caption CSS variables. UIKit/SwiftUI scene/safe-area/navigation chrome is the native replacement; physical-device orientation/safe-area evidence remains pending."
       }
     ]
   },
