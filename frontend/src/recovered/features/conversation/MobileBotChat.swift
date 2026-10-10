@@ -1376,6 +1376,51 @@ internal func mobileConversationHeaderStatus(_ bot: MobileBotSummary) -> String?
 
 internal let mobileComposerAttachmentLimit = 6
 
+internal enum MobileComposerStageFailureReason: Equatable {
+    case empty
+    case tooLarge
+    case failed
+}
+
+internal struct MobileComposerStageFailure: Equatable {
+    let name: String
+    let reason: MobileComposerStageFailureReason
+}
+
+internal func mobileComposerStageFileName(
+    proposedName: String?,
+    fallbackLastPathComponent: String,
+    mimeType: String?
+) -> String {
+    if let proposedName = proposedName?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !proposedName.isEmpty {
+        return proposedName
+    }
+    let pathName = fallbackLastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !pathName.isEmpty { return pathName }
+    return mimeType?.lowercased().hasPrefix("image/") == true ? "image.png" : "file"
+}
+
+internal func mobileComposerStageFailureNotice(
+    _ failures: [MobileComposerStageFailure]
+) -> String? {
+    guard let first = failures.first else { return nil }
+    if failures.count == 1 {
+        switch first.reason {
+        case .tooLarge:
+            return AttachmentLimits.formatTooLargeNotice(filename: first.name)
+        case .empty:
+            return "\"\(first.name)\" is empty, so it wasn't attached."
+        case .failed:
+            return "Couldn't attach \"\(first.name)\"."
+        }
+    }
+    if failures.allSatisfy({ $0.reason == .tooLarge }) {
+        return "\(failures.count) files are too large to attach (max 25 MB, or 200 MB for video)."
+    }
+    return "\(failures.count) files couldn't be attached."
+}
+
 internal func mobileComposerHasPayload(
     text: String,
     attachments: [MobileComposerAttachment]
@@ -4805,6 +4850,7 @@ internal struct MobileBotChat: View {
         let ownedAccount = model.settingsNoticeAccountKey
         let ownedAgent = bot.id
         stagingAttachments = true
+        var stagingFailures: [MobileComposerStageFailure] = []
         errorText = droppedForLimit > 0
             ? "You can attach up to \(mobileComposerAttachmentLimit) files."
             : nil
@@ -4831,8 +4877,11 @@ internal struct MobileBotChat: View {
                     let values = try url.resourceValues(
                         forKeys: [.fileSizeKey, .nameKey, .contentTypeKey]
                     )
-                    let name = values.name?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let filename = (name?.isEmpty == false ? name : nil) ?? url.lastPathComponent
+                    let filename = mobileComposerStageFileName(
+                        proposedName: values.name,
+                        fallbackLastPathComponent: url.lastPathComponent,
+                        mimeType: values.contentType?.preferredMIMEType
+                    )
                     let limit = AttachmentLimits.attachmentByteLimit(forName: filename)
                     if let fileSize = values.fileSize, fileSize > limit {
                         throw AttachmentTooLargeError(limitBytes: limit)
@@ -4842,7 +4891,11 @@ internal struct MobileBotChat: View {
                         throw NSError(
                             domain: "Fabushi.MobileComposer",
                             code: 1,
-                            userInfo: [NSLocalizedDescriptionKey: "\"\(filename)\" is empty, so it wasn't attached."]
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "\"\(filename)\" is empty, so it wasn't attached.",
+                                "fabushiAttachmentFilename": filename,
+                                "fabushiAttachmentFailureReason": "empty",
+                            ]
                         )
                     }
                     if data.count > limit {
@@ -4905,11 +4958,32 @@ internal struct MobileBotChat: View {
                     sizeBytes: sizeBytes
                 ))
             } catch is AttachmentTooLargeError {
-                let filename = url.lastPathComponent.isEmpty ? "file" : url.lastPathComponent
-                errorText = AttachmentLimits.formatTooLargeNotice(filename: filename)
+                let filename = mobileComposerStageFileName(
+                    proposedName: nil,
+                    fallbackLastPathComponent: url.lastPathComponent,
+                    mimeType: nil
+                )
+                stagingFailures.append(.init(name: filename, reason: .tooLarge))
             } catch {
-                errorText = error.localizedDescription
+                let nsError = error as NSError
+                let filename = (nsError.userInfo["fabushiAttachmentFilename"] as? String)
+                    ?? mobileComposerStageFileName(
+                        proposedName: nil,
+                        fallbackLastPathComponent: url.lastPathComponent,
+                        mimeType: nil
+                    )
+                let reason: MobileComposerStageFailureReason =
+                    (nsError.userInfo["fabushiAttachmentFailureReason"] as? String) == "empty"
+                    ? .empty
+                    : .failed
+                stagingFailures.append(.init(name: filename, reason: reason))
             }
+        }
+
+        if let failureNotice = mobileComposerStageFailureNotice(stagingFailures) {
+            errorText = droppedForLimit > 0
+                ? "You can attach up to \(mobileComposerAttachmentLimit) files. \(failureNotice)"
+                : failureNotice
         }
     }
 

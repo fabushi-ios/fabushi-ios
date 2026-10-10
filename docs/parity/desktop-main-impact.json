@@ -4161,6 +4161,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-controller-core-implemented-pending-exact-head-ci",
         "finding": "Desktop workspace controller composes the mounted transcript lifecycle, load-older pagination, reply/thread state, reaction/approval actions, find navigation, draft ownership and reconnect/account generation invalidation. iOS already had canonical reply/thread openWindowed pagination, reactions, approvals, find-in-chat, retry fencing and openTail baseline, but main-conversation history stopped at the 200-message tail. Shipping MobileBotChat now reuses the canonical conversation.openWindowed Host command with beforeMessageId for bounded 200-message older pages, fences pagination by account+Agent+generation, rejects malformed windows, preserves the pre-prepend scroll anchor, exposes retryable native load/error state, de-duplicates projected entries, and resets pagination on account/Agent changes. Together with the separately reviewed native draft/outline/reaction/thread owners this closes the controller-level main-history omission. Focused page merge tests added; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/desktop.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-attachment-staging-implemented-pending-exact-head-ci",
+        "finding": "Desktop workspace/desktop.ts stages native file bytes, falls back unnamed image files to image.png and other unnamed files to file, applies canonical 25 MB / 200 MB video limits, reports empty/too-large/failed staging with single and multi-file notices, and commits staged paths before submission. iOS uses the canonical Host attachment.upload store as the platform replacement for Desktop stage+commit, so the returned stored path is already the sendable committed path. Shipping native staging now matches unnamed-file fallback and Desktop single/multi-failure notices while retaining six-file capacity, canonical size limits, security-scoped reads, SHA-256 identity and account+Agent generation fencing. Focused staging/name/notice tests added; exact-head CI pending."
       }
     ]
   },
