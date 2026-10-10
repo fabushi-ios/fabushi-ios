@@ -335,6 +335,14 @@ final class MobileComposerParityTests: XCTestCase {
             ownedAgentID: "agent-a",
             currentAgentID: "agent-a"
         ).isEmpty)
+        XCTAssertTrue(projectMobileEditorPrReferences(
+            entries: [entry],
+            cloudInfos: [:],
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-a",
+            ownedAgentID: "agent-a",
+            currentAgentID: "agent-b"
+        ).isEmpty)
         let references = projectMobileEditorPrReferences(
             entries: [entry],
             cloudInfos: [:],
