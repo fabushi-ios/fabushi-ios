@@ -2,6 +2,7 @@ import XCTest
 @testable import Fabushi
 
 final class VoiceRecorderParityTests: XCTestCase {
+    @MainActor
     func testDesktopRecordingDurationBoundariesArePreserved() {
         XCTAssertEqual(VoiceRecorder.minimumRecordingDuration, 0.5)
         XCTAssertEqual(VoiceRecorder.maximumRecordingDuration, 300)
@@ -11,6 +12,7 @@ final class VoiceRecorderParityTests: XCTestCase {
         XCTAssertTrue(VoiceRecorder.reachedMaximumDuration(300))
     }
 
+    @MainActor
     func testWaveformLevelClampsAndNormalizesRecorderPower() {
         XCTAssertEqual(VoiceRecorder.normalizedWaveformLevel(decibels: -80), 0, accuracy: 0.0001)
         XCTAssertEqual(VoiceRecorder.normalizedWaveformLevel(decibels: -60), 0, accuracy: 0.0001)
