@@ -50,9 +50,9 @@ jobs:
       - name: Commit generated iOS-owned catalog
         if: github.event_name == 'push'
         run: |
-          if git diff --quiet -- \
+          if test -z "$(git status --porcelain -- \
             frontend/src/recovered/features/conversation/GeneratedDesktopEmojiCatalog.swift \
-            manifests/desktop-main-emoji-catalog-provenance.json; then
+            manifests/desktop-main-emoji-catalog-provenance.json)"; then
             echo "Generated catalog already matches source."
             exit 0
           fi
