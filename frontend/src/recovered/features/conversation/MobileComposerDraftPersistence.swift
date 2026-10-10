@@ -34,24 +34,73 @@ private struct MobileComposerAttachmentWire: Codable {
     }
 }
 
+private struct MobileComposerMcpReferenceWire: Codable {
+    let workflowReferenceID: String
+    let serverId: String
+    let serverIdentifier: String
+    let accountKey: String
+    let label: String
+    let status: String
+    let iconURL: String?
+
+    init(_ value: MobileComposerMcpReference) {
+        workflowReferenceID = value.workflowReferenceID
+        serverId = value.serverId
+        serverIdentifier = value.serverIdentifier
+        accountKey = value.accountKey
+        label = value.label
+        status = value.status
+        iconURL = value.iconURL
+    }
+
+    func project() -> MobileComposerMcpReference? {
+        guard workflowReferenceID == "mcp:\(serverId)",
+              !serverId.isEmpty,
+              !serverIdentifier.isEmpty,
+              !accountKey.isEmpty,
+              !label.isEmpty,
+              !status.isEmpty
+        else { return nil }
+        return .init(
+            workflowReferenceID: workflowReferenceID,
+            serverId: serverId,
+            serverIdentifier: serverIdentifier,
+            accountKey: accountKey,
+            label: label,
+            status: status,
+            iconURL: iconURL
+        )
+    }
+}
+
 private struct MobileComposerRecoveryWire: Codable {
     let requestId: String
     let text: String
     let attachments: [MobileComposerAttachmentWire]
+    let mcpReferences: [MobileComposerMcpReferenceWire]?
 
     init(_ value: MobileComposerRecovery) {
         requestId = value.requestId
         text = value.text
         attachments = value.attachments.map(MobileComposerAttachmentWire.init)
+        mcpReferences = value.mcpReferences.map(MobileComposerMcpReferenceWire.init)
     }
 
     func project() -> MobileComposerRecovery? {
         guard !requestId.isEmpty else { return nil }
         let projected = attachments.compactMap { $0.project() }
+        let rawReferences = mcpReferences ?? []
+        let references = rawReferences.compactMap { $0.project() }
         guard projected.count == attachments.count,
+              references.count == rawReferences.count,
               mobileComposerHasPayload(text: text, attachments: projected)
         else { return nil }
-        return .init(requestId: requestId, text: text, attachments: projected)
+        return .init(
+            requestId: requestId,
+            text: text,
+            attachments: projected,
+            mcpReferences: references
+        )
     }
 }
 
