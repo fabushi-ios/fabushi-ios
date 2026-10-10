@@ -2721,6 +2721,30 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-implemented-pending-exact-head",
         "finding": "Current-main renderer delta was decomposed into native shipping owners: Human conversations/forwarding/handoff, HumanCallsView/media runtime, MobileUiPreferences, new-Agent/avatar, and transcript reconciliation. A reachable late-baseline race in MessagingModel was repaired so same-settlement messageAdded/messageChanged events survive a following syncBatch while stale prior-cache rows remain discardable; focused Swift coverage was added. Verification waits for descendant exact-head Actions and protected UI evidence."
+      },
+      {
+        "path": "frontend/src/production/command-palette-root-commands.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop current-main changes only the shared-computer update product label from Grok Bot to Fabushi. Shipping GrokMobileShell+CommandPalette.swift exposes `Update Fabushi's Computer`, routes it through the real updateComputer confirmation/rebuild owner, and preserves busy-agent/queue fencing. Exact-head Actions and global closure remain required."
+      },
+      {
+        "path": "frontend/src/production/evidence.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Current-main active product strings replace Grok Bot/SpaceXAI identity with Fabushi while preserving reference-artifact anchors. Native iOS shipping owners use Fabushi product identity, including canonical legacy-roster name normalization and native call/system presentation; focused roster branding coverage exists. Exact-head UI evidence remains required."
+      },
+      {
+        "path": "frontend/src/production/human-call-media.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop call-media owner was mapped to native HumanCallsView + HumanCallMediaPort + HumanCallPeerConnection + HumanCallSystemCoordinator. Host remains authoritative for call state; iOS preserves generation/lease/signal fencing, permissions, preferred-device fallback, ICE/signaling, reconnect/failure cleanup, CallKit/VoIP projection, and media controls with focused native tests. Exact-head Actions/protected evidence remain required."
+      },
+      {
+        "path": "frontend/src/production/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Renderer model additions are split across native canonical owners: Human conversations/transcripts use MessagingModel, Agent roster upserts and membership/avatar metadata use GrokMobileBotService/MobileBotSummary, and legacy `grok`/`grok bot` names are normalized to Fabushi without rewriting custom names. Focused service tests cover the legacy-name projection. Exact-head Actions and global closure remain required."
       }
     ]
   },
