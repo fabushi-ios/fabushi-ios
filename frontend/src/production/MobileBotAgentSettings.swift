@@ -215,6 +215,13 @@ internal struct MobileBotAgentSettingsSheet: View {
                 Text("连接状态由 Rust Host 按账号与 Agent 持有；凭据加密保存且不会回传到界面。")
             }
 
+            MobileBotMemorySection(
+                agentId: currentAgent.id,
+                bridge: bridge,
+                accountScopeKey: accountScopeKey,
+                reconnectGeneration: reconnectGeneration
+            )
+
             MobileBotRoutinesSection(
                 agentId: currentAgent.id,
                 bridge: bridge,
