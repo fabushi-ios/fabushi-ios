@@ -47,6 +47,74 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(object["method"], .string("box.exec"))
     }
 
+    func testBoxExecPreservesTypedWriteReadAndStreamPolicyPayloads() async throws {
+        let transport = TestRemoteRunnerTransport()
+        let server = IOSBoxExecEntrypoint.makeServer(transport: transport)
+
+        _ = try await server.execute(.write(
+            path: "/workspace/a.bin",
+            fileBytesBase64: "AQID",
+            toolCallId: "tool-write"
+        ))
+        _ = try await server.execute(.redactedRead(
+            path: "/workspace/secret.txt",
+            offset: 3,
+            limit: 9
+        ))
+        _ = try await server.execute(.shellStreamWithPolicy(
+            command: "long-task",
+            workingDirectory: "/workspace",
+            timeoutMs: 5_000,
+            hardTimeoutMs: 30_000,
+            timeoutBehavior: .background,
+            closeStdin: false
+        ))
+        _ = try await server.execute(.writeShellStdin(
+            shellId: 17,
+            data: "hello",
+            closeStdin: true
+        ))
+
+        let params = await transport.recordedParams()
+        XCTAssertEqual(params.count, 4)
+
+        guard case .object(let writeRoot) = params[0],
+              case .object(let writeArgs)? = writeRoot["args"] else {
+            return XCTFail("expected typed write payload")
+        }
+        XCTAssertEqual(writeRoot["case"], .string("writeArgs"))
+        XCTAssertEqual(writeArgs["path"], .string("/workspace/a.bin"))
+        XCTAssertEqual(writeArgs["fileBytesBase64"], .string("AQID"))
+        XCTAssertEqual(writeArgs["toolCallId"], .string("tool-write"))
+
+        guard case .object(let readRoot) = params[1],
+              case .object(let readArgs)? = readRoot["args"] else {
+            return XCTFail("expected typed redacted read payload")
+        }
+        XCTAssertEqual(readRoot["case"], .string("redactedReadArgs"))
+        XCTAssertEqual(readArgs["offset"], .number(3))
+        XCTAssertEqual(readArgs["limit"], .number(9))
+
+        guard case .object(let streamRoot) = params[2],
+              case .object(let streamArgs)? = streamRoot["args"] else {
+            return XCTFail("expected typed stream payload")
+        }
+        XCTAssertEqual(streamRoot["case"], .string("shellStreamArgs"))
+        XCTAssertEqual(streamArgs["timeoutMs"], .number(5_000))
+        XCTAssertEqual(streamArgs["hardTimeoutMs"], .number(30_000))
+        XCTAssertEqual(streamArgs["timeoutBehavior"], .string("background"))
+        XCTAssertEqual(streamArgs["closeStdin"], .bool(false))
+
+        guard case .object(let stdinRoot) = params[3],
+              case .object(let stdinArgs)? = stdinRoot["args"] else {
+            return XCTFail("expected typed stdin payload")
+        }
+        XCTAssertEqual(stdinRoot["case"], .string("writeShellStdinArgs"))
+        XCTAssertEqual(stdinArgs["shellId"], .number(17))
+        XCTAssertEqual(stdinArgs["data"], .string("hello"))
+        XCTAssertEqual(stdinArgs["closeStdin"], .bool(true))
+    }
+
     func testProductionLocalExecutorOnlyRunsAllowlistedCapabilitiesLocally() async throws {
         let transport = TestRemoteRunnerTransport()
         let local = TestLocalCapabilityBackend()
