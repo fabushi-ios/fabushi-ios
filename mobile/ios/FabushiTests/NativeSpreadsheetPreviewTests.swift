@@ -37,4 +37,50 @@ final class NativeSpreadsheetPreviewTests: XCTestCase {
         XCTAssertEqual(nativeSpreadsheetRenderRows, 200)
         XCTAssertEqual(nativeSpreadsheetRenderColumns, 200)
     }
+
+    func testWorkbookProjectionDecodesNamedSheetsAndRows() throws {
+        let json = #"""
+        {
+          "ok": true,
+          "result": {
+            "sheets": [
+              {"name":"Summary","rows":[["Name","Count"],["Alice","42"]],"totalRows":2},
+              {"name":"Details","rows":[["Status"],["TRUE"]],"totalRows":2}
+            ]
+          },
+          "error": null
+        }
+        """#
+        let workbook = try NativeWorkbookSpreadsheet.decodeEnvelope(Data(json.utf8))
+        XCTAssertEqual(workbook.sheets.map(\.name), ["Summary", "Details"])
+        XCTAssertEqual(workbook.sheets[0].rows[1], ["Alice", "42"])
+        XCTAssertEqual(workbook.sheets[1].totalRows, 2)
+    }
+
+    func testWorkbookProjectionRejectsFailedOrMalformedEnvelope() {
+        let failed = #"{"ok":false,"result":null,"error":"invalid XLSX container"}"#
+        XCTAssertThrowsError(try NativeWorkbookSpreadsheet.decodeEnvelope(Data(failed.utf8))) { error in
+            XCTAssertEqual(
+                error as? NativeWorkbookSpreadsheet.ProjectionError,
+                .parserFailure("invalid XLSX container")
+            )
+        }
+        XCTAssertThrowsError(try NativeWorkbookSpreadsheet.decodeEnvelope(Data("no-json".utf8))) { error in
+            XCTAssertEqual(error as? NativeWorkbookSpreadsheet.ProjectionError, .invalidResponse)
+        }
+    }
+
+    func testNativeWorkbookFFIFailsClosedForMalformedAndOversizeInput() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-malformed-\(UUID().uuidString).xlsx")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("not-a-workbook".utf8).write(to: url)
+
+        XCTAssertThrowsError(
+            try NativeWorkbookSpreadsheet.parse(url: url, maxBytes: 1, maxRows: nativeSpreadsheetMaxRows)
+        )
+        XCTAssertThrowsError(
+            try NativeWorkbookSpreadsheet.parse(url: url, maxBytes: 1024, maxRows: nativeSpreadsheetMaxRows)
+        )
+    }
 }

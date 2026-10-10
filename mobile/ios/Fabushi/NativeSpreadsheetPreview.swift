@@ -1,4 +1,3 @@
-import QuickLook
 import SwiftUI
 import UIKit
 
@@ -123,43 +122,89 @@ struct NativeDelimitedSpreadsheet: Equatable {
     }
 }
 
-private final class NativeWorkbookPreviewDataSource: NSObject, QLPreviewControllerDataSource {
-    let url: URL
-    init(url: URL) { self.url = url }
-    func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
-    func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> any QLPreviewItem {
-        url as NSURL
+struct NativeWorkbookSheet: Codable, Equatable, Sendable {
+    let name: String
+    let rows: [[String]]
+    let totalRows: Int
+}
+
+struct NativeWorkbookSpreadsheet: Codable, Equatable, Sendable {
+    let sheets: [NativeWorkbookSheet]
+
+    enum ProjectionError: LocalizedError, Equatable {
+        case invalidResponse
+        case parserFailure(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidResponse:
+                return "Workbook parser returned an invalid response."
+            case .parserFailure(let message):
+                return message
+            }
+        }
+    }
+
+    private struct Envelope: Decodable {
+        let ok: Bool
+        let result: NativeWorkbookSpreadsheet?
+        let error: String?
+    }
+
+    static func decodeEnvelope(_ data: Data) throws -> NativeWorkbookSpreadsheet {
+        let envelope: Envelope
+        do {
+            envelope = try JSONDecoder().decode(Envelope.self, from: data)
+        } catch {
+            throw ProjectionError.invalidResponse
+        }
+        guard envelope.ok, let workbook = envelope.result else {
+            throw ProjectionError.parserFailure(envelope.error ?? "Workbook could not be parsed.")
+        }
+        guard !workbook.sheets.isEmpty else {
+            throw ProjectionError.parserFailure("Workbook contains no worksheets.")
+        }
+        return workbook
+    }
+
+    static func parse(
+        url: URL,
+        maxBytes: Int = nativeSpreadsheetPreviewByteCap,
+        maxRows: Int = nativeSpreadsheetMaxRows
+    ) throws -> NativeWorkbookSpreadsheet {
+        guard maxBytes > 0, maxRows > 0 else {
+            throw ProjectionError.parserFailure("Workbook preview bounds are invalid.")
+        }
+        let pointer = url.path.withCString { path in
+            mahayana_spreadsheet_parse_file(path, maxBytes, maxRows)
+        }
+        guard let pointer else { throw ProjectionError.invalidResponse }
+        defer { mahayana_app_host_free_string(pointer) }
+        let json = String(cString: pointer)
+        guard let data = json.data(using: .utf8) else { throw ProjectionError.invalidResponse }
+        return try decodeEnvelope(data)
     }
 }
 
-private struct NativeWorkbookPreview: UIViewControllerRepresentable {
-    let url: URL
-    func makeCoordinator() -> NativeWorkbookPreviewDataSource { .init(url: url) }
-    func makeUIViewController(context: Context) -> QLPreviewController {
-        let controller = QLPreviewController()
-        controller.dataSource = context.coordinator
-        return controller
-    }
-    func updateUIViewController(_ controller: QLPreviewController, context: Context) {}
-}
-
-private struct NativeDelimitedSpreadsheetPreview: View {
-    let sheet: NativeDelimitedSpreadsheet
+private struct NativeSpreadsheetTablePreview: View {
+    let rows: [[String]]
+    let totalRows: Int
     @State private var selectedCell: (row: Int, column: Int)?
 
-    private var header: [String] { sheet.rows.first ?? [] }
-    private var visibleRows: [[String]] { Array(sheet.rows.dropFirst().prefix(nativeSpreadsheetRenderRows)) }
+    private var displayedRowCount: Int { max(0, totalRows - (rows.isEmpty ? 0 : 1)) }
+    private var header: [String] { rows.first ?? [] }
+    private var visibleRows: [[String]] { Array(rows.dropFirst().prefix(nativeSpreadsheetRenderRows)) }
     private var columnCount: Int {
-        min(nativeSpreadsheetRenderColumns, sheet.rows.reduce(0) { max($0, $1.count) })
+        min(nativeSpreadsheetRenderColumns, rows.reduce(0) { max($0, $1.count) })
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("\(sheet.displayedRowCount) \(sheet.displayedRowCount == 1 ? "row" : "rows")")
+                Text("\(displayedRowCount) \(displayedRowCount == 1 ? "row" : "rows")")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                if sheet.totalRows > nativeSpreadsheetRenderRows + 1 {
+                if totalRows > nativeSpreadsheetRenderRows + 1 {
                     Text("预览前 \(nativeSpreadsheetRenderRows) 行").font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(.horizontal, 12).padding(.vertical, 8)
@@ -225,11 +270,11 @@ private struct NativeDelimitedSpreadsheetPreview: View {
                 }
                 .buttonStyle(.plain)
                 .overlay(
-                Rectangle().stroke(
-                    Color(uiColor: .separator).opacity(0.45),
-                    lineWidth: 0.5
+                    Rectangle().stroke(
+                        Color(uiColor: .separator).opacity(0.45),
+                        lineWidth: 0.5
+                    )
                 )
-            )
                 .accessibilityLabel(isHeader ? (value.isEmpty ? "Column \(column + 1)" : value) : "\(headerValue(column)) row \(row + 1)")
                 .accessibilityValue(value)
             }
@@ -239,14 +284,81 @@ private struct NativeDelimitedSpreadsheetPreview: View {
     private func headerValue(_ column: Int) -> String {
         column < header.count && !header[column].isEmpty ? header[column] : "Column \(column + 1)"
     }
+
     private func cellValue(_ cell: (row: Int, column: Int)) -> String {
         let sourceRow = cell.row == -1 ? 0 : cell.row + 1
-        guard sourceRow >= 0, sourceRow < sheet.rows.count, cell.column >= 0,
-              cell.column < sheet.rows[sourceRow].count else { return "" }
-        return sheet.rows[sourceRow][cell.column]
+        guard sourceRow >= 0, sourceRow < rows.count, cell.column >= 0,
+              cell.column < rows[sourceRow].count else { return "" }
+        return rows[sourceRow][cell.column]
     }
+
     private func selectedCellLabel(_ cell: (row: Int, column: Int)) -> String {
         "\(headerValue(cell.column)) · \(cell.row == -1 ? "header" : "row \(cell.row + 1)")"
+    }
+}
+
+private struct NativeWorkbookPreview: View {
+    enum State: Equatable {
+        case loading
+        case ready(NativeWorkbookSpreadsheet)
+        case failed(String)
+    }
+
+    let url: URL
+    @State private var state: State = .loading
+    @State private var selectedSheet = 0
+
+    var body: some View {
+        Group {
+            switch state {
+            case .loading:
+                ProgressView("Loading workbook…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .failed(let message):
+                ContentUnavailableView(
+                    "Couldn't read this spreadsheet",
+                    systemImage: "tablecells.badge.ellipsis",
+                    description: Text(message)
+                )
+            case .ready(let workbook):
+                let safeIndex = min(max(0, selectedSheet), max(0, workbook.sheets.count - 1))
+                let sheet = workbook.sheets[safeIndex]
+                VStack(spacing: 0) {
+                    if workbook.sheets.count > 1 {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(Array(workbook.sheets.enumerated()), id: \.offset) { index, item in
+                                    Button(item.name) { selectedSheet = index }
+                                        .buttonStyle(index == safeIndex ? .borderedProminent : .bordered)
+                                        .accessibilityAddTraits(index == safeIndex ? .isSelected : [])
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                        }
+                        Divider()
+                    }
+                    NativeSpreadsheetTablePreview(rows: sheet.rows, totalRows: sheet.totalRows)
+                        .id("\(url.path)#\(safeIndex)")
+                }
+            }
+        }
+        .task(id: url) {
+            state = .loading
+            selectedSheet = 0
+            do {
+                let workbook = try await Task.detached(priority: .userInitiated) {
+                    try NativeWorkbookSpreadsheet.parse(url: url)
+                }.value
+                try Task.checkCancellation()
+                state = .ready(workbook)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                state = .failed(error.localizedDescription)
+            }
+        }
     }
 }
 
@@ -259,9 +371,10 @@ struct NativeSpreadsheetPreview: View {
     var body: some View {
         switch nativeSpreadsheetKind(mimeType: mimeType, fileName: fileName) {
         case .delimited(let delimiter):
-            NativeDelimitedSpreadsheetPreview(sheet: .parse(data, delimiter: delimiter))
+            let sheet = NativeDelimitedSpreadsheet.parse(data, delimiter: delimiter)
+            NativeSpreadsheetTablePreview(rows: sheet.rows, totalRows: sheet.totalRows)
         case .workbook:
-            NativeWorkbookPreview(url: url).ignoresSafeArea(edges: .bottom)
+            NativeWorkbookPreview(url: url)
         case nil:
             ContentUnavailableView("File unavailable", systemImage: "doc")
         }

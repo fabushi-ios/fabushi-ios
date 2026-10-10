@@ -13,6 +13,7 @@ use uuid::Uuid;
 mod host_extensions;
 #[path = "../../../../internal/scheduling.rs"]
 mod scheduling;
+mod spreadsheet;
 
 #[path = "../../../utils/workspace-paths.rs"]
 mod package_utils_workspace_paths;
@@ -2037,6 +2038,53 @@ pub unsafe extern "C" fn mahayana_app_host_dispatch_with_handle(
     };
     CString::new(output)
         .unwrap_or_else(|_| CString::new("{\"ok\":false,\"error\":\"invalid response\"}").unwrap())
+        .into_raw()
+}
+
+/// Parses an XLS/XLSX workbook into the bounded structured preview projection used by iOS.
+///
+/// The parser is fully offline. It re-checks the byte and row limits at the Rust
+/// boundary and returns a JSON envelope allocated with CString::into_raw.
+///
+/// # Safety
+/// path must be a live NUL-terminated UTF-8-compatible path for the duration of
+/// this call. The returned pointer must be released with mahayana_app_host_free_string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mahayana_spreadsheet_parse_file(
+    path: *const c_char,
+    max_bytes: usize,
+    max_rows: usize,
+) -> *mut c_char {
+    let response = if path.is_null() {
+        serde_json::json!({
+            "ok": false,
+            "result": serde_json::Value::Null,
+            "error": "spreadsheet path pointer is null",
+        })
+    } else {
+        let path = PathBuf::from(
+            unsafe { CStr::from_ptr(path) }
+                .to_string_lossy()
+                .into_owned(),
+        );
+        match spreadsheet::parse_workbook_file(&path, max_bytes as u64, max_rows) {
+            Ok(workbook) => serde_json::json!({
+                "ok": true,
+                "result": workbook,
+                "error": serde_json::Value::Null,
+            }),
+            Err(error) => serde_json::json!({
+                "ok": false,
+                "result": serde_json::Value::Null,
+                "error": error,
+            }),
+        }
+    };
+    let output = serde_json::to_string(&response).unwrap_or_else(|_| {
+        "{\"ok\":false,\"result\":null,\"error\":\"spreadsheet response serialization failed\"}".to_owned()
+    });
+    CString::new(output)
+        .unwrap_or_else(|_| CString::new("{\"ok\":false,\"result\":null,\"error\":\"invalid spreadsheet response\"}").unwrap())
         .into_raw()
 }
 
