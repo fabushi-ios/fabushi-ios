@@ -3677,6 +3677,72 @@ mod tests {
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
+    #[tokio::test]
+    async fn durable_post_tool_continuation_retries_before_any_new_output() {
+        let model = Arc::new(PostToolRetryModel {
+            calls: AtomicUsize::new(0),
+        });
+        let engine = NativeEngine::new(
+            model.clone(),
+            NativeEngineConfig::embedded("retry-model"),
+        )
+        .expect("create retry engine");
+        let session_id = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                workspace_root: None,
+                model: None,
+                metadata: Value::Null,
+            })
+            .await
+            .expect("open retry session");
+        let session = engine.session(&session_id).expect("retry session");
+        let mut session = session.lock().await;
+        session.history.push(json!({
+            "type": "function_call_output",
+            "call_id": "call-durable",
+            "output": "{\"ok\":true}"
+        }));
+        let operation_id = OperationId::from_string("post-tool-retry");
+        let control = OperationControl::default();
+        let output = engine
+            .run_prompt(
+                &session_id,
+                &mut session,
+                &operation_id,
+                "continue after tool".into(),
+                &json!({"hidden": false}),
+                false,
+                &ExecutionPolicy::mobile_default(),
+                &control,
+                Arc::new(Events::default()),
+            )
+            .await
+            .expect("durable post-tool continuation retries safely");
+        assert_eq!(output, "continued");
+        assert_eq!(
+            model.calls.load(AtomicOrdering::SeqCst),
+            2,
+            "one transport timeout before output must retry exactly once"
+        );
+    }
+
+    #[test]
+    fn post_tool_retry_classifier_rejects_non_transport_failures() {
+        let history = vec![json!({
+            "type": "function_call_output",
+            "call_id": "call-1",
+            "output": "{}"
+        })];
+        assert!(history_ends_with_tool_result(&history));
+        assert!(retryable_post_tool_provider_error(&ModelError::Inference(
+            "model transport failed: timed out".into()
+        )));
+        assert!(!retryable_post_tool_provider_error(&ModelError::Inference(
+            "provider rejected malformed tool schema".into()
+        )));
+    }
+
     #[test]
     fn shipping_system_prompt_declares_fabushi_product_identity() {
         let instructions = default_system_instructions();
@@ -4082,6 +4148,40 @@ mod tests {
             image: "example.test/fabushi:latest".into(),
         };
         assert!(config.validate().is_err());
+    }
+
+    struct PostToolRetryModel {
+        calls: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl ModelRuntime for PostToolRetryModel {
+        async fn infer(
+            &self,
+            _request: ModelRequest,
+            events: SharedModelEventSink,
+        ) -> Result<(), ModelError> {
+            let attempt = self.calls.fetch_add(1, AtomicOrdering::SeqCst);
+            if attempt == 0 {
+                return Err(ModelError::Inference(
+                    "model stream read failed: timed out waiting for post-tool output".into(),
+                ));
+            }
+            events.emit(ModelEvent::OutputTextDelta("continued".into()))?;
+            events.emit(ModelEvent::Completed {
+                output: json!({
+                    "output": [{
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "continued"}]
+                    }]
+                }),
+            })
+        }
+
+        fn provider_mode(&self) -> ModelProviderMode {
+            ModelProviderMode::LocalModel
+        }
     }
 
     struct FakeModel {
