@@ -86,11 +86,49 @@ final class MobileMermaidRendererParityTests: XCTestCase {
         }
     }
 
-    func testUnsupportedValidFamilyFailsReadableInsteadOfExecutingWebRuntime() {
+    func testNativeMermaidParserProjectsGanttSectionsDatesAndDependenciesOffline() throws {
+        let diagram = try parseMobileMermaidDiagram(
+            """
+            gantt
+              title Release plan
+              dateFormat YYYY-MM-DD
+              section Build
+              Compile :done, build, 2026-10-10, 2d
+              Package :active, package, after build, 1d
+              section Ship
+              Release :milestone, release, 2026-10-13, 0d
+            """
+        )
+        guard case let .gantt(title, tasks) = diagram else {
+            return XCTFail("expected gantt")
+        }
+        XCTAssertEqual(title, "Release plan")
+        XCTAssertEqual(tasks.map(\.section), ["Build", "Build", "Ship"])
+        XCTAssertEqual(tasks.map(\.label), ["Compile", "Package", "Release"])
+        XCTAssertEqual(tasks.map(\.status), [.done, .active, .milestone])
+        XCTAssertEqual(tasks[0].startDay, 0, accuracy: 0.001)
+        XCTAssertEqual(tasks[0].durationDays, 2, accuracy: 0.001)
+        XCTAssertEqual(tasks[1].startDay, 2, accuracy: 0.001)
+        XCTAssertEqual(tasks[1].durationDays, 1, accuracy: 0.001)
+        XCTAssertEqual(tasks[2].startDay, 3, accuracy: 0.001)
+        XCTAssertEqual(tasks[2].durationDays, 0, accuracy: 0.001)
+    }
+
+    func testNativeMermaidGanttFailsClosedForUnsupportedDateFormatAndComplexity() {
         XCTAssertThrowsError(
-            try parseMobileMermaidDiagram("gantt\ntitle Project")
-        ) { error in
-            XCTAssertEqual(error as? MobileMermaidParseError, .unsupportedDiagram("gantt"))
+            try parseMobileMermaidDiagram(
+                """
+                gantt
+                  dateFormat DD-MM-YYYY
+                  Task : 10-10-2026, 2d
+                """
+            )
+        )
+        let tasks = (0...mobileMermaidNodeCap)
+            .map { "Task \($0) : id\($0), 2026-10-10, 1d" }
+            .joined(separator: "\n")
+        XCTAssertThrowsError(try parseMobileMermaidDiagram("gantt\n" + tasks)) { error in
+            XCTAssertEqual(error as? MobileMermaidParseError, .tooComplex)
         }
     }
 

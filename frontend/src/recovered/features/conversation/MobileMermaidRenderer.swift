@@ -70,6 +70,25 @@ internal struct MobileMermaidPieSlice: Identifiable, Equatable, Sendable {
     let value: Double
 }
 
+internal enum MobileMermaidGanttTaskStatus: String, Equatable, Sendable {
+    case normal
+    case active
+    case done
+    case critical
+    case milestone
+}
+
+internal struct MobileMermaidGanttTask: Identifiable, Equatable, Sendable {
+    let id: Int
+    let section: String
+    let label: String
+    let status: MobileMermaidGanttTaskStatus
+    let startLabel: String?
+    let durationLabel: String?
+    let startDay: Double?
+    let durationDays: Double?
+}
+
 internal enum MobileMermaidDiagram: Equatable, Sendable {
     case graph(
         direction: MobileMermaidDirection,
@@ -81,6 +100,7 @@ internal enum MobileMermaidDiagram: Equatable, Sendable {
         messages: [MobileMermaidSequenceMessage]
     )
     case pie(slices: [MobileMermaidPieSlice])
+    case gantt(title: String?, tasks: [MobileMermaidGanttTask])
 }
 
 internal enum MobileAssistantRichSegmentKind: Equatable {
@@ -455,6 +475,186 @@ private func mobileMermaidPie(lines: [String]) throws -> MobileMermaidDiagram {
     return .pie(slices: slices)
 }
 
+
+private func mobileMermaidGanttDurationDays(_ raw: String) -> Double? {
+    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard !value.isEmpty else { return nil }
+    let units: [(String, Double)] = [
+        ("w", 7),
+        ("d", 1),
+        ("h", 1.0 / 24.0),
+        ("m", 1.0 / 1_440.0),
+    ]
+    for (suffix, factor) in units where value.hasSuffix(suffix) {
+        let number = String(value.dropLast(suffix.count))
+        guard let amount = Double(number), amount.isFinite, amount >= 0 else { return nil }
+        return amount * factor
+    }
+    return nil
+}
+
+private func mobileMermaidGanttISODate(_ raw: String) -> Date? {
+    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    let parts = value.split(separator: "-", omittingEmptySubsequences: false)
+    guard parts.count == 3,
+          let year = Int(parts[0]),
+          let month = Int(parts[1]),
+          let day = Int(parts[2])
+    else { return nil }
+    var components = DateComponents()
+    components.calendar = Calendar(identifier: .gregorian)
+    components.timeZone = TimeZone(secondsFromGMT: 0)
+    components.year = year
+    components.month = month
+    components.day = day
+    return components.date
+}
+
+private func mobileMermaidGantt(lines: [String]) throws -> MobileMermaidDiagram {
+    var title: String?
+    var section = "Tasks"
+    var tasks: [MobileMermaidGanttTask] = []
+    var taskEndDayByIdentifier: [String: Double] = [:]
+    var earliestDate: Date?
+    var staged: [(label: String, section: String, status: MobileMermaidGanttTaskStatus, identifier: String?, start: String?, duration: String?)] = []
+
+    for rawLine in lines.dropFirst() {
+        let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty, !line.hasPrefix("%%") else { continue }
+        let lower = line.lowercased()
+        if lower.hasPrefix("title ") {
+            title = mobileMermaidCleanLabel(String(line.dropFirst(6)))
+            continue
+        }
+        if lower.hasPrefix("dateformat ") {
+            let format = String(line.dropFirst("dateFormat ".count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .uppercased()
+            guard ["YYYY-MM-DD", "YYYY-MM-DD "].contains(format) || format == "YYYY-MM-DD" else {
+                throw MobileMermaidParseError.malformed("native Gantt currently requires YYYY-MM-DD dateFormat")
+            }
+            continue
+        }
+        if lower.hasPrefix("axisformat ") || lower.hasPrefix("tickinterval ")
+            || lower.hasPrefix("excludes ") || lower.hasPrefix("todaymarker ")
+        {
+            continue
+        }
+        if lower.hasPrefix("section ") {
+            let candidate = mobileMermaidCleanLabel(String(line.dropFirst(8)))
+            section = candidate.isEmpty ? "Tasks" : candidate
+            continue
+        }
+
+        guard let colon = line.firstIndex(of: ":") else {
+            throw MobileMermaidParseError.malformed("Gantt task is missing ':'")
+        }
+        let label = mobileMermaidCleanLabel(String(line[..<colon]))
+        guard !label.isEmpty else {
+            throw MobileMermaidParseError.malformed("Gantt task has an empty label")
+        }
+        let rawParts = line[line.index(after: colon)...]
+            .split(separator: ",", omittingEmptySubsequences: false)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !rawParts.isEmpty else {
+            throw MobileMermaidParseError.malformed("Gantt task is missing scheduling fields")
+        }
+        var parts = rawParts
+        var status: MobileMermaidGanttTaskStatus = .normal
+        var sawCritical = false
+        while let first = parts.first {
+            switch first.lowercased() {
+            case "active":
+                status = .active
+            case "done":
+                status = .done
+            case "crit":
+                sawCritical = true
+                status = .critical
+            case "milestone":
+                status = .milestone
+            default:
+                break
+            }
+            if ["active", "done", "crit", "milestone"].contains(first.lowercased()) {
+                parts.removeFirst()
+            } else {
+                break
+            }
+        }
+        if status == .normal, sawCritical { status = .critical }
+
+        var identifier: String?
+        if parts.count >= 3 {
+            let candidate = parts[0]
+            if mobileMermaidGanttISODate(candidate) == nil,
+               mobileMermaidGanttDurationDays(candidate) == nil,
+               !candidate.lowercased().hasPrefix("after ")
+            {
+                identifier = candidate
+                parts.removeFirst()
+            }
+        }
+        let start = parts.first
+        let duration = parts.dropFirst().first
+        if let date = start.flatMap(mobileMermaidGanttISODate) {
+            earliestDate = min(earliestDate ?? date, date)
+        }
+        guard staged.count < mobileMermaidNodeCap else {
+            throw MobileMermaidParseError.tooComplex
+        }
+        staged.append((label, section, status, identifier, start, duration))
+    }
+
+    guard !staged.isEmpty else {
+        throw MobileMermaidParseError.malformed("Gantt diagram contains no tasks")
+    }
+
+    let origin = earliestDate
+    for item in staged {
+        var startDay: Double?
+        if let start = item.start {
+            if let date = mobileMermaidGanttISODate(start), let origin {
+                startDay = date.timeIntervalSince(origin) / 86_400
+            } else if start.lowercased().hasPrefix("after ") {
+                let dependency = String(start.dropFirst(6))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                startDay = taskEndDayByIdentifier[dependency]
+            }
+        }
+
+        var durationDays = item.duration.flatMap(mobileMermaidGanttDurationDays)
+        if durationDays == nil,
+           let start = item.start,
+           let startDate = mobileMermaidGanttISODate(start),
+           let end = item.duration,
+           let endDate = mobileMermaidGanttISODate(end)
+        {
+            durationDays = max(0, endDate.timeIntervalSince(startDate) / 86_400)
+        }
+        if item.status == .milestone {
+            durationDays = 0
+        }
+        let effectiveDuration = durationDays ?? (item.status == .milestone ? 0 : 1)
+        let task = MobileMermaidGanttTask(
+            id: tasks.count,
+            section: item.section,
+            label: item.label,
+            status: item.status,
+            startLabel: item.start,
+            durationLabel: item.duration,
+            startDay: startDay,
+            durationDays: durationDays
+        )
+        tasks.append(task)
+        if let identifier = item.identifier, !identifier.isEmpty, let startDay {
+            taskEndDayByIdentifier[identifier] = startDay + effectiveDuration
+        }
+    }
+    return .gantt(title: title, tasks: tasks)
+}
+
 internal func parseMobileMermaidDiagram(_ source: String) throws -> MobileMermaidDiagram {
     guard !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         throw MobileMermaidParseError.empty
@@ -504,6 +704,9 @@ internal func parseMobileMermaidDiagram(_ source: String) throws -> MobileMermai
     }
     if firstLower == "pie" || firstLower.hasPrefix("pie ") {
         return try mobileMermaidPie(lines: lines)
+    }
+    if firstLower == "gantt" {
+        return try mobileMermaidGantt(lines: lines)
     }
 
     let kind = first.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) ?? first
@@ -834,8 +1037,91 @@ private struct MobileMermaidDiagramSurface: View {
             MobileMermaidGraphView(nodes: nodes, edges: edges, direction: direction)
         case .sequence(let participants, let messages):
             MobileMermaidSequenceView(participants: participants, messages: messages)
+private struct MobileMermaidGanttView: View {
+    let title: String?
+    let tasks: [MobileMermaidGanttTask]
+
+    private var minimumStart: Double {
+        tasks.compactMap(\.startDay).min() ?? 0
+    }
+
+    private var maximumEnd: Double {
+        let values = tasks.compactMap { task -> Double? in
+            guard let start = task.startDay else { return nil }
+            return start + max(task.durationDays ?? 1, task.status == .milestone ? 0 : 0.25)
+        }
+        return max(values.max() ?? 1, minimumStart + 1)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let title, !title.isEmpty {
+                Text(title).font(.headline)
+            }
+            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                if index == 0 || tasks[index - 1].section != task.section {
+                    Text(task.section)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, index == 0 ? 0 : 6)
+                }
+                HStack(alignment: .center, spacing: 10) {
+                    Text(task.label)
+                        .font(.caption)
+                        .frame(width: 150, alignment: .leading)
+                        .lineLimit(2)
+                    GeometryReader { geometry in
+                        let span = max(1, maximumEnd - minimumStart)
+                        let start = task.startDay ?? minimumStart
+                        let duration = max(
+                            task.durationDays ?? 1,
+                            task.status == .milestone ? 0.08 : 0.25
+                        )
+                        let x = max(0, min(1, (start - minimumStart) / span))
+                        let width = max(6, min(1 - x, duration / span))
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.secondary.opacity(0.14))
+                            Capsule()
+                                .fill(task.status == .done ? Color.secondary.opacity(0.65) : Color.accentColor.opacity(task.status == .critical ? 0.9 : 0.68))
+                                .frame(width: max(6, geometry.size.width * width))
+                                .offset(x: geometry.size.width * x)
+                        }
+                    }
+                    .frame(height: task.status == .milestone ? 8 : 14)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        if let start = task.startLabel {
+                            Text(start).font(.caption2).foregroundStyle(.secondary)
+                        }
+                        if let duration = task.durationLabel {
+                            Text(duration).font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .frame(width: 95, alignment: .trailing)
+                }
+                .frame(minHeight: 28)
+            }
+        }
+        .padding(10)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Mermaid Gantt diagram with \(tasks.count) tasks")
+    }
+}
+
+private struct MobileMermaidDiagramSurface: View {
+    let diagram: MobileMermaidDiagram
+
+    @ViewBuilder
+    var body: some View {
+        switch diagram {
+        case .graph(let direction, let nodes, let edges):
+            MobileMermaidGraphView(nodes: nodes, edges: edges, direction: direction)
+        case .sequence(let participants, let messages):
+            MobileMermaidSequenceView(participants: participants, messages: messages)
         case .pie(let slices):
             MobileMermaidPieView(slices: slices)
+        case .gantt(let title, let tasks):
+            MobileMermaidGanttView(title: title, tasks: tasks)
         }
     }
 }
@@ -858,6 +1144,12 @@ internal func mobileMermaidNaturalSize(_ diagram: MobileMermaidDiagram) -> CGSiz
         )
     case .pie:
         return CGSize(width: 444, height: 206)
+    case .gantt(_, let tasks):
+        let sectionCount = Set(tasks.map(\.section)).count
+        return CGSize(
+            width: 720,
+            height: max(220, CGFloat(tasks.count) * 34 + CGFloat(sectionCount) * 28 + 48)
+        )
     }
 }
 
