@@ -4663,11 +4663,7 @@ impl FeatureHostController {
                 "unsafe memory agent id: {agent_id}"
             )));
         }
-        let root = self
-            .memory_root_path
-            .as_deref()
-            .ok_or_else(|| FeatureHostError::Contract("memory storage is unavailable".into()))?;
-        let memory_dir = root.join(&agent_id).join("memory");
+        let memory_dir = self.memory_dir_for_agent(&agent_id)?;
         match action {
             MemoryAction::List { limit } => {
                 let memories = list_memories(&memory_dir, limit.min(1000))?;
@@ -7751,6 +7747,17 @@ impl FeatureHostController {
         persist_peer_messages(&path, messages)
     }
 
+    fn memory_dir_for_agent(&self, agent_id: &str) -> Result<PathBuf, FeatureHostError> {
+        if !is_safe_memory_agent_id(agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unsafe memory agent id: {agent_id}"
+            )));
+        }
+        self.active_account_root(self.memory_root_path.as_deref())
+            .map(|root| root.join(agent_id).join("memory"))
+            .ok_or_else(|| FeatureHostError::Contract("memory storage is unavailable".into()))
+    }
+
     fn active_account_root(&self, base: Option<&Path>) -> Option<PathBuf> {
         let base = base?;
         #[cfg(feature = "production")]
@@ -10135,8 +10142,7 @@ impl FeatureHostController {
             );
         }
         if is_safe_memory_agent_id(memory_agent_id) {
-            if let Some(root) = self.active_account_root(self.memory_root_path.as_deref()) {
-                let memory_dir = root.join(memory_agent_id).join("memory");
+            if let Ok(memory_dir) = self.memory_dir_for_agent(memory_agent_id) {
                 let memory_prompt = render_memory_system_prompt(&memory_dir);
                 if !memory_prompt.is_empty() {
                     runtime_text = format!(
@@ -16809,6 +16815,17 @@ mod tests {
     }
 
     #[test]
+    fn memory_crud_and_turn_prompt_share_the_same_canonical_agent_directory() {
+        let controller = controller();
+        let canonical = controller
+            .memory_dir_for_agent("mahayana-assistant")
+            .expect("canonical memory directory");
+        let root = controller.memory_root_path.as_ref().expect("memory root");
+        assert_eq!(canonical, root.join("mahayana-assistant").join("memory"));
+        assert!(controller.memory_dir_for_agent("../escape").is_err());
+    }
+
+    #[test]
     fn memory_store_preserves_id_dedupe_and_markdown_layout() {
         assert_eq!(memory_id_for("hello"), "aaf4c61ddcc5e8a2");
         let controller = controller();
@@ -16862,10 +16879,9 @@ mod tests {
                 if memories.len() == 1 && memories[0].content == "Likes tea"
         )));
         let profile = controller
-            .memory_root_path
-            .as_ref()
-            .expect("memory root")
-            .join("mahayana-assistant/memory/profile.md");
+            .memory_dir_for_agent("mahayana-assistant")
+            .expect("canonical memory directory")
+            .join("profile.md");
         let raw = std::fs::read_to_string(profile).expect("profile markdown");
         assert!(raw.starts_with(MEMORY_PROFILE_HEADER));
         assert!(raw.contains("Likes tea"));
