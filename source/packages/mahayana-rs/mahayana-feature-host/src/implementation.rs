@@ -13319,7 +13319,7 @@ fn sort_memories_most_recent(facts: &mut [ParsedMemoryFact]) {
     });
 }
 
-fn list_memories(memory_dir: &Path, limit: usize) -> Result<Vec<MemoryRecord>, FeatureHostError> {
+pub(crate) fn list_memories(memory_dir: &Path, limit: usize) -> Result<Vec<MemoryRecord>, FeatureHostError> {
     if limit == 0 {
         return Ok(Vec::new());
     }
@@ -13345,7 +13345,7 @@ fn count_memories(memory_dir: &Path) -> Result<usize, FeatureHostError> {
     Ok(all_memory_facts(memory_dir).len())
 }
 
-fn add_memory(
+pub(crate) fn add_memory(
     memory_dir: &Path,
     content: &str,
     created_at: i64,
@@ -13397,7 +13397,7 @@ fn add_memory(
     }))
 }
 
-fn remove_memory(memory_dir: &Path, id: &str) -> Result<bool, FeatureHostError> {
+pub(crate) fn remove_memory(memory_dir: &Path, id: &str) -> Result<bool, FeatureHostError> {
     let mut paths = vec![memory_dir.join("profile.md")];
     paths.extend(memory_log_files(memory_dir));
     for path in paths {
