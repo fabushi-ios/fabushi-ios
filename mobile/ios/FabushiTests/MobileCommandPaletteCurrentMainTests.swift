@@ -80,6 +80,55 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
         XCTAssertEqual(entries.map(\.id), ["bot:g"])
     }
 
+    func testRootCommandsFailClosedWithoutActiveAgentAndGateContextRows() {
+        XCTAssertTrue(
+            MobileCommandPaletteRootProjection.actions(
+                activeAgent: nil,
+                hasChannels: true
+            ).isEmpty
+        )
+
+        let individual = bot("agent", name: "Agent")
+        XCTAssertEqual(
+            MobileCommandPaletteRootProjection.actions(
+                activeAgent: individual,
+                hasChannels: false
+            ).map(\.id),
+            ["info-settings"]
+        )
+
+        let group = MobileBotSummary(
+            id: "group",
+            name: "Group",
+            description: "",
+            isGroup: true,
+            memberIds: ["agent"]
+        )
+        XCTAssertEqual(
+            MobileCommandPaletteRootProjection.actions(
+                activeAgent: group,
+                hasChannels: true
+            ).map(\.id),
+            ["info-members", "info-channels", "info-settings"]
+        )
+
+        let shared = MobileBotSummary(
+            id: "shared",
+            name: "Shared",
+            description: "",
+            isGroup: true,
+            isSharedRoom: true,
+            memberIds: ["agent"]
+        )
+        XCTAssertEqual(
+            MobileCommandPaletteRootProjection.actions(
+                activeAgent: shared,
+                hasChannels: true
+            ).map(\.id),
+            ["info-channels", "info-settings"]
+        )
+    }
+
     func testComputerUpdateProjectionUsesAccountWideRosterAndFailsClosed() {
         let agent = bot("agent", name: "Agent")
         let available = RemoteComputerAgentBoxSnapshot(
