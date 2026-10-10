@@ -506,6 +506,7 @@ internal struct GrokMobileShell: View {
             messaging: messaging,
             appAgentSurface: appAgentSurface,
             reconnectGeneration: reconnectGeneration,
+            suggestionTransportConnected: coordinatorConnectionSnapshot.phase == .connected,
             focusPromptGeneration: promptFocusGeneration,
             onClose: { clearRosterSelection() },
             onOpenSettings: {
