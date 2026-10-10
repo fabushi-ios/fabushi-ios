@@ -3387,6 +3387,30 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-reaction-owner-implemented-pending-exact-head-ci",
         "finding": "Current-main reaction root owns one optimistic projection over canonical transcript state and reconciles through authoritative feed. iOS keeps the same single owner in MessagingModel: projectChatReactionToggle updates the canonical hydrated message collection, each reaction mutation receives a per-message/reaction generation, setReaction is dispatched to the canonical command path, and rollback occurs only when the same latest generation/optimistic value is still present; later canonical hydration replaces the projection. No second reaction feed/transcript store is created. Final exact-head CI remains required."
+      },
+      {
+        "path": "frontend/src/production/runtime-assets.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-bundle-replacement",
+        "finding": "Current-main runtime-assets.ts only resolves Vite/browser renderer asset filenames against import.meta.url in production or /upstream/assets during browser development. iOS has neither Vite module URLs nor that development origin; shipping resources are compiled into the native app bundle/asset catalog and resolved by Bundle/SwiftUI/UIKit. Reproducing a runtime-assets.swift URL shim would create a false second resource mechanism, so this is not-applicable-with-replacement rather than a missing product responsibility."
+      },
+      {
+        "path": "frontend/src/production/settings-notice-controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-root-notice-controller-implemented-pending-exact-head-ci",
+        "finding": "Current-main root notice storage maps to the shipping SettingsNoticeController.swift: one @Observable root snapshot owner, account/surface generation fences that reject stale async completions, publish/reset/dispose semantics, typed Settings/Plugins operations, and presenter-owned expiry/dismissal. SettingsNoticeControllerParityTests cover replacement, stale scope fences, disposal, 3.5s/6s expiry policy and accessibility announcement timing. Exact-head Swift/acceptance evidence remains pending."
+      },
+      {
+        "path": "frontend/src/production/sidebar-model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-host-pinned-order-ios-adapted-implemented-pending-exact-head-ci",
+        "finding": "Desktop's pinned/unpinned projection and deterministic reorder responsibility is preserved by the native Bot roster: ordered pinned IDs are loaded/persisted through canonical Host getHostPinnedAgents/setHostPinnedAgents, rows are projected in that order, and native up/down controls replace drag before/after placement without manufacturing pin truth. Unknown/unpinned Bots stay outside the pinned prefix. Exact-head ordinary/protected Actions remain required."
+      },
+      {
+        "path": "frontend/src/production/strict-mode-disposal.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-react-strictmode-replaced-native-lifecycle",
+        "finding": "React StrictMode setup-cleanup-replay is a Desktop renderer lifecycle mechanism, not an iOS runtime contract. Shipping FabushiSceneRoot owns a single native FabushiRuntime per scene, while native lifecycle/task owners cancel, recover and fence work across scene/protected-data transitions. IOSLifecycleParityTests cover background/unclean recovery and lifecycle state. This is a justified not-applicable-with-replacement mapping, not a waived cleanup responsibility."
       }
     ]
   },
