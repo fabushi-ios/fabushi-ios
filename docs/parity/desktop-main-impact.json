@@ -4,26 +4,10 @@
   "previousCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
   "currentCommit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
   "fullTree": "ed56d351521842550b541f37de3d567f027eeda9",
-  "directCount": 7,
+  "directCount": 5,
   "metadataCorrections": 0,
   "fullReviewAccepted": false,
   "directChanges": [
-    {
-      "path": ".github/workflows/rust-desktop-runtime.yml",
-      "change": "blob-changed",
-      "previousBlobSha": "a0cff860fac981805863868f9ac2e1ce101a9657",
-      "blobSha": "b555300a6a116c0aeea39d42ad8936d0e522ec22",
-      "previousSize": 13738,
-      "size": 13919
-    },
-    {
-      "path": "docs/specs/remote-computer-mobile-session-reconciliation.md",
-      "change": "added",
-      "previousBlobSha": null,
-      "blobSha": "5ed7994d8ae05539426ce8ac1de40cdd6471856d",
-      "previousSize": null,
-      "size": 5435
-    },
     {
       "path": "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0027_remote_computer_mobile_session_reconcile.sql",
       "change": "added",
@@ -1875,13 +1859,32 @@
       }
     ]
   },
-  "historyPolicy": "Earlier 3bc9240 reviewed evidence is retained only as cumulative context. Direct changes here are strictly the 3bc9240 -> 92fcc2b0 delta; current acceptance requires 92fcc2b0 identities and descendant iOS exact-head evidence.",
+  "historyPolicy": "Earlier 3bc9240 reviewed evidence is retained only as cumulative context. directChanges is the selected frontend/** + source/** 3bc9240 -> 92fcc2b0 delta consumed by per-source re-review fencing; outsideSelectedChanges separately preserves changed tracked workflow/spec evidence. Current acceptance requires 92fcc2b0 identities and descendant iOS exact-head evidence.",
   "groupSummary": [
     {
       "group": "source-mahayana",
       "previous": 5329,
       "current": 5330,
       "directChanges": 5
+    }
+  ],
+  "totalTrackedChangeCount": 7,
+  "outsideSelectedChanges": [
+    {
+      "path": ".github/workflows/rust-desktop-runtime.yml",
+      "change": "blob-changed",
+      "previousBlobSha": "a0cff860fac981805863868f9ac2e1ce101a9657",
+      "blobSha": "b555300a6a116c0aeea39d42ad8936d0e522ec22",
+      "previousSize": 13738,
+      "size": 13919
+    },
+    {
+      "path": "docs/specs/remote-computer-mobile-session-reconciliation.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "5ed7994d8ae05539426ce8ac1de40cdd6471856d",
+      "previousSize": null,
+      "size": 5435
     }
   ]
 }
