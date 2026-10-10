@@ -491,6 +491,7 @@ internal struct GrokMobileShell: View {
     private func selectedBotContent(_ bot: MobileBotSummary) -> some View {
         MobileBotChat(
             bot: bot,
+            availableBots: bots,
             bridge: bridge,
             model: model,
             messaging: messaging,
