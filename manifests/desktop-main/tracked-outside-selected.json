@@ -736,9 +736,10 @@
       "type": "blob",
       "sha": "876b3fe8a6e182d4d53c379dbfad7b80c967d748",
       "size": 11200,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-runtime-build-dependency-contract",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/Cargo.lock; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/Cargo.lock"
     },
     {
       "path": "native/mahayana-messaging/Cargo.toml",
@@ -746,9 +747,10 @@
       "type": "blob",
       "sha": "9cbcc72222ca6ba4bc5252fa837756528b3fdee7",
       "size": 705,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-runtime-build-dependency-contract",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/Cargo.toml; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/Cargo.toml"
     },
     {
       "path": "native/mahayana-messaging/README.md",
@@ -756,9 +758,10 @@
       "type": "blob",
       "sha": "1d9083ec562aa7fd45ac689f5020e3b1c641c618",
       "size": 895,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "runtime-documentation-and-contract-provenance",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/README.md; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/README.md"
     },
     {
       "path": "native/mahayana-messaging/src/access.rs",
@@ -766,9 +769,10 @@
       "type": "blob",
       "sha": "fc211d43117b5ea18ebdddcb0d557cc0e54017d5",
       "size": 14316,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/access.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/access.rs"
     },
     {
       "path": "native/mahayana-messaging/src/actor.rs",
@@ -776,9 +780,10 @@
       "type": "blob",
       "sha": "62fade9e5dd6a870f215a5f40473aba5cc6981b7",
       "size": 2820,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/actor.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/actor.rs"
     },
     {
       "path": "native/mahayana-messaging/src/bin/call-signaling-server.rs",
@@ -786,9 +791,10 @@
       "type": "blob",
       "sha": "a760646c908e0cda225f2839739577276e026964",
       "size": 762,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-server-entrypoint",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/bin/call-signaling-server.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/bin/call-signaling-server.rs"
     },
     {
       "path": "native/mahayana-messaging/src/bin/messaging-server.rs",
@@ -796,9 +802,10 @@
       "type": "blob",
       "sha": "3ef1d177aa32310dcbff1edcf11c6c9d947756b4",
       "size": 1324,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-server-entrypoint",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/bin/messaging-server.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/bin/messaging-server.rs"
     },
     {
       "path": "native/mahayana-messaging/src/blob_store.rs",
@@ -806,9 +813,10 @@
       "type": "blob",
       "sha": "d4bfa78c55804904a5c11ea15658b684fd0b7273",
       "size": 13743,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/blob_store.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/blob_store.rs"
     },
     {
       "path": "native/mahayana-messaging/src/bot.rs",
@@ -816,9 +824,10 @@
       "type": "blob",
       "sha": "a9ad72b5dceb84065fea22e44bd004f0e901f336",
       "size": 6080,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/bot.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/bot.rs"
     },
     {
       "path": "native/mahayana-messaging/src/community.rs",
@@ -826,9 +835,10 @@
       "type": "blob",
       "sha": "b4cdcafb6ebf99ddb4d923e75073f7d27e47ef21",
       "size": 11679,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/community.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/community.rs"
     },
     {
       "path": "native/mahayana-messaging/src/conversation.rs",
@@ -836,9 +846,10 @@
       "type": "blob",
       "sha": "a669d34de1127310a420943e6cc3c14d9410d716",
       "size": 24133,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/src/conversation.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/conversation.rs"
     },
     {
       "path": "native/mahayana-messaging/src/device.rs",
@@ -846,9 +857,10 @@
       "type": "blob",
       "sha": "d0d709554aa5f632717e09edfa65a61a566caf9c",
       "size": 3652,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/device.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/device.rs"
     },
     {
       "path": "native/mahayana-messaging/src/engine.rs",
@@ -856,9 +868,10 @@
       "type": "blob",
       "sha": "7fa8496520920dba41c9ff03274f7e7e5b270544",
       "size": 157109,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/src/engine.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/engine.rs"
     },
     {
       "path": "native/mahayana-messaging/src/gateway.rs",
@@ -866,9 +879,10 @@
       "type": "blob",
       "sha": "2c3427851d21d30d9501a28beaf7c0d1c2d6091b",
       "size": 9526,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/gateway.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/gateway.rs"
     },
     {
       "path": "native/mahayana-messaging/src/lib.rs",
@@ -876,9 +890,10 @@
       "type": "blob",
       "sha": "3b1997057b0048218be079047f81c2216ee689bc",
       "size": 1756,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/lib.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/lib.rs"
     },
     {
       "path": "native/mahayana-messaging/src/media.rs",
@@ -886,9 +901,10 @@
       "type": "blob",
       "sha": "b0d184c369ad55c1742a44026da00cdae379a8e7",
       "size": 7892,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/media.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/media.rs"
     },
     {
       "path": "native/mahayana-messaging/src/media_cache.rs",
@@ -896,9 +912,10 @@
       "type": "blob",
       "sha": "e578cb7dd5e9b5c7105f68e741f4cb1a71cd0ce2",
       "size": 5008,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/media_cache.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/media_cache.rs"
     },
     {
       "path": "native/mahayana-messaging/src/message.rs",
@@ -906,9 +923,10 @@
       "type": "blob",
       "sha": "43befb0734a6d1d6d17aeb11f6aa5608a16a6f5a",
       "size": 9081,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/src/message.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/message.rs"
     },
     {
       "path": "native/mahayana-messaging/src/miniapp.rs",
@@ -916,9 +934,10 @@
       "type": "blob",
       "sha": "ef5d919f20c27aff71cbe043564ff51427beffb1",
       "size": 6945,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/miniapp.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/miniapp.rs"
     },
     {
       "path": "native/mahayana-messaging/src/miniapp_service_call.rs",
@@ -926,9 +945,10 @@
       "type": "blob",
       "sha": "d6f3f503c1bccde38408ce507b9342717813b3ec",
       "size": 30051,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/miniapp_service_call.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/miniapp_service_call.rs"
     },
     {
       "path": "native/mahayana-messaging/src/notification.rs",
@@ -936,9 +956,10 @@
       "type": "blob",
       "sha": "0b4b55f93325a6c2eaad2c38772004d12d4e5e5c",
       "size": 4812,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/notification.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/notification.rs"
     },
     {
       "path": "native/mahayana-messaging/src/payment.rs",
@@ -946,9 +967,10 @@
       "type": "blob",
       "sha": "e0d22a624b29a4c666ae61b41a277f0186cbe8bb",
       "size": 4255,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/payment.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/payment.rs"
     },
     {
       "path": "native/mahayana-messaging/src/payment_provider.rs",
@@ -956,9 +978,10 @@
       "type": "blob",
       "sha": "9c8804c0729623ad7bcd8537cc93a0e038a1f2b0",
       "size": 2104,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/payment_provider.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/payment_provider.rs"
     },
     {
       "path": "native/mahayana-messaging/src/privacy.rs",
@@ -966,9 +989,10 @@
       "type": "blob",
       "sha": "e6a711ce5367f499e8fb8f5af0681fb8d37bcc7b",
       "size": 3080,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/privacy.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/privacy.rs"
     },
     {
       "path": "native/mahayana-messaging/src/protocol.rs",
@@ -976,9 +1000,10 @@
       "type": "blob",
       "sha": "c0190536131eb939fa4dec249708a067a20602ef",
       "size": 13596,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/src/protocol.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/protocol.rs"
     },
     {
       "path": "native/mahayana-messaging/src/realtime.rs",
@@ -986,9 +1011,10 @@
       "type": "blob",
       "sha": "2d19b2ddc2c274767bc2c8c0a7ff7cca9f7b70b2",
       "size": 5587,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/realtime.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/realtime.rs"
     },
     {
       "path": "native/mahayana-messaging/src/search.rs",
@@ -996,9 +1022,10 @@
       "type": "blob",
       "sha": "d57e1bcef2f9df154315e9b9b005f82ac6d397e2",
       "size": 18442,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/src/search.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/search.rs"
     },
     {
       "path": "native/mahayana-messaging/src/secret_chat.rs",
@@ -1006,9 +1033,10 @@
       "type": "blob",
       "sha": "a3e3cf6352104191e5ef8f040973be3dad7ab9e3",
       "size": 22557,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/secret_chat.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/secret_chat.rs"
     },
     {
       "path": "native/mahayana-messaging/src/server.rs",
@@ -1016,9 +1044,10 @@
       "type": "blob",
       "sha": "dcb7898be75927cdea6213879b1a38f8eb433f9d",
       "size": 10583,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/server.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/server.rs"
     },
     {
       "path": "native/mahayana-messaging/src/service.rs",
@@ -1026,9 +1055,10 @@
       "type": "blob",
       "sha": "3c85c39d5642c32e6b5333d59251602556219ce4",
       "size": 115417,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/src/service.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/service.rs"
     },
     {
       "path": "native/mahayana-messaging/src/settlement.rs",
@@ -1036,9 +1066,10 @@
       "type": "blob",
       "sha": "a2597ed43e2885285e9a6f4ed73ba3a9f167db0b",
       "size": 6548,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/settlement.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/settlement.rs"
     },
     {
       "path": "native/mahayana-messaging/src/signaling.rs",
@@ -1046,9 +1077,10 @@
       "type": "blob",
       "sha": "5d37fec5c3c7484b3afded49bc426c3c28907ed3",
       "size": 7839,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/signaling.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/signaling.rs"
     },
     {
       "path": "native/mahayana-messaging/src/signaling_server.rs",
@@ -1056,9 +1088,10 @@
       "type": "blob",
       "sha": "f74779be9ff9e76e8839bb2a29a88290908a86d5",
       "size": 12175,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/signaling_server.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/signaling_server.rs"
     },
     {
       "path": "native/mahayana-messaging/src/store.rs",
@@ -1066,9 +1099,10 @@
       "type": "blob",
       "sha": "2ffb60eab5986e92e6a296a9c8c90e05ba37fb8a",
       "size": 27775,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/store.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/store.rs"
     },
     {
       "path": "native/mahayana-messaging/src/story.rs",
@@ -1076,9 +1110,10 @@
       "type": "blob",
       "sha": "1bb40c228889b82f913b308bf4cb2500aab8c521",
       "size": 3316,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/story.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/story.rs"
     },
     {
       "path": "native/mahayana-messaging/src/wallet.rs",
@@ -1086,9 +1121,10 @@
       "type": "blob",
       "sha": "876799078c868017a3f27dae414b364fa21de425",
       "size": 12235,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-production-runtime",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/src/wallet.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/src/wallet.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/delta_sync_contract.rs",
@@ -1096,9 +1132,10 @@
       "type": "blob",
       "sha": "800f6344659a351c9805591722b04be01473a359",
       "size": 15710,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/tests/delta_sync_contract.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/delta_sync_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/m4_media_contract.rs",
@@ -1106,9 +1143,10 @@
       "type": "blob",
       "sha": "37811c22b7a1a318f216167f57711a3f6f8e57b4",
       "size": 7059,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/tests/m4_media_contract.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/m4_media_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/m5_contacts_groups_contract.rs",
@@ -1116,9 +1154,10 @@
       "type": "blob",
       "sha": "c2cf8e85fe56144ec9034c991f166e40e66abd08",
       "size": 18167,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/tests/m5_contacts_groups_contract.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/m5_contacts_groups_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/m6_channels_topics_contract.rs",
@@ -1126,9 +1165,10 @@
       "type": "blob",
       "sha": "a9e0de25b1c31b8e7f2c53ddc8e1381f6f2bed87",
       "size": 48784,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/tests/m6_channels_topics_contract.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/m6_channels_topics_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/messaging_contract.rs",
@@ -1136,9 +1176,10 @@
       "type": "blob",
       "sha": "a7ff74f27ed92816466cb85a8c1fb94eea927e88",
       "size": 26836,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/tests/messaging_contract.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/messaging_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/platform_contract.rs",
@@ -1146,9 +1187,10 @@
       "type": "blob",
       "sha": "9aea509d961def9b5499aeaa5f1cd90dbffbefb4",
       "size": 6554,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/tests/platform_contract.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/platform_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/service_contract.rs",
@@ -1156,9 +1198,10 @@
       "type": "blob",
       "sha": "06ffbec1084fded8edd402456c048b2ec6b789aa",
       "size": 30291,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is owned in iOS by source/packages/mahayana-messaging/tests/service_contract.rs. This file diverged from the original iOS vendor baseline because both Desktop and iOS evolved; the current iOS descendant integrates Desktop-main semantics with iOS shipping additions (including native Human transport/trusted-Agent/media-group behavior where applicable). It is implemented but remains pending exact-HEAD Rust/architecture evidence before verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/service_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/typing_contract.rs",
@@ -1166,9 +1209,10 @@
       "type": "blob",
       "sha": "354031ff9022539eef88926f09b9ada1e199d75a",
       "size": 7632,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/tests/typing_contract.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/typing_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/unread_projection_contract.rs",
@@ -1176,9 +1220,10 @@
       "type": "blob",
       "sha": "acee8c00a3a5e391218bcf407ccd67be099167a2",
       "size": 20128,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/tests/unread_projection_contract.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/unread_projection_contract.rs"
     },
     {
       "path": "native/mahayana-messaging/tests/websocket_gateway_contract.rs",
@@ -1186,9 +1231,10 @@
       "type": "blob",
       "sha": "3fd76ecda84a705fa7162c710cc803b747124723",
       "size": 7817,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "rust-messaging-behavior-contract-test",
+      "coverage_status": "reviewed-active-ios-owned-runtime",
+      "reason": "Desktop current native Mahayana messaging responsibility is already repository-owned in iOS at source/packages/mahayana-messaging/tests/websocket_gateway_contract.rs; blob comparison at this review found the current iOS-owned file identical to the Desktop native source for this path. Runtime closure still depends on the package shipping composition and same-final-HEAD Rust/architecture evidence, so this row is reviewed rather than independently marked verified.",
+      "ios_target_path": "source/packages/mahayana-messaging/tests/websocket_gateway_contract.rs"
     },
     {
       "path": "projects/desktop-chat-streaming-parity/OWNERS.md",

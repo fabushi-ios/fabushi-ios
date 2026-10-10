@@ -1,5 +1,5 @@
 use crate::actor::{Actor, ActorId};
-use crate::conversation::{Conversation, ConversationId};
+use crate::conversation::{Conversation, ConversationId, ConversationKind};
 use crate::message::{Message, MessageContent, MessageId};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,6 +28,116 @@ pub struct SearchQuery {
     pub from_ms: Option<i64>,
     pub to_ms: Option<i64>,
     pub limit: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RecipientContentKind {
+    Standard,
+    Secret,
+    Service,
+}
+
+impl Default for RecipientContentKind {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RecipientSearchRequirements {
+    pub require_media: bool,
+    pub require_polls: bool,
+    pub require_send_other: bool,
+    pub require_inline: bool,
+    pub require_game: bool,
+    pub source_protected_content: bool,
+    pub content_kind: RecipientContentKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RecipientAuthorizationInput {
+    pub conversation_kind: ConversationKind,
+    pub sender_is_participant: bool,
+    pub can_send_messages: bool,
+    pub can_send_media: bool,
+    pub can_send_polls: bool,
+    pub can_send_other: bool,
+    pub can_send_inline: bool,
+    pub can_send_games: bool,
+    pub community_forbidden: bool,
+    pub community_restrict_messages: bool,
+    pub community_restrict_media: bool,
+    pub community_restrict_polls: bool,
+    pub community_restrict_other: bool,
+    pub community_restrict_inline: bool,
+    pub community_restrict_games: bool,
+    pub channel_posting_allowed: bool,
+}
+
+impl RecipientAuthorizationInput {
+    pub fn direct_default(sender_is_participant: bool) -> Self {
+        Self {
+            conversation_kind: ConversationKind::Direct,
+            sender_is_participant,
+            can_send_messages: true,
+            can_send_media: true,
+            can_send_polls: true,
+            can_send_other: true,
+            can_send_inline: true,
+            can_send_games: true,
+            community_forbidden: false,
+            community_restrict_messages: false,
+            community_restrict_media: false,
+            community_restrict_polls: false,
+            community_restrict_other: false,
+            community_restrict_inline: false,
+            community_restrict_games: false,
+            channel_posting_allowed: true,
+        }
+    }
+}
+
+/// Canonical SearchRecipients authorization boundary.
+///
+/// Callers must apply this before indexing or exposing a destination. Search/UI
+/// code is not permitted to broaden this decision after the fact.
+pub fn recipient_search_authorized(
+    input: RecipientAuthorizationInput,
+    requirements: RecipientSearchRequirements,
+) -> bool {
+    if requirements.source_protected_content
+        || !input.sender_is_participant
+        || !input.can_send_messages
+        || input.community_forbidden
+        || input.community_restrict_messages
+        || (requirements.require_media
+            && (!input.can_send_media || input.community_restrict_media))
+        || (requirements.require_polls
+            && (!input.can_send_polls || input.community_restrict_polls))
+        || (requirements.require_send_other
+            && (!input.can_send_other || input.community_restrict_other))
+        || (requirements.require_inline
+            && (!input.can_send_inline || input.community_restrict_inline))
+        || (requirements.require_game
+            && (!input.can_send_games || input.community_restrict_games))
+    {
+        return false;
+    }
+
+    if matches!(input.conversation_kind, ConversationKind::Channel)
+        && (!input.channel_posting_allowed || requirements.require_game)
+    {
+        return false;
+    }
+
+    match (requirements.content_kind, input.conversation_kind) {
+        (RecipientContentKind::Standard, ConversationKind::Secret) => false,
+        (RecipientContentKind::Secret, ConversationKind::Secret) => true,
+        (RecipientContentKind::Secret, _) => false,
+        (RecipientContentKind::Service, _) | (RecipientContentKind::Standard, _) => true,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -317,5 +427,93 @@ fn content_matches_scope(content: &MessageContent, scope: SearchScope) -> bool {
             _ => false,
         },
         _ => true,
+    }
+}
+
+
+#[cfg(test)]
+mod recipient_policy_tests {
+    use super::*;
+
+    #[test]
+    fn recipient_authorization_fails_before_exposure_for_typed_share_requirements() {
+        let direct = RecipientAuthorizationInput::direct_default(true);
+        assert!(recipient_search_authorized(
+            direct,
+            RecipientSearchRequirements::default()
+        ));
+
+        let mut no_other = direct;
+        no_other.can_send_other = false;
+        assert!(!recipient_search_authorized(
+            no_other,
+            RecipientSearchRequirements {
+                require_send_other: true,
+                ..RecipientSearchRequirements::default()
+            }
+        ));
+
+        let mut inline_restricted = direct;
+        inline_restricted.community_restrict_inline = true;
+        assert!(!recipient_search_authorized(
+            inline_restricted,
+            RecipientSearchRequirements {
+                require_inline: true,
+                ..RecipientSearchRequirements::default()
+            }
+        ));
+
+        let mut channel = direct;
+        channel.conversation_kind = ConversationKind::Channel;
+        channel.channel_posting_allowed = true;
+        assert!(!recipient_search_authorized(
+            channel,
+            RecipientSearchRequirements {
+                require_game: true,
+                ..RecipientSearchRequirements::default()
+            }
+        ));
+
+        assert!(!recipient_search_authorized(
+            direct,
+            RecipientSearchRequirements {
+                source_protected_content: true,
+                ..RecipientSearchRequirements::default()
+            }
+        ));
+
+        let mut secret = direct;
+        secret.conversation_kind = ConversationKind::Secret;
+        assert!(!recipient_search_authorized(
+            secret,
+            RecipientSearchRequirements::default()
+        ));
+        assert!(recipient_search_authorized(
+            secret,
+            RecipientSearchRequirements {
+                content_kind: RecipientContentKind::Secret,
+                ..RecipientSearchRequirements::default()
+            }
+        ));
+        assert!(!recipient_search_authorized(
+            direct,
+            RecipientSearchRequirements {
+                content_kind: RecipientContentKind::Secret,
+                ..RecipientSearchRequirements::default()
+            }
+        ));
+    }
+
+    #[test]
+    fn recipient_requirements_deserialize_old_media_poll_shape_with_safe_defaults() {
+        let parsed: RecipientSearchRequirements =
+            serde_json::from_str(r#"{"requireMedia":true,"requirePolls":false}"#).unwrap();
+        assert!(parsed.require_media);
+        assert!(!parsed.require_polls);
+        assert!(!parsed.require_send_other);
+        assert!(!parsed.require_inline);
+        assert!(!parsed.require_game);
+        assert!(!parsed.source_protected_content);
+        assert_eq!(parsed.content_kind, RecipientContentKind::Standard);
     }
 }

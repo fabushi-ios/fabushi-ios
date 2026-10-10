@@ -1,21 +1,25 @@
-use crate::actor::{Actor, ActorId, ActorKind, Participant, ParticipantRole};
+use crate::actor::{Actor, ActorId, ActorKind, Participant, ParticipantRole, Presence, PresenceStatus};
 use crate::blob_store::{BlobStoreError, FileBlobStore};
 use crate::bot::BotInvocation;
 use crate::community::{CommunityState, MemberStatus};
 use crate::conversation::{
-    Conversation, ConversationDraft, ConversationId, ConversationKind, Topic, TopicDraft,
+    Conversation, ConversationDestination, ConversationDraft, ConversationId, ConversationKind,
+    Topic, TopicDraft,
 };
 use crate::engine::topic_id_from_root;
 use crate::engine::{Command, EngineError, Event, MessagingEngine};
 use crate::message::{
     ClientMessageId, DeliveryState, FormattedText, Message, MessageContent, MessageId,
-    ReactionSummary,
+    PendingPresenceSend, PresenceSendTrigger, ReactionSummary,
 };
 use crate::payment::Money;
 use crate::protocol::{
     ClientCommand, ClientEnvelope, ServerEnvelope, ServerEvent, FABUSHI_MESSAGING_PROTOCOL_VERSION,
 };
-use crate::search::{SearchIndex, SearchQuery};
+use crate::search::{
+    recipient_search_authorized, RecipientAuthorizationInput, RecipientSearchRequirements,
+    SearchIndex, SearchQuery, SearchResultKind,
+};
 use crate::settlement::{SettlementError, SettlementVerifier, SignedSettlement};
 use crate::store::{JournalEntry, MessagingSnapshot, MessagingStateStore, StoreError};
 use crate::wallet::{LedgerEntry, WalletAccountId};
@@ -888,6 +892,15 @@ impl<S: MessagingStateStore> MessagingService<S> {
             ClientCommand::Search { query } => {
                 Ok(vec![self.search_envelope(&actor_id, query, server_time_ms)])
             }
+            ClientCommand::SearchRecipients {
+                query,
+                requirements,
+            } => Ok(vec![self.recipient_search_envelope(
+                &actor_id,
+                query,
+                requirements,
+                server_time_ms,
+            )]),
             ClientCommand::ListCommunityMembers {
                 conversation_id,
                 cursor,
@@ -910,6 +923,9 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 limit,
                 server_time_ms,
             )?]),
+            ClientCommand::SetPresence { presence } => {
+                self.set_presence_and_release_triggers(&actor_id, presence, server_time_ms)
+            }
             ClientCommand::StartTyping {
                 conversation_id,
                 action,
@@ -971,6 +987,99 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 Ok(responses)
             }
         }
+    }
+
+    fn set_presence_and_release_triggers(
+        &mut self,
+        actor_id: &ActorId,
+        presence: Presence,
+        server_time_ms: i64,
+    ) -> Result<Vec<ServerEnvelope>, MessagingServiceError> {
+        let was_online = self
+            .engine
+            .state()
+            .actors
+            .get(actor_id)
+            .is_some_and(|actor| actor.presence.status == PresenceStatus::Online);
+        let becomes_online = presence.status == PresenceStatus::Online;
+
+        let mut events = self.engine.execute(Command::SetPresence {
+            actor_id: actor_id.clone(),
+            presence,
+        })?;
+
+        if !was_online && becomes_online {
+            let pending = self
+                .engine
+                .state()
+                .pending_presence_sends
+                .values()
+                .filter(|pending| {
+                    matches!(
+                        &pending.trigger,
+                        PresenceSendTrigger::WhenParticipantOnline { actor_id: target }
+                            if target == actor_id
+                    )
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
+            for pending in pending {
+                let queued = self.engine.execute(Command::QueueMessage {
+                    conversation_id: pending.conversation_id.clone(),
+                    local_message_id: pending.local_message_id.clone(),
+                    client_message_id: pending.client_message_id.clone(),
+                    sender_id: pending.sender_id.clone(),
+                    content: pending.content.clone(),
+                    reply_to_message_id: pending.reply_to_message_id.clone(),
+                    thread_root_message_id: pending.thread_root_message_id.clone(),
+                    created_at_ms: server_time_ms,
+                    scheduled_at_ms: None,
+                    silent: pending.silent,
+                    protected_content: pending.protected_content,
+                });
+                let Ok(queued) = queued else {
+                    // Current send policy may have changed while the trigger was pending.
+                    // Keep the durable pending request rather than dropping it or blocking
+                    // the target actor's presence transition.
+                    continue;
+                };
+                events.extend(queued);
+                events.extend(self.engine.execute(Command::AcknowledgeMessage {
+                    conversation_id: pending.conversation_id.clone(),
+                    local_message_id: pending.local_message_id.clone(),
+                    server_message_id: pending.local_message_id.clone(),
+                    accepted_at_ms: server_time_ms,
+                })?);
+                events.extend(self.engine.execute(Command::RemovePresenceTriggeredSend {
+                    client_message_id: pending.client_message_id,
+                })?);
+            }
+        }
+
+        let bot_invocations = events
+            .iter()
+            .filter_map(|event| match event {
+                Event::MessageQueued { message } => Some(message),
+                _ => None,
+            })
+            .flat_map(|message| self.bot_invocations_for_message(message))
+            .collect::<Vec<_>>();
+
+        self.cursor = self.cursor.saturating_add(events.len() as u64);
+        let mut responses = events
+            .into_iter()
+            .filter_map(|event| self.project_event(actor_id, event, server_time_ms))
+            .collect::<Vec<_>>();
+        responses.extend(bot_invocations.into_iter().map(|invocation| ServerEnvelope {
+            protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
+            cursor: Some(self.cursor.to_string()),
+            server_time_ms,
+            event: ServerEvent::BotInvocationRequested { invocation },
+        }));
+        let journal = self.journal_entries(actor_id, &responses);
+        self.persist_with_events(server_time_ms, &journal)?;
+        Ok(responses)
     }
 
     fn search_envelope(
@@ -1221,6 +1330,112 @@ impl<S: MessagingStateStore> MessagingService<S> {
         })
     }
 
+    fn recipient_search_envelope(
+        &self,
+        actor_id: &ActorId,
+        query: SearchQuery,
+        requirements: RecipientSearchRequirements,
+        server_time_ms: i64,
+    ) -> ServerEnvelope {
+        let state = self.engine.state();
+        let eligible_conversations = state
+            .conversations
+            .values()
+            .filter(|conversation| {
+                self.actor_can_see_conversation(actor_id, conversation)
+                    && self.actor_can_send_to_recipient(actor_id, conversation, requirements)
+            })
+            .map(|conversation| conversation.id.clone())
+            .collect::<BTreeSet<_>>();
+        let mut index = SearchIndex::default();
+        for conversation in state
+            .conversations
+            .values()
+            .filter(|conversation| eligible_conversations.contains(&conversation.id))
+            .cloned()
+        {
+            index.index_conversation(conversation);
+        }
+        let results = index
+            .search(&query)
+            .into_iter()
+            .filter(|result| matches!(result.kind, SearchResultKind::Conversation))
+            .collect();
+        ServerEnvelope {
+            protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
+            cursor: Some(self.cursor.to_string()),
+            server_time_ms,
+            event: ServerEvent::SearchResults { query, results },
+        }
+    }
+
+    fn actor_can_send_to_recipient(
+        &self,
+        actor_id: &ActorId,
+        conversation: &Conversation,
+        requirements: RecipientSearchRequirements,
+    ) -> bool {
+        let state = self.engine.state();
+        let sender_is_participant = conversation
+            .participants
+            .iter()
+            .any(|participant| &participant.actor_id == actor_id)
+            || conversation.owner_id.as_ref() == Some(actor_id);
+        let community_member = state
+            .communities
+            .get(&conversation.id)
+            .and_then(|community| community.members.get(actor_id));
+        let restricted = community_member
+            .filter(|member| matches!(member.status, MemberStatus::Restricted));
+        let channel_posting_allowed = if matches!(conversation.kind, ConversationKind::Channel) {
+            conversation.owner_id.as_ref() == Some(actor_id)
+                || conversation.participants.iter().any(|participant| {
+                    &participant.actor_id == actor_id
+                        && matches!(
+                            participant.role,
+                            ParticipantRole::Owner | ParticipantRole::Admin
+                        )
+                })
+                || community_member.is_some_and(|member| {
+                    matches!(member.status, MemberStatus::Administrator)
+                        && member.admin_rights.post_messages
+                })
+        } else {
+            true
+        };
+
+        recipient_search_authorized(
+            RecipientAuthorizationInput {
+                conversation_kind: conversation.kind,
+                sender_is_participant,
+                can_send_messages: conversation.permissions.can_send_messages,
+                can_send_media: conversation.permissions.can_send_media,
+                can_send_polls: conversation.permissions.can_send_polls,
+                // Conversation has no canonical send-other permission axis yet; fail closed
+                // whenever a caller requests that capability instead of assuming exposure.
+                can_send_other: false,
+                // Inline/game permissions are not yet represented by the canonical Conversation
+                // owner, so SearchRecipients refuses those typed requests until that owner exists.
+                can_send_inline: false,
+                can_send_games: false,
+                community_forbidden: community_member.is_some_and(|member| {
+                    matches!(member.status, MemberStatus::Left | MemberStatus::Banned)
+                }),
+                community_restrict_messages: restricted
+                    .is_some_and(|member| member.restrictions.send_messages),
+                community_restrict_media: restricted
+                    .is_some_and(|member| member.restrictions.send_media),
+                community_restrict_polls: restricted
+                    .is_some_and(|member| member.restrictions.send_polls),
+                community_restrict_other: false,
+                community_restrict_inline: false,
+                community_restrict_games: false,
+                channel_posting_allowed,
+            },
+            requirements,
+        )
+    }
+
     fn community_members_page(
         &self,
         actor_id: &ActorId,
@@ -1381,6 +1596,81 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     None,
                 ),
             ),
+            ClientCommand::SendWhenParticipantOnline {
+                conversation_id,
+                client_message_id,
+                target_actor_id,
+                content,
+                reply_to_message_id,
+                thread_root_message_id,
+                silent,
+                protected_content,
+            } => {
+                let stable_id = stable_message_id(actor_id, client_message_id);
+                if let Some(existing) = self
+                    .engine
+                    .state()
+                    .messages
+                    .get(conversation_id)
+                    .and_then(|messages| messages.get(&stable_id))
+                {
+                    if &existing.sender_id != actor_id
+                        || &existing.content != content
+                        || &existing.reply_to_message_id != reply_to_message_id
+                        || &existing.thread_root_message_id != thread_root_message_id
+                        || existing.scheduled_at_ms.is_some()
+                        || &existing.silent != silent
+                        || &existing.protected_content != protected_content
+                    {
+                        return Err(MessagingServiceError::IdempotencyConflict(
+                            client_message_id.0.clone(),
+                        ));
+                    }
+                    return Ok(Some(vec![ServerEnvelope {
+                        protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
+                        cursor: Some(self.cursor.to_string()),
+                        server_time_ms,
+                        event: ServerEvent::MessageChanged {
+                            message: existing.clone(),
+                        },
+                    }]));
+                }
+                if let Some(existing) = self
+                    .engine
+                    .state()
+                    .pending_presence_sends
+                    .get(client_message_id)
+                {
+                    let trigger_matches = matches!(
+                        &existing.trigger,
+                        PresenceSendTrigger::WhenParticipantOnline { actor_id: target }
+                            if target == target_actor_id
+                    );
+                    if &existing.sender_id != actor_id
+                        || &existing.conversation_id != conversation_id
+                        || !trigger_matches
+                        || &existing.content != content
+                        || &existing.reply_to_message_id != reply_to_message_id
+                        || &existing.thread_root_message_id != thread_root_message_id
+                        || &existing.silent != silent
+                        || &existing.protected_content != protected_content
+                    {
+                        return Err(MessagingServiceError::IdempotencyConflict(
+                            client_message_id.0.clone(),
+                        ));
+                    }
+                    return Ok(Some(vec![ServerEnvelope {
+                        protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
+                        cursor: Some(self.cursor.to_string()),
+                        server_time_ms,
+                        event: ServerEvent::PresenceTriggeredSendChanged {
+                            client_message_id: client_message_id.clone(),
+                            pending: Some(existing.clone()),
+                        },
+                    }]));
+                }
+                Ok(None)
+            }
             ClientCommand::ForwardMessage {
                 source_conversation_id,
                 message_id,
@@ -1464,14 +1754,6 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 client_message_id.0.clone(),
             ));
         }
-        Ok(Some(vec![ServerEnvelope {
-            protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
-            cursor: Some(self.cursor.to_string()),
-            server_time_ms,
-            event: ServerEvent::MessageChanged {
-                message: existing.clone(),
-            },
-        }]))
     }
 
     fn bot_invocations_for_message(&self, message: &Message) -> Vec<BotInvocation> {
@@ -1591,6 +1873,36 @@ impl<S: MessagingStateStore> MessagingService<S> {
                         .is_some_and(|community| community.is_subscriber(actor_id));
                 if !caller_is_member {
                     return Err(denied("conversation state update requires membership"));
+                }
+            }
+            ClientCommand::MarkConversationChildRead { destination, .. }
+            | ClientCommand::SetConversationChildDraft { destination, .. }
+            | ClientCommand::ReplaceConversationChildWindow { destination, .. }
+            | ClientCommand::SetConversationChildPinned { destination, .. }
+            | ClientCommand::SetConversationChildActive { destination, .. }
+            | ClientCommand::SetConversationChildMarkedUnread { destination, .. }
+            | ClientCommand::SetConversationChildNoPaidMessages { destination, .. }
+            | ClientCommand::DestroyConversationChild { destination, .. } => {
+                let conversation_id = &destination.conversation_id;
+                let existing = self
+                    .engine
+                    .state()
+                    .conversations
+                    .get(conversation_id)
+                    .ok_or_else(|| denied("conversation child target does not exist"))?;
+                let caller_is_member = existing
+                    .participants
+                    .iter()
+                    .any(|participant| &participant.actor_id == actor_id)
+                    || existing.owner_id.as_ref() == Some(actor_id)
+                    || self
+                        .engine
+                        .state()
+                        .communities
+                        .get(conversation_id)
+                        .is_some_and(|community| community.is_subscriber(actor_id));
+                if !caller_is_member {
+                    return Err(denied("conversation child state update requires membership"));
                 }
             }
             ClientCommand::MarkTopicRead {
@@ -2055,6 +2367,8 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 folders: Vec::new(),
                 drafts: Vec::new(),
                 topic_drafts: Vec::new(),
+                pending_presence_sends: Vec::new(),
+                conversation_children: Vec::new(),
                 invoices: Vec::new(),
                 orders: Vec::new(),
                 stories: Vec::new(),
@@ -2150,11 +2464,23 @@ impl<S: MessagingStateStore> MessagingService<S> {
         server_time_ms: i64,
     ) -> u32 {
         let state = self.engine.state();
-        let cursor = state
+        let destination = ConversationDestination::topic(
+            conversation_id.clone(),
+            format!("topic:{topic_id}"),
+        );
+        let typed_cursor = state
+            .conversation_child_states
+            .iter()
+            .find(|child| child.destination == destination && &child.actor_id == actor_id)
+            .and_then(|child| child.inbox_read_till.as_ref())
+            .map(|position| position.message_id.as_str());
+        let legacy_cursor = state
             .topic_read_cursors
             .get(conversation_id)
             .and_then(|by_actor| by_actor.get(actor_id))
-            .and_then(|by_topic| by_topic.get(topic_id));
+            .and_then(|by_topic| by_topic.get(topic_id))
+            .map(|message_id| message_id.0.as_str());
+        let cursor_message_id = typed_cursor.or(legacy_cursor);
         let mut messages = state
             .messages
             .get(conversation_id)
@@ -2166,10 +2492,10 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 .cmp(&right.created_at_ms)
                 .then_with(|| left.id.cmp(&right.id))
         });
-        let read_index = cursor.and_then(|message_id| {
+        let read_index = cursor_message_id.and_then(|message_id| {
             messages
                 .iter()
-                .position(|message| &message.id == message_id)
+                .position(|message| message.id.0 == message_id)
         });
         let unread = messages
             .iter()
@@ -2366,6 +2692,22 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     .filter_map(|conversation_id| state.topic_drafts.get(conversation_id))
                     .filter_map(|by_actor| by_actor.get(actor_id))
                     .flat_map(|by_topic| by_topic.values())
+                    .cloned()
+                    .collect(),
+                pending_presence_sends: state
+                    .pending_presence_sends
+                    .values()
+                    .filter(|pending| &pending.sender_id == actor_id)
+                    .cloned()
+                    .collect(),
+                conversation_children: state
+                    .conversation_child_states
+                    .iter()
+                    .filter(|child| {
+                        &child.actor_id == actor_id
+                            && visible_conversation_ids.contains(&child.destination.conversation_id)
+                    })
+                    .take(max_items)
                     .cloned()
                     .collect(),
                 invoices: state
@@ -2623,6 +2965,32 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     },
                 ]
             }
+            ClientCommand::SendWhenParticipantOnline {
+                conversation_id,
+                client_message_id,
+                target_actor_id,
+                content,
+                reply_to_message_id,
+                thread_root_message_id,
+                silent,
+                protected_content,
+            } => vec![Command::QueuePresenceTriggeredSend {
+                pending: PendingPresenceSend {
+                    local_message_id: stable_message_id(actor_id, &client_message_id),
+                    conversation_id,
+                    client_message_id,
+                    sender_id: actor_id.clone(),
+                    trigger: PresenceSendTrigger::WhenParticipantOnline {
+                        actor_id: target_actor_id,
+                    },
+                    content,
+                    reply_to_message_id,
+                    thread_root_message_id,
+                    silent,
+                    protected_content,
+                    created_at_ms: now_ms,
+                },
+            }],
             ClientCommand::ForwardMessage {
                 source_conversation_id,
                 message_id,
@@ -2720,6 +3088,14 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 actor_id: actor_id.clone(),
                 message_id,
             }],
+            ClientCommand::MarkConversationChildRead {
+                destination,
+                message_id,
+            } => vec![Command::MarkConversationChildRead {
+                destination,
+                actor_id: actor_id.clone(),
+                message_id,
+            }],
             ClientCommand::SetTopicDraft {
                 conversation_id,
                 topic_id,
@@ -2735,6 +3111,69 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     updated_at_ms: now_ms,
                 },
             }],
+            ClientCommand::SetConversationChildDraft {
+                destination,
+                text,
+                reply_to_message_id,
+            } => vec![Command::SetConversationChildDraft {
+                destination,
+                actor_id: actor_id.clone(),
+                text,
+                reply_to_message_id,
+                updated_at_ms: now_ms,
+            }],
+            ClientCommand::ReplaceConversationChildWindow {
+                destination,
+                message_ids,
+                skipped_before,
+                skipped_after,
+                full_count,
+            } => vec![Command::ReplaceConversationChildWindow {
+                destination,
+                actor_id: actor_id.clone(),
+                message_ids,
+                skipped_before,
+                skipped_after,
+                full_count,
+            }],
+            ClientCommand::SetConversationChildPinned {
+                destination,
+                pinned,
+            } => vec![Command::SetConversationChildPinned {
+                destination,
+                actor_id: actor_id.clone(),
+                pinned,
+            }],
+            ClientCommand::SetConversationChildActive {
+                destination,
+                active,
+            } => vec![Command::SetConversationChildActive {
+                destination,
+                actor_id: actor_id.clone(),
+                active,
+            }],
+            ClientCommand::SetConversationChildMarkedUnread {
+                destination,
+                marked_unread,
+            } => vec![Command::SetConversationChildMarkedUnread {
+                destination,
+                actor_id: actor_id.clone(),
+                marked_unread,
+            }],
+            ClientCommand::SetConversationChildNoPaidMessages {
+                destination,
+                no_paid_messages,
+            } => vec![Command::SetConversationChildNoPaidMessages {
+                destination,
+                actor_id: actor_id.clone(),
+                no_paid_messages,
+            }],
+            ClientCommand::DestroyConversationChild { destination } => {
+                vec![Command::DestroyConversationChild {
+                    destination,
+                    actor_id: actor_id.clone(),
+                }]
+            }
             ClientCommand::SetReaction {
                 conversation_id,
                 message_id,
@@ -3037,6 +3476,18 @@ impl<S: MessagingStateStore> MessagingService<S> {
             Event::DraftChanged { draft } => ServerEvent::DraftChanged { draft },
             Event::FolderUpserted { folder } => ServerEvent::FolderChanged { folder },
             Event::FolderDeleted { folder_id } => ServerEvent::FolderDeleted { folder_id },
+            Event::PresenceTriggeredSendQueued { pending } => {
+                ServerEvent::PresenceTriggeredSendChanged {
+                    client_message_id: pending.client_message_id.clone(),
+                    pending: Some(pending),
+                }
+            }
+            Event::PresenceTriggeredSendRemoved { client_message_id } => {
+                ServerEvent::PresenceTriggeredSendChanged {
+                    client_message_id,
+                    pending: None,
+                }
+            }
             Event::MessageQueued { message } => ServerEvent::MessageAdded { message },
             Event::MessageAcknowledged {
                 conversation_id,
@@ -3103,6 +3554,14 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 message_id,
             },
             Event::TopicDraftChanged { draft } => ServerEvent::TopicDraftChanged { draft },
+            Event::ConversationChildReadChanged { .. }
+            | Event::ConversationChildDraftChanged { .. }
+            | Event::ConversationChildWindowReplaced { .. }
+            | Event::ConversationChildPinnedChanged { .. }
+            | Event::ConversationChildActiveChanged { .. }
+            | Event::ConversationChildMarkedUnreadChanged { .. }
+            | Event::ConversationChildNoPaidMessagesChanged { .. }
+            | Event::ConversationChildDestroyed { .. } => return None,
             Event::InvoiceCreated { invoice } => ServerEvent::InvoiceChanged { invoice },
             Event::OrderUpserted { order } => ServerEvent::OrderChanged { order },
             Event::WalletChanged { .. } => return None,
@@ -3250,6 +3709,13 @@ impl<S: MessagingStateStore> MessagingService<S> {
                         })
                 {
                     Self::extend_conversation_audience(&mut audience, conversation);
+                }
+            }
+            ServerEvent::PresenceTriggeredSendChanged { pending, .. } => {
+                if let Some(pending) = pending {
+                    audience.insert(pending.sender_id.clone());
+                    let PresenceSendTrigger::WhenParticipantOnline { actor_id } = &pending.trigger;
+                    audience.insert(actor_id.clone());
                 }
             }
             ServerEvent::PresenceChanged { actor_id, .. } => {

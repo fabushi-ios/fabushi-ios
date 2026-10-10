@@ -198,6 +198,97 @@ fn contacts_and_groups_are_searchable_through_the_messaging_protocol() {
         ServerEvent::SearchResults { results, .. }
             if results.iter().any(|result| result.id == "group:m5-search")
     ));
+
+    let mut blocked = group_conversation("group:m5-search-blocked");
+    blocked.title = "Dharma Blocked Group".into();
+    blocked.permissions.can_send_messages = false;
+    service
+        .handle(
+            ClientEnvelope::new(
+                context("human:owner", "group-blocked"),
+                ClientCommand::CreateConversation {
+                    conversation: blocked,
+                },
+            ),
+            5,
+        )
+        .unwrap();
+
+    let mut media_blocked = group_conversation("group:m5-search-media-blocked");
+    media_blocked.title = "Dharma Media Blocked".into();
+    media_blocked.permissions.can_send_media = false;
+    service
+        .handle(
+            ClientEnvelope::new(
+                context("human:owner", "group-media-blocked"),
+                ClientCommand::CreateConversation {
+                    conversation: media_blocked,
+                },
+            ),
+            6,
+        )
+        .unwrap();
+
+    let recipients = service
+        .handle(
+            ClientEnvelope::new(
+                context("human:owner", "search-recipients"),
+                ClientCommand::SearchRecipients {
+                    query: SearchQuery {
+                        text: "dharma".into(),
+                        scope: SearchScope::Global,
+                        conversation_id: None,
+                        sender_id: None,
+                        from_ms: None,
+                        to_ms: None,
+                        limit: 10,
+                    },
+                    requirements: RecipientSearchRequirements::default(),
+                },
+            ),
+            7,
+        )
+        .unwrap();
+    assert!(matches!(
+        &recipients[0].event,
+        ServerEvent::SearchResults { results, .. }
+            if results.iter().any(|result| result.id == "group:m5-search")
+                && results.iter().any(|result| result.id == "group:m5-search-media-blocked")
+                && results.iter().all(|result| result.id != "group:m5-search-blocked")
+                && results.iter().all(|result| matches!(result.kind, SearchResultKind::Conversation))
+    ));
+
+    let media_recipients = service
+        .handle(
+            ClientEnvelope::new(
+                context("human:owner", "search-media-recipients"),
+                ClientCommand::SearchRecipients {
+                    query: SearchQuery {
+                        text: "dharma".into(),
+                        scope: SearchScope::Global,
+                        conversation_id: None,
+                        sender_id: None,
+                        from_ms: None,
+                        to_ms: None,
+                        limit: 10,
+                    },
+                    requirements: RecipientSearchRequirements {
+                        require_media: true,
+                        require_polls: false,
+                        ..RecipientSearchRequirements::default()
+                    },
+                },
+            ),
+            8,
+        )
+        .unwrap();
+    assert!(matches!(
+        &media_recipients[0].event,
+        ServerEvent::SearchResults { results, .. }
+            if results.iter().any(|result| result.id == "group:m5-search")
+                && results.iter().all(|result| result.id != "group:m5-search-blocked")
+                && results.iter().all(|result| result.id != "group:m5-search-media-blocked")
+    ));
 }
 
 #[test]

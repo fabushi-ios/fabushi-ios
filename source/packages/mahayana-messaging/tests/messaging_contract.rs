@@ -222,6 +222,41 @@ fn wire_protocol_is_fabushi_owned_and_versioned() {
 }
 
 #[test]
+fn formatted_text_prefix_shifts_entities_by_utf16_units_atomically() {
+    let mut text = FormattedText {
+        text: "善友 bold".into(),
+        entities: vec![TextEntity {
+            offset_utf16: 3,
+            length_utf16: 4,
+            kind: TextEntityKind::Bold,
+        }],
+    };
+    let prefix = "🔗 https://fabushi.example\n";
+    let shift = u32::try_from(prefix.encode_utf16().count()).unwrap();
+
+    text.prepend_plain_text(prefix).unwrap();
+
+    assert_eq!(text.text, format!("{prefix}善友 bold"));
+    assert_eq!(text.entities[0].offset_utf16, 3 + shift);
+    assert_eq!(text.entities[0].length_utf16, 4);
+
+    let mut overflow = FormattedText {
+        text: "x".into(),
+        entities: vec![TextEntity {
+            offset_utf16: u32::MAX,
+            length_utf16: 1,
+            kind: TextEntityKind::Bold,
+        }],
+    };
+    let before = overflow.clone();
+    assert_eq!(
+        overflow.prepend_plain_text("x"),
+        Err(TextEntityOffsetOverflow)
+    );
+    assert_eq!(overflow, before);
+}
+
+#[test]
 fn forwarding_preserves_origin_and_rejects_protected_content() {
     let mut engine = MessagingEngine::new();
     engine
@@ -266,10 +301,10 @@ fn forwarding_preserves_origin_and_rejects_protected_content() {
             local_message_id: MessageId::new("forward:1"),
             client_message_id: ClientMessageId("client:forward".into()),
             sender_id: ActorId::new("human:forwarder"),
-            thread_root_message_id: None,
+            thread_root_message_id: Some(MessageId::new("topic:destination")),
             created_at_ms: 3,
-            scheduled_at_ms: None,
-            silent: false,
+            scheduled_at_ms: Some(30),
+            silent: true,
             privacy: ForwardPrivacy::default(),
         })
         .unwrap();
@@ -280,6 +315,136 @@ fn forwarding_preserves_origin_and_rejects_protected_content() {
         Some("chat:source:source:1")
     );
     assert!(matches!(forwarded.content, MessageContent::Text { .. }));
+    assert_eq!(
+        forwarded.thread_root_message_id.as_ref(),
+        Some(&MessageId::new("topic:destination"))
+    );
+    assert_eq!(forwarded.scheduled_at_ms, Some(30));
+    assert!(forwarded.silent);
+
+    engine
+        .execute(Command::QueueMessage {
+            conversation_id: ConversationId::new("chat:source"),
+            local_message_id: MessageId::new("source:captioned"),
+            client_message_id: ClientMessageId("client:captioned".into()),
+            sender_id: ActorId::new("human:forwarder"),
+            content: MessageContent::Photo {
+                media: MediaRef {
+                    id: "media:captioned".into(),
+                    file_name: Some("photo.jpg".into()),
+                    mime_type: Some("image/jpeg".into()),
+                    size_bytes: Some(1),
+                    width: Some(1),
+                    height: Some(1),
+                    duration_ms: None,
+                    thumbnail_id: None,
+                    local_path: None,
+                    remote_url: None,
+                    content_hash: None,
+                },
+                caption: FormattedText::plain("private caption"),
+                spoiler: false,
+            },
+            reply_to_message_id: None,
+            thread_root_message_id: None,
+            created_at_ms: 3,
+            scheduled_at_ms: None,
+            silent: false,
+            protected_content: false,
+        })
+        .unwrap();
+    engine
+        .execute(Command::ForwardMessage {
+            source_conversation_id: ConversationId::new("chat:source"),
+            message_id: MessageId::new("source:captioned"),
+            destination_conversation_id: ConversationId::new("chat:destination"),
+            local_message_id: MessageId::new("forward:privacy"),
+            client_message_id: ClientMessageId("client:forward-privacy".into()),
+            sender_id: ActorId::new("human:forwarder"),
+            thread_root_message_id: None,
+            created_at_ms: 4,
+            scheduled_at_ms: None,
+            silent: false,
+            privacy: ForwardPrivacy {
+                drop_sender_names: false,
+                drop_captions: true,
+            },
+        })
+        .unwrap();
+    let private_forward = &engine.state().messages[&ConversationId::new("chat:destination")]
+        [&MessageId::new("forward:privacy")];
+    assert_eq!(private_forward.forward_origin, None);
+    match &private_forward.content {
+        MessageContent::Photo { caption, .. } => {
+            assert!(caption.text.is_empty());
+            assert!(caption.entities.is_empty());
+        }
+        other => panic!("expected photo, got {other:?}"),
+    }
+
+    let mut blocked_destination = Conversation::direct(
+        "chat:blocked-forward",
+        "Blocked forward",
+        vec![participant("human:forwarder", ParticipantRole::Owner)],
+        3,
+    );
+    blocked_destination.permissions.can_send_messages = false;
+    engine
+        .execute(Command::UpsertConversation {
+            conversation: blocked_destination,
+        })
+        .unwrap();
+    let blocked_error = engine
+        .execute(Command::ForwardMessage {
+            source_conversation_id: ConversationId::new("chat:source"),
+            message_id: MessageId::new("source:1"),
+            destination_conversation_id: ConversationId::new("chat:blocked-forward"),
+            local_message_id: MessageId::new("forward:blocked"),
+            client_message_id: ClientMessageId("client:forward-blocked".into()),
+            sender_id: ActorId::new("human:forwarder"),
+            thread_root_message_id: None,
+            created_at_ms: 3,
+            scheduled_at_ms: None,
+            silent: false,
+            privacy: ForwardPrivacy::default(),
+        })
+        .unwrap_err();
+    assert_eq!(
+        blocked_error,
+        EngineError::MessageSendPermissionDenied(ConversationId::new("chat:blocked-forward"))
+    );
+
+    let mut channel_destination = Conversation::direct(
+        "channel:read-only-forward",
+        "Read-only channel",
+        vec![participant("human:forwarder", ParticipantRole::Member)],
+        3,
+    );
+    channel_destination.kind = ConversationKind::Channel;
+    engine
+        .execute(Command::UpsertConversation {
+            conversation: channel_destination,
+        })
+        .unwrap();
+    let channel_error = engine
+        .execute(Command::ForwardMessage {
+            source_conversation_id: ConversationId::new("chat:source"),
+            message_id: MessageId::new("source:1"),
+            destination_conversation_id: ConversationId::new("channel:read-only-forward"),
+            local_message_id: MessageId::new("forward:channel-blocked"),
+            client_message_id: ClientMessageId("client:forward-channel-blocked".into()),
+            sender_id: ActorId::new("human:forwarder"),
+            thread_root_message_id: None,
+            created_at_ms: 3,
+            scheduled_at_ms: None,
+            silent: false,
+            privacy: ForwardPrivacy::default(),
+        })
+        .unwrap_err();
+    assert_eq!(
+        channel_error,
+        EngineError::CommunitySendRestricted(ConversationId::new("channel:read-only-forward"))
+    );
 
     engine
         .execute(Command::QueueMessage {

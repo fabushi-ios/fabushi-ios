@@ -5,17 +5,22 @@ use crate::community::{
     CommunityAuditEntry, CommunityMember, CommunityState, ForumTopicState, InviteLink, JoinRequest,
 };
 use crate::conversation::{
-    Conversation, ConversationDraft, ConversationFolder, ConversationId, NotificationSettings,
-    TopicDraft,
+    Conversation, ConversationDestination, ConversationDraft, ConversationFolder, ConversationId,
+    NotificationSettings, TopicDraft,
 };
 use crate::message::{
-    ClientMessageId, ForwardPrivacy, Message, MessageContent, MessageId, ReactionSummary,
+    ClientMessageId, ForwardPrivacy, Message, MessageContent, MessageId, PendingPresenceSend,
+    ReactionSummary,
+};
+use crate::message::{
+    ClientMessageId, ForwardPrivacy, Message, MessageContent, MessageId, PendingPresenceSend,
+    ReactionSummary,
 };
 use crate::miniapp::{
     MiniAppGrant, MiniAppManifest, MiniAppRequest, MiniAppResponse, MiniAppSession,
 };
 use crate::payment::{CustomerInfo, Invoice, PaymentOrder};
-use crate::search::{SearchQuery, SearchResult};
+use crate::search::{RecipientSearchRequirements, SearchQuery, SearchResult};
 use crate::story::{Story, StoryId};
 use crate::wallet::{LedgerEntry, WalletAccount};
 use serde::{Deserialize, Serialize};
@@ -63,6 +68,11 @@ pub enum ClientCommand {
     },
     Search {
         query: SearchQuery,
+    },
+    SearchRecipients {
+        query: SearchQuery,
+        #[serde(default)]
+        requirements: RecipientSearchRequirements,
     },
     UpsertProfile {
         actor: Actor,
@@ -132,6 +142,16 @@ pub enum ClientCommand {
         query: String,
         limit: u32,
     },
+    SendWhenParticipantOnline {
+        conversation_id: ConversationId,
+        client_message_id: ClientMessageId,
+        target_actor_id: ActorId,
+        content: MessageContent,
+        reply_to_message_id: Option<MessageId>,
+        thread_root_message_id: Option<MessageId>,
+        silent: bool,
+        protected_content: bool,
+    },
     ForwardMessage {
         source_conversation_id: ConversationId,
         message_id: MessageId,
@@ -179,11 +199,46 @@ pub enum ClientCommand {
         topic_id: String,
         message_id: MessageId,
     },
+    MarkConversationChildRead {
+        destination: ConversationDestination,
+        message_id: MessageId,
+    },
     SetTopicDraft {
         conversation_id: ConversationId,
         topic_id: String,
         text: String,
         reply_to_message_id: Option<MessageId>,
+    },
+    SetConversationChildDraft {
+        destination: ConversationDestination,
+        text: String,
+        reply_to_message_id: Option<MessageId>,
+    },
+    ReplaceConversationChildWindow {
+        destination: ConversationDestination,
+        message_ids: Vec<MessageId>,
+        skipped_before: Option<u32>,
+        skipped_after: Option<u32>,
+        full_count: Option<u32>,
+    },
+    SetConversationChildPinned {
+        destination: ConversationDestination,
+        pinned: bool,
+    },
+    SetConversationChildActive {
+        destination: ConversationDestination,
+        active: bool,
+    },
+    SetConversationChildMarkedUnread {
+        destination: ConversationDestination,
+        marked_unread: bool,
+    },
+    SetConversationChildNoPaidMessages {
+        destination: ConversationDestination,
+        no_paid_messages: bool,
+    },
+    DestroyConversationChild {
+        destination: ConversationDestination,
     },
     SetReaction {
         conversation_id: ConversationId,
@@ -338,6 +393,10 @@ pub enum ServerEvent {
         drafts: Vec<ConversationDraft>,
         #[serde(default)]
         topic_drafts: Vec<TopicDraft>,
+        #[serde(default)]
+        pending_presence_sends: Vec<PendingPresenceSend>,
+        #[serde(default)]
+        conversation_children: Vec<crate::conversation::ConversationChildRuntimeState>,
         invoices: Vec<Invoice>,
         orders: Vec<PaymentOrder>,
         stories: Vec<Story>,
@@ -362,6 +421,10 @@ pub enum ServerEvent {
     PresenceChanged {
         actor_id: ActorId,
         presence: Presence,
+    },
+    PresenceTriggeredSendChanged {
+        client_message_id: ClientMessageId,
+        pending: Option<PendingPresenceSend>,
     },
     ConversationChanged {
         conversation: Conversation,

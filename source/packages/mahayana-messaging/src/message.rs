@@ -105,12 +105,41 @@ pub struct FormattedText {
     pub entities: Vec<TextEntity>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextEntityOffsetOverflow;
+
 impl FormattedText {
     pub fn plain(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
             entities: Vec::new(),
         }
+    }
+
+    /// Prepends unformatted text while preserving entity positions expressed in UTF-16
+    /// code units. This matches the canonical text-entity coordinate system used by
+    /// clients and avoids treating UTF-8 byte length as a formatting offset.
+    ///
+    /// The operation is atomic: if the prefix or any shifted entity offset would
+    /// overflow u32, neither the text nor its entities are changed.
+    pub fn prepend_plain_text(
+        &mut self,
+        prefix: &str,
+    ) -> Result<(), TextEntityOffsetOverflow> {
+        let shift = u32::try_from(prefix.encode_utf16().count())
+            .map_err(|_| TextEntityOffsetOverflow)?;
+        if self
+            .entities
+            .iter()
+            .any(|entity| entity.offset_utf16.checked_add(shift).is_none())
+        {
+            return Err(TextEntityOffsetOverflow);
+        }
+        for entity in &mut self.entities {
+            entity.offset_utf16 += shift;
+        }
+        self.text.insert_str(0, prefix);
+        Ok(())
     }
 }
 
@@ -328,6 +357,28 @@ pub struct ReactionSummary {
     pub count: u32,
     pub chosen_by_me: bool,
     pub recent_actor_ids: Vec<ActorId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PresenceSendTrigger {
+    WhenParticipantOnline { actor_id: ActorId },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingPresenceSend {
+    pub local_message_id: MessageId,
+    pub conversation_id: ConversationId,
+    pub client_message_id: ClientMessageId,
+    pub sender_id: ActorId,
+    pub trigger: PresenceSendTrigger,
+    pub content: MessageContent,
+    pub reply_to_message_id: Option<MessageId>,
+    pub thread_root_message_id: Option<MessageId>,
+    pub silent: bool,
+    pub protected_content: bool,
+    pub created_at_ms: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

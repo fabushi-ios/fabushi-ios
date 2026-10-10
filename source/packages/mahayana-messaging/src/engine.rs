@@ -1,17 +1,17 @@
-use crate::actor::{Actor, ActorId, ActorKind, Participant, ParticipantRole, Presence};
+use crate::actor::{Actor, ActorId, ActorKind, Participant, ParticipantRole, Presence, PresenceStatus};
 use crate::bot::{BotExecution, BotInvocation, BotProfile, BotRegistry};
 use crate::community::{
     AdminRights, CommunityAuditAction, CommunityAuditEntry, CommunityError, CommunityMember,
     CommunityState, ForumTopicState, InviteLink, JoinRequest, MemberStatus,
 };
 use crate::conversation::{
-    Conversation, ConversationDraft, ConversationFolder, ConversationId, ConversationKind,
-    NotificationSettings, TopicDraft,
+    Conversation, ConversationChildIdentity, ConversationChildRuntimeState,
+    ConversationDestination, ConversationDraft, ConversationFolder, ConversationId,
+    ConversationKind, ConversationMessagePosition, NotificationSettings, TopicDraft,
 };
 use crate::message::{
     ClientMessageId, DeliveryState, ForwardPrivacy, MediaGroupMetadata, Message, MessageContent,
-    MessageId,
-    ReactionSummary,
+    MessageId, PendingPresenceSend, PresenceSendTrigger, ReactionSummary,
 };
 use crate::miniapp::{
     MiniAppGrant, MiniAppManifest, MiniAppPermission, MiniAppRequest, MiniAppResponse,
@@ -93,6 +93,12 @@ pub enum Command {
         silent: bool,
         protected_content: bool,
     },
+    QueuePresenceTriggeredSend {
+        pending: PendingPresenceSend,
+    },
+    RemovePresenceTriggeredSend {
+        client_message_id: ClientMessageId,
+    },
     ForwardMessage {
         source_conversation_id: ConversationId,
         message_id: MessageId,
@@ -138,8 +144,52 @@ pub enum Command {
         actor_id: ActorId,
         message_id: MessageId,
     },
+    MarkConversationChildRead {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        message_id: MessageId,
+    },
     SetTopicDraft {
         draft: TopicDraft,
+    },
+    SetConversationChildDraft {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        text: String,
+        reply_to_message_id: Option<MessageId>,
+        updated_at_ms: i64,
+    },
+    ReplaceConversationChildWindow {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        message_ids: Vec<MessageId>,
+        skipped_before: Option<u32>,
+        skipped_after: Option<u32>,
+        full_count: Option<u32>,
+    },
+    SetConversationChildPinned {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        pinned: bool,
+    },
+    SetConversationChildActive {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        active: bool,
+    },
+    SetConversationChildMarkedUnread {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        marked_unread: bool,
+    },
+    SetConversationChildNoPaidMessages {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        no_paid_messages: bool,
+    },
+    DestroyConversationChild {
+        destination: ConversationDestination,
+        actor_id: ActorId,
     },
     SetReaction {
         conversation_id: ConversationId,
@@ -351,6 +401,12 @@ pub enum Event {
     FolderDeleted {
         folder_id: String,
     },
+    PresenceTriggeredSendQueued {
+        pending: PendingPresenceSend,
+    },
+    PresenceTriggeredSendRemoved {
+        client_message_id: ClientMessageId,
+    },
     MessageQueued {
         message: Message,
     },
@@ -386,8 +442,52 @@ pub enum Event {
         actor_id: ActorId,
         message_id: MessageId,
     },
+    ConversationChildReadChanged {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        message_id: MessageId,
+    },
     TopicDraftChanged {
         draft: TopicDraft,
+    },
+    ConversationChildDraftChanged {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        text: String,
+        reply_to_message_id: Option<String>,
+        updated_at_ms: i64,
+    },
+    ConversationChildWindowReplaced {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        message_ids: Vec<String>,
+        skipped_before: Option<u32>,
+        skipped_after: Option<u32>,
+        full_count: Option<u32>,
+    },
+    ConversationChildPinnedChanged {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        pinned: bool,
+    },
+    ConversationChildActiveChanged {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        active: bool,
+    },
+    ConversationChildMarkedUnreadChanged {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        marked_unread: bool,
+    },
+    ConversationChildNoPaidMessagesChanged {
+        destination: ConversationDestination,
+        actor_id: ActorId,
+        no_paid_messages: bool,
+    },
+    ConversationChildDestroyed {
+        destination: ConversationDestination,
+        actor_id: ActorId,
     },
     ReactionUpdated {
         conversation_id: ConversationId,
@@ -470,6 +570,11 @@ pub struct MessagingState {
     pub marked_unread_by_actor: BTreeMap<ConversationId, BTreeSet<ActorId>>,
     pub drafts: BTreeMap<ConversationId, BTreeMap<ActorId, ConversationDraft>>,
     pub topic_drafts: BTreeMap<ConversationId, BTreeMap<ActorId, BTreeMap<String, TopicDraft>>>,
+    /// Canonical source-neutral child lifecycle state. Topic-only legacy maps above
+    /// remain protocol-compatibility projections until their load-time migration
+    /// is completed; new saved-sublist/community child state belongs here.
+    pub conversation_child_states: Vec<ConversationChildRuntimeState>,
+    pub pending_presence_sends: BTreeMap<ClientMessageId, PendingPresenceSend>,
     pub invoices: BTreeMap<String, Invoice>,
     pub orders: BTreeMap<String, PaymentOrder>,
     pub wallet: WalletLedger,
@@ -479,6 +584,23 @@ pub struct MessagingState {
     pub mini_apps: BTreeMap<String, MiniAppManifest>,
     pub mini_app_grants: BTreeMap<(String, ActorId), MiniAppGrant>,
     pub mini_app_sessions: BTreeMap<String, MiniAppSession>,
+}
+
+impl MessagingState {
+    fn child_state_mut(
+        &mut self,
+        destination: ConversationDestination,
+        actor_id: ActorId,
+    ) -> Option<&mut ConversationChildRuntimeState> {
+        if let Some(index) = self.conversation_child_states.iter().position(|state| {
+            state.destination == destination && state.actor_id == actor_id
+        }) {
+            return self.conversation_child_states.get_mut(index);
+        }
+        let state = ConversationChildRuntimeState::new(destination, actor_id)?;
+        self.conversation_child_states.push(state);
+        self.conversation_child_states.last_mut()
+    }
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -498,6 +620,12 @@ pub enum EngineError {
         conversation_id: ConversationId,
         message_id: MessageId,
     },
+    #[error("presence-triggered send is invalid for this target or conversation")]
+    InvalidPresenceTriggeredSend,
+    #[error("presence-trigger target is already online")]
+    PresenceTriggerAlreadySatisfied,
+    #[error("client message id {0:?} conflicts with an existing presence-triggered send")]
+    DuplicatePresenceTriggeredSend(ClientMessageId),
     #[error("message {message_id:?} already exists in conversation {conversation_id:?}")]
     DuplicateMessage {
         conversation_id: ConversationId,
@@ -570,6 +698,10 @@ pub enum EngineError {
     },
     #[error("message does not belong to forum topic {topic_id:?}")]
     TopicMessageMismatch { topic_id: String },
+    #[error("conversation child destination is invalid")]
+    InvalidConversationChildDestination,
+    #[error("message does not belong to the selected conversation child")]
+    ConversationChildMessageMismatch,
     #[error(transparent)]
     Community(#[from] CommunityError),
     #[error("bot operation permission denied")]
@@ -660,6 +792,15 @@ fn community_has_access(community: &CommunityState, actor_id: &ActorId) -> bool 
         .get(actor_id)
         .is_some_and(|member| !matches!(member.status, MemberStatus::Left | MemberStatus::Banned))
         || community.is_subscriber(actor_id)
+}
+
+fn destination_message_conversation_id(
+    destination: &ConversationDestination,
+) -> &ConversationId {
+    match destination.child.as_ref() {
+        Some(ConversationChildIdentity::Conversation { conversation_id }) => conversation_id,
+        _ => &destination.conversation_id,
+    }
 }
 
 fn append_community_audit(
@@ -961,6 +1102,73 @@ impl MessagingEngine {
             }
             Command::UpsertFolder { folder } => Ok(vec![Event::FolderUpserted { folder }]),
             Command::DeleteFolder { folder_id } => Ok(vec![Event::FolderDeleted { folder_id }]),
+            Command::QueuePresenceTriggeredSend { pending } => {
+                self.require_actor(&pending.sender_id)?;
+                let target_actor_id = match &pending.trigger {
+                    PresenceSendTrigger::WhenParticipantOnline { actor_id } => actor_id,
+                };
+                let target = self.require_actor(target_actor_id)?;
+                if target.kind != ActorKind::Human || &pending.sender_id == target_actor_id {
+                    return Err(EngineError::InvalidPresenceTriggeredSend);
+                }
+                if target.presence.status == PresenceStatus::Online {
+                    return Err(EngineError::PresenceTriggerAlreadySatisfied);
+                }
+                let conversation = self.require_conversation(&pending.conversation_id)?;
+                if !matches!(conversation.kind, ConversationKind::Direct) {
+                    return Err(EngineError::InvalidPresenceTriggeredSend);
+                }
+                let target_is_participant = conversation
+                    .participants
+                    .iter()
+                    .any(|participant| &participant.actor_id == target_actor_id)
+                    || conversation.owner_id.as_ref() == Some(target_actor_id);
+                if !target_is_participant {
+                    return Err(EngineError::InvalidPresenceTriggeredSend);
+                }
+                if let Some(existing) = self
+                    .state
+                    .pending_presence_sends
+                    .get(&pending.client_message_id)
+                {
+                    if existing == &pending {
+                        return Ok(Vec::new());
+                    }
+                    return Err(EngineError::DuplicatePresenceTriggeredSend(
+                        pending.client_message_id.clone(),
+                    ));
+                }
+                // Reuse the canonical send decision for all current conversation,
+                // media/poll, membership, channel/community, topic and slow-mode gates.
+                let validation = self.decide(Command::QueueMessage {
+                    conversation_id: pending.conversation_id.clone(),
+                    local_message_id: pending.local_message_id.clone(),
+                    client_message_id: pending.client_message_id.clone(),
+                    sender_id: pending.sender_id.clone(),
+                    content: pending.content.clone(),
+                    reply_to_message_id: pending.reply_to_message_id.clone(),
+                    thread_root_message_id: pending.thread_root_message_id.clone(),
+                    created_at_ms: pending.created_at_ms,
+                    scheduled_at_ms: None,
+                    silent: pending.silent,
+                    protected_content: pending.protected_content,
+                })?;
+                if !matches!(validation.as_slice(), [Event::MessageQueued { .. }]) {
+                    return Err(EngineError::InvalidPresenceTriggeredSend);
+                }
+                Ok(vec![Event::PresenceTriggeredSendQueued { pending }])
+            }
+            Command::RemovePresenceTriggeredSend { client_message_id } => {
+                if self
+                    .state
+                    .pending_presence_sends
+                    .contains_key(&client_message_id)
+                {
+                    Ok(vec![Event::PresenceTriggeredSendRemoved { client_message_id }])
+                } else {
+                    Ok(Vec::new())
+                }
+            }
             Command::QueueMessage {
                 conversation_id,
                 local_message_id,
@@ -1189,38 +1397,8 @@ impl MessagingEngine {
                 silent,
                 privacy,
             } => {
-                let destination = self.require_conversation(&destination_conversation_id)?.clone();
+                let conversation = self.require_conversation(&destination_conversation_id)?;
                 self.require_actor(&sender_id)?;
-                let sender_is_participant = destination
-                    .participants
-                    .iter()
-                    .any(|participant| participant.actor_id == sender_id)
-                    || destination.owner_id.as_ref() == Some(&sender_id);
-                if !sender_is_participant {
-                    return Err(EngineError::SenderNotParticipant {
-                        conversation_id: destination_conversation_id.clone(),
-                        actor_id: sender_id.clone(),
-                    });
-                }
-                if !destination.permissions.can_send_messages {
-                    return Err(EngineError::MessageSendPermissionDenied(
-                        destination_conversation_id.clone(),
-                    ));
-                }
-                if client_message_id.0.trim().is_empty() || client_message_id.0.len() > 200 {
-                    return Err(EngineError::InvalidClientMessageId);
-                }
-                if self
-                    .state
-                    .messages
-                    .get(&destination_conversation_id)
-                    .is_some_and(|messages| messages.contains_key(&local_message_id))
-                {
-                    return Err(EngineError::DuplicateMessage {
-                        conversation_id: destination_conversation_id,
-                        message_id: local_message_id,
-                    });
-                }
                 let original = self
                     .require_message(&source_conversation_id, &message_id)?
                     .clone();
@@ -1233,15 +1411,35 @@ impl MessagingEngine {
                 if original.protected_content {
                     return Err(EngineError::ProtectedContent);
                 }
+
+                // Forwarding is still a send into the destination conversation. Reuse the
+                // canonical destination policy instead of letting the forward path bypass
+                // membership, media/poll, community, channel, slow-mode, or secret-chat gates.
+                let sender_is_participant = conversation
+                    .participants
+                    .iter()
+                    .any(|participant| participant.actor_id == sender_id)
+                    || conversation.owner_id.as_ref() == Some(&sender_id);
+                if !sender_is_participant {
+                    return Err(EngineError::SenderNotParticipant {
+                        conversation_id: destination_conversation_id.clone(),
+                        actor_id: sender_id.clone(),
+                    });
+                }
+                if !conversation.permissions.can_send_messages {
+                    return Err(EngineError::MessageSendPermissionDenied(
+                        destination_conversation_id.clone(),
+                    ));
+                }
                 if message_content_uses_media(&original.content)
-                    && !destination.permissions.can_send_media
+                    && !conversation.permissions.can_send_media
                 {
                     return Err(EngineError::MediaSendPermissionDenied(
                         destination_conversation_id.clone(),
                     ));
                 }
                 if matches!(&original.content, MessageContent::Poll { .. })
-                    && !destination.permissions.can_send_polls
+                    && !conversation.permissions.can_send_polls
                 {
                     return Err(EngineError::PollSendPermissionDenied(
                         destination_conversation_id.clone(),
@@ -1278,24 +1476,26 @@ impl MessagingEngine {
                         ));
                     }
                 }
-                if matches!(destination.kind, ConversationKind::Channel) {
+                if matches!(conversation.kind, ConversationKind::Channel) {
                     let can_post =
-                        destination.owner_id.as_ref() == Some(&sender_id)
-                            || destination.participants.iter().any(|participant| {
+                        conversation.owner_id.as_ref() == Some(&sender_id)
+                            || conversation.participants.iter().any(|participant| {
                                 participant.actor_id == sender_id
                                     && matches!(
                                         participant.role,
                                         ParticipantRole::Owner | ParticipantRole::Admin
                                     )
                             })
-                            || self.state.communities.get(&destination_conversation_id).is_some_and(
-                                |community| {
+                            || self
+                                .state
+                                .communities
+                                .get(&destination_conversation_id)
+                                .is_some_and(|community| {
                                     community.members.get(&sender_id).is_some_and(|member| {
                                         matches!(member.status, MemberStatus::Administrator)
                                             && member.admin_rights.post_messages
                                     })
-                                },
-                            );
+                                });
                     if !can_post {
                         return Err(EngineError::CommunitySendRestricted(
                             destination_conversation_id.clone(),
@@ -1303,6 +1503,22 @@ impl MessagingEngine {
                     }
                 }
                 if let Some(community) = self.state.communities.get(&destination_conversation_id) {
+                    if let Some(thread_root) = &thread_root_message_id {
+                        if let Some(topic_id) = topic_id_from_root(thread_root) {
+                            let topic = community.topics.get(topic_id).ok_or_else(|| {
+                                EngineError::ForumTopicNotFound {
+                                    conversation_id: destination_conversation_id.clone(),
+                                    topic_id: topic_id.to_string(),
+                                }
+                            })?;
+                            if topic.closed || topic.hidden {
+                                return Err(EngineError::ForumTopicClosed {
+                                    conversation_id: destination_conversation_id.clone(),
+                                    topic_id: topic_id.to_string(),
+                                });
+                            }
+                        }
+                    }
                     if let Some(seconds) = community.slow_mode_seconds {
                         let bypass = community.can_moderate(&sender_id);
                         if !bypass {
@@ -1334,25 +1550,7 @@ impl MessagingEngine {
                         }
                     }
                 }
-                if let Some(community) = self.state.communities.get(&destination_conversation_id) {
-                    if let Some(thread_root) = &thread_root_message_id {
-                        if let Some(topic_id) = topic_id_from_root(thread_root) {
-                            let topic = community.topics.get(topic_id).ok_or_else(|| {
-                                EngineError::ForumTopicNotFound {
-                                    conversation_id: destination_conversation_id.clone(),
-                                    topic_id: topic_id.to_string(),
-                                }
-                            })?;
-                            if topic.closed || topic.hidden {
-                                return Err(EngineError::ForumTopicClosed {
-                                    conversation_id: destination_conversation_id.clone(),
-                                    topic_id: topic_id.to_string(),
-                                });
-                            }
-                        }
-                    }
-                }
-                let is_secret_conversation = matches!(destination.kind, ConversationKind::Secret);
+                let is_secret_conversation = matches!(conversation.kind, ConversationKind::Secret);
                 let is_secret_content = matches!(&original.content, MessageContent::Secret { .. });
                 let is_service_content = matches!(&original.content, MessageContent::Service { .. });
                 if is_secret_conversation && !is_secret_content && !is_service_content {
@@ -1360,6 +1558,20 @@ impl MessagingEngine {
                 }
                 if !is_secret_conversation && is_secret_content {
                     return Err(EngineError::SecretContentOutsideSecretConversation);
+                }
+                if client_message_id.0.trim().is_empty() || client_message_id.0.len() > 200 {
+                    return Err(EngineError::InvalidClientMessageId);
+                }
+                if self
+                    .state
+                    .messages
+                    .get(&destination_conversation_id)
+                    .is_some_and(|messages| messages.contains_key(&local_message_id))
+                {
+                    return Err(EngineError::DuplicateMessage {
+                        conversation_id: destination_conversation_id,
+                        message_id: local_message_id,
+                    });
                 }
                 let privacy = privacy.normalized();
                 let forward_origin = if privacy.drop_sender_names {
@@ -1550,6 +1762,108 @@ impl MessagingEngine {
                     message_id,
                 }])
             }
+            Command::MarkConversationChildRead {
+                destination,
+                actor_id,
+                message_id,
+            } => {
+                if !destination.is_valid() {
+                    return Err(EngineError::InvalidConversationChildDestination);
+                }
+                self.require_actor(&actor_id)?;
+                let conversation_id = destination.conversation_id.clone();
+                let conversation = self.require_conversation(&conversation_id)?;
+                let community = self.state.communities.get(&conversation_id);
+                let has_access = community
+                    .map(|community| {
+                        community_has_access(community, &actor_id)
+                            || conversation.owner_id.as_ref() == Some(&actor_id)
+                    })
+                    .unwrap_or_else(|| {
+                        conversation.owner_id.as_ref() == Some(&actor_id)
+                            || conversation
+                                .participants
+                                .iter()
+                                .any(|participant| participant.actor_id == actor_id)
+                    });
+                if !has_access {
+                    return Err(EngineError::CommunityAccessDenied {
+                        conversation_id: conversation_id.clone(),
+                        actor_id: actor_id.clone(),
+                    });
+                }
+                match destination.child.as_ref() {
+                    Some(ConversationChildIdentity::Topic { root_message_id }) => {
+                        let topic_exists = community.is_some_and(|community| {
+                            community.topics.contains_key(root_message_id)
+                                || topic_id_from_root(&MessageId(root_message_id.clone()))
+                                    .is_some_and(|topic_id| community.topics.contains_key(topic_id))
+                        }) || self
+                            .state
+                            .messages
+                            .get(&conversation_id)
+                            .is_some_and(|messages| messages.contains_key(&MessageId(root_message_id.clone())));
+                        if !topic_exists {
+                            return Err(EngineError::InvalidConversationChildDestination);
+                        }
+                    }
+                    Some(ConversationChildIdentity::SavedSublist { participant_id }) => {
+                        // Telegram SavedSublist is owned either by self Saved Messages or by
+                        // an explicit monoforum parent chat. Fabushi does not yet model the
+                        // monoforum parent relation, so accept only the canonical self
+                        // SavedMessages parent and fail closed for all other parent kinds.
+                        let self_saved_messages = matches!(
+                            conversation.kind,
+                            ConversationKind::SavedMessages
+                        ) && conversation.owner_id.as_ref() == Some(&actor_id);
+                        let participant_exists = self.state.actors.contains_key(participant_id);
+                        if !self_saved_messages || !participant_exists {
+                            return Err(EngineError::InvalidConversationChildDestination);
+                        }
+                    }
+                    Some(ConversationChildIdentity::Conversation {
+                        conversation_id: child_conversation_id,
+                    }) => {
+                        let child = self.require_conversation(child_conversation_id)?;
+                        let child_access = child.owner_id.as_ref() == Some(&actor_id)
+                            || child
+                                .participants
+                                .iter()
+                                .any(|participant| participant.actor_id == actor_id)
+                            || self
+                                .state
+                                .communities
+                                .get(child_conversation_id)
+                                .is_some_and(|community| community_has_access(community, &actor_id));
+                        if !child_access {
+                            return Err(EngineError::CommunityAccessDenied {
+                                conversation_id: child_conversation_id.clone(),
+                                actor_id: actor_id.clone(),
+                            });
+                        }
+                    }
+                    None => {}
+                }
+                let message_conversation_id = destination_message_conversation_id(&destination);
+                let message = self.require_message(message_conversation_id, &message_id)?;
+                if let Some(ConversationChildIdentity::Topic { root_message_id }) =
+                    &destination.child
+                {
+                    let belongs = message
+                        .thread_root_message_id
+                        .as_ref()
+                        .is_some_and(|root| root.0 == *root_message_id)
+                        || message.id.0 == *root_message_id;
+                    if !belongs {
+                        return Err(EngineError::ConversationChildMessageMismatch);
+                    }
+                }
+                Ok(vec![Event::ConversationChildReadChanged {
+                    destination,
+                    actor_id,
+                    message_id,
+                }])
+            }
             Command::SetTopicDraft { draft } => {
                 self.require_actor(&draft.actor_id)?;
                 let community = self
@@ -1579,6 +1893,269 @@ impl MessagingEngine {
                     });
                 }
                 Ok(vec![Event::TopicDraftChanged { draft }])
+            }
+            Command::SetConversationChildDraft {
+                destination,
+                actor_id,
+                text,
+                reply_to_message_id,
+                updated_at_ms,
+            } => {
+                if !destination.is_valid() {
+                    return Err(EngineError::InvalidConversationChildDestination);
+                }
+                self.require_actor(&actor_id)?;
+                let conversation_id = destination.conversation_id.clone();
+                let conversation = self.require_conversation(&conversation_id)?;
+                let community = self.state.communities.get(&conversation_id);
+                let has_access = community
+                    .map(|community| {
+                        community_has_access(community, &actor_id)
+                            || conversation.owner_id.as_ref() == Some(&actor_id)
+                    })
+                    .unwrap_or_else(|| {
+                        conversation.owner_id.as_ref() == Some(&actor_id)
+                            || conversation
+                                .participants
+                                .iter()
+                                .any(|participant| participant.actor_id == actor_id)
+                    });
+                if !has_access {
+                    return Err(EngineError::CommunityAccessDenied {
+                        conversation_id: conversation_id.clone(),
+                        actor_id: actor_id.clone(),
+                    });
+                }
+                match destination.child.as_ref() {
+                    Some(ConversationChildIdentity::Topic { root_message_id }) => {
+                        let topic_exists = community.is_some_and(|community| {
+                            community.topics.contains_key(root_message_id)
+                                || topic_id_from_root(&MessageId(root_message_id.clone()))
+                                    .is_some_and(|topic_id| community.topics.contains_key(topic_id))
+                        }) || self
+                            .state
+                            .messages
+                            .get(&conversation_id)
+                            .is_some_and(|messages| messages.contains_key(&MessageId(root_message_id.clone())));
+                        if !topic_exists {
+                            return Err(EngineError::InvalidConversationChildDestination);
+                        }
+                    }
+                    Some(ConversationChildIdentity::SavedSublist { participant_id }) => {
+                        // Telegram SavedSublist is owned either by self Saved Messages or by
+                        // an explicit monoforum parent chat. Fabushi does not yet model the
+                        // monoforum parent relation, so accept only the canonical self
+                        // SavedMessages parent and fail closed for all other parent kinds.
+                        let self_saved_messages = matches!(
+                            conversation.kind,
+                            ConversationKind::SavedMessages
+                        ) && conversation.owner_id.as_ref() == Some(&actor_id);
+                        let participant_exists = self.state.actors.contains_key(participant_id);
+                        if !self_saved_messages || !participant_exists {
+                            return Err(EngineError::InvalidConversationChildDestination);
+                        }
+                    }
+                    Some(ConversationChildIdentity::Conversation {
+                        conversation_id: child_conversation_id,
+                    }) => {
+                        let child = self.require_conversation(child_conversation_id)?;
+                        let child_access = child.owner_id.as_ref() == Some(&actor_id)
+                            || child
+                                .participants
+                                .iter()
+                                .any(|participant| participant.actor_id == actor_id)
+                            || self
+                                .state
+                                .communities
+                                .get(child_conversation_id)
+                                .is_some_and(|community| community_has_access(community, &actor_id));
+                        if !child_access {
+                            return Err(EngineError::CommunityAccessDenied {
+                                conversation_id: child_conversation_id.clone(),
+                                actor_id: actor_id.clone(),
+                            });
+                        }
+                    }
+                    None => {}
+                }
+                if let Some(reply_to_message_id) = &reply_to_message_id {
+                    self.require_message(
+                        destination_message_conversation_id(&destination),
+                        reply_to_message_id,
+                    )?;
+                }
+                Ok(vec![Event::ConversationChildDraftChanged {
+                    destination,
+                    actor_id,
+                    text,
+                    reply_to_message_id: reply_to_message_id.map(|id| id.0),
+                    updated_at_ms,
+                }])
+            }
+            Command::ReplaceConversationChildWindow {
+                destination,
+                actor_id,
+                message_ids,
+                skipped_before,
+                skipped_after,
+                full_count,
+            } => {
+                self.decide(Command::SetConversationChildDraft {
+                    destination: destination.clone(),
+                    actor_id: actor_id.clone(),
+                    text: String::new(),
+                    reply_to_message_id: None,
+                    updated_at_ms: 0,
+                })?;
+                // SavedSublist membership is not derivable from the current canonical
+                // Message shape yet. Never accept arbitrary parent messages into that
+                // child just to populate a page; empty lifecycle snapshots remain valid
+                // until a source-neutral message-to-child relation lands.
+                if matches!(
+                    &destination.child,
+                    Some(ConversationChildIdentity::SavedSublist { .. })
+                ) && !message_ids.is_empty()
+                {
+                    return Err(EngineError::ConversationChildMessageMismatch);
+                }
+                for message_id in &message_ids {
+                    self.decide(Command::MarkConversationChildRead {
+                        destination: destination.clone(),
+                        actor_id: actor_id.clone(),
+                        message_id: message_id.clone(),
+                    })?;
+                }
+                let message_ids = message_ids
+                    .into_iter()
+                    .map(|message_id| message_id.0)
+                    .collect::<Vec<_>>();
+                let mut pagination = crate::conversation::ConversationChildPaginationState::default();
+                if !pagination.replace_window(
+                    message_ids.clone(),
+                    skipped_before,
+                    skipped_after,
+                    full_count,
+                ) {
+                    return Err(EngineError::InvalidConversationChildDestination);
+                }
+                Ok(vec![Event::ConversationChildWindowReplaced {
+                    destination,
+                    actor_id,
+                    message_ids,
+                    skipped_before,
+                    skipped_after,
+                    full_count,
+                }])
+            }
+            Command::SetConversationChildPinned {
+                destination,
+                actor_id,
+                pinned,
+            } => {
+                self.decide(Command::SetConversationChildDraft {
+                    destination: destination.clone(),
+                    actor_id: actor_id.clone(),
+                    text: String::new(),
+                    reply_to_message_id: None,
+                    updated_at_ms: 0,
+                })?;
+                Ok(vec![Event::ConversationChildPinnedChanged {
+                    destination,
+                    actor_id,
+                    pinned,
+                }])
+            }
+            Command::SetConversationChildActive {
+                destination,
+                actor_id,
+                active,
+            } => {
+                self.decide(Command::SetConversationChildDraft {
+                    destination: destination.clone(),
+                    actor_id: actor_id.clone(),
+                    text: String::new(),
+                    reply_to_message_id: None,
+                    updated_at_ms: 0,
+                })?;
+                Ok(vec![Event::ConversationChildActiveChanged {
+                    destination,
+                    actor_id,
+                    active,
+                }])
+            }
+            Command::SetConversationChildMarkedUnread {
+                destination,
+                actor_id,
+                marked_unread,
+            } => {
+                self.decide(Command::SetConversationChildDraft {
+                    destination: destination.clone(),
+                    actor_id: actor_id.clone(),
+                    text: String::new(),
+                    reply_to_message_id: None,
+                    updated_at_ms: 0,
+                })?;
+                let conversation = self.require_conversation(&destination.conversation_id)?;
+                let currently_unread = self
+                    .state
+                    .conversation_child_states
+                    .iter()
+                    .find(|state| state.destination == destination && state.actor_id == actor_id)
+                    .is_some_and(|state| state.marked_unread || state.unread_count.unwrap_or(0) > 0);
+                let context = crate::conversation::ConversationChildUnreadContext {
+                    parent_is_self: matches!(conversation.kind, ConversationKind::SavedMessages)
+                        && conversation.owner_id.as_ref() == Some(&actor_id),
+                    parent_is_community: self.state.communities.contains_key(&destination.conversation_id),
+                    actor_is_monoforum_admin: false,
+                };
+                if !destination.can_toggle_unread(currently_unread, context) {
+                    return Err(EngineError::InvalidConversationChildDestination);
+                }
+                Ok(vec![Event::ConversationChildMarkedUnreadChanged {
+                    destination,
+                    actor_id,
+                    marked_unread,
+                }])
+            }
+            Command::SetConversationChildNoPaidMessages {
+                destination,
+                actor_id,
+                no_paid_messages,
+            } => {
+                self.decide(Command::SetConversationChildDraft {
+                    destination: destination.clone(),
+                    actor_id: actor_id.clone(),
+                    text: String::new(),
+                    reply_to_message_id: None,
+                    updated_at_ms: 0,
+                })?;
+                if !matches!(
+                    &destination.child,
+                    Some(ConversationChildIdentity::SavedSublist { .. })
+                ) {
+                    return Err(EngineError::InvalidConversationChildDestination);
+                }
+                Ok(vec![Event::ConversationChildNoPaidMessagesChanged {
+                    destination,
+                    actor_id,
+                    no_paid_messages,
+                }])
+            }
+            Command::DestroyConversationChild {
+                destination,
+                actor_id,
+            } => {
+                self.decide(Command::SetConversationChildDraft {
+                    destination: destination.clone(),
+                    actor_id: actor_id.clone(),
+                    text: String::new(),
+                    reply_to_message_id: None,
+                    updated_at_ms: 0,
+                })?;
+                Ok(vec![Event::ConversationChildDestroyed {
+                    destination,
+                    actor_id,
+                }])
             }
             Command::SetReaction {
                 conversation_id,
@@ -2728,6 +3305,14 @@ impl MessagingEngine {
                     conversation.folder_ids.retain(|id| id != &folder_id);
                 }
             }
+            Event::PresenceTriggeredSendQueued { pending } => {
+                self.state
+                    .pending_presence_sends
+                    .insert(pending.client_message_id.clone(), pending);
+            }
+            Event::PresenceTriggeredSendRemoved { client_message_id } => {
+                self.state.pending_presence_sends.remove(&client_message_id);
+            }
             Event::MessageQueued { message } => {
                 if let Some(conversation) =
                     self.state.conversations.get_mut(&message.conversation_id)
@@ -2846,6 +3431,30 @@ impl MessagingEngine {
                 actor_id,
                 message_id,
             } => {
+                let position = self
+                    .state
+                    .messages
+                    .get(&conversation_id)
+                    .and_then(|messages| messages.get(&message_id))
+                    .map(|message| {
+                        ConversationMessagePosition::new(
+                            message.created_at_ms,
+                            message.id.0.clone(),
+                        )
+                    });
+                if let Some(position) = position {
+                    let destination = ConversationDestination::topic(
+                        conversation_id.clone(),
+                        format!("topic:{topic_id}"),
+                    );
+                    if let Some(child) =
+                        self.state.child_state_mut(destination, actor_id.clone())
+                    {
+                        let _ = child.advance_inbox_read_till(position, None);
+                    }
+                }
+                // Protocol compatibility projection while topic callers migrate to
+                // the source-neutral child runtime state above.
                 self.state
                     .topic_read_cursors
                     .entry(conversation_id)
@@ -2854,7 +3463,47 @@ impl MessagingEngine {
                     .or_default()
                     .insert(topic_id, message_id);
             }
+            Event::ConversationChildReadChanged {
+                destination,
+                actor_id,
+                message_id,
+            } => {
+                let position = self
+                    .state
+                    .messages
+                    .get(destination_message_conversation_id(&destination))
+                    .and_then(|messages| messages.get(&message_id))
+                    .map(|message| {
+                        ConversationMessagePosition::new(
+                            message.created_at_ms,
+                            message.id.0.clone(),
+                        )
+                    });
+                if let Some(position) = position {
+                    if let Some(child) = self.state.child_state_mut(destination, actor_id) {
+                        let _ = child.advance_inbox_read_till(position, None);
+                    }
+                }
+            }
             Event::TopicDraftChanged { draft } => {
+                let destination = ConversationDestination::topic(
+                    draft.conversation_id.clone(),
+                    format!("topic:{}", draft.topic_id),
+                );
+                if let Some(child) = self
+                    .state
+                    .child_state_mut(destination, draft.actor_id.clone())
+                {
+                    if draft.text.trim().is_empty() && draft.reply_to_message_id.is_none() {
+                        child.clear_draft();
+                    } else {
+                        child.set_draft(
+                            draft.text.clone(),
+                            draft.reply_to_message_id.clone(),
+                            draft.updated_at_ms,
+                        );
+                    }
+                }
                 if draft.text.trim().is_empty() && draft.reply_to_message_id.is_none() {
                     if let Some(by_actor) = self.state.topic_drafts.get_mut(&draft.conversation_id)
                     {
@@ -2877,6 +3526,101 @@ impl MessagingEngine {
                         .or_default()
                         .insert(draft.topic_id.clone(), draft);
                 }
+            }
+            Event::ConversationChildDraftChanged {
+                destination,
+                actor_id,
+                text,
+                reply_to_message_id,
+                updated_at_ms,
+            } => {
+                if let Some(child) = self.state.child_state_mut(destination, actor_id) {
+                    if text.trim().is_empty() && reply_to_message_id.is_none() {
+                        child.clear_draft();
+                    } else {
+                        child.set_draft(text, reply_to_message_id, updated_at_ms);
+                    }
+                }
+            }
+            Event::ConversationChildWindowReplaced {
+                destination,
+                actor_id,
+                message_ids,
+                skipped_before,
+                skipped_after,
+                full_count,
+            } => {
+                if let Some(child) = self.state.child_state_mut(destination, actor_id) {
+                    let empty = message_ids.is_empty();
+                    if child.pagination.replace_window(
+                        message_ids,
+                        skipped_before,
+                        skipped_after,
+                        full_count,
+                    ) {
+                        if empty {
+                            child.note_locally_empty();
+                        } else {
+                            child.note_non_empty();
+                        }
+                    }
+                }
+            }
+            Event::ConversationChildPinnedChanged {
+                destination,
+                actor_id,
+                pinned,
+            } => {
+                if let Some(child) = self.state.child_state_mut(destination, actor_id) {
+                    child.pinned = pinned;
+                    if pinned {
+                        child.restore_pinned_when_non_empty = false;
+                    }
+                }
+            }
+            Event::ConversationChildActiveChanged {
+                destination,
+                actor_id,
+                active,
+            } => {
+                if active {
+                    for child in &mut self.state.conversation_child_states {
+                        if child.actor_id == actor_id
+                            && child.destination.conversation_id == destination.conversation_id
+                        {
+                            child.active = false;
+                        }
+                    }
+                }
+                if let Some(child) = self.state.child_state_mut(destination, actor_id) {
+                    child.set_active(active);
+                }
+            }
+            Event::ConversationChildMarkedUnreadChanged {
+                destination,
+                actor_id,
+                marked_unread,
+            } => {
+                if let Some(child) = self.state.child_state_mut(destination, actor_id) {
+                    child.marked_unread = marked_unread;
+                }
+            }
+            Event::ConversationChildNoPaidMessagesChanged {
+                destination,
+                actor_id,
+                no_paid_messages,
+            } => {
+                if let Some(child) = self.state.child_state_mut(destination, actor_id) {
+                    child.no_paid_messages = no_paid_messages;
+                }
+            }
+            Event::ConversationChildDestroyed {
+                destination,
+                actor_id,
+            } => {
+                self.state.conversation_child_states.retain(|child| {
+                    child.destination != destination || child.actor_id != actor_id
+                });
             }
             Event::ReactionUpdated {
                 conversation_id,
