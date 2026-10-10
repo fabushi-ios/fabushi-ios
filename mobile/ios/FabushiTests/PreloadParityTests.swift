@@ -278,12 +278,38 @@ final class PreloadParityTests: XCTestCase {
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("listAllAutomations"))
         XCTAssertEqual(IOSMainRPCRuntime.methodTable["listAllAutomations"], IOSRPCArgumentShape.none)
         XCTAssertFalse(IOSMainRPCRuntime.isMethod("totallyUnknownMethod"))
+
+        XCTAssertEqual(IOSMainRPCRuntime.eventNames, [
+            "box-migration",
+            "cursor-auth-changed",
+            "deep-link",
+            "dev-box-pull-progress",
+            "dev-box-rebuild",
+            "egress-tunnel-changed",
+            "egress-tunnel-status-changed",
+            "experiments-changed",
+            "focus-agent",
+            "force-onboarding",
+            "open-about",
+            "open-feedback",
+            "skip-onboarding",
+            "theme-changed",
+            "update-status",
+            "vnc-user-presence",
+            "window-state",
+            "webauthn-proxy-changed",
+            "zoom-factor-changed",
+        ])
+        XCTAssertTrue(IOSMainRPCRuntime.isEvent("deep-link"))
+        XCTAssertTrue(IOSMainRPCRuntime.isEvent("zoom-factor-changed"))
+        XCTAssertFalse(IOSMainRPCRuntime.isEvent("totally-unknown-event"))
+
         XCTAssertEqual(
-            IOSRPCEdgeRuntime.methodChannel(edge: "main", method: "openExternal"),
+            IOSMainRPCRuntime.methodChannel("openExternal"),
             "sand-rpc:main:m:openExternal"
         )
         XCTAssertEqual(
-            IOSRPCEdgeRuntime.eventChannel(edge: "main", event: "deep-link"),
+            IOSMainRPCRuntime.eventChannel("deep-link"),
             "sand-rpc:main:e:deep-link"
         )
     }
