@@ -6,6 +6,29 @@ use crate::box_remote_accessor::{
     BoxConnectError, BoxPingControlClient,
 };
 
+#[allow(dead_code)]
+pub mod agent_v1_generated {
+    include!(concat!(env!("OUT_DIR"), "/agent.v1.rs"));
+    include!(concat!(env!("OUT_DIR"), "/agent.v1.serde.rs"));
+}
+
+pub fn canonical_exec_schema_has_field(field_number: u32, server: bool) -> bool {
+    let fields: &[u32] = if server {
+        &[
+            2, 3, 4, 5, 7, 29, 8, 9, 10, 11, 14, 16, 17, 18, 36, 20, 21,
+            22, 23, 27, 28, 30, 31, 37, 38, 40, 41, 42, 43, 44, 45, 46, 47,
+            48, 49, 50, 51, 52, 53, 54, 56,
+        ]
+    } else {
+        &[
+            2, 3, 4, 5, 7, 29, 8, 9, 10, 11, 14, 16, 17, 18, 36, 20, 21,
+            22, 23, 27, 28, 30, 31, 37, 38, 40, 41, 42, 43, 44, 46, 47, 48,
+            49, 50, 51, 52, 53, 54, 55, 56,
+        ]
+    };
+    fields.contains(&field_number)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoxGeneratedPackageVersions {
     pub protobuf: &'static str,
@@ -190,6 +213,27 @@ mod tests {
             adapter.service().mcp.lock().unwrap().as_slice(),
             &[("{}".into(), true)]
         );
+    }
+
+    #[test]
+    fn generated_local_exec_schema_preserves_complete_oneof_topology() {
+        for field in [2, 3, 7, 14, 16, 22, 23, 29, 36, 44, 53, 54, 56] {
+            assert!(canonical_exec_schema_has_field(field, true));
+            assert!(canonical_exec_schema_has_field(field, false));
+        }
+        assert!(canonical_exec_schema_has_field(45, true));
+        assert!(!canonical_exec_schema_has_field(45, false));
+        assert!(canonical_exec_schema_has_field(55, false));
+        assert!(!canonical_exec_schema_has_field(55, true));
+
+        let shell = agent_v1_generated::ShellArgs::default();
+        assert_eq!(agent_v1_generated::TimeoutBehavior::Background as i32, 2);
+        assert_eq!(agent_v1_generated::ShellAbortReason::Timeout as i32, 2);
+        assert!(shell.admin_command_denylist.is_empty());
+
+        let read = agent_v1_generated::ReadSuccess::default();
+        assert!(!read.truncated);
+        assert!(read.output_blob_id.is_none());
     }
 
     #[test]
