@@ -2166,9 +2166,6 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 destination_conversation_id,
                 ..
             } => {
-                if source_conversation_id == destination_conversation_id {
-                    return Err(denied("forward destination must differ from source conversation"));
-                }
                 let source_message =
                     self.forward_source_message(
                     actor_id,
