@@ -906,9 +906,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "The native owner projects the iOS remote-computer WebKit session as the platform box-health signal and retains Desktop ForeverBox phase vocabulary; it does not add a second polling timer/reachability watcher.",
       "implementation_status": "implemented",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerForeverBoxProjection plus WebKit navigation→box lifecycle ingestion).",
-      "test_evidence": "RemoteComputerRebuildTests covers pulling/running/local/starting/sleeping/off projection and shipping-owner navigation hydration.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerForeverBoxProjection plus WebKit navigation→box lifecycle ingestion).; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "test_evidence": "RemoteComputerRebuildTests covers pulling/running/local/starting/sleeping/off projection and shipping-owner navigation hydration.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
+      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-migration-store.ts",
@@ -921,9 +921,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "RemoteComputerMigrationAccumulator plus the single owner replace the TypeScript store; getBoxMigrationStatus hydration is reconnect-generation fenced and history resets on operation-id change.",
       "implementation_status": "implemented",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerMigrationAccumulator and RemoteComputerRebuildOwner hydrateMigration).",
-      "test_evidence": "RemoteComputerRebuildTests covers operation-scoped phase-history reset and owner launch/reconnect hydration.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerMigrationAccumulator and RemoteComputerRebuildOwner hydrateMigration).; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "test_evidence": "RemoteComputerRebuildTests covers operation-scoped phase-history reset and owner launch/reconnect hydration.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
+      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-model.ts",
@@ -936,9 +936,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "Swift value types and a single @MainActor RemoteComputerRebuildOwner replace the React renderer reducer while preserving operation-id fencing and terminal semantics.",
       "implementation_status": "implemented",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildState/Event/Reducer and shipping RemoteComputerRebuildOwner).",
-      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift covers stale operation-id terminal fencing, matching done→settled, failed and deactivate→cancelled, and healthy→disconnect→reconnect transport tracking.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildState/Event/Reducer and shipping RemoteComputerRebuildOwner).; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift covers stale operation-id terminal fencing, matching done→settled, failed and deactivate→cancelled, and healthy→disconnect→reconnect transport tracking.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
+      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-transport-store.ts",
@@ -951,9 +951,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "WKNavigationDelegate connection lifecycle plus FabushiRuntime's existing canonical post-resync reconnectGeneration replace Desktop transport subscriptions; no additional reachability watcher or timer is created.",
       "implementation_status": "implemented",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift plus frontend/src/recovered/features/app-shell/ContentView.swift, ContentView+Root.swift and frontend/src/production/GrokMobileShell.swift carry the existing bridge/reconnect generation into the single Computer owner.",
-      "test_evidence": "RemoteComputerRebuildTests covers healthy→disconnect→reconnect and owner reconnect hydration over one injected source.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. State/UI ownership is implemented in the existing shipping surface. The current iOS Rust Product/Host graph does not yet serve Desktop's Cursor-box getBoxMigrationStatus/update/recreate lifecycle contract; shipping iOS therefore fails closed by hiding managed Update/Reset/Recover and never calls those unserved RPCs, while explicit reconnect remains a real native WKWebView reload/navigation operation. Keep implemented (not verified) until an iOS-owned authenticated lifecycle service is wired and a fresh exact HEAD passes ordinary+protected+artifact provenance."
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift plus frontend/src/recovered/features/app-shell/ContentView.swift, ContentView+Root.swift and frontend/src/production/GrokMobileShell.swift carry the existing bridge/reconnect generation into the single Computer owner.; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
+      "test_evidence": "RemoteComputerRebuildTests covers healthy→disconnect→reconnect and owner reconnect hydration over one injected source.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
+      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/first-box-gate.ts",
@@ -998,7 +998,7 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift",
-      "notes": "Replacement applies only to the Electron rebuild-signal mechanism. It does not close managed Computer lifecycle or access-cover roster composition."
+      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Electron onDevBoxRebuild is still not applicable on iOS; RemoteComputerRebuildOwner directly consumes native WebKit/noVNC lifecycle and generation-fences hydration/requests. Managed update/reset/recover is now separately served by the authenticated CoordinatorMcpSurface lifecycle route. Keep this mechanism row not-applicable-with-replacement."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/roster-snapshot-store.ts",

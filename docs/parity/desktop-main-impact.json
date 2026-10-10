@@ -3465,6 +3465,42 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-access-model-and-structured-failure-wiring-implemented-pending-exact-head-ci",
         "finding": "AccessCoverModel.swift preserves state/reason projection, reason-specific copy/actions, fail-closed unknown state, four-way cover gate and canonical onboarding URL. The prior note that roster errors collapsed to an empty list is obsolete: current refreshAccessRoster reads fresh Sand access on failure, classifies structured sand-access-blocked/network/dns failures, feeds AccessRosterSnapshot.fail and the root composition, and preserves restored rows. Focused tests cover this path; exact-head CI remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/computer-rebuild-box-store.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-box-owner-implemented-pending-exact-head-ci",
+        "finding": "Current iOS RemoteComputerRebuildOwner is the single native rebuild owner. WebKit/noVNC lifecycle supplies box/connection health and IOSRemoteComputerRebuildSource now has a real managed-lifecycle bridge; the current source no longer hides Update/Reset/Recover for lack of service. ForeverBox phase projection remains native and tested. Exact-head CI/protected evidence is still required."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/computer-rebuild-migration-store.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-authenticated-migration-stream-implemented-pending-exact-head-ci",
+        "finding": "Current iOS has real operation-scoped migration hydration: IOSRemoteComputerRebuildSource calls getBoxMigrationStatus, CoordinatorMcpSurface owns an authenticated Cursor lifecycle watch with resume offset, operation-id and terminal fencing, and RemoteComputerMigrationAccumulator resets history on operation change. CursorSandBoxLifecycleClientTests cover migration streaming/offset projection; exact-head acceptance remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/computer-rebuild-model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-computer-rebuild-reducer-and-service-implemented-pending-exact-head-ci",
+        "finding": "RemoteComputerRebuildReducer/Owner preserves update/reset/recover/reconnecting identity, pending/ack, box/transport teardown, operation-id fencing and settled/failed/cancelled terminals. Managed actions now route through a real authenticated lifecycle service rather than a hidden placeholder. RemoteComputerRebuildTests cover stale-operation fencing and reconnect/terminal behavior; keep implemented until current-head CI succeeds."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/computer-rebuild-transport-store.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-transport-owner-implemented-pending-exact-head-ci",
+        "finding": "WKWebView/noVNC transport signals and the canonical reconnect generation feed the single RemoteComputerRebuildOwner; connection loss/recovery is not backed by a second reachability owner. The managed lifecycle source now exists for update/recreate while native reload remains the reconnect transport operation. Focused tests cover healthy→disconnect→reconnect; exact-head evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/rebuild-signal.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-electron-signal-replaced-native-owner",
+        "finding": "Desktop's Electron dev-box rebuild signal mechanism remains not-applicable on native iOS, but its product effect is replaced by direct RemoteComputerRebuildOwner lifecycle ingestion with request/hydration generations and reloadRevision. Unlike the old note, managed Computer lifecycle is now separately served by CoordinatorMcpSurface; this row only exempts the Electron signal mechanism itself."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/roster-snapshot-store.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-account-scoped-roster-snapshot-implemented-pending-exact-head-ci",
+        "finding": "The account-scoped native roster snapshot owner restores schema-versioned cached rows, then performs canonical live Host roster loading with reconnect/account generation fencing and structured access/network/DNS failure preservation. It feeds first-box/access composition and selection state rather than maintaining a second roster owner. AccessCoverParityTests cover restored/live/failure/account isolation; exact-head CI pending."
       }
     ]
   },
