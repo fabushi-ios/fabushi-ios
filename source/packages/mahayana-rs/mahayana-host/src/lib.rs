@@ -91,6 +91,11 @@ pub struct HostCreateConfig {
     pub process_execution: ProcessExecution,
     /// Tests and constrained hosts may opt out of inherited local plugins.
     pub inherit_installed_plugins: Option<bool>,
+    /// iOS-adapted owner for Desktop's authenticated `sand_memory_dreaming`
+    /// gate. `None` preserves the shipping default (enabled); `Some(false)`
+    /// means the synthesis service is not active and turn settlement must use
+    /// the legacy extraction/episode path under the same Feature Host owner.
+    pub memory_synthesis_enabled: Option<bool>,
 }
 
 #[derive(Debug, thiserror::Error)]
