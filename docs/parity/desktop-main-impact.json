@@ -3609,6 +3609,24 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-group-members-implemented-pending-exact-head-ci",
         "finding": "SwiftUI native group-members surface preserves current-main applicable interactions and constraints while routing all mutation truth through group.update. Remove confirmation, pending/failure state and member navigation are scoped to the current local group/account/reconnect generation. Exact-head UI/protected evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/settings/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-agent-settings-implemented-pending-exact-head-ci",
+        "finding": "Desktop settings controller semantics map to GrokMobileAgentSettingsModel + MobileBotAgentSettingsSheet over the canonical Host roster. Profile values are normalized, blank names/no-op edits are rejected, only one profile/notification mutation may be pending, individual-only notifications do not cross the group boundary, and account+Agent+generation fences plus Task cancellation prevent stale completions after scope replacement. Successful mutations reload and apply authoritative Host roster state. Current exact-head Swift/UI/protected evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/settings/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-agent-settings-implemented-pending-exact-head-ci",
+        "finding": "Desktop CSS carries presentation/focus/disabled-state behavior only. Shipping SwiftUI Form/TextField/TextEditor/Toggle replaces browser styling with native focus and accessibility semantics, preserves grouped fields and pending-disabled controls, and keeps errors visible. No CSS-specific runtime owner is required. Current exact-head UI/accessibility evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/settings/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-agent-settings-implemented-pending-exact-head-ci",
+        "finding": "The shipping MobileBotAgentSettingsSheet is the native replacement for the Desktop Agent Settings panel. It exposes name/title/description editing, omits title and notification controls for groups, exposes update notifications for individual Agents, keeps local drafts separate from authoritative roster state, surfaces mutation failure, disables concurrent mutations, and routes profile/notification changes through GrokMobileBotService to bot.update/group.update before authoritative roster reload. Current exact-head unit/UI/protected evidence is pending."
       }
     ]
   },
