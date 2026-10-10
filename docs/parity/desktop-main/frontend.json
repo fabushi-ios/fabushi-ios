@@ -3503,12 +3503,12 @@
       "desktop_visible_effect": "Consecutive message bubbles visually group correctly without merging across authors, special cards, threads, reactions, emoji-only messages or attachment boundaries.",
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
-      "ios_language": "SwiftUI",
-      "ios_platform_delta": "MobileBotChat currently renders each transcript row independently and already excludes several special card kinds through mobileMainTranscriptEntries, but it has no explicit six-field adjacency projector matching Desktop bubble/thread/emoji/reaction seams.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat is the canonical native transcript row renderer; no second transcript presentation owner introduced.",
-      "test_evidence": "Existing transcript projection tests cover row kinds/thread/reaction semantics; focused adjacency grouping tests remain required.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-ADJACENCY-20261009: exact Desktop source reviewed; explicit native adjacency projector remains open.",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "The canonical iOS conversation-window model has role plus explicit fromAgent/toAgent special-variant markers but no ordinary-message author string. The native projector therefore uses the one available ordinary role bucket as group identity, while agent-to-agent special rows, notices and tool rows deliberately project an all-false boundary rather than inventing author identity. Bubble eligibility preserves attachment, send-card/URL-card, image-only markdown and standalone-emoji exclusions; branch reply counts feed thread-chip seams.",
+      "implementation_status": "implemented",
+      "production_evidence": "MobileBotChat.projectMobileTranscriptAdjacency is computed once over mobileMainTranscriptEntries, receives threadChipEntryIDs from mobileThreadReplyCounts, and every shipping transcript row consumes adjacency[index]. Continued-from-prev changes native row spacing, while the six-field projection remains available to the one transcript owner. mobileTranscriptAdjacencySemantics rejects non-message and fromAgent/toAgent special variants, so no second presentation owner or invented grouping identity is introduced.",
+      "test_evidence": "SharedWorkflowTranscriptParityTests.testNativeTranscriptAdjacencyProjectsSixFieldGroupingContract covers all six fields for user/assistant runs; testNativeTranscriptAdjacencyThreadChipAndSpecialRowsBreakSeams covers thread/reaction/special-row boundaries; testNativeTranscriptAdjacencyExcludesNonBubbleMessageVariants covers standalone emoji, attachment, send-card/URL-card and image-only markdown. Same-final-HEAD Xcode/UI/device evidence is still required before verified promotion.",
+      "notes": "IOS-MAIN-DEP-TRANSCRIPT-ADJACENCY-20261011: source, shipping composition and focused tests are now closed at implementation level. Desktop author grouping cannot be copied because the canonical iOS conversation-window contract does not expose an ordinary author field; special Agent identity is preserved as a seam-breaking variant rather than synthesized. Keep implemented until exact-head ordinary/UI/device evidence succeeds.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
