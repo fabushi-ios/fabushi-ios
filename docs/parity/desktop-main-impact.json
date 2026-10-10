@@ -3063,6 +3063,54 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-call-session-owner-pending-rust-ci",
         "finding": "New Host CallSessionStore owns durable SQLite call lifecycle, generation-fenced transitions, remote event watermarks, media/device state, ordered signaling, idempotent replay/conflict rejection and terminal guards. iOS direct-ports this Host-owned Rust store and routes it through mahayana-app-host-mobile; live transport/WebRTC remain separate owners."
+      },
+      {
+        "path": "source/host/app/src/main.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-human-handoff-and-native-messaging-implemented-pending-exact-head-ci",
+        "finding": "Current-main replaces the old partial send-message fast lane with canonical transcript append events, validates human-handoff conversation routing before turn start, projects successful terminal Agent text back into the Human conversation, and installs the authenticated local Human identity into ProductionSessionWorkers. iOS already owns Human handoff validation/projection in FeatureHost and now routes shipping Human messaging through the same account-scoped fabushi-messaging-core owner; descendant 5df71749 adds real Rust product transport while 567defd7 adds durability/idempotency focused tests. Exact-head CI remains pending."
+      },
+      {
+        "path": "source/host/src/extensions/session/gateway.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-human-gateway-surface-implemented-pending-exact-head-ci",
+        "finding": "Current-main adds Human conversation list/sync/create/search/send/forward/reaction plus Human call transport gateway commands. iOS maps messaging commands through feature.messaging.execute into the canonical Rust MessagingService and maps call transport through mahayana-app-host-mobile CallSessionStore/product transport. Shipping remote direct send/sync/reaction is now wired in FeatureHost without creating a second Swift state owner."
+      },
+      {
+        "path": "source/host/src/extensions/session/mod.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-session-owner-modules-implemented-pending-exact-head-ci",
+        "finding": "Current-main exposes new call_session and native_messaging Host modules. iOS owns the same responsibilities in repository-local Rust: source/host/extensions/session/call-session.rs for call lifecycle and the existing Mahayana product client + FeatureHost shipping adapter for authenticated native Human messaging."
+      },
+      {
+        "path": "source/host/src/extensions/session/native_messaging.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-human-transport-implemented-pending-exact-head-ci",
+        "finding": "New Desktop module is the authenticated native Human transport authority for friends, direct messages, resources, reactions, calls/events and ICE, with HTTPS/account/device binding and strict canonical response validation. iOS platform replacement keeps credentials in the Rust MahayanaProductClient, uses the same /api/social surface, persists local-to-remote message/resource bindings inside account-scoped MessagingState, persists Pending before network dispatch, bounds reconnect recovery to 200x32 rows, validates sender/recipient/text/clientRequestId/reply/resource settlement, downloads remote resources into the canonical blob store, and fail-closes unsupported remote edit/delete."
+      },
+      {
+        "path": "source/host/src/extensions/session/production.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-human-session-production-implemented-pending-exact-head-ci",
+        "finding": "Current-main ProductionSessionWorkers gains authenticated local-Human ownership, required native messaging, durable Human conversation storage, retryable pending/dispatching sends, bounded overlap sync and call-session composition. iOS now composes the equivalent responsibilities inside the account-scoped FeatureHost/MessagingService plus direct-ported CallSessionStore: remote contacts create deterministic direct conversations, outgoing messages remain durable Pending until canonical backend settlement, resource bindings survive retry/reload, remote rows reconcile into the same store, and calls remain owned by the separate call-session runtime."
+      },
+      {
+        "path": "source/host/src/extensions/session/session_materialization.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-hidden-human-store-ios-adapted",
+        "finding": "Current-main excludes hidden session directories such as .conversations from Agent session materialization. iOS does not encode Human conversations as Agent session directories: account-scoped Human state lives under the dedicated _messaging snapshot/blob owner, so Agent session enumeration cannot materialize it. This is an iOS-adapted replacement of the same namespace-isolation effect."
+      },
+      {
+        "path": "source/host/src/extensions/session/session_paths.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-hidden-human-store-ios-adapted",
+        "finding": "Current-main adds hidden .conversations path helpers under the Desktop SessionStore. iOS replacement is the account-scoped _messaging/snapshot.json plus _messaging/blobs layout owned by FeatureHost/MessagingService; it is outside Agent session paths while preserving per-account durability and isolation."
+      },
+      {
+        "path": "source/host/src/extensions/session/session_roster.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-hidden-session-namespace-ios-adapted",
+        "finding": "Current-main reserves dot-prefixed hidden namespaces and filters them from session rosters. iOS Human messaging is never inserted into the Agent session roster at all; its _messaging owner is account-scoped and separately addressed, preserving the same non-enumerability/non-collision product contract."
       }
     ]
   },
