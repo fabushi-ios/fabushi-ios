@@ -112,7 +112,7 @@ final class MobileComposerParityTests: XCTestCase {
                 name: "Duplicate",
                 serverIdentifier: "github-work",
                 rowServerIdentifier: "duplicate",
-                accountKey: "other",
+                accountKey: "default",
                 transport: "http",
                 status: "disabledByTeamAdminPolicy",
                 statusDetail: nil,
@@ -134,17 +134,27 @@ final class MobileComposerParityTests: XCTestCase {
             ),
         ]
 
-        let rows = projectMobileEditorMcpSuggestions(servers: servers, catalog: catalog)
+        let rows = projectMobileEditorMcpSuggestions(
+            servers: servers,
+            catalog: catalog,
+            accountKey: "default"
+        )
+        let personalRows = projectMobileEditorMcpSuggestions(
+            servers: servers,
+            catalog: catalog,
+            accountKey: "personal"
+        )
 
-        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].label, "GitHub")
         XCTAssertEqual(rows[0].subtitle, "connected")
         XCTAssertEqual(rows[0].mcpReference?.workflowReferenceID, "mcp:17")
         XCTAssertEqual(rows[0].mcpReference?.accountKey, "default")
         XCTAssertEqual(rows[0].iconURL, "https://example.invalid/github.png")
-        XCTAssertEqual(rows[1].label, "GitHub (personal)")
-        XCTAssertEqual(rows[1].subtitle, "needs auth")
-        XCTAssertEqual(rows[1].mcpReference?.accountKey, "personal")
+        XCTAssertEqual(personalRows.count, 1)
+        XCTAssertEqual(personalRows[0].label, "GitHub (personal)")
+        XCTAssertEqual(personalRows[0].subtitle, "needs auth")
+        XCTAssertEqual(personalRows[0].mcpReference?.accountKey, "personal")
     }
 
     func testMcpDisabledPolicyAndAppAccountAgentFencing() {
@@ -165,30 +175,30 @@ final class MobileComposerParityTests: XCTestCase {
             managedByTeamPluginPolicy: true
         )
         let current = projectScopedMobileEditorMcpSuggestions(
-            servers: [server],
-            catalog: [],
-            ownedAccountKey: "app-account-a",
-            currentAccountKey: "app-account-a",
-            ownedAgentID: "agent-a",
-            currentAgentID: "agent-a"
+            servers: [server], catalog: [],
+            ownedMcpAccountKey: "default", currentMcpAccountKey: "default",
+            ownedAppAccountKey: "app-account-a", currentAppAccountKey: "app-account-a",
+            ownedAgentID: "agent-a", currentAgentID: "agent-a"
         )
         XCTAssertEqual(current.first?.subtitle, "disabled")
         XCTAssertEqual(current.first?.mcpReference?.accountKey, "default")
         XCTAssertTrue(projectScopedMobileEditorMcpSuggestions(
-            servers: [server],
-            catalog: [],
-            ownedAccountKey: "app-account-a",
-            currentAccountKey: "app-account-b",
-            ownedAgentID: "agent-a",
-            currentAgentID: "agent-a"
+            servers: [server], catalog: [],
+            ownedMcpAccountKey: "default", currentMcpAccountKey: "personal",
+            ownedAppAccountKey: "app-account-a", currentAppAccountKey: "app-account-a",
+            ownedAgentID: "agent-a", currentAgentID: "agent-a"
         ).isEmpty)
         XCTAssertTrue(projectScopedMobileEditorMcpSuggestions(
-            servers: [server],
-            catalog: [],
-            ownedAccountKey: "app-account-a",
-            currentAccountKey: "app-account-a",
-            ownedAgentID: "agent-a",
-            currentAgentID: "agent-b"
+            servers: [server], catalog: [],
+            ownedMcpAccountKey: "default", currentMcpAccountKey: "default",
+            ownedAppAccountKey: "app-account-a", currentAppAccountKey: "app-account-b",
+            ownedAgentID: "agent-a", currentAgentID: "agent-a"
+        ).isEmpty)
+        XCTAssertTrue(projectScopedMobileEditorMcpSuggestions(
+            servers: [server], catalog: [],
+            ownedMcpAccountKey: "default", currentMcpAccountKey: "default",
+            ownedAppAccountKey: "app-account-a", currentAppAccountKey: "app-account-a",
+            ownedAgentID: "agent-a", currentAgentID: "agent-b"
         ).isEmpty)
     }
 
@@ -252,8 +262,8 @@ final class MobileComposerParityTests: XCTestCase {
             isRequired: false,
             managedByTeamPluginPolicy: false
         )
-        let before = projectMobileEditorMcpSuggestions(servers: [needsAuth], catalog: [])
-        let after = projectMobileEditorMcpSuggestions(servers: [connected], catalog: [])
+        let before = projectMobileEditorMcpSuggestions(servers: [needsAuth], catalog: [], accountKey: "work")
+        let after = projectMobileEditorMcpSuggestions(servers: [connected], catalog: [], accountKey: "work")
         XCTAssertEqual(before.first?.id, after.first?.id)
         XCTAssertEqual(before.first?.mcpReference?.accountKey, "work")
         XCTAssertEqual(before.first?.subtitle, "needs auth")
