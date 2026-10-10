@@ -41,7 +41,7 @@
       "desktop_owner": "local-runner",
       "desktop_visible_effect": "The shipping Desktop daemon executes only the canonical generated protocol/resource graph; missing mandatory runtime bindings fail construction rather than falling back to a substitute.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/local-exec-daemon/production-executor.swift; source/box-exec-daemon/RemoteRunner.swift; source/local-exec-daemon/LocalCapabilityRunner.swift",
+      "ios_target_path": "source/local-exec-daemon/production-executor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS replaces arbitrary on-device shell/file execution with an allowlisted native capability runner plus RemoteRunner for shell/process/box semantics. Unknown methods are rejected rather than treated as remote-capable.",
       "implementation_status": "implemented",
