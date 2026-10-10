@@ -6,11 +6,14 @@ use crate::legacy_blob_retirement::LegacyBlobRetirementVerdict;
 use crate::worker_blob_store::AgentWorkerBlobPool;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 
 pub const DEFAULT_IDLE_TIMEOUT_MS: u64 = 5 * 60_000;
 pub const DEFAULT_MAX_WORKERS: usize = 64;
+pub const DEFAULT_SWEEP_INTERVAL_MS: u64 = 30_000;
 
 type WorkerLane = Arc<Mutex<AgentStoreWorker>>;
 
@@ -31,7 +34,10 @@ pub struct AgentWorkerPool {
     busy_timeout_ms: u64,
     idle_timeout: Duration,
     max_workers: usize,
+    sweep_interval: Duration,
     state: Arc<Mutex<PoolState>>,
+    sweep_started: Arc<AtomicBool>,
+    closed: Arc<AtomicBool>,
 }
 
 impl Default for AgentWorkerPool {
@@ -42,13 +48,30 @@ impl Default for AgentWorkerPool {
 
 impl AgentWorkerPool {
     pub fn new(busy_timeout_ms: u64, idle_timeout_ms: u64, max_workers: usize) -> Self {
+        Self::with_sweep_interval(
+            busy_timeout_ms,
+            idle_timeout_ms,
+            max_workers,
+            DEFAULT_SWEEP_INTERVAL_MS,
+        )
+    }
+
+    pub fn with_sweep_interval(
+        busy_timeout_ms: u64,
+        idle_timeout_ms: u64,
+        max_workers: usize,
+        sweep_interval_ms: u64,
+    ) -> Self {
         Self {
             busy_timeout_ms,
             idle_timeout: Duration::from_millis(idle_timeout_ms),
             max_workers: max_workers.max(1),
+            sweep_interval: Duration::from_millis(sweep_interval_ms.max(1)),
             state: Arc::new(Mutex::new(PoolState {
                 workers: HashMap::new(),
             })),
+            sweep_started: Arc::new(AtomicBool::new(false)),
+            closed: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -94,6 +117,62 @@ impl AgentWorkerPool {
         Ok(())
     }
 
+    fn start_sweep(&self) {
+        if self.idle_timeout == Duration::from_millis(u64::MAX) {
+            return;
+        }
+        if self.sweep_started.swap(true, Ordering::AcqRel) {
+            return;
+        }
+
+        let state = Arc::downgrade(&self.state);
+        let closed = Arc::downgrade(&self.closed);
+        let idle_timeout = self.idle_timeout;
+        let sweep_interval = self.sweep_interval;
+        let _ = thread::Builder::new()
+            .name("fabushi-ios-agent-worker-sweep".into())
+            .spawn(move || loop {
+                thread::sleep(sweep_interval);
+                let Some(state) = state.upgrade() else {
+                    break;
+                };
+                let Some(closed) = closed.upgrade() else {
+                    break;
+                };
+                if closed.load(Ordering::Acquire) {
+                    break;
+                }
+
+                let victims = {
+                    let mut state = match state.lock() {
+                        Ok(state) => state,
+                        Err(poisoned) => poisoned.into_inner(),
+                    };
+                    let candidates = state
+                        .workers
+                        .iter()
+                        .filter_map(|(path, lane)| {
+                            if Arc::strong_count(lane) != 1 {
+                                return None;
+                            }
+                            let worker = lane.lock().ok()?;
+                            (worker.idle_for() >= idle_timeout).then_some(path.clone())
+                        })
+                        .collect::<Vec<_>>();
+                    candidates
+                        .into_iter()
+                        .filter_map(|path| state.workers.remove(&path))
+                        .collect::<Vec<_>>()
+                };
+
+                for lane in victims {
+                    if let Ok(mut worker) = lane.lock() {
+                        let _ = worker.close();
+                    }
+                }
+            });
+    }
+
     fn evict_for_capacity_locked(
         &self,
         state: &mut PoolState,
@@ -134,6 +213,12 @@ impl AgentWorkerPool {
         blob_db_path: impl Into<PathBuf>,
         legacy_blob_db_path: Option<&Path>,
     ) -> Result<WorkerLane, ConversationBlobRecoveryError> {
+        if self.closed.load(Ordering::Acquire) {
+            return Err(ConversationBlobRecoveryError::new(
+                "SAND_AGENT_WORKER_POOL_CLOSED",
+                "agent worker pool is closed",
+            ));
+        }
         let blob_db_path = blob_db_path.into();
         let mut state = self
             .state
@@ -169,6 +254,8 @@ impl AgentWorkerPool {
         )?;
         let lane = Arc::new(Mutex::new(worker));
         state.workers.insert(blob_db_path, lane.clone());
+        drop(state);
+        self.start_sweep();
         Ok(lane)
     }
 
@@ -337,6 +424,7 @@ impl AgentWorkerPool {
     }
 
     pub fn close_all(&self) -> Result<(), ConversationBlobRecoveryError> {
+        self.closed.store(true, Ordering::Release);
         let workers = {
             let mut state = self
                 .state
@@ -465,6 +553,34 @@ mod tests {
             pool.describe_workers().unwrap()[0].blob_db_path,
             second
         );
+    }
+
+    #[test]
+    fn background_sweep_releases_idle_unretained_lane() {
+        let dir = temp_dir();
+        let db = dir.join("idle.sqlite");
+        let pool = AgentWorkerPool::with_sweep_interval(500, 10, 4, 5);
+
+        {
+            let lane = pool.ensure("agent-a", &db, None).unwrap();
+            drop(lane);
+        }
+
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(pool.active_worker_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn close_all_is_terminal_for_future_lanes() {
+        let dir = temp_dir();
+        let pool = AgentWorkerPool::default();
+        pool.ensure("agent-a", dir.join("a.sqlite"), None).unwrap();
+        pool.close_all().unwrap();
+
+        let error = pool
+            .ensure("agent-b", dir.join("b.sqlite"), None)
+            .unwrap_err();
+        assert_eq!(error.code, "SAND_AGENT_WORKER_POOL_CLOSED");
     }
 
     #[test]
