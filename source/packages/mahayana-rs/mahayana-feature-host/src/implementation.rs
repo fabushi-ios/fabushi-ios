@@ -9247,17 +9247,6 @@ impl FeatureHostController {
                 ..
             } => {
                 let operation_id = operation_id.to_string();
-                if message.role == RuntimeMessageRole::Assistant
-                    && !message.text.trim().is_empty()
-                {
-                    if let Some(observation) = self
-                        .state()?
-                        .memory_turn_observations
-                        .get_mut(&operation_id)
-                    {
-                        observation.assistant = Some(message.text.clone());
-                    }
-                }
                 let group_context = self.state()?.group_operations.get(&operation_id).cloned();
                 if let Some(context) = group_context {
                     Some(HostEvent::GroupDelta {
@@ -9296,6 +9285,17 @@ impl FeatureHostController {
                 ..
             } => {
                 let operation_id = operation_id.to_string();
+                if message.role == RuntimeMessageRole::Assistant
+                    && !message.text.trim().is_empty()
+                {
+                    if let Some(observation) = self
+                        .state()?
+                        .memory_turn_observations
+                        .get_mut(&operation_id)
+                    {
+                        observation.assistant = Some(message.text.clone());
+                    }
+                }
                 let group_context = self.state()?.group_operations.get(&operation_id).cloned();
                 if let Some(context) = group_context {
                     if message.role != RuntimeMessageRole::Assistant {
