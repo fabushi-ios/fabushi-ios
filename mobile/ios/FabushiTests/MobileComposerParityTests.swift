@@ -397,6 +397,20 @@ final class MobileComposerParityTests: XCTestCase {
         )
     }
 
+    func testEditorEmojiSuggestionsUseRecordedRecency() throws {
+        let first = try XCTUnwrap(mobileReactionCatalog.first)
+        let second = try XCTUnwrap(mobileReactionCatalog.dropFirst().first)
+        let context = try XCTUnwrap(mobileEditorSuggestionContext(":"))
+        let rows = mobileEditorSuggestionRows(
+            context: context,
+            assistants: [],
+            workflows: [],
+            recentKeys: ["emoji:\(second.id)", "emoji:\(first.id)"]
+        )
+        XCTAssertEqual(rows.first?.id, second.id)
+        XCTAssertEqual(rows.dropFirst().first?.id, first.id)
+    }
+
     func testStageFailureNoticeAggregatesLikeDesktop() {
         XCTAssertEqual(
             mobileComposerStageFailureNotice([
