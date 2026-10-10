@@ -4,6 +4,7 @@ use mahayana_core::ModelProviderMode;
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ResponsesWireApi {
@@ -66,10 +67,16 @@ pub type ModelCredentialResolver =
     Arc<dyn Fn() -> Result<Option<String>, ModelError> + Send + Sync>;
 
 static RESPONSES_HTTP_AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+const PROVIDER_FIRST_OUTPUT_TIMEOUT: Duration = Duration::from_secs(150);
 
 fn responses_http_agent() -> &'static ureq::Agent {
     RESPONSES_HTTP_AGENT.get_or_init(|| {
         ureq::AgentBuilder::new()
+            // Match the canonical Runner first-output watchdog. Without an
+            // explicit receive timeout ureq may block forever inside SSE
+            // read_line(), which prevents the Host from retrying a durable
+            // post-tool continuation.
+            .timeout_read(PROVIDER_FIRST_OUTPUT_TIMEOUT)
             .max_idle_connections(16)
             .max_idle_connections_per_host(8)
             .build()
