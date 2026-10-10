@@ -182,6 +182,290 @@ internal func mobileReactionPickerNextIndex(
     }
 }
 
+internal enum MobileEditorSuggestionCategory: String, Equatable {
+    case assistants
+    case automations
+    case emoji
+}
+
+internal enum MobileEditorSuggestionSourceStatus: Equatable {
+    case idle
+    case loading
+    case ready
+    case empty
+    case failed
+    case unavailable
+    case cancelled
+}
+
+internal struct MobileEditorSuggestionItem: Identifiable, Equatable {
+    let id: String
+    let category: MobileEditorSuggestionCategory
+    let label: String
+    var subtitle: String?
+    let insertion: String
+    var triggerSchedule: String?
+    var triggerEnabled: Bool?
+    var keywords: [String] = []
+}
+
+internal struct MobileEditorSuggestionContext: Equatable {
+    let trigger: Character
+    let query: String
+    let replacementRange: NSRange
+}
+
+internal enum MobileEditorSuggestionMove: Equatable {
+    case previous
+    case next
+    case first
+    case last
+}
+
+private func mobileEditorSuggestionNonEmpty(_ value: Any?) -> String? {
+    guard let string = value as? String else { return nil }
+    let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+}
+
+internal func projectMobileEditorMentionSuggestions(
+    _ bots: [MobileBotSummary],
+    allowEveryone: Bool = true
+) -> [MobileEditorSuggestionItem] {
+    var seen = Set<String>()
+    let visible = bots.compactMap { bot -> MobileEditorSuggestionItem? in
+        guard !bot.hidden, !bot.id.isEmpty, !bot.name.isEmpty, seen.insert(bot.id).inserted else {
+            return nil
+        }
+        return .init(
+            id: bot.id,
+            category: .assistants,
+            label: bot.name,
+            subtitle: bot.isGroup && !bot.memberIds.isEmpty
+                ? "\(bot.memberIds.count) agents"
+                : bot.title,
+            insertion: "@\(bot.name)",
+            keywords: [bot.name, bot.title ?? "", bot.description]
+        )
+    }
+    guard allowEveryone, visible.count >= 2 else { return visible }
+    return [
+        .init(
+            id: "__everyone__",
+            category: .assistants,
+            label: "everyone",
+            insertion: "@everyone",
+            keywords: ["everyone", "all"]
+        ),
+    ] + visible
+}
+
+internal func projectMobileEditorWorkflowSuggestions(
+    _ rows: [[String: Any]]
+) -> [MobileEditorSuggestionItem] {
+    var seen = Set<String>()
+    return rows.compactMap { row in
+        guard let id = mobileEditorSuggestionNonEmpty(row["id"]),
+              let name = mobileEditorSuggestionNonEmpty(row["name"]),
+              seen.insert(id).inserted
+        else { return nil }
+
+        var schedule: String?
+        var enabled: Bool?
+        if let rawTrigger = row["trigger"] {
+            guard let trigger = rawTrigger as? [String: Any],
+                  let projectedSchedule = mobileEditorSuggestionNonEmpty(trigger["schedule"]),
+                  let projectedEnabled = (trigger["isEnabled"] ?? trigger["enabled"]) as? Bool
+            else { return nil }
+            schedule = projectedSchedule
+            enabled = projectedEnabled
+        }
+        let subtitle = mobileEditorSuggestionNonEmpty(row["scheduleDescription"])
+            ?? mobileEditorSuggestionNonEmpty(row["description"])
+        return .init(
+            id: id,
+            category: .automations,
+            label: name,
+            subtitle: subtitle,
+            insertion: "@\(name)",
+            triggerSchedule: schedule,
+            triggerEnabled: enabled,
+            keywords: [
+                name,
+                subtitle ?? "",
+                schedule ?? "",
+            ]
+        )
+    }
+}
+
+internal func mobileEditorSuggestionContext(
+    _ draft: String
+) -> MobileEditorSuggestionContext? {
+    let ns = draft as NSString
+    let fullLength = ns.length
+    guard fullLength > 0 else { return nil }
+    let contextLength = min(200, fullLength)
+    let start = fullLength - contextLength
+    let tail = ns.substring(with: NSRange(location: start, length: contextLength))
+
+    let patterns: [(Character, String, Int)] = [
+        ("@", #"(^|[\s(])@([^@#/:\n]{0,50})$"#, 2),
+        ("/", #"(^|[\s(])/([^@#/:\n]{0,50})$"#, 2),
+        (":", #"(^|[^\p{L}\p{N}_:/]):([A-Za-z0-9_+\-]{2,50})$"#, 2),
+    ]
+    for (trigger, pattern, queryGroup) in patterns {
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(
+                in: tail,
+                range: NSRange(location: 0, length: (tail as NSString).length)
+              )
+        else { continue }
+        let queryRange = match.range(at: queryGroup)
+        guard queryRange.location != NSNotFound else { continue }
+        let query = (tail as NSString).substring(with: queryRange)
+        let triggerLocation = queryRange.location - 1
+        guard triggerLocation >= 0 else { continue }
+        return .init(
+            trigger: trigger,
+            query: query,
+            replacementRange: NSRange(
+                location: start + triggerLocation,
+                length: fullLength - (start + triggerLocation)
+            )
+        )
+    }
+    return nil
+}
+
+private func mobileEditorSuggestionNormalized(_ value: String) -> String {
+    value.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        .lowercased()
+        .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+        .joined(separator: " ")
+}
+
+private func mobileEditorSuggestionScore(
+    _ item: MobileEditorSuggestionItem,
+    query: String
+) -> Int? {
+    let query = mobileEditorSuggestionNormalized(query)
+    guard !query.isEmpty else { return 0 }
+    let candidates = [item.label, item.subtitle ?? ""] + item.keywords
+    var best: Int?
+    for candidate in candidates {
+        let normalized = mobileEditorSuggestionNormalized(candidate)
+        if normalized == query {
+            best = max(best ?? Int.min, 10_000)
+        } else if normalized.hasPrefix(query) {
+            best = max(best ?? Int.min, 5_000 - normalized.count)
+        } else if normalized.contains(query) {
+            best = max(best ?? Int.min, 2_500 - normalized.count)
+        } else {
+            var search = normalized.startIndex
+            var matched = 0
+            for character in query {
+                guard let index = normalized[search...].firstIndex(of: character) else {
+                    matched = -1
+                    break
+                }
+                matched += 1
+                search = normalized.index(after: index)
+                if search == normalized.endIndex && matched < query.count {
+                    matched = -1
+                    break
+                }
+            }
+            if matched == query.count {
+                best = max(best ?? Int.min, 1_000 - normalized.count)
+            }
+        }
+    }
+    return best
+}
+
+internal func mobileEditorSuggestionRows(
+    context: MobileEditorSuggestionContext?,
+    assistants: [MobileEditorSuggestionItem],
+    workflows: [MobileEditorSuggestionItem],
+    recentKeys: [String] = []
+) -> [MobileEditorSuggestionItem] {
+    guard let context else { return [] }
+    let source: [MobileEditorSuggestionItem]
+    switch context.trigger {
+    case "@":
+        source = assistants + workflows.filter { $0.triggerSchedule != nil }
+    case "/":
+        source = workflows.filter { $0.triggerSchedule == nil }
+    case ":":
+        return mobileReactionPickerResults(
+            query: context.query,
+            category: .all
+        ).map {
+            .init(
+                id: $0.id,
+                category: .emoji,
+                label: $0.emoji,
+                subtitle: $0.name,
+                insertion: $0.emoji,
+                keywords: [$0.name, $0.category.rawValue]
+            )
+        }
+    default:
+        return []
+    }
+
+    let recency = Dictionary(uniqueKeysWithValues: recentKeys.enumerated().map { ($0.element, $0.offset) })
+    return source.compactMap { item -> (MobileEditorSuggestionItem, Int)? in
+        guard let score = mobileEditorSuggestionScore(item, query: context.query) else { return nil }
+        return (item, score)
+    }
+    .sorted { lhs, rhs in
+        if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+        let leftKey = "\(lhs.0.category.rawValue):\(lhs.0.id)"
+        let rightKey = "\(rhs.0.category.rawValue):\(rhs.0.id)"
+        let leftRecent = recency[leftKey] ?? Int.max
+        let rightRecent = recency[rightKey] ?? Int.max
+        if leftRecent != rightRecent { return leftRecent < rightRecent }
+        return lhs.0.label.localizedCaseInsensitiveCompare(rhs.0.label) == .orderedAscending
+    }
+    .prefix(96)
+    .map(\.0)
+}
+
+internal func applyMobileEditorSuggestion(
+    draft: String,
+    context: MobileEditorSuggestionContext,
+    item: MobileEditorSuggestionItem
+) -> String {
+    let ns = NSMutableString(string: draft)
+    guard NSMaxRange(context.replacementRange) <= ns.length else { return draft }
+    ns.replaceCharacters(
+        in: context.replacementRange,
+        with: item.insertion + " "
+    )
+    return ns as String
+}
+
+internal func mobileEditorSuggestionNextIndex(
+    current: Int?,
+    count: Int,
+    move: MobileEditorSuggestionMove
+) -> Int? {
+    guard count > 0 else { return nil }
+    let index = min(max(current ?? 0, 0), count - 1)
+    switch move {
+    case .previous:
+        return (index - 1 + count) % count
+    case .next:
+        return (index + 1) % count
+    case .first:
+        return 0
+    case .last:
+        return count - 1
+    }
+}
+
 
 internal func isMobileBotVisibleAssistantCompletion(
     _ event: [String: Any],
@@ -934,6 +1218,7 @@ private struct MobileTranscriptMediaAttachmentView: View {
 
 internal struct MobileBotChat: View {
     let bot: MobileBotSummary
+    var availableBots: [MobileBotSummary] = []
     let bridge: IOSPreloadBridge
     let model: MarketplaceModel
     let messaging: MessagingModel
@@ -967,6 +1252,11 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerDraft = ""
     @State private var reactionPickerSearch = ""
     @State private var reactionPickerCategory: MobileReactionPickerCategory = .all
+    @State private var editorSuggestionWorkflows: [MobileEditorSuggestionItem] = []
+    @State private var editorSuggestionStatus: MobileEditorSuggestionSourceStatus = .idle
+    @State private var editorSuggestionGeneration = 0
+    @State private var editorSuggestionActiveIndex: Int?
+    @State private var editorSuggestionRecents: [String] = []
     @State private var approvalGeneration = 0
     @State private var transcriptBaselineGeneration = 0
     @State private var transcriptBaselineError: String?
@@ -1015,6 +1305,9 @@ internal struct MobileBotChat: View {
         .task(id: listenerScopeFingerprint) {
             await pollVisibleListenerIntegrations()
         }
+        .task(id: editorSuggestionScopeFingerprint) {
+            await refreshEditorSuggestions()
+        }
         .onChange(of: bot.id) { _, _ in
             cancelVoiceInput()
             invalidateReactionScope()
@@ -1033,9 +1326,11 @@ internal struct MobileBotChat: View {
             resetSecretRequestUI()
             forwardMessage = nil
             closeFind()
+            invalidateEditorSuggestions()
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             invalidateReactionScope()
+            invalidateEditorSuggestions()
         }
         .onChange(of: focusPromptGeneration) { _, _ in
             promptFocused = true
@@ -1051,6 +1346,7 @@ internal struct MobileBotChat: View {
             threadLoadingRootId = nil
             forwardMessage = nil
             closeFind()
+            invalidateEditorSuggestions()
         }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
@@ -1455,29 +1751,269 @@ internal struct MobileBotChat: View {
         }
     }
 
-    private var composer: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField("Message", text: $draft, axis: .vertical)
-                .focused($promptFocused)
-                .lineLimit(1...5)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .onSubmit {
-                    if !busy {
-                        Task { await send() }
-                    }
-                }
-                .accessibilityIdentifier("mobile-bot-draft")
+    private var editorSuggestionContext: MobileEditorSuggestionContext? {
+        mobileEditorSuggestionContext(draft)
+    }
 
-            miniAppButton
-            voiceInputButton
-            sendButton
+    private var editorSuggestionAssistants: [MobileEditorSuggestionItem] {
+        let canonicalRoster = availableBots.isEmpty ? [bot] : availableBots
+        return projectMobileEditorMentionSuggestions(canonicalRoster)
+    }
+
+    private var editorSuggestionRows: [MobileEditorSuggestionItem] {
+        mobileEditorSuggestionRows(
+            context: editorSuggestionContext,
+            assistants: editorSuggestionAssistants,
+            workflows: editorSuggestionWorkflows,
+            recentKeys: editorSuggestionRecents
+        )
+    }
+
+    private var editorSuggestionScopeFingerprint: String {
+        [
+            model.settingsNoticeAccountKey,
+            bot.id,
+            String(reconnectGeneration),
+        ].joined(separator: "|")
+    }
+
+    @ViewBuilder
+    private var editorSuggestionList: some View {
+        let rows = editorSuggestionRows
+        if editorSuggestionContext != nil {
+            VStack(alignment: .leading, spacing: 2) {
+                if rows.isEmpty {
+                    if editorSuggestionStatus == .loading {
+                        ProgressView("Loading suggestions…")
+                            .controlSize(.small)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    } else if editorSuggestionStatus == .failed || editorSuggestionStatus == .unavailable {
+                        Text("Suggestions unavailable")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    } else {
+                        Text("No matches")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    }
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
+                                Button {
+                                    chooseEditorSuggestion(item)
+                                } label: {
+                                    HStack(spacing: 9) {
+                                        Image(systemName: item.category == .assistants
+                                            ? "person.crop.circle"
+                                            : item.category == .automations
+                                                ? "bolt.circle"
+                                                : "face.smiling")
+                                            .foregroundStyle(.secondary)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(item.label)
+                                                .lineLimit(1)
+                                            if let subtitle = item.subtitle, !subtitle.isEmpty {
+                                                Text(subtitle)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        Spacer()
+                                        if index == editorSuggestionActiveIndex {
+                                            Image(systemName: "return")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .contentShape(Rectangle())
+                                    .background(
+                                        index == editorSuggestionActiveIndex
+                                            ? Color.accentColor.opacity(0.10)
+                                            : Color.clear
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    item.subtitle.map { "\(item.label), \($0)" } ?? item.label
+                                )
+                                .accessibilityIdentifier("mobile-bot-editor-suggestion-\(index)")
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 220)
+                }
+            }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.black.opacity(0.08))
+            )
+            .padding(.horizontal, 12)
+            .accessibilityIdentifier("mobile-bot-editor-suggestions")
+        }
+    }
+
+    private var composer: some View {
+        VStack(spacing: 4) {
+            editorSuggestionList
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField("Message", text: $draft, axis: .vertical)
+                    .focused($promptFocused)
+                    .lineLimit(1...5)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .onChange(of: draft) { _, _ in
+                        normalizeEditorSuggestionSelection()
+                    }
+                    .onSubmit {
+                        if chooseActiveEditorSuggestion() { return }
+                        if !busy {
+                            Task { await send() }
+                        }
+                    }
+                    .onKeyPress(phases: .down) { press in
+                        guard !editorSuggestionRows.isEmpty else { return .ignored }
+                        let move: MobileEditorSuggestionMove?
+                        switch press.key {
+                        case .upArrow:
+                            move = press.modifiers.contains(.command) ? .first : .previous
+                        case .downArrow:
+                            move = press.modifiers.contains(.command) ? .last : .next
+                        case .escape:
+                            editorSuggestionActiveIndex = nil
+                            return .handled
+                        default:
+                            move = nil
+                        }
+                        guard let move else { return .ignored }
+                        editorSuggestionActiveIndex = mobileEditorSuggestionNextIndex(
+                            current: editorSuggestionActiveIndex,
+                            count: editorSuggestionRows.count,
+                            move: move
+                        )
+                        return .handled
+                    }
+                    .accessibilityIdentifier("mobile-bot-draft")
+
+                miniAppButton
+                voiceInputButton
+                sendButton
+            }
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background(.ultraThinMaterial)
+    }
+
+    @MainActor
+    private func normalizeEditorSuggestionSelection() {
+        let rows = editorSuggestionRows
+        guard !rows.isEmpty else {
+            editorSuggestionActiveIndex = nil
+            return
+        }
+        if let index = editorSuggestionActiveIndex, rows.indices.contains(index) {
+            return
+        }
+        editorSuggestionActiveIndex = 0
+    }
+
+    @MainActor
+    private func chooseEditorSuggestion(_ item: MobileEditorSuggestionItem) {
+        guard let context = editorSuggestionContext else { return }
+        draft = applyMobileEditorSuggestion(draft: draft, context: context, item: item)
+        let key = "\(item.category.rawValue):\(item.id)"
+        editorSuggestionRecents = [key] + editorSuggestionRecents.filter { $0 != key }
+        editorSuggestionRecents = Array(editorSuggestionRecents.prefix(50))
+        editorSuggestionActiveIndex = nil
+        promptFocused = true
+    }
+
+    @MainActor
+    @discardableResult
+    private func chooseActiveEditorSuggestion() -> Bool {
+        let rows = editorSuggestionRows
+        guard !rows.isEmpty else { return false }
+        let index = min(max(editorSuggestionActiveIndex ?? 0, 0), rows.count - 1)
+        chooseEditorSuggestion(rows[index])
+        return true
+    }
+
+    @MainActor
+    private func invalidateEditorSuggestions() {
+        editorSuggestionGeneration &+= 1
+        editorSuggestionStatus = .cancelled
+        editorSuggestionWorkflows = []
+        editorSuggestionActiveIndex = nil
+    }
+
+    @MainActor
+    private func refreshEditorSuggestions() async {
+        editorSuggestionGeneration &+= 1
+        let generation = editorSuggestionGeneration
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedAgent = bot.id
+        let ownedReconnect = reconnectGeneration
+        guard !ownedAccount.isEmpty, !ownedAgent.isEmpty else {
+            editorSuggestionStatus = .unavailable
+            editorSuggestionWorkflows = []
+            return
+        }
+
+        let previous = editorSuggestionWorkflows
+        editorSuggestionStatus = .loading
+        let requestId = "ios-editor-workflow-list-\(UUID().uuidString.lowercased())"
+        do {
+            _ = try await bridge.request(
+                method: "feature.execute",
+                params: [
+                    "command": [
+                        "type": "workflow.list",
+                        "requestId": requestId,
+                        "agentId": ownedAgent,
+                    ],
+                ]
+            )
+            let result = try await bridge.receiveFeatureEvent(
+                deadlineMilliseconds: 8_000
+            ) { event in
+                event["type"] as? String == "workflow.listed"
+                    && event["agentId"] as? String == ownedAgent
+            }
+            guard generation == editorSuggestionGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedAgent,
+                  reconnectGeneration == ownedReconnect,
+                  let event = result.value as? [String: Any],
+                  let rows = event["workflows"] as? [[String: Any]]
+            else { return }
+            editorSuggestionWorkflows = projectMobileEditorWorkflowSuggestions(rows)
+            editorSuggestionStatus = editorSuggestionWorkflows.isEmpty ? .empty : .ready
+            normalizeEditorSuggestionSelection()
+        } catch is CancellationError {
+            guard generation == editorSuggestionGeneration else { return }
+            editorSuggestionStatus = .cancelled
+            editorSuggestionWorkflows = previous
+        } catch {
+            guard generation == editorSuggestionGeneration,
+                  model.settingsNoticeAccountKey == ownedAccount,
+                  bot.id == ownedAgent,
+                  reconnectGeneration == ownedReconnect
+            else { return }
+            editorSuggestionStatus = .failed
+            editorSuggestionWorkflows = previous
+        }
     }
 
     @ViewBuilder
