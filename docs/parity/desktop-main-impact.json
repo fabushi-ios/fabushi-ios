@@ -3711,6 +3711,78 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
         "finding": "MobileBotRoutinesSection is reachable from shipping MobileBotAgentSettings and uses the real IOSPreloadBridge??ost automation command path for list/create/update/enable/delete/run-now. Current-main review found and repaired enabled-first list ordering, full run-history visibility and transient-disappear resubscription semantics; focused XCTest was added, while exact-head unit/UI/protected evidence is still pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/overlay/entrypoint.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop's computer overlay entrypoint only declares availability; iOS exposes the same product capability through the native account Remote Computer destination and Agent full-screen RemoteComputerSurface, without a second overlay runtime owner. Exact-head UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/overlay/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main overlay view intentionally renders no product UI. iOS therefore does not invent a parallel overlay; the actual remote-computer product lives in the native shipping surfaces. This file is presentation/non-runtime-accounted with its product responsibility preserved elsewhere; exact-head acceptance remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/shell/controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop computer experience ownership maps to RemoteComputerSurface plus RemoteComputerHostActivityOwner and RemoteComputerAgentBoxOwner: subagent/async-task hydration, forever-box status, monitor retention, reconnect/focus refresh, account/Agent fencing, handoff and cursor events remain under canonical Host-backed owners. Exact-head CI/UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/shell/cursor-icons-16-f_W_ogc-.woff2",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop cursor icon font is renderer presentation data. iOS uses native SwiftUI/SF Symbol presentation and RemoteComputerShell cursor telemetry rather than shipping the webfont; no runtime/product state is hidden by this platform replacement. Device/accessibility evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/shell/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "RemoteComputerShellModel reproduces current-main status phases, read states, monitor projection, active-task detection, stage copy, VNC dimensions, warm-source retention, viewer URL parameters, nested-token identity, VNC session parsing, cursor timing/presentation, monitor selection and handoff labels. Constants match 15s/3-per-60s/32ms/3/3/2.5s contracts. Exact-head focused CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/shell/status-store.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "RemoteComputerAgentBoxOwner preserves the 32-record cache, watcher retention, 15s read/ensure deadlines, late-result fencing, demand tracking, reconnect/focus rehydration, generation fencing, handback, disk pressure, VNC presence and action fan-out. Account/Agent scope changes invalidate and release the old owner rather than leaking state. Exact-head tests pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/shell/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop shell CSS is presentation-only. iOS replaces it with the native SwiftUI RemoteComputerSurface while preserving loading/unavailable/retry/rebuild/handoff/monitor states and accessibility identifiers; no CSS-derived runtime owner is carried over. Device/accessibility evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/shell/vnc-webview.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Electron webview transport is replaced by restricted WKWebView. iOS keeps autoconnect/scale/reconnect/interactive URL semantics, VNC session/liveness/host-key telemetry, viewer visibility, navigation recovery and fail-closed web-process crash policy (3 crashes/60s), with native lifecycle teardown. Exact-head UI/protected evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/teach-recording/composition.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop teach-recording composition maps to RemoteComputerSurface + RemoteComputerTeachRecordingOwner: availability is gated to live Agent computer state without handoff, recording/armed presentation shares the canonical owner, and close/minimize paths reset native capture rather than creating a second recording truth. Exact-head UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/teach-recording/primitives.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop button/icon primitives are pure web presentation. iOS uses native SwiftUI controls and accessibility identifiers while preserving start/save/discard/dismiss product actions; this is an evidence-backed native presentation replacement, not an omitted capability."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/teach-recording/store.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "RemoteComputerTeachRecordingOwner maps the canonical Host teach.status/start/stop state, 600s max duration, 1s timer, reconnect healing and native capture. Current-main review found an in-flight start/reset race; commits 2d2d01d57a2398f8195a77fd1fd34708557fd293 and 3737f09232c8cffe3be8396c0e1eafc482a96d4f now serialize cleanup, await stale start completion and discard it under generation fencing. Deterministic XCTest added; exact-head CI still pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/teach-recording/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
+        "finding": "Desktop armed/recording/peer/save/discard controls map to the native RemoteComputerSurface teach recording bar and owner-backed actions, with elapsed duration and Host capture state rather than mock UI. Exact-head Swift/UI evidence pending."
       }
     ]
   },
