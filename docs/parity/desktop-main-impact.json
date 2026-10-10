@@ -3369,6 +3369,24 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-coordinator-client-implemented-pending-exact-head-ci",
         "finding": "Current-main Coordinator client responsibilities are present in the native port stack: protocol-version ready validation, correlated requests/replies, typed failures, event delivery, cancellation, protocol-breach shutdown and settlement of every pending continuation. IOSCoordinatorRuntime owns whole-port restart/replacement and monotonically fences accepted generations so stale ports cannot regain authority; dispose closes the live owner. Focused Coordinator architecture/contracts exist, but final exact-head CI remains required."
+      },
+      {
+        "path": "frontend/src/production/group-members-root.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-group-members-native-owner-implemented-pending-final-exact-head-ci",
+        "finding": "Current-main group-members root composes a generation-fenced roster source/provider over the canonical Coordinator owner and resets/disposes all renderer-local state. iOS maps this to MobileBotGroupMembersSheet/GrokMobileGroupMembersModel over the canonical Host group roster/update service; native interaction state is account/reconnect generation fenced and no second group store or nested-group owner is introduced. Historical green evidence cannot satisfy the final exact source chain; final exact-head CI remains required."
+      },
+      {
+        "path": "frontend/src/production/local-tool-permission-scope.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-not-applicable-with-fail-closed-native-capability-replacement",
+        "finding": "The Desktop renderer gate for unrestricted local-computer approval rows is not a valid iOS product surface. Native local execution is restricted to LocalCapabilityRunner's explicit supported capabilities; IOSLocalExecSupervisor routes shell/process/box namespaces to RemoteRunner and returns unavailable for unknown device capabilities. Mini App/native privacy grants remain separate owners. Thus the Desktop approval cache/scope gate is N/A-with-replacement, while fail-closed capability/security behavior is preserved and still requires final release/security AC evidence."
+      },
+      {
+        "path": "frontend/src/production/reaction-root.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-reaction-owner-implemented-pending-exact-head-ci",
+        "finding": "Current-main reaction root owns one optimistic projection over canonical transcript state and reconciles through authoritative feed. iOS keeps the same single owner in MessagingModel: projectChatReactionToggle updates the canonical hydrated message collection, each reaction mutation receives a per-message/reaction generation, setReaction is dispatched to the canonical command path, and rollback occurs only when the same latest generation/optimistic value is still present; later canonical hydration replaces the projection. No second reaction feed/transcript store is created. Final exact-head CI remains required."
       }
     ]
   },
