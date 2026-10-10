@@ -3819,6 +3819,30 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-timeline-event-implemented-pending-exact-head-ci",
         "finding": "Current-main non-automation event rows use the canonical descriptions Renamed to/Connected to/Disconnected from plus row timestamp and single-line presentation. iOS renders the projected text and createdAt timestamp in the native transcript row, keeps these rows non-message/non-actionable, and preserves strict projection before display. Exact-head CI is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/attachment-data.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-attachment-implemented-pending-exact-head-ci",
+        "finding": "Desktop attachment classification/projection maps to MarketplaceModel.projectMobileAttachmentCard and classifyMobileAttachmentURL: sand://box, normalized HTTP legacy-link, media/file classification, strict finite/non-negative metadata, basename fallback, batch/reply/clientNonce preservation, and fail-closed malformed rows. MobileBotChat renders image/video/audio/file natively and focused SharedWorkflowTranscriptParityTests cover box/link/media/audio/file, user-attachment metadata, malformed inputs, and shared transcript/live-chat projection. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/auto-review-actions.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-auto-review-implemented-pending-exact-head-ci",
+        "finding": "Desktop approval actions map to the existing iOS auto-review owner: bounded 20-entry/1000-unit instruction normalization, inline-secret redaction before Always allow persistence, duplicate handling, allow-once transport for approved/always, deny transport, exact operation ownership, generation fencing in MobileBotChat, stale/failure presentation, and Host settings synchronization through MahayanaCoordinator. AutoReviewApprovalParityTests cover rule persistence/redaction/normalization, operation fencing and decision mapping. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/cloud-agent-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-production-gap-open",
+        "finding": "Reviewed current-main provider contract: bcId-scoped getCloudAgentInfo, 5s live/60s recovery polling, terminal stop, account+agent scope generation fencing, Open in Cursor, plus branch/PR/files/line statistics. iOS already owns authenticated BackgroundComposer GetBackgroundComposerInfo via IOSCursorDashboardClient -> Coordinator MCP manager, but the shipping renderer/main RPC and MobileBotChat transcript projection do not expose send-message:cursor-agent, and IOSCloudAgentComposerInfo currently decodes only status/summary/permanentError rather than the richer branch/PR/stat fields. This remains an implementation gap; no verified/implemented promotion."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/connector-actions.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-production-gap-open",
+        "finding": "Reviewed current-main connector provider lifecycle: normalized identity, catalog/server matching, open/close load, install/authenticate, external OAuth handoff/reopen/retry, pending/action state, team-policy fail-closed behavior, auth-completed refresh, request/generation fencing and dispose cleanup. iOS has canonical MCP account/catalog/OAuth/install managers, but MobileBotChat's recovered transcript-card projector does not currently project send-message:connector/connectors or render these provider actions. This remains a shipping integration gap and is not marked implemented/verified."
       }
     ]
   },
