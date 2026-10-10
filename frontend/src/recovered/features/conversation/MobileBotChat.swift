@@ -763,6 +763,65 @@ internal func mobileTranscriptCopyText(_ entry: MobileChatMessage) -> String? {
     return entry.text
 }
 
+internal struct MobileMessageCardSeamProjection: Equatable {
+    let isSourceTrusted: Bool
+    let isFromUser: Bool
+    let isStandaloneEmoji: Bool
+    let url: String?
+    let copyText: String?
+}
+
+private func mobileMessageCardStrictHTTPSURL(_ text: String) -> String? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty,
+          !trimmed.contains(where: { $0.isWhitespace }),
+          let components = URLComponents(string: trimmed),
+          components.scheme?.lowercased() == "https",
+          let host = components.host,
+          !host.isEmpty
+    else { return nil }
+    return components.url?.absoluteString
+}
+
+internal func projectMobileMessageCardSeam(
+    _ entry: MobileChatMessage
+) -> MobileMessageCardSeamProjection {
+    guard entry.kind == .message else {
+        return .init(
+            isSourceTrusted: false,
+            isFromUser: false,
+            isStandaloneEmoji: false,
+            url: nil,
+            copyText: nil
+        )
+    }
+
+    let text = entry.sendMessageTextProjection?.content ?? entry.text
+    let standaloneEmoji = entry.role == .user && mobileTranscriptStandaloneEmoji(text)
+    let url: String?
+    if entry.role == .user,
+       entry.attachmentProjection == nil,
+       entry.attachmentURL == nil
+    {
+        if let projection = entry.sendMessageTextProjection,
+           case let .urlCard(rawURL) = projection.presentation {
+            url = mobileMessageCardStrictHTTPSURL(rawURL)
+        } else {
+            url = mobileMessageCardStrictHTTPSURL(text)
+        }
+    } else {
+        url = nil
+    }
+
+    return .init(
+        isSourceTrusted: entry.role == .assistant,
+        isFromUser: entry.role == .user,
+        isStandaloneEmoji: standaloneEmoji,
+        url: url,
+        copyText: mobileTranscriptCopyText(entry)
+    )
+}
+
 internal enum MobileReplyReferencePreview: Equatable {
     case userText(String)
     case assistantText(String)
@@ -2377,6 +2436,7 @@ internal struct MobileBotChat: View {
                 .padding(.vertical, 2)
             }
         } else if entry.role == .user {
+            let seam = projectMobileMessageCardSeam(entry)
             HStack {
                 Spacer(minLength: 54)
                 VStack(alignment: .leading, spacing: 7) {
@@ -2410,11 +2470,12 @@ internal struct MobileBotChat: View {
                         }
                     }
                 }
-                .foregroundStyle(.white)
-                .tint(.white)
-                .padding(.horizontal, 15).padding(.vertical, 10)
+                .foregroundStyle(seam.isStandaloneEmoji ? Color.primary : Color.white)
+                .tint(seam.isStandaloneEmoji ? Color.accentColor : Color.white)
+                .padding(.horizontal, seam.isStandaloneEmoji ? 4 : 15)
+                .padding(.vertical, seam.isStandaloneEmoji ? 2 : 10)
                 .background(
-                    .black,
+                    seam.isStandaloneEmoji ? Color.clear : Color.black,
                     in: UnevenRoundedRectangle(
                         cornerRadii: .init(
                             topLeading: 18,
@@ -2436,13 +2497,14 @@ internal struct MobileBotChat: View {
                     ) != nil {
                         Button("Forward") { forwardMessage = entry }
                     }
-                    if let copyText = mobileTranscriptCopyText(entry) {
+                    if let copyText = seam.copyText {
                         Button("Copy") { UIPasteboard.general.string = copyText }
                     }
                     reactionMenu(entry)
                 }
             }
         } else {
+            let seam = projectMobileMessageCardSeam(entry)
             VStack(alignment: .leading, spacing: 3) {
                 if adjacency.isRunStart {
                     Text(bot.name)
@@ -2486,7 +2548,7 @@ internal struct MobileBotChat: View {
                         ) != nil {
                             Button("Forward") { forwardMessage = entry }
                         }
-                        if let copyText = mobileTranscriptCopyText(entry) {
+                        if let copyText = seam.copyText {
                             Button("Copy") { UIPasteboard.general.string = copyText }
                         }
                         reactionMenu(entry)
@@ -3624,7 +3686,11 @@ internal struct MobileBotChat: View {
 
     @ViewBuilder
     private func messageTextContent(_ entry: MobileChatMessage) -> some View {
-        if let projection = entry.sendMessageTextProjection {
+        let seam = projectMobileMessageCardSeam(entry)
+        if let url = seam.url {
+            MobileLinkMetadataCard(url: url, model: model)
+                .accessibilityIdentifier(Self.semanticId("mobile-bot-message-url-card-\(entry.id)"))
+        } else if let projection = entry.sendMessageTextProjection {
             switch projection.presentation {
             case .urlCard(let rawURL):
                 if URL(string: rawURL) != nil {
