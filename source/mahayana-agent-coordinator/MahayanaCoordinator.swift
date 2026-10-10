@@ -331,6 +331,10 @@ final class MahayanaCoordinator {
     private let nativeLocalCapabilities = IOSNativeLocalCapabilityBackend()
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
     private var autoReviewHostSyncNeeded = true
+    private var localToolApprovalAccountScope: String?
+    private var localToolApprovalScopeRevision: UInt64 = 0
+    private var localToolApprovalCleanupStatus = "idle"
+    private var localToolApprovalCleanupFailure: String?
     private(set) var lifecycleState: LifecycleState = .starting
     private var inFlight = Set<String>()
 
@@ -547,6 +551,14 @@ final class MahayanaCoordinator {
     }
 
     func updateAccountSettingsScope(_ accountScope: String?) {
+        localToolApprovalScopeRevision &+= 1
+        localToolApprovalAccountScope = accountScope?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if localToolApprovalAccountScope?.isEmpty == true {
+            localToolApprovalAccountScope = nil
+        }
+        localToolApprovalCleanupStatus = "idle"
+        localToolApprovalCleanupFailure = nil
         if let accountScope {
             settingsStore?.scopeToAccount(accountScope)
             hostSettingsReconciler?.scopeToAccount(accountScope)
@@ -556,6 +568,145 @@ final class MahayanaCoordinator {
         }
         autoReviewHostSyncNeeded = true
         mcpSurface?.updateAccountScope(accountScope)
+    }
+
+    private func localToolApprovalCleanupStateObject() -> [String: Any] {
+        [
+            "status": localToolApprovalCleanupStatus,
+            "failure": localToolApprovalCleanupFailure.map { $0 as Any } ?? NSNull(),
+            "scopeRevision": NSNumber(value: localToolApprovalScopeRevision),
+        ]
+    }
+
+    private func resolveLocalToolPermissionWithApprovalLifecycle(
+        _ params: [String: Any]
+    ) async throws -> JSONResult {
+        guard let settingsStore,
+              let entryId = (params["entryId"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !entryId.isEmpty,
+              let requestId = (params["requestId"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !requestId.isEmpty,
+              let agentId = (params["agentId"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !agentId.isEmpty,
+              let requestedResolution = params["resolution"] as? String,
+              ["always", "allow-once", "never", "deny"].contains(requestedResolution),
+              let action = params["action"] as? String,
+              isSandLocalToolAction(action),
+              let target = params["target"] as? String,
+              let accountScope = localToolApprovalAccountScope,
+              !accountScope.isEmpty
+        else {
+            throw CoordinatorError.invalidParams
+        }
+
+        let scopeRevision = localToolApprovalScopeRevision
+        var resolution = requestedResolution
+        if requestedResolution == "always" || requestedResolution == "never" {
+            do {
+                guard scopeRevision == localToolApprovalScopeRevision,
+                      localToolApprovalAccountScope == accountScope
+                else {
+                    throw CoordinatorError.requestFailed("Local tool permission scope changed.")
+                }
+                let ceiling = settingsStore.getLocalToolPermissionCeiling()
+                guard resolveSandLocalToolPermission(
+                    requestedResolution,
+                    adminCeiling: ceiling
+                ) == requestedResolution else {
+                    throw CoordinatorError.requestFailed(
+                        "Local tool permission exceeds the administrator ceiling."
+                    )
+                }
+                try settingsStore.setLocalToolPermissionPersisting(requestedResolution)
+            } catch {
+                resolution = requestedResolution == "always" ? "allow-once" : "deny"
+            }
+        }
+
+        if resolution == "allow-once" {
+            guard scopeRevision == localToolApprovalScopeRevision,
+                  localToolApprovalAccountScope == accountScope,
+                  try settingsStore.recordLocalToolApproval(
+                      id: requestId,
+                      action: action,
+                      target: target,
+                      expectedAccountScope: accountScope
+                  )
+            else {
+                throw CoordinatorError.requestFailed(
+                    "Local tool approval scope changed before it could be persisted."
+                )
+            }
+        }
+
+        guard scopeRevision == localToolApprovalScopeRevision,
+              localToolApprovalAccountScope == accountScope
+        else {
+            throw CoordinatorError.requestFailed("Local tool permission scope changed.")
+        }
+
+        _ = try await request(
+            method: "resolveLocalToolPermission",
+            params: [
+                "entryId": entryId,
+                "requestId": requestId,
+                "resolution": resolution,
+                "agentId": agentId,
+            ]
+        )
+
+        guard scopeRevision == localToolApprovalScopeRevision,
+              localToolApprovalAccountScope == accountScope
+        else {
+            throw CoordinatorError.requestFailed("Local tool permission scope changed.")
+        }
+        return JSONResult(value: resolution)
+    }
+
+    private func clearLocalToolApprovalsAfterAcceptedSend(
+        scopeRevision: UInt64
+    ) {
+        guard scopeRevision == localToolApprovalScopeRevision else { return }
+        guard let settingsStore,
+              let accountScope = localToolApprovalAccountScope,
+              !accountScope.isEmpty
+        else {
+            localToolApprovalCleanupStatus = "failed"
+            localToolApprovalCleanupFailure =
+                "Temporary local-tool approval cleanup has no active account scope."
+            return
+        }
+
+        localToolApprovalCleanupStatus = "clearing"
+        localToolApprovalCleanupFailure = nil
+        do {
+            let cleared = try settingsStore.clearLocalToolApprovals(
+                expectedAccountScope: accountScope
+            )
+            guard scopeRevision == localToolApprovalScopeRevision,
+                  localToolApprovalAccountScope == accountScope
+            else {
+                localToolApprovalCleanupStatus = "idle"
+                localToolApprovalCleanupFailure = nil
+                return
+            }
+            if cleared {
+                localToolApprovalCleanupStatus = "idle"
+            } else {
+                localToolApprovalCleanupStatus = "failed"
+                localToolApprovalCleanupFailure =
+                    "Temporary local-tool approval cleanup was fenced by account scope."
+            }
+        } catch {
+            guard scopeRevision == localToolApprovalScopeRevision,
+                  localToolApprovalAccountScope == accountScope
+            else { return }
+            localToolApprovalCleanupStatus = "failed"
+            localToolApprovalCleanupFailure = error.localizedDescription
+        }
     }
 
     private func autoReviewInstructionsObject() -> [String: Any] {
@@ -741,6 +892,12 @@ final class MahayanaCoordinator {
             settingsStore.setLocalToolPermission(raw)
             return JSONResult(value: settingsStore.getLocalToolPermission())
         }
+        if method == "resolveLocalToolPermissionWithApprovalLifecycle" {
+            return try await resolveLocalToolPermissionWithApprovalLifecycle(params)
+        }
+        if method == "getLocalToolApprovalCleanupState" {
+            return JSONResult(value: localToolApprovalCleanupStateObject())
+        }
 
         if method == "getAutoReviewInstructions" {
             return JSONResult(value: autoReviewInstructionsObject())
@@ -825,6 +982,13 @@ final class MahayanaCoordinator {
             try await syncAutoReviewRulesToHost()
         }
 
+        let localToolApprovalCleanupRevision: UInt64? = {
+            guard method == "feature.execute",
+                  let command = params["command"] as? [String: Any],
+                  command["type"] as? String == "chat.send"
+            else { return nil }
+            return localToolApprovalScopeRevision
+        }()
         let requestId = UUID().uuidString.lowercased()
         let observedHostGeneration = hostSupervisor.generation
         let awaitTurn = method == "feature.execute" && (params["awaitTurn"] as? Bool) == true
@@ -834,6 +998,11 @@ final class MahayanaCoordinator {
 
         do {
             let result = try await hostSupervisor.request(method: method, params: params)
+            if let localToolApprovalCleanupRevision {
+                clearLocalToolApprovalsAfterAcceptedSend(
+                    scopeRevision: localToolApprovalCleanupRevision
+                )
+            }
             guard awaitTurn,
                   let accepted = result.value as? [String: Any],
                   let operationId = (accepted["operationId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),

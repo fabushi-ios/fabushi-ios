@@ -53,6 +53,13 @@ struct SandStoredSidebarSection: Codable, Equatable, Sendable {
     }
 }
 
+struct SandStoredLocalToolApproval: Codable, Equatable, Sendable {
+    let id: String
+    let action: SandLocalToolAction
+    let target: String
+    var resourcePath: String? = nil
+}
+
 struct SandStoredSettings: Codable, Equatable, Sendable {
     var version: Int
     var mcpBoxServers: [String]
@@ -77,6 +84,7 @@ struct SandStoredSettings: Codable, Equatable, Sendable {
     var autoReviewInstructions: SandStoredAutoReviewInstructions?
     var localToolPermission: String?
     var localToolPermissionCeiling: String?
+    var localToolApprovals: [SandStoredLocalToolApproval]?
     var inferenceProvider: SandInferenceProvider?
     var inferenceRouterUsage: SandInferenceRouterUsage?
     var boxRuntime: SandBoxRuntime?
@@ -156,6 +164,27 @@ private func normalizeStoredSettings(_ decoded: SandStoredSettings) -> SandStore
     if let raw = value.localToolPermissionCeiling,
        !isSandLocalToolPermission(raw) {
         value.localToolPermissionCeiling = nil
+    }
+    if let approvals = value.localToolApprovals {
+        var normalized: [SandStoredLocalToolApproval] = []
+        var indexByID: [String: Int] = [:]
+        for approval in approvals {
+            let id = approval.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !id.isEmpty, isSandLocalToolAction(approval.action) else { continue }
+            let candidate = SandStoredLocalToolApproval(
+                id: id,
+                action: approval.action,
+                target: approval.target,
+                resourcePath: approval.resourcePath
+            )
+            if let index = indexByID[id] {
+                normalized[index] = candidate
+            } else {
+                indexByID[id] = normalized.count
+                normalized.append(candidate)
+            }
+        }
+        value.localToolApprovals = normalized.isEmpty ? nil : normalized
     }
     value.pinnedAgentIds = value.pinnedAgentIds.map(uniqueNonEmpty)
     value.sidebarSections = value.sidebarSections?.filter {
@@ -257,6 +286,10 @@ private func parseStoredSettingsObject(_ rawValue: Any) -> SandStoredSettings? {
 
     value.localToolPermission = raw["localToolPermission"] as? String
     value.localToolPermissionCeiling = raw["localToolPermissionCeiling"] as? String
+    value.localToolApprovals = decodeStoredValue(
+        [SandStoredLocalToolApproval].self,
+        from: raw["localToolApprovals"]
+    )
     if let provider = raw["inferenceProvider"] as? String {
         value.inferenceProvider = SandInferenceProvider(rawValue: provider)
     }
@@ -515,6 +548,7 @@ final class SandSettingsStore: @unchecked Sendable {
                 $0.computerUseModel = nil
                 $0.localToolPermission = nil
                 $0.localToolPermissionCeiling = nil
+                $0.localToolApprovals = nil
             }
             if let seen = $0.hasSeenOnboarding,
                $0.hasSeenOnboardingAccountScope == nil || $0.hasSeenOnboardingAccountScope == accountScope {
@@ -539,6 +573,7 @@ final class SandSettingsStore: @unchecked Sendable {
             $0.computerUseModel = nil
             $0.localToolPermission = nil
             $0.localToolPermissionCeiling = nil
+            $0.localToolApprovals = nil
             $0.hasSeenOnboarding = nil
             $0.hasSeenOnboardingAccountScope = nil
         }
@@ -587,6 +622,82 @@ final class SandSettingsStore: @unchecked Sendable {
 
     func setLocalToolPermissionCeiling(_ value: SandLocalToolPermission?) {
         update { $0.localToolPermissionCeiling = value }
+    }
+
+    func setLocalToolPermissionPersisting(_ value: SandLocalToolPermission?) throws {
+        if let value, !isSandLocalToolPermission(value) {
+            throw CocoaError(.coderInvalidValue)
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        var current = loadLocked()
+        current.localToolPermission = value
+        try persistLocked(current)
+    }
+
+    func getLocalToolApprovalAccountScope() -> String? {
+        let scope = load().mcpCustomInstructionsAccountScope?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return scope?.isEmpty == false ? scope : nil
+    }
+
+    func getLocalToolApprovals(expectedAccountScope: String) -> [SandStoredLocalToolApproval] {
+        let normalizedScope = expectedAccountScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedScope.isEmpty else { return [] }
+        let current = load()
+        guard current.mcpCustomInstructionsAccountScope == normalizedScope else { return [] }
+        return current.localToolApprovals ?? []
+    }
+
+    @discardableResult
+    func recordLocalToolApproval(
+        id: String,
+        action: SandLocalToolAction,
+        target: String,
+        resourcePath: String? = nil,
+        expectedAccountScope: String
+    ) throws -> Bool {
+        let normalizedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedScope = expectedAccountScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedID.isEmpty,
+              !normalizedScope.isEmpty,
+              isSandLocalToolAction(action)
+        else { return false }
+
+        lock.lock()
+        defer { lock.unlock() }
+        var current = loadLocked()
+        guard current.mcpCustomInstructionsAccountScope == normalizedScope else { return false }
+
+        let approval = SandStoredLocalToolApproval(
+            id: normalizedID,
+            action: action,
+            target: target,
+            resourcePath: resourcePath
+        )
+        var approvals = current.localToolApprovals ?? []
+        if let index = approvals.firstIndex(where: { $0.id == normalizedID }) {
+            approvals[index] = approval
+        } else {
+            approvals.append(approval)
+        }
+        current.localToolApprovals = approvals
+        try persistLocked(current)
+        return true
+    }
+
+    @discardableResult
+    func clearLocalToolApprovals(expectedAccountScope: String) throws -> Bool {
+        let normalizedScope = expectedAccountScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedScope.isEmpty else { return false }
+
+        lock.lock()
+        defer { lock.unlock() }
+        var current = loadLocked()
+        guard current.mcpCustomInstructionsAccountScope == normalizedScope else { return false }
+        current.localToolApprovals = nil
+        try persistLocked(current)
+        return true
     }
 
     func getResolvedLocalToolPermission() -> SandLocalToolPermission {

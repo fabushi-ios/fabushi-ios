@@ -748,6 +748,8 @@ struct MobileChatMessage: Identifiable, Equatable {
     var listenerPlatform: String?
     var localToolPermissionRequestId: String?
     var localToolPermissionStatus: String?
+    var localToolPermissionAction: SandLocalToolAction?
+    var localToolPermissionTarget: String?
     var cloudAgentBcId: String?
     var connectorNames: [String]?
     var connectorServerIdHint: String?
@@ -1464,7 +1466,10 @@ func projectMobileTranscriptCard(
             guard let ask = message["ask"] as? [String: Any],
                   let rawRequestId = ask["requestId"] as? String,
                   let status = ask["status"] as? String,
-                  mobileLocalToolPermissionStatuses.contains(status)
+                  mobileLocalToolPermissionStatuses.contains(status),
+                  let action = ask["action"] as? String,
+                  isSandLocalToolAction(action),
+                  let target = ask["target"] as? String
             else { return nil }
             let requestId = rawRequestId.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !requestId.isEmpty else { return nil }
@@ -1483,6 +1488,8 @@ func projectMobileTranscriptCard(
                 actionStatus: status,
                 localToolPermissionRequestId: requestId,
                 localToolPermissionStatus: status,
+                localToolPermissionAction: action,
+                localToolPermissionTarget: target,
                 createdAt: createdAt
             )
         }
@@ -2437,6 +2444,8 @@ final class MarketplaceModel {
         entryId: String,
         requestId: String,
         agentId: String,
+        action: SandLocalToolAction,
+        target: String,
         resolution requestedResolution: String
     ) async throws -> String {
         let normalizedEntryId = entryId.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2445,35 +2454,29 @@ final class MarketplaceModel {
         guard !normalizedEntryId.isEmpty,
               !normalizedRequestId.isEmpty,
               !normalizedAgentId.isEmpty,
+              isSandLocalToolAction(action),
               mobileLocalToolPermissionResolutions.contains(requestedResolution)
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidParams
         }
 
-        var resolution = requestedResolution
-        if requestedResolution == "always" || requestedResolution == "never" {
-            do {
-                let stored = try await updateLocalToolPermission(requestedResolution)
-                if stored != requestedResolution {
-                    resolution = mobileLocalToolPermissionFallbackResolution(requestedResolution)
-                }
-            } catch {
-                // Desktop parity: a durable Always/Never write that is rejected
-                // or unavailable degrades to the corresponding one-time answer.
-                resolution = mobileLocalToolPermissionFallbackResolution(requestedResolution)
-            }
-        }
-
-        _ = try await bridge.request(
-            method: "resolveLocalToolPermission",
+        let result = try await bridge.request(
+            method: "resolveLocalToolPermissionWithApprovalLifecycle",
             params: [
                 "entryId": normalizedEntryId,
                 "requestId": normalizedRequestId,
-                "resolution": resolution,
+                "resolution": requestedResolution,
                 "agentId": normalizedAgentId,
+                "action": action,
+                "target": target,
             ]
         )
-        return resolution
+        guard let authoritative = result.value as? String,
+              mobileLocalToolPermissionResolutions.contains(authoritative)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return authoritative
     }
 
     func updateAutoReviewSettings(

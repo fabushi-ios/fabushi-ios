@@ -4854,6 +4854,8 @@ internal struct MobileBotChat: View {
     ) async {
         guard entry.localToolPermissionStatus == "pending",
               let requestId = entry.localToolPermissionRequestId,
+              let action = entry.localToolPermissionAction,
+              let target = entry.localToolPermissionTarget,
               mobileLocalToolPermissionResolutions.contains(resolution),
               !localToolPermissionPendingEntryIds.contains(entry.id)
         else { return }
@@ -4876,6 +4878,8 @@ internal struct MobileBotChat: View {
                 entryId: entry.id,
                 requestId: requestId,
                 agentId: ownedBotId,
+                action: action,
+                target: target,
                 resolution: resolution
             )
             guard !Task.isCancelled,

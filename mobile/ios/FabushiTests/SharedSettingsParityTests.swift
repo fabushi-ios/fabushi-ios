@@ -701,4 +701,237 @@ final class SharedSettingsParityTests: XCTestCase {
         }
     }
 
+
+    func testLocalToolApprovalsPersistAcrossRestartAndFenceAccountReplacement() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("settings.json")
+        let store = SandSettingsStore(settingsPath: path.path)
+        store.scopeToAccount("owner-a")
+
+        XCTAssertTrue(try store.recordLocalToolApproval(
+            id: "approval-1",
+            action: "run-command",
+            target: "swift test",
+            expectedAccountScope: "owner-a"
+        ))
+        XCTAssertEqual(
+            store.getLocalToolApprovals(expectedAccountScope: "owner-a"),
+            [.init(id: "approval-1", action: "run-command", target: "swift test")]
+        )
+
+        let restored = SandSettingsStore(settingsPath: path.path)
+        XCTAssertEqual(
+            restored.getLocalToolApprovals(expectedAccountScope: "owner-a"),
+            [.init(id: "approval-1", action: "run-command", target: "swift test")]
+        )
+
+        restored.scopeToAccount("owner-b")
+        XCTAssertTrue(restored.getLocalToolApprovals(expectedAccountScope: "owner-a").isEmpty)
+        XCTAssertTrue(restored.getLocalToolApprovals(expectedAccountScope: "owner-b").isEmpty)
+        XCTAssertFalse(try restored.recordLocalToolApproval(
+            id: "stale",
+            action: "read-file",
+            target: "/tmp/stale",
+            expectedAccountScope: "owner-a"
+        ))
+        XCTAssertTrue(try restored.recordLocalToolApproval(
+            id: "approval-2",
+            action: "read-file",
+            target: "/tmp/current",
+            expectedAccountScope: "owner-b"
+        ))
+        XCTAssertFalse(try restored.clearLocalToolApprovals(expectedAccountScope: "owner-a"))
+        XCTAssertEqual(
+            restored.getLocalToolApprovals(expectedAccountScope: "owner-b").map(\.id),
+            ["approval-2"]
+        )
+        XCTAssertTrue(try restored.clearLocalToolApprovals(expectedAccountScope: "owner-b"))
+        XCTAssertTrue(restored.getLocalToolApprovals(expectedAccountScope: "owner-b").isEmpty)
+    }
+
+    func testLocalToolPermissionTranscriptProjectionRetainsCanonicalApprovalIdentity() throws {
+        let event: [String: Any] = [
+            "entryId": "entry-1",
+            "card": [
+                "kind": "send-message",
+                "message": [
+                    "type": "local-tool-permission",
+                    "ask": [
+                        "requestId": "approval-1",
+                        "status": "pending",
+                        "action": "run-command",
+                        "target": "printf 'hello'",
+                    ],
+                ],
+            ],
+        ]
+        let row = try XCTUnwrap(projectMobileTranscriptCard(event: event, operationId: "operation-1"))
+        XCTAssertEqual(row.localToolPermissionRequestId, "approval-1")
+        XCTAssertEqual(row.localToolPermissionAction, "run-command")
+        XCTAssertEqual(row.localToolPermissionTarget, "printf 'hello'")
+
+        var malformed = event
+        malformed["card"] = [
+            "kind": "send-message",
+            "message": [
+                "type": "local-tool-permission",
+                "ask": [
+                    "requestId": "approval-2",
+                    "status": "pending",
+                    "action": "spawn-arbitrary-process",
+                    "target": "unsafe",
+                ],
+            ],
+        ]
+        XCTAssertNil(projectMobileTranscriptCard(event: malformed, operationId: "operation-1"))
+    }
+
+    @MainActor
+    func testCoordinatorLocalToolApprovalLifecyclePersistsAllowOnceAndAcceptedSendClears() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        let host = SettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+        coordinator.updateAccountSettingsScope("owner-a")
+
+        let resolved = try await coordinator.request(
+            method: "resolveLocalToolPermissionWithApprovalLifecycle",
+            params: [
+                "entryId": "entry-1",
+                "requestId": "approval-1",
+                "agentId": "agent-1",
+                "action": "run-command",
+                "target": "swift test",
+                "resolution": "allow-once",
+            ]
+        )
+        XCTAssertEqual(resolved.value as? String, "allow-once")
+        XCTAssertEqual(
+            store.getLocalToolApprovals(expectedAccountScope: "owner-a").map(\.id),
+            ["approval-1"]
+        )
+
+        let sent = try await coordinator.request(
+            method: "feature.execute",
+            params: [
+                "command": [
+                    "type": "chat.send",
+                    "requestId": "send-1",
+                    "agentId": "agent-1",
+                    "text": "continue",
+                ],
+            ]
+        )
+        XCTAssertNotNil(sent.value)
+        XCTAssertTrue(store.getLocalToolApprovals(expectedAccountScope: "owner-a").isEmpty)
+
+        let cleanup = try await coordinator.request(method: "getLocalToolApprovalCleanupState")
+        let cleanupObject = try XCTUnwrap(cleanup.value as? [String: Any])
+        XCTAssertEqual(cleanupObject["status"] as? String, "idle")
+        XCTAssertTrue(cleanupObject["failure"] is NSNull)
+    }
+
+    @MainActor
+    func testCoordinatorLocalToolApprovalLifecycleFailsClosedAndAccountSwitchFencesStaleApprovals() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        let host = SettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+        coordinator.updateAccountSettingsScope("owner-a")
+
+        do {
+            _ = try await coordinator.request(
+                method: "resolveLocalToolPermissionWithApprovalLifecycle",
+                params: [
+                    "entryId": "entry-invalid",
+                    "requestId": "approval-invalid",
+                    "agentId": "agent-1",
+                    "action": "spawn-arbitrary-process",
+                    "target": "unsafe",
+                    "resolution": "allow-once",
+                ]
+            )
+            XCTFail("unknown local-tool actions must fail closed")
+        } catch {
+            XCTAssertTrue(store.getLocalToolApprovals(expectedAccountScope: "owner-a").isEmpty)
+        }
+
+        _ = try await coordinator.request(
+            method: "resolveLocalToolPermissionWithApprovalLifecycle",
+            params: [
+                "entryId": "entry-2",
+                "requestId": "approval-2",
+                "agentId": "agent-1",
+                "action": "read-file",
+                "target": "/tmp/current",
+                "resolution": "allow-once",
+            ]
+        )
+        XCTAssertEqual(store.getLocalToolApprovals(expectedAccountScope: "owner-a").count, 1)
+
+        coordinator.updateAccountSettingsScope("owner-b")
+        XCTAssertTrue(store.getLocalToolApprovals(expectedAccountScope: "owner-a").isEmpty)
+        XCTAssertTrue(store.getLocalToolApprovals(expectedAccountScope: "owner-b").isEmpty)
+        XCTAssertFalse(try store.clearLocalToolApprovals(expectedAccountScope: "owner-a"))
+    }
+
+    @MainActor
+    func testAcceptedSendSurvivesApprovalCleanupPersistenceFailure() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("settings.json")
+        let store = SandSettingsStore(settingsPath: path.path)
+        let host = SettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+        coordinator.updateAccountSettingsScope("owner-a")
+        _ = try await coordinator.request(
+            method: "resolveLocalToolPermissionWithApprovalLifecycle",
+            params: [
+                "entryId": "entry-3",
+                "requestId": "approval-3",
+                "agentId": "agent-1",
+                "action": "run-command",
+                "target": "swift test",
+                "resolution": "allow-once",
+            ]
+        )
+
+        try FileManager.default.removeItem(at: path)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: false)
+
+        let sent = try await coordinator.request(
+            method: "feature.execute",
+            params: [
+                "command": [
+                    "type": "chat.send",
+                    "requestId": "send-cleanup-failure",
+                    "agentId": "agent-1",
+                    "text": "continue",
+                ],
+            ]
+        )
+        XCTAssertNotNil(sent.value, "cleanup failure must not flip an accepted send")
+
+        let cleanup = try await coordinator.request(method: "getLocalToolApprovalCleanupState")
+        let cleanupObject = try XCTUnwrap(cleanup.value as? [String: Any])
+        XCTAssertEqual(cleanupObject["status"] as? String, "failed")
+        XCTAssertNotNil(cleanupObject["failure"] as? String)
+    }
+
 }
