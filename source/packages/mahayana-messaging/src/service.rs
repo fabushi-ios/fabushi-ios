@@ -1573,7 +1573,18 @@ impl<S: MessagingStateStore> MessagingService<S> {
         command: &ClientCommand,
         server_time_ms: i64,
     ) -> Result<Option<Vec<ServerEnvelope>>, MessagingServiceError> {
-        let (conversation_id, client_message_id, expected) = match command {
+        let replay = |existing: &Message| {
+            vec![ServerEnvelope {
+                protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
+                cursor: Some(self.cursor.to_string()),
+                server_time_ms,
+                event: ServerEvent::MessageChanged {
+                    message: existing.clone(),
+                },
+            }]
+        };
+
+        match command {
             ClientCommand::SendMessage {
                 conversation_id,
                 client_message_id,
@@ -1583,19 +1594,38 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 scheduled_at_ms,
                 silent,
                 protected_content,
-            } => (
-                conversation_id,
-                client_message_id,
-                (
-                    content.clone(),
-                    reply_to_message_id.clone(),
-                    thread_root_message_id.clone(),
-                    *scheduled_at_ms,
-                    *silent,
-                    *protected_content,
-                    None,
-                ),
-            ),
+            } => {
+                let stable_id = stable_message_id(actor_id, client_message_id);
+                let legacy_id = MessageId::new(format!("local:{}", client_message_id.0));
+                let existing = self
+                    .engine
+                    .state()
+                    .messages
+                    .get(conversation_id)
+                    .and_then(|messages| {
+                        messages
+                            .get(&stable_id)
+                            .or_else(|| messages.get(&legacy_id))
+                    });
+                let Some(existing) = existing else {
+                    return Ok(None);
+                };
+                // The stable/legacy lookup key already binds this replay to the authenticated
+                // actor + client_message_id, without extending the canonical Message schema.
+                if &existing.sender_id != actor_id
+                    || &existing.content != content
+                    || &existing.reply_to_message_id != reply_to_message_id
+                    || &existing.thread_root_message_id != thread_root_message_id
+                    || &existing.scheduled_at_ms != scheduled_at_ms
+                    || &existing.silent != silent
+                    || &existing.protected_content != protected_content
+                {
+                    return Err(MessagingServiceError::IdempotencyConflict(
+                        client_message_id.0.clone(),
+                    ));
+                }
+                Ok(Some(replay(existing)))
+            }
             ClientCommand::SendWhenParticipantOnline {
                 conversation_id,
                 client_message_id,
@@ -1626,14 +1656,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
                             client_message_id.0.clone(),
                         ));
                     }
-                    return Ok(Some(vec![ServerEnvelope {
-                        protocol_version: FABUSHI_MESSAGING_PROTOCOL_VERSION,
-                        cursor: Some(self.cursor.to_string()),
-                        server_time_ms,
-                        event: ServerEvent::MessageChanged {
-                            message: existing.clone(),
-                        },
-                    }]));
+                    return Ok(Some(replay(existing)));
                 }
                 if let Some(existing) = self
                     .engine
@@ -1681,78 +1704,62 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 silent,
                 privacy,
             } => {
-                let original =
-                    self.forward_source_message(
-                    actor_id,
-                    source_conversation_id,
-                    message_id,
-                    server_time_ms,
-                )?;
+                let stable_id = stable_message_id(actor_id, client_message_id);
+                let legacy_id = MessageId::new(format!("local:{}", client_message_id.0));
+                let existing = self
+                    .engine
+                    .state()
+                    .messages
+                    .get(destination_conversation_id)
+                    .and_then(|messages| {
+                        messages
+                            .get(&stable_id)
+                            .or_else(|| messages.get(&legacy_id))
+                    });
+                let Some(existing) = existing else {
+                    return Ok(None);
+                };
+                let source = self
+                    .engine
+                    .state()
+                    .messages
+                    .get(source_conversation_id)
+                    .and_then(|messages| messages.get(message_id));
                 let privacy = privacy.normalized();
-                let origin = if privacy.drop_sender_names {
+                let expected_origin = if privacy.drop_sender_names {
                     None
                 } else {
                     Some(
-                        original
-                            .forward_origin
-                            .clone()
+                        source
+                            .and_then(|message| message.forward_origin.clone())
                             .unwrap_or_else(|| {
-                                format!("{}:{}", original.conversation_id.0, original.id.0)
+                                format!("{}:{}", source_conversation_id.0, message_id.0)
                             }),
                     )
                 };
-                let mut content = original.content.clone();
-                if privacy.drop_captions {
-                    content.clear_caption();
+                let expected_content = source.map(|message| {
+                    let mut content = message.content.clone();
+                    if privacy.drop_captions {
+                        content.clear_caption();
+                    }
+                    content
+                });
+                if &existing.sender_id != actor_id
+                    || existing.forward_origin.as_deref() != expected_origin.as_deref()
+                    || expected_content
+                        .as_ref()
+                        .is_some_and(|content| &existing.content != content)
+                    || &existing.thread_root_message_id != thread_root_message_id
+                    || &existing.scheduled_at_ms != scheduled_at_ms
+                    || &existing.silent != silent
+                {
+                    return Err(MessagingServiceError::IdempotencyConflict(
+                        client_message_id.0.clone(),
+                    ));
                 }
-                (
-                    destination_conversation_id,
-                    client_message_id,
-                    (
-                        content,
-                        None,
-                        thread_root_message_id.clone(),
-                        *scheduled_at_ms,
-                        *silent,
-                        false,
-                        origin,
-                    ),
-                )
+                Ok(Some(replay(existing)))
             }
-            _ => return Ok(None),
-        };
-        let stable_id = stable_message_id(actor_id, client_message_id);
-        let legacy_id = MessageId::new(format!("local:{}", client_message_id.0));
-        let existing = self
-            .engine
-            .state()
-            .messages
-            .get(conversation_id)
-            .and_then(|messages| messages.get(&stable_id).or_else(|| messages.get(&legacy_id)));
-        let Some(existing) = existing else {
-            return Ok(None);
-        };
-        let (
-            expected_content,
-            expected_reply,
-            expected_thread,
-            expected_schedule,
-            expected_silent,
-            expected_protected,
-            expected_forward_origin,
-        ) = expected;
-        if &existing.sender_id != actor_id
-            || existing.content != expected_content
-            || existing.reply_to_message_id != expected_reply
-            || existing.thread_root_message_id != expected_thread
-            || existing.scheduled_at_ms != expected_schedule
-            || existing.silent != expected_silent
-            || existing.protected_content != expected_protected
-            || existing.forward_origin != expected_forward_origin
-        {
-            return Err(MessagingServiceError::IdempotencyConflict(
-                client_message_id.0.clone(),
-            ));
+            _ => Ok(None),
         }
     }
 
@@ -3203,6 +3210,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 option_ids,
             }],
             ClientCommand::Search { .. }
+            | ClientCommand::SearchRecipients { .. }
             | ClientCommand::ListForwardRecipients { .. }
             | ClientCommand::ListCommunityMembers { .. }
             | ClientCommand::ListCommunityAuditLog { .. }

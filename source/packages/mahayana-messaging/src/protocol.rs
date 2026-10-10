@@ -12,10 +12,6 @@ use crate::message::{
     ClientMessageId, ForwardPrivacy, Message, MessageContent, MessageId, PendingPresenceSend,
     ReactionSummary,
 };
-use crate::message::{
-    ClientMessageId, ForwardPrivacy, Message, MessageContent, MessageId, PendingPresenceSend,
-    ReactionSummary,
-};
 use crate::miniapp::{
     MiniAppGrant, MiniAppManifest, MiniAppRequest, MiniAppResponse, MiniAppSession,
 };
