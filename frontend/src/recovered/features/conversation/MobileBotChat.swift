@@ -1104,6 +1104,7 @@ struct MobileSecretRequestFence: Equatable {
 private struct MobileLinkMetadataCard: View {
     let url: String
     let model: MarketplaceModel
+    let healingRevision: Int
     var isGroupStart = false
 
     @State private var metadata: MobileLinkMetadata?
@@ -1164,7 +1165,7 @@ private struct MobileLinkMetadataCard: View {
         .buttonStyle(.plain)
         .accessibilityLabel(metadata?.displayTitle ?? url)
         .accessibilityIdentifier("mobile-bot-link-card")
-        .task(id: url) {
+        .task(id: "\(url)|\(healingRevision)") {
             metadata = nil
             loading = true
             defer { loading = false }
@@ -1288,6 +1289,7 @@ private struct MobileTranscriptMediaAttachmentView: View {
 }
 
 internal struct MobileBotChat: View {
+    @Environment(\.scenePhase) private var scenePhase
     let bot: MobileBotSummary
     var availableBots: [MobileBotSummary] = []
     let bridge: IOSPreloadBridge
@@ -1309,6 +1311,7 @@ internal struct MobileBotChat: View {
     @State private var asyncTasksPresented = false
     @State private var replyTargetId: String?
     @State private var replyIsFork = false
+    @State private var linkMetadataFocusRevision = 0
     @State private var threadRootId: String?
     @State private var threadLoadGeneration = 0
     @State private var threadLoadingRootId: String?
@@ -1375,6 +1378,13 @@ internal struct MobileBotChat: View {
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
         .task(id: "\(bot.id):\(bot.conversationId ?? "")") {
             await loadInitialConversationTail()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                linkMetadataFocusRevision = linkMetadataFocusRevision == Int.max
+                    ? 1
+                    : linkMetadataFocusRevision + 1
+            }
         }
         .task(id: listenerScopeFingerprint) {
             await pollVisibleListenerIntegrations()
@@ -3947,13 +3957,21 @@ internal struct MobileBotChat: View {
     private func messageTextContent(_ entry: MobileChatMessage) -> some View {
         let seam = projectMobileMessageCardSeam(entry)
         if let url = seam.url {
-            MobileLinkMetadataCard(url: url, model: model)
+            MobileLinkMetadataCard(
+                url: url,
+                model: model,
+                healingRevision: reconnectGeneration &+ linkMetadataFocusRevision
+            )
                 .accessibilityIdentifier(Self.semanticId("mobile-bot-message-url-card-\(entry.id)"))
         } else if let projection = entry.sendMessageTextProjection {
             switch projection.presentation {
             case .urlCard(let rawURL):
                 if URL(string: rawURL) != nil {
-                    MobileLinkMetadataCard(url: rawURL, model: model)
+                    MobileLinkMetadataCard(
+                url: rawURL,
+                model: model,
+                healingRevision: reconnectGeneration &+ linkMetadataFocusRevision
+            )
                         .accessibilityIdentifier(Self.semanticId("mobile-bot-url-card-\(projection.id)"))
                 } else if !projection.content.isEmpty {
                     Text(projection.content)
@@ -4030,7 +4048,11 @@ internal struct MobileBotChat: View {
                 }
                 .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-box-\(attachment.id)"))
             case .legacyLink:
-                MobileLinkMetadataCard(url: attachment.url, model: model)
+                MobileLinkMetadataCard(
+                url: attachment.url,
+                model: model,
+                healingRevision: reconnectGeneration &+ linkMetadataFocusRevision
+            )
                     .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
             case .media:
                 MobileTranscriptMediaAttachmentView(
