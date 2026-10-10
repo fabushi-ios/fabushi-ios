@@ -60,6 +60,13 @@ struct SandStoredLocalToolApproval: Codable, Equatable, Sendable {
     var resourcePath: String? = nil
 }
 
+struct SandStoredComposerSubmission: Codable, Equatable, Sendable {
+    let nonce: String
+    let agentId: String
+    let createdAtMs: Int64
+    let commandJSON: String
+}
+
 struct SandStoredSettings: Codable, Equatable, Sendable {
     var version: Int
     var mcpBoxServers: [String]
@@ -85,6 +92,7 @@ struct SandStoredSettings: Codable, Equatable, Sendable {
     var localToolPermission: String?
     var localToolPermissionCeiling: String?
     var localToolApprovals: [SandStoredLocalToolApproval]?
+    var composerSubmissionQueue: [SandStoredComposerSubmission]?
     var inferenceProvider: SandInferenceProvider?
     var inferenceRouterUsage: SandInferenceRouterUsage?
     var boxRuntime: SandBoxRuntime?
@@ -185,6 +193,25 @@ private func normalizeStoredSettings(_ decoded: SandStoredSettings) -> SandStore
             }
         }
         value.localToolApprovals = normalized.isEmpty ? nil : normalized
+    }
+    if let submissions = value.composerSubmissionQueue {
+        var normalized: [SandStoredComposerSubmission] = []
+        var indexByNonce: [String: Int] = [:]
+        for submission in submissions {
+            let nonce = submission.nonce.trimmingCharacters(in: .whitespacesAndNewlines)
+            let agentId = submission.agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !nonce.isEmpty, !agentId.isEmpty, !submission.commandJSON.isEmpty,
+                  let data = submission.commandJSON.data(using: .utf8),
+                  (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { continue }
+            let candidate = SandStoredComposerSubmission(
+                nonce: nonce, agentId: agentId,
+                createdAtMs: max(0, submission.createdAtMs),
+                commandJSON: submission.commandJSON
+            )
+            if let index = indexByNonce[nonce] { normalized[index] = candidate }
+            else { indexByNonce[nonce] = normalized.count; normalized.append(candidate) }
+        }
+        value.composerSubmissionQueue = normalized.isEmpty ? nil : normalized
     }
     value.pinnedAgentIds = value.pinnedAgentIds.map(uniqueNonEmpty)
     value.sidebarSections = value.sidebarSections?.filter {
@@ -289,6 +316,10 @@ private func parseStoredSettingsObject(_ rawValue: Any) -> SandStoredSettings? {
     value.localToolApprovals = decodeStoredValue(
         [SandStoredLocalToolApproval].self,
         from: raw["localToolApprovals"]
+    )
+    value.composerSubmissionQueue = decodeStoredValue(
+        [SandStoredComposerSubmission].self,
+        from: raw["composerSubmissionQueue"]
     )
     if let provider = raw["inferenceProvider"] as? String {
         value.inferenceProvider = SandInferenceProvider(rawValue: provider)
@@ -549,6 +580,7 @@ final class SandSettingsStore: @unchecked Sendable {
                 $0.localToolPermission = nil
                 $0.localToolPermissionCeiling = nil
                 $0.localToolApprovals = nil
+                $0.composerSubmissionQueue = nil
             }
             if let seen = $0.hasSeenOnboarding,
                $0.hasSeenOnboardingAccountScope == nil || $0.hasSeenOnboardingAccountScope == accountScope {
@@ -574,6 +606,7 @@ final class SandSettingsStore: @unchecked Sendable {
             $0.localToolPermission = nil
             $0.localToolPermissionCeiling = nil
             $0.localToolApprovals = nil
+            $0.composerSubmissionQueue = nil
             $0.hasSeenOnboarding = nil
             $0.hasSeenOnboardingAccountScope = nil
         }
@@ -696,6 +729,63 @@ final class SandSettingsStore: @unchecked Sendable {
         var current = loadLocked()
         guard current.mcpCustomInstructionsAccountScope == normalizedScope else { return false }
         current.localToolApprovals = nil
+        try persistLocked(current)
+        return true
+    }
+
+    func composerSubmissions(expectedAccountScope: String, agentId: String? = nil) -> [SandStoredComposerSubmission] {
+        let scope = expectedAccountScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !scope.isEmpty else { return [] }
+        let current = load()
+        guard current.mcpCustomInstructionsAccountScope == scope else { return [] }
+        let rows = current.composerSubmissionQueue ?? []
+        let filtered = agentId.map { wanted in rows.filter { $0.agentId == wanted } } ?? rows
+        return filtered.sorted {
+            if $0.createdAtMs == $1.createdAtMs { return $0.nonce < $1.nonce }
+            return $0.createdAtMs < $1.createdAtMs
+        }
+    }
+
+    @discardableResult
+    func enqueueComposerSubmission(
+        nonce: String, agentId: String, createdAtMs: Int64,
+        commandJSON: String, expectedAccountScope: String
+    ) throws -> Bool {
+        let nonce = nonce.trimmingCharacters(in: .whitespacesAndNewlines)
+        let agentId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let scope = expectedAccountScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !nonce.isEmpty, !agentId.isEmpty, !scope.isEmpty,
+              let data = commandJSON.data(using: .utf8),
+              (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { return false }
+        lock.lock(); defer { lock.unlock() }
+        var current = loadLocked()
+        guard current.mcpCustomInstructionsAccountScope == scope else { return false }
+        let candidate = SandStoredComposerSubmission(
+            nonce: nonce, agentId: agentId,
+            createdAtMs: max(0, createdAtMs), commandJSON: commandJSON
+        )
+        var rows = current.composerSubmissionQueue ?? []
+        if let index = rows.firstIndex(where: { $0.nonce == nonce }) {
+            if rows[index] == candidate { return true }
+            rows[index] = candidate
+        } else { rows.append(candidate) }
+        current.composerSubmissionQueue = rows
+        try persistLocked(current)
+        return true
+    }
+
+    @discardableResult
+    func removeComposerSubmission(nonce: String, expectedAccountScope: String) throws -> Bool {
+        let nonce = nonce.trimmingCharacters(in: .whitespacesAndNewlines)
+        let scope = expectedAccountScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !nonce.isEmpty, !scope.isEmpty else { return false }
+        lock.lock(); defer { lock.unlock() }
+        var current = loadLocked()
+        guard current.mcpCustomInstructionsAccountScope == scope else { return false }
+        var rows = current.composerSubmissionQueue ?? []
+        guard let index = rows.firstIndex(where: { $0.nonce == nonce }) else { return true }
+        rows.remove(at: index)
+        current.composerSubmissionQueue = rows.isEmpty ? nil : rows
         try persistLocked(current)
         return true
     }

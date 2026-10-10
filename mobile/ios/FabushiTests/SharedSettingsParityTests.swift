@@ -934,4 +934,48 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertNotNil(cleanupObject["failure"] as? String)
     }
 
+
+    func testComposerSubmissionQueuePersistsOrdersDeduplicatesAndFencesAccountSwitch() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("settings.json")
+        let store = SandSettingsStore(settingsPath: path.path)
+        store.scopeToAccount("owner-a")
+        let one = #"{"agentId":"agent-1","requestId":"nonce-1","text":"first","type":"chat.send"}"#
+        let two = #"{"agentId":"agent-1","requestId":"nonce-2","text":"second","type":"chat.send"}"#
+        XCTAssertTrue(try store.enqueueComposerSubmission(nonce: "nonce-1", agentId: "agent-1", createdAtMs: 10, commandJSON: one, expectedAccountScope: "owner-a"))
+        XCTAssertTrue(try store.enqueueComposerSubmission(nonce: "nonce-2", agentId: "agent-1", createdAtMs: 20, commandJSON: two, expectedAccountScope: "owner-a"))
+        XCTAssertTrue(try store.enqueueComposerSubmission(nonce: "nonce-1", agentId: "agent-1", createdAtMs: 10, commandJSON: one, expectedAccountScope: "owner-a"))
+        XCTAssertEqual(store.composerSubmissions(expectedAccountScope: "owner-a", agentId: "agent-1").map(\.nonce), ["nonce-1", "nonce-2"])
+        let restored = SandSettingsStore(settingsPath: path.path)
+        XCTAssertEqual(restored.composerSubmissions(expectedAccountScope: "owner-a").map(\.nonce), ["nonce-1", "nonce-2"])
+        XCTAssertTrue(try restored.removeComposerSubmission(nonce: "nonce-1", expectedAccountScope: "owner-a"))
+        restored.scopeToAccount("owner-b")
+        XCTAssertTrue(restored.composerSubmissions(expectedAccountScope: "owner-a").isEmpty)
+        XCTAssertFalse(try restored.enqueueComposerSubmission(nonce: "stale", agentId: "agent-1", createdAtMs: 30, commandJSON: one, expectedAccountScope: "owner-a"))
+    }
+
+    @MainActor
+    func testCoordinatorComposerQueueRoundTripUsesExactChatSendCommand() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(settingsPath: root.appendingPathComponent("settings.json").path)
+        let host = SettingsParityHost()
+        let coordinator = MahayanaCoordinator(hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }), settingsStore: store)
+        coordinator.updateAccountSettingsScope("owner-a")
+        let command: [String: Any] = [
+            "type": "chat.send", "requestId": "nonce-queue", "agentId": "agent-1", "text": "hello",
+            "attachments": [["id": "attachment-1", "name": "a.txt", "path": "/durable/attachment-1", "sizeBytes": 3]]
+        ]
+        _ = try await coordinator.request(method: "native.composerQueue.enqueue", params: ["command": command])
+        let listed = try await coordinator.request(method: "native.composerQueue.list", params: ["agentId": "agent-1"])
+        let rows = try XCTUnwrap(listed.value as? [[String: Any]])
+        XCTAssertEqual(rows.count, 1)
+        let restored = try XCTUnwrap(rows[0]["command"] as? [String: Any])
+        XCTAssertEqual(restored["requestId"] as? String, "nonce-queue")
+        _ = try await coordinator.request(method: "native.composerQueue.cancel", params: ["nonce": "nonce-queue"])
+        let empty = try await coordinator.request(method: "native.composerQueue.list", params: ["agentId": "agent-1"])
+        XCTAssertEqual((empty.value as? [[String: Any]])?.count, 0)
+    }
+
 }

@@ -899,6 +899,54 @@ final class MahayanaCoordinator {
             return JSONResult(value: localToolApprovalCleanupStateObject())
         }
 
+        if method == "native.composerQueue.enqueue" {
+            guard let settingsStore,
+                  let accountScope = localToolApprovalAccountScope, !accountScope.isEmpty,
+                  let command = params["command"] as? [String: Any],
+                  command["type"] as? String == "chat.send",
+                  let nonce = command["requestId"] as? String, !nonce.isEmpty,
+                  let agentId = command["agentId"] as? String, !agentId.isEmpty,
+                  JSONSerialization.isValidJSONObject(command)
+            else { throw CoordinatorError.invalidParams }
+            let data = try JSONSerialization.data(withJSONObject: command, options: [.sortedKeys])
+            guard let commandJSON = String(data: data, encoding: .utf8),
+                  try settingsStore.enqueueComposerSubmission(
+                    nonce: nonce, agentId: agentId,
+                    createdAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
+                    commandJSON: commandJSON, expectedAccountScope: accountScope
+                  )
+            else { throw CoordinatorError.requestFailed("Composer submission scope changed before persistence.") }
+            return JSONResult(value: ["nonce": nonce, "queued": true])
+        }
+        if method == "native.composerQueue.list" {
+            guard let settingsStore,
+                  let accountScope = localToolApprovalAccountScope, !accountScope.isEmpty
+            else { throw CoordinatorError.unavailable }
+            let rawAgentId = (params["agentId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rows = settingsStore.composerSubmissions(
+                expectedAccountScope: accountScope,
+                agentId: rawAgentId?.isEmpty == false ? rawAgentId : nil
+            )
+            let value: [[String: Any]] = rows.compactMap { row in
+                guard let data = row.commandJSON.data(using: .utf8),
+                      let command = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                else { return nil }
+                return ["nonce": row.nonce, "agentId": row.agentId,
+                        "createdAtMs": NSNumber(value: row.createdAtMs), "command": command]
+            }
+            return JSONResult(value: value)
+        }
+        if method == "native.composerQueue.remove" || method == "native.composerQueue.cancel" {
+            guard let settingsStore,
+                  let accountScope = localToolApprovalAccountScope, !accountScope.isEmpty,
+                  let nonce = (params["nonce"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !nonce.isEmpty
+            else { throw CoordinatorError.invalidParams }
+            guard try settingsStore.removeComposerSubmission(nonce: nonce, expectedAccountScope: accountScope)
+            else { throw CoordinatorError.requestFailed("Composer submission scope changed before removal.") }
+            return JSONResult(value: ["nonce": nonce, "removed": true])
+        }
+
         if method == "getAutoReviewInstructions" {
             return JSONResult(value: autoReviewInstructionsObject())
         }

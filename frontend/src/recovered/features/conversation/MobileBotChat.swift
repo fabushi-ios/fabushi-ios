@@ -2096,6 +2096,7 @@ internal struct MobileBotChat: View {
     @State private var findIndex: Int?
     @State private var forwardMessage: MobileChatMessage?
     @State private var composerFocusGeneration = 0
+    @State private var durableQueueFlushing = false
     @FocusState private var findFocused: Bool
     @FocusState private var reactionPickerFocusedId: String?
 
@@ -2118,6 +2119,12 @@ internal struct MobileBotChat: View {
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
         .task(id: "\(bot.id):\(bot.conversationId ?? "")") {
             await loadInitialConversationTail()
+            if suggestionTransportConnected { await flushDurableComposerQueue() }
+            else { await restoreDurableQueuedRows() }
+        }
+        .onChange(of: suggestionTransportConnected) { _, connected in
+            guard connected else { return }
+            Task { await flushDurableComposerQueue() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -2971,7 +2978,7 @@ internal struct MobileBotChat: View {
     private var composer: some View {
         VStack(spacing: 4) {
             if composerTransportDisabled {
-                Text("Reconnecting… Sending and attachments are temporarily unavailable.")
+                Text("Reconnecting… Messages can be queued; new attachments are temporarily unavailable.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -2989,7 +2996,7 @@ internal struct MobileBotChat: View {
                     focusGeneration: focusPromptGeneration &+ composerFocusGeneration,
                     onSubmit: {
                         if chooseActiveEditorSuggestion() { return }
-                        if !busy, !composerTransportDisabled {
+                        if !busy {
                             Task { await send() }
                         }
                     },
@@ -3012,7 +3019,6 @@ internal struct MobileBotChat: View {
                         handleComposerPasteItemProviders(providers)
                     }
                 )
-                .disabled(composerTransportDisabled)
                 .background(
                     Color.black.opacity(0.055),
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -3360,8 +3366,7 @@ internal struct MobileBotChat: View {
         }
         .disabled(
             !busy && (
-                composerTransportDisabled
-                    || !mobileComposerHasPayload(text: draft, attachments: composerAttachments)
+                !mobileComposerHasPayload(text: draft, attachments: composerAttachments)
                     || stagingAttachments
                     || voiceRecorder.isRecording
                     || transcribingVoice
@@ -3718,6 +3723,7 @@ internal struct MobileBotChat: View {
                             }
                             Text(
                                 phase == .acceptedAwaitingEcho ? "Waiting for sync…"
+                                    : phase == .queued ? "Queued offline"
                                     : phase == .failed ? "Failed to send"
                                     : "Sending…"
                             )
@@ -3765,8 +3771,11 @@ internal struct MobileBotChat: View {
                         Button("Copy") { UIPasteboard.general.string = copyText }
                     }
                     if entry.optimisticDeliveryPhase == .failed {
-                        Button("Retry") {
-                            Task { await retryFailedSend(entry) }
+                        Button("Retry") { Task { await retryFailedSend(entry) } }
+                    }
+                    if entry.optimisticDeliveryPhase == .queued {
+                        Button("Cancel queued send", role: .destructive) {
+                            Task { await cancelQueuedSend(entry) }
                         }
                     }
                     reactionMenu(entry)
@@ -6101,6 +6110,14 @@ internal struct MobileBotChat: View {
         entries[startIndex].optimisticDeliveryError = nil
 
         if let miniAppId = bot.miniAppId {
+            guard suggestionTransportConnected else {
+                let message = "Mini App messages require an active connection."
+                entries[startIndex].optimisticDeliveryPhase = .failed
+                entries[startIndex].optimisticDeliveryError = message
+                errorText = message
+                busy = false
+                return
+            }
             guard attachments.isEmpty else {
                 let message = "Attachments aren't supported by this Mini App chat."
                 entries[startIndex].optimisticDeliveryPhase = .failed
@@ -6160,6 +6177,19 @@ internal struct MobileBotChat: View {
             }
             if let richText, !richText.isEmpty { command["richText"] = richText }
             if let replyTarget { command["replyToMessageId"] = replyTarget }
+            _ = try await bridge.request(method: "native.composerQueue.enqueue", params: ["command": command])
+            guard suggestionTransportConnected else {
+                guard model.settingsNoticeAccountKey == ownedAccountKey,
+                      bot.id == ownedBotId,
+                      let index = entries.firstIndex(where: {
+                          $0.id == requestId && $0.optimisticAccountKey == ownedAccountKey
+                              && $0.optimisticAgentId == ownedBotId && $0.optimisticNonce == requestId
+                      }) else { return }
+                entries[index].optimisticDeliveryPhase = .queued
+                entries[index].optimisticDeliveryError = nil
+                busy = false
+                return
+            }
             let result = try await bridge.request(
                 method: "feature.execute",
                 params: ["command": command]
@@ -6178,6 +6208,11 @@ internal struct MobileBotChat: View {
             let operationId = accepted?["operationId"] as? String ?? requestId
             entries[index].optimisticDeliveryPhase = .acceptedAwaitingEcho
             entries[index].optimisticDeliveryError = nil
+            do {
+                _ = try await bridge.request(method: "native.composerQueue.remove", params: ["nonce": requestId])
+            } catch {
+                errorText = "Message was accepted, but queued-send cleanup failed: \(error.localizedDescription)"
+            }
             clearComposerRecovery(requestId: requestId)
             activeOperationId = operationId
             entries.append(MobileChatMessage(
@@ -6216,7 +6251,6 @@ internal struct MobileBotChat: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = composerAttachments
         guard mobileComposerHasPayload(text: text, attachments: attachments),
-              suggestionTransportConnected,
               !busy,
               !stagingAttachments,
               !voiceRecorder.isRecording,
@@ -6276,6 +6310,120 @@ internal struct MobileBotChat: View {
             replyTarget: replyTarget,
             sendAsFork: sendAsFork
         )
+    }
+
+    @MainActor
+    private func restoreDurableQueuedRows() async {
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedBot = bot.id
+        do {
+            let result = try await bridge.request(method: "native.composerQueue.list", params: ["agentId": ownedBot])
+            guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id,
+                  let rows = result.value as? [[String: Any]] else { return }
+            for row in rows {
+                guard let command = row["command"] as? [String: Any],
+                      let requestId = command["requestId"] as? String, !requestId.isEmpty,
+                      entries.firstIndex(where: { $0.optimisticNonce == requestId }) == nil else { continue }
+                appendOptimisticUserMessage(
+                    requestId: requestId, text: command["text"] as? String ?? "",
+                    attachments: decodeDurableComposerAttachments(command["attachments"]),
+                    mcpReferences: decodeDurableComposerMcpReferences(command["mcpReferences"]),
+                    prReferences: [], richText: command["richText"] as? String,
+                    replyTarget: command["replyToMessageId"] as? String,
+                    sendAsFork: command["isFork"] as? Bool ?? false
+                )
+                if let index = entries.firstIndex(where: { $0.optimisticNonce == requestId }) {
+                    entries[index].optimisticDeliveryPhase = .queued
+                }
+            }
+        } catch {
+            guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id else { return }
+            errorText = "Queued messages could not be restored: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func flushDurableComposerQueue() async {
+        guard suggestionTransportConnected, !durableQueueFlushing, !busy else { return }
+        durableQueueFlushing = true
+        defer { durableQueueFlushing = false }
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedBot = bot.id
+        do {
+            let result = try await bridge.request(method: "native.composerQueue.list", params: ["agentId": ownedBot])
+            guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id,
+                  let rows = result.value as? [[String: Any]] else { return }
+            for row in rows {
+                guard suggestionTransportConnected, ownedAccount == model.settingsNoticeAccountKey,
+                      ownedBot == bot.id, let command = row["command"] as? [String: Any],
+                      let requestId = command["requestId"] as? String, !requestId.isEmpty else { return }
+                let text = command["text"] as? String ?? ""
+                let attachments = decodeDurableComposerAttachments(command["attachments"])
+                let refs = decodeDurableComposerMcpReferences(command["mcpReferences"])
+                if entries.firstIndex(where: { $0.optimisticNonce == requestId }) == nil {
+                    appendOptimisticUserMessage(
+                        requestId: requestId, text: text, attachments: attachments,
+                        mcpReferences: refs, prReferences: [], richText: command["richText"] as? String,
+                        replyTarget: command["replyToMessageId"] as? String,
+                        sendAsFork: command["isFork"] as? Bool ?? false
+                    )
+                }
+                await dispatchOptimisticUserMessage(
+                    requestId: requestId, text: text, attachments: attachments,
+                    mcpReferences: refs, richText: command["richText"] as? String,
+                    replyTarget: command["replyToMessageId"] as? String,
+                    sendAsFork: command["isFork"] as? Bool ?? false
+                )
+                if entries.contains(where: {
+                    $0.optimisticNonce == requestId
+                        && ($0.optimisticDeliveryPhase == .failed || $0.optimisticDeliveryPhase == .queued)
+                }) { return }
+            }
+        } catch {
+            guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id else { return }
+            errorText = "Queued messages could not be flushed: \(error.localizedDescription)"
+        }
+    }
+
+    private func decodeDurableComposerAttachments(_ raw: Any?) -> [MobileComposerAttachment] {
+        (raw as? [[String: Any]] ?? []).compactMap { value in
+            guard let id = value["id"] as? String, let name = value["name"] as? String,
+                  let path = value["path"] as? String, !id.isEmpty, !name.isEmpty, !path.isEmpty else { return nil }
+            return .init(id: id, name: name, path: path, mimeType: value["mimeType"] as? String,
+                         sizeBytes: (value["sizeBytes"] as? NSNumber)?.intValue ?? 0)
+        }
+    }
+
+    private func decodeDurableComposerMcpReferences(_ raw: Any?) -> [MobileComposerMcpReference] {
+        (raw as? [[String: Any]] ?? []).compactMap { value in
+            guard let workflowReferenceID = value["id"] as? String,
+                  let serverId = value["serverId"] as? String,
+                  let serverIdentifier = value["serverIdentifier"] as? String,
+                  let accountKey = value["accountKey"] as? String,
+                  let label = value["label"] as? String,
+                  let status = value["status"] as? String else { return nil }
+            return .init(workflowReferenceID: workflowReferenceID, serverId: serverId,
+                         serverIdentifier: serverIdentifier, accountKey: accountKey,
+                         label: label, status: status, iconURL: value["iconUrl"] as? String)
+        }
+    }
+
+    @MainActor
+    private func cancelQueuedSend(_ entry: MobileChatMessage) async {
+        guard entry.optimisticDeliveryPhase == .queued,
+              entry.optimisticAccountKey == model.settingsNoticeAccountKey,
+              entry.optimisticAgentId == bot.id, let nonce = entry.optimisticNonce else { return }
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedBot = bot.id
+        do {
+            _ = try await bridge.request(method: "native.composerQueue.cancel", params: ["nonce": nonce])
+            guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id else { return }
+            entries.removeAll { $0.optimisticNonce == nonce }
+            clearComposerRecovery(requestId: nonce)
+        } catch {
+            guard ownedAccount == model.settingsNoticeAccountKey, ownedBot == bot.id else { return }
+            errorText = "Queued message could not be cancelled: \(error.localizedDescription)"
+        }
     }
 
     @MainActor
