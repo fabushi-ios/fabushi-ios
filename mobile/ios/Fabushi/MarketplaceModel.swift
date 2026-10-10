@@ -1306,8 +1306,8 @@ func projectMobileTranscriptCard(
                 operationId: operationId,
                 actionTitle: title?.isEmpty == false ? title : "Cloud agent",
                 actionStatus: "running",
-                canonicalMessageId: entryId,
                 cloudAgentBcId: bcId,
+                canonicalMessageId: entryId,
                 createdAt: createdAt
             )
         }
