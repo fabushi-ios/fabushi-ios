@@ -696,10 +696,33 @@ struct MobileComposerAttachment: Equatable {
     let sizeBytes: Int
 }
 
+struct MobileComposerMcpReference: Equatable, Sendable {
+    let workflowReferenceID: String
+    let serverId: String
+    let serverIdentifier: String
+    let accountKey: String
+    let label: String
+    let status: String
+    let iconURL: String?
+}
+
 struct MobileComposerRecovery: Equatable {
     let requestId: String
     let text: String
     let attachments: [MobileComposerAttachment]
+    let mcpReferences: [MobileComposerMcpReference]
+
+    init(
+        requestId: String,
+        text: String,
+        attachments: [MobileComposerAttachment],
+        mcpReferences: [MobileComposerMcpReference] = []
+    ) {
+        self.requestId = requestId
+        self.text = text
+        self.attachments = attachments
+        self.mcpReferences = mcpReferences
+    }
 }
 
 struct MobileChatMessage: Identifiable, Equatable {
@@ -733,6 +756,7 @@ struct MobileChatMessage: Identifiable, Equatable {
     var attachmentAlt: String?
     var attachmentProjection: MobileAttachmentCardProjection?
     var optimisticAttachments: [MobileComposerAttachment] = []
+    var optimisticMcpReferences: [MobileComposerMcpReference] = []
     var sendMessageTextProjection: MobileSendMessageTextProjection?
     var timelineEvent: SandTimelineEvent?
     var timelineAutomationId: String?
@@ -1671,6 +1695,7 @@ struct MobileConnectorCatalogEntry: Identifiable, Equatable, Sendable {
     let name: String
     let displayName: String
     let connectors: [String]
+    var iconURL: String? = nil
 }
 
 func normalizeMobileConnectorName(_ value: String) -> String {
@@ -1692,6 +1717,7 @@ struct MarketplaceMcpServer: Identifiable, Equatable, Sendable {
     let serverId: String
     let name: String
     let serverIdentifier: String
+    var rowServerIdentifier: String? = nil
     let accountKey: String
     let transport: String
     let status: String
@@ -3748,6 +3774,7 @@ final class MarketplaceModel {
             serverId: id,
             name: name,
             serverIdentifier: identifier,
+            rowServerIdentifier: row["rowServerIdentifier"] as? String,
             accountKey: (row["accountKey"] as? String) ?? DEFAULT_MCP_ACCOUNT_KEY,
             transport: transport,
             status: status,
@@ -3879,7 +3906,13 @@ final class MarketplaceModel {
                       let displayName = row["displayName"] as? String,
                       let connectors = row["connectors"] as? [String]
                 else { return nil }
-                return .init(id: id, name: name, displayName: displayName, connectors: connectors)
+                return .init(
+                    id: id,
+                    name: name,
+                    displayName: displayName,
+                    connectors: connectors,
+                    iconURL: row["iconUrl"] as? String
+                )
             }
             await refreshMcpServers()
         } catch {
@@ -4264,11 +4297,12 @@ final class MarketplaceModel {
         }
     }
 
-    func refreshMcpServers() async {
+    @discardableResult
+    func refreshMcpServers() async -> Bool {
         let noticeFence = settingsNoticeController.makeFence()
         guard loggedIn else {
             resetMcpState()
-            return
+            return false
         }
         let epoch = mcpAccountEpoch
         mcpServerRequestSerial = mcpServerRequestSerial == Int.max ? 1 : mcpServerRequestSerial + 1
@@ -4282,7 +4316,7 @@ final class MarketplaceModel {
         }
         do {
             let response = try await bridge.request(method: "coordinator.mcp.servers")
-            guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return }
+            guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return false }
             guard let object = response.value as? [String: Any],
                   let rows = object["servers"] as? [[String: Any]]
             else {
@@ -4292,12 +4326,57 @@ final class MarketplaceModel {
             mcpServers = next
             let validIds = Set(next.map(\.serverId))
             mcpToolsByServerId = mcpToolsByServerId.filter { validIds.contains($0.key) }
+            return true
         } catch {
-            guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return }
+            guard epoch == mcpAccountEpoch, serial == mcpServerRequestSerial else { return false }
             let notice = error.localizedDescription
             mcpError = notice
             publishPluginsNotice(.load, kind: .error, message: notice, fence: noticeFence)
+            return false
         }
+    }
+
+    func refreshMcpReferenceSnapshot() async throws -> (
+        servers: [MarketplaceMcpServer],
+        catalog: [MobileConnectorCatalogEntry]
+    ) {
+        guard loggedIn else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "MCP references require an authenticated account."
+            )
+        }
+        let epoch = mcpAccountEpoch
+        let catalogResponse = try await bridge.request(
+            method: "coordinator.mcp.catalog",
+            params: ["forceRefresh": false]
+        )
+        guard epoch == mcpAccountEpoch,
+              let object = catalogResponse.value as? [String: Any],
+              let rows = object["entries"] as? [[String: Any]]
+        else {
+            throw CancellationError()
+        }
+        let nextCatalog = rows.compactMap { row -> MobileConnectorCatalogEntry? in
+            guard let id = row["id"] as? String,
+                  let name = row["name"] as? String,
+                  let displayName = row["displayName"] as? String,
+                  let connectors = row["connectors"] as? [String]
+            else { return nil }
+            return .init(
+                id: id,
+                name: name,
+                displayName: displayName,
+                connectors: connectors,
+                iconURL: row["iconUrl"] as? String
+            )
+        }
+        guard await refreshMcpServers(),
+              epoch == mcpAccountEpoch
+        else {
+            throw CancellationError()
+        }
+        connectorCatalog = nextCatalog
+        return (mcpServers, nextCatalog)
     }
 
     func loadMcpTools(serverId: String) async {
