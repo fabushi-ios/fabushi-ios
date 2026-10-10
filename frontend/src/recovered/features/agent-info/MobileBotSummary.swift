@@ -16,6 +16,16 @@ internal enum MobileAgentAvatarState: String, Equatable, Sendable {
     case orbit
 }
 
+internal struct MobileBotSubagent: Identifiable, Equatable, Sendable {
+    let subagentId: String
+    let subagentType: String
+    let title: String
+    let status: String
+
+    var id: String { subagentId }
+    var isRunning: Bool { status == "running" }
+}
+
 internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -43,6 +53,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
     let memberIds: [String]
     let conversationPartnerIds: [String]
     let isSharedRoom: Bool
+    let subagents: [MobileBotSubagent]
 
     init(
         id: String,
@@ -70,7 +81,8 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         isGroup: Bool = false,
         memberIds: [String] = [],
         conversationPartnerIds: [String] = [],
-        isSharedRoom: Bool = false
+        isSharedRoom: Bool = false,
+        subagents: [MobileBotSubagent] = []
     ) {
         self.id = id
         self.name = name
@@ -98,6 +110,7 @@ internal struct MobileBotSummary: Identifiable, Equatable, Sendable {
         self.memberIds = memberIds
         self.conversationPartnerIds = conversationPartnerIds
         self.isSharedRoom = isSharedRoom
+        self.subagents = subagents
     }
 }
 
@@ -130,7 +143,8 @@ extension MobileBotSummary {
             isGroup: isGroup,
             memberIds: memberIds,
             conversationPartnerIds: ids,
-            isSharedRoom: isSharedRoom
+            isSharedRoom: isSharedRoom,
+            subagents: subagents
         )
     }
 }
