@@ -2,6 +2,15 @@ import Foundation
 
 struct MahayanaHostSettingsSnapshot: Equatable, Sendable {
     let hasSeenOnboarding: Bool?
+    let userTimeZone: String?
+
+    init(
+        hasSeenOnboarding: Bool?,
+        userTimeZone: String? = nil
+    ) {
+        self.hasSeenOnboarding = hasSeenOnboarding
+        self.userTimeZone = userTimeZone
+    }
 }
 
 private enum MahayanaHostSettingsTransportError: LocalizedError {
@@ -80,6 +89,22 @@ final class MahayanaLocalHostSupervisor {
         return try Self.decodeHostSettings(response.value)
     }
 
+    @discardableResult
+    func pushHostUserTimeZone(
+        _ userTimeZone: String?
+    ) async throws -> MahayanaHostSettingsSnapshot {
+        let encoded: Any = userTimeZone.map { $0 as Any } ?? NSNull()
+        let response = try await request(
+            method: "setHostSettings",
+            params: [
+                "settings": [
+                    "userTimeZone": encoded,
+                ],
+            ]
+        )
+        return try Self.decodeHostSettings(response.value)
+    }
+
     private static func decodeHostSettings(
         _ value: Any
     ) throws -> MahayanaHostSettingsSnapshot {
@@ -88,13 +113,33 @@ final class MahayanaLocalHostSupervisor {
         else {
             throw MahayanaHostSettingsTransportError.invalidResponse
         }
+        let seen: Bool?
         if raw is NSNull {
-            return .init(hasSeenOnboarding: nil)
-        }
-        guard let seen = raw as? Bool else {
+            seen = nil
+        } else if let value = raw as? Bool {
+            seen = value
+        } else {
             throw MahayanaHostSettingsTransportError.invalidResponse
         }
-        return .init(hasSeenOnboarding: seen)
+
+        let userTimeZone: String?
+        if let rawTimeZone = object["userTimeZone"] {
+            if rawTimeZone is NSNull {
+                userTimeZone = nil
+            } else if let value = rawTimeZone as? String,
+                      !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      TimeZone(identifier: value) != nil {
+                userTimeZone = value
+            } else {
+                throw MahayanaHostSettingsTransportError.invalidResponse
+            }
+        } else {
+            userTimeZone = nil
+        }
+        return .init(
+            hasSeenOnboarding: seen,
+            userTimeZone: userTimeZone
+        )
     }
 
     @discardableResult

@@ -29,6 +29,7 @@ private final class TestCoordinatorPort: CoordinatorPort {
 @MainActor
 private final class TestHostSettingsRequester: MahayanaHostRequesting, @unchecked Sendable {
     var remoteSeen: Bool?
+    var remoteTimeZone: String?
     var requests: [(String, [String: Any])] = []
     var failReads = false
     var failWrites = false
@@ -42,24 +43,39 @@ private final class TestHostSettingsRequester: MahayanaHostRequesting, @unchecke
             if failReads { throw NSError(domain: "host-settings", code: 503) }
             return .init(value: [
                 "hasSeenOnboarding": remoteSeen.map { $0 as Any } ?? NSNull(),
+                "userTimeZone": remoteTimeZone.map { $0 as Any } ?? NSNull(),
             ])
         }
         if method == "setHostSettings" {
             if failWrites { throw NSError(domain: "host-settings", code: 503) }
-            guard let settings = params["settings"] as? [String: Any],
-                  let raw = settings["hasSeenOnboarding"]
-            else {
+            guard let settings = params["settings"] as? [String: Any] else {
                 throw NSError(domain: "host-settings", code: 400)
             }
-            if raw is NSNull {
-                remoteSeen = nil
-            } else if let value = raw as? Bool {
-                remoteSeen = value
-            } else {
-                throw NSError(domain: "host-settings", code: 422)
+            var touched = false
+            if let raw = settings["hasSeenOnboarding"] {
+                touched = true
+                if raw is NSNull {
+                    remoteSeen = nil
+                } else if let value = raw as? Bool {
+                    remoteSeen = value
+                } else {
+                    throw NSError(domain: "host-settings", code: 422)
+                }
             }
+            if let raw = settings["userTimeZone"] {
+                touched = true
+                if raw is NSNull {
+                    remoteTimeZone = nil
+                } else if let value = raw as? String, TimeZone(identifier: value) != nil {
+                    remoteTimeZone = value
+                } else {
+                    throw NSError(domain: "host-settings", code: 422)
+                }
+            }
+            guard touched else { throw NSError(domain: "host-settings", code: 400) }
             return .init(value: [
                 "hasSeenOnboarding": remoteSeen.map { $0 as Any } ?? NSNull(),
+                "userTimeZone": remoteTimeZone.map { $0 as Any } ?? NSNull(),
             ])
         }
         throw NSError(domain: "host-settings", code: 404)
@@ -104,6 +120,42 @@ final class CoordinatorContractTests: XCTestCase {
         XCTAssertEqual(pushedSettings, .init(hasSeenOnboarding: true))
         XCTAssertEqual(host.remoteSeen, true)
         XCTAssertEqual(host.requests.map(\.0), ["getHostSettings", "setHostSettings"])
+
+        let timeZone = try await supervisor.pushHostUserTimeZone("America/Los_Angeles")
+        XCTAssertEqual(timeZone.userTimeZone, "America/Los_Angeles")
+        XCTAssertEqual(host.remoteTimeZone, "America/Los_Angeles")
+    }
+
+    @MainActor
+    func testHostSettingsTimezoneProjectionFencesAccountSwitchAndHostGeneration() async {
+        var generation: UInt64 = 11
+        var localTimeZone = "America/Los_Angeles"
+        var projected: [String] = []
+        let reconciler = IOSHostSettingsReconciler(
+            readLocal: { nil },
+            writeLocal: { _ in },
+            readRemote: { .init(hasSeenOnboarding: nil) },
+            pushRemote: { $0 },
+            readLocalUserTimeZone: { localTimeZone },
+            pushTimeZoneRemote: { value in
+                await Task.yield()
+                if let value { projected.append(value) }
+                return .init(hasSeenOnboarding: nil, userTimeZone: value)
+            },
+            hostGeneration: { generation }
+        )
+        reconciler.scopeToAccount("owner-a")
+        reconciler.setTransportLive(true)
+        await yieldHostSettingsWork()
+        XCTAssertTrue(projected.contains("America/Los_Angeles"))
+
+        localTimeZone = "Asia/Tokyo"
+        reconciler.scopeToAccount("owner-b")
+        generation = 12
+        reconciler.scheduleUserTimeZoneWrite(localTimeZone)
+        await yieldHostSettingsWork()
+        XCTAssertEqual(reconciler.lastSuccessfulAccountScope, "owner-b")
+        XCTAssertEqual(projected.last, "Asia/Tokyo")
     }
 
     @MainActor

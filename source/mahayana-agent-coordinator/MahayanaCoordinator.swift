@@ -87,6 +87,8 @@ final class IOSHostSettingsReconciler {
     typealias ClearLocal = @MainActor () -> Void
     typealias ReadRemote = @MainActor () async throws -> MahayanaHostSettingsSnapshot
     typealias PushRemote = @MainActor (MahayanaHostSettingsSnapshot) async throws -> MahayanaHostSettingsSnapshot
+    typealias ReadLocalUserTimeZone = @MainActor () -> String?
+    typealias PushTimeZoneRemote = @MainActor (String?) async throws -> MahayanaHostSettingsSnapshot
     typealias HostGeneration = @MainActor () -> UInt64
 
     private enum SyncError: Error {
@@ -104,6 +106,8 @@ final class IOSHostSettingsReconciler {
     private let clearLocal: ClearLocal
     private let readRemote: ReadRemote
     private let pushRemote: PushRemote
+    private let readLocalUserTimeZone: ReadLocalUserTimeZone
+    private let pushTimeZoneRemote: PushTimeZoneRemote
     private let hostGeneration: HostGeneration
 
     private var accountScope: String?
@@ -142,6 +146,10 @@ final class IOSHostSettingsReconciler {
         clearLocal: @escaping ClearLocal = {},
         readRemote: @escaping ReadRemote,
         pushRemote: @escaping PushRemote,
+        readLocalUserTimeZone: @escaping ReadLocalUserTimeZone = { nil },
+        pushTimeZoneRemote: @escaping PushTimeZoneRemote = {
+            .init(hasSeenOnboarding: nil, userTimeZone: $0)
+        },
         hostGeneration: @escaping HostGeneration
     ) {
         self.readLocal = readLocal
@@ -149,6 +157,8 @@ final class IOSHostSettingsReconciler {
         self.clearLocal = clearLocal
         self.readRemote = readRemote
         self.pushRemote = pushRemote
+        self.readLocalUserTimeZone = readLocalUserTimeZone
+        self.pushTimeZoneRemote = pushTimeZoneRemote
         self.hostGeneration = hostGeneration
     }
 
@@ -208,10 +218,23 @@ final class IOSHostSettingsReconciler {
         }
     }
 
+    func scheduleUserTimeZoneWrite(_ value: String) {
+        invalidateInFlight(resetFieldSession: false)
+        inFlight = Task { @MainActor [weak self] in
+            guard let self else { return }
+            _ = await self.pushUserTimeZoneIfCurrent(value)
+        }
+    }
+
     @discardableResult
     func reconcileIfReadable() async -> Bool {
         guard let token = tokenIfReadable() else { return false }
         _ = await onboardingSeen.absorbFromBox()
+        guard isCurrent(token) else { return false }
+        if let userTimeZone = readLocalUserTimeZone(),
+           !(await pushUserTimeZoneIfCurrent(userTimeZone)) {
+            return false
+        }
         return isCurrent(token) && lastSuccessfulEpoch == token.epoch
     }
 
@@ -260,6 +283,24 @@ final class IOSHostSettingsReconciler {
             lastSuccessfulEpoch = token.epoch
         }
         return response
+    }
+
+    @discardableResult
+    func pushUserTimeZoneIfCurrent(_ value: String) async -> Bool {
+        guard let token = tokenIfReadable() else { return false }
+        do {
+            let response = try await pushTimeZoneRemote(value)
+            guard isCurrent(token),
+                  response.userTimeZone == value
+            else {
+                return false
+            }
+            lastSuccessfulAccountScope = token.accountScope
+            lastSuccessfulEpoch = token.epoch
+            return true
+        } catch {
+            return false
+        }
     }
 
     private func tokenIfReadable() -> Token? {
@@ -357,6 +398,14 @@ final class MahayanaCoordinator {
                 clearLocal: { store.clearHasSeenOnboarding() },
                 readRemote: { try await hostSupervisor.readHostSettings() },
                 pushRemote: { try await hostSupervisor.pushHostSettings($0) },
+                readLocalUserTimeZone: {
+                    let detected = store.getDetectedUserTimeZone()
+                        ?? TimeZone.autoupdatingCurrent.identifier
+                    return store.getUserTimeZoneOverride() ?? detected
+                },
+                pushTimeZoneRemote: {
+                    try await hostSupervisor.pushHostUserTimeZone($0)
+                },
                 hostGeneration: { hostSupervisor.generation }
             )
         }
@@ -837,8 +886,9 @@ final class MahayanaCoordinator {
             if settingsStore.getDetectedUserTimeZone() == nil {
                 settingsStore.setUserTimeZone(detected)
             }
-            let overrideTimeZone: Any = settingsStore.getUserTimeZoneOverride()
-                .map { $0 as Any } ?? NSNull()
+            let override = settingsStore.getUserTimeZoneOverride()
+            hostSettingsReconciler?.scheduleUserTimeZoneWrite(override ?? detected)
+            let overrideTimeZone: Any = override.map { $0 as Any } ?? NSNull()
             return JSONResult(value: [
                 "detectedTimeZone": detected,
                 "overrideTimeZone": overrideTimeZone,
@@ -864,6 +914,12 @@ final class MahayanaCoordinator {
                 ?? TimeZone.autoupdatingCurrent.identifier
             if settingsStore.getDetectedUserTimeZone() == nil {
                 settingsStore.setUserTimeZone(detected)
+            }
+            let effective = override ?? detected
+            if let hostSettingsReconciler,
+               hostSettingsReconciler.isReadable,
+               !(await hostSettingsReconciler.pushUserTimeZoneIfCurrent(effective)) {
+                throw CoordinatorError.requestFailed("Time zone scope changed before Host projection completed.")
             }
             let overrideTimeZone: Any = settingsStore.getUserTimeZoneOverride()
                 .map { $0 as Any } ?? NSNull()
