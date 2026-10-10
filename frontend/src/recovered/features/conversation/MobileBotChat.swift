@@ -1936,8 +1936,19 @@ internal struct MobileBotChat: View {
                         }
                     },
                     onEscape: {
-                        guard !editorSuggestionRows.isEmpty else { return }
+                        guard !editorSuggestionRows.isEmpty else { return false }
                         editorSuggestionActiveIndex = nil
+                        return true
+                    },
+                    onSuggestionMove: { move in
+                        let rows = editorSuggestionRows
+                        guard !rows.isEmpty else { return false }
+                        editorSuggestionActiveIndex = mobileEditorSuggestionNextIndex(
+                            current: editorSuggestionActiveIndex,
+                            count: rows.count,
+                            move: move
+                        )
+                        return true
                     }
                 )
                 .background(

@@ -25,7 +25,7 @@ final class MobileComposerImeAcceptanceTests: XCTestCase {
                 binding: binding,
                 scopeKey: "account-a|agent-a",
                 onSubmit: { submitCount += 1 },
-                onEscape: { escapeCount += 1 }
+                onEscape: { escapeCount += 1; return true }
             )
             coordinator.syncExternalText(draft, scopeKey: "account-a|agent-a", to: textView)
 
@@ -42,7 +42,7 @@ final class MobileComposerImeAcceptanceTests: XCTestCase {
                 binding: binding,
                 scopeKey: "account-a|agent-a",
                 onSubmit: { submitCount += 1 },
-                onEscape: { escapeCount += 1 }
+                onEscape: { escapeCount += 1; return true }
             )
             coordinator.syncExternalText(draft, scopeKey: "account-a|agent-a", to: textView)
 
@@ -99,7 +99,7 @@ final class MobileComposerImeAcceptanceTests: XCTestCase {
             binding: firstBinding,
             scopeKey: "account-a|agent-a",
             onSubmit: {},
-            onEscape: {}
+            onEscape: { false }
         )
         coordinator.syncExternalText(firstDraft, scopeKey: "account-a|agent-a", to: textView)
 
@@ -115,7 +115,7 @@ final class MobileComposerImeAcceptanceTests: XCTestCase {
             binding: secondBinding,
             scopeKey: "account-b|agent-a",
             onSubmit: {},
-            onEscape: {}
+            onEscape: { false }
         )
         coordinator.syncExternalText(secondDraft, scopeKey: "account-b|agent-a", to: textView)
 
@@ -126,6 +126,49 @@ final class MobileComposerImeAcceptanceTests: XCTestCase {
         XCTAssertTrue(firstDraft.contains("中文"))
         XCTAssertEqual(secondDraft, "second")
         XCTAssertEqual(textView.text, "second")
+    }
+
+    func testSuggestionNavigationAndEscapeStayWithImeWhileMarkedTextIsActive() {
+        var draft = "seed"
+        var moves: [MobileEditorSuggestionMove] = []
+        var escaped = false
+        let binding = Binding(
+            get: { draft },
+            set: { draft = $0 }
+        )
+
+        let coordinator = MobileComposerTextCoordinator()
+        let textView = MobileComposerUITextView()
+        let window = host(textView)
+        _ = window
+
+        coordinator.attach(to: textView)
+        coordinator.updateOwner(
+            binding: binding,
+            scopeKey: "account-a|agent-a",
+            onSubmit: {},
+            onEscape: {
+                escaped = true
+                return true
+            },
+            onSuggestionMove: { move in
+                moves.append(move)
+                return true
+            }
+        )
+
+        XCTAssertTrue(coordinator.handleSuggestionMove(.next, in: textView))
+        XCTAssertEqual(moves, [.next])
+        XCTAssertTrue(coordinator.handleEscape(in: textView))
+        XCTAssertTrue(escaped)
+
+        escaped = false
+        textView.setMarkedText("かな", selectedRange: NSRange(location: 2, length: 0))
+        coordinator.textViewDidChange(textView)
+        XCTAssertFalse(coordinator.handleSuggestionMove(.previous, in: textView))
+        XCTAssertFalse(coordinator.handleEscape(in: textView))
+        XCTAssertEqual(moves, [.next])
+        XCTAssertFalse(escaped)
     }
 
     func testNaturalBidiDirectionAndAccountAgentStorageKeys() {

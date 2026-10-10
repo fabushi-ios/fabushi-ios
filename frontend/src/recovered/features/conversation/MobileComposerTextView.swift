@@ -3,7 +3,8 @@ import UIKit
 
 @MainActor
 internal final class MobileComposerUITextView: UITextView {
-    var onEscapeKey: (() -> Void)?
+    var onEscapeKey: (() -> Bool)?
+    var onSuggestionMove: ((MobileEditorSuggestionMove) -> Bool)?
 
     private let placeholderLabel: UILabel = {
         let label = UILabel()
@@ -40,14 +41,31 @@ internal final class MobileComposerUITextView: UITextView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override var keyCommands: [UIKeyCommand]? {
-        let escape = UIKeyCommand(
-            input: UIKeyCommand.inputEscape,
-            modifierFlags: [],
-            action: #selector(handleEscapeKeyCommand)
-        )
-        escape.wantsPriorityOverSystemBehavior = true
-        return (super.keyCommands ?? []) + [escape]
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        // UIKit/IME owns all hardware keys while marked text is active so
+        // arrows, Escape and candidate-selection keys keep their native meaning.
+        guard markedTextRange == nil,
+              presses.count == 1,
+              let key = presses.first?.key
+        else {
+            super.pressesBegan(presses, with: event)
+            return
+        }
+
+        let command = key.modifierFlags.contains(.command)
+        let handled: Bool
+        switch key.keyCode {
+        case .keyboardEscape:
+            handled = onEscapeKey?() ?? false
+        case .keyboardUpArrow:
+            handled = onSuggestionMove?(command ? .first : .previous) ?? false
+        case .keyboardDownArrow:
+            handled = onSuggestionMove?(command ? .last : .next) ?? false
+        default:
+            handled = false
+        }
+        if handled { return }
+        super.pressesBegan(presses, with: event)
     }
 
     override func layoutSubviews() {
@@ -68,10 +86,6 @@ internal final class MobileComposerUITextView: UITextView {
         placeholderLabel.isHidden = !text.isEmpty || markedTextRange != nil
     }
 
-    @objc
-    private func handleEscapeKeyCommand() {
-        onEscapeKey?()
-    }
 }
 
 @MainActor
@@ -84,7 +98,8 @@ internal final class MobileComposerTextCoordinator: NSObject, UITextViewDelegate
     private var binding: Binding<String> = .constant("")
     private var scopeKey = ""
     private var onSubmit: () -> Void = {}
-    private var onEscape: () -> Void = {}
+    private var onEscape: () -> Bool = { false }
+    private var onSuggestionMove: (MobileEditorSuggestionMove) -> Bool = { _ in false }
 
     private var compositionActive = false
     private var compositionScopeKey: String?
@@ -95,8 +110,12 @@ internal final class MobileComposerTextCoordinator: NSObject, UITextViewDelegate
     func attach(to textView: MobileComposerUITextView) {
         textView.delegate = self
         textView.onEscapeKey = { [weak self, weak textView] in
-            guard let self, let textView else { return }
-            _ = self.handleEscape(in: textView)
+            guard let self, let textView else { return false }
+            return self.handleEscape(in: textView)
+        }
+        textView.onSuggestionMove = { [weak self, weak textView] move in
+            guard let self, let textView else { return false }
+            return self.handleSuggestionMove(move, in: textView)
         }
         applyNaturalWritingDirection(to: textView)
         textView.updatePlaceholderVisibility()
@@ -106,12 +125,14 @@ internal final class MobileComposerTextCoordinator: NSObject, UITextViewDelegate
         binding: Binding<String>,
         scopeKey: String,
         onSubmit: @escaping () -> Void,
-        onEscape: @escaping () -> Void
+        onEscape: @escaping () -> Bool,
+        onSuggestionMove: @escaping (MobileEditorSuggestionMove) -> Bool = { _ in false }
     ) {
         self.binding = binding
         self.scopeKey = scopeKey
         self.onSubmit = onSubmit
         self.onEscape = onEscape
+        self.onSuggestionMove = onSuggestionMove
     }
 
     func syncExternalText(
@@ -150,8 +171,16 @@ internal final class MobileComposerTextCoordinator: NSObject, UITextViewDelegate
     @discardableResult
     func handleEscape(in textView: UITextView) -> Bool {
         guard !isCompositionActive(in: textView) else { return false }
-        onEscape()
-        return true
+        return onEscape()
+    }
+
+    @discardableResult
+    func handleSuggestionMove(
+        _ move: MobileEditorSuggestionMove,
+        in textView: UITextView
+    ) -> Bool {
+        guard !isCompositionActive(in: textView) else { return false }
+        return onSuggestionMove(move)
     }
 
     func textViewDidChange(_ textView: UITextView) {
@@ -254,7 +283,8 @@ internal struct MobileComposerTextView: UIViewRepresentable {
     let scopeKey: String
     let focusGeneration: Int
     let onSubmit: () -> Void
-    let onEscape: () -> Void
+    let onEscape: () -> Bool
+    let onSuggestionMove: (MobileEditorSuggestionMove) -> Bool
 
     func makeCoordinator() -> MobileComposerTextCoordinator {
         MobileComposerTextCoordinator()
@@ -267,7 +297,8 @@ internal struct MobileComposerTextView: UIViewRepresentable {
             binding: $text,
             scopeKey: scopeKey,
             onSubmit: onSubmit,
-            onEscape: onEscape
+            onEscape: onEscape,
+            onSuggestionMove: onSuggestionMove
         )
         context.coordinator.syncExternalText(text, scopeKey: scopeKey, to: textView)
         context.coordinator.updateFocus(generation: focusGeneration, in: textView)
@@ -279,7 +310,8 @@ internal struct MobileComposerTextView: UIViewRepresentable {
             binding: $text,
             scopeKey: scopeKey,
             onSubmit: onSubmit,
-            onEscape: onEscape
+            onEscape: onEscape,
+            onSuggestionMove: onSuggestionMove
         )
         context.coordinator.syncExternalText(text, scopeKey: scopeKey, to: textView)
         context.coordinator.updateFocus(generation: focusGeneration, in: textView)
