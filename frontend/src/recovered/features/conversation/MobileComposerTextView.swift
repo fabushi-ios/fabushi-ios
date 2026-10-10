@@ -22,7 +22,7 @@ internal final class MobileComposerUITextView: UITextView {
         font = .preferredFont(forTextStyle: .body)
         adjustsFontForContentSizeCategory = true
         textContainerInset = UIEdgeInsets(top: 11, left: 14, bottom: 11, right: 14)
-        textContainer.lineFragmentPadding = 0
+        self.textContainer.lineFragmentPadding = 0
         textAlignment = .natural
         semanticContentAttribute = .unspecified
         autocorrectionType = .yes

@@ -96,37 +96,6 @@ struct AccountMenuView: View {
     @State private var actionError: String?
     @Environment(\.mobileUiPreferencesStore) private var uiPreferencesStore
 
-    private struct AdvancedCopy {
-        let section: String
-        let timeZone: String
-        let automaticTimeZone: String
-        let localExecution: String
-        let localExecutionDescription: String
-        let permissionAlways: String
-        let permissionAsk: String
-        let permissionNever: String
-        let maximum: String
-    }
-
-    private var advancedCopy: AdvancedCopy {
-        switch (uiPreferencesStore?.preferences ?? MobileUiPreferences()).locale {
-        case .zhHans:
-            return .init(section: "高级", timeZone: "时区", automaticTimeZone: "自动", localExecution: "本地执行权限", localExecutionDescription: "控制 Agent 在此设备上使用本地工具前是否需要询问。", permissionAlways: "始终允许", permissionAsk: "先询问", permissionNever: "从不允许", maximum: "管理员上限")
-        case .zhHant:
-            return .init(section: "進階", timeZone: "時區", automaticTimeZone: "自動", localExecution: "本機執行權限", localExecutionDescription: "控制 Agent 在此裝置使用本機工具前是否需要詢問。", permissionAlways: "一律允許", permissionAsk: "先詢問", permissionNever: "永不允許", maximum: "管理員上限")
-        case .ja:
-            return .init(section: "詳細設定", timeZone: "タイムゾーン", automaticTimeZone: "自動", localExecution: "ローカル実行権限", localExecutionDescription: "このデバイスでローカルツールを使う前に Agent が確認するかを制御します。", permissionAlways: "常に許可", permissionAsk: "先に確認", permissionNever: "許可しない", maximum: "管理者上限")
-        case .ko:
-            return .init(section: "고급", timeZone: "시간대", automaticTimeZone: "자동", localExecution: "로컬 실행 권한", localExecutionDescription: "Agent가 이 기기에서 로컬 도구를 사용하기 전에 물어볼지 제어합니다.", permissionAlways: "항상 허용", permissionAsk: "먼저 묻기", permissionNever: "허용 안 함", maximum: "관리자 한도")
-        case .ar:
-            return .init(section: "متقدم", timeZone: "المنطقة الزمنية", automaticTimeZone: "تلقائي", localExecution: "إذن التنفيذ المحلي", localExecutionDescription: "يتحكم فيما إذا كان على Agent طلب الإذن قبل استخدام الأدوات المحلية على هذا الجهاز.", permissionAlways: "السماح دائمًا", permissionAsk: "اسأل أولًا", permissionNever: "عدم السماح", maximum: "حد المسؤول")
-        case .he:
-            return .init(section: "מתקדם", timeZone: "אזור זמן", automaticTimeZone: "אוטומטי", localExecution: "הרשאת ביצוע מקומית", localExecutionDescription: "קובע אם Agent צריך לשאול לפני שימוש בכלים מקומיים במכשיר הזה.", permissionAlways: "לאפשר תמיד", permissionAsk: "לשאול קודם", permissionNever: "לא לאפשר", maximum: "מגבלת מנהל")
-        case .en, .system:
-            return .init(section: "Advanced", timeZone: "Time zone", automaticTimeZone: "Automatic", localExecution: "Local execution permission", localExecutionDescription: "Controls whether Agent must ask before using local tools on this device.", permissionAlways: "Always allow", permissionAsk: "Ask first", permissionNever: "Never allow", maximum: "Admin maximum")
-        }
-    }
-
     private var shellCopy: MobileSettingsShellCopy {
         (uiPreferencesStore?.preferences ?? MobileUiPreferences()).shellCopy()
     }
@@ -343,6 +312,38 @@ struct AccountSettingsView: View {
     @State private var editingRule: SandAutoReviewInstructionRow?
     @Environment(\.mobileUiPreferencesStore) private var uiPreferencesStore
     @Environment(\.humanCallMediaPort) private var mediaPort
+
+    private struct AdvancedCopy {
+        let section: String
+        let timeZone: String
+        let automaticTimeZone: String
+        let localExecution: String
+        let localExecutionDescription: String
+        let permissionAlways: String
+        let permissionAsk: String
+        let permissionNever: String
+        let maximum: String
+    }
+
+    private var advancedCopy: AdvancedCopy {
+        switch (uiPreferencesStore?.preferences ?? MobileUiPreferences()).locale {
+        case .zhHans:
+            return .init(section: "高级", timeZone: "时区", automaticTimeZone: "自动", localExecution: "本地执行权限", localExecutionDescription: "控制 Agent 在此设备上使用本地工具前是否需要询问。", permissionAlways: "始终允许", permissionAsk: "先询问", permissionNever: "从不允许", maximum: "管理员上限")
+        case .zhHant:
+            return .init(section: "進階", timeZone: "時區", automaticTimeZone: "自動", localExecution: "本機執行權限", localExecutionDescription: "控制 Agent 在此裝置使用本機工具前是否需要詢問。", permissionAlways: "一律允許", permissionAsk: "先詢問", permissionNever: "永不允許", maximum: "管理員上限")
+        case .ja:
+            return .init(section: "詳細設定", timeZone: "タイムゾーン", automaticTimeZone: "自動", localExecution: "ローカル実行権限", localExecutionDescription: "このデバイスでローカルツールを使う前に Agent が確認するかを制御します。", permissionAlways: "常に許可", permissionAsk: "先に確認", permissionNever: "許可しない", maximum: "管理者上限")
+        case .ko:
+            return .init(section: "고급", timeZone: "시간대", automaticTimeZone: "자동", localExecution: "로컬 실행 권한", localExecutionDescription: "Agent가 이 기기에서 로컬 도구를 사용하기 전에 물어볼지 제어합니다.", permissionAlways: "항상 허용", permissionAsk: "먼저 묻기", permissionNever: "허용 안 함", maximum: "관리자 한도")
+        case .ar:
+            return .init(section: "متقدم", timeZone: "المنطقة الزمنية", automaticTimeZone: "تلقائي", localExecution: "إذن التنفيذ المحلي", localExecutionDescription: "يتحكم فيما إذا كان على Agent طلب الإذن قبل استخدام الأدوات المحلية على هذا الجهاز.", permissionAlways: "السماح دائمًا", permissionAsk: "اسأل أولًا", permissionNever: "عدم السماح", maximum: "حد المسؤول")
+        case .he:
+            return .init(section: "מתקדם", timeZone: "אזור זמן", automaticTimeZone: "אוטומטי", localExecution: "הרשאת ביצוע מקומית", localExecutionDescription: "קובע אם Agent צריך לשאול לפני שימוש בכלים מקומיים במכשיר הזה.", permissionAlways: "לאפשר תמיד", permissionAsk: "לשאול קודם", permissionNever: "לא לאפשר", maximum: "מגבלת מנהל")
+        case .en, .system:
+            return .init(section: "Advanced", timeZone: "Time zone", automaticTimeZone: "Automatic", localExecution: "Local execution permission", localExecutionDescription: "Controls whether Agent must ask before using local tools on this device.", permissionAlways: "Always allow", permissionAsk: "Ask first", permissionNever: "Never allow", maximum: "Admin maximum")
+        }
+    }
+
 
     private var localizedFeatureCopy: MobileSettingsFeatureCopy {
         (uiPreferencesStore?.preferences ?? MobileUiPreferences()).featureCopy()
