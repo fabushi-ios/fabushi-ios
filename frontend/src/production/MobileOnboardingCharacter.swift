@@ -149,20 +149,23 @@ struct MobileOnboardingCharacter: View {
         )
     }
 
+    private var motionParameters: (speed: Double, lift: CGFloat, scale: CGFloat) {
+        switch state {
+        case .idle: return (1.4, 1.6, 0.018)
+        case .happy: return (2.4, 2.8, 0.035)
+        case .thinking: return (1.9, 1.2, 0.015)
+        case .searching: return (2.8, 2.0, 0.022)
+        case .working: return (3.2, 2.0, 0.024)
+        case .loading: return (1.1, 1.0, 0.012)
+        case .sending: return (3.6, 2.4, 0.026)
+        case .orbit: return (1.8, 1.8, 0.018)
+        }
+    }
+
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
             let seconds = timeline.date.timeIntervalSinceReferenceDate
-            let motion: (speed: Double, lift: CGFloat, scale: CGFloat)
-            switch state {
-            case .idle: motion = (1.4, 1.6, 0.018)
-            case .happy: motion = (2.4, 2.8, 0.035)
-            case .thinking: motion = (1.9, 1.2, 0.015)
-            case .searching: motion = (2.8, 2.0, 0.022)
-            case .working: motion = (3.2, 2.0, 0.024)
-            case .loading: motion = (1.1, 1.0, 0.012)
-            case .sending: motion = (3.6, 2.4, 0.026)
-            case .orbit: motion = (1.8, 1.8, 0.018)
-            }
+            let motion = motionParameters
             let phase = reduceMotion ? 0 : seconds * motion.speed
             let lift: CGFloat = reduceMotion ? 0 : CGFloat(sin(phase)) * motion.lift
             let scale: CGFloat = reduceMotion

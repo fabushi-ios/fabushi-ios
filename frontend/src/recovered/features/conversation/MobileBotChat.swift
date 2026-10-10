@@ -84,7 +84,11 @@ internal func mobileReactionPickerResults(
             || item.shortcodes.contains(where: { $0.lowercased().hasPrefix(normalizedQuery) })
             || name.hasPrefix(normalizedQuery)
             || name.contains(" " + normalizedQuery)
-        (isExact ? exact : secondary).append((sourceIndex, item))
+        if isExact {
+            exact.append((sourceIndex, item))
+        } else {
+            secondary.append((sourceIndex, item))
+        }
     }
 
     var recentOrder: [String: Int] = [:]
@@ -3711,33 +3715,33 @@ internal struct MobileBotChat: View {
             }
             if let info,
                info.filesChanged != nil || info.linesAdded != nil || info.linesRemoved != nil {
-                Text("Files \\(info.filesChanged ?? 0) · +\\(info.linesAdded ?? 0) −\\(info.linesRemoved ?? 0)")
+                Text("Files \(info.filesChanged ?? 0) · +\(info.linesAdded ?? 0) −\(info.linesRemoved ?? 0)")
                     .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
             }
             if let error, !error.isEmpty {
                 Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2)
             }
             HStack(spacing: 8) {
-                if let cursorURL = URL(string: "https://cursor.com/agents/\\(bcId)") {
+                if let cursorURL = URL(string: "https://cursor.com/agents/\(bcId)") {
                     Link("Open in Cursor", destination: cursorURL)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-open-\\(bcId)"))
+                        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-open-\(bcId)"))
                 }
                 if let rawPR = info?.prURL,
                    let prURL = URL(string: rawPR),
                    prURL.scheme?.lowercased() == "https",
                    prURL.host != nil {
-                    Link(info?.prNumber.map { "View PR #\\($0)" } ?? "View PR", destination: prURL)
+                    Link(info?.prNumber.map { "View PR #\($0)" } ?? "View PR", destination: prURL)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-pr-\\(bcId)"))
+                        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-pr-\(bcId)"))
                 }
             }
         }
         .padding(10)
         .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-\\(bcId)"))
+        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-\(bcId)"))
     }
 
     @MainActor
