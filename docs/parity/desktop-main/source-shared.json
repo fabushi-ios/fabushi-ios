@@ -480,13 +480,19 @@
       "ios_language": "Swift / Rust",
       "ios_platform_delta": "iOS presents external/auth URLs through native APIs, but the same-origin security decision is enforced before presentation. Swift carries the shared policy and the Rust product network owner independently rejects foreign server auth URLs at the authoritative response boundary.",
       "implementation_status": "mapped",
-      "production_evidence": "source/shared/external-url-policy.swift commit 04c3a54cd6e514abec1ed48bbf0b9a6457cd69c9 adds same-origin auth URL validation; mahayana-product commit 9a30b949293aa6c61d40b5e5eb31fa89cd2c4c9c applies it to browser login start/reopen responses.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift testServerAcceptedBrowserAuthUrlMustStayOnConfiguredOrigin; mahayana-product focused auth-origin tests; current exact-HEAD Actions required.",
-      "notes": "IOS-MAIN-SHARED-DIRECT-20261009: exact Desktop main blob a126587a99580c5ea0be801b688cc164a16947df reviewed at 3bc92400826cc4ca7ac665b467708e22261edc61. Existing canonical iOS owners were reused; keep mapped/current-main-fenced until same-head CI and aggregate shared/dependency review close.",
+      "production_evidence": "source/shared/external-url-policy.swift now mirrors current-main allowlisted-scheme handling, raw query/fragment foreign WebAuth token stripping (including repeated percent-decoding), and exact-origin/no-userinfo server-auth validation; source/packages/mahayana-rs/mahayana-product/src/lib.rs remains the authoritative product-network auth response boundary.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift covers foreign WebAuth/autologin stripping from query/fragment, repeated percent encoding, unrelated-parameter preservation, non-web scheme preservation, and exact-origin/no-userinfo server accepted auth URLs; exact-current-head GitHub Actions required before promotion.",
+      "notes": "Current-main security re-review against Desktop external-url-policy.ts@a126587a99580c5ea0be801b688cc164a16947df found the native Swift port already enforced the server-auth same-origin boundary but was missing ordinary HTTP(S) foreign WebAuth token stripping. This descendant closes that real security delta in the existing ExternalURLPolicy owner and adds focused tests. Row remains mapped and requires-current-main-review until aggregate shared/dependency review and same-head CI close.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "responsibility_id": "IOS-MAIN-SHARED-EXTERNAL-URL-001",
+      "desktop_runtime_entrypoint": "parseAllowedExternalUrl / stripForeignWebAuthTokens; parseServerAcceptedAuthExternalUrl",
+      "desktop_state_machine": "Parse allowlisted schemes; for ordinary HTTP(S) external URLs strip foreign Telegram WebAuth/autologin token parameters from raw query/fragment including repeatedly percent-encoded names; for server-accepted auth URLs require HTTP(S), no userinfo and exact origin.",
+      "ios_target_symbol": "ExternalURLPolicy.parseAllowed; ExternalURLPolicy.parseServerAcceptedAuthExternalURL",
+      "ios_owner": "ExternalURLPolicy shared security boundary",
+      "ios_runtime_entrypoint": "Native external/auth URL presentation callers -> ExternalURLPolicy before opening"
     },
     {
       "desktop_path": "source/shared/feedback.ts",

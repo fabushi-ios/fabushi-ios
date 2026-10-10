@@ -2638,6 +2638,16 @@
         }
       ],
       "verdict": "Current Desktop main still requires spec-first existing-owner-first composition, single canonical roots, Coordinator/Host/Runner boundaries, full responsibility/source closure, GitHub-Actions-only executable verification for FBCP/TDRP, and fail-closed exact-head release evidence. No PR20-era acceptance status was inherited."
+    },
+    "sharedContractReviewEvidence": {
+      "externalUrlPolicy": {
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "desktopPath": "source/shared/external-url-policy.ts",
+        "desktopBlobSha": "a126587a99580c5ea0be801b688cc164a16947df",
+        "iosPath": "source/shared/external-url-policy.swift",
+        "finding": "Existing same-origin server-auth gate retained; missing ordinary HTTP(S) foreign WebAuth/autologin token stripping was implemented in the canonical shared Swift owner with focused tests.",
+        "status": "implemented-pending-exact-head-ci"
+      }
     }
   },
   "historyPolicy": "PR20 old status and evidence historical only",

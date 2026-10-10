@@ -201,6 +201,30 @@ final class SharedSettingsParityTests: XCTestCase {
         XCTAssertNil(media.cameraId)
     }
 
+    func testAllowedExternalUrlStripsForeignWebAuthTokensFromQueryAndFragment() throws {
+        let sanitized = try XCTUnwrap(ExternalURLPolicy.parseAllowed(
+            "https://example.com/path?keep=1&tgWebAuthToken=secret&%2561utologin_token=hidden#route?ok=2&tgwebauthnonce=leak"
+        ))
+        let components = try XCTUnwrap(URLComponents(string: sanitized))
+        XCTAssertEqual(components.host, "example.com")
+        XCTAssertEqual(components.path, "/path")
+        XCTAssertEqual(components.percentEncodedQuery, "keep=1")
+        XCTAssertEqual(components.percentEncodedFragment, "route?ok=2")
+        XCTAssertFalse(sanitized.lowercased().contains("tgwebauth"))
+        XCTAssertFalse(sanitized.lowercased().contains("autologin_token"))
+    }
+
+    func testAllowedExternalUrlPreservesUnrelatedParametersAndNonWebSchemes() {
+        XCTAssertEqual(
+            ExternalURLPolicy.parseAllowed("https://example.com/?token=safe#route?mode=1"),
+            "https://example.com/?token=safe#route?mode=1"
+        )
+        XCTAssertEqual(
+            ExternalURLPolicy.parseAllowed("mailto:user@example.com?autologin_token=mail-metadata"),
+            "mailto:user@example.com?autologin_token=mail-metadata"
+        )
+    }
+
     func testServerAcceptedBrowserAuthUrlMustStayOnConfiguredOrigin() {
         XCTAssertEqual(
             ExternalURLPolicy.parseServerAcceptedAuthExternalURL(
