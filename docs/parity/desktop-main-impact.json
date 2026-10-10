@@ -3421,8 +3421,8 @@
       {
         "path": "frontend/src/recovered/contracts/main-rpc.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-method-table-mapped-event-families-still-pending",
-        "finding": "Current Desktop main defines the canonical main method/event surface. IOSMainRPCRuntime retains the Desktop method names and none/object argument shapes with only explicit iOS/Fabushi extensions, while native owners replace Electron mechanisms. This aggregate row must remain mapped: the 19 Desktop event families still require per-event applicability/owner/user-effect evidence before promotion, so method-table parity alone is not accepted as closure."
+        "status": "current-main-reviewed-method-and-event-dispositions-implemented-pending-exact-head-ci",
+        "finding": "Current Desktop main defines 117 canonical main methods and 19 named event families. IOSMainRPCRuntime preserves the method/event identities and now fail-closes every event through an explicit native disposition: Computer migration/pull/rebuild -> RemoteComputerRebuildOwner/RemoteComputerShellModel; Cursor auth -> IOSCursorAuthService; deep links -> IOSDeepLinkController; egress -> EgressTunnelController; experiments -> SandExperimentService; focus/onboarding/about/feedback -> existing native navigation owners; theme/update/VNC/WebAuthn -> their existing native services; Desktop-only window-state and zoom-factor renderer mechanisms -> explicit SwiftUI/native presentation replacements. No second event/state owner or synthetic Electron bus was introduced. Same-final-HEAD CI/device/protected evidence remains pending."
       },
       {
         "path": "frontend/src/recovered/contracts/rpc-edge.ts",

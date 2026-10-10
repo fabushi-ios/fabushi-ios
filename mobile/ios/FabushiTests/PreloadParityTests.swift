@@ -304,6 +304,22 @@ final class PreloadParityTests: XCTestCase {
         XCTAssertTrue(IOSMainRPCRuntime.isEvent("zoom-factor-changed"))
         XCTAssertFalse(IOSMainRPCRuntime.isEvent("totally-unknown-event"))
 
+        XCTAssertEqual(Set(IOSMainRPCRuntime.eventDispositions.keys), Set(IOSMainRPCRuntime.eventNames))
+        XCTAssertEqual(IOSMainRPCRuntime.eventDispositions.count, 19)
+        XCTAssertEqual(IOSMainRPCRuntime.eventDisposition("deep-link")?.ownerSymbol, "IOSDeepLinkController")
+        XCTAssertEqual(IOSMainRPCRuntime.eventDisposition("cursor-auth-changed")?.ownerSymbol, "IOSCursorAuthService")
+        XCTAssertEqual(IOSMainRPCRuntime.eventDisposition("box-migration")?.ownerSymbol, "RemoteComputerRebuildOwner")
+        XCTAssertEqual(IOSMainRPCRuntime.eventDisposition("open-feedback")?.ownerSymbol, "AccountFeedbackView")
+        XCTAssertEqual(IOSMainRPCRuntime.eventDisposition("window-state")?.delivery, .platformMechanismReplacement)
+        XCTAssertEqual(IOSMainRPCRuntime.eventDisposition("zoom-factor-changed")?.delivery, .platformMechanismReplacement)
+        for event in IOSMainRPCRuntime.eventNames {
+            let disposition = IOSMainRPCRuntime.eventDisposition(event)
+            XCTAssertNotNil(disposition, "Missing iOS disposition for \(event)")
+            XCTAssertFalse(disposition?.ownerPath.isEmpty ?? true)
+            XCTAssertFalse(disposition?.ownerSymbol.isEmpty ?? true)
+            XCTAssertFalse(disposition?.productEffect.isEmpty ?? true)
+        }
+
         XCTAssertEqual(
             IOSMainRPCRuntime.methodChannel("openExternal"),
             "sand-rpc:main:m:openExternal"
