@@ -1,5 +1,6 @@
 use crate::conversation_blob_db::{
     ConversationBlobDb, ConversationBlobMigrationState, ConversationBlobRecoveryError,
+    ConversationBlobRecoveryInfo,
 };
 use crate::conversation_blob_gc::{
     BlobReferenceDecoder, collect_reachable_blob_hex_ids, from_hex_id, to_hex_id,
@@ -57,13 +58,29 @@ impl ConversationBlobStoreDb {
     ) -> Result<Self, ConversationBlobRecoveryError> {
         let agent_id = agent_id.into();
         let blob_db_path = blob_db_path.into();
+        let recovery_log = |message: &str| {
+            eprintln!("{message}");
+        };
+        let recovery_event = |info: &ConversationBlobRecoveryInfo| {
+            eprintln!(
+                "[agent-store-worker] recovery event: agent={} outcome={:?} quarantine={} salvaged_blobs={} salvaged_checkpoint_roots={}",
+                info.agent_id,
+                info.outcome,
+                info.quarantine_path
+                    .as_deref()
+                    .map(|path| path.display().to_string())
+                    .unwrap_or_else(|| "none".into()),
+                info.salvaged_blobs,
+                info.salvaged_checkpoint_roots,
+            );
+        };
         let db = ConversationBlobDb::open_with_options(
             crate::conversation_blob_db::ConversationBlobDbOptions {
                 db_path: &blob_db_path,
                 busy_timeout_ms,
                 agent_id: &agent_id,
-                log: None,
-                on_recovery: None,
+                log: Some(&recovery_log),
+                on_recovery: Some(&recovery_event),
             },
         )?;
         let mut store = Self {

@@ -117,6 +117,7 @@ pub enum ConversationBlobRecoveryOutcome {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversationBlobRecoveryInfo {
+    pub agent_id: String,
     pub outcome: ConversationBlobRecoveryOutcome,
     pub quarantine_path: Option<PathBuf>,
     pub salvaged_blobs: usize,
@@ -620,6 +621,7 @@ fn finish_recovery(
     }
 
     let info = ConversationBlobRecoveryInfo {
+        agent_id: options.agent_id.to_string(),
         outcome: if salvaged_blobs > 0 || salvaged_checkpoint_roots > 0 {
             ConversationBlobRecoveryOutcome::Recovered
         } else {
@@ -953,6 +955,7 @@ mod tests {
         );
         let events = events.lock().unwrap();
         assert_eq!(events.len(), 1);
+        assert_eq!(events[0].agent_id, "agent-a");
         assert_eq!(events[0].outcome, ConversationBlobRecoveryOutcome::Reset);
         let parent = path.parent().unwrap();
         let base = path.file_name().unwrap().to_string_lossy().to_string();
