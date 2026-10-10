@@ -59,11 +59,11 @@ final class AsyncTasksParityTests: XCTestCase {
     }
 
     func testCloudAgentStatusClassificationMatchesDesktopPoller() {
-        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 1, summary: nil, permanentError: nil).isActive)
-        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 4, summary: nil, permanentError: nil).isActive)
-        XCTAssertFalse(IOSCloudAgentComposerInfo(status: 2, summary: nil, permanentError: nil).isActive)
-        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 3, summary: nil, permanentError: nil).isError)
-        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 5, summary: nil, permanentError: nil).isError)
+        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 1, name: nil, prompt: nil, summary: nil, permanentError: nil, branchName: nil, filesChanged: nil, linesAdded: nil, linesRemoved: nil, prURL: nil, prState: nil, prNumber: nil).isActive)
+        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 4, name: nil, prompt: nil, summary: nil, permanentError: nil, branchName: nil, filesChanged: nil, linesAdded: nil, linesRemoved: nil, prURL: nil, prState: nil, prNumber: nil).isActive)
+        XCTAssertFalse(IOSCloudAgentComposerInfo(status: 2, name: nil, prompt: nil, summary: nil, permanentError: nil, branchName: nil, filesChanged: nil, linesAdded: nil, linesRemoved: nil, prURL: nil, prState: nil, prNumber: nil).isActive)
+        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 3, name: nil, prompt: nil, summary: nil, permanentError: nil, branchName: nil, filesChanged: nil, linesAdded: nil, linesRemoved: nil, prURL: nil, prState: nil, prNumber: nil).isError)
+        XCTAssertTrue(IOSCloudAgentComposerInfo(status: 5, name: nil, prompt: nil, summary: nil, permanentError: nil, branchName: nil, filesChanged: nil, linesAdded: nil, linesRemoved: nil, prURL: nil, prState: nil, prNumber: nil).isError)
     }
 
     func testTaskDecoderRejectsMalformedOrNonRunningRows() {
