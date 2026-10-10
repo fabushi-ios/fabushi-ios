@@ -45,6 +45,37 @@ final class ForwardMessageParityTests: XCTestCase {
         )
     }
 
+    func testSubmitShortcutAcceptsDesktopCommandAndControlVariants() {
+        XCTAssertTrue(
+            ForwardRecipientNavigation.isSubmitShortcut(
+                isReturn: true,
+                command: true,
+                control: false
+            )
+        )
+        XCTAssertTrue(
+            ForwardRecipientNavigation.isSubmitShortcut(
+                isReturn: true,
+                command: false,
+                control: true
+            )
+        )
+        XCTAssertFalse(
+            ForwardRecipientNavigation.isSubmitShortcut(
+                isReturn: true,
+                command: false,
+                control: false
+            )
+        )
+        XCTAssertFalse(
+            ForwardRecipientNavigation.isSubmitShortcut(
+                isReturn: false,
+                command: true,
+                control: true
+            )
+        )
+    }
+
     func testPageNavigationMatchesDesktopSixRowStepAndClamps() {
         XCTAssertEqual(
             ForwardRecipientNavigation.nextIndex(

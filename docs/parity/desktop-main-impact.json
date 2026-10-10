@@ -2685,6 +2685,30 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-implemented-parent",
         "finding": "Store safety semantics exist in memory_metadata.rs with focused tests; promotion waits for descendant exact-head CI and global gates."
+      },
+      {
+        "path": "frontend/src/production/ForwardMessageDialog.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Shipping native Forward path reviewed against Desktop current main; implementation exists, but ledger status remains mapped until descendant exact-head Swift/UI evidence."
+      },
+      {
+        "path": "frontend/src/production/forward-recipient-navigation.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Shipping native Forward path reviewed against Desktop current main; implementation exists, but ledger status remains mapped until descendant exact-head Swift/UI evidence."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/transcript.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Shipping native Forward path reviewed against Desktop current main; implementation exists, but ledger status remains mapped until descendant exact-head Swift/UI evidence."
+      },
+      {
+        "path": "frontend/src/recovered/features/recovered-conversation-infra.contract.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Shipping native Forward path reviewed against Desktop current main; implementation exists, but ledger status remains mapped until descendant exact-head Swift/UI evidence."
       }
     ]
   },

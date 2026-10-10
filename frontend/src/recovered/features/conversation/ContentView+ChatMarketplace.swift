@@ -12,6 +12,14 @@ internal enum ForwardRecipientNavigationKey: Equatable {
 }
 
 internal enum ForwardRecipientNavigation {
+    static func isSubmitShortcut(
+        isReturn: Bool,
+        command: Bool,
+        control: Bool
+    ) -> Bool {
+        isReturn && (command || control)
+    }
+
     static func nextIndex(
         currentIndex: Int,
         recipientCount: Int,
@@ -425,7 +433,11 @@ internal struct ForwardMessageSheet: View {
             return .handled
         }
 
-        if press.key == .return, press.modifiers.contains(.command) {
+        if ForwardRecipientNavigation.isSubmitShortcut(
+            isReturn: press.key == .return,
+            command: press.modifiers.contains(.command),
+            control: press.modifiers.contains(.control)
+        ) {
             guard !pendingRecipients.isEmpty else { return .ignored }
             Task { await submit() }
             return .handled
