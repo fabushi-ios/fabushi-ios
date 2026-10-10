@@ -2035,11 +2035,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Requires a native Cloud Agent provider and an iOS-appropriate open handoff. The current PR has no getCloudAgentInfo provider/surface or equivalent scoped poll owner; Host cloud-agent support is not exposed to this shipping transcript path.",
-      "implementation_status": "mapped",
-      "production_evidence": "No current iOS transcript Cloud Agent provider, getCloudAgentInfo bridge, or Open-in-Cursor composition was found at the exact HEAD.",
-      "test_evidence": "Desktop provider contract audited at final PR #20 HEAD; implementation and focused lifecycle tests remain required.",
-      "notes": "Larger independent production slice; mapped rather than faked with static card data."
+      "ios_platform_delta": "SwiftUI reuses the existing canonical Cursor/Coordinator cloud-agent path rather than creating a second watcher runtime. MarketplaceModel.cloudAgentInfo(bcId:) calls the typed iOS Cursor dashboard client with includeFiles=false semantics; MobileBotChat watches only visible bcIds, polls live rows every 5 seconds and recovery/error rows every 60 seconds, stops terminal finished/error/expired states, and fences account + Bot + visible-bcId scope changes/disposal before writing results. Open in Cursor is an iOS HTTPS handoff to the same bcId identity.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift (MobileCloudAgentInfo, projectMobileCloudAgentInfo, MarketplaceModel.cloudAgentInfo); frontend/src/recovered/features/conversation/MobileBotChat.swift (visibleCloudAgentIds, cloudAgentScopeFingerprint, resetCloudAgentState, pollVisibleCloudAgents, cloudAgentCard) through the shipping MobileBotChat transcript surface; source/ios-main/account/cursor-dashboard-client.swift supplies the canonical cloud-agent backend contract.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers exact-bcId decoding/stat projection and strict cursor-agent card projection. Current exact-head ordinary/protected GitHub Actions and protected UI evidence remain required before verified promotion.",
+      "notes": "IOS-MAIN-DEP-CLOUD-AGENT-PROVIDER-20261011: production provider and shipping leaf composition are present on exact HEAD 79bbe08a36611b661bde5b333b740429748e232b. Status advances only to implemented; final-head CI/protected/device evidence remains fail-closed."
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/connector-actions.ts",
@@ -2050,11 +2050,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Current iOS Marketplace/Mini App OAuth/install flows are different product contracts. Desktop parity requires the MCP connector catalog/list/install/auth/onAuthCompleted/openExternal provider; those routes are not currently composed into the transcript shipping owner and must not be substituted with Marketplace plugin installation.",
-      "implementation_status": "mapped",
-      "production_evidence": "Current MarketplaceModel has plugin/Mini App OAuth and install wiring, but no Desktop-equivalent MCP connector provider lifecycle for transcript connector cards.",
-      "test_evidence": "Desktop connector provider contract audited at final PR #20 HEAD; production transport + focused lifecycle tests remain required.",
-      "notes": "Mapped with an explicit contract gap; Marketplace plugin installation is not accepted as connector-card parity."
+      "ios_platform_delta": "The transcript card reuses the existing MarketplaceModel/SandMcpManager MCP catalog, server/account, OAuth and installation owners. MobileBotChat opens one scoped connector-card lifecycle only while connector cards are visible; MarketplaceModel loads catalog + canonical server state, normalizes connector identity, prefers the default account unless an exact account is requested, fail-closes team-policy-only servers, installs missing catalog entries, authenticates needsAuth/disconnected/error servers, preserves external OAuth waiting state, supports reopen/retry, refreshes after auth completion, and fences card generation/request/account lifecycle without creating a Marketplace-plugin substitute runtime.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift (connectorCardKey, connectorCatalogEntry, connectorServer, openConnectorCards, closeConnectorCards, loadConnectorCardData, connectConnectorCard, retryConnectorCard, reopenConnectorCard plus existing MCP OAuth/session owner); frontend/src/recovered/features/conversation/MobileBotChat.swift (visibleConnectorNames, connectorCardScopeFingerprint, runConnectorCardLifecycle, connectorCard) is the shipping transcript caller.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers strict singular/plural connector projection, normalized de-duplication, default-account preference and team-policy fail-closed matching. Current exact-head ordinary/protected Actions remain required before verified promotion.",
+      "notes": "IOS-MAIN-DEP-CONNECTOR-ACTIONS-20261011: canonical MCP connector provider/action lifecycle is shipping-composed on exact HEAD 79bbe08a36611b661bde5b333b740429748e232b. Keep below verified until same-final-HEAD CI/protected evidence succeeds."
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-catalog.ts",
@@ -2491,11 +2491,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "The leaf remains dependent on the separately tracked cloud-agent provider mapping. iOS cannot claim completion from a static card; native remote-runner/async-task state must supply equivalent live task/PR projection and URL opening.",
-      "implementation_status": "mapped",
-      "production_evidence": "No duplicate card state was introduced. Existing mobile async-task/remote-runner surfaces are the intended native composition, while the cloud-agent-provider row remains the explicit production gap.",
-      "test_evidence": "Blocked on the separately tracked cloud-agent-provider completion and same-head UI acceptance.",
-      "notes": "IOS-MAIN-DEP-CLOUD-AGENT-LEAF-20261009: exact Desktop cloud-agent.tsx reviewed; intentionally remains mapped because its provider owner is not yet closed.",
+      "ios_platform_delta": "Native SwiftUI replaces the React card while consuming the same single cloud-agent provider state. The shipping card renders pending/error/status, prompt/title, branch, PR identity/link, file/line statistics and Open in Cursor from the canonical bcId-scoped provider; stale scope results cannot write back after account/Bot/visible-card changes.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift cloudAgentCard consumes MarketplaceModel.cloudAgentInfo-backed state from pollVisibleCloudAgents and is reached by the shipping cursor-agent transcript projection.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers strict cursor-agent projection and cloud-agent info/stat decoding. Exact-head Swift/UI/protected evidence is still pending.",
+      "notes": "IOS-MAIN-DEP-CLOUD-AGENT-LEAF-20261011: provider dependency is now production-composed; advance to implemented only, not verified.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -2507,11 +2507,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift + Rust",
-      "ios_platform_delta": "Canonical connector list/connect/OAuth/account/tool state already lives in FeatureHost + MarketplaceModel, but the transcript connector-card adapter remains the separately tracked connector-actions gap. These leaves stay mapped rather than being faked by Marketplace install UI.",
-      "implementation_status": "mapped",
-      "production_evidence": "MarketplaceModel/FeatureHost own connector.connect, OAuth, account/tool state and catalog projections; transcript leaf wiring waits on the connector-actions row to expose that same owner to transcript entries.",
-      "test_evidence": "Connector FeatureHost/Marketplace tests exist; transcript-specific UI acceptance remains blocked on connector-actions completion.",
-      "notes": "IOS-MAIN-DEP-CONNECTOR-LEAF-20261009: exact Desktop connector leaf source reviewed; provider dependency intentionally remains mapped.",
+      "ios_platform_delta": "SwiftUI singular connector cards reuse the canonical MarketplaceModel MCP provider/action lifecycle. The leaf resolves catalog/server identity, preserves serverId/account hints, fail-closes team-managed policy, and exposes Added/Add/Authorize/waiting/failed plus OAuth reopen/retry states without routing through generic Marketplace plugin installation.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift connectorCard renders the singular connector projection and invokes MarketplaceModel.connectConnectorCard/retryConnectorCard/reopenConnectorCard from the one visible-card lifecycle.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers singular connector projection and canonical normalized/default-account/team-policy matching. Exact-head UI/protected evidence remains pending.",
+      "notes": "IOS-MAIN-DEP-CONNECTOR-LEAF-20261011: connector-actions dependency is production-composed; keep at implemented pending same-head acceptance.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -2523,11 +2523,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift + Rust",
-      "ios_platform_delta": "Canonical connector list/connect/OAuth/account/tool state already lives in FeatureHost + MarketplaceModel, but the transcript connector-card adapter remains the separately tracked connector-actions gap. These leaves stay mapped rather than being faked by Marketplace install UI.",
-      "implementation_status": "mapped",
-      "production_evidence": "MarketplaceModel/FeatureHost own connector.connect, OAuth, account/tool state and catalog projections; transcript leaf wiring waits on the connector-actions row to expose that same owner to transcript entries.",
-      "test_evidence": "Connector FeatureHost/Marketplace tests exist; transcript-specific UI acceptance remains blocked on connector-actions completion.",
-      "notes": "IOS-MAIN-DEP-CONNECTOR-LEAF-20261009: exact Desktop connector leaf source reviewed; provider dependency intentionally remains mapped.",
+      "ios_platform_delta": "SwiftUI plural connector cards strictly project and normalize/deduplicate the source connector list, then render every row against the same single MarketplaceModel catalog/server/OAuth/action lifecycle. No per-row MCP owner is created.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift visibleConnectorNames/runConnectorCardLifecycle/connectorCard plus mobile/ios/Fabushi/MarketplaceModel.swift canonical connector action methods compose the plural shipping card.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers strict plural projection and normalized connector de-duplication plus canonical server matching. Exact-head UI/protected evidence remains pending.",
+      "notes": "IOS-MAIN-DEP-CONNECTORS-LEAF-20261011: plural leaf now shares the canonical connector-actions owner; keep below verified pending same-final-HEAD evidence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
