@@ -709,7 +709,10 @@ struct AccountSettingsView: View {
                         editingRule == nil
                             ? localizedFeatureCopy.autoReviewDraftLabel
                             : localizedFeatureCopy.autoReviewDraftLabel,
-                        text: $ruleDraft,
+                        text: Binding(
+                            get: { ruleDraft },
+                            set: { ruleDraft = clampSandAutoReviewInstructionDraft($0) }
+                        ),
                         axis: .vertical
                     )
                     .lineLimit(1...4)
@@ -735,9 +738,12 @@ struct AccountSettingsView: View {
                         }
                         .disabled(
                             configurationSaving
-                                || ruleDraft.trimmingCharacters(
-                                    in: .whitespacesAndNewlines
-                                ).isEmpty
+                                || saveSandAutoReviewInstruction(
+                                    autoReviewSettings,
+                                    text: ruleDraft,
+                                    behavior: ruleBehavior,
+                                    editing: editingRule
+                                ) == nil
                         )
                         .accessibilityIdentifier("settings-auto-review-rule-save")
 

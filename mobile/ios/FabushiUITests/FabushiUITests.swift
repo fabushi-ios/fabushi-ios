@@ -127,6 +127,42 @@ final class FabushiUITests: XCTestCase {
     }
 
     @MainActor
+    func testAccountSettingsExposesCanonicalAutoReviewEditor() throws {
+        let app = launchAuthenticatedApp()
+
+        let profile = app.buttons["profile-avatar"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 10))
+        profile.tap()
+
+        let settingsEntry = app.buttons["account-settings-entry"]
+        XCTAssertTrue(settingsEntry.waitForExistence(timeout: 5))
+        settingsEntry.tap()
+
+        let settingsSurface = app.descendants(matching: .any)["account-settings"]
+        XCTAssertTrue(settingsSurface.waitForExistence(timeout: 10))
+
+        let autoReviewToggle = app.switches["settings-auto-review-enabled"]
+        XCTAssertTrue(
+            scrollToElement(autoReviewToggle, in: app),
+            "Expected account-scoped Auto-review in the shipping Settings surface."
+        )
+
+        if (autoReviewToggle.value as? String) == "0" {
+            autoReviewToggle.tap()
+        }
+
+        let draft = app.descendants(matching: .any)["settings-auto-review-rule-draft"]
+        XCTAssertTrue(
+            draft.waitForExistence(timeout: 10),
+            "Expected the Auto-review rule editor after enabling the canonical setting."
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-auto-review-rule-behavior"].exists
+        )
+        XCTAssertTrue(app.buttons["settings-auto-review-rule-save"].exists)
+    }
+
+    @MainActor
     func testMiniAppOpensAndClosesDedicatedWebMcpSurface() throws {
         let app = launchAuthenticatedApp()
         openMarketplace(in: app)

@@ -394,6 +394,37 @@ final class SharedSettingsParityTests: XCTestCase {
                 editing: nil
             )
         )
+
+        let oversized = String(repeating: "😀", count: 501)
+        let bounded = saveSandAutoReviewInstruction(
+            .init(isEnabled: true, allowInstructions: [], blockInstructions: []),
+            text: oversized,
+            behavior: .allow,
+            editing: nil
+        )
+        XCTAssertEqual(
+            bounded?.allowInstructions.first?.utf16.count,
+            SAND_AUTO_REVIEW_INSTRUCTION_MAX_CHARS
+        )
+        XCTAssertEqual(
+            clampSandAutoReviewInstructionDraft(oversized).utf16.count,
+            SAND_AUTO_REVIEW_INSTRUCTION_MAX_CHARS
+        )
+
+        let exactLimit = String(repeating: "x", count: SAND_AUTO_REVIEW_INSTRUCTION_MAX_CHARS)
+        XCTAssertNil(
+            saveSandAutoReviewInstruction(
+                .init(
+                    isEnabled: true,
+                    allowInstructions: [exactLimit],
+                    blockInstructions: []
+                ),
+                text: exactLimit + "x",
+                behavior: .allow,
+                editing: nil
+            ),
+            "Duplicate detection must run after the same 1000-unit clamp used by persistence."
+        )
     }
 
     @MainActor

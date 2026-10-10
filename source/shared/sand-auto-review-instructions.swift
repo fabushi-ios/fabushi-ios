@@ -92,7 +92,9 @@ func saveSandAutoReviewInstruction(
     behavior: SandAutoReviewInstructionBehavior,
     editing: SandAutoReviewInstructionRow?
 ) -> SandAutoReviewInstructions? {
-    let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalized = clampSandAutoReviewInstructionDraft(
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    )
     guard !normalized.isEmpty else { return nil }
 
     var allow = instructions.allowInstructions
@@ -132,6 +134,10 @@ func saveSandAutoReviewInstruction(
         allowInstructions: allow,
         blockInstructions: ask
     )
+}
+
+func clampSandAutoReviewInstructionDraft(_ value: String) -> String {
+    clampSandInstructionUTF16(value)
 }
 
 private func clampSandInstructionUTF16(_ value: String) -> String {
