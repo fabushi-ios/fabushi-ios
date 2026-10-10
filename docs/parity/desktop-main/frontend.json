@@ -2840,11 +2840,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "MobileBotChat owns the native TextField composer, reply banner, send/stop lifecycle and on-device VoiceRecorder/OfflineSpeechTranscriber. Rich-text draft and the Desktop attachment staging/drop/paste/limit composition are not yet fully exposed from this iOS composer.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat.composer plus VoiceRecorder and OfflineSpeechTranscriber are shipping native owners; no second composer was created.",
-      "test_evidence": "Existing offline speech/reply/mobile transcript tests cover native portions; attachment/rich-text composer acceptance remains open.",
-      "notes": "IOS-MAIN-DEP-COMPOSER-20261009: exact Desktop composer.tsx reviewed; native voice/reply/text parity exists, attachment/rich-text composition remains.",
+      "ios_platform_delta": "MobileBotChat owns the single native composer with account+Agent scoped draft/recovery, MCP/PR rich-reference synthesis, reply target, six-file attachment strip/removal/limits, native document picker and non-text paste-provider staging through the same Host attachment.upload owner, local voice capture/on-device transcription/cancel, reconnect notice/gating, and send/stop lifecycle. Desktop drag/drop is platform-replaced by iOS document picker and paste-provider input; ordinary text/URL paste remains native UIKit behavior.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (composer, attachment strip/button, paste-provider staging, stageImportedComposerAttachments, reply/voice/send/stop and reconnect gating); frontend/src/recovered/features/conversation/MobileComposerTextView.swift (IME-safe editor, suggestion keyboard navigation, non-text paste interception); mobile/ios/Fabushi/OfflineSpeechTranscriber.swift and canonical attachment.upload Host store.",
+      "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers attachment limits/staging helpers, account-scoped suggestions/recents, paste type filtering and transport availability; existing voice/reply/draft tests cover on-device transcription, scope fencing and recovery. Current exact-head ordinary/protected Actions remain required before verified.",
+      "notes": "IOS-MAIN-DEP-COMPOSER-20261011: native composer responsibility is implemented. Browser drag/drop is replaced by fileImporter; non-text clipboard providers are materialized only temporarily, staged through the canonical Host store, then cleaned. Keep below verified pending exact-head CI/protected evidence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {

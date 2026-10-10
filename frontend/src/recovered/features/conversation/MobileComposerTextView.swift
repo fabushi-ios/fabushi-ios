@@ -1,10 +1,31 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
+
+internal func mobileComposerPasteAttachmentTypeIdentifier(
+    _ identifiers: [String]
+) -> String? {
+    for identifier in identifiers {
+        guard let type = UTType(identifier) else { continue }
+        if type.conforms(to: .fileURL)
+            || type.conforms(to: .image)
+            || type.conforms(to: .movie)
+            || type.conforms(to: .audio)
+            || type.conforms(to: .pdf)
+        {
+            return identifier
+        }
+        if type.conforms(to: .text) || type.conforms(to: .url) { continue }
+        if type.conforms(to: .data) || type.conforms(to: .content) { return identifier }
+    }
+    return nil
+}
 
 @MainActor
 internal final class MobileComposerUITextView: UITextView {
     var onEscapeKey: (() -> Bool)?
     var onSuggestionMove: ((MobileEditorSuggestionMove) -> Bool)?
+    var onPasteItemProviders: (([NSItemProvider]) -> Bool)?
 
     private let placeholderLabel: UILabel = {
         let label = UILabel()
@@ -68,6 +89,12 @@ internal final class MobileComposerUITextView: UITextView {
         super.pressesBegan(presses, with: event)
     }
 
+    override func paste(_ sender: Any?) {
+        let providers = UIPasteboard.general.itemProviders
+        if !providers.isEmpty, onPasteItemProviders?(providers) == true { return }
+        super.paste(sender)
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         let width = max(
@@ -100,6 +127,7 @@ internal final class MobileComposerTextCoordinator: NSObject, UITextViewDelegate
     private var onSubmit: () -> Void = {}
     private var onEscape: () -> Bool = { false }
     private var onSuggestionMove: (MobileEditorSuggestionMove) -> Bool = { _ in false }
+    private var onPasteItemProviders: ([NSItemProvider]) -> Bool = { _ in false }
 
     private var compositionActive = false
     private var compositionScopeKey: String?
@@ -117,6 +145,9 @@ internal final class MobileComposerTextCoordinator: NSObject, UITextViewDelegate
             guard let self, let textView else { return false }
             return self.handleSuggestionMove(move, in: textView)
         }
+        textView.onPasteItemProviders = { [weak self] providers in
+            self?.onPasteItemProviders(providers) ?? false
+        }
         applyNaturalWritingDirection(to: textView)
         textView.updatePlaceholderVisibility()
     }
@@ -126,13 +157,15 @@ internal final class MobileComposerTextCoordinator: NSObject, UITextViewDelegate
         scopeKey: String,
         onSubmit: @escaping () -> Void,
         onEscape: @escaping () -> Bool,
-        onSuggestionMove: @escaping (MobileEditorSuggestionMove) -> Bool = { _ in false }
+        onSuggestionMove: @escaping (MobileEditorSuggestionMove) -> Bool = { _ in false },
+        onPasteItemProviders: @escaping ([NSItemProvider]) -> Bool = { _ in false }
     ) {
         self.binding = binding
         self.scopeKey = scopeKey
         self.onSubmit = onSubmit
         self.onEscape = onEscape
         self.onSuggestionMove = onSuggestionMove
+        self.onPasteItemProviders = onPasteItemProviders
     }
 
     func syncExternalText(
@@ -285,6 +318,7 @@ internal struct MobileComposerTextView: UIViewRepresentable {
     let onSubmit: () -> Void
     let onEscape: () -> Bool
     let onSuggestionMove: (MobileEditorSuggestionMove) -> Bool
+    let onPasteItemProviders: ([NSItemProvider]) -> Bool
 
     func makeCoordinator() -> MobileComposerTextCoordinator {
         MobileComposerTextCoordinator()
@@ -298,7 +332,8 @@ internal struct MobileComposerTextView: UIViewRepresentable {
             scopeKey: scopeKey,
             onSubmit: onSubmit,
             onEscape: onEscape,
-            onSuggestionMove: onSuggestionMove
+            onSuggestionMove: onSuggestionMove,
+            onPasteItemProviders: onPasteItemProviders
         )
         context.coordinator.syncExternalText(text, scopeKey: scopeKey, to: textView)
         context.coordinator.updateFocus(generation: focusGeneration, in: textView)
@@ -311,7 +346,8 @@ internal struct MobileComposerTextView: UIViewRepresentable {
             scopeKey: scopeKey,
             onSubmit: onSubmit,
             onEscape: onEscape,
-            onSuggestionMove: onSuggestionMove
+            onSuggestionMove: onSuggestionMove,
+            onPasteItemProviders: onPasteItemProviders
         )
         context.coordinator.syncExternalText(text, scopeKey: scopeKey, to: textView)
         context.coordinator.updateFocus(generation: focusGeneration, in: textView)

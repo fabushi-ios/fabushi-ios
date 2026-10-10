@@ -2930,8 +2930,19 @@ internal struct MobileBotChat: View {
         }
     }
 
+    private var composerTransportDisabled: Bool {
+        !suggestionTransportConnected
+    }
+
     private var composer: some View {
         VStack(spacing: 4) {
+            if composerTransportDisabled {
+                Text("Reconnecting… Sending and attachments are temporarily unavailable.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("mobile-bot-composer-notice")
+            }
             editorSuggestionList
             composerAttachmentStrip
             HStack(alignment: .bottom, spacing: 8) {
@@ -2944,7 +2955,7 @@ internal struct MobileBotChat: View {
                     focusGeneration: focusPromptGeneration &+ composerFocusGeneration,
                     onSubmit: {
                         if chooseActiveEditorSuggestion() { return }
-                        if !busy {
+                        if !busy, !composerTransportDisabled {
                             Task { await send() }
                         }
                     },
@@ -2962,8 +2973,12 @@ internal struct MobileBotChat: View {
                             move: move
                         )
                         return true
+                    },
+                    onPasteItemProviders: { providers in
+                        handleComposerPasteItemProviders(providers)
                     }
                 )
+                .disabled(composerTransportDisabled)
                 .background(
                     Color.black.opacity(0.055),
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -3243,7 +3258,8 @@ internal struct MobileBotChat: View {
             }
             .buttonStyle(.plain)
             .disabled(
-                busy
+                composerTransportDisabled
+                    || busy
                     || stagingAttachments
                     || voiceRecorder.isRecording
                     || transcribingVoice
@@ -3289,7 +3305,7 @@ internal struct MobileBotChat: View {
                     .frame(width: 39, height: 39)
                     .background(voiceRecorder.isRecording ? Color.red : Color.black, in: Circle())
             }
-            .disabled(transcribingVoice || stagingAttachments)
+            .disabled(composerTransportDisabled || transcribingVoice || stagingAttachments)
             .accessibilityIdentifier(voiceRecorder.isRecording ? "mobile-bot-voice-stop" : "mobile-bot-voice-start")
         }
     }
@@ -3310,7 +3326,8 @@ internal struct MobileBotChat: View {
         }
         .disabled(
             !busy && (
-                !mobileComposerHasPayload(text: draft, attachments: composerAttachments)
+                composerTransportDisabled
+                    || !mobileComposerHasPayload(text: draft, attachments: composerAttachments)
                     || stagingAttachments
                     || voiceRecorder.isRecording
                     || transcribingVoice
@@ -5542,6 +5559,113 @@ internal struct MobileBotChat: View {
     }
 
     @MainActor
+    private func handleComposerPasteItemProviders(
+        _ providers: [NSItemProvider]
+    ) -> Bool {
+        let candidates = providers.compactMap { provider -> (NSItemProvider, String)? in
+            guard let identifier = mobileComposerPasteAttachmentTypeIdentifier(
+                provider.registeredTypeIdentifiers
+            ) else { return nil }
+            return (provider, identifier)
+        }
+        guard !candidates.isEmpty else { return false }
+        guard !composerTransportDisabled,
+              !busy,
+              !stagingAttachments,
+              !voiceRecorder.isRecording,
+              !transcribingVoice
+        else {
+            errorText = composerTransportDisabled
+                ? "Reconnecting… Attachments are temporarily unavailable."
+                : "Finish the current composer action before attaching pasted files."
+            return true
+        }
+        let capacity = max(0, mobileComposerAttachmentLimit - composerAttachments.count)
+        guard capacity > 0 else {
+            errorText = "You can attach up to \(mobileComposerAttachmentLimit) files."
+            return true
+        }
+        let selected = Array(candidates.prefix(capacity))
+        if candidates.count > selected.count {
+            errorText = "You can attach up to \(mobileComposerAttachmentLimit) files."
+        }
+        Task { @MainActor in await stagePastedComposerAttachments(selected) }
+        return true
+    }
+
+    @MainActor
+    private func stagePastedComposerAttachments(
+        _ providers: [(NSItemProvider, String)]
+    ) async {
+        var temporaryURLs: [URL] = []
+        defer {
+            for url in temporaryURLs {
+                try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+            }
+        }
+        do {
+            for (provider, identifier) in providers {
+                try Task.checkCancellation()
+                temporaryURLs.append(try await materializeComposerPasteProvider(
+                    provider,
+                    typeIdentifier: identifier
+                ))
+            }
+            await stageImportedComposerAttachments(.success(temporaryURLs))
+        } catch is CancellationError {
+            return
+        } catch {
+            errorText = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func materializeComposerPasteProvider(
+        _ provider: NSItemProvider,
+        typeIdentifier: String
+    ) async throws -> URL {
+        let suggestedName = provider.suggestedName
+        return try await withCheckedThrowingContinuation { continuation in
+            provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { sourceURL, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let sourceURL else {
+                    continuation.resume(throwing: NSError(
+                        domain: "Fabushi.MobileComposer.Paste",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Couldn't read the pasted attachment."]
+                    ))
+                    return
+                }
+                do {
+                    let mimeType = UTType(typeIdentifier)?.preferredMIMEType
+                    let fileName = mobileComposerStageFileName(
+                        proposedName: suggestedName,
+                        fallbackLastPathComponent: sourceURL.lastPathComponent,
+                        mimeType: mimeType
+                    )
+                    let directory = FileManager.default.temporaryDirectory
+                        .appendingPathComponent(
+                            "FabushiComposerPaste-\(UUID().uuidString.lowercased())",
+                            isDirectory: true
+                        )
+                    try FileManager.default.createDirectory(
+                        at: directory,
+                        withIntermediateDirectories: true
+                    )
+                    let destination = directory.appendingPathComponent(fileName)
+                    try FileManager.default.copyItem(at: sourceURL, to: destination)
+                    continuation.resume(returning: destination)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    @MainActor
     private func stageImportedComposerAttachments(
         _ result: Result<[URL], Error>
     ) async {
@@ -6026,6 +6150,7 @@ internal struct MobileBotChat: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = composerAttachments
         guard mobileComposerHasPayload(text: text, attachments: attachments),
+              suggestionTransportConnected,
               !busy,
               !stagingAttachments,
               !voiceRecorder.isRecording,

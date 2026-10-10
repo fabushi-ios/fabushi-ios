@@ -1,7 +1,22 @@
 import XCTest
+import UniformTypeIdentifiers
 @testable import Fabushi
 
 final class MobileComposerParityTests: XCTestCase {
+    func testComposerPasteAttachmentTypeFilterKeepsTextPasteNative() {
+        XCTAssertNil(mobileComposerPasteAttachmentTypeIdentifier([UTType.utf8PlainText.identifier]))
+        XCTAssertNil(mobileComposerPasteAttachmentTypeIdentifier([UTType.url.identifier]))
+        XCTAssertEqual(
+            mobileComposerPasteAttachmentTypeIdentifier([
+                UTType.utf8PlainText.identifier,
+                UTType.png.identifier,
+            ]),
+            UTType.png.identifier
+        )
+        XCTAssertEqual(mobileComposerPasteAttachmentTypeIdentifier([UTType.pdf.identifier]), UTType.pdf.identifier)
+        XCTAssertEqual(mobileComposerPasteAttachmentTypeIdentifier([UTType.zip.identifier]), UTType.zip.identifier)
+    }
+
     func testConversationHeaderSuppressesComputerForGroups() {
         let agent = MobileBotSummary(id: "agent", name: "Agent", description: "")
         XCTAssertTrue(MobileConversationHeaderControlPolicy.project(agent: agent).showsComputer)
