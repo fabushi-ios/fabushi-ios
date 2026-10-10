@@ -5428,7 +5428,13 @@ internal struct MobileBotChat: View {
                     if entry.role == .assistant {
                         MobileAssistantMathTextView(
                             text: projection.content,
-                            streaming: projection.streaming
+                            streaming: projection.streaming,
+                            renderScopeID: mobileMermaidRenderScopeID(
+                                accountKey: model.settingsNoticeAccountKey,
+                                agentID: bot.id,
+                                conversationID: bot.conversationId ?? bot.id,
+                                entryID: mobileTranscriptCanonicalId(entry)
+                            )
                         )
                     } else {
                         Text(projection.content)
@@ -5475,7 +5481,13 @@ internal struct MobileBotChat: View {
             if entry.role == .assistant {
                 MobileAssistantMathTextView(
                     text: entry.text,
-                    streaming: entry.streaming
+                    streaming: entry.streaming,
+                    renderScopeID: mobileMermaidRenderScopeID(
+                        accountKey: model.settingsNoticeAccountKey,
+                        agentID: bot.id,
+                        conversationID: bot.conversationId ?? bot.id,
+                        entryID: mobileTranscriptCanonicalId(entry)
+                    )
                 )
             } else {
                 Text(entry.text)

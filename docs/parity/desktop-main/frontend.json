@@ -3081,13 +3081,13 @@
       "desktop_owner": "renderer / assistant Mermaid diagram presentation",
       "desktop_visible_effect": "Valid diagrams render inline and can be inspected fullscreen; invalid diagrams fail safely back to source instead of executing unsafe content or breaking chat.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
+      "ios_target_path": "frontend/src/recovered/features/conversation/MobileMermaidRenderer.swift; frontend/src/recovered/features/conversation/MobileMathRenderer.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "No shipping native Mermaid renderer exists in MobileBotChat. The Desktop securityLevel=strict behavior is applicable, but an ungoverned WKWebView/script runtime would be a regression, so this remains mapped until a controlled native/offline renderer is composed.",
+      "ios_platform_delta": "A controlled offline native renderer is now composed into the canonical assistant transcript owner instead of WKWebView/CDN execution. It handles flowchart/graph, state/class/ER graph families, sequence diagrams and pie charts with strict directive rejection, source/line/node/edge/text limits, readable source fallback, and native fullscreen zoom/pan/fit. Other Mermaid families still fail closed to source, so full generic Mermaid parity remains review-fenced.",
       "implementation_status": "mapped",
-      "production_evidence": "No parallel Web runtime introduced; MobileBotChat remains the canonical transcript surface.",
-      "test_evidence": "No focused native Mermaid strict-parse/fallback/fullscreen evidence yet.",
-      "notes": "IOS-MAIN-DEP-MERMAID-20261009: exact Desktop mermaid.tsx reviewed; security boundary preserved by leaving unsupported rendering explicit.",
+      "production_evidence": "MobileBotChat passes account+agent+conversation+entry identity into MobileAssistantMathTextView; MobileMathRenderer projects closed Mermaid fences before preserving existing math behavior; MobileMermaidRenderer parses/renders supported families entirely offline. SwiftUI task identity, cancellation checks, active request fencing and onDisappear invalidation reject late results after account/conversation/entry replacement.",
+      "test_evidence": "MobileMermaidRendererParityTests covers fence projection, graph direction/labels/edges, sequence, pie, strict runtime-directive rejection, byte cap, unsupported-family fail-closed fallback and account/conversation/entry render-scope isolation. Exact-head Xcode/UI evidence remains pending.",
+      "notes": "IOS-MAIN-DEP-MERMAID-20261011: meaningful native shipping implementation landed but remains mapped because Desktop's generic Mermaid runtime also accepts additional valid diagram families such as gantt; do not upgrade to implemented/verified until remaining families are covered or a current-spec replacement ruling is recorded.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {

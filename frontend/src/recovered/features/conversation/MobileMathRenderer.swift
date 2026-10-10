@@ -138,7 +138,7 @@ internal struct MobileMathExpressionView: View {
     }
 }
 
-internal struct MobileAssistantMathTextView: View {
+private struct MobileAssistantMathFragmentView: View {
     let text: String
     let streaming: Bool
 
@@ -176,6 +176,50 @@ internal struct MobileAssistantMathTextView: View {
                     }
                 }
                 if streaming {
+                    Text("▌")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.black.opacity(0.65))
+                }
+            }
+        }
+    }
+}
+
+internal struct MobileAssistantMathTextView: View {
+    let text: String
+    let streaming: Bool
+    var renderScopeID: String = ""
+
+    private var richSegments: [MobileAssistantRichSegment] {
+        splitMobileAssistantMermaid(text)
+    }
+
+    private var containsMermaid: Bool {
+        richSegments.contains { $0.kind == .mermaid }
+    }
+
+    var body: some View {
+        if !containsMermaid {
+            MobileAssistantMathFragmentView(text: text, streaming: streaming)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(richSegments.enumerated()), id: \.element.id) { index, segment in
+                    switch segment.kind {
+                    case .text:
+                        if !segment.text.isEmpty {
+                            MobileAssistantMathFragmentView(
+                                text: segment.text,
+                                streaming: streaming && index == richSegments.count - 1
+                            )
+                        }
+                    case .mermaid:
+                        MobileMermaidDiagramView(
+                            source: segment.text,
+                            renderScopeID: "\(renderScopeID)\u{0}mermaid:\(segment.id)"
+                        )
+                    }
+                }
+                if streaming, richSegments.last?.kind == .mermaid {
                     Text("▌")
                         .font(.system(size: 16))
                         .foregroundStyle(.black.opacity(0.65))
