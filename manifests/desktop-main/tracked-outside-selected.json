@@ -236,9 +236,9 @@
       "type": "blob",
       "sha": "b2913b3a8bcc190bb945b9d5fa49817bb8ce1556",
       "size": 2158,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-avatar-motion-e2e-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop test proves the shipping avatar surface is bounded to a finite runtime state and that the retired Grok motion CSS/DOM runtime is absent. iOS compiles frontend/src/recovered/features/agent-info/ClothGhostAvatar.swift and frontend/src/production/MobileOnboardingCharacter.swift into the Fabushi target; both use one native vector TimelineView, honor accessibilityReduceMotion, and MobileAgentAvatar projects the canonical MobileBotSummary avatar state. The native state vocabulary is not a one-for-one copy of Desktop (iOS currently exposes idle/thinking/searching/working/loading/sending/orbit), so the file is reviewed but exact state/effect parity plus focused final-HEAD UI evidence remain open."
     },
     {
       "path": "desktop/e2e/grok-parity.spec.ts",
@@ -246,9 +246,9 @@
       "type": "blob",
       "sha": "278b22f5c5707650b0005cd7b5d4417450e3302f",
       "size": 63520,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-unified-grok-product-e2e-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop umbrella acceptance exercises the single Fabushi Messenger/Agent product root, transcript/runtime ownership, prompt references, sidebar layout, recovery and Host event projection. iOS production replacements are the compiled GrokMobileShell family, GrokMobileBotService, canonical Coordinator/Host/Runner sources, MobileAgentSidebarSections and repository-owned messaging/runtime modules with focused Swift/Rust tests. Because this one test spans many selected-ledger responsibilities, it is reviewed as an active product contract and must not be treated as source/runtime closure until those responsibilities and same-HEAD end-to-end evidence are individually closed."
     },
     {
       "path": "desktop/e2e/grok-visual-evidence.spec.ts",
@@ -256,9 +256,9 @@
       "type": "blob",
       "sha": "eef0853a8eb40e748f3d03db4cea1c17fa43d3d5",
       "size": 6066,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-grok-visual-evidence-contract",
+      "coverage_status": "reviewed-with-native-ios-release-replacement",
+      "reason": "Desktop test captures packaged Electron visual evidence for signed-in navigation, search/settings, assistant conversation and a real send/response. Electron selectors and screenshot geometry are platform-specific. iOS replacement is the native SwiftUI shipping surface compiled from frontend/** plus the final simulator/physical-device, iPhone/iPad, accessibility and release evidence required by ios-desktop-main-completeness.yml. Product journey parity remains required; this row is reviewed, not verified."
     },
     {
       "path": "desktop/e2e/mahayana-agent-workbench.spec.ts",
@@ -266,9 +266,9 @@
       "type": "blob",
       "sha": "d616a34c02c0f3160998c528071eb73eee444897",
       "size": 74231,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-human-agent-workbench-e2e-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop test is a multi-domain shipping contract for one Hermes-style assistant turn, Human reply/attachment/reaction/search/forward durability, two-device convergence, localization/accessibility/IME, Human calls, restart/handoff and self-hosted Bot invocation without impersonation. iOS has native owners across MessagingModel.swift, HumanCallsView.swift and call adapters, GrokMobileBotService/Coordinator/Host, plus ForwardMessageParityTests, MobileUiPreferencesLocalizationParityTests and messaging/runtime tests. Exact protected/native end-to-end coverage of every sub-journey is still required, so this umbrella file is reviewed but not closed."
     },
     {
       "path": "desktop/e2e/messenger-regressions.spec.ts",
@@ -276,9 +276,9 @@
       "type": "blob",
       "sha": "89683feae14ee7a519bc66d55c404e442814a262",
       "size": 13572,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-messenger-regression-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop regressions cover terminal-vs-transient auth classification, Mini App separation/routing, composer viewport containment, dynamic avatar continuity and narrow-layout conversation info. iOS native replacements exist in account/auth owners, GlobalDharma/MiniApp surfaces, GrokMobileShell SwiftUI layout, MobileAgentAvatar/ClothGhostAvatar and ConversationInfoView. The contracts remain applicable on iPhone/iPad and require focused UI/protected evidence before closure."
     },
     {
       "path": "desktop/e2e/messenger.spec.ts",
@@ -286,9 +286,9 @@
       "type": "blob",
       "sha": "af7aa06ade37e180d12e3ce1054893949fb8be41",
       "size": 35677,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-messenger-product-e2e-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop Messenger acceptance spans unified navigation, Router/settings/usage/sandbox preferences, logout/cache isolation, local-first lists, channel/group creation, Mini App discovery, per-peer drafts/search and anti-impersonation at the Host boundary. iOS implements corresponding native product owners in GrokMobileShell*, MessagingModel, ChatSearchModel, MarketplaceModel, MiniApp/WebMCP surfaces, account/session code and the repository-owned Host/Runner graph, with many focused tests. This broad file remains an umbrella contract until each selected responsibility and same-final-HEAD UI/service evidence is independently verified."
     },
     {
       "path": "desktop/e2e/miniapp-bot-parity.spec.ts",
@@ -296,9 +296,9 @@
       "type": "blob",
       "sha": "bfb06ccddd106cdc4e71463c06b9a985f1e03c7e",
       "size": 16118,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-global-dharma-miniapp-e2e-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Desktop proves the Global Dharma Bot/WebMCP/UI/account/payment/restore journey stays inside one host boundary without token exposure. iOS shipping replacements are GlobalDharmaMiniAppView.swift, GlobalDharmaMiniAppBridge.swift, MiniAppWebMcpSurface.swift, GlobalDharmaCommerceModel.swift/FabushiPayStoreKit.swift and the protected GlobalDharma UI journey. These sources are compiled into the app and have focused tests, but real protected-account/service/commerce evidence must still succeed on the same final HEAD before this responsibility can be verified."
     },
     {
       "path": "desktop/e2e/miniapp-search-entry.spec.ts",
@@ -306,9 +306,9 @@
       "type": "blob",
       "sha": "ec1eb352f2c52bb8a3bb5728dded59c21f2b0ffc",
       "size": 7901,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-miniapp-discovery-install-entry-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop contract requires the official Global Dharma Mini App to be discoverable, installable/openable and placed coherently next to the composer entry. iOS has native MarketplaceModel, command/search surfaces, GlobalDharmaMiniAppView and Bot/Mini App production wiring. Desktop DOM placement is not copied, but equivalent native discovery/install/open UX and final iPhone/iPad evidence remain required."
     },
     {
       "path": "desktop/e2e/openbot-gap-closure.spec.ts",
@@ -316,9 +316,9 @@
       "type": "blob",
       "sha": "8d1ac76d2377eb424796135a36e18a0189f297c5",
       "size": 8466,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-agent-identity-visual-e2e-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop test binds one coworker identity/shape across roster, header action, completed transcript step and final peer message while enforcing bounded desktop geometry. iOS preserves canonical agent identity through MobileBotSummary, MobileAgentAvatar/ClothGhostAvatar and GrokMobileShell projections; native phone/tablet geometry is platform-adapted. Identity continuity and final native UI evidence remain open, so this is reviewed rather than marked complete."
     },
     {
       "path": "desktop/e2e/openbot-packaged-acceptance.spec.ts",
@@ -326,9 +326,9 @@
       "type": "blob",
       "sha": "4075f76ec7e4b74e2e219cb3f49e984bd96132a6",
       "size": 46576,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-packaged-release-acceptance-contract",
+      "coverage_status": "reviewed-not-applicable-with-ios-release-replacement",
+      "reason": "The Electron signed-candidate launcher/CDP/package mechanics are not applicable to iOS as an implementation. Their release responsibility is replaced by ios-desktop-main-completeness.yml plus ios-store-delivery.yml, signed archive/export, clean physical-device install/launch, upgrade, TestFlight/App Store and artifact-provenance gates. The underlying Agent/network/plugin/lifecycle product journeys remain applicable and are tracked in their native runtime/UI responsibilities; this platform-specific harness is not evidence that those journeys are already closed."
     },
     {
       "path": "desktop/e2e/sidebar-contact-groups.spec.ts",
@@ -336,9 +336,9 @@
       "type": "blob",
       "sha": "b93de36e915b4a914cde9b5739e44edbce2b0a4c",
       "size": 2701,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-sidebar-contact-groups-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop source defines stable pinned/named/unassigned projection, exclusive assignment, reserved-id normalization and search expansion of collapsed groups. iOS production owner MobileAgentSidebarSections.swift is compiled and provides canonical normalization, exclusive agent assignment, custom section CRUD/reordering/collapse plus account-scoped fallback persistence, with MobileAgentSidebarSectionsTests. The exact synthetic pinned/unassigned section projection is not yet demonstrated by the native owner, so this row records a real parity gap and stays active."
     },
     {
       "path": "desktop/e2e/smoke.spec.ts",
@@ -346,9 +346,9 @@
       "type": "blob",
       "sha": "c7b2362c4750ae5c9f4973b8adf398953bc1c6a1",
       "size": 11427,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-cross-platform-host-journey-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop smoke drives every declared Host journey through the unified UI, Host feature protocol, approvals/interrupts, Mini App and security boundary. iOS owns an equivalent Coordinator/Host/Runner graph, typed bridges, native Mini App surface and product UI; current architecture/rust-host workflows exercise many of those contracts. This is an umbrella cross-platform journey and remains pending until the final completeness/protected/device evidence proves all applicable declared journeys on one exact HEAD."
     },
     {
       "path": "desktop/e2e/surfaces.spec.ts",
@@ -356,9 +356,9 @@
       "type": "blob",
       "sha": "5fe0aabf82323eb8de5ed95dca9201cea6a3587f",
       "size": 11263,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-native-surface-lifecycle-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Desktop test covers unified Messenger plus Electron native-menu routing, browser-auth lifecycle and safe native reads. Electron menu/process mechanics are replaced on iOS by SwiftUI scene/navigation, account/auth adapters, URL/deep-link policy and typed native services compiled into the app. The underlying auth cancellation/reopen, single product root and safe-read semantics remain applicable; native lifecycle/device evidence is still required."
     },
     {
       "path": "desktop/e2e/tdrp-canonical-search-contract.spec.ts",
@@ -366,9 +366,9 @@
       "type": "blob",
       "sha": "3b97e3c332ef69d2a07984135abd7917b2d1ab49",
       "size": 2004,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-canonical-search-identity-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Desktop contract requires duplicate participant rows to collapse to one canonical identity using the newest replacement, including hidden/visible replacement semantics. iOS GrokMobileCommandPaletteModel.entries deduplicates canonical bot rows and its focused test testDuplicateBotRosterKeepsOriginalSlotButUsesNewestCanonicalRow proves newest data replaces the stale row while retaining stable ordering. Human/contact canonical-search projection still needs exact end-to-end confirmation, so this file is reviewed but not globally verified."
     },
     {
       "path": "desktop/e2e/tdrp-external-url-auth-policy.spec.ts",
@@ -376,9 +376,9 @@
       "type": "blob",
       "sha": "1e200932710097620f80f32a52a1e329d031af1b",
       "size": 1731,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-external-url-auth-security-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Desktop security contract strips foreign tgWebAuth/autologin credentials even under casing/encoding tricks, preserves server-accepted auth URLs only for the exact first-party origin, rejects credential-bearing or scheme-mismatched auth URLs, and allowlists safe non-HTTP schemes. iOS compiles source/shared/external-url-policy.swift in the Fabushi target and implements the same sanitization/origin checks with URLComponents. A dedicated focused XCTest for these exact attack cases is not present yet, so production replacement exists but final verification remains open."
     },
     {
       "path": "desktop/index.html",
