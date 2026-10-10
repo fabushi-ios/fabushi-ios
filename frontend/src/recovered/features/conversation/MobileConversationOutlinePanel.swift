@@ -145,6 +145,7 @@ internal struct MobileConversationOutlinePanel: View {
     let accountKey: String
     let bridge: IOSPreloadBridge
     let reconnectGeneration: Int
+    let historicalSubagents: [MobileBotSubagent]
     let onClose: () -> Void
 
     @State private var selectedAgentId: String
@@ -161,6 +162,7 @@ internal struct MobileConversationOutlinePanel: View {
         accountKey: String,
         bridge: IOSPreloadBridge,
         reconnectGeneration: Int,
+        historicalSubagents: [MobileBotSubagent] = [],
         onClose: @escaping () -> Void
     ) {
         self.agentId = agentId
@@ -168,12 +170,36 @@ internal struct MobileConversationOutlinePanel: View {
         self.accountKey = accountKey
         self.bridge = bridge
         self.reconnectGeneration = reconnectGeneration
+        self.historicalSubagents = historicalSubagents
         self.onClose = onClose
         _selectedAgentId = State(initialValue: agentId)
     }
 
-    private var selectedRunningSubagent: MobileAsyncTask? {
-        runningSubagents.first { $0.id == selectedAgentId && $0.kind == "subagent" }
+    private var mergedSubagents: [MobileBotSubagent] {
+        var order: [String] = []
+        var byId: [String: MobileBotSubagent] = [:]
+        for subagent in historicalSubagents {
+            if byId[subagent.subagentId] == nil { order.append(subagent.subagentId) }
+            byId[subagent.subagentId] = subagent
+        }
+        for task in runningSubagents where task.kind == "subagent" {
+            if byId[task.id] == nil { order.append(task.id) }
+            byId[task.id] = .init(
+                subagentId: task.id,
+                subagentType: task.subagentType ?? "subagent",
+                title: task.label,
+                status: "running"
+            )
+        }
+        return order.compactMap { byId[$0] }
+    }
+
+    private var selectedRunningSubagent: MobileBotSubagent? {
+        mergedSubagents.first { $0.subagentId == selectedAgentId && $0.status == "running" }
+    }
+
+    private var selectedHistoricalSubagent: MobileBotSubagent? {
+        mergedSubagents.first { $0.subagentId == selectedAgentId && $0.status != "running" }
     }
 
     private var refreshInterval: Duration {
@@ -183,14 +209,18 @@ internal struct MobileConversationOutlinePanel: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if !runningSubagents.isEmpty {
+                if !mergedSubagents.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            outlineTab(id: agentId, label: agentName)
-                            ForEach(runningSubagents.filter { $0.kind == "subagent" }) { task in
+                            outlineTab(id: agentId, label: agentName, status: nil)
+                            ForEach(mergedSubagents) { subagent in
+                                let title = subagent.title.trimmingCharacters(in: .whitespacesAndNewlines)
                                 outlineTab(
-                                    id: task.id,
-                                    label: task.subagentType.map { "\($0): \(task.label)" } ?? task.label
+                                    id: subagent.subagentId,
+                                    label: title.isEmpty
+                                        ? subagent.subagentType
+                                        : "\(subagent.subagentType): \(title)",
+                                    status: subagent.status
                                 )
                             }
                         }
@@ -290,7 +320,11 @@ internal struct MobileConversationOutlinePanel: View {
                 let interval = refreshInterval
                 do { try await Task.sleep(for: interval) }
                 catch { return }
-                await refreshAll()
+                if selectedHistoricalSubagent == nil {
+                    await refreshAll()
+                } else {
+                    await refreshSubagents()
+                }
             }
         }
         .onChange(of: selectedAgentId) { _, _ in
@@ -303,19 +337,27 @@ internal struct MobileConversationOutlinePanel: View {
     }
 
     @ViewBuilder
-    private func outlineTab(id: String, label: String) -> some View {
+    private func outlineTab(id: String, label: String, status: String?) -> some View {
         Button {
             selectedAgentId = id
         } label: {
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(
-                    selectedAgentId == id ? Color.accentColor.opacity(0.16) : Color.black.opacity(0.05),
-                    in: Capsule()
-                )
+            HStack(spacing: 5) {
+                if let status {
+                    Circle()
+                        .fill(status == "running" ? Color.accentColor : status == "done" ? Color.green : Color.red)
+                        .frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                }
+                Text(label)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                selectedAgentId == id ? Color.accentColor.opacity(0.16) : Color.black.opacity(0.05),
+                in: Capsule()
+            )
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("mobile-outline-tab-\(id)")
@@ -373,7 +415,8 @@ internal struct MobileConversationOutlinePanel: View {
                 if task.kind == "subagent" { decoded.append(task) }
             }
             runningSubagents = decoded
-            if selectedAgentId != agentId && !decoded.contains(where: { $0.id == selectedAgentId }) {
+            if selectedAgentId != agentId
+                && !mergedSubagents.contains(where: { $0.subagentId == selectedAgentId }) {
                 selectedAgentId = agentId
             }
         } catch is CancellationError {
