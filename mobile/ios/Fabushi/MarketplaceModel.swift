@@ -1841,6 +1841,8 @@ final class MarketplaceModel {
     var mcpError: String?
     var mcpBackendLoggedIn = false
     var mcpBackendEmail = ""
+    // Canonical MCP editor identity (Desktop: authId ?? email), separate from app account scope.
+    var mcpBackendAccountKey = ""
     var mcpBackendBusy = false
     var mcpNewAccountDraftByServerId: [String: String] = [:]
     var mcpRenameDraftByIdentity: [String: String] = [:]
@@ -4058,6 +4060,7 @@ final class MarketplaceModel {
         guard loggedIn else {
             mcpBackendLoggedIn = false
             mcpBackendEmail = ""
+            mcpBackendAccountKey = ""
             return
         }
         do {
@@ -4065,11 +4068,16 @@ final class MarketplaceModel {
             guard let auth = response.value as? [String: Any] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
-            mcpBackendLoggedIn = auth["loggedIn"] as? Bool ?? false
-            mcpBackendEmail = auth["email"] as? String ?? ""
+            let loggedIn = auth["loggedIn"] as? Bool ?? false
+            let authId = (auth["authId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let email = (auth["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            mcpBackendLoggedIn = loggedIn
+            mcpBackendEmail = loggedIn ? email : ""
+            mcpBackendAccountKey = loggedIn ? (!authId.isEmpty ? authId : email) : ""
         } catch {
             mcpBackendLoggedIn = false
             mcpBackendEmail = ""
+            mcpBackendAccountKey = ""
             mcpError = error.localizedDescription
         }
     }
@@ -4134,6 +4142,7 @@ final class MarketplaceModel {
             _ = try await bridge.request(method: "coordinator.mcp.cursorAuth.logout")
             mcpBackendLoggedIn = false
             mcpBackendEmail = ""
+            mcpBackendAccountKey = ""
             await refreshMcpServers()
         } catch {
             mcpError = error.localizedDescription
