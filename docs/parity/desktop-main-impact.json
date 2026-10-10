@@ -3853,14 +3853,14 @@
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-picker-content.css",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-ios-adapted-dependent-gap-open",
-        "finding": "Desktop CSS owns only browser grid geometry (294x320, 8 columns, 34px cells/layout containment). iOS replaces this with a native SwiftUI sheet, adaptive LazyVGrid, medium/large detents and native spacing, which is an appropriate platform replacement rather than a CSS port. The presentation responsibility is implemented, but overall picker closure remains dependent on the open full-catalog parity gap."
+        "status": "current-main-reviewed-ios-adapted-picker-layout-implemented-pending-exact-head-ci",
+        "finding": "Desktop CSS owns only browser grid geometry (294x320, 8 columns, 34px cells/layout containment). iOS appropriately replaces that presentation with a native SwiftUI sheet, adaptive LazyVGrid, medium/large detents and native spacing. The previously open catalog dependency is now closed by the pinned generated full Desktop emoji catalog (1,914 base + 2,030 skin variants); exact-head UI evidence remains pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-picker-content.tsx",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-ios-adapted-dependent-gap-open",
-        "finding": "Desktop picker behavior maps to native MobileBotChat reactionPickerSheet: category selection, search, selected/reacted state, empty results, accessible labels, bounded keyboard grid movement and add/remove submission; focused tests cover category/search/96 limit, accessibility, hardware-key navigation and settled-message gating. iOS additionally permits custom emoji through the system text/emoji keyboard. The UI/interaction owner is implemented, while complete built-in catalog/alias/skin browse-search parity remains open."
+        "status": "current-main-reviewed-ios-adapted-picker-implemented-pending-exact-head-ci",
+        "finding": "Desktop picker behavior maps to native MobileBotChat reactionPickerSheet: category selection, search, selected/reacted state, empty results, accessible labels, bounded keyboard grid movement and add/remove submission. The pinned generated Desktop emoji catalog now supplies full aliases/search strings/skin variants with the 96-result ranking semantics, while iOS additionally permits custom emoji through the system text/emoji keyboard. Exact-head Swift/UI evidence remains pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/frame.tsx",
@@ -3919,8 +3919,8 @@
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-picker.tsx",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-native-reaction-picker-implemented-dependent-catalog-gap",
-        "finding": "Desktop quick reactions are 👍/👎/❤️/😂/🎉/😮 and grouped pills preserve first-seen emoji order, counts, self-selection and reactor identity. MobileBotChat uses the same six quick reactions, native pills, settled-message gating, More Reactions sheet, selected-state accessibility, keyboard grid navigation, category/search and custom emoji. Picker mechanics are implemented; complete built-in browse/search parity still depends on the separately open emoji-catalog aliases/skin/full-catalog gap."
+        "status": "current-main-reviewed-native-reaction-picker-implemented-pending-exact-head-ci",
+        "finding": "Desktop quick reactions are 👍/👎/❤️/😂/🎉/😮 and grouped pills preserve first-seen emoji order, counts, self-selection and reactor identity. MobileBotChat uses the same six quick reactions, native pills, settled-message gating, More Reactions sheet, selected-state accessibility, keyboard grid navigation, category/search and custom emoji. Its built-in browse/search source is now the pinned generated full Desktop emoji catalog with alias/skin coverage and exact-before-secondary 96-result ranking; exact-head UI evidence remains pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-workspace-handoff.ts",
@@ -4125,6 +4125,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-agent-avatar-implemented-pending-exact-head-ci",
         "finding": "Desktop AgentAvatar dispatches custom artifact avatar first, then shared-room, group, and persona; persona shape/color fallback is deterministic from agentId, and visual state derives from awaiting-user/currentActivity/composing/running. iOS now preserves currentActivity as normalized MobileAgentAvatarState in the canonical Host roster projection, retains avatar fields/state through Mini App roster merge, parses isSharedRoom, and routes shipping chat/home/group-member agent identities through one MobileAgentAvatar owner. That owner reuses AvatarImagePolicy for data URLs, MobileOnboardingCharacter for the exact 8-shape/10-fallback-color persona catalog, the Desktop UTF-16 hash/PRNG resolver, shared-room native globe, group member composition with +N overflow, reduce-motion-safe activity presentation, and the pre-existing iOS status badge. New-Bot draft preview now reflects selected shape/color. Decorative All Hands and Human-conversation marks remain separate non-Agent identity surfaces. Focused AvatarEditorParityTests cover precedence, deterministic identities, activity priority, and roster/merge preservation; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/chat-header.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-chat-header-implemented-pending-exact-head-ci",
+        "finding": "Desktop ChatHeader owns Agent identity/avatar, settings trigger, canonical isRunning Working copy, optional Shared Room entry, non-group Computer entry and trailing controls. Shipping iOS MobileBotChat already owns the native identity/settings trigger and keeps canonical avatarState; this change restores the explicit Working copy from bot.isRunning and exposes it to accessibility without coupling it to transient local busy animation. Shared Room and Computer are intentionally reorganized into the same MobileBotAgentSettings surface, where Shared Room uses the canonical account-scoped owner and Computer remains inside the non-group agent-only section; native Back/Find/Async controls are additive mobile presentation. Focused MobileChatHeaderParityTests fences the Working copy to canonical isRunning. Exact-head Swift/UI evidence remains pending."
       }
     ]
   },

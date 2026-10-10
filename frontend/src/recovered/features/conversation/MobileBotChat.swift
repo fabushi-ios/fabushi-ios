@@ -1365,6 +1365,10 @@ private struct MobileTranscriptMediaAttachmentView: View {
     }
 }
 
+internal func mobileConversationHeaderStatus(_ bot: MobileBotSummary) -> String? {
+    bot.isRunning ? "Working" : nil
+}
+
 internal struct MobileBotChat: View {
     @Environment(\.scenePhase) private var scenePhase
     let bot: MobileBotSummary
@@ -1697,8 +1701,15 @@ internal struct MobileBotChat: View {
             Spacer()
             Button(action: onOpenSettings) {
                 HStack(spacing: 8) {
-                    MobileAgentAvatar(bot: bot, size: 28, activeOverride: busy)
-                    Text(bot.name).font(.system(size: 17, weight: .semibold))
+                    MobileAgentAvatar(bot: bot, size: 28, activeOverride: busy || bot.isRunning)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(bot.name).font(.system(size: 17, weight: .semibold))
+                        if let status = mobileConversationHeaderStatus(bot) {
+                            Text(status)
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 .padding(.horizontal, 13).padding(.vertical, 7)
                 .background(.white, in: Capsule())
@@ -1706,6 +1717,7 @@ internal struct MobileBotChat: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Bot settings")
+            .accessibilityValue(mobileConversationHeaderStatus(bot) ?? "")
             .accessibilityIdentifier("mobile-bot-settings")
             Spacer()
             Button {
