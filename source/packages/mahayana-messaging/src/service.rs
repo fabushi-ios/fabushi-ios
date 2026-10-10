@@ -3451,3 +3451,215 @@ impl<S: MessagingStateStore> MessagingService<S> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod remote_transport_tests {
+    use super::*;
+    use crate::store::MemoryStateStore;
+
+    fn remote_service_fixture(
+    ) -> (
+        MessagingService<MemoryStateStore>,
+        ActorId,
+        ActorId,
+        ConversationId,
+    ) {
+        let viewer = ActorId::new("human:account:test");
+        let peer = ActorId::new("human:platform:peer-7");
+        let conversation_id = ConversationId::new("human-direct-test");
+        let participants = vec![
+            Participant {
+                actor_id: viewer.clone(),
+                role: ParticipantRole::Owner,
+                joined_at_ms: 1,
+                muted_until_ms: None,
+            },
+            Participant {
+                actor_id: peer.clone(),
+                role: ParticipantRole::Member,
+                joined_at_ms: 1,
+                muted_until_ms: None,
+            },
+        ];
+        let mut service = MessagingService::load(MemoryStateStore::default())
+            .expect("load messaging service");
+        service
+            .trusted_upsert_direct_conversation(
+                &viewer,
+                Actor::human(viewer.0.clone(), "Viewer"),
+                Actor::human(peer.0.clone(), "Peer"),
+                Conversation::direct(
+                    conversation_id.0.clone(),
+                    "Peer",
+                    participants,
+                    1,
+                ),
+                1,
+            )
+            .expect("create trusted direct conversation");
+        (service, viewer, peer, conversation_id)
+    }
+
+    #[test]
+    fn remote_send_persists_pending_then_settles_without_renaming_local_id() {
+        let (mut service, viewer, _peer, conversation_id) = remote_service_fixture();
+        let client_message_id = ClientMessageId("ios:nonce-1".into());
+        let command = ClientCommand::SendMessage {
+            conversation_id: conversation_id.clone(),
+            client_message_id: client_message_id.clone(),
+            content: MessageContent::Text {
+                text: FormattedText::plain("shipping"),
+            },
+            reply_to_message_id: None,
+            thread_root_message_id: None,
+            scheduled_at_ms: None,
+            silent: false,
+            protected_content: false,
+        };
+        let (pending, _) = service
+            .trusted_prepare_remote_send(&viewer, &command, 10)
+            .expect("persist pending before dispatch");
+        assert!(matches!(
+            pending.delivery_state,
+            DeliveryState::Pending { ref client_message_id: pending_id }
+                if pending_id == &client_message_id
+        ));
+        let local_id = pending.id.clone();
+
+        service
+            .trusted_settle_remote_send(
+                &viewer,
+                &conversation_id,
+                &local_id,
+                "7001",
+                20,
+                DeliveryState::Delivered,
+                vec![ReactionSummary {
+                    reaction: "🙏".into(),
+                    count: 2,
+                    chosen_by_me: true,
+                    recent_actor_ids: vec![viewer.clone()],
+                }],
+                21,
+            )
+            .expect("settle canonical remote message");
+        let settled = service
+            .engine()
+            .state()
+            .messages
+            .get(&conversation_id)
+            .and_then(|messages| messages.get(&local_id))
+            .expect("settled message stays at stable local id");
+        assert_eq!(settled.id, local_id);
+        assert_eq!(settled.delivery_state, DeliveryState::Delivered);
+        assert_eq!(
+            service.remote_message_id_for_local(&conversation_id, &local_id),
+            Some("7001")
+        );
+
+        let store = service.into_store();
+        let mut reloaded = MessagingService::load(store).expect("reload messaging service");
+        assert_eq!(
+            reloaded.remote_message_id_for_local(&conversation_id, &local_id),
+            Some("7001")
+        );
+        let (replay, _) = reloaded
+            .trusted_prepare_remote_send(&viewer, &command, 30)
+            .expect("idempotent replay");
+        assert_eq!(replay.id, local_id);
+        assert_eq!(replay.delivery_state, DeliveryState::Delivered);
+    }
+
+    #[test]
+    fn remote_import_is_idempotent_and_rejects_conflicting_server_replay() {
+        let (mut service, viewer, peer, conversation_id) = remote_service_fixture();
+        let message_id = MessageId::new("human-server-message:1");
+        let canonical = Message {
+            id: message_id.clone(),
+            conversation_id: conversation_id.clone(),
+            sender_id: peer,
+            content: MessageContent::Text {
+                text: FormattedText::plain("remote hello"),
+            },
+            reply_to_message_id: None,
+            thread_root_message_id: None,
+            forward_origin: None,
+            reply_markup: None,
+            reactions: vec![ReactionSummary {
+                reaction: "👍".into(),
+                count: 3,
+                chosen_by_me: false,
+                recent_actor_ids: Vec::new(),
+            }],
+            delivery_state: DeliveryState::Delivered,
+            created_at_ms: 40,
+            edited_at_ms: None,
+            scheduled_at_ms: None,
+            silent: false,
+            protected_content: false,
+            pinned: false,
+            deleted: false,
+        };
+        service
+            .trusted_import_remote_message(
+                &viewer,
+                canonical.clone(),
+                ClientMessageId("remote:1:0".into()),
+                Some("1".into()),
+                41,
+            )
+            .expect("import remote message");
+        service
+            .trusted_import_remote_message(
+                &viewer,
+                canonical.clone(),
+                ClientMessageId("remote:1:0".into()),
+                Some("1".into()),
+                42,
+            )
+            .expect("idempotent remote replay");
+        assert_eq!(
+            service.local_message_id_for_remote(&conversation_id, "1"),
+            Some(message_id.clone())
+        );
+
+        let mut conflicting = canonical;
+        conflicting.content = MessageContent::Text {
+            text: FormattedText::plain("different"),
+        };
+        assert!(service
+            .trusted_import_remote_message(
+                &viewer,
+                conflicting,
+                ClientMessageId("remote:1:0".into()),
+                Some("1".into()),
+                43,
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn remote_attachment_binding_survives_reload_and_fences_rebinding() {
+        let (mut service, _viewer, _peer, _conversation_id) = remote_service_fixture();
+        service
+            .trusted_bind_remote_blob_resource("blob-a", "resource-9", 50)
+            .expect("bind remote resource");
+        service
+            .trusted_bind_remote_blob_resource("blob-a", "resource-9", 51)
+            .expect("same binding is idempotent");
+        assert!(service
+            .trusted_bind_remote_blob_resource("blob-a", "resource-10", 52)
+            .is_err());
+        assert!(service
+            .trusted_bind_remote_blob_resource("blob-b", "resource-9", 53)
+            .is_err());
+
+        let store = service.into_store();
+        let reloaded = MessagingService::load(store).expect("reload messaging service");
+        assert_eq!(
+            reloaded.remote_blob_resource_id("blob-a"),
+            Some("resource-9")
+        );
+    }
+}
+
