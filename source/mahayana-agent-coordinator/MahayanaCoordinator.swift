@@ -655,9 +655,11 @@ final class MahayanaCoordinator {
             if settingsStore.getDetectedUserTimeZone() == nil {
                 settingsStore.setUserTimeZone(detected)
             }
+            let overrideTimeZone: Any = settingsStore.getUserTimeZoneOverride()
+                .map { $0 as Any } ?? NSNull()
             return JSONResult(value: [
                 "detectedTimeZone": detected,
-                "overrideTimeZone": settingsStore.getUserTimeZoneOverride() ?? NSNull(),
+                "overrideTimeZone": overrideTimeZone,
             ])
         }
         if method == "setTimeZoneOverride" {
@@ -681,9 +683,11 @@ final class MahayanaCoordinator {
             if settingsStore.getDetectedUserTimeZone() == nil {
                 settingsStore.setUserTimeZone(detected)
             }
+            let overrideTimeZone: Any = settingsStore.getUserTimeZoneOverride()
+                .map { $0 as Any } ?? NSNull()
             return JSONResult(value: [
                 "detectedTimeZone": detected,
-                "overrideTimeZone": settingsStore.getUserTimeZoneOverride() ?? NSNull(),
+                "overrideTimeZone": overrideTimeZone,
             ])
         }
         if method == "getLocalToolPermission" {
