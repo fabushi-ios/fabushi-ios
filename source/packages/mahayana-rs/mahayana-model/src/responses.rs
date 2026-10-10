@@ -793,6 +793,11 @@ mod tests {
     use super::*;
 
     #[test]
+    fn provider_first_output_timeout_matches_canonical_runner_policy() {
+        assert_eq!(PROVIDER_FIRST_OUTPUT_TIMEOUT, Duration::from_secs(150));
+    }
+
+    #[test]
     fn responses_http_agent_is_process_shared() {
         let first = responses_http_agent();
         let second = responses_http_agent();
