@@ -3556,6 +3556,7 @@ mod tests {
     async fn durable_post_tool_continuation_retries_before_any_new_output() {
         let model = Arc::new(PostToolRetryModel {
             calls: AtomicUsize::new(0),
+            post_tool_attempts: AtomicUsize::new(0),
         });
         let engine = NativeEngine::new(
             model.clone(),
@@ -3596,9 +3597,9 @@ mod tests {
             .expect("durable post-tool continuation retries safely");
         assert_eq!(output, "continued");
         assert_eq!(
-            model.calls.load(AtomicOrdering::SeqCst),
+            model.post_tool_attempts.load(AtomicOrdering::SeqCst),
             2,
-            "one transport timeout before output must retry exactly once"
+            "one transport timeout before post-tool output must retry exactly once"
         );
     }
 
@@ -3938,15 +3939,24 @@ mod tests {
 
     struct PostToolRetryModel {
         calls: AtomicUsize,
+        post_tool_attempts: AtomicUsize,
     }
 
     #[async_trait]
     impl ModelRuntime for PostToolRetryModel {
         async fn infer(
             &self,
-            _request: ModelRequest,
+            request: ModelRequest,
             events: SharedModelEventSink,
         ) -> Result<(), ModelError> {
+            if request
+                .input
+                .as_array()
+                .is_some_and(|history| history_ends_with_tool_result(history))
+            {
+                self.post_tool_attempts
+                    .fetch_add(1, AtomicOrdering::SeqCst);
+            }
             let attempt = self.calls.fetch_add(1, AtomicOrdering::SeqCst);
             if attempt == 0 {
                 return Err(ModelError::Inference(
