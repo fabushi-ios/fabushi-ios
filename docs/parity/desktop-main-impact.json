@@ -3165,6 +3165,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-post-tool-watchdog-implemented-pending-exact-head-ci",
         "finding": "Current-main re-arms the first-output watchdog only after a durable tool checkpoint, keeps the generation watcher alive for later re-arm, and retries a stalled post-tool provider continuation from the durable checkpoint without replaying tool side effects. iOS shipping parity is implemented in the repository-owned Rust runtime: mahayana-model Responses SSE now has the canonical 150s receive bound; mahayana-native-engine retries only a post-tool continuation whose latest history item is a persisted function_call_output, only while no new text/terminal payload has been emitted, with the canonical 3-attempt/500ms bounded backoff. Existing session persistence keeps the tool result durable before the continuation, and focused tests cover timeout classification plus one safe retry. Exact-head GitHub Actions evidence is pending."
+      },
+      {
+        "path": "source/host/src/runner/routed_provider_runtime.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-retired-fast-lane-removed-pending-exact-head-ci",
+        "finding": "Current-main removes the CHAT-013 short-conversation classifier, fast-lane system instruction, and zero-tool schema override from the routed provider runtime; all turns now keep the canonical routed tool schema. iOS had retained the equivalent first-party fast lane in mahayana-native-engine, so the shipping owner was corrected: the classifier/constants/direct-text terminal bypass and zero-tool projection were removed, visible turns use the normal buffered delivery path, and a focused contract asserts simple first-party turns retain send_message/react_to_message. Exact-head GitHub Actions evidence remains pending."
       }
     ]
   },
