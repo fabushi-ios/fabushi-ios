@@ -12,6 +12,69 @@ fn context(actor_id: &str) -> RequestContext {
 }
 
 #[test]
+fn trusted_assistant_target_validation_fails_closed_before_agent_dispatch() {
+    let store = MemoryStateStore::default();
+    let mut service = MessagingService::load(store).unwrap();
+    service
+        .handle(
+            ClientEnvelope::new(
+                context("human:1"),
+                ClientCommand::UpsertProfile {
+                    actor: Actor::human("human:1", "Owner"),
+                },
+            ),
+            10,
+        )
+        .unwrap();
+    service
+        .handle(
+            ClientEnvelope::new(
+                context("human:1"),
+                ClientCommand::CreateConversation {
+                    conversation: Conversation::direct(
+                        "chat:handoff",
+                        "Handoff",
+                        vec![Participant {
+                            actor_id: ActorId::new("human:1"),
+                            role: ParticipantRole::Owner,
+                            joined_at_ms: 10,
+                            muted_until_ms: None,
+                        }],
+                        10,
+                    ),
+                },
+            ),
+            11,
+        )
+        .unwrap();
+
+    assert!(
+        service
+            .validate_trusted_assistant_target(
+                &ActorId::new("human:1"),
+                &ConversationId::new("chat:handoff"),
+            )
+            .is_ok()
+    );
+    assert!(
+        service
+            .validate_trusted_assistant_target(
+                &ActorId::new("human:other"),
+                &ConversationId::new("chat:handoff"),
+            )
+            .is_err()
+    );
+    assert!(
+        service
+            .validate_trusted_assistant_target(
+                &ActorId::new("human:1"),
+                &ConversationId::new("chat:missing"),
+            )
+            .is_err()
+    );
+}
+
+#[test]
 fn self_hosted_service_persists_and_restores_state() {
     let store = MemoryStateStore::default();
     let mut service = MessagingService::load(store).unwrap();

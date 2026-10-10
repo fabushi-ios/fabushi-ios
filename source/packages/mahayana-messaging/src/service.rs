@@ -135,6 +135,32 @@ impl<S: MessagingStateStore> MessagingService<S> {
     }
 
 
+    /// Validates that a Host-authorized Agent projection targets a conversation
+    /// visible to the authenticated Human before any Agent operation is started.
+    pub fn validate_trusted_assistant_target(
+        &self,
+        viewer_actor_id: &ActorId,
+        conversation_id: &ConversationId,
+    ) -> Result<(), MessagingServiceError> {
+        let conversation = self
+            .engine
+            .state()
+            .conversations
+            .get(conversation_id)
+            .ok_or_else(|| EngineError::ConversationNotFound(conversation_id.clone()))?;
+        let viewer_is_participant = conversation
+            .participants
+            .iter()
+            .any(|participant| &participant.actor_id == viewer_actor_id)
+            || conversation.owner_id.as_ref() == Some(viewer_actor_id);
+        if !viewer_is_participant {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "trusted assistant projection requires the authenticated Human to belong to the target conversation".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Persists a Host-authorized Agent response into an existing Human
     /// conversation without allowing renderer clients to impersonate Agents.
     ///
@@ -165,6 +191,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
             ));
         }
 
+        self.validate_trusted_assistant_target(viewer_actor_id, &conversation_id)?;
         let conversation = self
             .engine
             .state()
@@ -172,16 +199,6 @@ impl<S: MessagingStateStore> MessagingService<S> {
             .get(&conversation_id)
             .cloned()
             .ok_or_else(|| EngineError::ConversationNotFound(conversation_id.clone()))?;
-        let viewer_is_participant = conversation
-            .participants
-            .iter()
-            .any(|participant| &participant.actor_id == viewer_actor_id)
-            || conversation.owner_id.as_ref() == Some(viewer_actor_id);
-        if !viewer_is_participant {
-            return Err(MessagingServiceError::UnauthorizedCommand(
-                "trusted assistant projection requires the authenticated Human to belong to the target conversation".into(),
-            ));
-        }
         if let Some(existing_actor) = self.engine.state().actors.get(&assistant_id) {
             if !matches!(existing_actor.kind, ActorKind::Assistant | ActorKind::Bot) {
                 return Err(MessagingServiceError::UnauthorizedCommand(

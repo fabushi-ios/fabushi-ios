@@ -569,6 +569,16 @@ struct HumanHandoffLease {
     human_conversation_id: String,
     agent_id: String,
     agent_name: String,
+    terminal_text: Option<String>,
+}
+
+impl HumanHandoffLease {
+    fn observe_assistant_text(&mut self, text: &str) {
+        let text = text.trim();
+        if !text.is_empty() {
+            self.terminal_text = Some(text.to_string());
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -8742,17 +8752,9 @@ impl FeatureHostController {
                     }
                 } else {
                     if message.role == RuntimeMessageRole::Assistant {
-                        let lease = self
-                            .state()?
-                            .human_handoff_operations
-                            .get(&operation_id)
-                            .cloned();
-                        if let Some(lease) = lease {
-                            self.project_human_handoff_message(
-                                &operation_id,
-                                &lease,
-                                &message.text,
-                            )?;
+                        let mut state = self.state()?;
+                        if let Some(lease) = state.human_handoff_operations.get_mut(&operation_id) {
+                            lease.observe_assistant_text(&message.text);
                         }
                     }
                     let mut cards = transcript_cards_from_metadata(&message.metadata);
@@ -8859,17 +8861,26 @@ impl FeatureHostController {
                         error: None,
                     })
                 } else {
-                    let mut state = self.state()?;
-                    state.operations.remove(&operation_id);
-                    state.human_handoff_operations.remove(&operation_id);
-                    let terminal_agent_id = state.operation_agents.remove(&operation_id);
-                    if state.awaited_operations.contains(&operation_id) {
-                        state
-                            .operation_terminals
-                            .insert(operation_id.clone(), json!({"status": "completed"}));
-                    }
-                    if let Some(agent_id) = terminal_agent_id {
-                        let _ = queue_active_agent_automation_projection(&mut state, &agent_id);
+                    let human_handoff_lease = {
+                        let mut state = self.state()?;
+                        state.operations.remove(&operation_id);
+                        let human_handoff_lease =
+                            state.human_handoff_operations.remove(&operation_id);
+                        let terminal_agent_id = state.operation_agents.remove(&operation_id);
+                        if state.awaited_operations.contains(&operation_id) {
+                            state
+                                .operation_terminals
+                                .insert(operation_id.clone(), json!({"status": "completed"}));
+                        }
+                        if let Some(agent_id) = terminal_agent_id {
+                            let _ = queue_active_agent_automation_projection(&mut state, &agent_id);
+                        }
+                        human_handoff_lease
+                    };
+                    if let Some(lease) = human_handoff_lease
+                        && let Some(text) = lease.terminal_text.as_deref()
+                    {
+                        self.project_human_handoff_message(&operation_id, &lease, text)?;
                     }
                     Some(HostEvent::OperationCompleted {
                         timestamp: timestamp(),
@@ -9854,6 +9865,47 @@ impl FeatureHostController {
     }
 
     #[cfg(feature = "production")]
+    fn validate_human_handoff_conversation(
+        &self,
+        human_conversation_id: &str,
+    ) -> Result<(), FeatureHostError> {
+        let account_id = self
+            .active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone()
+            .ok_or_else(|| {
+                FeatureHostError::Contract(
+                    "human handoff requires an authenticated account".into(),
+                )
+            })?;
+        let root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("messaging storage is unavailable".into()))?;
+        let messaging_root = root.join("_messaging");
+        let _io_guard = MESSAGING_IO_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .map_err(|_| FeatureHostError::Contract("messaging storage lock is poisoned".into()))?;
+        let store = JsonFileStateStore::new(messaging_root.join("snapshot.json"));
+        let service = MessagingService::load_with_blob_store(
+            store,
+            FileBlobStore::new(messaging_root.join("blobs")),
+        )
+        .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        service
+            .validate_trusted_assistant_target(
+                &actor_id_for_account_id(&account_id),
+                &fabushi_messaging_core::ConversationId::new(human_conversation_id.to_string()),
+            )
+            .map_err(|error| {
+                FeatureHostError::Contract(format!(
+                    "human handoff conversation is not available to the authenticated Human: {error}"
+                ))
+            })
+    }
+
+    #[cfg(feature = "production")]
     fn project_human_handoff_message(
         &self,
         operation_id: &str,
@@ -9923,6 +9975,7 @@ impl FeatureHostController {
         let human_conversation_id =
             required(human_conversation_id, "human handoff conversation id")?;
         let text = required(text, "human handoff text")?;
+        self.validate_human_handoff_conversation(&human_conversation_id)?;
         let agent = self
             .state()?
             .bots
@@ -9952,6 +10005,7 @@ impl FeatureHostController {
                 human_conversation_id,
                 agent_id,
                 agent_name: agent.name,
+                terminal_text: None,
             },
         );
         Ok(accepted)
@@ -10618,6 +10672,7 @@ impl FeatureHostController {
                         human_conversation_id,
                         agent_id,
                         agent_name: agent.name,
+                        terminal_text: None,
                     },
                 );
                 state.events.push_back(HostEvent::OperationStarted {
@@ -17700,6 +17755,20 @@ mod tests {
     }
 
     #[test]
+    fn human_handoff_lease_keeps_only_the_latest_non_empty_terminal_candidate() {
+        let mut lease = HumanHandoffLease {
+            human_conversation_id: "direct:human-chat".into(),
+            agent_id: "mahayana-assistant".into(),
+            agent_name: "Fabushi".into(),
+            terminal_text: None,
+        };
+        lease.observe_assistant_text(" first answer ");
+        lease.observe_assistant_text("   ");
+        lease.observe_assistant_text("final answer");
+        assert_eq!(lease.terminal_text.as_deref(), Some("final answer"));
+    }
+
+    #[test]
     fn human_handoff_command_binds_and_clears_the_trusted_operation_lease() {
         let controller = controller();
         drain(&controller);
@@ -17720,6 +17789,7 @@ mod tests {
                 .expect("trusted handoff lease");
             assert_eq!(lease.human_conversation_id, "direct:human-chat");
             assert_eq!(lease.agent_id, "mahayana-assistant");
+            assert!(lease.terminal_text.is_none());
         }
         controller.interrupt(&operation_id).expect("interrupt handoff");
         assert!(
