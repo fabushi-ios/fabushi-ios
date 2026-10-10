@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -34,11 +34,35 @@ jobs:
             --output "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift" \
             --provenance "$RUNNER_TEMP/fabushi-emoji/provenance.json"
 
+      - name: Stage generated iOS-owned catalog
+        run: |
+          cp "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift" \
+            frontend/src/recovered/features/conversation/GeneratedDesktopEmojiCatalog.swift
+          cp "$RUNNER_TEMP/fabushi-emoji/provenance.json" \
+            manifests/desktop-main-emoji-catalog-provenance.json
+
       - name: Verify generated catalog is substantial and pinned
         run: |
           grep -q 'mobileDesktopEmojiCatalogSourcePackage = "emojibase-data@17.0.0"' "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift"
           test "$(wc -c < "$RUNNER_TEMP/fabushi-emoji/GeneratedDesktopEmojiCatalog.swift")" -gt 500000
           node -e 'const p=require(process.argv[1]); if (p.counts.projectedEntries < 1000 || p.counts.skinVariants < 100) process.exit(1)' "$RUNNER_TEMP/fabushi-emoji/provenance.json"
+
+      - name: Commit generated iOS-owned catalog
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- \
+            frontend/src/recovered/features/conversation/GeneratedDesktopEmojiCatalog.swift \
+            manifests/desktop-main-emoji-catalog-provenance.json; then
+            echo "Generated catalog already matches source."
+            exit 0
+          fi
+          git config user.name "fabushi-ios-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            frontend/src/recovered/features/conversation/GeneratedDesktopEmojiCatalog.swift \
+            manifests/desktop-main-emoji-catalog-provenance.json
+          git commit -m "build(ios): refresh generated emoji catalog"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Upload generated catalog and provenance
         uses: actions/upload-artifact@v4
