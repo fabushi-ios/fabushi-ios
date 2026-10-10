@@ -4218,11 +4218,115 @@ impl FeatureHostController {
         }
     }
 
+    fn execute_bot_clone(
+        &self,
+        request_id: String,
+        source_agent_id: String,
+    ) -> Result<CommandAccepted, FeatureHostError> {
+        let fallback_time_zone = self.host_settings_user_timezone_direct()?;
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("Agent storage is unavailable".into()))?;
+        let mut state = self.state()?;
+        ensure_open(&state)?;
+        let source = state
+            .bots
+            .get(&source_agent_id)
+            .cloned()
+            .ok_or_else(|| {
+                FeatureHostError::Contract(format!("unknown bot: {source_agent_id}"))
+            })?;
+        let sequence_before = state.sequence;
+        let old_bots = state.bots.clone();
+        let old_automations = state.automations.clone();
+        let new_id = next_id(&mut state, "agent");
+        let clone_name = clone_agent_display_name(&source.name);
+        let bot = BotSummary {
+            id: new_id.clone(),
+            name: clone_name,
+            description: source.description,
+            title: source.title,
+            hidden: false,
+            avatar: source.avatar,
+            avatar_shape: source.avatar_shape,
+            avatar_color: source.avatar_color,
+            notifications_enabled: source.notifications_enabled,
+            notify_on_updates: source.notify_on_updates,
+            unread: false,
+            conversation_id: Some(format!("codex:agent:{new_id}")),
+        };
+
+        let target_dir = match clone_agent_known_durable_config(
+            &agent_root,
+            &source_agent_id,
+            &new_id,
+        ) {
+            Ok(target) => target,
+            Err(error) => {
+                state.sequence = sequence_before;
+                return Err(error);
+            }
+        };
+
+        let cloned_automations = clone_agent_automation_configs(
+            &mut state,
+            &source_agent_id,
+            &new_id,
+            fallback_time_zone.as_deref(),
+        );
+        state.bots.insert(new_id, bot.clone());
+
+        let persist_result = self
+            .persist_automations(&state.automations)
+            .and_then(|_| self.persist_bots(&state.bots));
+        if let Err(error) = persist_result {
+            state.bots = old_bots;
+            state.automations = old_automations;
+            state.sequence = sequence_before;
+            let automation_rollback = self.persist_automations(&state.automations);
+            let bot_rollback = self.persist_bots(&state.bots);
+            drop(state);
+            let durable_rollback = std::fs::remove_dir_all(&target_dir);
+            if let Err(rollback_error) = automation_rollback
+                .and(bot_rollback)
+                .and_then(|_| {
+                    durable_rollback.map_err(|remove_error| {
+                        FeatureHostError::Contract(format!(
+                            "remove partial Agent clone: {remove_error}"
+                        ))
+                    })
+                })
+            {
+                return Err(FeatureHostError::Contract(format!(
+                    "Agent clone persistence failed: {error}; rollback also failed: {rollback_error}"
+                )));
+            }
+            return Err(error);
+        }
+
+        state.events.push_back(HostEvent::BotChanged {
+            timestamp: timestamp(),
+            action: "cloned".into(),
+            bot,
+        });
+        drop(state);
+        for automation in &cloned_automations {
+            self.arm_listener_resume_after_automation_write(automation)?;
+        }
+        Ok(CommandAccepted {
+            request_id,
+            operation_id: None,
+        })
+    }
+
     fn execute_bot_profile(
         &self,
         command: FeatureCommand,
     ) -> Result<CommandAccepted, FeatureHostError> {
         let request_id = command.request_id().to_string();
+        if let FeatureCommand::BotClone { id, .. } = &command {
+            return self.execute_bot_clone(request_id, id.clone());
+        }
         let mut state = self.state()?;
         ensure_open(&state)?;
         let (action, bot) = match command {
@@ -4311,30 +4415,8 @@ impl FeatureHostController {
                 }
                 ("updated", bot.clone())
             }
-            FeatureCommand::BotClone { id, .. } => {
-                let source = state
-                    .bots
-                    .get(&id)
-                    .cloned()
-                    .ok_or_else(|| FeatureHostError::Contract(format!("unknown bot: {id}")))?;
-                let new_id = next_id(&mut state, "agent");
-                let clone_name = clone_agent_display_name(&source.name);
-                let bot = BotSummary {
-                    id: new_id.clone(),
-                    name: clone_name,
-                    description: source.description,
-                    title: source.title,
-                    hidden: false,
-                    avatar: source.avatar,
-                    avatar_shape: source.avatar_shape,
-                    avatar_color: source.avatar_color,
-                    notifications_enabled: source.notifications_enabled,
-                    notify_on_updates: source.notify_on_updates,
-                    unread: false,
-                    conversation_id: Some(format!("codex:agent:{new_id}")),
-                };
-                state.bots.insert(new_id, bot.clone());
-                ("cloned", bot)
+            FeatureCommand::BotClone { .. } => {
+                unreachable!("BotClone is handled by the durable clone path above")
             }
             FeatureCommand::BotDelete { id, .. } => {
                 if id == "mahayana-assistant" {
@@ -15446,6 +15528,234 @@ fn clone_agent_display_name(name: &str) -> String {
         "copy".into()
     } else {
         format!("{trimmed} copy")
+    }
+}
+
+fn copy_agent_clone_tree(source: &Path, target: &Path) -> Result<(), FeatureHostError> {
+    let metadata = std::fs::symlink_metadata(source).map_err(|error| {
+        FeatureHostError::Contract(format!("inspect Agent clone source: {error}"))
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(FeatureHostError::Contract(
+            "Agent clone source must be a real directory and may not be a symlink.".into(),
+        ));
+    }
+    std::fs::create_dir_all(target).map_err(|error| {
+        FeatureHostError::Contract(format!("create Agent clone target: {error}"))
+    })?;
+    for entry in std::fs::read_dir(source).map_err(|error| {
+        FeatureHostError::Contract(format!("read Agent clone source: {error}"))
+    })? {
+        let entry = entry.map_err(|error| {
+            FeatureHostError::Contract(format!("read Agent clone source entry: {error}"))
+        })?;
+        let entry_type = entry.file_type().map_err(|error| {
+            FeatureHostError::Contract(format!("inspect Agent clone source entry: {error}"))
+        })?;
+        if entry_type.is_symlink() {
+            return Err(FeatureHostError::Contract(
+                "Agent durable configuration may not contain symlinks.".into(),
+            ));
+        }
+        let destination = target.join(entry.file_name());
+        if entry_type.is_dir() {
+            copy_agent_clone_tree(&entry.path(), &destination)?;
+        } else if entry_type.is_file() {
+            std::fs::copy(entry.path(), destination).map_err(|error| {
+                FeatureHostError::Contract(format!("copy Agent durable configuration: {error}"))
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn clone_agent_known_durable_config(
+    agent_root: &Path,
+    source_agent_id: &str,
+    target_agent_id: &str,
+) -> Result<PathBuf, FeatureHostError> {
+    if !is_safe_memory_agent_id(source_agent_id) || !is_safe_memory_agent_id(target_agent_id) {
+        return Err(FeatureHostError::Contract(
+            "unsafe Agent clone identity".into(),
+        ));
+    }
+    let source = agent_root.join(source_agent_id);
+    let target = agent_root.join(target_agent_id);
+    if target.exists() {
+        return Err(FeatureHostError::Contract(format!(
+            "Agent clone target already exists: {target_agent_id}"
+        )));
+    }
+    std::fs::create_dir_all(agent_root).map_err(|error| {
+        FeatureHostError::Contract(format!("create Agent storage root: {error}"))
+    })?;
+    let staging = agent_root.join(format!(
+        ".clone-{target_agent_id}-{}",
+        Uuid::new_v4()
+    ));
+    if staging.exists() {
+        std::fs::remove_dir_all(&staging).map_err(|error| {
+            FeatureHostError::Contract(format!("clear stale Agent clone staging: {error}"))
+        })?;
+    }
+    std::fs::create_dir_all(&staging).map_err(|error| {
+        FeatureHostError::Contract(format!("create Agent clone staging: {error}"))
+    })?;
+
+    let result = (|| {
+        let source_memory = source.join("memory");
+        if source_memory.is_dir() {
+            copy_agent_clone_tree(&source_memory, &staging.join("memory"))?;
+        }
+        let source_enablement = source.join(WORKFLOW_ENABLEMENT_FILENAME);
+        if source_enablement.is_file() {
+            std::fs::copy(
+                &source_enablement,
+                staging.join(WORKFLOW_ENABLEMENT_FILENAME),
+            )
+            .map_err(|error| {
+                FeatureHostError::Contract(format!(
+                    "copy Agent workflow enablement: {error}"
+                ))
+            })?;
+        }
+        std::fs::rename(&staging, &target).map_err(|error| {
+            FeatureHostError::Contract(format!("commit Agent durable clone: {error}"))
+        })
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_dir_all(&staging);
+        let _ = std::fs::remove_dir_all(&target);
+    }
+    result?;
+    Ok(target)
+}
+
+fn clone_agent_automation_configs(
+    state: &mut FeatureState,
+    source_agent_id: &str,
+    target_agent_id: &str,
+    fallback_time_zone: Option<&str>,
+) -> Vec<AutomationSummary> {
+    let templates = state
+        .automations
+        .values()
+        .filter(|automation| automation.agent_id.as_deref() == Some(source_agent_id))
+        .cloned()
+        .collect::<Vec<_>>();
+    let now = now_millis();
+    let mut clones = Vec::with_capacity(templates.len());
+    for mut automation in templates {
+        state.sequence = state.sequence.saturating_add(1);
+        automation.id = format!("routine-{now}-{}", state.sequence);
+        automation.agent_id = Some(target_agent_id.to_string());
+        automation.created_at_ms = now;
+        automation.runs.clear();
+        automation.last_run_at_ms = None;
+        let trigger = automation
+            .trigger
+            .clone()
+            .unwrap_or_else(|| AutomationTrigger::Schedule {
+                schedule: automation.schedule.clone(),
+            });
+        automation.next_run_at_ms = automation_next_run(
+            &trigger,
+            &automation.schedule,
+            automation.enabled,
+            now,
+            fallback_time_zone,
+        );
+        state
+            .automations
+            .insert(automation.id.clone(), automation.clone());
+        clones.push(automation);
+    }
+    clones
+}
+
+#[cfg(test)]
+mod agent_clone_durable_config_tests {
+    use super::*;
+
+    fn temp_root(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "fabushi-ios-agent-clone-{label}-{}-{}",
+            std::process::id(),
+            now_millis()
+        ))
+    }
+
+    #[test]
+    fn clone_copies_only_known_durable_agent_config() {
+        let root = temp_root("durable");
+        let source = root.join("source");
+        std::fs::create_dir_all(source.join("memory")).unwrap();
+        std::fs::create_dir_all(source.join("attachments")).unwrap();
+        std::fs::write(source.join("memory").join("profile.md"), "durable memory").unwrap();
+        std::fs::write(
+            source.join(WORKFLOW_ENABLEMENT_FILENAME),
+            r#"{"disabled":["skill-a"],"enabled":[]}"#,
+        )
+        .unwrap();
+        std::fs::write(source.join("attachments").join("turn.bin"), b"transient").unwrap();
+        std::fs::write(source.join("conversation.json"), b"must not copy").unwrap();
+
+        let target =
+            clone_agent_known_durable_config(&root, "source", "target").expect("clone durable");
+        assert_eq!(
+            std::fs::read_to_string(target.join("memory/profile.md")).unwrap(),
+            "durable memory"
+        );
+        assert!(target.join(WORKFLOW_ENABLEMENT_FILENAME).is_file());
+        assert!(!target.join("attachments").exists());
+        assert!(!target.join("conversation.json").exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn clone_automation_rewrites_identity_and_clears_run_history() {
+        let mut state = FeatureState::default();
+        state.automations.insert(
+            "source-routine".into(),
+            AutomationSummary {
+                id: "source-routine".into(),
+                agent_id: Some("source".into()),
+                name: "Daily".into(),
+                prompt: "Do it".into(),
+                schedule: "@daily".into(),
+                trigger: Some(AutomationTrigger::Schedule {
+                    schedule: "@daily".into(),
+                }),
+                enabled: true,
+                created_at_ms: 1,
+                runs: vec![AutomationRunSummary {
+                    id: "old-run".into(),
+                    status: AutomationRunStatus::Ok,
+                    started_at: 2,
+                    detail: None,
+                    event: None,
+                }],
+                last_run_at_ms: Some(2),
+                next_run_at_ms: Some(3),
+            },
+        );
+        let clones = clone_agent_automation_configs(&mut state, "source", "target", Some("UTC"));
+        assert_eq!(clones.len(), 1);
+        let cloned = &clones[0];
+        assert_eq!(cloned.agent_id.as_deref(), Some("target"));
+        assert_ne!(cloned.id, "source-routine");
+        assert!(cloned.runs.is_empty());
+        assert_eq!(cloned.last_run_at_ms, None);
+        assert!(cloned.next_run_at_ms.is_some());
+        assert_eq!(
+            state
+                .automations
+                .get("source-routine")
+                .unwrap()
+                .runs
+                .len(),
+            1
+        );
     }
 }
 
