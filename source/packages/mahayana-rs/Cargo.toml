@@ -87,6 +87,7 @@ codex-tui = { path = "../codex-rs/tui" }
 codex-utils-absolute-path = { path = "../codex-rs/utils/absolute-path" }
 crossbeam-channel = "0.5"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
+jiff = "0.2.35"
 flate2 = "1.1.8"
 crossterm = "0.28.1"
 fabushi-messaging-core = { path = "../mahayana-messaging" }

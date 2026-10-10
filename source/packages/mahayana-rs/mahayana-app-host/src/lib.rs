@@ -660,8 +660,13 @@ impl AppHost {
                     .feature
                     .host_settings_onboarding_seen_direct()
                     .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                let user_time_zone = self
+                    .feature
+                    .host_settings_user_timezone_direct()
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
                 Ok(json!({
                     "hasSeenOnboarding": has_seen_onboarding,
+                    "userTimeZone": user_time_zone,
                 }))
             }
             "setHostSettings" => {
@@ -673,26 +678,53 @@ impl AppHost {
                             "host settings payload must contain a settings object".into(),
                         )
                     })?;
-                let value = match object.get("hasSeenOnboarding") {
-                    Some(Value::Bool(value)) => Some(*value),
-                    Some(Value::Null) => None,
-                    Some(_) => {
-                        return Err(AppHostError::InvalidRequest(
-                            "hasSeenOnboarding must be boolean or null".into(),
-                        ));
-                    }
-                    None => {
-                        return Err(AppHostError::InvalidRequest(
-                            "host settings payload must include hasSeenOnboarding".into(),
-                        ));
-                    }
-                };
+                let mut touched = false;
+                if let Some(raw) = object.get("hasSeenOnboarding") {
+                    touched = true;
+                    let value = match raw {
+                        Value::Bool(value) => Some(*value),
+                        Value::Null => None,
+                        _ => {
+                            return Err(AppHostError::InvalidRequest(
+                                "hasSeenOnboarding must be boolean or null".into(),
+                            ));
+                        }
+                    };
+                    self.feature
+                        .set_has_seen_onboarding_direct(value)
+                        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                }
+                if let Some(raw) = object.get("userTimeZone") {
+                    touched = true;
+                    let value = match raw {
+                        Value::String(value) => Some(value.clone()),
+                        Value::Null => None,
+                        _ => {
+                            return Err(AppHostError::InvalidRequest(
+                                "userTimeZone must be an IANA string or null".into(),
+                            ));
+                        }
+                    };
+                    self.feature
+                        .set_user_timezone_direct(value)
+                        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                }
+                if !touched {
+                    return Err(AppHostError::InvalidRequest(
+                        "host settings payload must include a supported field".into(),
+                    ));
+                }
                 let has_seen_onboarding = self
                     .feature
-                    .set_has_seen_onboarding_direct(value)
+                    .host_settings_onboarding_seen_direct()
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                let user_time_zone = self
+                    .feature
+                    .host_settings_user_timezone_direct()
                     .map_err(|error| AppHostError::Operation(error.to_string()))?;
                 Ok(json!({
                     "hasSeenOnboarding": has_seen_onboarding,
+                    "userTimeZone": user_time_zone,
                 }))
             }
             "feature.settings.localToolPermission" => {

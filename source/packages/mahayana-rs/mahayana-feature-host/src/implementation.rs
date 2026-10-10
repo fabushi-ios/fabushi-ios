@@ -14,6 +14,7 @@ use chrono::NaiveDate;
 use chrono::TimeZone;
 use chrono::Timelike;
 use chrono::Utc;
+use jiff::{tz::TimeZone as JiffTimeZone, Timestamp as JiffTimestamp};
 
 use crate::channel_management::AgentChannelStore;
 use crate::client_side_tool_v2::{ClientSideToolV2Producer, FAMILY as CLIENT_SIDE_TOOL_V2_FAMILY};
@@ -9681,6 +9682,69 @@ impl FeatureHostController {
         Ok(value)
     }
 
+    /// Read the current authenticated account's IANA user time zone from the
+    /// canonical ProductHostSettings owner.
+    pub fn host_settings_user_timezone_direct(
+        &self,
+    ) -> Result<Option<String>, FeatureHostError> {
+        let account_id = self.host_settings_account_id()?;
+        let state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state
+            .settings
+            .user_timezone_by_account
+            .get(&account_id)
+            .cloned())
+    }
+
+    /// Project the native user time zone into the existing account-scoped
+    /// ProductHostSettings owner. Invalid IANA identifiers fail closed.
+    pub fn set_user_timezone_direct(
+        &self,
+        value: Option<String>,
+    ) -> Result<Option<String>, FeatureHostError> {
+        let account_id = self.host_settings_account_id()?;
+        let normalized = match value {
+            Some(value) => {
+                let value = value.trim().to_string();
+                if value.is_empty() || JiffTimeZone::get(&value).is_err() {
+                    return Err(FeatureHostError::Contract(
+                        "user time zone must be a valid IANA identifier".into(),
+                    ));
+                }
+                Some(value)
+            }
+            None => None,
+        };
+        let settings = {
+            let mut state = self.state()?;
+            ensure_open(&state)?;
+            match normalized.as_ref() {
+                Some(value) => {
+                    state
+                        .settings
+                        .user_timezone_by_account
+                        .insert(account_id, value.clone());
+                }
+                None => {
+                    state
+                        .settings
+                        .user_timezone_by_account
+                        .remove(&account_id);
+                }
+            }
+            state.settings.clone()
+        };
+        if let Some(path) = self.settings_path.as_deref() {
+            persist_product_host_settings(path, &settings)?;
+        }
+        self.state()?.events.push_back(HostEvent::SettingsChanged {
+            timestamp: timestamp(),
+            settings,
+        });
+        Ok(normalized)
+    }
+
     /// Main settings are canonical on iOS; the Host receives this bounded
     /// runtime projection before execution so approval matching has one owner.
     pub fn set_auto_review_rules_direct(
@@ -18319,10 +18383,19 @@ fn persist_automations(
 }
 
 fn normalize_automation_schedule(raw: &str) -> Result<String, FeatureHostError> {
+    normalize_automation_schedule_with_timezone(raw, None)
+}
+
+fn normalize_automation_schedule_with_timezone(
+    raw: &str,
+    fallback_time_zone: Option<&str>,
+) -> Result<String, FeatureHostError> {
     let schedule = raw.split_whitespace().collect::<Vec<_>>().join(" ");
-    if schedule.is_empty() || next_automation_run(&schedule, now_millis()).is_none() {
+    if schedule.is_empty()
+        || next_automation_run_with_timezone(&schedule, now_millis(), fallback_time_zone).is_none()
+    {
         return Err(FeatureHostError::Contract(
-            "invalid automation schedule; use a 5-field cron, @hourly/@daily/@weekly/@monthly/@yearly, or @every <n><s|m|h|d>"
+            "invalid automation schedule or IANA time zone; use a 5-field cron, optional CRON_TZ=/TZ= prefix, @hourly/@daily/@weekly/@monthly/@yearly, or @every <n><s|m|h|d>"
                 .into(),
         ));
     }
@@ -18344,6 +18417,20 @@ fn parse_every_interval_ms(schedule: &str) -> Option<i64> {
         _ => return None,
     };
     amount.checked_mul(unit_ms).filter(|value| *value > 0)
+}
+
+fn split_automation_time_zone(schedule: &str) -> Option<(String, Option<String>)> {
+    let normalized = schedule.split_whitespace().collect::<Vec<_>>().join(" ");
+    for prefix in ["CRON_TZ=", "TZ="] {
+        if let Some(rest) = normalized.strip_prefix(prefix) {
+            let (zone, expression) = rest.split_once(' ')?;
+            if zone.is_empty() || expression.is_empty() {
+                return None;
+            }
+            return Some((expression.to_string(), Some(zone.to_string())));
+        }
+    }
+    Some((normalized, None))
 }
 
 fn expand_cron_alias(schedule: &str) -> &str {
@@ -18386,11 +18473,57 @@ fn parse_cron_field(field: &str, min: u32, max: u32) -> Option<BTreeSet<u32>> {
     (!values.is_empty()).then_some(values)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AutomationWallClock {
+    minute: u32,
+    hour: u32,
+    month: u32,
+    day_of_month: u32,
+    day_of_week: u32,
+}
+
+fn resolved_automation_time_zone(
+    explicit_time_zone: Option<&str>,
+    fallback_time_zone: Option<&str>,
+) -> Option<JiffTimeZone> {
+    JiffTimeZone::get(
+        explicit_time_zone
+            .or(fallback_time_zone)
+            .unwrap_or("UTC"),
+    )
+    .ok()
+}
+
+fn automation_wall_clock(
+    timestamp_ms: i64,
+    time_zone: &JiffTimeZone,
+) -> Option<AutomationWallClock> {
+    let timestamp = JiffTimestamp::from_millisecond(timestamp_ms).ok()?;
+    let date = timestamp.to_zoned(time_zone.clone());
+    Some(AutomationWallClock {
+        minute: date.minute() as u32,
+        hour: date.hour() as u32,
+        month: date.month() as u32,
+        day_of_month: date.day() as u32,
+        day_of_week: date.weekday().to_sunday_zero_offset() as u32,
+    })
+}
+
 fn next_automation_run(schedule: &str, after_ms: i64) -> Option<i64> {
-    if let Some(interval) = parse_every_interval_ms(schedule) {
+    next_automation_run_with_timezone(schedule, after_ms, None)
+}
+
+fn next_automation_run_with_timezone(
+    schedule: &str,
+    after_ms: i64,
+    fallback_time_zone: Option<&str>,
+) -> Option<i64> {
+    let normalized = schedule.split_whitespace().collect::<Vec<_>>().join(" ");
+    if let Some(interval) = parse_every_interval_ms(&normalized) {
         return after_ms.checked_add(interval);
     }
-    let expression = expand_cron_alias(schedule);
+    let (expression, explicit_time_zone) = split_automation_time_zone(&normalized)?;
+    let expression = expand_cron_alias(&expression);
     let fields = expression.split_whitespace().collect::<Vec<_>>();
     if fields.len() != 5 {
         return None;
@@ -18402,19 +18535,23 @@ fn next_automation_run(schedule: &str, after_ms: i64) -> Option<i64> {
     let day_of_week = parse_cron_field(fields[4], 0, 7)?;
     let dom_restricted = fields[2] != "*";
     let dow_restricted = fields[4] != "*";
+    let time_zone = resolved_automation_time_zone(
+        explicit_time_zone.as_deref(),
+        fallback_time_zone,
+    )?;
     let mut candidate = after_ms.div_euclid(60_000) * 60_000 + 60_000;
     for _ in 0..(366 * 24 * 60) {
-        let date = chrono::DateTime::<Utc>::from_timestamp_millis(candidate)?;
-        let dom_ok = day_of_month.contains(&date.day());
-        let dow_ok = day_of_week.contains(&date.weekday().num_days_from_sunday());
+        let date = automation_wall_clock(candidate, &time_zone)?;
+        let dom_ok = day_of_month.contains(&date.day_of_month);
+        let dow_ok = day_of_week.contains(&date.day_of_week);
         let day_ok = if dom_restricted && dow_restricted {
             dom_ok || dow_ok
         } else {
             (!dom_restricted || dom_ok) && (!dow_restricted || dow_ok)
         };
-        if minute.contains(&date.minute())
-            && hour.contains(&date.hour())
-            && month.contains(&date.month())
+        if minute.contains(&date.minute)
+            && hour.contains(&date.hour)
+            && month.contains(&date.month)
             && day_ok
         {
             return Some(candidate);
@@ -18422,6 +18559,87 @@ fn next_automation_run(schedule: &str, after_ms: i64) -> Option<i64> {
         candidate = candidate.checked_add(60_000)?;
     }
     None
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AutomationScheduleSummary {
+    scheduled_fires_next_7_days: usize,
+    fires_on_weekend: bool,
+    fires_overnight: bool,
+}
+
+fn summarize_automation_schedule_next_7_days(
+    schedule: &str,
+    fallback_time_zone: Option<&str>,
+    start_ms: i64,
+) -> AutomationScheduleSummary {
+    const WINDOW_MS: i64 = 7 * 24 * 60 * 60_000;
+    let deadline = start_ms.saturating_add(WINDOW_MS);
+    let normalized = schedule.split_whitespace().collect::<Vec<_>>().join(" ");
+    let interval_ms = parse_every_interval_ms(&normalized);
+    let (expression, explicit_time_zone) = match split_automation_time_zone(&normalized) {
+        Some(value) => value,
+        None => {
+            return AutomationScheduleSummary {
+                scheduled_fires_next_7_days: 0,
+                fires_on_weekend: false,
+                fires_overnight: false,
+            };
+        }
+    };
+    let time_zone = match resolved_automation_time_zone(
+        explicit_time_zone.as_deref(),
+        fallback_time_zone,
+    ) {
+        Some(value) => value,
+        None => {
+            return AutomationScheduleSummary {
+                scheduled_fires_next_7_days: 0,
+                fires_on_weekend: false,
+                fires_overnight: false,
+            };
+        }
+    };
+    let is_cron = interval_ms.is_none()
+        && {
+            let expanded = expand_cron_alias(&expression);
+            expanded.split_whitespace().count() == 5
+        };
+    if interval_ms.is_none() && !is_cron {
+        return AutomationScheduleSummary {
+            scheduled_fires_next_7_days: 0,
+            fires_on_weekend: false,
+            fires_overnight: false,
+        };
+    }
+
+    let mut cursor = start_ms;
+    let mut count = 0usize;
+    let mut fires_on_weekend = false;
+    let mut fires_overnight = false;
+    loop {
+        let next = if let Some(interval) = interval_ms {
+            cursor.checked_add(interval)
+        } else {
+            next_automation_run_with_timezone(&normalized, cursor, fallback_time_zone)
+        };
+        let Some(next) = next else { break; };
+        if next > deadline || next <= cursor {
+            break;
+        }
+        let Some(clock) = automation_wall_clock(next, &time_zone) else {
+            break;
+        };
+        count = count.saturating_add(1);
+        fires_on_weekend |= clock.day_of_week == 0 || clock.day_of_week == 6;
+        fires_overnight |= clock.hour < 7 || clock.hour >= 22;
+        cursor = next;
+    }
+    AutomationScheduleSummary {
+        scheduled_fires_next_7_days: count,
+        fires_on_weekend,
+        fires_overnight,
+    }
 }
 
 fn now_millis() -> i64 {
@@ -19804,6 +20022,140 @@ mod tests {
         assert!(next_automation_run("@daily", base).is_some());
         assert!(next_automation_run("*/15 9-17 * * 1-5", base).is_some());
         assert!(normalize_automation_schedule("not a schedule").is_err());
+    }
+
+    #[test]
+    fn automation_schedule_honors_iana_fallback_explicit_override_and_dst() {
+        let anchor = Utc
+            .with_ymd_and_hms(2026, 9, 24, 6, 0, 0)
+            .single()
+            .expect("anchor")
+            .timestamp_millis();
+        let fallback = next_automation_run_with_timezone(
+            "0 9 * * *",
+            anchor,
+            Some("America/Los_Angeles"),
+        )
+        .expect("fallback time zone");
+        assert_eq!(
+            fallback,
+            Utc.with_ymd_and_hms(2026, 9, 24, 16, 0, 0)
+                .single()
+                .unwrap()
+                .timestamp_millis()
+        );
+
+        let explicit = next_automation_run_with_timezone(
+            "CRON_TZ=UTC 0 9 * * *",
+            anchor,
+            Some("America/Los_Angeles"),
+        )
+        .expect("explicit time zone");
+        assert_eq!(
+            explicit,
+            Utc.with_ymd_and_hms(2026, 9, 24, 9, 0, 0)
+                .single()
+                .unwrap()
+                .timestamp_millis()
+        );
+
+        let before_dst = Utc
+            .with_ymd_and_hms(2026, 3, 7, 0, 0, 0)
+            .single()
+            .unwrap()
+            .timestamp_millis();
+        let after_dst = Utc
+            .with_ymd_and_hms(2026, 3, 8, 0, 0, 0)
+            .single()
+            .unwrap()
+            .timestamp_millis();
+        assert_eq!(
+            next_automation_run_with_timezone(
+                "0 9 * * *",
+                before_dst,
+                Some("America/Los_Angeles"),
+            ),
+            Some(
+                Utc.with_ymd_and_hms(2026, 3, 7, 17, 0, 0)
+                    .single()
+                    .unwrap()
+                    .timestamp_millis()
+            )
+        );
+        assert_eq!(
+            next_automation_run_with_timezone(
+                "0 9 * * *",
+                after_dst,
+                Some("America/Los_Angeles"),
+            ),
+            Some(
+                Utc.with_ymd_and_hms(2026, 3, 8, 16, 0, 0)
+                    .single()
+                    .unwrap()
+                    .timestamp_millis()
+            )
+        );
+
+        assert!(
+            next_automation_run_with_timezone(
+                "TZ=Not/AZone 0 9 * * *",
+                anchor,
+                Some("America/Los_Angeles"),
+            )
+            .is_none()
+        );
+        assert!(normalize_automation_schedule_with_timezone(
+            "CRON_TZ=Not/AZone 0 9 * * *",
+            Some("UTC"),
+        )
+        .is_err());
+
+        let summary = summarize_automation_schedule_next_7_days(
+            "0 2 * * *",
+            Some("America/Los_Angeles"),
+            before_dst,
+        );
+        assert_eq!(summary.scheduled_fires_next_7_days, 7);
+        assert!(summary.fires_on_weekend);
+        assert!(summary.fires_overnight);
+    }
+
+    #[test]
+    fn account_scoped_user_timezone_projection_validates_and_isolated_by_account_owner() {
+        let controller = controller();
+        drain(&controller);
+        let projected = controller
+            .set_user_timezone_direct(Some("America/Los_Angeles".into()))
+            .expect("set IANA time zone");
+        assert_eq!(projected.as_deref(), Some("America/Los_Angeles"));
+        assert_eq!(
+            controller
+                .host_settings_user_timezone_direct()
+                .expect("read IANA time zone")
+                .as_deref(),
+            Some("America/Los_Angeles")
+        );
+        assert!(
+            controller
+                .set_user_timezone_direct(Some("Not/AZone".into()))
+                .is_err()
+        );
+        assert_eq!(
+            controller
+                .host_settings_user_timezone_direct()
+                .expect("invalid write must not replace timezone")
+                .as_deref(),
+            Some("America/Los_Angeles")
+        );
+        controller
+            .set_user_timezone_direct(None)
+            .expect("clear IANA time zone");
+        assert_eq!(
+            controller
+                .host_settings_user_timezone_direct()
+                .expect("read cleared time zone"),
+            None
+        );
     }
 
     #[test]

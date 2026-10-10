@@ -809,6 +809,11 @@ pub struct ProductHostSettings {
     /// settings owner so switching accounts cannot expose another account's value.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub has_seen_onboarding_by_account: BTreeMap<String, bool>,
+    /// IANA user time zone projected by the native product shell, keyed by the
+    /// authenticated account id. Scheduling reads this through the same canonical
+    /// settings owner; there is deliberately no second time-zone authority.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub user_timezone_by_account: BTreeMap<String, String>,
 }
 
 impl Default for ProductHostSettings {
@@ -827,6 +832,7 @@ impl Default for ProductHostSettings {
             inference_provider: InferenceProvider::default(),
             sandbox_runtime: SandboxRuntime::default(),
             has_seen_onboarding_by_account: BTreeMap::new(),
+            user_timezone_by_account: BTreeMap::new(),
         }
     }
 }
@@ -3350,15 +3356,24 @@ mod tests {
         .expect("decode legacy settings");
         assert_eq!(legacy.inference_provider, InferenceProvider::Fabushi);
         assert_eq!(legacy.sandbox_runtime, SandboxRuntime::Host);
+        assert!(legacy.user_timezone_by_account.is_empty());
 
         let configured = ProductHostSettings {
             inference_provider: InferenceProvider::ClaudeCode,
             sandbox_runtime: SandboxRuntime::LocalDocker,
+            user_timezone_by_account: BTreeMap::from([(
+                "account-a".into(),
+                "America/Los_Angeles".into(),
+            )]),
             ..Default::default()
         };
         let value = serde_json::to_value(configured).expect("encode router settings");
         assert_eq!(value["inferenceProvider"], "claude-code");
         assert_eq!(value["sandboxRuntime"], "local-docker");
+        assert_eq!(
+            value["userTimezoneByAccount"]["account-a"],
+            "America/Los_Angeles"
+        );
     }
 
     #[test]

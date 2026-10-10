@@ -9086,6 +9086,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "fabushi-messaging-core",
+ "jiff",
  "mahayana-computer",
  "mahayana-core",
  "mahayana-harness",
