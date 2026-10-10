@@ -3237,6 +3237,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-retired-fast-lane-delivery-counter-implemented-pending-exact-head-ci",
         "finding": "Current-main removes record_host_delivery(), eliminating the synthetic host-delivery increment used by the retired direct conversation fast lane. iOS had an equivalent direct text terminal bypass; it was removed from mahayana-native-engine together with CHAT-013 fast-lane classification so visible turns now settle through the canonical delivery/tool path. Exact-head Actions pending."
+      },
+      {
+        "path": "source/host/tests/session_summaries_roster_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-roster-isolation-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main adds a regression ensuring reserved .conversations namespaces are never discovered/recovered as Agents and cannot gain store.db side effects. iOS uses a different canonical owner: account-scoped Bot/Agent roster is loaded exclusively from bots.json into FeatureHost state.bots, and BotList enumerates that map rather than scanning conversation directories. A focused test now creates .conversations/human-conversation beside the bot store, verifies only the canonical bot JSON entry is loaded, rejects .conversations as a bot id, and asserts no store.db recovery side effect. Exact-head GitHub Actions evidence is pending."
       }
     ]
   },
