@@ -23,6 +23,17 @@ final class GrokMobileCommandPaletteTests: XCTestCase {
                 query: "ai"
             )
         )
+        let camel = GrokMobileCommandPaletteModel.fuzzyScore(
+            value: "openFullMessaging",
+            query: "fm"
+        )
+        let flat = GrokMobileCommandPaletteModel.fuzzyScore(
+            value: "openfullmessaging",
+            query: "fm"
+        )
+        XCTAssertNotNil(camel)
+        XCTAssertNotNil(flat)
+        XCTAssertGreaterThan(camel ?? 0, flat ?? 0)
     }
 
     func testEmptyAllTabKeepsPrimaryNavigationAndActions() {

@@ -2709,6 +2709,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-implemented-pending-exact-head",
         "finding": "Shipping native Forward path reviewed against Desktop current main; implementation exists, but ledger status remains mapped until descendant exact-head Swift/UI evidence."
+      },
+      {
+        "path": "frontend/src/production/command-palette-model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Native model is shipping; fixed lost camelCase fuzzy boundary bonus and added focused test. Validator re-review fence remains intact."
       }
     ]
   },

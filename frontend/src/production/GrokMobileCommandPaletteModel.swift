@@ -269,6 +269,7 @@ internal enum GrokMobileCommandPaletteModel {
 
     static func fuzzyScore(value: String, query: String) -> Double? {
         guard !query.isEmpty else { return 0 }
+        let originalCharacters = Array(value)
         let valueCharacters = Array(value.lowercased())
         let queryCharacters = Array(query.lowercased())
         var score = 0
@@ -282,8 +283,11 @@ internal enum GrokMobileCommandPaletteModel {
             if firstMatch < 0 { firstMatch = index }
             let previousCharacter = index > 0 ? valueCharacters[index - 1] : nil
             let boundary = index == 0 || previousCharacter == " " || previousCharacter == "-" || previousCharacter == "_" || previousCharacter == "/" || previousCharacter == "."
+            let camelBoundary = index > 0
+                && originalCharacters[index - 1].isLowercase
+                && originalCharacters[index].isUppercase
             var characterScore = 1
-            if boundary { characterScore += 4 }
+            if boundary || camelBoundary { characterScore += 4 }
             if previousMatch == index - 1 { characterScore += 3 }
             score += characterScore
             previousMatch = index
