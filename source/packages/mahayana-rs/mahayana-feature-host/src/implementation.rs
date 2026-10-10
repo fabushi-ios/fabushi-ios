@@ -4077,6 +4077,7 @@ impl FeatureHostController {
                 let trigger = normalize_automation_trigger(trigger)?;
                 let schedule = automation_trigger_legacy_schedule(&trigger);
                 let now = now_millis();
+                let user_time_zone = self.host_settings_user_timezone_direct()?;
                 let mut state = self.state()?;
                 let id = id
                     .filter(|id| is_safe_automation_id(id))
@@ -4119,7 +4120,13 @@ impl FeatureHostController {
                     created_at_ms: previous.as_ref().map_or(now, |item| item.created_at_ms),
                     runs: previous.as_ref().map_or_else(Vec::new, |item| item.runs.clone()),
                     last_run_at_ms: previous.as_ref().and_then(|item| item.last_run_at_ms),
-                    next_run_at_ms: automation_next_run(&trigger, &schedule, enabled, now),
+                    next_run_at_ms: automation_next_run(
+                        &trigger,
+                        &schedule,
+                        enabled,
+                        now,
+                        user_time_zone.as_deref(),
+                    ),
                 };
                 state.automations.insert(id, automation.clone());
                 self.persist_automations(&state.automations)?;
@@ -4141,6 +4148,7 @@ impl FeatureHostController {
                 enabled,
                 ..
             } => {
+                let user_time_zone = self.host_settings_user_timezone_direct()?;
                 let mut state = self.state()?;
                 let automation = state.automations.get_mut(&id).ok_or_else(|| {
                     FeatureHostError::Contract(format!("unknown automation: {id}"))
@@ -4155,7 +4163,13 @@ impl FeatureHostController {
                             schedule: automation.schedule.clone(),
                         });
                 automation.next_run_at_ms =
-                    automation_next_run(&trigger, &automation.schedule, enabled, now_millis());
+                    automation_next_run(
+                        &trigger,
+                        &automation.schedule,
+                        enabled,
+                        now_millis(),
+                        user_time_zone.as_deref(),
+                    );
                 let automation = automation.clone();
                 self.persist_automations(&state.automations)?;
                 if !enabled {
@@ -9413,12 +9427,27 @@ impl FeatureHostController {
                 self.runtime()?.reset_session()?;
             }
             let account_id = next_account_id.as_deref();
+            let user_time_zone = {
+                let state = self.state()?;
+                account_id.and_then(|id| {
+                    state
+                        .settings
+                        .user_timezone_by_account
+                        .get(id)
+                        .cloned()
+                })
+            };
             let automations = self
                 .automation_path
                 .as_deref()
                 .map(|path| {
                     account_id
-                        .map(|id| load_automations(&account_scoped_path(path, id)))
+                        .map(|id| {
+                            load_automations(
+                                &account_scoped_path(path, id),
+                                user_time_zone.as_deref(),
+                            )
+                        })
                         .unwrap_or_default()
                 })
                 .unwrap_or_default();
@@ -14453,16 +14482,27 @@ fn automation_next_run(
     schedule: &str,
     enabled: bool,
     after_ms: i64,
+    fallback_time_zone: Option<&str>,
 ) -> Option<i64> {
     if !enabled {
         return None;
     }
     match trigger {
-        AutomationTrigger::Schedule { schedule } => next_automation_run(schedule, after_ms),
+        AutomationTrigger::Schedule { schedule } => {
+            next_automation_run_with_timezone(schedule, after_ms, fallback_time_zone)
+        }
         AutomationTrigger::Event { .. } => None,
         AutomationTrigger::Group { listeners } => listeners
             .iter()
-            .filter_map(|listener| automation_next_run(listener, schedule, true, after_ms))
+            .filter_map(|listener| {
+                automation_next_run(
+                    listener,
+                    schedule,
+                    true,
+                    after_ms,
+                    fallback_time_zone,
+                )
+            })
             .min(),
     }
 }
@@ -18327,7 +18367,10 @@ fn persist_bots(path: &Path, bots: &BTreeMap<String, BotSummary>) -> Result<(), 
     Ok(())
 }
 
-fn load_automations(path: &Path) -> BTreeMap<String, AutomationSummary> {
+fn load_automations(
+    path: &Path,
+    fallback_time_zone: Option<&str>,
+) -> BTreeMap<String, AutomationSummary> {
     let Ok(bytes) = std::fs::read(path) else {
         return BTreeMap::new();
     };
@@ -18357,6 +18400,7 @@ fn load_automations(path: &Path) -> BTreeMap<String, AutomationSummary> {
                 &item.schedule,
                 item.enabled,
                 now,
+                fallback_time_zone,
             );
             Some((item.id.clone(), item))
         })
@@ -20886,7 +20930,16 @@ mod tests {
         })
         .expect("normalize grouped trigger");
 
-        assert!(automation_next_run(&trigger, "unused", true, 1_750_000_000_000).is_some());
+        assert!(
+            automation_next_run(
+                &trigger,
+                "unused",
+                true,
+                1_750_000_000_000,
+                None,
+            )
+            .is_some()
+        );
 
         let event = EventCard {
             source: ListenerPlatform::Sentry,
@@ -20968,7 +21021,7 @@ mod tests {
         )
         .expect("persist event group");
 
-        let loaded = load_automations(&path);
+        let loaded = load_automations(&path, None);
         assert_eq!(loaded.get("event-group"), Some(&automation));
         std::fs::remove_dir_all(&root).expect("remove isolated automation store");
     }
@@ -21007,7 +21060,7 @@ mod tests {
             },
         );
         persist_automations(&path, &items).expect("persist automation store");
-        let loaded = load_automations(&path);
+        let loaded = load_automations(&path, None);
         assert_eq!(loaded.get("weekly-review"), items.get("weekly-review"));
         std::fs::remove_dir_all(&root).expect("remove isolated automation store");
     }
