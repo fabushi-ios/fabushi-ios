@@ -8,7 +8,7 @@ enum IOSBoxExecOperation: Equatable, Sendable {
 
     case read(path: String, offset: Int?, limit: Int?)
     case redactedRead(path: String, offset: Int?, limit: Int?)
-    case write(path: String, fileBytesBase64: String, toolCallId: String)
+    case write(path: String, fileBytes: String, toolCallId: String)
     case shell(command: String, workingDirectory: String?)
     case shellStream(command: String, workingDirectory: String?)
     case shellStreamWithPolicy(
@@ -61,9 +61,9 @@ enum IOSBoxExecOperation: Equatable, Sendable {
         ):
             object["command"] = .string(command)
             if let workingDirectory { object["workingDirectory"] = .string(workingDirectory) }
-            object["timeoutMs"] = .number(Double(timeoutMs))
-            if let hardTimeoutMs { object["hardTimeoutMs"] = .number(Double(hardTimeoutMs)) }
-            object["timeoutBehavior"] = .string(timeoutBehavior.rawValue)
+            object["timeout"] = .number(Double(timeoutMs))
+            if let hardTimeoutMs { object["hardTimeout"] = .number(Double(hardTimeoutMs)) }
+            object["timeoutBehavior"] = .number(Double(timeoutBehavior.rawValue))
             object["closeStdin"] = .bool(closeStdin)
         case .writeShellStdin(let shellId, let data, let closeStdin):
             object["shellId"] = .number(Double(shellId))
