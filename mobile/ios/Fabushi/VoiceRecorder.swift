@@ -212,15 +212,36 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        guard !flag, self.recorder === recorder else { return }
+    nonisolated func audioRecorderDidFinishRecording(
+        _ recorder: AVAudioRecorder,
+        successfully flag: Bool
+    ) {
+        let recorderIdentity = ObjectIdentifier(recorder)
+        Task { @MainActor [weak self] in
+            self?.handleRecorderFinished(
+                recorderIdentity: recorderIdentity,
+                successfully: flag
+            )
+        }
+    }
+
+    private func handleRecorderFinished(
+        recorderIdentity: ObjectIdentifier,
+        successfully flag: Bool
+    ) {
+        guard !flag,
+              let activeRecorder = recorder,
+              ObjectIdentifier(activeRecorder) == recorderIdentity
+        else {
+            return
+        }
         timer?.invalidate()
         timer = nil
         isRecording = false
         didReachMaximumDuration = false
         waveformLevel = 0
         waveformSamples = []
-        self.recorder = nil
+        recorder = nil
         if let outputURL { try? FileManager.default.removeItem(at: outputURL) }
         outputURL = nil
         setFailure(.recordingError, recoverable: true)

@@ -298,71 +298,83 @@ private struct NativeSpreadsheetTablePreview: View {
 }
 
 private struct NativeWorkbookPreview: View {
-    enum State: Equatable {
+    enum LoadState: Equatable {
         case loading
         case ready(NativeWorkbookSpreadsheet)
         case failed(String)
     }
 
     let url: URL
-    @State private var state: State = .loading
+    @State private var state: LoadState = .loading
     @State private var selectedSheet = 0
 
+    init(url: URL) {
+        self.url = url
+    }
+
     var body: some View {
-        Group {
-            switch state {
-            case .loading:
-                ProgressView("Loading workbook…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .failed(let message):
-                ContentUnavailableView(
-                    "Couldn't read this spreadsheet",
-                    systemImage: "tablecells.badge.ellipsis",
-                    description: Text(message)
-                )
-            case .ready(let workbook):
-                let safeIndex = min(max(0, selectedSheet), max(0, workbook.sheets.count - 1))
-                let sheet = workbook.sheets[safeIndex]
-                VStack(spacing: 0) {
-                    if workbook.sheets.count > 1 {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(Array(workbook.sheets.enumerated()), id: \.offset) { index, item in
-                                    if index == safeIndex {
-                                        Button(item.name) { selectedSheet = index }
-                                            .buttonStyle(.borderedProminent)
-                                            .accessibilityAddTraits(.isSelected)
-                                    } else {
-                                        Button(item.name) { selectedSheet = index }
-                                            .buttonStyle(.bordered)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                        }
-                        Divider()
-                    }
-                    NativeSpreadsheetTablePreview(rows: sheet.rows, totalRows: sheet.totalRows)
-                        .id("\(url.path)#\(safeIndex)")
+        content
+            .task(id: url) {
+                state = .loading
+                selectedSheet = 0
+                do {
+                    let workbook = try await Task.detached(priority: .userInitiated) {
+                        try NativeWorkbookSpreadsheet.parse(url: url)
+                    }.value
+                    try Task.checkCancellation()
+                    state = .ready(workbook)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    state = .failed(error.localizedDescription)
                 }
             }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch state {
+        case .loading:
+            ProgressView("Loading workbook…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .failed(let message):
+            ContentUnavailableView(
+                "Couldn't read this spreadsheet",
+                systemImage: "tablecells.badge.ellipsis",
+                description: Text(message)
+            )
+        case .ready(let workbook):
+            workbookContent(workbook)
         }
-        .task(id: url) {
-            state = .loading
-            selectedSheet = 0
-            do {
-                let workbook = try await Task.detached(priority: .userInitiated) {
-                    try NativeWorkbookSpreadsheet.parse(url: url)
-                }.value
-                try Task.checkCancellation()
-                state = .ready(workbook)
-            } catch is CancellationError {
-                return
-            } catch {
-                guard !Task.isCancelled else { return }
-                state = .failed(error.localizedDescription)
+    }
+
+    @ViewBuilder
+    private func workbookContent(_ workbook: NativeWorkbookSpreadsheet) -> some View {
+        let safeIndex = min(max(0, selectedSheet), max(0, workbook.sheets.count - 1))
+        let sheet = workbook.sheets[safeIndex]
+        VStack(spacing: 0) {
+            if workbook.sheets.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(workbook.sheets.enumerated()), id: \.offset) { index, item in
+                            if index == safeIndex {
+                                Button(item.name) { selectedSheet = index }
+                                    .buttonStyle(.borderedProminent)
+                                    .accessibilityAddTraits(.isSelected)
+                            } else {
+                                Button(item.name) { selectedSheet = index }
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+                Divider()
             }
+            NativeSpreadsheetTablePreview(rows: sheet.rows, totalRows: sheet.totalRows)
+                .id("\(url.path)#\(safeIndex)")
         }
     }
 }
