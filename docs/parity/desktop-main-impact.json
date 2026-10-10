@@ -4232,6 +4232,162 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-ui-agent-refs-implemented-pending-exact-head-ci",
         "finding": "Desktop ui-agent-refs is account-scoped: Host/sidebar pin+collapse ownership is preserved separately in iOS, while one MobileUiAgentRefsPersistence envelope now holds assistants/automations/tools mention MRU (20) plus actual-emoji MRU (50) for the whole App account. Composer and all reaction entry points share it; Agent switches reuse it; corrupt/wrong-schema data is cleared fail-closed. Exact-head CI is pending."
+      },
+      {
+        "path": "source/host/tests/remote_box_resources_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Verify remote-box resource connection caching/invalidation, shell lifecycle audit events and Auto-review classifier registration modes for the Desktop computer/box owner. iOS owner/evidence: iOS does not own Desktop Sand resources; authenticated remote-computer sessions/device secrets/generation and app-surface generation live in FeatureHost/FabushiRemoteDeviceGateway. Focused evidence: Exact Desktop contract read: cache reuse/invalidation, shell audit lifecycle, and auto-review mode registration. iOS has stale-generation/wrong-device tests but not a local Desktop resource-cache/classifier because that owner remains remote. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/host/tests/system_prompt_shipping_wiring_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Verify shipping Host wiring feeds live MCP/remote-box/computer state into prompt assembly in the correct owner order and that computer-use coordination has one lease owner. iOS owner/evidence: iOS shipping FeatureHost pulls live MCP custom instructions during production_chat and owns remote-computer session/device/generation state; mobile Host is the single runtime composition owner. Focused evidence: Exact Desktop shipping-wiring test read: asserts live MCP precedes remote sections, production bindings reach the prompt collector, and computer-use lease owner is unique. iOS needs exact composition tests tying all remaining dynamic prompt sections to the native Host before promotion. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/node-agent-coordinator/src/carrier.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Own the Desktop Coordinator process bootstrap/carrier boundary: validate packaged process config including canonical localHumanId, classify control/data/main-data envelopes into explicit channels, queue them deterministically, and fail closed after carrier shutdown. iOS owner/evidence: iOS collapses the separate Node process into the canonical in-process Mobile Host composition. Host creation/account-boundary logic owns the authenticated Human identity, typed FeatureHost/Runtime commands replace string carrier channels, and runtime/session replacement clears old-account state before new work. Focused evidence: Existing mobile Host/FeatureHost tests cover canonical local Human identity/account transition and typed Host command boundaries. Exact carrier queue/close mechanics are process-specific and are not duplicated. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/node-agent-coordinator/src/inference_router.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Route Desktop Agent inference without owning Host state: normalize Host transcript aliases, preserve durable send context, enforce one active stream per Agent with pre/post-accept supersede fencing, prioritize addressed inbound wakes, choose provider routes, correlate Runner events, and keep the Host transcript authoritative over provider-local history. iOS owner/evidence: KernelConversationProvider owns one DirectOperationState per conversation, client-message/display-vs-expanded input identity and stale settlement fencing; FeatureHost is the canonical transcript/product projection and owns addressed Agent/background routing. Native iOS does not introduce a provider-local renderer transcript. Focused evidence: Existing Kernel conversation tests cover supersession/cancellation and visible-vs-expanded input; FeatureHost tests cover Agent/background routing. A full exact mapping of Desktop urgent inbound/provider-route edge cases remains current-main evidence work. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/node-agent-coordinator/src/main.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Compose the Desktop Coordinator process lifecycle and renderer/Host gateway: bootstrap process state, bind carrier channels, supervise Host generations/reconnect, dispatch Host-authoritative session methods, route inference/workflows/MCP, settle pending renderer requests and shut down cleanly. iOS owner/evidence: Mobile Host is the native composition root and constructs Runtime/Product/FeatureHost owners in-process; FeatureHost account/generation/session reset and typed Runtime commands replace Coordinator process reconnect/gateway dispatch. The Swift app consumes the typed native bridge rather than a Node carrier. Focused evidence: Mobile Host/FeatureHost composition tests and iOS architecture gates cover single-owner composition; same-head current-main acceptance is still required for lifecycle/reconnect equivalence. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/node-agent-coordinator/tests/coordinator_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Verify Desktop Coordinator lifecycle, reconnect generation settlement, gateway down/up recovery, explicit MCP routing and shutdown/close ordering. iOS owner/evidence: Corresponding native lifecycle/gateway ownership is the Mobile Host/FeatureHost replacement. Focused evidence: Exact Desktop contract read: reconnect increments generation and reports pending requests, Host restart settles old generation, gateway recovers down/up, MCP routes are explicit and shutdown closes carrier. iOS has account/session/generation tests but needs complete native lifecycle parity evidence. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/node-agent-coordinator/tests/inference_host_boundary_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Verify the Coordinator/Host inference boundary: provider selection stays Host-runtime independent, transcript reads remain Host authoritative, awaitTurn is explicit, durable turn fields are projected exactly, Host acceptance supplies recovery identity, supersede is generation-fenced, inbound wakes address one session, and workflow hidden/visible input semantics are preserved. iOS owner/evidence: Native KernelConversation/FeatureHost preserve one canonical conversation owner and separate display_text from expanded provider input, with operation identity fencing and addressed Agent routing. Focused evidence: Exact Desktop test read in full; assertions cover Host-authoritative transcript, explicit awaitTurn, attachment/image/video/reply/fork/model/redrive projection, routed acceptance recovery identity, stream supersede, direct-user-only cancellation and hidden workflow prompt behavior. iOS evidence is partial and remains fenced. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/node-agent-coordinator/tests/production_protocol.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Lock the shipping production protocol so local-provider turns remain accepted while inference-router/provider failures stay private diagnostic state and never create a synthetic assistant transcript message. iOS owner/evidence: source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs: RuntimeKernelEventBridge maps OperationFailed to ActivityUpdated only; ConversationState records assistant history only on canonical completion paths. Focused evidence: provider_operation_failure_stays_activity_only_and_does_not_pollute_transcript in source/packages/mahayana-rs/mahayana-runtime/src/kernel_conversation.rs (commit d6ca80b743041695ae83e14eaeadc4cddcf31940); current exact-HEAD Actions still required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/product/fabushi/fabushi-account-adapters.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Bind the shipping Fabushi account/product adapter, including first-party inference endpoint and credentials, fresh-profile provider defaults and feature-gate fallbacks, and fail closed when a server-supplied browser-auth URL is not an HTTP(S), userinfo-free URL on the configured first-party API origin. iOS owner/evidence: source/packages/mahayana-rs/mahayana-product/src/lib.rs commit 9a30b949293aa6c61d40b5e5eb31fa89cd2c4c9c adds server_accepted_auth_external_url and sanitize_server_auth_external_urls to browser_login_start/reopen; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs keeps production auth dispatch in Rust; mobile/ios/Fabushi/MarketplaceModel.swift uses ASWebAuthenticationSession only after that Host result. Focused evidence: mahayana-product focused tests browser_login_urls_are_restricted_to_the_configured_first_party_origin and browser_login_response_sanitizer_rejects_foreign_urls; existing browser-login Host tests; current exact-HEAD Actions still required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/agents/disk-saver.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Define the low-disk recovery task and hidden kickstart/re-audit prompts, preserving user work, credentials, logins and Git state while requiring a user-confirmed cleanup plan. iOS owner/evidence: source/shared/agents/disk-saver.swift mirrors the current Fabushi disk-saver task/kickstart/re-audit contract in the existing shared owner. Focused evidence: Current exact-HEAD architecture/build Actions are required; disk cleanup remains exercised only through managed runner flows, not a new iOS filesystem owner. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/channel-messaging.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Define external-channel outbound projection, inbound/reaction wake prompts, connection summaries and delivery-failure recovery semantics. iOS owner/evidence: source/shared/channel-messaging.swift contains the native shared channel address/outbound/inbound/failure projection consumed by the iOS channel surface. Focused evidence: mobile/ios/FabushiTests/AgentChannelsParityTests.swift; mobile/ios/FabushiTests/SharedChannelsPersistenceParityTests.swift; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/desktop.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Define shared theme/deep-link policy plus normalized UI locale/direction/accessibility preferences and selected microphone/camera preference values. iOS owner/evidence: source/shared/desktop.swift commit 1a4efb766feabf55cf718b939968caee1b02d931 ports SandUiPreferences/SandCallMediaPreferences normalization and RTL resolution; source/shared/node/settings/sand-settings-store.swift commit 1757fe0ba6a38027fa0e6317346d36751a6d02a6 persists them. Focused evidence: mobile/ios/FabushiTests/SharedSettingsParityTests.swift testCurrentMainUiAndCallPreferencesNormalizeAndPersist; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/external-url-policy.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Gate externally opened URLs and require server-accepted browser-auth URLs to be HTTP(S), userinfo-free and exactly same-origin with the configured first-party API origin. iOS owner/evidence: source/shared/external-url-policy.swift now mirrors current-main allowlisted-scheme handling, raw query/fragment foreign WebAuth token stripping (including repeated percent-decoding), and exact-origin/no-userinfo server-auth validation; source/packages/mahayana-rs/mahayana-product/src/lib.rs remains the authoritative product-network auth response boundary. Focused evidence: mobile/ios/FabushiTests/SharedSettingsParityTests.swift covers foreign WebAuth/autologin stripping from query/fragment, repeated percent encoding, unrelated-parameter preservation, non-web scheme preservation, and exact-origin/no-userinfo server accepted auth URLs; exact-current-head GitHub Actions required before promotion. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/local-exec-gateway.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Define local-exec gateway paths, liveness/response deadlines, transfer-size limits and user-facing unavailable/oversize diagnostics. iOS owner/evidence: source/shared/local-exec-gateway.swift plus IOSLocalExecSupervisor/production executor keep the gateway bounds and single execution owner; commit b9fb9d6e10cfc038215891e0cc72b3c3891ec6bd updates current product wording. Focused evidence: mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift testIOSLocalExecRoutesOnlyAllowlistedDeviceCapabilitiesLocally and local-exec identity/limit coverage; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/local-tool-permission-machinery.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Fail closed around local-tool approvals, bind permission decisions to task/tool/action scope, normalize resource ownership and describe only recognized local capability requests. iOS owner/evidence: source/shared/local-tool-permission-machinery.swift ports approval scope, fail-closed authorization and resource coverage; source/host/runner/tools/sand-permission-request.rs remains supporting Host request production evidence; MahayanaCoordinator resolves/persists the resulting decisions through the canonical account-scoped owner. Focused evidence: mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift covers permission ceiling/resource coverage, known capability description and fail-closed authorization; mobile/ios/FabushiTests/SharedSettingsParityTests.swift covers durable approval lifecycle/account fencing. Same-head Actions pending. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/node/mcp/mcp-account-slot-lifecycle.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Own MCP account-slot logout/rename/remove lifecycle, pending-auth-watch cancellation, display/list state commit and cache/push invalidation. iOS owner/evidence: source/shared/node/mcp/mcp-account-slot-lifecycle.swift is the existing native lifecycle owner; commit 30aef2b5d8b8815afb51e9d0edf79f56c0e55db aligns current Fabushi wording. Focused evidence: mobile/ios/FabushiTests/SharedMcpAccountLifecycleParityTests.swift; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/node/mcp/mcp-auth-watch-lifecycle.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Drive bounded MCP OAuth/auth-watch start, callback registration, polling, token validation, cancellation, timeout and completion telemetry. iOS owner/evidence: source/shared/node/mcp/mcp-auth-watch-lifecycle.swift owns the native watch state machine; coordinator OAuth listener/registry own native callback delivery. Focused evidence: mobile/ios/FabushiTests/SharedMcpAuthWatchLifecycleParityTests.swift; mobile/ios/FabushiTests/SharedMcpOAuthLifecycleParityTests.swift; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/node/mcp/mcp-display-runtime.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Normalize MCP display/runtime rows, plugin attribution and backend/remote status into stable product-facing connector state. iOS owner/evidence: source/shared/node/mcp/mcp-display-runtime.swift is the existing display normalization owner; commit 910a8ee576f2349f24dc30131c92df9a102632bf aligns current Fabushi wording. Focused evidence: mobile/ios/FabushiTests/SharedMcpDisplayDefinitionParityTests.swift; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/node/mcp/mcp-listing-summaries.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Project backend, remote-box and admin-disabled MCP definitions into stable per-server summaries with account slots, enabled/disabled tool counts, custom instructions and runtime status. iOS owner/evidence: source/shared/node/mcp/mcp-listing-summaries.swift implements the native summary projection against the existing settings/remote-runner owners. Focused evidence: mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/node/mcp/tools-discovery.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Discover and cache MCP tools with bounded deadlines, stale-cache recovery, account/server identity, execution audit identity and normalized result/custom-instruction projection. iOS owner/evidence: source/shared/node/mcp/tools-discovery.swift contains the native discovery/cache/execution state machine and routed-mcp-bridge.swift owns Coordinator transport. Focused evidence: mobile/ios/FabushiTests/SharedMcpToolsDiscoveryParityTests.swift; mobile/ios/FabushiTests/SharedMcpResultAssetsParityTests.swift; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/node/settings/sand-settings-store.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Persist and normalize shared product settings, including current-main UI locale/direction/accessibility preferences and selected Human Call microphone/camera IDs, alongside existing account-scoped MCP/model/local-tool state. iOS owner/evidence: source/shared/node/settings/sand-settings-store.swift commit 1757fe0ba6a38027fa0e6317346d36751a6d02a6 adds UI/call persistence and get/set APIs; source/shared/desktop.swift supplies normalization. Focused evidence: mobile/ios/FabushiTests/SharedSettingsParityTests.swift testCurrentMainUiAndCallPreferencesNormalizeAndPersist plus existing corrupt/partial/account-scope tests; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/os-notification.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Compute agent needs-input/done notification transitions with hidden/disabled/focus gating, message-identity deduplication, throttling and bounded notification text. iOS owner/evidence: source/shared/os-notification.swift ports the transition/5-second throttle/140-character body contract; source/ios-main/notifications/dock-badge.swift applies native badge state through UNUserNotificationCenter. Focused evidence: mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift testNotificationDeciderNeedsNewMessageAndRespectsFocusAndThrottle; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/product-name.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Define the canonical user-facing product display name and HTTP-safe product token. iOS owner/evidence: source/shared/product-name.swift defines FabushiProductIdentity.displayName/httpToken as Fabushi. Focused evidence: Current exact-HEAD build and product-surface acceptance are required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/rpc/main.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Define the Desktop main-process RPC surface for settings, local permissions, WebAuthn, call-media permission/device/display-source operations and other shell-owned capabilities. iOS owner/evidence: Existing native runtime/settings/Human Call/ReplayKit/WebAuthn owners provide the current-main added UI preferences, call media permission/device selection and display-source effects without a parallel RPC table. Focused evidence: mobile/ios/FabushiTests/SharedSettingsParityTests.swift; mobile/ios/FabushiTests/HumanCallSystemCoordinatorTests.swift; mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/sand-spotlight.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Fence untrusted external tool content, sanitize forged spotlight markers/source attributes and prevent fenced data from causing user-unauthorized actions. iOS owner/evidence: source/shared/sand-spotlight.swift ports marker stripping/content wrapping/prompt policy; canonical Rust Agent/FeatureHost owners enforce tool execution and review boundaries. Focused evidence: mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift covers related fail-closed permission behavior; current exact-HEAD architecture/rust-host tests remain required for the Rust review boundary. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
+      },
+      {
+        "path": "source/shared/webauthn-gateway.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ledger-mapped-pending-aggregate-and-exact-head-ci",
+        "finding": "Define WebAuthn request/response frames, liveness/ceremony bounds and origin classification for security-key operations mediated by the user's machine. iOS owner/evidence: source/shared/webauthn-gateway.swift ports request/response, 30-second liveness and 120-second ceremony bounds; native coordinator provider/signer owns platform authentication. Focused evidence: mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift testIosWebauthnAvailabilityUsesNativeSignerPlatforms; current exact-HEAD Actions required. This synchronizes an already-reviewed canonical ledger row into the impact register; it does not promote implementation_status or close aggregate review."
       }
     ]
   },
