@@ -1242,9 +1242,9 @@
       "type": "blob",
       "sha": "668baec12232dac311e6724b28855ad29f94b981",
       "size": 274,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-governance",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. This file only records project roles/escalation and the no-secrets rule; it has no runtime implementation."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/PROJECT.yaml",
@@ -1252,9 +1252,9 @@
       "type": "blob",
       "sha": "45fb3d05772472b35388a13ebd13c01e4c090f35",
       "size": 515,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-metadata",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Project id/stage/risk/source-system metadata is Desktop planning state, not an iOS shipping dependency."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/README.md",
@@ -1262,9 +1262,9 @@
       "type": "blob",
       "sha": "b9fb8b3bd4be14674155bdf085f13c017253b3f1",
       "size": 947,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-chat-parity-summary",
+      "coverage_status": "reviewed-active-product-effect-provenance",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. The summarized user-visible defects remain useful provenance for current transcript/streaming responsibilities, but branch/stage labels are historical."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/SOURCE_OF_TRUTH.md",
@@ -1272,9 +1272,9 @@
       "type": "blob",
       "sha": "89ab7c2a40ef48a8209c5f32157efa217cbd7927",
       "size": 1563,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-authority-record",
+      "coverage_status": "reviewed-superseded-project-authority",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. This file itself establishes the supersession rule, so it is retained as provenance rather than treated as current iOS authority."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/decisions/README.md",
@@ -1282,9 +1282,9 @@
       "type": "blob",
       "sha": "e296a05f69a1884b134153cd3a7433cf7e6c60d4",
       "size": 554,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-stream-projection-adr",
+      "coverage_status": "reviewed-architecture-provenance",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. ADR-001's durable Host-authority/projection-only principle remains relevant, but the provisional-turn implementation detail is superseded by later canonical behavior."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/00-项目章程.md",
@@ -1292,9 +1292,9 @@
       "type": "blob",
       "sha": "2e8dd8d075bdb1de4ef9b66d5a2846f700eb969d",
       "size": 526,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-charter",
+      "coverage_status": "reviewed-product-effect-provenance",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. The charter's duplicate/fragmented streaming/composer/Bot-hydration problem statement is retained as product-effect provenance."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/01-范围与非目标.md",
@@ -1302,9 +1302,9 @@
       "type": "blob",
       "sha": "3f0211af248d3e12944cfde40097481d68abb2a8",
       "size": 388,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-scope",
+      "coverage_status": "reviewed-superseded-scope",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Scope/non-goal decisions are historical; the old immediate local thinking placeholder requirement is explicitly superseded."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/02-需求与成功指标.md",
@@ -1312,9 +1312,9 @@
       "type": "blob",
       "sha": "872ddd38eec37c1c4185fcedbbbcab03f6b7a1fc",
       "size": 1374,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-chat-requirements",
+      "coverage_status": "reviewed-with-current-owner-replacement",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. R2-R9 style stream/final reconciliation, single-turn, composer, hydration, persisted-reply projection and stop-settlement effects remain applicable where present in current Desktop main; R1's pre-Host assistant surface is not carried forward."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/03-架构与实现策略.md",
@@ -1322,9 +1322,9 @@
       "type": "blob",
       "sha": "78217503bbe9460a7e578707251676435d406754",
       "size": 700,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-streaming-architecture",
+      "coverage_status": "reviewed-with-current-owner-replacement",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Host-authoritative projection and single-turn reconciliation remain applicable; provisional assistant rekeying before canonical acceptance is historical and not copied to iOS."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/04-质量与测试策略.md",
@@ -1332,9 +1332,9 @@
       "type": "blob",
       "sha": "e514da445c042df5b87edfd24d0ee6e16e56c3ad",
       "size": 1230,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-chat-test-contract",
+      "coverage_status": "reviewed-test-provenance",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Test scenarios for one assistant turn, coalesced deltas, final dedupe, composer visibility, Bot hydration and stop settlement remain useful regression requirements, while Desktop-specific timing/build harness evidence is historical."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/05-发布迁移与回滚.md",
@@ -1342,9 +1342,9 @@
       "type": "blob",
       "sha": "1508750779bd728aab4a8e87b70e319f99eb073d",
       "size": 332,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-release-plan",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Desktop protected-main/revert rollout mechanics are replaced by iOS PR/main, archive/device/TestFlight/App Store release gates; the rollback trigger semantics remain relevant."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/06-运维可观测性与SLO.md",
@@ -1352,9 +1352,9 @@
       "type": "blob",
       "sha": "8d495cedcec9ae866e1524b11763747c27052f55",
       "size": 452,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-chat-slo",
+      "coverage_status": "reviewed-product-slo-provenance",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Responsiveness goals are historical product SLO provenance. The obsolete locally painted assistant-before-Host target is not adopted; current iOS latency/progress evidence must come from current specs and exact-head acceptance."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/07-安全隐私与合规.md",
@@ -1362,9 +1362,9 @@
       "type": "blob",
       "sha": "c5408ad054e634079734527fb70a08e9f05f11ca",
       "size": 276,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-chat-security-note",
+      "coverage_status": "reviewed-security-provenance",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. No-new-secret-surface, no credential/token/message-body logging, and reference-code provenance constraints remain applicable security discipline."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/docs/19-完成定义与验收.md",
@@ -1372,9 +1372,9 @@
       "type": "blob",
       "sha": "a2dc860453282e7907fa703344c72f612e4f63e8",
       "size": 422,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-acceptance",
+      "coverage_status": "reviewed-historical-acceptance-only",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Its Desktop project merge/main reread definition cannot satisfy iOS closure; iOS requires IOS-MAIN-AC criteria on one final exact HEAD."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/evidence/README.md",
@@ -1382,9 +1382,9 @@
       "type": "blob",
       "sha": "b3194719735fb94f5a43945a47ccffbfbdbd1d55",
       "size": 459,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-evidence-index",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project record. Its SOURCE_OF_TRUTH explicitly says the newer Grok/runtime parity spec supersedes conflicting requirements, including the old provisional assistant/thinking-before-Host-acceptance behavior. iOS must follow current canonical Desktop source/owners and its own exact-head ledger, while preserving applicable user effects such as local-first user send, one canonical assistant turn, stream/final reconciliation, stop settlement, composer continuity and Bot hydration. No historical project completion/PR/CI evidence is inherited. Referenced screenshots/video and old PR/check identities are historical evidence only; no media or old CI is reused as current iOS acceptance."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/00-路线图.md",
