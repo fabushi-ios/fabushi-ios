@@ -4088,7 +4088,7 @@
         "path": "frontend/src/recovered/features/conversation/message-card-seam.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-message-card-seam-implemented-pending-exact-head-ci",
-        "finding": "Desktop projects ordinary user/assistant message-card semantics, strict HTTPS bare-link delegation, source trust, standalone-emoji guards, fromUser metadata, copy and adjacency without introducing a second transcript owner. iOS projectMobileMessageCardSeam reuses canonical MobileChatMessage; this descendant change makes isFromUser depend on explicit fromUser metadata, blocks URL-card delegation for that case, and prevents attachment/image-bearing emoji from becoming standalone. Focused XCTest covers the guards; exact-head CI pending."
+        "finding": "Desktop ordinary message seam rejects fromAgent/toAgent special variants, projects source trust/fromUser/standalone-emoji/adjacency, specializes one plain/Markdown/richText HTTPS link to the URL-card owner, and exposes copy/open behavior without owning transcript state. iOS now preserves fromAgent/toAgent presence at live and history canonical message boundaries without guessing payload schema; projectMobileMessageCardSeam fails those variants out of the ordinary bubble and the shipping transcript routes them to a distinct native peer-message surface. Focused SharedWorkflowTranscriptParityTests cover link and special-variant guards. Exact-head CI remains pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/tool-results/model.ts",

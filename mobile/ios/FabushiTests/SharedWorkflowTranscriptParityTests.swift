@@ -174,6 +174,36 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertFalse(projectMobileMessageCardSeam(imageEmoji).isStandaloneEmoji)
     }
 
+    func testMessageCardSeamProjectsMarkdownAndRichTextBareLinksButRejectsUnsafeShapes() throws {
+        let markdown = MobileChatMessage(id: "markdown", role: .user, text: "[Docs](https://example.com/docs)")
+        XCTAssertEqual(projectMobileMessageCardSeam(markdown).url, "https://example.com/docs")
+        var rich = MobileChatMessage(id: "rich", role: .user, text: "Docs")
+        rich.richText = #"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Docs","marks":[{"type":"link","attrs":{"href":"https://example.com/rich"}}]}]}]}"#
+        XCTAssertEqual(projectMobileMessageCardSeam(rich).url, "https://example.com/rich")
+        XCTAssertNil(projectMobileMessageCardSeam(MobileChatMessage(id: "http", role: .user, text: "http://example.com/plain")).url)
+        XCTAssertNil(projectMobileMessageCardSeam(MobileChatMessage(id: "sentence", role: .user, text: "See https://example.com/inside")).url)
+    }
+
+    func testMessageCardSeamKeepsAgentVariantsOffOrdinaryBubbleAndAdjacency() throws {
+        var peer = MobileChatMessage(id: "peer", role: .assistant, text: "Internal handoff")
+        peer.fromAgentPresent = true
+        let seam = projectMobileMessageCardSeam(peer)
+        XCTAssertTrue(seam.isSpecialVariant)
+        XCTAssertFalse(seam.isSourceTrusted)
+        XCTAssertNil(seam.url)
+        XCTAssertNil(seam.copyText)
+        XCTAssertEqual(projectMobileTranscriptAdjacency([peer]), [.empty])
+        let history = try XCTUnwrap(projectMobileConversationWindowMessage([
+            "id": "peer-history", "role": "assistant", "text": "Delegated", "createdAtMs": 1_234,
+            "fromAgent": ["id": "agent-a"], "toAgent": ["id": "agent-b"],
+            "richText": #"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Delegated"}]}]}"#,
+        ]))
+        XCTAssertTrue(history.fromAgentPresent)
+        XCTAssertTrue(history.toAgentPresent)
+        XCTAssertNotNil(history.richText)
+        XCTAssertTrue(projectMobileMessageCardSeam(history).isSpecialVariant)
+    }
+
     func testToolResultBoundaryRequiresGenericToolCallRowAndExactAgentScope() throws {
         let card = MobileToolResultCard(
             agentId: "agent-1",

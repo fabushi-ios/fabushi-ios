@@ -781,6 +781,8 @@ struct MobileChatMessage: Identifiable, Equatable {
     var optimisticDeliveryError: String?
     var createdAt = Date()
     var fromUserPresent = false
+    var fromAgentPresent = false
+    var toAgentPresent = false
     var toolCallId: String?
     var toolName: String?
     var toolStatus: String?
@@ -3462,14 +3464,25 @@ final class MarketplaceModel {
                                 chatMessages[index].attachmentAlt = nil
                             }
                             chatMessages[index].branched = event["branched"] as? Bool ?? false
+                            chatMessages[index].fromAgentPresent = event["fromAgent"] != nil && !(event["fromAgent"] is NSNull)
+                            chatMessages[index].toAgentPresent = event["toAgent"] != nil && !(event["toAgent"] is NSNull)
+                            chatMessages[index].richText = event["richText"] as? String
                         }
-                    } else if !chatMessages.contains(where: { $0.role == .user && $0.text == eventText }) {
+                    } else if let index = chatMessages.lastIndex(where: { $0.role == .user && $0.text == eventText }) {
+                        chatMessages[index].fromUserPresent = event["fromUser"] != nil && !(event["fromUser"] is NSNull)
+                        chatMessages[index].fromAgentPresent = event["fromAgent"] != nil && !(event["fromAgent"] is NSNull)
+                        chatMessages[index].toAgentPresent = event["toAgent"] != nil && !(event["toAgent"] is NSNull)
+                        chatMessages[index].richText = event["richText"] as? String
+                    } else {
                         var userMessage = MobileChatMessage(
                             id: "user:\(UUID().uuidString)",
                             role: .user,
                             text: eventText
                         )
                         userMessage.fromUserPresent = event["fromUser"] != nil && !(event["fromUser"] is NSNull)
+                        userMessage.fromAgentPresent = event["fromAgent"] != nil && !(event["fromAgent"] is NSNull)
+                        userMessage.toAgentPresent = event["toAgent"] != nil && !(event["toAgent"] is NSNull)
+                        userMessage.richText = event["richText"] as? String
                         chatMessages.append(userMessage)
                     }
                 case "chat.delta":

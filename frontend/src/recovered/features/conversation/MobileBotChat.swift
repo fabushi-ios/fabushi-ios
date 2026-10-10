@@ -984,6 +984,9 @@ internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> Mo
         replyToMessageId = normalized
     }
     if row["branched"] != nil, row["branched"] is Bool == false { return nil }
+    if row["richText"] != nil, !(row["richText"] is String), !(row["richText"] is NSNull) {
+        return nil
+    }
     var message = MobileChatMessage(
         id: "history:\(id)",
         role: role,
@@ -994,6 +997,9 @@ internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> Mo
         branched: row["branched"] as? Bool ?? false
     )
     message.fromUserPresent = row["fromUser"] != nil && !(row["fromUser"] is NSNull)
+    message.fromAgentPresent = row["fromAgent"] != nil && !(row["fromAgent"] is NSNull)
+    message.toAgentPresent = row["toAgent"] != nil && !(row["toAgent"] is NSNull)
+    message.richText = row["richText"] as? String
     message.createdAt = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1_000)
     return message
 }
@@ -1136,7 +1142,7 @@ private func mobileTranscriptImageOnlyMarkdown(_ text: String) -> Bool {
 private func mobileTranscriptAdjacencySemantics(
     _ entry: MobileChatMessage
 ) -> MobileTranscriptAdjacencySemantics {
-    guard entry.kind == .message else {
+    guard entry.kind == .message, !entry.fromAgentPresent, !entry.toAgentPresent else {
         return .init(role: nil, groupKey: nil, isBubble: false, hasReaction: false)
     }
 
@@ -1236,6 +1242,7 @@ internal func mobileTranscriptCopyText(_ entry: MobileChatMessage) -> String? {
 }
 
 internal struct MobileMessageCardSeamProjection: Equatable {
+    let isSpecialVariant: Bool
     let isSourceTrusted: Bool
     let isFromUser: Bool
     let isStandaloneEmoji: Bool
@@ -1243,14 +1250,47 @@ internal struct MobileMessageCardSeamProjection: Equatable {
     let copyText: String?
 }
 
-private func mobileMessageCardStrictHTTPSURL(_ text: String) -> String? {
+private func mobileMessageCardRichTextBareLink(_ richText: String) -> String? {
+    guard let data = richText.data(using: .utf8),
+          let document = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          document["type"] as? String == "doc",
+          let docContent = document["content"] as? [[String: Any]], docContent.count == 1,
+          docContent[0]["type"] as? String == "paragraph",
+          let paragraphContent = docContent[0]["content"] as? [[String: Any]], paragraphContent.count == 1,
+          paragraphContent[0]["type"] as? String == "text",
+          let nodeText = paragraphContent[0]["text"] as? String
+    else { return nil }
+    let marks = paragraphContent[0]["marks"] as? [[String: Any]] ?? []
+    guard !marks.contains(where: { $0["type"] as? String == "code" }) else { return nil }
+    if let link = marks.first(where: { $0["type"] as? String == "link" }),
+       let attrs = link["attrs"] as? [String: Any],
+       let href = attrs["href"] as? String {
+        return href
+    }
+    return nodeText
+}
+
+private func mobileMessageCardPlainBareLink(_ text: String) -> String? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty,
-          !trimmed.contains(where: { $0.isWhitespace }),
-          let components = URLComponents(string: trimmed),
+    guard !trimmed.isEmpty else { return nil }
+    if let expression = try? NSRegularExpression(pattern: #"^\[[^\]\n]*\]\(\s*([^\)\s]+)(?:\s+[^)]*)?\)\s*$"#) {
+        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+        if let match = expression.firstMatch(in: trimmed, range: range),
+           match.numberOfRanges > 1,
+           let targetRange = Range(match.range(at: 1), in: trimmed) {
+            return String(trimmed[targetRange])
+        }
+    }
+    guard !trimmed.contains(where: { $0.isWhitespace }) else { return nil }
+    return trimmed
+}
+
+private func mobileMessageCardStrictHTTPSURL(_ text: String, richText: String? = nil) -> String? {
+    let candidate = richText.flatMap(mobileMessageCardRichTextBareLink) ?? mobileMessageCardPlainBareLink(text)
+    guard let candidate,
+          let components = URLComponents(string: candidate),
           components.scheme?.lowercased() == "https",
-          let host = components.host,
-          !host.isEmpty
+          let host = components.host, !host.isEmpty
     else { return nil }
     return components.url?.absoluteString
 }
@@ -1260,6 +1300,18 @@ internal func projectMobileMessageCardSeam(
 ) -> MobileMessageCardSeamProjection {
     guard entry.kind == .message else {
         return .init(
+            isSpecialVariant: false,
+            isSourceTrusted: false,
+            isFromUser: false,
+            isStandaloneEmoji: false,
+            url: nil,
+            copyText: nil
+        )
+    }
+
+    if entry.fromAgentPresent || entry.toAgentPresent {
+        return .init(
+            isSpecialVariant: true,
             isSourceTrusted: false,
             isFromUser: false,
             isStandaloneEmoji: false,
@@ -1287,13 +1339,14 @@ internal func projectMobileMessageCardSeam(
            case let .urlCard(rawURL) = projection.presentation {
             url = mobileMessageCardStrictHTTPSURL(rawURL)
         } else {
-            url = mobileMessageCardStrictHTTPSURL(text)
+            url = mobileMessageCardStrictHTTPSURL(text, richText: entry.richText)
         }
     } else {
         url = nil
     }
 
     return .init(
+        isSpecialVariant: false,
         isSourceTrusted: entry.role == .assistant,
         isFromUser: entry.role == .user && entry.fromUserPresent,
         isStandaloneEmoji: standaloneEmoji,
@@ -3504,6 +3557,19 @@ internal struct MobileBotChat: View {
                 }
                 .padding(.vertical, 2)
             }
+        } else if entry.fromAgentPresent || entry.toAgentPresent {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Agent message", systemImage: "person.2.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                if !entry.text.isEmpty {
+                    Text(entry.text).font(.system(size: 15)).foregroundStyle(.primary)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.black.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-peer-message-\(entry.id)"))
         } else if entry.role == .user {
             let seam = projectMobileMessageCardSeam(entry)
             HStack {

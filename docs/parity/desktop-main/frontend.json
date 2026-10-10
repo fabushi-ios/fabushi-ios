@@ -2712,11 +2712,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "SwiftUI already owns the single native message bubble surface, copy/reply/thread/reaction actions, attachment/media rendering and MobileLinkMetadataCard. The exact Desktop ordinary-message seam still has unresolved parity for explicit special-variant/source-trust/standalone-emoji/adjacency projection and ordinary-message richText bare-link specialization, so this row is mapped rather than claimed implemented.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat is the canonical native message surface; mobileTranscriptCopyText, thread/reply/reaction affordances, attachmentContent and MobileLinkMetadataCard cover existing native responsibilities. projectMobileSendMessageText covers Agent send-message bare-link cards but is intentionally not treated as proof for the distinct ordinary-message seam.",
-      "test_evidence": "SharedWorkflowTranscriptParityTests.testMobileTranscriptMessageActionsProjectMainThreadCountsAndCopySemantics and testSendMessageTextProjectionPreservesDesktopGuardsAndBareLinkGate cover adjacent owners; focused ordinary-message seam parity remains required before implemented.",
-      "notes": "IOS-MAIN-DEP-MESSAGE-CARD-SEAM-20261009: exact Desktop message-card-seam.ts reviewed. No parallel transcript/message model introduced; remaining semantics stay explicit.",
+      "ios_platform_delta": "SwiftUI keeps one native transcript owner. The ordinary-message seam carries Desktop source-trust/fromUser/standalone-emoji/adjacency and strict HTTPS bare-link semantics for plain, Markdown and exact richText link nodes. Canonical live/history decoding preserves only presence of fromAgent/toAgent—the Desktop seam discriminant without guessing payload schema—and routes those variants to a distinct native peer-message surface instead of an ordinary user/assistant bubble.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (projectMobileMessageCardSeam, projectMobileTranscriptAdjacency, peer-message shipping branch, MobileLinkMetadataCard/copy actions) plus mobile/ios/Fabushi/MarketplaceModel.swift (MobileChatMessage special-variant/richText fields and live canonical projection).",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers source/fromUser and standalone-emoji guards, Markdown and richText HTTPS specialization, insecure/multi-token rejection, special Agent variant exclusion from ordinary seam/adjacency, and history projection. Same-final-HEAD Actions remain required before verified promotion.",
+      "notes": "IOS-MAIN-DEP-MESSAGE-CARD-SEAM-20261011: implemented in the shipping native transcript without a second message owner. fromAgent/toAgent payload shape is deliberately not interpreted; only presence is retained because that is the Desktop seam discriminant. Keep below verified until exact-head ordinary/protected CI succeeds.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
