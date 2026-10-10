@@ -8,6 +8,43 @@ private final class SettingsParityHost: MahayanaHostRequesting {
     }
 }
 
+@MainActor
+private final class RejectingSettingsParityHost: MahayanaHostRequesting {
+    enum Failure: Error {
+        case rejected
+    }
+
+    func request(method: String, params: [String: Any]) async throws -> MahayanaHostJSONResult {
+        if method == "feature.execute" {
+            throw Failure.rejected
+        }
+        return .init(value: ["method": method])
+    }
+}
+
+@MainActor
+private final class GatedSettingsParityHost: MahayanaHostRequesting {
+    var onFeatureExecuteStart: (() -> Void)?
+    private var featureExecuteContinuation: CheckedContinuation<MahayanaHostJSONResult, Error>?
+
+    func request(method: String, params: [String: Any]) async throws -> MahayanaHostJSONResult {
+        guard method == "feature.execute" else {
+            return .init(value: ["method": method])
+        }
+        onFeatureExecuteStart?()
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<MahayanaHostJSONResult, Error>) in
+            featureExecuteContinuation = continuation
+        }
+    }
+
+    func resumeFeatureExecute() {
+        let continuation = featureExecuteContinuation
+        featureExecuteContinuation = nil
+        continuation?.resume(returning: .init(value: ["method": "feature.execute"]))
+    }
+}
+
 final class SharedSettingsParityTests: XCTestCase {
     private func makeRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -932,6 +969,180 @@ final class SharedSettingsParityTests: XCTestCase {
         let cleanupObject = try XCTUnwrap(cleanup.value as? [String: Any])
         XCTAssertEqual(cleanupObject["status"] as? String, "failed")
         XCTAssertNotNil(cleanupObject["failure"] as? String)
+    }
+
+
+    @MainActor
+    func testRejectedSendDoesNotClearTemporaryLocalToolApprovals() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        let host = RejectingSettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+        coordinator.updateAccountSettingsScope("owner-a")
+
+        _ = try await coordinator.request(
+            method: "resolveLocalToolPermissionWithApprovalLifecycle",
+            params: [
+                "entryId": "entry-rejected-send",
+                "requestId": "approval-rejected-send",
+                "agentId": "agent-1",
+                "action": "run-command",
+                "target": "swift test",
+                "resolution": "allow-once",
+            ]
+        )
+        XCTAssertEqual(
+            store.getLocalToolApprovals(expectedAccountScope: "owner-a").map(\.id),
+            ["approval-rejected-send"]
+        )
+
+        do {
+            _ = try await coordinator.request(
+                method: "feature.execute",
+                params: [
+                    "command": [
+                        "type": "chat.send",
+                        "requestId": "send-rejected",
+                        "agentId": "agent-1",
+                        "text": "continue",
+                    ],
+                ]
+            )
+            XCTFail("rejected send must remain failed")
+        } catch {
+            XCTAssertEqual(
+                store.getLocalToolApprovals(expectedAccountScope: "owner-a").map(\.id),
+                ["approval-rejected-send"],
+                "a failed send must not clear temporary local-tool approvals"
+            )
+        }
+
+        let cleanup = try await coordinator.request(method: "getLocalToolApprovalCleanupState")
+        let cleanupObject = try XCTUnwrap(cleanup.value as? [String: Any])
+        XCTAssertEqual(cleanupObject["status"] as? String, "idle")
+        XCTAssertTrue(cleanupObject["failure"] is NSNull)
+    }
+
+    @MainActor
+    func testComposerQueueCancelAndRemoveDoNotClearTemporaryLocalToolApprovals() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        let host = SettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+        coordinator.updateAccountSettingsScope("owner-a")
+        XCTAssertTrue(try store.recordLocalToolApproval(
+            id: "approval-queue",
+            action: "read-file",
+            target: "/tmp/current",
+            expectedAccountScope: "owner-a"
+        ))
+
+        for nonce in ["queue-cancel", "queue-remove"] {
+            _ = try await coordinator.request(
+                method: "native.composerQueue.enqueue",
+                params: [
+                    "command": [
+                        "type": "chat.send",
+                        "requestId": nonce,
+                        "agentId": "agent-1",
+                        "text": nonce,
+                    ],
+                ]
+            )
+        }
+
+        _ = try await coordinator.request(
+            method: "native.composerQueue.cancel",
+            params: ["nonce": "queue-cancel"]
+        )
+        XCTAssertEqual(
+            store.getLocalToolApprovals(expectedAccountScope: "owner-a").map(\.id),
+            ["approval-queue"],
+            "queue cancellation must not clear temporary local-tool approvals"
+        )
+
+        _ = try await coordinator.request(
+            method: "native.composerQueue.remove",
+            params: ["nonce": "queue-remove"]
+        )
+        XCTAssertEqual(
+            store.getLocalToolApprovals(expectedAccountScope: "owner-a").map(\.id),
+            ["approval-queue"],
+            "queue deletion/removal must not clear temporary local-tool approvals"
+        )
+    }
+
+    @MainActor
+    func testAcceptedSendCleanupIsFencedAfterAccountSwitch() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SandSettingsStore(
+            settingsPath: root.appendingPathComponent("settings.json").path
+        )
+        let host = GatedSettingsParityHost()
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            settingsStore: store
+        )
+        coordinator.updateAccountSettingsScope("owner-a")
+        XCTAssertTrue(try store.recordLocalToolApproval(
+            id: "approval-owner-a",
+            action: "run-command",
+            target: "swift test",
+            expectedAccountScope: "owner-a"
+        ))
+
+        let featureExecuteStarted = expectation(description: "old-account send reached host")
+        host.onFeatureExecuteStart = {
+            featureExecuteStarted.fulfill()
+        }
+        let oldSend = Task {
+            try await coordinator.request(
+                method: "feature.execute",
+                params: [
+                    "command": [
+                        "type": "chat.send",
+                        "requestId": "send-owner-a",
+                        "agentId": "agent-1",
+                        "text": "continue",
+                    ],
+                ]
+            )
+        }
+        await fulfillment(of: [featureExecuteStarted], timeout: 2)
+
+        coordinator.updateAccountSettingsScope("owner-b")
+        XCTAssertTrue(try store.recordLocalToolApproval(
+            id: "approval-owner-b",
+            action: "read-file",
+            target: "/tmp/new-owner",
+            expectedAccountScope: "owner-b"
+        ))
+
+        host.resumeFeatureExecute()
+        _ = try await oldSend.value
+
+        XCTAssertEqual(
+            store.getLocalToolApprovals(expectedAccountScope: "owner-b").map(\.id),
+            ["approval-owner-b"],
+            "late cleanup from the prior account must not clear the replacement account"
+        )
+        let cleanup = try await coordinator.request(method: "getLocalToolApprovalCleanupState")
+        let cleanupObject = try XCTUnwrap(cleanup.value as? [String: Any])
+        XCTAssertEqual(cleanupObject["status"] as? String, "idle")
+        XCTAssertTrue(cleanupObject["failure"] is NSNull)
     }
 
 
