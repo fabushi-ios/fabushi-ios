@@ -18011,6 +18011,47 @@ fn load_bots(path: &Path) -> BTreeMap<String, BotSummary> {
         .collect()
 }
 
+#[cfg(test)]
+mod reserved_session_roster_tests {
+    use super::*;
+
+    #[test]
+    fn bot_roster_never_scans_reserved_human_conversation_namespaces() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-ios-roster-reserved-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        let bot_path = root.join("bots.json");
+        let reserved = root.join(".conversations").join("human-conversation");
+        std::fs::create_dir_all(&reserved).expect("create reserved Human namespace");
+
+        let bot = BotSummary {
+            id: "visible-agent".into(),
+            name: "Visible Agent".into(),
+            description: String::new(),
+            title: String::new(),
+            avatar_shape: String::new(),
+            avatar_color: String::new(),
+            hidden: false,
+            ..Default::default()
+        };
+        persist_bots(&bot_path, &BTreeMap::from([(bot.id.clone(), bot.clone())]))
+            .expect("persist canonical bot roster");
+
+        let loaded = load_bots(&bot_path);
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded.get("visible-agent").map(|item| item.name.as_str()), Some("Visible Agent"));
+        assert!(!loaded.contains_key(".conversations"));
+        assert!(
+            !reserved.join("store.db").exists(),
+            "Human conversation namespace must not be recovered through the Agent roster owner"
+        );
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+}
+
 fn persist_bots(path: &Path, bots: &BTreeMap<String, BotSummary>) -> Result<(), FeatureHostError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|error| {
