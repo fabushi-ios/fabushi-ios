@@ -3291,6 +3291,36 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-human-messaging-and-call-gateway-implemented-pending-exact-head-ci",
         "finding": "Desktop current-main greatly expands shipping session-gateway acceptance across Human conversation ownership, attachment upload/reply server identity, ambiguous-send restart recovery without reupload, backend-authoritative reactions, bounded multi-device history gap recovery, Host/device-scoped ICE credentials, backend-ordered CallSession materialization, incoming-call discovery, and lifecycle/signaling/reconnect/restart fencing. iOS current production owns these responsibilities across fabushi-messaging-core (durable Pending delivery, stable client identity, persisted remote message/resource bindings, authoritative reaction replacement), FeatureHost shipping Human transport (account-scoped attachment upload/download, reply/reaction server identity, bounded reconnect gap paging and canonical transcript materialization), and mahayana-app-host-mobile CallSessionStore (authenticated Human scope, backend event cursor/order checks, device-scoped ICE retrieval, incoming discovery, terminal/media/signaling fences and restart durability). These are shipping owners, not fixtures; exact-head required rust-host/build/protected evidence is still pending, so this path is not verified."
+      },
+      {
+        "path": "frontend/src/production/AgentDeleteConfirmation.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-delete-confirmation-implemented-pending-exact-head-ci",
+        "finding": "Current-main destructive Agent/group confirmation is mapped to the shipping SwiftUI Home delete sheet and canonical bot.delete Host mutation. Group copy preserves deletion of the group/chat history without deleting member Bots; cancel and interactive dismissal are disabled while the mutation is pending, success alone clears the target, and failure remains visible for retry. GrokMobileBotServiceTests covers distinct Bot/group copy and canonical delete command; exact-head Swift/UI Actions remain required before verified promotion."
+      },
+      {
+        "path": "frontend/src/production/AgentNameEditor.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-rename-sheet-implemented-pending-exact-head-ci",
+        "finding": "Desktop inline rename focus/Enter/Escape presentation is adapted to a native SwiftUI rename sheet while preserving the product rule: cancel exits without mutation, only a trimmed non-empty changed name may commit, one async Host mutation owner is active, controls are fenced while pending, and failure stays visible. Shipping owner is GrokMobileShell+Home/Bots via GrokMobileBotService.renameBot; exact-head Actions remain pending."
+      },
+      {
+        "path": "frontend/src/production/AgentRowActions.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-row-actions-implemented-pending-exact-head-ci",
+        "finding": "The Desktop Agent-row action orchestrator is represented by the shipping SwiftUI row Menu. Settings/profile, full conversation, async tasks, section move/new section, pin ordering, unread toggle, duplicate, conversation-id copy, hide and destructive delete route to existing native/Host owners; group rows expose membership/delete semantics without inventing a second roster owner. Section assignment is forbidden for pinned/hidden Bots through MobileAgentSidebarSections.canAssign. Exact-head ordinary/protected CI remains required."
+      },
+      {
+        "path": "frontend/src/production/agent-name-editor-model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-direct-port-rename-rule-implemented-pending-exact-head-ci",
+        "finding": "The pure committedAgentName rule is directly ported as committedMobileBotName: whitespace is trimmed and blank/no-op values produce no mutation. GrokMobileBotServiceTests exercises the rule. Current exact-head Swift test evidence is still pending."
+      },
+      {
+        "path": "frontend/src/production/agent-row-actions-model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-row-action-model-implemented-pending-exact-head-ci",
+        "finding": "State-dependent row actions are derived from MobileBotSummary plus canonical Host pin/section state: hidden Bots are absent from the active menu, pin/unpin and ordering round-trip through Host settings, unread/hide/duplicate/delete use canonical Host mutations, and copy-conversation-id stays presentation-only. This is an iOS-native projection of the same action values, not a second lifecycle owner; exact-head CI remains pending."
       }
     ]
   },
