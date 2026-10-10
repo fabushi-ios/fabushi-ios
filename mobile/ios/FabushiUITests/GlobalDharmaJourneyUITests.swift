@@ -181,8 +181,12 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             buy.tap()
             mark("purchaseTapped", true)
             XCTAssertTrue(
+                buy.isEnabled,
+                "Protected acceptance requires a real purchase/authorization path. If StoreKit/provider checkout is unavailable in this CI environment, commerce remains blocked rather than using synthetic entitlement state."
+            )
+            XCTAssertTrue(
                 allowed.waitForExistence(timeout: 60),
-                "Canonical test-mode purchase did not project an allowed server entitlement"
+                "Real purchase/authorization did not project an allowed service entitlement"
             )
             checkpoint("070-purchase-entitlement")
         } else {
@@ -226,6 +230,12 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         app.launchEnvironment["FABUSHI_API_BASE_URL"] = apiBaseURL
         app.launchEnvironment["MAHAYANA_API_BASE_URL"] = apiBaseURL
         app.launchEnvironment["FABUSHI_RESPONSES_URL"] = apiBaseURL
+        XCTAssertNotEqual(
+            environment["FABUSHI_FEATURE_HOST_TEST"],
+            "1",
+            "Protected acceptance must never enable the synthetic/test commerce rail"
+        )
+        app.launchEnvironment["FABUSHI_FEATURE_HOST_TEST"] = "0"
         for key in [
             "GITHUB_ACTIONS", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_JOB",
             "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "RUNNER_NAME", "RUNNER_OS", "RUNNER_ARCH",

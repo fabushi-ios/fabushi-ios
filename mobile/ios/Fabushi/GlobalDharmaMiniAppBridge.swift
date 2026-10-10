@@ -25,15 +25,18 @@ final class GlobalDharmaMiniAppBridge {
         self.session = session
     }
 
-    var testCommerceEnabled: Bool {
+    nonisolated static func detectTestCommerceEnabled(
+        environment: [String: String]
+    ) -> Bool {
         #if DEBUG
-        let environment = ProcessInfo.processInfo.environment
-        return environment["GITHUB_ACTIONS"] == "true"
-            || environment["FABUSHI_FEATURE_HOST_TEST"] == "1"
-            || environment["FABUSHI_CI_ACCOUNT_SESSION_FILE"]?.isEmpty == false
+        return environment["FABUSHI_FEATURE_HOST_TEST"] == "1"
         #else
         return false
         #endif
+    }
+
+    var testCommerceEnabled: Bool {
+        Self.detectTestCommerceEnabled(environment: ProcessInfo.processInfo.environment)
     }
 
     func installedMiniAppBots() async throws -> [GlobalDharmaInstalledBot] {

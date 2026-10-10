@@ -52,33 +52,18 @@ final class GlobalDharmaCommerceTests: XCTestCase {
         XCTAssertFalse(offer.appleStoreAvailable)
     }
 
-    func testCanonicalLedgerTestModeRequiresBoundedGitHubSimulatorEnvironment() {
-        XCTAssertTrue(GlobalDharmaCommerceModel.detectCanonicalLedgerTestMode(environment: [
-            "GITHUB_ACTIONS": "true",
-            "GITHUB_REPOSITORY": "bhrumom/fabushi",
-            "GITHUB_SHA": "8595a50196309c8ebb91c3f8077125d7dc9e3ffa",
-            "FABUSHI_CI_ACCOUNT_SESSION_FILE": "/app/Documents/fabushi-ci-session.json",
-        ]))
-        XCTAssertTrue(GlobalDharmaCommerceModel.detectCanonicalLedgerTestMode(environment: [
+    func testProtectedAcceptanceEnvironmentNeverEnablesSyntheticCommerce() {
+        XCTAssertFalse(GlobalDharmaMiniAppBridge.detectTestCommerceEnabled(environment: [
             "GITHUB_ACTIONS": "true",
             "GITHUB_REPOSITORY": "fabushi-ios/fabushi-ios",
             "GITHUB_SHA": "8595a50196309c8ebb91c3f8077125d7dc9e3ffa",
             "FABUSHI_CI_ACCOUNT_SESSION_FILE": "/app/Documents/fabushi-ci-session.json",
+            "FABUSHI_FEATURE_HOST_TEST": "0",
         ]))
-        XCTAssertFalse(GlobalDharmaCommerceModel.detectCanonicalLedgerTestMode(environment: [
-            "GITHUB_ACTIONS": "true",
-            "GITHUB_REPOSITORY": "bhrumom/fabushi",
-            "GITHUB_SHA": "8595a50196309c8ebb91c3f8077125d7dc9e3ffa",
-        ]))
-        XCTAssertFalse(GlobalDharmaCommerceModel.detectCanonicalLedgerTestMode(environment: [
-            "GITHUB_ACTIONS": "true",
-            "GITHUB_REPOSITORY": "other/repo",
-            "GITHUB_SHA": "8595a50196309c8ebb91c3f8077125d7dc9e3ffa",
-            "FABUSHI_CI_ACCOUNT_SESSION_FILE": "/app/Documents/fabushi-ci-session.json",
+        XCTAssertTrue(GlobalDharmaMiniAppBridge.detectTestCommerceEnabled(environment: [
+            "FABUSHI_FEATURE_HOST_TEST": "1",
         ]))
     }
-
-
     func testPlatformBaseURLPrefersInjectedFabushiAPIBase() {
         let url = GlobalDharmaCommerceModel.resolvePlatformBaseURL(environment: [
             "FABUSHI_API_BASE_URL": "https://ci-api.example.test",

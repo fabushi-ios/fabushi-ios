@@ -25,6 +25,7 @@ jobs:
       FABUSHI_CI_TEST_PASSWORD: ${{ secrets.FABUSHI_CI_TEST_PASSWORD }}
       FABUSHI_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
       MAHAYANA_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
+      FABUSHI_FEATURE_HOST_TEST: '0'
     steps:
       - name: Checkout exact source
         uses: actions/checkout@v5
@@ -82,6 +83,29 @@ jobs:
             echo "FABUSHI_CI_TEST_USERNAME and FABUSHI_CI_TEST_PASSWORD are required." >&2
             exit 2
           fi
+
+      - name: Verify protected commerce is real-service only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${FABUSHI_FEATURE_HOST_TEST:-}" = "0"
+          python3 - <<'PY'
+          from pathlib import Path
+          host = Path("source/host/MahayanaHostRuntime.swift").read_text()
+          model = Path("mobile/ios/Fabushi/GlobalDharmaCommerceModel.swift").read_text()
+          bridge = Path("mobile/ios/Fabushi/GlobalDharmaMiniAppBridge.swift").read_text()
+          ui = Path("mobile/ios/FabushiUITests/GlobalDharmaJourneyUITests.swift").read_text()
+          forbidden_host = ("MobileCanonicalCICommerceLedger", "ciCommerceLedger", "canonical-commerce-ledger")
+          if any(token in host for token in forbidden_host):
+              raise SystemExit("protected acceptance still contains a synthetic Host commerce ledger")
+          if "canonicalLedgerTestMode" in model or "purchaseLifetimeThroughCanonicalLedger" in model:
+              raise SystemExit("protected acceptance still contains automatic synthetic commerce in the production model")
+          marker = 'return environment["FABUSHI_FEATURE_HOST_TEST"] == "1"'
+          if marker not in bridge:
+              raise SystemExit("test commerce must require the explicit test-only feature-host flag")
+          if 'app.launchEnvironment["FABUSHI_FEATURE_HOST_TEST"] = "0"' not in ui:
+              raise SystemExit("protected UI launch must explicitly disable test commerce")
+          PY
 
       - name: Install simulator build tools
         shell: bash
@@ -276,6 +300,7 @@ jobs:
             .naturalLanguageSent == true and
             .webMcpReady == true and
             .sharedRuntimeSynced == true and
+            .purchaseTapped == true and
             .entitlementAllowed == true and
             .restoreTapped == true
           ' "$EVIDENCE_DIR/state.json" >/dev/null
