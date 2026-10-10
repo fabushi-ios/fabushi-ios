@@ -1172,13 +1172,14 @@ impl NativeEngine {
                         .and_then(Value::as_str)
                         .map(str::trim)
                         .filter(|value| !value.is_empty());
+                    let awaiting_user = transcript_card.is_some();
                     Ok(json!({
                         "delivered": true,
                         "characters": message.map(|value| value.chars().count()).unwrap_or_default(),
                         "generatedMessage": message,
                         "generatedAttachment": attachment,
                         "generatedTranscriptCard": transcript_card,
-                        "awaitingUser": transcript_card.is_some(),
+                        "awaitingUser": awaiting_user,
                         "toolCallId": call.call_id.clone(),
                         "replyToMessageId": reply_to_message_id,
                     }))
