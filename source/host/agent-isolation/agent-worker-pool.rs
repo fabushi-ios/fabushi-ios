@@ -300,7 +300,7 @@ impl AgentWorkerPool {
             }
             None => false,
         };
-        if became_idle && !state.workers.contains_key(blob_db_path) {
+        if became_idle {
             state.active_ops.remove(blob_db_path);
         }
         Ok(())
@@ -725,6 +725,27 @@ mod tests {
         let replacement = pool.ensure("agent-a", &db, None).unwrap();
         assert!(!Arc::ptr_eq(&original, &replacement));
         assert_eq!(pool.describe_workers().unwrap()[0].next_request_id, 2);
+    }
+
+    #[test]
+    fn close_store_resets_request_identity_for_reopened_lane() {
+        let dir = temp_dir();
+        let db = dir.join("reopen.sqlite");
+        let pool = AgentWorkerPool::new(500, u64::MAX, 2);
+
+        pool.mark_checkpoint_root("agent-a", &db, b"root", None)
+            .unwrap();
+        assert_eq!(pool.describe_workers().unwrap()[0].next_request_id, 3);
+
+        pool.close_store(&db).unwrap();
+        assert_eq!(pool.active_worker_count().unwrap(), 0);
+
+        pool.ensure("agent-a", &db, None).unwrap();
+        assert_eq!(
+            pool.describe_workers().unwrap()[0].next_request_id,
+            2,
+            "a reopened worker must restart request identity after its implicit init request",
+        );
     }
 
     #[test]
