@@ -969,6 +969,13 @@ struct GrokMobileBotService {
         return legacy == "grok" || legacy == "grok bot" ? "Fabushi" : configuredName
     }
 
+    static func projectedHiddenFromSidebar(_ row: [String: Any]) -> Bool {
+        (row["isHiddenFromSidebar"] as? Bool)
+            ?? (row["hiddenFromSidebar"] as? Bool)
+            ?? (row["hidden"] as? Bool)
+            ?? false
+    }
+
     static func parseConversationPartnerIds(_ row: [String: Any]) -> [String] {
         guard let raw = row["conversationPartnerIds"] as? [String] else { return [] }
         var seen = Set<String>()
@@ -1021,7 +1028,7 @@ struct GrokMobileBotService {
             avatarShape: row["avatarShape"] as? String,
             avatarColor: row["avatarColor"] as? String,
             notifyOnUpdatesEnabled: row["notifyOnUpdates"] as? Bool ?? false,
-            hidden: row["hidden"] as? Bool ?? false,
+            hidden: projectedHiddenFromSidebar(row),
             unread: (row["hasUnread"] as? Bool) ?? (row["unread"] as? Bool) ?? false,
             conversationId: row["conversationId"] as? String,
             lastEntry: summary.lastEntry,
@@ -1056,6 +1063,7 @@ struct GrokMobileBotService {
             id: id,
             name: canonicalProductDisplayName(configuredName),
             description: row["description"] as? String ?? "",
+            hidden: projectedHiddenFromSidebar(row),
             avatarDataURL: row["avatar"] as? String,
             avatarShape: row["avatarShape"] as? String,
             avatarColor: row["avatarColor"] as? String,
