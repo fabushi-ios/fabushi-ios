@@ -1425,6 +1425,7 @@ internal struct MobileBotChat: View {
 
     @Binding var draft: String
     @Binding var composerAttachments: [MobileComposerAttachment]
+    @Binding var composerRecovery: MobileComposerRecovery?
     @Binding var entries: [MobileChatMessage]
     @State private var busy = false
     @State private var activeOperationId: String?
@@ -4992,6 +4993,9 @@ internal struct MobileBotChat: View {
             else { return }
             entries[index].optimisticDeliveryPhase = succeeded ? nil : .failed
             entries[index].optimisticDeliveryError = succeeded ? nil : errorText
+            if succeeded {
+                clearComposerRecovery(requestId: requestId)
+            }
             activeOperationId = nil
             busy = false
             return
@@ -5028,6 +5032,7 @@ internal struct MobileBotChat: View {
             let operationId = accepted?["operationId"] as? String ?? requestId
             entries[index].optimisticDeliveryPhase = .acceptedAwaitingEcho
             entries[index].optimisticDeliveryError = nil
+            clearComposerRecovery(requestId: requestId)
             activeOperationId = operationId
             entries.append(MobileChatMessage(
                 id: "thinking:\(operationId)",
@@ -5074,11 +5079,16 @@ internal struct MobileBotChat: View {
             errorText = "Attachments aren't supported by this Mini App chat."
             return
         }
+        let requestId = "ios-mobile-bot-chat-\(UUID().uuidString.lowercased())"
+        composerRecovery = .init(
+            requestId: requestId,
+            text: text,
+            attachments: attachments
+        )
         draft = ""
         composerAttachments = []
         busy = true
         errorText = nil
-        let requestId = "ios-mobile-bot-chat-\(UUID().uuidString.lowercased())"
         let replyTarget = replyTargetId
         let sendAsFork = replyIsFork
         replyTargetId = nil
@@ -5117,6 +5127,11 @@ internal struct MobileBotChat: View {
         )
         let priorNonces = entry.optimisticPriorNonces + [oldNonce]
         entries.removeAll { $0.id == entry.id }
+        composerRecovery = .init(
+            requestId: freshNonce,
+            text: entry.text,
+            attachments: entry.optimisticAttachments
+        )
         busy = true
         errorText = nil
         appendOptimisticUserMessage(
@@ -5134,6 +5149,12 @@ internal struct MobileBotChat: View {
             replyTarget: entry.replyToMessageId,
             sendAsFork: entry.branched
         )
+    }
+
+    @MainActor
+    private func clearComposerRecovery(requestId: String) {
+        guard composerRecovery?.requestId == requestId else { return }
+        composerRecovery = nil
     }
 
     @MainActor

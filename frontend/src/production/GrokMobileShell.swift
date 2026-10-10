@@ -59,6 +59,7 @@ internal struct GrokMobileShell: View {
     @State var remoteComputerAgentTarget: MobileBotSummary?
     @State var botDrafts: [String: String] = [:]
     @State var botComposerAttachments: [String: [MobileComposerAttachment]] = [:]
+    @State var botComposerRecoveries: [String: MobileComposerRecovery] = [:]
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
     @State var legacyConversationID: String?
@@ -517,8 +518,15 @@ internal struct GrokMobileShell: View {
             },
             draft: botDraftBinding(for: bot.id),
             composerAttachments: botComposerAttachmentBinding(for: bot.id),
+            composerRecovery: botComposerRecoveryBinding(for: bot.id),
             entries: botTranscriptBinding(for: bot.id)
         )
+        .task(id: mobileBotConversationScopeKey(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: bot.id
+        )) {
+            restoreMobileComposerDraft(for: bot.id)
+        }
     }
 
     private func botDraftBinding(for botID: String) -> Binding<String> {
@@ -528,7 +536,10 @@ internal struct GrokMobileShell: View {
         )
         return Binding(
             get: { botDrafts[storageKey] ?? "" },
-            set: { botDrafts[storageKey] = $0 }
+            set: {
+                botDrafts[storageKey] = $0
+                persistMobileComposerDraft(for: botID)
+            }
         )
     }
 
@@ -541,7 +552,73 @@ internal struct GrokMobileShell: View {
         )
         return Binding(
             get: { botComposerAttachments[storageKey] ?? [] },
-            set: { botComposerAttachments[storageKey] = $0 }
+            set: {
+                botComposerAttachments[storageKey] = $0
+                persistMobileComposerDraft(for: botID)
+            }
+        )
+    }
+
+    private func botComposerRecoveryBinding(
+        for botID: String
+    ) -> Binding<MobileComposerRecovery?> {
+        let storageKey = mobileBotConversationScopeKey(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID
+        )
+        return Binding(
+            get: { botComposerRecoveries[storageKey] },
+            set: {
+                if let value = $0 {
+                    botComposerRecoveries[storageKey] = value
+                } else {
+                    botComposerRecoveries.removeValue(forKey: storageKey)
+                }
+                persistMobileComposerDraft(for: botID)
+            }
+        )
+    }
+
+    @MainActor
+    private func restoreMobileComposerDraft(for botID: String) {
+        let storageKey = mobileBotConversationScopeKey(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID
+        )
+        let snapshot = MobileComposerDraftPersistence.load(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID
+        )
+        if snapshot.hasActivePayload {
+            botDrafts[storageKey] = snapshot.text
+            botComposerAttachments[storageKey] = snapshot.attachments
+            if let recovery = snapshot.recovery {
+                botComposerRecoveries[storageKey] = recovery
+            }
+            return
+        }
+        if let recovery = snapshot.recovery {
+            botDrafts[storageKey] = recovery.text
+            botComposerAttachments[storageKey] = recovery.attachments
+            botComposerRecoveries.removeValue(forKey: storageKey)
+            persistMobileComposerDraft(for: botID)
+        }
+    }
+
+    @MainActor
+    private func persistMobileComposerDraft(for botID: String) {
+        let storageKey = mobileBotConversationScopeKey(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID
+        )
+        MobileComposerDraftPersistence.save(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID,
+            snapshot: .init(
+                text: botDrafts[storageKey] ?? "",
+                attachments: botComposerAttachments[storageKey] ?? [],
+                recovery: botComposerRecoveries[storageKey]
+            )
         )
     }
 

@@ -4149,6 +4149,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-outline-view-implemented-pending-exact-head-ci",
         "finding": "Desktop ConversationOutlinePanel exposes a Full conversation surface with strict status states, expandable rows, first-line previews, tool status, close action and subagent tabs. iOS MobileBotChat now has a shipping Full conversation button and native SwiftUI sheet backed by the canonical Coordinator outline method, with loading/empty/error/last-known states, pull-to-refresh, expandable selectable detail, pending/failed tool presentation, native accessibility identifiers and tabs for canonical running subagents. The native layout replaces the movable Electron panel while preserving the product effect. Historical non-running subagent tabs remain a separately tracked follow-up until their authoritative getSubagents contract is reviewed."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/draft-state.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-composer-draft-persistence-implemented-pending-exact-head-ci",
+        "finding": "Desktop draft-state owns schema-v1 account-sensitive per-Agent client persistence for prompt+attachments plus a separate recovery payload, rejects corrupt/wrong-schema envelopes, fences account restoration, and preserves failed-send recovery without overwriting an active draft. iOS previously kept Bot drafts and newly added attachment drafts only in GrokMobileShell @State. Shipping iOS now persists a schema-v1 native MobileComposerDraftSnapshot in account+Agent hashed UserDefaults keys, validates every stored attachment/recovery, removes corrupt or obsolete data fail-closed, restores active drafts on conversation entry, promotes recovery only when no active draft exists, records text/attachment recovery before dispatch/retry, and clears that recovery only after canonical send acceptance. Focused tests cover account/Agent isolation, attachment-only recovery, clearing, corruption and schema mismatch. Exact-head Swift/UI evidence pending."
       }
     ]
   },

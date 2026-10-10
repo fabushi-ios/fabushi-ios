@@ -696,6 +696,12 @@ struct MobileComposerAttachment: Equatable {
     let sizeBytes: Int
 }
 
+struct MobileComposerRecovery: Equatable {
+    let requestId: String
+    let text: String
+    let attachments: [MobileComposerAttachment]
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
