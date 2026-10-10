@@ -1085,6 +1085,164 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertNil(messages[0].optimisticDeliveryError)
     }
 
+    func testNativeReactionPickerCatalogSearchCategoryAndLimit() {
+        XCTAssertGreaterThan(mobileReactionCatalog.count, 96)
+
+        let limited = mobileReactionPickerResults(
+            query: "",
+            category: .all
+        )
+        XCTAssertEqual(limited.count, 96)
+
+        let cats = mobileReactionPickerResults(
+            query: "cat",
+            category: .nature
+        )
+        XCTAssertTrue(cats.contains(where: { $0.emoji == "🐱" }))
+        XCTAssertTrue(cats.allSatisfy { $0.category == .nature })
+
+        let heart = mobileReactionPickerResults(
+            query: "heart",
+            category: .symbols
+        )
+        XCTAssertFalse(heart.isEmpty)
+        XCTAssertTrue(heart.allSatisfy { $0.category == .symbols })
+
+        XCTAssertTrue(
+            mobileReactionPickerResults(
+                query: "nonexistent-reaction-query",
+                category: .all
+            ).isEmpty
+        )
+        XCTAssertTrue(
+            mobileReactionPickerResults(
+                query: "",
+                category: .all,
+                limit: 0
+            ).isEmpty
+        )
+    }
+
+    func testNativeReactionPickerAccessibilityReflectsCurrentUserState() {
+        let item = MobileReactionCatalogItem(
+            emoji: "👍",
+            name: "thumbs up approve",
+            category: .people
+        )
+        XCTAssertEqual(
+            mobileReactionPickerAccessibilityLabel(
+                item,
+                reactedByCurrentUser: false
+            ),
+            "thumbs up approve, 👍, not reacted"
+        )
+        XCTAssertEqual(
+            mobileReactionPickerAccessibilityLabel(
+                item,
+                reactedByCurrentUser: true
+            ),
+            "thumbs up approve, 👍, reacted by you"
+        )
+    }
+
+    func testNativeReactionPickerKeyboardGridNavigationIsBounded() {
+        XCTAssertEqual(
+            mobileReactionPickerNextIndex(
+                current: 7,
+                count: 20,
+                columns: 6,
+                move: .left
+            ),
+            6
+        )
+        XCTAssertEqual(
+            mobileReactionPickerNextIndex(
+                current: 7,
+                count: 20,
+                columns: 6,
+                move: .right
+            ),
+            8
+        )
+        XCTAssertEqual(
+            mobileReactionPickerNextIndex(
+                current: 7,
+                count: 20,
+                columns: 6,
+                move: .up
+            ),
+            1
+        )
+        XCTAssertEqual(
+            mobileReactionPickerNextIndex(
+                current: 17,
+                count: 20,
+                columns: 6,
+                move: .down
+            ),
+            19
+        )
+        XCTAssertEqual(
+            mobileReactionPickerNextIndex(
+                current: 9,
+                count: 20,
+                columns: 6,
+                move: .first
+            ),
+            0
+        )
+        XCTAssertEqual(
+            mobileReactionPickerNextIndex(
+                current: 9,
+                count: 20,
+                columns: 6,
+                move: .last
+            ),
+            19
+        )
+        XCTAssertNil(
+            mobileReactionPickerNextIndex(
+                current: 0,
+                count: 0,
+                columns: 6,
+                move: .right
+            )
+        )
+    }
+
+    func testNativeReactionPickerFailsClosedUntilCanonicalMessageIsSettled() {
+        var message = MobileChatMessage(
+            id: "local-reaction",
+            role: .assistant,
+            text: "react",
+            canonicalMessageId: "canonical-reaction"
+        )
+        XCTAssertTrue(isMobileReactionActionable(message))
+
+        message.streaming = true
+        XCTAssertFalse(isMobileReactionActionable(message))
+
+        message.streaming = false
+        message.optimisticDeliveryPhase = .pending
+        XCTAssertFalse(isMobileReactionActionable(message))
+
+        message.optimisticDeliveryPhase = .acceptedAwaitingEcho
+        XCTAssertFalse(isMobileReactionActionable(message))
+
+        message.optimisticDeliveryPhase = nil
+        message.canonicalMessageId = nil
+        XCTAssertFalse(isMobileReactionActionable(message))
+
+        let notice = MobileChatMessage(
+            id: "notice-reaction",
+            role: .assistant,
+            text: "notice",
+            kind: .notice,
+            canonicalMessageId: "notice-reaction"
+        )
+        XCTAssertFalse(isMobileReactionActionable(notice))
+    }
+
     func testTranscriptLoadRetrySurfaceUsesCanonicalCopy() {
         XCTAssertEqual(MobileTranscriptLoadErrorCopy.title, "Couldn't load conversation")
         XCTAssertEqual(
