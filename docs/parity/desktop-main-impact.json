@@ -3243,6 +3243,48 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-ios-roster-isolation-implemented-pending-exact-head-ci",
         "finding": "Desktop current-main adds a regression ensuring reserved .conversations namespaces are never discovered/recovered as Agents and cannot gain store.db side effects. iOS uses a different canonical owner: account-scoped Bot/Agent roster is loaded exclusively from bots.json into FeatureHost state.bots, and BotList enumerates that map rather than scanning conversation directories. A focused test now creates .conversations/human-conversation beside the bot store, verifies only the canonical bot JSON entry is loaded, rejects .conversations as a bot id, and asserts no store.db recovery side effect. Exact-head GitHub Actions evidence is pending."
+      },
+      {
+        "path": "source/host/tests/box_reference_docs_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-brand-contract-ios-native",
+        "finding": "Desktop current-main contract only updates verified app-reference headings and update copy from Grok Bot to Fabushi. iOS shipping product identity and native reference/UI surfaces are already Fabushi-branded; no runtime, persistence, permission, or lifecycle responsibility changes."
+      },
+      {
+        "path": "source/host/tests/production_turn_run_shell_adapter_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-post-tool-watchdog-contract-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main regression now requires a durable tool-only checkpoint to re-arm the first-output watchdog and resume the next attempt from that exact checkpoint after a post-tool stall. iOS parity is implemented by durable function_call_output persistence, a fresh bounded provider continuation with canonical 150s receive timeout, and no-output-only retry without replaying tool side effects; focused native-engine/model tests are in the required rust-host gate. Exact-head CI pending."
+      },
+      {
+        "path": "source/host/tests/routed_send_acceptance_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-human-handoff-lease-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main adds Human-handoff admission that requires a Human destination only for human-handoff source, binds it to the Host-owned turn lease, clears it on settlement, and rejects missing/forged destinations. iOS FeatureHost production owns HumanHandoffLease, requires authenticated account and accessible canonical Human conversation, binds the conversation to an asynchronous Agent operation, projects only terminal output into MessagingService with stable human-handoff:{operation_id} idempotency, and clears leases on terminal/cancel/account lifecycle paths. Focused lease binding/clearing tests exist; exact-head CI pending."
+      },
+      {
+        "path": "source/host/tests/runner_routed_provider_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-retired-fast-lane-contract-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main deletes CHAT-013 conversation fast-lane classifier/tool-schema tests entirely. iOS removed the corresponding classifier, zero-tool projection, prompt override, direct-text terminal bypass, and obsolete tests; simple first-party turns now retain canonical send_message/react_to_message tools. Exact-head CI pending."
+      },
+      {
+        "path": "source/host/tests/sand_auto_review_summaries_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-brand-contract-ios-native",
+        "finding": "Exact contract delta only changes expected auto-review summary identity from Grok Bot's computer to Fabushi's computer; behavior and approval semantics are unchanged and the corresponding production summary delta is already reviewed."
+      },
+      {
+        "path": "source/host/tests/sand_memory_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-brand-contract-ios-native",
+        "finding": "Exact contract delta only changes the episode prompt label expectation from Grok Bot: answer to Fabushi: answer. Memory scheduling, six-turn synthesis, persistence, date precision, cancellation and account fencing remain unchanged and are owned by the existing iOS FeatureHost memory implementation."
+      },
+      {
+        "path": "source/host/tests/system_prompt_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-fabushi-identity-contract-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main contract updates root/subagent assistant identity to Fabushi. iOS canonical default_system_instructions now explicitly binds product/assistant identity to Fabushi and forbids model/vendor/historical identity substitution, while runtime_model_instructions supplies provider/model metadata separately; focused prompt tests are present. Exact-head CI pending."
       }
     ]
   },
