@@ -216,6 +216,36 @@ internal func mobileEditorSuggestionProviderIsAvailable(
         && !agentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
 
+internal func mobileEditorSuggestionRecentsScopeKey(
+    accountKey: String,
+    agentID: String
+) -> String {
+    mobileBotConversationScopeKey(
+        accountScopeKey: accountKey,
+        agentID: agentID
+    )
+}
+
+internal func mobileEditorSuggestionRecents(
+    _ storage: [String: [String]],
+    accountKey: String,
+    agentID: String
+) -> [String] {
+    storage[mobileEditorSuggestionRecentsScopeKey(
+        accountKey: accountKey,
+        agentID: agentID
+    )] ?? []
+}
+
+internal func mobileEditorSuggestionRecordRecent(
+    _ key: String,
+    existing: [String],
+    limit: Int = 50
+) -> [String] {
+    guard limit > 0 else { return [] }
+    return Array(([key] + existing.filter { $0 != key }).prefix(limit))
+}
+
 private func mobileEditorSuggestionNonEmpty(_ value: Any?) -> String? {
     guard let string = value as? String else { return nil }
     let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -288,7 +318,8 @@ internal func projectMobileEditorWorkflowSuggestions(
                 name,
                 subtitle ?? "",
                 schedule ?? "",
-            ]
+            ],
+            iconURL: mobileEditorSuggestionNonEmpty(row["iconUrl"])
         )
     }
 }
@@ -659,7 +690,7 @@ internal func mobileEditorSuggestionContext(
         ("@", #"(^|[\s(])@([^@#/:\n]{0,50})$"#, 2),
         ("/", #"(^|[\s(])/([^@#/:\n]{0,50})$"#, 2),
         ("#", #"(^|[\s(])#([^@#/:\n]{0,50})$"#, 2),
-        (":", #"(^|[^\p{L}\p{N}_:/]):([A-Za-z0-9_+\-]{2,50})$"#, 2),
+        (":", #"(^|[^\p{L}\p{N}_:/]):([A-Za-z0-9_+\-]{0,50})$"#, 2),
     ]
     for (trigger, pattern, queryGroup) in patterns {
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -1902,7 +1933,7 @@ internal struct MobileBotChat: View {
     @State private var editorSuggestionStatus: MobileEditorSuggestionSourceStatus = .idle
     @State private var editorSuggestionGeneration = 0
     @State private var editorSuggestionActiveIndex: Int?
-    @State private var editorSuggestionRecents: [String] = []
+    @State private var editorSuggestionRecentsByScope: [String: [String]] = [:]
     @State private var approvalGeneration = 0
     @State private var localToolPermissionGeneration = 0
     @State private var localToolPermissionPendingEntryIds: Set<String> = []
@@ -2646,6 +2677,21 @@ internal struct MobileBotChat: View {
         )
     }
 
+    private var editorSuggestionRecentsScopeKey: String {
+        mobileEditorSuggestionRecentsScopeKey(
+            accountKey: model.settingsNoticeAccountKey,
+            agentID: bot.id
+        )
+    }
+
+    private var editorSuggestionRecents: [String] {
+        mobileEditorSuggestionRecents(
+            editorSuggestionRecentsByScope,
+            accountKey: model.settingsNoticeAccountKey,
+            agentID: bot.id
+        )
+    }
+
     private var editorSuggestionScopeFingerprint: String {
         [
             model.settingsNoticeAccountKey,
@@ -2688,13 +2734,14 @@ internal struct MobileBotChat: View {
                                     chooseEditorSuggestion(item)
                                 } label: {
                                     HStack(spacing: 9) {
-                                        if item.category == .tools,
-                                           let rawIconURL = item.iconURL,
+                                        if let rawIconURL = item.iconURL,
                                            let iconURL = URL(string: rawIconURL) {
                                             AsyncImage(url: iconURL) { image in
                                                 image.resizable().scaledToFit()
                                             } placeholder: {
-                                                Image(systemName: "puzzlepiece.extension")
+                                                Image(systemName: item.category == .automations
+                                                    ? "bolt.circle"
+                                                    : "puzzlepiece.extension")
                                             }
                                             .frame(width: 18, height: 18)
                                             .foregroundStyle(.secondary)
@@ -2849,8 +2896,11 @@ internal struct MobileBotChat: View {
             )
         }
         let key = "\(item.category.rawValue):\(item.id)"
-        editorSuggestionRecents = [key] + editorSuggestionRecents.filter { $0 != key }
-        editorSuggestionRecents = Array(editorSuggestionRecents.prefix(50))
+        editorSuggestionRecentsByScope[editorSuggestionRecentsScopeKey] =
+            mobileEditorSuggestionRecordRecent(
+                key,
+                existing: editorSuggestionRecents
+            )
         editorSuggestionActiveIndex = nil
         composerFocusGeneration &+= 1
     }

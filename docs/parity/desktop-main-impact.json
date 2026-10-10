@@ -4185,6 +4185,11 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-editor-suggestion-provider-implemented-pending-exact-head-ci",
         "finding": "Desktop suggestion state machine owns trusted Agent/everyone/workflow projection, fuzzy + recent ranking, emoji recents, keyboard selection, account/Agent request cancellation and non-connected transport fail-closed behavior. Shipping iOS MobileBotChat now owns the equivalent single native state machine, including MCP/PR integration; GrokMobileShell passes the canonical root Coordinator connection phase, so loading/reconnecting/unreachable clear transient suggestion rows immediately while durable selected references remain. Reconnect/request generations prevent stale writes, account/Agent/disappear invalidate the owner, and focused tests cover emoji recency and transport/account/Agent fail-closed behavior. Exact-head CI is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/editor-suggestion-production-adapter.ts",
+        "status": "current-main-reviewed-native-editor-suggestion-adapter-implemented-pending-exact-head-ci",
+        "finding": "Desktop production adapter binds mention/workflow/emoji sources, scope recents and skill icons into the prompt editor and disposes the controller with composer scope. Shipping iOS MobileBotChat now provides the equivalent single native adapter across @, /, # and : rows, renders workflow/tool icon URLs, isolates recency by App account + Agent instead of one View-global array, fails closed on non-connected transport, and fences refreshes by account/Agent/reconnect/request generation. Focused MobileComposerParityTests cover scoped recents, empty-query recent emoji, workflow icon projection and transport fencing. Exact-head CI remains pending."
       }
     ]
   },

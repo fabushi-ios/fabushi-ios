@@ -434,6 +434,79 @@ final class MobileComposerParityTests: XCTestCase {
         XCTAssertEqual(rows.dropFirst().first?.id, first.id)
     }
 
+    func testEditorSuggestionRecentsRemainAccountAndAgentScoped() {
+        var storage: [String: [String]] = [:]
+        let accountAAgentA = mobileEditorSuggestionRecentsScopeKey(
+            accountKey: "account-a",
+            agentID: "agent-a"
+        )
+        storage[accountAAgentA] = mobileEditorSuggestionRecordRecent(
+            "assistants:alpha",
+            existing: []
+        )
+        storage[accountAAgentA] = mobileEditorSuggestionRecordRecent(
+            "emoji:smile",
+            existing: storage[accountAAgentA] ?? []
+        )
+
+        XCTAssertEqual(
+            mobileEditorSuggestionRecents(
+                storage,
+                accountKey: "account-a",
+                agentID: "agent-a"
+            ),
+            ["emoji:smile", "assistants:alpha"]
+        )
+        XCTAssertTrue(
+            mobileEditorSuggestionRecents(
+                storage,
+                accountKey: "account-b",
+                agentID: "agent-a"
+            ).isEmpty
+        )
+        XCTAssertTrue(
+            mobileEditorSuggestionRecents(
+                storage,
+                accountKey: "account-a",
+                agentID: "agent-b"
+            ).isEmpty
+        )
+
+        let accountBAgentA = mobileEditorSuggestionRecentsScopeKey(
+            accountKey: "account-b",
+            agentID: "agent-a"
+        )
+        storage[accountBAgentA] = mobileEditorSuggestionRecordRecent(
+            "assistants:beta",
+            existing: []
+        )
+        XCTAssertEqual(
+            mobileEditorSuggestionRecents(
+                storage,
+                accountKey: "account-a",
+                agentID: "agent-a"
+            ),
+            ["emoji:smile", "assistants:alpha"]
+        )
+        XCTAssertEqual(
+            mobileEditorSuggestionRecents(
+                storage,
+                accountKey: "account-b",
+                agentID: "agent-a"
+            ),
+            ["assistants:beta"]
+        )
+    }
+
+    func testWorkflowSuggestionsPreserveSkillIconUrl() throws {
+        let row = try XCTUnwrap(projectMobileEditorWorkflowSuggestions([[
+            "id": "deploy",
+            "name": "Deploy",
+            "iconUrl": "https://example.invalid/deploy.png",
+        ]]).first)
+        XCTAssertEqual(row.iconURL, "https://example.invalid/deploy.png")
+    }
+
     func testStageFailureNoticeAggregatesLikeDesktop() {
         XCTAssertEqual(
             mobileComposerStageFailureNotice([
