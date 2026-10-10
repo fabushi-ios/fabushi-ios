@@ -1126,7 +1126,7 @@ mod tests {
 
     #[test]
     fn native_send_message_completion_becomes_the_canonical_visible_agent_message() {
-        let conversation_id = ConversationId::new("mahayana-ai:agent:test");
+        let conversation_id = ConversationId::new("mahayana-ai:agent:test")\n            .expect("valid conversation id");
         let event = native_send_message_event(
             &conversation_id,
             &json!({
@@ -1151,7 +1151,7 @@ mod tests {
     #[test]
     fn native_send_message_projection_accepts_card_only_awaiting_user_delivery() {
         let event = native_send_message_event(
-            &ConversationId::new("mahayana-ai:agent:test"),
+            &ConversationId::new("mahayana-ai:agent:test").expect("valid conversation id"),
             &json!({
                 "generatedTranscriptCard": {
                     "kind": "secretRequest",
@@ -1178,7 +1178,7 @@ mod tests {
     fn native_send_message_projection_rejects_empty_success_payloads() {
         assert!(
             native_send_message_event(
-                &ConversationId::new("mahayana-ai:agent:test"),
+                &ConversationId::new("mahayana-ai:agent:test").expect("valid conversation id"),
                 &json!({"generatedMessage":"   ","generatedAttachment":null})
             )
             .is_none()

@@ -98,14 +98,10 @@ final class CoordinatorContractTests: XCTestCase {
         host.remoteSeen = false
         let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
 
-        XCTAssertEqual(
-            try await supervisor.readHostSettings(),
-            .init(hasSeenOnboarding: false)
-        )
-        XCTAssertEqual(
-            try await supervisor.pushHostSettings(.init(hasSeenOnboarding: true)),
-            .init(hasSeenOnboarding: true)
-        )
+        let remoteSettings = try await supervisor.readHostSettings()
+        XCTAssertEqual(remoteSettings, .init(hasSeenOnboarding: false))
+        let pushedSettings = try await supervisor.pushHostSettings(.init(hasSeenOnboarding: true))
+        XCTAssertEqual(pushedSettings, .init(hasSeenOnboarding: true))
         XCTAssertEqual(host.remoteSeen, true)
         XCTAssertEqual(host.requests.map(\.0), ["getHostSettings", "setHostSettings"])
     }
@@ -219,8 +215,10 @@ final class CoordinatorContractTests: XCTestCase {
         reconciler.scopeToAccount("owner-a")
         reconciler.setTransportLive(false)
 
-        XCTAssertFalse(await reconciler.reconcileIfReadable())
-        XCTAssertFalse(await reconciler.pushLocalIfWritable(false))
+        let reconciledWhileDown = await reconciler.reconcileIfReadable()
+        XCTAssertFalse(reconciledWhileDown)
+        let pushedWhileDown = await reconciler.pushLocalIfWritable(false)
+        XCTAssertFalse(pushedWhileDown)
         XCTAssertEqual(reads, 0)
         XCTAssertEqual(pushes, 0)
     }
