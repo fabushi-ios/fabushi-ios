@@ -644,6 +644,15 @@ pub enum MemoryKind {
     Log,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MemoryScope {
+    #[default]
+    Agent,
+    User,
+    Project,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryRecord {
@@ -1753,6 +1762,51 @@ pub enum FeatureCommand {
         #[serde(rename = "agentId")]
         agent_id: String,
     },
+    #[serde(rename = "memory.scopedList")]
+    MemoryScopedList {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        scope: MemoryScope,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<String>,
+        #[serde(default = "default_memory_limit")]
+        limit: usize,
+    },
+    #[serde(rename = "memory.scopedAdd")]
+    MemoryScopedAdd {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        scope: MemoryScope,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<String>,
+        content: String,
+        kind: MemoryKind,
+    },
+    #[serde(rename = "memory.scopedRemove")]
+    MemoryScopedRemove {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        scope: MemoryScope,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<String>,
+        id: String,
+    },
+    #[serde(rename = "memory.scopedClear")]
+    MemoryScopedClear {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        scope: MemoryScope,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<String>,
+    },
     #[serde(rename = "tray.list")]
     TrayList {
         #[serde(rename = "requestId")]
@@ -2143,6 +2197,10 @@ impl FeatureCommand {
             | Self::MemoryAdd { request_id, .. }
             | Self::MemoryRemove { request_id, .. }
             | Self::MemoryClear { request_id, .. }
+            | Self::MemoryScopedList { request_id, .. }
+            | Self::MemoryScopedAdd { request_id, .. }
+            | Self::MemoryScopedRemove { request_id, .. }
+            | Self::MemoryScopedClear { request_id, .. }
             | Self::TrayList { request_id }
             | Self::TrayDismiss { request_id, .. }
             | Self::TrayClear { request_id }

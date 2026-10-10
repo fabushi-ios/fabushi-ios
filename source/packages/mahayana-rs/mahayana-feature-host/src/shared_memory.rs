@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use mahayana_host_protocol::{MemoryKind, MemoryRecord};
+use mahayana_host_protocol::{MemoryKind, MemoryRecord, MemoryScope};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -256,6 +256,46 @@ fn read_sharded_root(root: &Path, names: &BTreeMap<String, String>) -> Vec<Scope
     facts
 }
 
+pub(crate) fn resolve_scoped_memory_dir(
+    account_agents_root: &Path,
+    own_agent_id: &str,
+    scope: MemoryScope,
+    project: Option<&str>,
+) -> Result<PathBuf, String> {
+    if !safe_component(own_agent_id) {
+        return Err(format!("unsafe memory agent id: {own_agent_id}"));
+    }
+    match scope {
+        MemoryScope::Agent => Ok(account_agents_root.join(own_agent_id).join("memory")),
+        MemoryScope::User => Ok(account_agents_root
+            .parent()
+            .unwrap_or(account_agents_root)
+            .join("user-memory")
+            .join("agents")
+            .join(own_agent_id)),
+        MemoryScope::Project => {
+            let slug = project
+                .map(str::trim)
+                .filter(|slug| !slug.is_empty())
+                .ok_or_else(|| "project is required for project memory scope".to_string())?;
+            if !safe_component(slug) {
+                return Err(format!("unsafe project memory slug: {slug}"));
+            }
+            let sand_root = account_agents_root.parent().unwrap_or(account_agents_root);
+            let project_dir = sand_root.join("projects").join(slug);
+            if !project_dir.is_dir() {
+                return Err(format!("unknown project memory scope: {slug}"));
+            }
+            if !read_memberships(&account_agents_root.join(own_agent_id)).contains(slug) {
+                return Err(format!(
+                    "agent {own_agent_id} has not joined project memory scope: {slug}"
+                ));
+            }
+            Ok(project_dir.join("memory").join("agents").join(own_agent_id))
+        }
+    }
+}
+
 pub(crate) fn render_shared_memory_prompt(
     account_agents_root: &Path,
     own_agent_id: &str,
@@ -397,6 +437,47 @@ mod tests {
         );
         assert!(rendered.contains("[via Planner]"));
         assert!(rendered.contains("[episode] booked Tokyo"));
+        let _ = fs::remove_dir_all(sand);
+    }
+
+    #[test]
+    fn scoped_memory_dir_preserves_account_isolation_and_project_membership_gate() {
+        let sand = fixture_root("scope");
+        let agents = sand.join("agents");
+        let own = agents.join("agent-a");
+        fs::create_dir_all(&own).expect("agent");
+        fs::create_dir_all(sand.join("projects/alpha")).expect("project");
+        fs::write(own.join("projects.json"), r#"{"projects":["alpha"]}"#).expect("membership");
+
+        assert_eq!(
+            resolve_scoped_memory_dir(&agents, "agent-a", MemoryScope::Agent, None)
+                .expect("agent scope"),
+            agents.join("agent-a/memory")
+        );
+        assert_eq!(
+            resolve_scoped_memory_dir(&agents, "agent-a", MemoryScope::User, None)
+                .expect("user scope"),
+            sand.join("user-memory/agents/agent-a")
+        );
+        assert_eq!(
+            resolve_scoped_memory_dir(&agents, "agent-a", MemoryScope::Project, Some("alpha"))
+                .expect("joined project scope"),
+            sand.join("projects/alpha/memory/agents/agent-a")
+        );
+        assert!(
+            resolve_scoped_memory_dir(
+                &agents,
+                "agent-a",
+                MemoryScope::Project,
+                Some("../escape")
+            )
+            .is_err()
+        );
+        fs::create_dir_all(sand.join("projects/beta")).expect("second project");
+        assert!(
+            resolve_scoped_memory_dir(&agents, "agent-a", MemoryScope::Project, Some("beta"))
+                .is_err()
+        );
         let _ = fs::remove_dir_all(sand);
     }
 

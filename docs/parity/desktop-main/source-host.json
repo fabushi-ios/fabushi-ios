@@ -3734,9 +3734,9 @@
       "ios_language": "Rust",
       "ios_platform_delta": "FeatureHostController remains the single iOS memory owner. Existing account-scoped Agent CRUD/ranking is composed with Host-owned shared user/project shard recall for shipping Agent/group turns. Background synthesis metadata remains an explicit later gap.",
       "implementation_status": "mapped",
-      "production_evidence": "implementation.rs owns account-scoped Agent memory CRUD and prompt injection; shared_memory.rs adds deterministic shared-user/project aggregation, provenance, dedupe, ranking and precedence on the same account root for chat.send and group turns.",
-      "test_evidence": "Existing FeatureHost memory tests cover Agent CRUD/ranking. shared_memory.rs adds focused shared-user/project recall tests. Desktop synthesis/explicit-origin/tombstone/temporal-review semantics remain uncovered, so this aggregate row stays mapped.",
-      "notes": "IOS-MAIN-MEMORY-SHARED-001: exact current-main service audited. Shared recall is now on the shipping Host turn path; no status inflation because synthesis bridge/store semantics and mutation surfaces still require closure.",
+      "production_evidence": "FeatureHostController owns account-scoped Agent memory CRUD and shipping prompt injection. shared_memory.rs now also owns deterministic shared-user/project aggregation and a fail-closed scoped storage resolver. New memory.scoped* Host protocol commands reach the same executor for Agent/User/Project list/add/remove/clear; project scope requires an existing project and membership.",
+      "test_evidence": "Existing FeatureHost tests cover Agent CRUD/ranking; shared_memory.rs covers shared-user/project recall plus scoped path/account isolation, unsafe slug rejection and project membership denial. Desktop synthesis/explicit-origin/tombstone/temporal-review semantics and native SwiftUI memory management entrypoints remain open.",
+      "notes": "IOS-MAIN-MEMORY-SHARED-002: shared recall plus scoped Host read/write semantics are now implemented in the canonical owner. Row stays mapped because synthesis bridge/store semantics, project membership mutation lifecycle, and native user-facing memory UI are not yet closed.",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
@@ -3796,8 +3796,8 @@
       "ios_language": "Rust",
       "ios_platform_delta": "iOS keeps the canonical account-scoped Host data root. The native Host reads the safe projects.json membership shape, ignores unsafe/missing project roots, and injects at most three ranked project blocks into real Agent and group turns. Join/leave mutation parity remains separately open.",
       "implementation_status": "mapped",
-      "production_evidence": "Shipping chat.send and group-member turn composition call shared_memory::render_shared_memory_prompt from FeatureHostController using the account-scoped agents root and Host bot roster; no Swift/UI state owner is introduced.",
-      "test_evidence": "shared_memory.rs focused tests cover unsafe-slug rejection, membership scoping, project-name metadata, shared-shard provenance, ranking and three-project injection bound. Same-head GitHub Actions remain required.",
+      "production_evidence": "Shipping chat/group turns consume only safe joined project scopes. memory.scoped* operations now reuse the same membership gate before project list/add/remove/clear, preventing non-member or unsafe project writes. Project create/join/leave/prune mutation commands remain open.",
+      "test_evidence": "shared_memory.rs tests cover safe membership parsing, project existence, non-member rejection, unsafe slug rejection, scoped project path and prompt injection bounds. Same-head GitHub Actions remain required.",
       "notes": "IOS-MAIN-MEMORY-PROJECT-001: exact Desktop main project_membership.rs reviewed. Shipping read/injection is closed in the existing Host owner; row remains mapped because create/join/leave/prune mutation surfaces plus synthesis/frozen-snapshot contracts remain open.",
       "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"

@@ -107,6 +107,7 @@ use mahayana_host_protocol::ListenerPlatform;
 use mahayana_host_protocol::LocalToolPermission;
 use mahayana_host_protocol::MemoryKind;
 use mahayana_host_protocol::MemoryRecord;
+use mahayana_host_protocol::MemoryScope;
 use mahayana_host_protocol::MessageDraft;
 use mahayana_host_protocol::MessageRole;
 use mahayana_host_protocol::ProductHostSettings;
@@ -2483,6 +2484,10 @@ impl FeatureHostController {
                 | FeatureCommand::MemoryAdd { .. }
                 | FeatureCommand::MemoryRemove { .. }
                 | FeatureCommand::MemoryClear { .. }
+                | FeatureCommand::MemoryScopedList { .. }
+                | FeatureCommand::MemoryScopedAdd { .. }
+                | FeatureCommand::MemoryScopedRemove { .. }
+                | FeatureCommand::MemoryScopedClear { .. }
         ) {
             return self.execute_memory(command);
         }
@@ -4633,20 +4638,58 @@ impl FeatureHostController {
 
     fn execute_memory(&self, command: FeatureCommand) -> Result<CommandAccepted, FeatureHostError> {
         let request_id = command.request_id().to_string();
-        let (agent_id, action) = match command {
+        let (agent_id, scope, project, action) = match command {
             FeatureCommand::MemoryList {
                 agent_id, limit, ..
-            } => (agent_id, MemoryAction::List { limit }),
+            } => (agent_id, MemoryScope::Agent, None, MemoryAction::List { limit }),
             FeatureCommand::MemoryAdd {
                 agent_id,
                 content,
                 kind,
                 ..
-            } => (agent_id, MemoryAction::Add { content, kind }),
-            FeatureCommand::MemoryRemove { agent_id, id, .. } => {
-                (agent_id, MemoryAction::Remove { id })
+            } => (
+                agent_id,
+                MemoryScope::Agent,
+                None,
+                MemoryAction::Add { content, kind },
+            ),
+            FeatureCommand::MemoryRemove { agent_id, id, .. } => (
+                agent_id,
+                MemoryScope::Agent,
+                None,
+                MemoryAction::Remove { id },
+            ),
+            FeatureCommand::MemoryClear { agent_id, .. } => {
+                (agent_id, MemoryScope::Agent, None, MemoryAction::Clear)
             }
-            FeatureCommand::MemoryClear { agent_id, .. } => (agent_id, MemoryAction::Clear),
+            FeatureCommand::MemoryScopedList {
+                agent_id,
+                scope,
+                project,
+                limit,
+                ..
+            } => (agent_id, scope, project, MemoryAction::List { limit }),
+            FeatureCommand::MemoryScopedAdd {
+                agent_id,
+                scope,
+                project,
+                content,
+                kind,
+                ..
+            } => (agent_id, scope, project, MemoryAction::Add { content, kind }),
+            FeatureCommand::MemoryScopedRemove {
+                agent_id,
+                scope,
+                project,
+                id,
+                ..
+            } => (agent_id, scope, project, MemoryAction::Remove { id }),
+            FeatureCommand::MemoryScopedClear {
+                agent_id,
+                scope,
+                project,
+                ..
+            } => (agent_id, scope, project, MemoryAction::Clear),
             _ => unreachable!("non-memory command routed to memory executor"),
         };
         {
@@ -4663,7 +4706,16 @@ impl FeatureHostController {
                 "unsafe memory agent id: {agent_id}"
             )));
         }
-        let memory_dir = self.memory_dir_for_agent(&agent_id)?;
+        let account_agents_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("memory storage is unavailable".into()))?;
+        let memory_dir = crate::shared_memory::resolve_scoped_memory_dir(
+            &account_agents_root,
+            &agent_id,
+            scope,
+            project.as_deref(),
+        )
+        .map_err(FeatureHostError::Contract)?;
         match action {
             MemoryAction::List { limit } => {
                 let memories = list_memories(&memory_dir, limit.min(1000))?;
