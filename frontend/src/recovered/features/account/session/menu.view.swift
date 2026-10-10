@@ -463,18 +463,24 @@ struct AccountSettingsView: View {
             }
             .onAppear {
                 if nameDraft.isEmpty { nameDraft = model.accountName }
+                bindSettingsNoticeScope()
                 refreshMediaDevices()
             }
             .task {
                 await model.refreshAccountUsage()
             }
             .task(id: model.settingsNoticeAccountKey) {
+                bindSettingsNoticeScope()
                 await refreshConfigurationSettings()
             }
             .onDisappear {
                 configurationGeneration = configurationGeneration == Int.max
                     ? 1
                     : configurationGeneration + 1
+                model.settingsNoticeController.updateScope(
+                    accountKey: model.settingsNoticeAccountKey,
+                    surface: .none
+                )
             }
         }
         .sheet(isPresented: $feedbackPresented) {
@@ -509,7 +515,7 @@ struct AccountSettingsView: View {
                     copy.language,
                     selection: Binding(
                         get: { preferences.locale },
-                        set: { uiPreferencesStore.setLocale($0) }
+                        set: { value in mutateUiPreferences { uiPreferencesStore.setLocale(value) } }
                     )
                 ) {
                     ForEach(MobileSettingsLocale.allCases) { locale in
@@ -527,7 +533,7 @@ struct AccountSettingsView: View {
                     copy.readingDirection,
                     selection: Binding(
                         get: { preferences.direction },
-                        set: { uiPreferencesStore.setDirection($0) }
+                        set: { value in mutateUiPreferences { uiPreferencesStore.setDirection(value) } }
                     )
                 ) {
                     Text(copy.directionAutomatic).tag(MobileSettingsDirection.auto)
@@ -544,7 +550,7 @@ struct AccountSettingsView: View {
                     copy.textSize,
                     selection: Binding(
                         get: { preferences.textScale },
-                        set: { uiPreferencesStore.setTextScale($0) }
+                        set: { value in mutateUiPreferences { uiPreferencesStore.setTextScale(value) } }
                     )
                 ) {
                     ForEach(MobileUiPreferences.supportedTextScales, id: \.self) { scale in
@@ -561,7 +567,7 @@ struct AccountSettingsView: View {
                     copy.reduceMotion,
                     isOn: Binding(
                         get: { preferences.reducedMotion },
-                        set: { uiPreferencesStore.setReducedMotion($0) }
+                        set: { value in mutateUiPreferences { uiPreferencesStore.setReducedMotion(value) } }
                     )
                 )
                 .accessibilityIdentifier("settings-ui-reduce-motion")
@@ -574,7 +580,7 @@ struct AccountSettingsView: View {
                     copy.highContrast,
                     isOn: Binding(
                         get: { preferences.highContrast },
-                        set: { uiPreferencesStore.setHighContrast($0) }
+                        set: { value in mutateUiPreferences { uiPreferencesStore.setHighContrast(value) } }
                     )
                 )
                 .accessibilityIdentifier("settings-ui-high-contrast")
@@ -848,6 +854,44 @@ struct AccountSettingsView: View {
     }
 
     @MainActor
+    private func bindSettingsNoticeScope() {
+        model.settingsNoticeController.updateScope(
+            accountKey: model.settingsNoticeAccountKey,
+            surface: .settings
+        )
+    }
+
+    @MainActor
+    private func publishSettingsNotice(
+        _ kind: SurfaceNoticeKind,
+        operation: SettingsNoticeOperation,
+        message: String,
+        fence: SettingsNoticeFence? = nil
+    ) {
+        SurfaceNoticePublisher.publish(
+            SettingsNoticeEventFactory.settings(
+                kind,
+                operation: operation,
+                message: message
+            ),
+            controller: model.settingsNoticeController,
+            fence: fence
+        )
+    }
+
+    @MainActor
+    private func mutateUiPreferences(_ mutation: () -> Void) {
+        let fence = model.settingsNoticeController.makeFence()
+        mutation()
+        publishSettingsNotice(
+            .success,
+            operation: .uiPreferences,
+            message: "UI preferences updated.",
+            fence: fence
+        )
+    }
+
+    @MainActor
     private func refreshMediaDevices() {
         guard let mediaPort else {
             mediaDevices = []
@@ -863,8 +907,15 @@ struct AccountSettingsView: View {
 
     @MainActor
     private func selectMediaDevice(_ id: String, kind: HumanCallMediaDevice.Kind) {
+        let fence = model.settingsNoticeController.makeFence()
         guard let mediaPort else {
             actionError = shellCopy.mediaRuntimeUnavailable
+            publishSettingsNotice(
+                .error,
+                operation: .callMedia,
+                message: shellCopy.mediaRuntimeUnavailable,
+                fence: fence
+            )
             return
         }
         do {
@@ -876,25 +927,55 @@ struct AccountSettingsView: View {
                 _ = try mediaPort.selectCamera(deviceId: id)
             }
             refreshMediaDevices()
+            publishSettingsNotice(
+                .success,
+                operation: .callMedia,
+                message: "Call media settings updated.",
+                fence: fence
+            )
         } catch {
             actionError = error.localizedDescription
             refreshMediaDevices()
+            publishSettingsNotice(
+                .error,
+                operation: .callMedia,
+                message: error.localizedDescription,
+                fence: fence
+            )
         }
     }
 
     @MainActor
     private func requestMediaPermissions() {
         guard !mediaBusy else { return }
+        let accountKey = model.settingsNoticeAccountKey
+        let fence = model.settingsNoticeController.makeFence()
         guard let mediaPort else {
             actionError = shellCopy.mediaRuntimeUnavailable
+            publishSettingsNotice(
+                .error,
+                operation: .callMedia,
+                message: shellCopy.mediaRuntimeUnavailable,
+                fence: fence
+            )
             return
         }
         mediaBusy = true
         Task { @MainActor in
             let result = await mediaPort.requestPermissions(audio: true, video: true)
+            guard accountKey == model.settingsNoticeAccountKey else {
+                mediaBusy = false
+                return
+            }
             mediaPermissions = result
             mediaBusy = false
             refreshMediaDevices()
+            publishSettingsNotice(
+                .success,
+                operation: .callMedia,
+                message: "Call media permissions updated.",
+                fence: fence
+            )
         }
     }
 

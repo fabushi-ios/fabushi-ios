@@ -61,6 +61,20 @@ struct RootSettingsNoticeEvent: Equatable, Hashable, Sendable {
     let message: String
 }
 
+enum SettingsNoticeEventFactory {
+    static func settings(
+        _ kind: SurfaceNoticeKind,
+        operation: SettingsNoticeOperation,
+        message: String
+    ) -> RootSettingsNoticeEvent {
+        RootSettingsNoticeEvent(
+            kind: kind,
+            operation: .settings(operation),
+            message: message
+        )
+    }
+}
+
 @MainActor
 enum SurfaceNoticePublisher {
     static func publish(

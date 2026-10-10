@@ -114,6 +114,24 @@ final class SettingsNoticeControllerParityTests: XCTestCase {
         XCTAssertEqual(legacyStatus, "installed")
     }
 
+    func testSettingsFactoryPreservesTypedUiPreferencesAndCallMediaOperations() {
+        let ui = SettingsNoticeEventFactory.settings(
+            .success,
+            operation: .uiPreferences,
+            message: "updated"
+        )
+        XCTAssertEqual(ui.kind, .success)
+        XCTAssertEqual(ui.operation.rawValue, "settings-ui-preferences")
+
+        let media = SettingsNoticeEventFactory.settings(
+            .error,
+            operation: .callMedia,
+            message: "denied"
+        )
+        XCTAssertEqual(media.kind, .error)
+        XCTAssertEqual(media.operation.rawValue, "settings-call-media")
+    }
+
     func testTypedOperationSetsMatchDesktopSurfaceNoticeContract() {
         XCTAssertEqual(
             Set(SettingsNoticeOperation.allCases.map(\.rawValue)),
