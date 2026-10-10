@@ -328,9 +328,14 @@ private struct NativeWorkbookPreview: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(Array(workbook.sheets.enumerated()), id: \.offset) { index, item in
-                                    Button(item.name) { selectedSheet = index }
-                                        .buttonStyle(index == safeIndex ? .borderedProminent : .bordered)
-                                        .accessibilityAddTraits(index == safeIndex ? .isSelected : [])
+                                    if index == safeIndex {
+                                        Button(item.name) { selectedSheet = index }
+                                            .buttonStyle(.borderedProminent)
+                                            .accessibilityAddTraits(.isSelected)
+                                    } else {
+                                        Button(item.name) { selectedSheet = index }
+                                            .buttonStyle(.bordered)
+                                    }
                                 }
                             }
                             .padding(.horizontal, 12)
