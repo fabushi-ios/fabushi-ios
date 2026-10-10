@@ -2769,6 +2769,42 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-implemented-pending-exact-head",
         "finding": "Desktop current-main changes the access-cover product heading from Grok Bot to Fabushi. Native iOS login/onboarding shipping surface presents Fabushi branding and preserves auth/account-scoped onboarding cancellation fencing. Exact-head protected UI evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/account/session/menu.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop removes the experiment-gated Get-iOS account-menu item. Native iOS AccountMenuView has no Get-iOS external action; its Settings surface records an explicit installed/self-reference platform disposition instead, while auth and usage remain canonical model projections. Exact-head UI/account evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/shared-room/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Current-main delta updates shared-room invite instructions from Grok Bot to Fabushi. iOS ships MobileBotSharedRoom/GrokMobileSharedRoomModel under the Agent settings path with canonical room/member actions and Fabushi product identity. Exact-head Actions remain required."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/rebuild/banner.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop delta rebrands rebuild/update/reset/reconnect progress copy to Fabushi. Native iOS computer update is wired through the real RemoteComputer status/rebuild owner and scoped command-palette projection; state, queue, dispose, and failure behavior is not simulated. Exact-head runtime/UI evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/shell/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop current-main changes computer header labels to Fabushi. iOS native computer entry/surface is reached from Agent settings and command palette using Fabushi product identity while status remains sourced from IOSRemoteComputerAgentBoxSource. Exact-head UI/runtime evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/computer/update/confirmation.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop confirmation copy is rebranded to Fabushi. iOS shipping command palette exposes the same Fabushi update title, shared-computer description, busy-agent confirmation, 3-second confirmation delay, queue-until-idle behavior, generation fencing, scope reset/dispose, and real rebuild request path. Exact-head Actions remain required."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/resolver.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop fallback message now names Fabushi. Agent shipping MobileBotChat uses projectMobileTranscriptCardWithFallback for live transcript cards and persisted conversation-window cards, producing the exact Fabushi unsupported-card notice rather than dropping an unrenderable card. Exact-head Swift/runtime evidence remains required."
       }
     ]
   },
