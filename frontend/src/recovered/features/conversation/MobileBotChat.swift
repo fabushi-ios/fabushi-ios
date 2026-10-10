@@ -5412,13 +5412,20 @@ internal struct MobileBotChat: View {
                 }
             case .text:
                 if !projection.content.isEmpty {
-                    Text(projection.content)
-                        .overlay(alignment: .trailing) {
-                            if projection.streaming {
-                                Text("▌").foregroundStyle(.black.opacity(0.65))
+                    if entry.role == .assistant {
+                        MobileAssistantMathTextView(
+                            text: projection.content,
+                            streaming: projection.streaming
+                        )
+                    } else {
+                        Text(projection.content)
+                            .overlay(alignment: .trailing) {
+                                if projection.streaming {
+                                    Text("▌").foregroundStyle(.black.opacity(0.65))
+                                }
                             }
-                        }
-                        .font(.system(size: 16))
+                            .font(.system(size: 16))
+                    }
                 }
             }
             ForEach(Array(projection.images.enumerated()), id: \.offset) { index, image in
@@ -5452,13 +5459,20 @@ internal struct MobileBotChat: View {
                 }
             }
         } else if !entry.text.isEmpty {
-            Text(entry.text)
-                .overlay(alignment: .trailing) {
-                    if entry.streaming {
-                        Text("▌").foregroundStyle(.black.opacity(0.65))
+            if entry.role == .assistant {
+                MobileAssistantMathTextView(
+                    text: entry.text,
+                    streaming: entry.streaming
+                )
+            } else {
+                Text(entry.text)
+                    .overlay(alignment: .trailing) {
+                        if entry.streaming {
+                            Text("▌").foregroundStyle(.black.opacity(0.65))
+                        }
                     }
-                }
-                .font(.system(size: 16))
+                    .font(.system(size: 16))
+            }
         }
     }
 

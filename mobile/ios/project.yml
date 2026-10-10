@@ -7,6 +7,9 @@ packages:
   LiveKitWebRTC:
     url: https://github.com/livekit/webrtc-xcframework.git
     exactVersion: 150.7871.02
+  SwiftMath:
+    url: https://github.com/mgriebling/SwiftMath.git
+    exactVersion: 1.7.3
 settings:
   base:
     SWIFT_VERSION: '6.0'
@@ -30,6 +33,8 @@ targets:
     dependencies:
       - package: LiveKitWebRTC
         product: LiveKitWebRTC
+      - package: SwiftMath
+        product: SwiftMath
       - target: FabushiBroadcastUpload
         embed: true
     sources:

@@ -4214,6 +4214,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-referenced-preview-implemented-pending-exact-head-ci",
         "finding": "Shipping transcript referenced quote now reuses shared MarkdownPreview normalization, image/file/link/missing labels and a touch-native actionable control. Main-scope targets scroll to the exact row; absent/branched targets reuse bounded openThread history loading; Bot/account/dispose clears scroll intent. Exact-head UI/CI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/math.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-math-renderer-implemented-pending-exact-head-ci",
+        "finding": "Desktop shipped-KaTeX math user effect is replaced by an iOS-native SwiftMath 1.7.3 renderer pinned in the XcodeGen project. Assistant transcript text now recognizes \\(...\\), \\[...\\] and $$...$$ while single-dollar text remains ordinary text; valid expressions are rendered locally with bundled math fonts, invalid expressions fall back to selectable readable source, and no WebView/CDN/second runtime is introduced. MIT notice/provenance and focused parser/fallback tests are included; exact-head build/UI evidence remains pending."
       }
     ]
   },
