@@ -3411,6 +3411,60 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-react-strictmode-replaced-native-lifecycle",
         "finding": "React StrictMode setup-cleanup-replay is a Desktop renderer lifecycle mechanism, not an iOS runtime contract. Shipping FabushiSceneRoot owns a single native FabushiRuntime per scene, while native lifecycle/task owners cancel, recover and fence work across scene/protected-data transitions. IOSLifecycleParityTests cover background/unclean recovery and lifecycle state. This is a justified not-applicable-with-replacement mapping, not a waived cleanup responsibility."
+      },
+      {
+        "path": "frontend/src/recovered/contracts/desktop-bridge.contract.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-typed-preload-boundary-implemented-pending-exact-head-ci",
+        "finding": "Desktop bridge fail-closed ownership contract maps to the single IOSCoordinatorPortClient/IOSPreloadBridge boundary. Current native code requires protocol hello/version readiness, rejects requests before readiness/after settlement, rejects illegal peer-direction frames, settles pending calls on cancel/close, and keeps SwiftUI away from direct Main/Host runtime ownership. CoordinatorContractTests cover handshake, cancellation, disconnect/protocol breach and restart-generation fencing; exact-head CI remains required."
+      },
+      {
+        "path": "frontend/src/recovered/contracts/main-rpc.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-method-table-mapped-event-families-still-pending",
+        "finding": "Current Desktop main defines the canonical main method/event surface. IOSMainRPCRuntime retains the Desktop method names and none/object argument shapes with only explicit iOS/Fabushi extensions, while native owners replace Electron mechanisms. This aggregate row must remain mapped: the 19 Desktop event families still require per-event applicability/owner/user-effect evidence before promotion, so method-table parity alone is not accepted as closure."
+      },
+      {
+        "path": "frontend/src/recovered/contracts/rpc-edge.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-rpc-edge-direct-port-implemented-pending-exact-head-ci",
+        "finding": "IOSRPCEdgeRuntime preserves sand-rpc method/event channel naming and edge/unknown-method plus edge/handler-failed vocabulary through typed IOSEdgeReplyEnvelope/IOSEdgeReplyFailure. Swift async transport replaces Electron invoke/on without changing structured failure semantics; malformed wire decoding remains fail-closed at the typed boundary. Exact-head acceptance remains required before verified."
+      },
+      {
+        "path": "frontend/src/recovered/features/about/overlay/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-about-overlay-implemented-pending-exact-head-ci",
+        "finding": "Shipping Settings exposes FabushiAboutOverlayView. Native Bundle version/build and receipt provenance replace Electron updater status; TestFlight/App Store/archive/development tracks are projected explicitly, UIPasteboard replaces navigator.clipboard, the copy payload includes version/build/track/iOS, copied state lasts 1200ms, and close is native. AboutOverlayParityTests cover projection, release-track fail-closed behavior and copy timing; exact-head UI/device evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/access-cover.contract.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-test-contract-replaced-native-xctest",
+        "finding": "This Desktop node:test responsibility is replaced by native XCTest over the shipping Access Cover and Remote Computer rebuild owners. AccessCoverParityTests covers wire projection, copy/gating, first-box suppressors and roster state; RemoteComputerRebuildTests covers native rebuild lifecycle. Test-file mechanism is not applicable on iOS, while the product responsibilities are mapped separately."
+      },
+      {
+        "path": "frontend/src/recovered/features/access-roster-state.contract.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-roster-rebuild-selection-contract-implemented-pending-exact-head-ci",
+        "finding": "Current iOS splits this renderer contract across native owners but retains one state chain: structured roster failures and restored rows, AccessCoverComposition rebuild suppression, account-scoped roster cache and last-Agent selection persistence, pending-load reconciliation/settlement fencing, and RemoteComputer rebuild transitions. GrokMobileShell refresh/select wiring consumes these owners. Focused XCTest exists; exact-head CI remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/composition.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-access-composition-implemented-pending-exact-head-ci",
+        "finding": "AccessCoverComposition.swift consumes canonical Sand access, structured AccessRosterSnapshot failure/load state, sticky FirstBoxGate and the shipping Remote Computer rebuild lock to derive loading/error/visibility. It preserves the Desktop rule that only canonical access-blocked state before a usable/restored box can show the cover and rebuild suppresses it. Root roster wiring now provides structured failures; exact-head acceptance remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/first-box-gate.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-first-box-reducer-implemented-pending-exact-head-ci",
+        "finding": "FirstBoxGate.swift preserves sticky hasReachedBox and suppresses false waiting for restored roster, canonical access-block, network and DNS failures. The current shipping roster owner feeds load/failure state into this reducer during refresh and recovery; AccessCoverParityTests cover the latch/suppressors. Exact-head CI remains required before verified."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-access-model-and-structured-failure-wiring-implemented-pending-exact-head-ci",
+        "finding": "AccessCoverModel.swift preserves state/reason projection, reason-specific copy/actions, fail-closed unknown state, four-way cover gate and canonical onboarding URL. The prior note that roster errors collapsed to an empty list is obsolete: current refreshAccessRoster reads fresh Sand access on failure, classifies structured sand-access-blocked/network/dns failures, feeds AccessRosterSnapshot.fail and the root composition, and preserves restored rows. Focused tests cover this path; exact-head CI remains pending."
       }
     ]
   },

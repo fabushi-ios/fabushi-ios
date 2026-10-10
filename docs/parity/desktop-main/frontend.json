@@ -968,7 +968,7 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/first-box-gate.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; fresh exact-head GitHub Actions required before verified promotion.",
-      "notes": "Pure first-box state semantics are now implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Shipping access-cover composition remains mapped until the roster owner emits the canonical structured access-blocked failure."
+      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The shipping GrokMobileShell roster owner feeds canonical load/failure/restored state into FirstBoxGate and AccessCoverComposition; sticky ready and restored/access/network/DNS suppressors are covered by native tests. Keep implemented until current exact-head acceptance succeeds."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/model.ts",
@@ -983,7 +983,7 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/model.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; fresh exact-head GitHub Actions required before verified promotion.",
-      "notes": "Model semantics are implemented, but this does not claim the aggregate cover is shipping: current iOS bot roster loading still collapses Host failures to an empty list and therefore does not yet surface sand-access-blocked into the root composition."
+      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS roster refresh now reads fresh Sand access on load failure, classifies structured sand-access-blocked/network/dns failures, feeds AccessRosterSnapshot.fail, preserves restored rows, and drives the shipping AccessCoverComposition. Keep implemented until current exact-head acceptance succeeds."
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/rebuild-signal.ts",
