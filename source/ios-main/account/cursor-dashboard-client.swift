@@ -328,33 +328,116 @@ private enum IOSCursorDashboardProto {
 
         var detailed = Reader(detailedMessage)
         var composerMessage: Data?
+        var promptMessage: Data?
         var detailedStatus: Int32?
         var summary: String?
         var permanentErrorMessage: Data?
+        var prMessages: [Data] = []
         for (field, value) in try detailed.readFields() {
             switch (field, value) {
             case (1, .bytes(let bytes)):
                 composerMessage = bytes
+            case (4, .bytes(let bytes)):
+                promptMessage = bytes
             case (5, .varint(let value)):
                 detailedStatus = Int32(truncatingIfNeeded: value)
             case (10, .bytes(let bytes)):
                 summary = String(data: bytes, encoding: .utf8)
             case (16, .bytes(let bytes)):
                 permanentErrorMessage = bytes
+            case (20, .bytes(let bytes)):
+                prMessages.append(bytes)
             default:
                 break
             }
         }
 
         var composerStatus: Int32?
+        var name: String?
+        var branchName: String?
+        var prURL: String?
+        var composerPrState: String?
+        var filesChanged: Int?
+        var linesAdded: Int?
+        var linesRemoved: Int?
         if let composerMessage {
             var composer = Reader(composerMessage)
-            for (field, value) in try composer.readFields() where field == 12 {
-                if case .varint(let value) = value {
+            for (field, value) in try composer.readFields() {
+                switch (field, value) {
+                case (5, .bytes(let bytes)):
+                    name = nonemptyUTF8(bytes)
+                case (6, .bytes(let bytes)):
+                    branchName = nonemptyUTF8(bytes)
+                case (12, .varint(let value)):
                     composerStatus = Int32(truncatingIfNeeded: value)
+                case (22, .bytes(let bytes)):
+                    prURL = nonemptyUTF8(bytes)
+                case (25, .varint(let value)):
+                    linesAdded = nonnegativeInt32(value)
+                case (26, .varint(let value)):
+                    linesRemoved = nonnegativeInt32(value)
+                case (27, .varint(let value)):
+                    filesChanged = nonnegativeInt32(value)
+                case (43, .varint(let value)):
+                    composerPrState = cloudAgentPRState(Int32(truncatingIfNeeded: value))
+                default:
                     break
                 }
             }
+        }
+
+        var prompt: String?
+        if let promptMessage {
+            var promptReader = Reader(promptMessage)
+            for (field, value) in try promptReader.readFields() where field == 1 {
+                if case .bytes(let bytes) = value {
+                    prompt = nonemptyUTF8(bytes)
+                    break
+                }
+            }
+        }
+
+        struct DecodedPR {
+            let branchName: String?
+            let number: Int32?
+            let state: String?
+            let url: String?
+        }
+        var prs: [DecodedPR] = []
+        for message in prMessages {
+            var reader = Reader(message)
+            var prBranch: String?
+            var number: Int32?
+            var state: String?
+            var url: String?
+            for (field, value) in try reader.readFields() {
+                switch (field, value) {
+                case (1, .bytes(let bytes)):
+                    prBranch = nonemptyUTF8(bytes)
+                case (4, .varint(let value)):
+                    number = Int32(truncatingIfNeeded: value)
+                case (5, .varint(let value)):
+                    state = cloudAgentPRState(Int32(truncatingIfNeeded: value))
+                case (6, .bytes(let bytes)):
+                    url = nonemptyUTF8(bytes)
+                default:
+                    break
+                }
+            }
+            prs.append(.init(branchName: prBranch, number: number, state: state, url: url))
+        }
+
+        let primaryPR: DecodedPR? = {
+            if let prURL {
+                return prs.first(where: { $0.url == prURL })
+            }
+            return prs.first(where: { $0.number != nil || $0.state != nil || $0.url != nil })
+        }()
+        if branchName == nil {
+            branchName = prs.compactMap(\.branchName).first
+        }
+        if prURL == nil {
+            prURL = primaryPR?.url
         }
 
         var permanentError: String?
@@ -392,7 +475,43 @@ private enum IOSCursorDashboardProto {
         guard let status = composerStatus ?? detailedStatus else {
             throw IOSCursorDashboardError(message: "Background composer response was missing status.")
         }
-        return .init(status: status, summary: summary, permanentError: permanentError)
+        let resolvedPrState = primaryPR?.state ?? composerPrState ?? (prURL == nil ? "none" : "unknown")
+        return .init(
+            status: status,
+            name: name,
+            prompt: prompt,
+            summary: summary,
+            permanentError: permanentError,
+            branchName: branchName,
+            filesChanged: filesChanged,
+            linesAdded: linesAdded,
+            linesRemoved: linesRemoved,
+            prURL: prURL,
+            prState: resolvedPrState,
+            prNumber: primaryPR?.number
+        )
+    }
+
+    private static func nonemptyUTF8(_ bytes: Data) -> String? {
+        guard let value = String(data: bytes, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        return value
+    }
+
+    private static func nonnegativeInt32(_ value: UInt64) -> Int? {
+        let signed = Int32(truncatingIfNeeded: value)
+        return signed >= 0 ? Int(signed) : nil
+    }
+
+    private static func cloudAgentPRState(_ value: Int32) -> String? {
+        switch value {
+        case 1: "open"
+        case 2: "draft"
+        case 3: "merged"
+        case 4: "closed"
+        default: nil
+        }
     }
 
     static func decodeTeams(_ data: Data) throws -> [IOSCursorSkillPublishTeam] {
@@ -476,8 +595,17 @@ struct IOSCursorPublishedSkill: Equatable, Sendable {
 
 struct IOSCloudAgentComposerInfo: Equatable, Sendable {
     let status: Int32
+    let name: String?
+    let prompt: String?
     let summary: String?
     let permanentError: String?
+    let branchName: String?
+    let filesChanged: Int?
+    let linesAdded: Int?
+    let linesRemoved: Int?
+    let prURL: String?
+    let prState: String?
+    let prNumber: Int32?
 
     var isActive: Bool { status == 1 || status == 4 }
     var isError: Bool { status == 3 || status == 5 || permanentError != nil }
@@ -581,6 +709,10 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
 
     static func decodePrReviewTeamDestinationForTests(_ data: Data) throws -> SandPrReviewDestination? {
         try IOSCursorDashboardProto.decodePrReviewTeamDestination(data)
+    }
+
+    static func decodeBackgroundComposerInfoForTests(_ data: Data) throws -> IOSCloudAgentComposerInfo {
+        try IOSCursorDashboardProto.decodeBackgroundComposerInfo(data)
     }
 
     typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
