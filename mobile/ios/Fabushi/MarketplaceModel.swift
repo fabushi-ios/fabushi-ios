@@ -1572,7 +1572,8 @@ final class MarketplaceModel {
 
     private let bridge: IOSPreloadBridge
     private let globalDharmaBridge: GlobalDharmaMiniAppBridge
-    // Read-only migration source for builds that predate the canonical SandSettingsStore owner.\n    private static let legacyOnboardingKeyPrefix = "fabushi.mobile.onboarding-complete.v2:"
+    // Read-only migration source for builds that predate the canonical SandSettingsStore owner.
+    private static let legacyOnboardingKeyPrefix = "fabushi.mobile.onboarding-complete.v2:"
     @ObservationIgnored private var onboardingRouteGeneration = 0
     @ObservationIgnored private var globalDharmaAccountScope: String?
     @ObservationIgnored private var globalDharmaExecution: [String: Any]?
