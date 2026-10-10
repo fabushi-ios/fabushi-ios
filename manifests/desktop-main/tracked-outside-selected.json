@@ -636,9 +636,9 @@
       "type": "blob",
       "sha": "349f42dbfbba7629f3491e13524dd5fd22b14380",
       "size": 3172,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-commerce-settlement-architecture-requirement",
+      "coverage_status": "reviewed-active-ios-commerce-replacement",
+      "reason": "Desktop ADR is a proposed/no-production-implementation decision record, but it defines a mandatory independent settlement owner whenever Fabushi enables paid entitlements, purchases, credits or transferable value. iOS already ships commerce, so this is applicable architecture rather than N/A. Current iOS replacement is repository-owned Rust payment/ledger/settlement code (including mahayana-platform-core payment_infra and mahayana-messaging settlement verification) composed with FabushiPayStoreKit and GlobalDharmaCommerceModel. The native path preserves trusted catalog/amount identity, idempotency, provider verification, account binding and server-authoritative entitlement projection; final real-service, signed App Store/restore, device and exact-head release evidence remains required and this review does not mark commerce verified."
     },
     {
       "path": "docs/adr/FBCP-ADR-003-call-session-signaling.md",
@@ -646,9 +646,9 @@
       "type": "blob",
       "sha": "9693a27376effc7d3231c76df7c4a26be6c97f55",
       "size": 3068,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-call-session-signaling-architecture-requirement",
+      "coverage_status": "reviewed-with-native-ios-call-session-replacement",
+      "reason": "Desktop ADR is proposed/no-production-implementation but defines the required independent CallSession/Signaling owner if calls exist. Calls are active in the iOS product, so the responsibility is applicable. iOS replacement uses the repository-owned Rust source/host/extensions/session/call-session.rs durable call/session and ordered signaling store with generation fencing, plus HumanCallSystemCoordinator (CallKit/PushKit), HumanCallMediaPort, HumanCallPeerConnection and the unified HumanCallsView surface. The active ios-human-call-media-parity spec preserves canonical Host ownership, reconnect/resume, media/device projection and stale-callback fencing. Real two-device media/background/push/device acceptance and final exact-head release evidence remain open, so this review is not a verified claim."
     },
     {
       "path": "docs/fabu-agent-architecture-parity.md",
@@ -656,9 +656,9 @@
       "type": "blob",
       "sha": "c813a1b059d0e4382bf01071df77e844bef1cfb5",
       "size": 4847,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-agent-architecture-reference",
+      "coverage_status": "reviewed-governance-and-architecture-context",
+      "reason": "Desktop architecture reference records owner-level lessons from bhrumom/fabu (Agent identity/profile separation, per-turn ownership, bounded inference context, progress/cancellation/approval/checkpoint semantics and per-Agent concurrency). It is not a standalone shipping dependency and does not override current Desktop main. iOS preserves the applicable product responsibilities through its current Coordinator/Host/Runner, repository-owned Rust runtime/session/memory/permission/scheduler owners and SwiftUI presentation. Any responsibility that is shipping in current Desktop main remains accounted for in the selected ledger and must earn exact-head production evidence there; reference-only follow-up wording is not promoted to completed work."
     },
     {
       "path": "docs/specs/SPEC_TEMPLATE.md",
@@ -666,9 +666,9 @@
       "type": "blob",
       "sha": "72272d9696c38f3b968d610ad12489b080e31293",
       "size": 3593,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "repository-spec-governance-template",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Generic Desktop specification-authoring template only; it carries no runtime, product state or release asset. Its governance intent (explicit ownership, contracts, failure modes, verification and evidence) is replaced by the iOS repository AGENTS/current Desktop-main parity spec and task-specific native specs. No production code is copied and no user capability is waived."
     },
     {
       "path": "docs/specs/fabushi-bot-communication-platform.md",
