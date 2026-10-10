@@ -20237,16 +20237,24 @@ mod tests {
                 .unwrap();
         }
 
-        let summary_operation = controller
+        let (summary_operation, summary_latest_timestamp) = controller
             .state()
             .unwrap()
             .legacy_memory_operations
             .iter()
-            .find_map(|(id, context)| {
-                matches!(context.phase, LegacyMemoryPhase::EpisodeSummary { .. })
-                    .then(|| id.clone())
+            .find_map(|(id, context)| match context.phase {
+                LegacyMemoryPhase::EpisodeSummary {
+                    latest_timestamp,
+                    ..
+                } => Some((id.clone(), latest_timestamp)),
+                LegacyMemoryPhase::Extraction { .. } => None,
             })
             .expect("episode summary operation");
+        // Desktop passes the exact newest turn timestamp into FileMemoryStore.
+        // Its canonical Markdown representation persists only YYYY-MM-DD, so a
+        // later list/reload intentionally recovers the day boundary. Assert the
+        // exact owner handoff here, before durable format normalization.
+        assert_eq!(summary_latest_timestamp, 1_900_000_000_005);
         controller
             .translate_legacy_memory_runtime_event_with_dispatch(
                 memory_owner_message(
@@ -20283,7 +20291,10 @@ mod tests {
             .into_iter()
             .find(|memory| memory.content.starts_with("[episode] "))
             .expect("episode memory");
-        assert_eq!(episode.created_at, 1_900_000_000_005);
+        assert_eq!(
+            format_memory_date(episode.created_at),
+            format_memory_date(1_900_000_000_005)
+        );
     }
 
     #[cfg(feature = "production")]
