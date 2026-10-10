@@ -544,7 +544,12 @@ struct AccountSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
     
-                Text(copy.accessibilityCount(preferences.activeAccessibilityPreferenceCount))
+                Text(
+                    copy.accessibilityCount(
+                        preferences.activeAccessibilityPreferenceCount,
+                        locale: preferences.resolvedLocale()
+                    )
+                )
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("settings-ui-accessibility-count")

@@ -77,6 +77,30 @@ final class MobileUiPreferencesLocalizationParityTests: XCTestCase {
         )
     }
 
+    func testAccessibilityPreferenceCountUsesSelectedLocaleNumberFormatting() {
+        let locale = Locale(identifier: "ar")
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .decimal
+        let expected = formatter.string(from: NSNumber(value: 1_234))!
+
+        let rendered = MobileUiPreferences(localeRaw: MobileSettingsLocale.ar.rawValue)
+            .accessibilityCopy()
+            .accessibilityCount(1_234, locale: locale)
+
+        XCTAssertTrue(rendered.contains(expected))
+        XCTAssertFalse(rendered.contains("{count}"))
+    }
+
+    func testAccessibilityPreferenceCountClampsNegativeValues() {
+        let locale = Locale(identifier: "en-US")
+        let rendered = MobileUiPreferences(localeRaw: MobileSettingsLocale.en.rawValue)
+            .accessibilityCopy()
+            .accessibilityCount(-4, locale: locale)
+        XCTAssertTrue(rendered.contains("0"))
+        XCTAssertFalse(rendered.contains("-4"))
+    }
+
     func testDynamicTypeScalingNeverShrinksAccessibilitySizes() {
         let preferences = MobileUiPreferences(textScale: 0.9)
         XCTAssertEqual(

@@ -55,10 +55,17 @@ internal struct MobileSettingsAccessibilityCopy: Equatable {
     let accessibilityCountOne: String
     let accessibilityCountOther: String
 
-    func accessibilityCount(_ count: Int) -> String {
+    func accessibilityCount(
+        _ count: Int,
+        locale: Locale = .autoupdatingCurrent
+    ) -> String {
         let safeCount = max(0, count)
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .decimal
+        let formattedCount = formatter.string(from: NSNumber(value: safeCount)) ?? String(safeCount)
         return (safeCount == 1 ? accessibilityCountOne : accessibilityCountOther)
-            .replacingOccurrences(of: "{count}", with: String(safeCount))
+            .replacingOccurrences(of: "{count}", with: formattedCount)
     }
 }
 

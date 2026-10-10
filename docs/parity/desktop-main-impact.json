@@ -2615,8 +2615,30 @@
       "source/shared/write-epoch.ts"
     ],
     "sharedContractReview": "pending",
-    "mainActiveSpecsReview": "pending",
-    "newAndChangedResponsibilitiesReviewed": false
+    "mainActiveSpecsReview": "verified",
+    "newAndChangedResponsibilitiesReviewed": false,
+    "mainActiveSpecsReviewEvidence": {
+      "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "blobSha": "f0e01c5814472398f770ab053700c92bd1968988"
+        },
+        {
+          "path": "docs/specs/fabushi-bot-communication-platform.md",
+          "blobSha": "bcee7a0b16cfa98eb0a6f67da8c3ee08eef77d3e"
+        },
+        {
+          "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
+          "blobSha": "2223e63455806b5fb6faeefedf07f6eab670f361"
+        },
+        {
+          "path": "docs/specs/telegram-desktop-rust-equivalence-migration.md",
+          "blobSha": "439c9a3871a31f007cc914227d4ce5aa5fa87a09"
+        }
+      ],
+      "verdict": "Current Desktop main still requires spec-first existing-owner-first composition, single canonical roots, Coordinator/Host/Runner boundaries, full responsibility/source closure, GitHub-Actions-only executable verification for FBCP/TDRP, and fail-closed exact-head release evidence. No PR20-era acceptance status was inherited."
+    }
   },
   "historyPolicy": "PR20 old status and evidence historical only",
   "groupSummary": [
