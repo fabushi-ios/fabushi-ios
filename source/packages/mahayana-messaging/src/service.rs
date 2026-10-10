@@ -3521,7 +3521,7 @@ mod remote_transport_tests {
             .expect("persist pending before dispatch");
         assert!(matches!(
             pending.delivery_state,
-            DeliveryState::Pending { ref client_message_id: pending_id }
+            DeliveryState::Pending { client_message_id: ref pending_id }
                 if pending_id == &client_message_id
         ));
         let local_id = pending.id.clone();
