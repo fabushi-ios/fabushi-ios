@@ -15232,8 +15232,25 @@ fn clean_optional_string(value: Option<String>) -> Option<String> {
     })
 }
 
+const MAX_AVATAR_BYTES: usize = 5 * 1024 * 1024;
+
+fn sniff_avatar_mime_type(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.len() >= 8 && bytes[..8] == [137, 80, 78, 71, 13, 10, 26, 10] {
+        return Some("image/png");
+    }
+    if bytes.len() >= 3 && bytes[..3] == [255, 216, 255] {
+        return Some("image/jpeg");
+    }
+    if bytes.len() >= 6 && (&bytes[..6] == b"GIF87a" || &bytes[..6] == b"GIF89a") {
+        return Some("image/gif");
+    }
+    if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        return Some("image/webp");
+    }
+    None
+}
+
 fn sanitize_avatar_data_url(value: Option<String>) -> Result<Option<String>, FeatureHostError> {
-    const MAX_AVATAR_BYTES: usize = 2 * 1024 * 1024;
     let Some(value) = value else {
         return Ok(None);
     };
@@ -15244,17 +15261,17 @@ fn sanitize_avatar_data_url(value: Option<String>) -> Result<Option<String>, Fea
     let (header, payload) = value.split_once(',').ok_or_else(|| {
         FeatureHostError::Contract("avatar must be a base64 image data URL".into())
     })?;
-    if !matches!(
-        header,
-        "data:image/png;base64"
-            | "data:image/jpeg;base64"
-            | "data:image/webp;base64"
-            | "data:image/gif;base64"
-    ) {
-        return Err(FeatureHostError::Contract(
-            "avatar format must be PNG, JPEG, WebP, or GIF".into(),
-        ));
-    }
+    let declared_mime = match header {
+        "data:image/png;base64" => "image/png",
+        "data:image/jpeg;base64" => "image/jpeg",
+        "data:image/webp;base64" => "image/webp",
+        "data:image/gif;base64" => "image/gif",
+        _ => {
+            return Err(FeatureHostError::Contract(
+                "avatar format must be PNG, JPEG, WebP, or GIF".into(),
+            ));
+        }
+    };
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(payload)
         .map_err(|_| FeatureHostError::Contract("avatar base64 payload is invalid".into()))?;
@@ -15263,7 +15280,44 @@ fn sanitize_avatar_data_url(value: Option<String>) -> Result<Option<String>, Fea
             "avatar must be between 1 byte and {MAX_AVATAR_BYTES} bytes"
         )));
     }
+    let actual_mime = sniff_avatar_mime_type(&bytes).ok_or_else(|| {
+        FeatureHostError::Contract("avatar payload is not a supported image".into())
+    })?;
+    if actual_mime != declared_mime {
+        return Err(FeatureHostError::Contract(
+            "avatar payload does not match declared image format".into(),
+        ));
+    }
     Ok(Some(value.to_string()))
+}
+
+#[cfg(test)]
+mod avatar_contract_tests {
+    use super::*;
+
+    #[test]
+    fn avatar_data_url_requires_payload_mime_to_match_header() {
+        let png_header = base64::engine::general_purpose::STANDARD
+            .encode([137, 80, 78, 71, 13, 10, 26, 10]);
+        let valid = format!("data:image/png;base64,{png_header}");
+        assert_eq!(
+            sanitize_avatar_data_url(Some(valid.clone())).unwrap(),
+            Some(valid)
+        );
+
+        let spoofed = format!("data:image/jpeg;base64,{png_header}");
+        let error = sanitize_avatar_data_url(Some(spoofed)).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("does not match declared image format")
+        );
+    }
+
+    #[test]
+    fn avatar_data_url_uses_desktop_five_mib_byte_limit() {
+        assert_eq!(MAX_AVATAR_BYTES, 5 * 1024 * 1024);
+    }
 }
 
 fn clone_agent_display_name(name: &str) -> String {
