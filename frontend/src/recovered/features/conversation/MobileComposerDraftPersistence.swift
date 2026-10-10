@@ -73,33 +73,68 @@ private struct MobileComposerMcpReferenceWire: Codable {
     }
 }
 
+private struct MobileComposerPrReferenceWire: Codable {
+    let prNumber: Int
+    let title: String?
+    let url: String?
+    let source: String
+    let state: String?
+
+    init(_ value: MobileComposerPrReference) {
+        prNumber = value.prNumber
+        title = value.title
+        url = value.url
+        source = value.source
+        state = value.state
+    }
+
+    func project() -> MobileComposerPrReference? {
+        guard prNumber > 0,
+              ["node", "cloud", "text"].contains(source)
+        else { return nil }
+        return .init(
+            prNumber: prNumber,
+            title: title,
+            url: url,
+            source: source,
+            state: state
+        )
+    }
+}
+
 private struct MobileComposerRecoveryWire: Codable {
     let requestId: String
     let text: String
     let attachments: [MobileComposerAttachmentWire]
     let mcpReferences: [MobileComposerMcpReferenceWire]?
+    let prReferences: [MobileComposerPrReferenceWire]?
 
     init(_ value: MobileComposerRecovery) {
         requestId = value.requestId
         text = value.text
         attachments = value.attachments.map(MobileComposerAttachmentWire.init)
         mcpReferences = value.mcpReferences.map(MobileComposerMcpReferenceWire.init)
+        prReferences = value.prReferences.map(MobileComposerPrReferenceWire.init)
     }
 
     func project() -> MobileComposerRecovery? {
         guard !requestId.isEmpty else { return nil }
         let projected = attachments.compactMap { $0.project() }
-        let rawReferences = mcpReferences ?? []
-        let references = rawReferences.compactMap { $0.project() }
+        let rawMcpReferences = mcpReferences ?? []
+        let mcpReferences = rawMcpReferences.compactMap { $0.project() }
+        let rawPrReferences = prReferences ?? []
+        let prReferences = rawPrReferences.compactMap { $0.project() }
         guard projected.count == attachments.count,
-              references.count == rawReferences.count,
+              mcpReferences.count == rawMcpReferences.count,
+              prReferences.count == rawPrReferences.count,
               mobileComposerHasPayload(text: text, attachments: projected)
         else { return nil }
         return .init(
             requestId: requestId,
             text: text,
             attachments: projected,
-            mcpReferences: references
+            mcpReferences: mcpReferences,
+            prReferences: prReferences
         )
     }
 }
