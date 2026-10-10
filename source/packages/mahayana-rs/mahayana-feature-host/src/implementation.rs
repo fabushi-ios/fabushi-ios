@@ -287,6 +287,7 @@ enum MemoryAction {
 #[cfg(feature = "production")]
 #[derive(Debug, Clone)]
 struct PendingMemoryTurn {
+    account_id: Option<String>,
     agent_id: String,
     evidence_id: String,
     occurred_at: i64,
@@ -316,6 +317,30 @@ struct MemorySynthesisOperation {
     synthesis_started_at_ms: i64,
     attempt_started_at_ms: i64,
     phase: MemorySynthesisPhase,
+    output: String,
+}
+
+#[cfg(feature = "production")]
+#[derive(Debug, Clone)]
+enum LegacyMemoryPhase {
+    Extraction {
+        memory_dir: PathBuf,
+        exchange: crate::turn_memory::TurnExchange,
+        existing_memories: Vec<String>,
+        turn_timestamp: i64,
+    },
+    EpisodeSummary {
+        memory_dir: PathBuf,
+        latest_timestamp: i64,
+    },
+}
+
+#[cfg(feature = "production")]
+#[derive(Debug, Clone)]
+struct LegacyMemoryOperation {
+    account_id: Option<String>,
+    agent_id: String,
+    phase: LegacyMemoryPhase,
     output: String,
 }
 
@@ -663,6 +688,10 @@ struct FeatureState {
     #[cfg(feature = "production")]
     memory_synthesis_operations: BTreeMap<String, MemorySynthesisOperation>,
     #[cfg(feature = "production")]
+    legacy_memory_operations: BTreeMap<String, LegacyMemoryOperation>,
+    #[cfg(feature = "production")]
+    memory_synthesis_enabled: bool,
+    #[cfg(feature = "production")]
     memory_synthesis_active_agents: BTreeSet<String>,
     #[cfg(feature = "production")]
     memory_synthesis_next_temporal_poll_at_ms: i64,
@@ -727,6 +756,10 @@ impl Default for FeatureState {
             memory_synthesis_pending_order: VecDeque::new(),
             #[cfg(feature = "production")]
             memory_synthesis_operations: BTreeMap::new(),
+            #[cfg(feature = "production")]
+            legacy_memory_operations: BTreeMap::new(),
+            #[cfg(feature = "production")]
+            memory_synthesis_enabled: false,
             #[cfg(feature = "production")]
             memory_synthesis_active_agents: BTreeSet::new(),
             #[cfg(feature = "production")]
@@ -1147,6 +1180,7 @@ impl FeatureHostController {
             platform,
         };
         let mut state = FeatureState::default();
+        state.memory_synthesis_enabled = true;
         if let Some(path) = settings_path.as_deref() {
             state.settings = load_product_host_settings(path);
             // The bundled Computer Use MCP independently rereads this canonical
@@ -3927,6 +3961,25 @@ impl FeatureHostController {
                             timestamp: timestamp(),
                             message: peer,
                         });
+                        #[cfg(feature = "production")]
+                        {
+                            let active_turns = state
+                                .memory_turn_observations
+                                .iter()
+                                .filter(|(operation_id, observation)| {
+                                    observation.agent_id == from_agent_id
+                                        && state.operations.contains(*operation_id)
+                                })
+                                .map(|(operation_id, _)| operation_id.clone())
+                                .collect::<Vec<_>>();
+                            if active_turns.len() == 1 {
+                                if let Some(observation) =
+                                    state.memory_turn_observations.get_mut(&active_turns[0])
+                                {
+                                    observation.agent_messages.push(text.clone());
+                                }
+                            }
+                        }
                         Some((sender, target))
                     } else if let Some(group_snapshot) = state.groups.get(&target_id).cloned() {
                         if !group_snapshot
@@ -8272,13 +8325,16 @@ impl FeatureHostController {
             if reset_runtime {
                 self.retire_routines_for_account_change()?;
                 self.retire_background_recoveries_for_account_change()?;
-                let synthesis_operations = self
-                    .state()?
-                    .memory_synthesis_operations
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<_>>();
-                for operation_id in synthesis_operations {
+                let memory_operations = {
+                    let state = self.state()?;
+                    state
+                        .memory_synthesis_operations
+                        .keys()
+                        .chain(state.legacy_memory_operations.keys())
+                        .cloned()
+                        .collect::<Vec<_>>()
+                };
+                for operation_id in memory_operations {
                     let _ = self.runtime()?.interrupt(OperationId(operation_id));
                 }
                 self.runtime()?.reset_session()?;
@@ -8374,6 +8430,7 @@ impl FeatureHostController {
             state.memory_synthesis_started_at_ms.clear();
             state.memory_synthesis_pending_order.clear();
             state.memory_synthesis_operations.clear();
+            state.legacy_memory_operations.clear();
             state.memory_synthesis_active_agents.clear();
             state.memory_synthesis_next_temporal_poll_at_ms = 0;
             state.automation_operations.clear();
@@ -8655,6 +8712,8 @@ impl FeatureHostController {
         state.operations.remove(operation_id);
         state.operation_agents.remove(operation_id);
         state.human_handoff_operations.remove(operation_id);
+        #[cfg(feature = "production")]
+        state.memory_turn_observations.remove(operation_id);
         state.events.push_back(HostEvent::OperationInterrupted {
             timestamp: timestamp(),
             operation_id: operation_id.to_string(),
@@ -8665,7 +8724,7 @@ impl FeatureHostController {
 
     pub fn close(&self) -> Result<(), FeatureHostError> {
         self.set_routine_quiescing(true)?;
-        let (operation_ids, memory_synthesis_operation_ids) = {
+        let (operation_ids, memory_synthesis_operation_ids, legacy_memory_operation_ids) = {
             let mut state = self.state()?;
             if state.closed {
                 return Ok(());
@@ -8719,6 +8778,9 @@ impl FeatureHostController {
             let memory_synthesis_operation_ids =
                 state.memory_synthesis_operations.keys().cloned().collect::<Vec<_>>();
             state.memory_synthesis_operations.clear();
+            let legacy_memory_operation_ids =
+                state.legacy_memory_operations.keys().cloned().collect::<Vec<_>>();
+            state.legacy_memory_operations.clear();
             state.memory_synthesis_active_agents.clear();
             state.memory_synthesis_next_temporal_poll_at_ms = 0;
             *self
@@ -8728,7 +8790,7 @@ impl FeatureHostController {
             state.events.push_back(HostEvent::HostClosed {
                 timestamp: timestamp(),
             });
-            (operation_ids, memory_synthesis_operation_ids)
+            (operation_ids, memory_synthesis_operation_ids, legacy_memory_operation_ids)
         };
 
         if self.config.mode == HostMode::Production {
@@ -8739,6 +8801,9 @@ impl FeatureHostController {
                 }
             }
             for operation_id in memory_synthesis_operation_ids {
+                let _ = self.runtime()?.interrupt(OperationId(operation_id));
+            }
+            for operation_id in legacy_memory_operation_ids {
                 let _ = self.runtime()?.interrupt(OperationId(operation_id));
             }
             #[cfg(not(feature = "production"))]
@@ -8977,6 +9042,350 @@ impl FeatureHostController {
     }
 
     #[cfg(feature = "production")]
+    fn memory_turn_account_is_current(
+        &self,
+        account_id: Option<&str>,
+    ) -> Result<bool, FeatureHostError> {
+        let state = self.state()?;
+        if state.closed {
+            return Ok(false);
+        }
+        if self.config.mode == HostMode::Test {
+            return Ok(true);
+        }
+        if !state.session_active {
+            return Ok(false);
+        }
+        let active = self
+            .active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone();
+        Ok(account_id.is_some() && active.as_deref() == account_id)
+    }
+
+    #[cfg(feature = "production")]
+    fn memory_synthesis_is_active_for(
+        &self,
+        account_id: Option<&str>,
+    ) -> Result<bool, FeatureHostError> {
+        if !self.memory_turn_account_is_current(account_id)? || self.memory_root_path.is_none() {
+            return Ok(false);
+        }
+        Ok(self.state()?.memory_synthesis_enabled)
+    }
+
+    #[cfg(feature = "production")]
+    fn dispatch_legacy_memory_operation_with<F>(
+        &self,
+        context: LegacyMemoryOperation,
+        system_prompt: String,
+        user_prompt: String,
+        stage: &str,
+        dispatch: &mut F,
+    ) -> Result<(), FeatureHostError>
+    where
+        F: FnMut(&str, &LegacyMemoryOperation, String) -> Result<String, FeatureHostError>,
+    {
+        let prompt = format!("{system_prompt}\n\n{user_prompt}");
+        let operation_id = dispatch(stage, &context, prompt)?;
+        self.state()?.legacy_memory_operations.insert(operation_id, context);
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn dispatch_legacy_memory_runtime(
+        &self,
+        stage: &str,
+        context: &LegacyMemoryOperation,
+        prompt: String,
+    ) -> Result<String, FeatureHostError> {
+        let response = self.runtime()?.execute(RuntimeCommand::SendMessage {
+            conversation_id: ConversationId(format!(
+                "internal:memory-legacy:{stage}:{}",
+                context.agent_id
+            )),
+            text: prompt,
+            display_text: None,
+            client_message_id: Some(uuid::Uuid::new_v4().to_string()),
+            hidden: true,
+            show_assistant_output: true,
+            recovery_eligible: false,
+            reply_to_message_id: None,
+            is_fork: false,
+            attachment_batch_id: None,
+            selected_image_data_urls: Vec::new(),
+        })?;
+        match response {
+            RuntimeResponse::Accepted { operation_id } => Ok(operation_id.to_string()),
+            other => Err(unexpected_response("memory.legacy", other)),
+        }
+    }
+
+    #[cfg(feature = "production")]
+    fn settle_completed_memory_turn_with_dispatch<F>(
+        &self,
+        observation: PendingMemoryTurn,
+        dispatch: &mut F,
+    ) -> Result<(), FeatureHostError>
+    where
+        F: FnMut(&str, &LegacyMemoryOperation, String) -> Result<String, FeatureHostError>,
+    {
+        if !self.memory_turn_account_is_current(observation.account_id.as_deref())? {
+            return Ok(());
+        }
+        let Some(assistant) = observation
+            .assistant
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return Ok(());
+        };
+        let exchange = crate::turn_memory::build_turn_memory_exchange(
+            observation.user.clone(),
+            observation.agent_messages.clone(),
+            assistant,
+        );
+        if self.memory_synthesis_is_active_for(observation.account_id.as_deref())? {
+            return self.enqueue_memory_synthesis_observation(observation);
+        }
+        if !crate::turn_memory::is_memorable_exchange(&exchange.user) {
+            return Ok(());
+        }
+
+        let memory_dir = self.memory_dir_for_agent(&observation.agent_id)?;
+        let archive = list_memories(
+            &memory_dir,
+            crate::turn_memory::MEMORY_EXTRACTION_ARCHIVE_SCAN_LIMIT,
+        )?;
+        let existing_memories = crate::turn_memory::gather_extraction_memories(
+            &archive,
+            &format!("{}\n{}", exchange.user, exchange.agent),
+        );
+        let user_prompt =
+            crate::turn_memory::build_extraction_user_prompt(&exchange, &existing_memories);
+        let context = LegacyMemoryOperation {
+            account_id: observation.account_id,
+            agent_id: observation.agent_id,
+            phase: LegacyMemoryPhase::Extraction {
+                memory_dir,
+                exchange,
+                existing_memories,
+                turn_timestamp: observation.occurred_at,
+            },
+            output: String::new(),
+        };
+        self.dispatch_legacy_memory_operation_with(
+            context,
+            crate::turn_memory::build_extraction_system_prompt(),
+            user_prompt,
+            "extraction",
+            dispatch,
+        )
+    }
+
+    #[cfg(feature = "production")]
+    fn settle_completed_memory_turn(
+        &self,
+        observation: PendingMemoryTurn,
+    ) -> Result<(), FeatureHostError> {
+        let mut dispatch = |stage: &str, context: &LegacyMemoryOperation, prompt: String| {
+            self.dispatch_legacy_memory_runtime(stage, context, prompt)
+        };
+        self.settle_completed_memory_turn_with_dispatch(observation, &mut dispatch)
+    }
+
+    #[cfg(feature = "production")]
+    fn apply_legacy_memory_extraction(
+        &self,
+        memory_dir: &Path,
+        raw: &str,
+        existing_memories: &[String],
+    ) -> Result<(), FeatureHostError> {
+        let extraction = crate::turn_memory::parse_extracted_memories(raw, existing_memories);
+        let allowed_removals = existing_memories
+            .iter()
+            .map(|memory| memory_dedupe_key(memory))
+            .collect::<BTreeSet<_>>();
+        for removal in extraction.removals {
+            if !allowed_removals.contains(&memory_dedupe_key(&removal)) {
+                continue;
+            }
+            if let Some(existing) = list_memories(
+                memory_dir,
+                crate::turn_memory::MEMORY_EXTRACTION_ARCHIVE_SCAN_LIMIT,
+            )?
+            .into_iter()
+            .find(|memory| memory_dedupe_key(&memory.content) == memory_dedupe_key(&removal))
+            {
+                let _ = remove_memory(memory_dir, &existing.id)?;
+            }
+        }
+        for addition in extraction.additions {
+            let _ = add_memory(memory_dir, &addition.content, now_millis(), addition.kind)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn finish_legacy_memory_operation_with_dispatch<F>(
+        &self,
+        context: LegacyMemoryOperation,
+        inference_succeeded: bool,
+        dispatch: &mut F,
+    ) -> Result<(), FeatureHostError>
+    where
+        F: FnMut(&str, &LegacyMemoryOperation, String) -> Result<String, FeatureHostError>,
+    {
+        if !self.memory_turn_account_is_current(context.account_id.as_deref())? {
+            return Ok(());
+        }
+        match context.phase {
+            LegacyMemoryPhase::Extraction {
+                memory_dir,
+                exchange,
+                existing_memories,
+                turn_timestamp,
+            } => {
+                if inference_succeeded {
+                    let _ = self.apply_legacy_memory_extraction(
+                        &memory_dir,
+                        &context.output,
+                        &existing_memories,
+                    );
+                }
+
+                let episode = crate::turn_memory::EpisodeTurn {
+                    ts: turn_timestamp,
+                    user: exchange.user,
+                    agent: exchange.agent,
+                };
+                if crate::turn_memory::record_pending_episode_turn(&memory_dir, &episode).is_err() {
+                    return Ok(());
+                }
+                let pending = crate::turn_memory::load_pending_episode_turns(&memory_dir);
+                let interval_raw = std::env::var("SAND_MEMORY_EPISODE_INTERVAL").ok();
+                if pending.len() < crate::turn_memory::episode_interval(interval_raw.as_deref()) {
+                    return Ok(());
+                }
+
+                let latest_timestamp = pending.last().map(|turn| turn.ts).unwrap_or(turn_timestamp);
+                let summary_context = LegacyMemoryOperation {
+                    account_id: context.account_id,
+                    agent_id: context.agent_id,
+                    phase: LegacyMemoryPhase::EpisodeSummary {
+                        memory_dir: memory_dir.clone(),
+                        latest_timestamp,
+                    },
+                    output: String::new(),
+                };
+                let summary_dispatch = self.dispatch_legacy_memory_operation_with(
+                    summary_context,
+                    crate::turn_memory::build_episode_system_prompt(),
+                    crate::turn_memory::build_episode_user_prompt(&pending),
+                    "episode-summary",
+                    dispatch,
+                );
+                if summary_dispatch.is_err() {
+                    let _ = crate::turn_memory::clear_pending_episode_turns(&memory_dir);
+                }
+                Ok(())
+            }
+            LegacyMemoryPhase::EpisodeSummary {
+                memory_dir,
+                latest_timestamp,
+            } => {
+                if inference_succeeded {
+                    if let Some(summary) =
+                        crate::turn_memory::normalize_episode_summary(&context.output)
+                    {
+                        let _ = add_memory(
+                            &memory_dir,
+                            &summary,
+                            latest_timestamp,
+                            MemoryKind::Log,
+                        );
+                    }
+                }
+                let _ = crate::turn_memory::clear_pending_episode_turns(&memory_dir);
+                Ok(())
+            }
+        }
+    }
+
+    #[cfg(feature = "production")]
+    fn translate_legacy_memory_runtime_event_with_dispatch<F>(
+        &self,
+        event: RuntimeEvent,
+        dispatch: &mut F,
+    ) -> Result<(), FeatureHostError>
+    where
+        F: FnMut(&str, &LegacyMemoryOperation, String) -> Result<String, FeatureHostError>,
+    {
+        match event {
+            RuntimeEvent::MessageCompleted {
+                operation_id,
+                message,
+                ..
+            } => {
+                if message.role == RuntimeMessageRole::Assistant {
+                    if let Some(context) = self
+                        .state()?
+                        .legacy_memory_operations
+                        .get_mut(&operation_id.to_string())
+                    {
+                        context.output = message.text;
+                    }
+                }
+            }
+            RuntimeEvent::OperationCompleted { operation_id } => {
+                let context = self
+                    .state()?
+                    .legacy_memory_operations
+                    .remove(&operation_id.to_string());
+                if let Some(context) = context {
+                    self.finish_legacy_memory_operation_with_dispatch(context, true, dispatch)?;
+                }
+            }
+            RuntimeEvent::OperationInterrupted { operation_id, .. }
+            | RuntimeEvent::OperationFailed { operation_id, .. } => {
+                let context = self
+                    .state()?
+                    .legacy_memory_operations
+                    .remove(&operation_id.to_string());
+                if let Some(context) = context {
+                    self.finish_legacy_memory_operation_with_dispatch(context, false, dispatch)?;
+                }
+            }
+            RuntimeEvent::ApprovalRequested { operation_id, .. } => {
+                if self.config.mode == HostMode::Production {
+                    let _ = self.runtime()?.interrupt(operation_id);
+                }
+            }
+            RuntimeEvent::MessageDelta { .. }
+            | RuntimeEvent::ModelUsageUpdated { .. }
+            | RuntimeEvent::PluginProgress { .. }
+            | RuntimeEvent::AgentActivity { .. }
+            | RuntimeEvent::Ready { .. }
+            | RuntimeEvent::ProviderDegraded { .. }
+            | RuntimeEvent::Lagged { .. } => {}
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn translate_legacy_memory_runtime_event(
+        &self,
+        event: RuntimeEvent,
+    ) -> Result<(), FeatureHostError> {
+        let mut dispatch = |stage: &str, context: &LegacyMemoryOperation, prompt: String| {
+            self.dispatch_legacy_memory_runtime(stage, context, prompt)
+        };
+        self.translate_legacy_memory_runtime_event_with_dispatch(event, &mut dispatch)
+    }
+
+    #[cfg(feature = "production")]
     fn emit_memory_synthesis_report(&self, report: crate::memory_synthesis::SynthesisReport) {
         let value = crate::memory_synthesis::synthesis_telemetry_value(&report);
         if let Ok(encoded) = serde_json::to_string(&value) {
@@ -9060,7 +9469,11 @@ impl FeatureHostController {
     fn queue_due_temporal_memory_synthesis(&self, now: i64) -> Result<(), FeatureHostError> {
         {
             let mut state = self.state()?;
-            if state.closed || !state.session_active || state.memory_synthesis_next_temporal_poll_at_ms > now {
+            if state.closed
+                || !state.session_active
+                || !state.memory_synthesis_enabled
+                || state.memory_synthesis_next_temporal_poll_at_ms > now
+            {
                 return Ok(());
             }
             state.memory_synthesis_next_temporal_poll_at_ms =
@@ -9104,7 +9517,9 @@ impl FeatureHostController {
     fn memory_synthesis_receive_timeout(&self, requested: Duration, now: i64) -> Result<Duration, FeatureHostError> {
         if requested == Duration::ZERO { return Ok(Duration::ZERO); }
         let state = self.state()?;
-        if !state.session_active || state.closed { return Ok(requested); }
+        if !state.session_active || state.closed || !state.memory_synthesis_enabled {
+            return Ok(requested);
+        }
         let mut next = Some(if state.memory_synthesis_next_temporal_poll_at_ms <= 0 {
             now
         } else {
@@ -9551,14 +9966,22 @@ impl FeatureHostController {
         if self.stale_routine_runtime_event(&event)? {
             return Ok(None);
         }
-        if let Some(operation_id) = runtime_event_operation_id(&event)
-            && self
-                .state()?
-                .memory_synthesis_operations
-                .contains_key(&operation_id)
-        {
-            self.translate_memory_synthesis_runtime_event(event)?;
-            return Ok(None);
+        if let Some(operation_id) = runtime_event_operation_id(&event) {
+            let (legacy_memory, memory_synthesis) = {
+                let state = self.state()?;
+                (
+                    state.legacy_memory_operations.contains_key(&operation_id),
+                    state.memory_synthesis_operations.contains_key(&operation_id),
+                )
+            };
+            if legacy_memory {
+                self.translate_legacy_memory_runtime_event(event)?;
+                return Ok(None);
+            }
+            if memory_synthesis {
+                self.translate_memory_synthesis_runtime_event(event)?;
+                return Ok(None);
+            }
         }
         let event = match event {
             RuntimeEvent::Ready { .. } => None,
@@ -9860,7 +10283,7 @@ impl FeatureHostController {
                         (human_handoff_lease, memory_turn)
                     };
                     if let Some(memory_turn) = memory_turn {
-                        let _ = self.enqueue_memory_synthesis_observation(memory_turn);
+                        let _ = self.settle_completed_memory_turn(memory_turn);
                     }
                     if let Some(lease) = human_handoff_lease
                         && let Some(text) = lease.terminal_text.as_deref()
@@ -11182,6 +11605,11 @@ impl FeatureHostController {
             RuntimeResponse::Accepted { operation_id } => operation_id.to_string(),
             other => return Err(unexpected_response("chat.send", other)),
         };
+        let memory_account_id = self
+            .active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone();
         let mut state = self.state()?;
         state.operations.insert(operation_id.clone());
         state.operation_agents.insert(
@@ -11194,6 +11622,7 @@ impl FeatureHostController {
             state.memory_turn_observations.insert(
                 operation_id.clone(),
                 PendingMemoryTurn {
+                    account_id: memory_account_id,
                     agent_id: memory_agent_id.to_string(),
                     evidence_id: request_id.clone(),
                     occurred_at: now_millis(),

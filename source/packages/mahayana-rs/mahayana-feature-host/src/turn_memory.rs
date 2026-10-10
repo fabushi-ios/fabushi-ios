@@ -1,5 +1,5 @@
 use chrono::TimeZone;
-use mahayana_host_protocol::MemoryKind;
+use mahayana_host_protocol::{MemoryKind, MemoryRecord};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -11,6 +11,9 @@ pub(crate) const MEMORY_EPISODE_PROMPT_MARKER: &str = "<<SAND_MEMORY_EPISODE>>";
 pub(crate) const MEMORY_EPISODE_PREFIX: &str = "[episode] ";
 pub(crate) const MEMORY_NOTE_PREFIX: &str = "[note] ";
 pub(crate) const MEMORY_EXTRACTION_NONE_SENTINEL: &str = "NONE";
+pub(crate) const MEMORY_RECENT_PROMPT_LIMIT: usize = 30;
+pub(crate) const MEMORY_PROFILE_PROMPT_LIMIT: usize = 100;
+pub(crate) const MEMORY_EXTRACTION_ARCHIVE_SCAN_LIMIT: usize = 500;
 pub(crate) const DEFAULT_EPISODE_INTERVAL: usize = 6;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -198,6 +201,60 @@ pub(crate) fn parse_extracted_memories(raw: &str, existing_memories: &[String]) 
     output
 }
 
+pub(crate) fn gather_extraction_memories(
+    memories: &[MemoryRecord],
+    exchange_text: &str,
+) -> Vec<String> {
+    let mut newest = memories.to_vec();
+    newest.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+
+    let mut in_prompt = newest
+        .iter()
+        .filter(|memory| memory.kind == MemoryKind::Profile)
+        .take(MEMORY_PROFILE_PROMPT_LIMIT)
+        .cloned()
+        .collect::<Vec<_>>();
+    in_prompt.extend(
+        newest
+            .iter()
+            .filter(|memory| memory.kind == MemoryKind::Log)
+            .take(MEMORY_RECENT_PROMPT_LIMIT)
+            .cloned(),
+    );
+
+    let seen = in_prompt
+        .iter()
+        .map(|memory| dedupe_key(&memory.content))
+        .collect::<HashSet<_>>();
+    let query_tokens = relevance_tokens(exchange_text);
+    let mut relevant = if query_tokens.is_empty() {
+        Vec::new()
+    } else {
+        memories
+            .iter()
+            .filter(|memory| !seen.contains(&dedupe_key(&memory.content)))
+            .filter_map(|memory| {
+                let overlap = relevance_tokens(&memory.content)
+                    .iter()
+                    .filter(|token| query_tokens.contains(*token))
+                    .count();
+                (overlap > 0).then_some((memory.clone(), overlap))
+            })
+            .collect::<Vec<_>>()
+    };
+    relevant.sort_by(|(left, left_overlap), (right, right_overlap)| {
+        right_overlap
+            .cmp(left_overlap)
+            .then_with(|| right.created_at.cmp(&left.created_at))
+    });
+
+    in_prompt
+        .into_iter()
+        .chain(relevant.into_iter().take(10).map(|(memory, _)| memory))
+        .map(|memory| memory.content)
+        .collect()
+}
+
 pub(crate) fn build_episode_system_prompt() -> String {
     [
         MEMORY_EPISODE_PROMPT_MARKER,
@@ -228,6 +285,26 @@ pub(crate) fn normalize_episode_summary(raw: &str) -> Option<String> {
     } else {
         Some(format!("{MEMORY_EPISODE_PREFIX}{normalized}"))
     }
+}
+
+fn relevance_tokens(text: &str) -> HashSet<String> {
+    text.split(|ch: char| !ch.is_alphanumeric())
+        .map(str::to_lowercase)
+        .filter(|token| token.chars().count() >= 4 && !is_relevance_stopword(token))
+        .collect()
+}
+
+fn is_relevance_stopword(token: &str) -> bool {
+    matches!(
+        token,
+        "that" | "this" | "with" | "from" | "they" | "them" | "then" | "than"
+            | "what" | "when" | "where" | "which" | "will" | "would" | "could"
+            | "should" | "have" | "been" | "being" | "about" | "just" | "like"
+            | "your" | "does" | "were" | "also" | "into" | "over" | "only"
+            | "some" | "more" | "most" | "very" | "much" | "here" | "there"
+            | "their" | "these" | "those" | "because" | "while" | "after"
+            | "before" | "user"
+    )
 }
 
 fn normalize(raw: &str) -> String {
