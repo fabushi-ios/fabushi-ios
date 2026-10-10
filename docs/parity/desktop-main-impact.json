@@ -2713,8 +2713,8 @@
       {
         "path": "frontend/src/production/command-palette-model.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-implemented-pending-exact-head",
-        "finding": "Native model is shipping; fixed lost camelCase fuzzy boundary bonus and added focused test. Validator re-review fence remains intact."
+        "status": "current-main-reviewed-native-command-palette-model-implemented-pending-exact-head-ci",
+        "finding": "Desktop search normalization/fuzzy/tab/hidden/dedupe model is implemented by the shipping Swift model. DOM virtual-window geometry is intentionally replaced by SwiftUI LazyVStack; focused tests preserve the visible deterministic search/order contract, including camelCase boundary scoring and first-slot/newest-row roster identity. Exact-head CI remains pending."
       },
       {
         "path": "frontend/src/production/ProductionRenderer.tsx",
@@ -2725,8 +2725,8 @@
       {
         "path": "frontend/src/production/command-palette-root-commands.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-implemented-pending-exact-head",
-        "finding": "Desktop current-main changes only the shared-computer update product label from Grok Bot to Fabushi. Shipping GrokMobileShell+CommandPalette.swift exposes `Update Fabushi's Computer`, routes it through the real updateComputer confirmation/rebuild owner, and preserves busy-agent/queue fencing. Exact-head Actions and global closure remain required."
+        "status": "current-main-reviewed-native-command-palette-root-commands-implemented-pending-exact-head-ci",
+        "finding": "Desktop active-chat command projection was re-audited. iOS now keeps additive global native actions separate while current-chat commands fail closed without an active Agent, gate Members to non-shared groups, Channels to an available native channel roster, and Chat Settings to active Agent scope. Members routes to the existing groupMembersTarget owner; Computer update still routes through existing status/confirmation/queue/force owners. Focused current-main tests cover gating; exact-head CI remains pending."
       },
       {
         "path": "frontend/src/production/evidence.ts",
