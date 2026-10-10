@@ -2819,6 +2819,7 @@ internal struct MobileBotChat: View {
         threadLoadGeneration &+= 1
         let generation = threadLoadGeneration
         let ownedBotId = bot.id
+        let ownedAccountKey = model.settingsNoticeAccountKey
         threadLoadingRootId = rootId
         defer {
             if generation == threadLoadGeneration, threadLoadingRootId == rootId {
@@ -2833,6 +2834,7 @@ internal struct MobileBotChat: View {
             for page in 0..<50 {
                 guard generation == threadLoadGeneration,
                       bot.id == ownedBotId,
+                      model.settingsNoticeAccountKey == ownedAccountKey,
                       threadRootId == rootId
                 else { return }
 
@@ -2859,6 +2861,7 @@ internal struct MobileBotChat: View {
                 }
                 guard generation == threadLoadGeneration,
                       bot.id == ownedBotId,
+                      model.settingsNoticeAccountKey == ownedAccountKey,
                       threadRootId == rootId,
                       let event = result.value as? [String: Any],
                       let rows = event["messages"] as? [[String: Any]]
@@ -2912,6 +2915,7 @@ internal struct MobileBotChat: View {
         } catch {
             guard generation == threadLoadGeneration,
                   bot.id == ownedBotId,
+                  model.settingsNoticeAccountKey == ownedAccountKey,
                   threadRootId == rootId
             else { return }
             threadLoadError = error.localizedDescription
