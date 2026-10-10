@@ -3921,6 +3921,66 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-reaction-picker-implemented-dependent-catalog-gap",
         "finding": "Desktop quick reactions are 👍/👎/❤️/😂/🎉/😮 and grouped pills preserve first-seen emoji order, counts, self-selection and reactor identity. MobileBotChat uses the same six quick reactions, native pills, settled-message gating, More Reactions sheet, selected-state accessibility, keyboard grid navigation, category/search and custom emoji. Picker mechanics are implemented; complete built-in browse/search parity still depends on the separately open emoji-catalog aliases/skin/full-catalog gap."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-workspace-handoff.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-reaction-workspace-implemented-pending-exact-head-ci",
+        "finding": "Desktop only creates a scoped reaction workspace when both transcript feed and reactToMessage source exist, then shares scope/controller/feed authoritative reconciliation. iOS uses the single MobileBotChat canonical transcript pump plus settled-message reaction controller; optimistic writes and authoritative reconciliation share account+Bot+generation fencing and no second reaction owner is introduced. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/registry.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-adapted-card-registry-implemented-pending-exact-head-ci",
+        "finding": "Desktop registry maps each send-message protocol discriminant to lazy leaf metadata/frame/placeholder. iOS replaces lazy React chunks with strict projectMobileTranscriptCard discriminant projection and native SwiftUI leaf selection in MobileBotChat. Current native projection includes text/widget/cursor-agent/drafts/approval/listener/secret/attachment/connector(s)/local permission and fails closed on malformed shapes; exact-head UI/compile evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/root.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-adapted-card-root-implemented-pending-exact-head-ci",
+        "finding": "Desktop root owns leaf dispatch, frame selection, reaction action/pills placement and read-only/delivery gates. Shipping MobileBotChat is the native root owner and composes the same product responsibilities through canonical card payloads, native action cards, attachment classifications, reaction pills/context actions, and settled/read-only gates. Exact-head UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/secret-request-actions.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-secret-request-implemented-pending-exact-head-ci",
+        "finding": "Desktop secret action trims non-empty values, prevents duplicate pending/provided submission, scopes completion by accountSlot+agentId+generation and settles from authoritative secretProvided state. iOS uses secure native input and canonical secret.provide/secret.provided transport; commit 4593db8eaa57e391c219730b7121790768a2ffc0 adds account+Bot+generation fencing so stale same-account Bot switches cannot write Provided/error state into the replacement scope. Focused fence test committed; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/send-message-text.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-send-message-text-implemented-pending-exact-head-ci",
+        "finding": "Desktop strictly projects text/content/images/channel/streaming/timestamp, treats source as trusted, and only uses URL-card presentation for non-streaming image-free bare links. iOS projectMobileSendMessageText enforces the same typed shape, streaming/image guards and URL-card branch, with native text/image/link presentation; exact-head tests/UI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/thread-affordance.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-thread-affordance-implemented-pending-exact-head-ci",
+        "finding": "Desktop renders View thread only for positive integer reply counts and labels 1 reply/N replies. iOS derives authoritative reply counts from canonical thread topology, hides zero-count affordances, opens the exact root, and exposes the same VoiceOver count label. Exact-head UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/thread-loader.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-thread-loader-implemented-pending-exact-head-ci",
+        "finding": "Desktop thread loader owns one pending root, accountSlot+agentId generation fencing, unavailable/loading/ready/empty/failed states and stale-result rejection. iOS loads canonical conversation history in bounded 200-message pages up to 10,000 messages, validates Host rows/anchors, merges only after locating the exact root, and commit 3bad5826c8f548ba7b60e2cea010c05e2b21091e extends its existing generation+Bot+root fence with account scope so stale cross-account pages/errors cannot merge. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/thread-summary-controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-thread-summary-implemented-pending-exact-head-ci",
+        "finding": "Desktop summary controller maintains scoped reply summaries/entry IDs and resolves in-scope scroll versus out-of-scope thread open. iOS derives reply summaries from the canonical transcript topology, resolves visible roots inline, opens the native thread sheet for full history when needed, and invalidates thread generation on Bot/account lifecycle changes. Exact-head UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/transcript-feed-source.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-transcript-feed-implemented-pending-exact-head-ci",
+        "finding": "Desktop fanout accepts only validated snapshot/appended/updated/cleared transcript events with unique entry IDs and agent identity, then disposes the underlying subscription. iOS uses the canonical MobileBotChat Host transcript baseline/live event pump, strict row projection and account/Bot reconnect fencing as the sole native feed owner; reaction/thread/card consumers reconcile from that source. Exact-head protected/live evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/url-card.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-url-card-implemented-pending-exact-head-ci",
+        "finding": "Desktop normalizes only HTTP(S), caches per URL, renders bare-link/legacy-link metadata, and heals watched failures on reconnect/window focus while successful values remain cached. iOS MarketplaceModel validates/projects/caches successful link metadata and never caches failures; commit 1f08d935e8d275e54994059132c06e91701a7823 adds reconnect plus scene-active healing revisions to remount failed card loads while successful cards resolve from cache. Exact-head compile/UI evidence pending."
       }
     ]
   },
