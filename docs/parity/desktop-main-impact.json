@@ -2648,7 +2648,45 @@
         "finding": "Existing same-origin server-auth gate retained; missing ordinary HTTP(S) foreign WebAuth/autologin token stripping was implemented in the canonical shared Swift owner with focused tests.",
         "status": "implemented-pending-exact-head-ci"
       }
-    }
+    },
+    "reviewedPathEvidence": [
+      {
+        "path": "source/host/src/extensions/memory/extension.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-open",
+        "finding": "Single FeatureHost memory root is real; synthesis replacement/disable background owner remains open."
+      },
+      {
+        "path": "source/host/src/extensions/memory/mod.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-replaced",
+        "finding": "Desktop module declaration is replaced by the iOS-owned mahayana-feature-host module graph; no independent behavior waived."
+      },
+      {
+        "path": "source/host/src/extensions/memory/production.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-open",
+        "finding": "Production root/Host composition is real; proposal/verification/cancellation/telemetry synthesis service remains open."
+      },
+      {
+        "path": "source/host/tests/memory_extension_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-open",
+        "finding": "Single-root contract mapped; synthesis owner replacement/disable test awaits production service."
+      },
+      {
+        "path": "source/host/tests/memory_service_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-open",
+        "finding": "CRUD/shared/project/store semantics mapped; aggregate dynamic synthesis gate/listener parity remains open."
+      },
+      {
+        "path": "source/host/tests/memory_synthesis_store_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-parent",
+        "finding": "Store safety semantics exist in memory_metadata.rs with focused tests; promotion waits for descendant exact-head CI and global gates."
+      }
+    ]
   },
   "historyPolicy": "PR20 old status and evidence historical only",
   "groupSummary": [
