@@ -326,43 +326,32 @@ private func mobileEditorMcpCatalogEntry(
 
 internal func projectMobileEditorMcpSuggestions(
     servers: [MarketplaceMcpServer],
-    catalog: [MobileConnectorCatalogEntry]
+    catalog: [MobileConnectorCatalogEntry],
+    accountKey scopedAccountKey: String
 ) -> [MobileEditorSuggestionItem] {
+    let scope = scopedAccountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !scope.isEmpty else { return [] }
     var seen = Set<String>()
     return servers.compactMap { server in
         let serverIdentifier = server.serverIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
         let serverId = server.serverId.trimmingCharacters(in: .whitespacesAndNewlines)
         let accountKey = server.accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !serverIdentifier.isEmpty,
-              !serverId.isEmpty,
-              !accountKey.isEmpty,
-              seen.insert(serverIdentifier).inserted
-        else { return nil }
-
+        guard !serverIdentifier.isEmpty, !serverId.isEmpty, accountKey == scope,
+              seen.insert(serverIdentifier).inserted else { return nil }
         let safeAccount = mobileEditorMcpSafeAccountLabel(accountKey)
-        let label = accountKey == DEFAULT_MCP_ACCOUNT_KEY
-            ? server.name
-            : "\(server.name) (\(safeAccount))"
+        let label = accountKey == DEFAULT_MCP_ACCOUNT_KEY ? server.name : "\(server.name) (\(safeAccount))"
         let subtitle = mobileEditorMcpStatusLabel(server)
         let metadata = mobileEditorMcpCatalogEntry(server: server, catalog: catalog)
         let reference = MobileComposerMcpReference(
-            workflowReferenceID: "mcp:\(serverId)",
-            serverId: serverId,
-            serverIdentifier: serverIdentifier,
-            accountKey: accountKey,
-            label: label,
-            status: server.status,
-            iconURL: metadata?.iconURL
+            workflowReferenceID: "mcp:\(serverId)", serverId: serverId,
+            serverIdentifier: serverIdentifier, accountKey: accountKey,
+            label: label, status: server.status, iconURL: metadata?.iconURL
         )
         return .init(
-            id: "mcp:\(serverIdentifier)",
-            category: .tools,
-            label: label,
-            subtitle: subtitle.isEmpty ? nil : subtitle,
-            insertion: "@\(label)",
+            id: "mcp:\(serverIdentifier)", category: .tools, label: label,
+            subtitle: subtitle.isEmpty ? nil : subtitle, insertion: "@\(label)",
             keywords: [label, serverIdentifier, accountKey, subtitle],
-            iconURL: metadata?.iconURL,
-            mcpReference: reference
+            iconURL: metadata?.iconURL, mcpReference: reference
         )
     }
 }
@@ -370,17 +359,18 @@ internal func projectMobileEditorMcpSuggestions(
 internal func projectScopedMobileEditorMcpSuggestions(
     servers: [MarketplaceMcpServer],
     catalog: [MobileConnectorCatalogEntry],
-    ownedAccountKey: String,
-    currentAccountKey: String,
+    ownedMcpAccountKey: String,
+    currentMcpAccountKey: String,
+    ownedAppAccountKey: String,
+    currentAppAccountKey: String,
     ownedAgentID: String,
     currentAgentID: String
 ) -> [MobileEditorSuggestionItem] {
-    guard !ownedAccountKey.isEmpty,
-          !ownedAgentID.isEmpty,
-          ownedAccountKey == currentAccountKey,
-          ownedAgentID == currentAgentID
-    else { return [] }
-    return projectMobileEditorMcpSuggestions(servers: servers, catalog: catalog)
+    guard !ownedMcpAccountKey.isEmpty, !ownedAppAccountKey.isEmpty, !ownedAgentID.isEmpty,
+          ownedMcpAccountKey == currentMcpAccountKey,
+          ownedAppAccountKey == currentAppAccountKey,
+          ownedAgentID == currentAgentID else { return [] }
+    return projectMobileEditorMcpSuggestions(servers: servers, catalog: catalog, accountKey: ownedMcpAccountKey)
 }
 
 internal func pruneMobileComposerMcpReferences(
@@ -1976,6 +1966,9 @@ internal struct MobileBotChat: View {
         .onChange(of: model.connectorCatalog) { _, _ in
             adoptEditorMcpReferencesFromModel()
         }
+        .onChange(of: model.mcpBackendAccountKey) { _, _ in
+            invalidateEditorSuggestions()
+        }
         .onChange(of: bot.id) { _, _ in
             resetAcknowledgementScope()
             cancelVoiceInput()
@@ -2638,6 +2631,7 @@ internal struct MobileBotChat: View {
     private var editorSuggestionScopeFingerprint: String {
         [
             model.settingsNoticeAccountKey,
+            model.mcpBackendAccountKey,
             bot.id,
             String(reconnectGeneration),
         ].joined(separator: "|")
@@ -2865,13 +2859,16 @@ internal struct MobileBotChat: View {
 
     @MainActor
     private func adoptEditorMcpReferencesFromModel() {
-        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedMcpAccount = model.mcpBackendAccountKey
+        let ownedAppAccount = model.settingsNoticeAccountKey
         let ownedAgent = bot.id
         editorSuggestionMcpReferences = projectScopedMobileEditorMcpSuggestions(
             servers: model.mcpServers,
             catalog: model.connectorCatalog,
-            ownedAccountKey: ownedAccount,
-            currentAccountKey: model.settingsNoticeAccountKey,
+            ownedMcpAccountKey: ownedMcpAccount,
+            currentMcpAccountKey: model.mcpBackendAccountKey,
+            ownedAppAccountKey: ownedAppAccount,
+            currentAppAccountKey: model.settingsNoticeAccountKey,
             ownedAgentID: ownedAgent,
             currentAgentID: bot.id
         )
@@ -2883,6 +2880,7 @@ internal struct MobileBotChat: View {
         editorSuggestionGeneration &+= 1
         let generation = editorSuggestionGeneration
         let ownedAccount = model.settingsNoticeAccountKey
+        let ownedMcpAccount = model.mcpBackendAccountKey
         let ownedAgent = bot.id
         let ownedReconnect = reconnectGeneration
         guard !ownedAccount.isEmpty, !ownedAgent.isEmpty else {
@@ -2944,11 +2942,14 @@ internal struct MobileBotChat: View {
                   bot.id == ownedAgent,
                   reconnectGeneration == ownedReconnect
             else { return }
+            guard model.mcpBackendAccountKey == ownedMcpAccount else { return }
             editorSuggestionMcpReferences = projectScopedMobileEditorMcpSuggestions(
                 servers: snapshot.servers,
                 catalog: snapshot.catalog,
-                ownedAccountKey: ownedAccount,
-                currentAccountKey: model.settingsNoticeAccountKey,
+                ownedMcpAccountKey: ownedMcpAccount,
+                currentMcpAccountKey: model.mcpBackendAccountKey,
+                ownedAppAccountKey: ownedAccount,
+                currentAppAccountKey: model.settingsNoticeAccountKey,
                 ownedAgentID: ownedAgent,
                 currentAgentID: bot.id
             )
