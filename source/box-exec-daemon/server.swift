@@ -1,9 +1,9 @@
 import Foundation
 
 enum IOSBoxExecOperation: Equatable, Sendable {
-    enum TimeoutBehavior: String, Equatable, Sendable {
-        case cancel
-        case background
+    enum TimeoutBehavior: Int, Equatable, Sendable {
+        case cancel = 1
+        case background = 2
     }
 
     case read(path: String, offset: Int?, limit: Int?)
@@ -42,9 +42,9 @@ enum IOSBoxExecOperation: Equatable, Sendable {
             object["path"] = .string(path)
             if let offset { object["offset"] = .number(Double(offset)) }
             if let limit { object["limit"] = .number(Double(limit)) }
-        case .write(let path, let fileBytesBase64, let toolCallId):
+        case .write(let path, let fileBytes, let toolCallId):
             object["path"] = .string(path)
-            object["fileBytesBase64"] = .string(fileBytesBase64)
+            object["fileBytes"] = .string(fileBytes)
             object["toolCallId"] = .string(toolCallId)
         case .shell(let command, let workingDirectory),
              .shellStream(let command, let workingDirectory),
