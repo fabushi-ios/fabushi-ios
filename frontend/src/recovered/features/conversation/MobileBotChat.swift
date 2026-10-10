@@ -330,6 +330,122 @@ internal func mobileMainTranscriptEntries(_ entries: [MobileChatMessage]) -> [Mo
     return entries.filter { mainIds.contains(mobileTranscriptCanonicalId($0)) }
 }
 
+internal struct MobileTranscriptAdjacency: Equatable {
+    let isContinuedFromPrev: Bool
+    let isContinuedToNext: Bool
+    let isGroupStart: Bool
+    let isRunStart: Bool
+    let isFollowedByThreadChip: Bool
+    let isGroupEnd: Bool
+
+    static let empty = MobileTranscriptAdjacency(
+        isContinuedFromPrev: false,
+        isContinuedToNext: false,
+        isGroupStart: false,
+        isRunStart: false,
+        isFollowedByThreadChip: false,
+        isGroupEnd: false
+    )
+}
+
+private struct MobileTranscriptAdjacencySemantics {
+    let role: MobileChatRole?
+    let groupKey: String?
+    let isBubble: Bool
+    let hasReaction: Bool
+}
+
+private func mobileTranscriptStandaloneEmoji(_ text: String) -> Bool {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed.count == 1 else { return false }
+    return trimmed.unicodeScalars.contains { scalar in
+        scalar.properties.isEmojiPresentation || scalar.properties.isEmoji
+    }
+}
+
+private func mobileTranscriptImageOnlyMarkdown(_ text: String) -> Bool {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty,
+          let expression = try? NSRegularExpression(pattern: #"!\[[^\]]*\]\([^)]*\)"#)
+    else { return false }
+    let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+    let remainder = expression.stringByReplacingMatches(
+        in: trimmed,
+        options: [],
+        range: range,
+        withTemplate: ""
+    )
+    return remainder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
+private func mobileTranscriptAdjacencySemantics(
+    _ entry: MobileChatMessage
+) -> MobileTranscriptAdjacencySemantics {
+    guard entry.kind == .message else {
+        return .init(role: nil, groupKey: nil, isBubble: false, hasReaction: false)
+    }
+
+    let hasAttachment = entry.attachmentProjection != nil
+        || !(entry.attachmentURL?
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    let isSendMessageCard = entry.sendMessageTextProjection != nil
+    let text = entry.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let isBubble = !hasAttachment
+        && !isSendMessageCard
+        && !text.isEmpty
+        && !mobileTranscriptImageOnlyMarkdown(text)
+        && !(entry.role == .user && mobileTranscriptStandaloneEmoji(text))
+
+    return .init(
+        role: entry.role,
+        groupKey: entry.role.rawValue,
+        isBubble: isBubble,
+        hasReaction: !entry.reactions.isEmpty
+    )
+}
+
+internal func projectMobileTranscriptAdjacency(
+    _ entries: [MobileChatMessage],
+    threadChipEntryIDs: Set<String> = []
+) -> [MobileTranscriptAdjacency] {
+    entries.enumerated().map { index, entry in
+        let current = mobileTranscriptAdjacencySemantics(entry)
+        guard current.role != nil, current.groupKey != nil else {
+            return .empty
+        }
+
+        let previousEntry = index > 0 ? entries[index - 1] : nil
+        let nextEntry = index + 1 < entries.count ? entries[index + 1] : nil
+        let previous = previousEntry.map(mobileTranscriptAdjacencySemantics)
+        let next = nextEntry.map(mobileTranscriptAdjacencySemantics)
+        let currentId = mobileTranscriptCanonicalId(entry)
+        let hasThreadChip = threadChipEntryIDs.contains(currentId)
+        let previousHasThreadChip = previousEntry
+            .map { threadChipEntryIDs.contains(mobileTranscriptCanonicalId($0)) }
+            ?? false
+        let isIndicatorSeaming = current.role == .assistant
+            && !hasThreadChip
+            && !current.hasReaction
+
+        return .init(
+            isContinuedFromPrev: current.isBubble
+                && previous?.groupKey == current.groupKey
+                && previous?.isBubble == true
+                && !previousHasThreadChip,
+            isContinuedToNext: current.isBubble
+                && (
+                    (next?.groupKey == current.groupKey && next?.isBubble == true)
+                    || isIndicatorSeaming
+                ),
+            isGroupStart: previousEntry != nil && previous?.groupKey != current.groupKey,
+            isRunStart: previousEntry == nil || previous?.groupKey != current.groupKey,
+            isFollowedByThreadChip: current.isBubble && hasThreadChip && !current.hasReaction,
+            isGroupEnd: current.role != .assistant
+                && (nextEntry == nil || next?.groupKey != current.groupKey)
+        )
+    }
+}
+
 internal func mobileThreadEntries(
     _ entries: [MobileChatMessage],
     rootId: String
@@ -1051,7 +1167,17 @@ internal struct MobileBotChat: View {
     }
 
     private var transcriptList: some View {
-        ScrollViewReader { proxy in
+        let mainEntries = mobileMainTranscriptEntries(entries)
+        let threadReplyCounts = mobileThreadReplyCounts(entries)
+        let threadChipEntryIDs = Set(
+            threadReplyCounts.compactMap { key, value in value > 0 ? key : nil }
+        )
+        let adjacency = projectMobileTranscriptAdjacency(
+            mainEntries,
+            threadChipEntryIDs: threadChipEntryIDs
+        )
+
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 7) {
                     if entries.isEmpty {
@@ -1070,8 +1196,17 @@ internal struct MobileBotChat: View {
                         .padding(.horizontal, 30)
                     }
 
-                    ForEach(mobileMainTranscriptEntries(entries)) { entry in
-                        transcript(entry)
+                    ForEach(Array(mainEntries.enumerated()), id: \.element.id) { index, entry in
+                        transcript(
+                            entry,
+                            adjacency: adjacency.indices.contains(index) ? adjacency[index] : .empty
+                        )
+                            .padding(
+                                .top,
+                                adjacency.indices.contains(index) && adjacency[index].isContinuedFromPrev
+                                    ? -4
+                                    : 0
+                            )
                             .background(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .fill(
@@ -1129,7 +1264,7 @@ internal struct MobileBotChat: View {
                     withAnimation(.easeOut(duration: 0.16)) {
                         proxy.scrollTo(match.entryId, anchor: .center)
                     }
-                } else if let last = mobileMainTranscriptEntries(entries).last {
+                } else if let last = mainEntries.last {
                     withAnimation(.easeOut(duration: 0.16)) {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
@@ -1573,7 +1708,10 @@ internal struct MobileBotChat: View {
     }
 
     @ViewBuilder
-    private func transcript(_ entry: MobileChatMessage) -> some View {
+    private func transcript(
+        _ entry: MobileChatMessage,
+        adjacency: MobileTranscriptAdjacency = .empty
+    ) -> some View {
         if entry.kind == .thinking {
             HStack(spacing: 7) {
                 ClothGhostAvatar(botId: bot.id, size: 22, active: true)
@@ -1739,7 +1877,18 @@ internal struct MobileBotChat: View {
                 .foregroundStyle(.white)
                 .tint(.white)
                 .padding(.horizontal, 15).padding(.vertical, 10)
-                .background(.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(
+                    .black,
+                    in: UnevenRoundedRectangle(
+                        cornerRadii: .init(
+                            topLeading: 18,
+                            bottomLeading: 18,
+                            bottomTrailing: adjacency.isContinuedToNext ? 8 : 18,
+                            topTrailing: adjacency.isContinuedFromPrev ? 8 : 18
+                        ),
+                        style: .continuous
+                    )
+                )
                 .contextMenu {
                     if mobileStableReplyTargetID(entry) != nil {
                         Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
@@ -1759,9 +1908,16 @@ internal struct MobileBotChat: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 3) {
-                Text(bot.name).font(.caption).foregroundStyle(.secondary).padding(.leading, 12)
+                if adjacency.isRunStart {
+                    Text(bot.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 12)
+                }
                 HStack(alignment: .bottom, spacing: 7) {
                     ClothGhostAvatar(botId: bot.id, size: 20)
+                        .opacity(adjacency.isContinuedToNext ? 0 : 1)
+                        .accessibilityHidden(adjacency.isContinuedToNext)
                     VStack(alignment: .leading, spacing: 7) {
                         replyReferenceContent(entry)
                         messageTextContent(entry)
@@ -1771,7 +1927,18 @@ internal struct MobileBotChat: View {
                         threadAffordance(entry)
                     }
                     .padding(.horizontal, 15).padding(.vertical, 10)
-                    .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(
+                        Color.black.opacity(0.055),
+                        in: UnevenRoundedRectangle(
+                            cornerRadii: .init(
+                                topLeading: adjacency.isContinuedFromPrev ? 8 : 18,
+                                bottomLeading: adjacency.isContinuedToNext ? 8 : 18,
+                                bottomTrailing: 18,
+                                topTrailing: 18
+                            ),
+                            style: .continuous
+                        )
+                    )
                     .contextMenu {
                         if mobileStableReplyTargetID(entry) != nil {
                             Button("Reply") { beginReply(to: entry, inThread: threadRootId != nil) }
