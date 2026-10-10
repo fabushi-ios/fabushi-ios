@@ -619,6 +619,26 @@ final class GrokMobileBotServiceTests: XCTestCase {
             "Photo"
         )
 
+        var file = MobileChatMessage(
+            id: "history:m-file",
+            role: .assistant,
+            text: "",
+            canonicalMessageId: "m-file"
+        )
+        file.attachmentURL = "https://example.invalid/report.pdf"
+        file.attachmentFileName = "Quarterly report.pdf"
+        XCTAssertEqual(
+            mobileReplyReferencePreview(for: file),
+            .file(
+                url: "https://example.invalid/report.pdf",
+                name: "Quarterly report.pdf"
+            )
+        )
+        XCTAssertEqual(
+            mobileReplyReferenceQuoteLabel(mobileReplyReferencePreview(for: file)),
+            "Quarterly report.pdf"
+        )
+
         var linkMessage = MobileChatMessage(
             id: "history:m-3",
             role: .user,
@@ -635,9 +655,20 @@ final class GrokMobileBotServiceTests: XCTestCase {
             "docs.example.invalid"
         )
 
+        let resolved = mobileResolveReplyReference(
+            targetID: "m-1",
+            entries: [text, image, file, linkMessage]
+        )
+        XCTAssertTrue(resolved.isResolved)
+        XCTAssertEqual(resolved.targetID, "m-1")
+        XCTAssertEqual(
+            resolved.preview,
+            .assistantText("A reply with normalized spacing")
+        )
+
         let missing = mobileResolveReplyReference(
             targetID: "deleted-message",
-            entries: [text, image, linkMessage]
+            entries: [text, image, file, linkMessage]
         )
         XCTAssertFalse(missing.isResolved)
         XCTAssertEqual(missing.preview, .missing)
