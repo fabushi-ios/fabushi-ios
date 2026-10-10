@@ -761,7 +761,11 @@ fn native_send_message_event(
         .get("generatedAttachment")
         .cloned()
         .filter(|value| !value.is_null());
-    if text.is_empty() && attachment.is_none() {
+    let transcript_card = output
+        .get("generatedTranscriptCard")
+        .cloned()
+        .filter(|value| !value.is_null());
+    if text.is_empty() && attachment.is_none() && transcript_card.is_none() {
         return None;
     }
     let tool_call_id = output
@@ -786,6 +790,7 @@ fn native_send_message_event(
                 "deliveryTool": "send_message",
                 "toolCallId": tool_call_id,
                 "generatedAttachment": attachment,
+                "transcriptCard": transcript_card,
                 "replyToMessageId": reply_to_message_id,
             }),
         },
@@ -1004,6 +1009,32 @@ mod tests {
         assert_eq!(message.metadata["toolCallId"], "call-send-42");
         assert_eq!(message.metadata["generatedAttachment"]["name"], "report.pdf");
         assert_eq!(message.metadata["replyToMessageId"], "user:42");
+    }
+
+    #[test]
+    fn native_send_message_projection_accepts_card_only_awaiting_user_delivery() {
+        let event = native_send_message_event(
+            &ConversationId::new("mahayana-ai:agent:test"),
+            &json!({
+                "generatedTranscriptCard": {
+                    "kind": "secretRequest",
+                    "requestId": "secret:call-1",
+                    "label": "API key",
+                    "provided": false
+                },
+                "toolCallId": "call-1"
+            }),
+        )
+        .expect("card-only delivery");
+        let AgentEvent::MessageCompleted { message } = event else {
+            panic!("card-only send_message must become MessageCompleted");
+        };
+        assert_eq!(message.text, "");
+        assert_eq!(message.metadata["transcriptCard"]["kind"], "secretRequest");
+        assert_eq!(
+            message.metadata["transcriptCard"]["requestId"],
+            "secret:call-1"
+        );
     }
 
     #[test]

@@ -878,7 +878,11 @@ impl NativeEngine {
                                 output["syntheticReplyNudge"] = Value::Bool(true);
                             }
                         }
-                        let waiting_user = call.name == "request_box_help";
+                        let waiting_user = call.name == "request_box_help"
+                            || output
+                                .get("awaitingUser")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false);
                         if call.name == "workflow_create" {
                             last_workflow_id = output
                                 .get("workflow_id")
@@ -1030,11 +1034,138 @@ impl NativeEngine {
                         .and_then(Value::as_object)
                         .cloned()
                         .map(Value::Object);
-                    if message.is_none() && attachment.is_none() {
+                    let widget = call
+                        .arguments
+                        .get("widget")
+                        .and_then(Value::as_object)
+                        .cloned()
+                        .map(Value::Object);
+                    let secret_request = call
+                        .arguments
+                        .get("secret_request")
+                        .and_then(Value::as_object)
+                        .cloned()
+                        .map(Value::Object);
+                    let structured_count =
+                        usize::from(widget.is_some()) + usize::from(secret_request.is_some());
+                    if structured_count > 1 {
                         return Err(KernelError::Backend(
-                            "send_message requires a non-empty message or attachment".into(),
+                            "send_message accepts at most one awaiting-user card".into(),
                         ));
                     }
+                    if message.is_none()
+                        && attachment.is_none()
+                        && widget.is_none()
+                        && secret_request.is_none()
+                    {
+                        return Err(KernelError::Backend(
+                            "send_message requires text, attachment, widget, or secret_request"
+                                .into(),
+                        ));
+                    }
+                    let transcript_card = if let Some(widget) = widget {
+                        let prompt = widget
+                            .get("prompt")
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .ok_or_else(|| {
+                                KernelError::Backend(
+                                    "send_message widget requires a non-empty prompt".into(),
+                                )
+                            })?;
+                        let options = widget
+                            .get("options")
+                            .and_then(Value::as_array)
+                            .ok_or_else(|| {
+                                KernelError::Backend(
+                                    "send_message widget requires an options array".into(),
+                                )
+                            })?;
+                        if options.is_empty() || options.len() > 12 {
+                            return Err(KernelError::Backend(
+                                "send_message widget requires 1-12 options".into(),
+                            ));
+                        }
+                        let mut normalized_options = Vec::with_capacity(options.len());
+                        for option in options {
+                            let label = option
+                                .get("label")
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|value| !value.is_empty())
+                                .ok_or_else(|| {
+                                    KernelError::Backend(
+                                        "send_message widget options require labels".into(),
+                                    )
+                                })?;
+                            normalized_options.push(json!({
+                                "label": label,
+                                "value": option
+                                    .get("value")
+                                    .and_then(Value::as_str)
+                                    .map(str::trim)
+                                    .filter(|value| !value.is_empty()),
+                                "description": option
+                                    .get("description")
+                                    .and_then(Value::as_str)
+                                    .map(str::trim)
+                                    .filter(|value| !value.is_empty()),
+                                "style": option
+                                    .get("style")
+                                    .and_then(Value::as_str)
+                                    .map(str::trim)
+                                    .filter(|value| !value.is_empty()),
+                            }));
+                        }
+                        Some(json!({
+                            "kind": "widget",
+                            "widget": {
+                                "prompt": prompt,
+                                "helpText": widget
+                                    .get("help_text")
+                                    .and_then(Value::as_str)
+                                    .map(str::trim)
+                                    .filter(|value| !value.is_empty()),
+                                "options": normalized_options,
+                                "allowCustom": widget
+                                    .get("allow_custom")
+                                    .and_then(Value::as_bool)
+                                    .unwrap_or(false),
+                                "dismissOnMoveOn": widget
+                                    .get("dismiss_on_move_on")
+                                    .and_then(Value::as_bool)
+                                    .unwrap_or(false),
+                            },
+                            "respondedValue": Value::Null,
+                            "widgetDismissed": false,
+                            "widgetSkipped": false,
+                        }))
+                    } else if let Some(secret_request) = secret_request {
+                        let label = secret_request
+                            .get("label")
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .ok_or_else(|| {
+                                KernelError::Backend(
+                                    "send_message secret_request requires a non-empty label".into(),
+                                )
+                            })?;
+                        Some(json!({
+                            "kind": "secretRequest",
+                            "requestId": format!("secret:{}", call.call_id),
+                            "label": label,
+                            "description": secret_request
+                                .get("description")
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|value| !value.is_empty()),
+                            "provided": false,
+                        }))
+                    } else {
+                        None
+                    };
                     let reply_to_message_id = call
                         .arguments
                         .get("reply_to_message_id")
@@ -1046,6 +1177,8 @@ impl NativeEngine {
                         "characters": message.map(|value| value.chars().count()).unwrap_or_default(),
                         "generatedMessage": message,
                         "generatedAttachment": attachment,
+                        "generatedTranscriptCard": transcript_card,
+                        "awaitingUser": transcript_card.is_some(),
                         "toolCallId": call.call_id.clone(),
                         "replyToMessageId": reply_to_message_id,
                     }))
@@ -3344,7 +3477,7 @@ fn tool_definitions(enable_process_tools: bool, enable_web_research: bool) -> Ve
         function_tool(
             "send_message",
             "Send a concise user-visible progress update or answer as a separate message bubble. Use this for meaningful milestones, confirmations, and the final answer in a multi-step task. Do not invent progress; only report work that has happened or is about to happen.",
-            json!({"type":"object","properties":{"message":{"type":"string","description":"Optional concise text to show the user."},"attachment":{"type":"object","properties":{"url":{"type":"string"},"file_name":{"type":"string"},"alt":{"type":"string"},"channel":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["url"],"additionalProperties":false},"reply_to_message_id":{"type":"string","description":"Optional live transcript message id to reply to. Invalid or stale ids are ignored by the transcript owner."}},"anyOf":[{"required":["message"]},{"required":["attachment"]}],"additionalProperties":false}),
+            json!({"type":"object","properties":{"message":{"type":"string","description":"Optional concise text to show the user."},"attachment":{"type":"object","properties":{"url":{"type":"string"},"file_name":{"type":"string"},"alt":{"type":"string"},"channel":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"}},"required":["url"],"additionalProperties":false},"widget":{"type":"object","description":"Ask one bounded multiple-choice question and stop this turn until the user responds.","properties":{"prompt":{"type":"string","minLength":1,"maxLength":1000},"help_text":{"type":"string","maxLength":1000},"options":{"type":"array","minItems":1,"maxItems":12,"items":{"type":"object","properties":{"label":{"type":"string","minLength":1,"maxLength":200},"value":{"type":"string","maxLength":500},"description":{"type":"string","maxLength":500},"style":{"type":"string","maxLength":64}},"required":["label"],"additionalProperties":false}},"allow_custom":{"type":"boolean"},"dismiss_on_move_on":{"type":"boolean"}},"required":["prompt","options"],"additionalProperties":false},"secret_request":{"type":"object","description":"Request a sensitive value through the existing secure secret-entry UI and stop this turn. Never ask the user to place the secret in ordinary chat text.","properties":{"label":{"type":"string","minLength":1,"maxLength":200},"description":{"type":"string","maxLength":1000}},"required":["label"],"additionalProperties":false},"reply_to_message_id":{"type":"string","description":"Optional live transcript message id to reply to. Invalid or stale ids are ignored by the transcript owner."}},"anyOf":[{"required":["message"]},{"required":["attachment"]},{"required":["widget"]},{"required":["secret_request"]}],"additionalProperties":false}),
         ),
         function_tool(
             "react_to_message",
@@ -3590,6 +3723,28 @@ mod tests {
         assert!(
             !is_conversation_fast_lane(&multimodal),
             "non-plain/multimodal user content must keep the full tool path",
+        );
+    }
+
+    #[test]
+    fn send_message_schema_exposes_existing_widget_and_secret_card_owners() {
+        let tools = tool_definitions(false, false);
+        let send = tools
+            .iter()
+            .find(|tool| tool.get("name").and_then(Value::as_str) == Some("send_message"))
+            .expect("send_message tool");
+        let properties = &send["parameters"]["properties"];
+        assert!(properties.get("widget").is_some());
+        assert!(properties.get("secret_request").is_some());
+        assert_eq!(
+            properties["widget"]["properties"]["options"]["maxItems"],
+            12
+        );
+        assert!(
+            properties["secret_request"]["properties"]
+                .get("value")
+                .is_none(),
+            "model must never provide the secret itself"
         );
     }
 
