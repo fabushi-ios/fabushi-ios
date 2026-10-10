@@ -2952,11 +2952,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI + canonical plugin/workflow sources",
-      "ios_platform_delta": "iOS already has canonical plugin/MCP marketplace/runtime owners, but the native Bot composer has no MCP-reference suggestion surface or scoped refresh/auth projection equivalent mounted today.",
-      "implementation_status": "mapped",
-      "production_evidence": "Existing MarketplaceModel/plugin runtime remain the only MCP owners; MobileBotChat is the only composer owner. No parallel MCP catalog/provider was added.",
-      "test_evidence": "Plugin/runtime tests cover source ownership; native editor MCP reference projection/filter/scope tests remain required.",
-      "notes": "IOS-MAIN-DEP-EDITOR-MCP-REF-20261009: exact Desktop source reviewed; editor surface remains open.",
+      "ios_platform_delta": "SwiftUI uses the existing MarketplaceModel/Coordinator MCP runtime and the single MobileBotChat composer owner. The composer derives the canonical MCP backend identity from cursorAuth.status (authId, then email), projects only matching server.accountKey rows, preserves serverIdentifier/serverId/status/catalog icon semantics, inserts workflowReference id mcp:${serverId}, and fences App-account/Agent/reconnect/request generations without a second MCP runtime.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift (mcpBackendAccountKey; refreshMcpReferenceSnapshot); frontend/src/recovered/features/conversation/MobileBotChat.swift (projectMobileEditorMcpSuggestions; projectScopedMobileEditorMcpSuggestions; refreshEditorSuggestions; mobileComposerRichText); source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs and mahayana-host-protocol/src/lib.rs (validated mcpReferences/richText shipping protocol).",
+      "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers default/non-default account isolation, duplicate serverIdentifier, catalog icon/status, disabled policy, auth-completion status refresh, MCP/App-account/Agent fencing and workflowReference rich text. Current exact-head Actions are still required before verified promotion.",
+      "notes": "Implemented in shipping composer on PR #3 descendants 997f403072098e08b6ef1d02ace5cc06cf38f9bc / 257f04d509f4eaab25edcb4b9ca262d3f16d98a2 / e2076fc94acc0fea9d1cb564acfe71c3f4b13f6a. Keep below verified until same final HEAD ordinary/protected CI and completeness evidence succeed.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -2968,11 +2968,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "Current native transcript can display/copy links but has no PR-reference candidate projection or rich-text PR insertion UI. GitHub/cloud data must be consumed through existing owners rather than a new repository client.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat remains the composer/transcript owner; no duplicate GitHub or cloud-agent provider introduced.",
-      "test_evidence": "No focused native PR-reference projection/precedence/watcher lifecycle evidence yet.",
-      "notes": "IOS-MAIN-DEP-EDITOR-PR-REF-20261009: exact Desktop source reviewed; product surface missing.",
+      "ios_platform_delta": "MobileBotChat projects PR candidates from canonical transcript richText (including prReference nodes and link marks), plain-text fallback GitHub/Cursor review URLs, and the existing cloud-agent polling owner. It preserves node > cloud > text precedence, PR-number dedupe, account+Agent scope fencing, SwiftUI task cancellation/release on scope/disappear, and stale-result checks without creating another GitHub/cloud provider.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (projectMobileEditorPrReferences; projectMobileEditorPrSuggestionItems; mobileComposerRichText; cloudAgentScopeFingerprint; pollVisibleCloudAgents; send/retry durable PR references); source/ios-main/account/cursor-dashboard-client.swift (canonical cloud-agent PR metadata).",
+      "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers node>cloud>text priority, PR-number dedupe, GitHub/Cursor URL projection, account and Agent switch fencing, suggestion insertion and MCP+PR rich-text coexistence. Current exact-head Actions are still required before verified promotion.",
+      "notes": "Implemented in the shipping composer during the current PR #3 descendant chain; focused Agent-switch fencing added at 775c4eabddf48b970eefdc6126e7207c469df676. Keep below verified until same final HEAD ordinary/protected CI and completeness evidence succeed.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
