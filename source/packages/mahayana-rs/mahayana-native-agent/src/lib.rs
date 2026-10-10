@@ -42,6 +42,7 @@ struct NativeThread {
 #[derive(Clone)]
 struct NativeMcpSession {
     plugin: ResolvedMcpPlugin,
+    platform: mahayana_platform_core::HostPlatform,
     tools: Vec<Value>,
 }
 
@@ -583,6 +584,113 @@ impl AgentBackend for NativeAgentBackend {
     }
 
     async fn refresh_mcp_servers(&self) -> Result<(), AgentError> {
+        let live = self
+            .mcp_sessions
+            .lock()
+            .map_err(|_| AgentError::Backend("native MCP session registry poisoned".into()))?
+            .iter()
+            .map(|(thread_id, session)| {
+                (
+                    thread_id.clone(),
+                    session.plugin.plugin_id.clone(),
+                    session.plugin.server_name.clone(),
+                    session.platform,
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut seen = HashSet::new();
+        for (_thread_id, plugin_id, server, platform) in live {
+            if !seen.insert(server.clone()) {
+                continue;
+            }
+            let generation = self
+                .mcp_server_state
+                .lock()
+                .map_err(|_| AgentError::Backend("native MCP server state poisoned".into()))?
+                .begin(&server, &plugin_id)
+                .ok_or_else(|| AgentError::Backend("native MCP server generation exhausted".into()))?;
+            let registry = self.config.mcp_registry.clone();
+            let plugin_id_for_resolve = plugin_id.clone();
+            let resolved = tokio::task::spawn_blocking(move || {
+                registry.resolve_plugin(&plugin_id_for_resolve, platform)
+            })
+            .await
+            .map_err(|error| AgentError::Backend(error.to_string()))?;
+            let resolved = match resolved {
+                Ok(resolved) if resolved.server_name == server => resolved,
+                Ok(resolved) => {
+                    let detail = format!(
+                        "MCP refresh resolved {} instead of {}",
+                        resolved.server_name,
+                        server
+                    );
+                    let _ = self.settle_mcp_server_attempt(
+                        &server,
+                        generation,
+                        "error",
+                        Some(detail.clone()),
+                        Vec::new(),
+                    )?;
+                    return Err(AgentError::Unavailable(detail));
+                }
+                Err(error) => {
+                    let detail = error.to_string();
+                    let _ = self.settle_mcp_server_attempt(
+                        &server,
+                        generation,
+                        "error",
+                        Some(detail.clone()),
+                        Vec::new(),
+                    )?;
+                    return Err(AgentError::Unavailable(detail));
+                }
+            };
+            let client = resolved.client();
+            let tools = tokio::task::spawn_blocking(move || client.list_tools())
+                .await
+                .map_err(|error| AgentError::Backend(error.to_string()))?;
+            let tools = match tools {
+                Ok(tools) => tools,
+                Err(error) => {
+                    let detail = error.to_string();
+                    let _ = self.settle_mcp_server_attempt(
+                        &server,
+                        generation,
+                        "error",
+                        Some(detail.clone()),
+                        Vec::new(),
+                    )?;
+                    return Err(AgentError::Unavailable(detail));
+                }
+            };
+            {
+                let mut sessions = self
+                    .mcp_sessions
+                    .lock()
+                    .map_err(|_| AgentError::Backend("native MCP session registry poisoned".into()))?;
+                let state = self
+                    .mcp_server_state
+                    .lock()
+                    .map_err(|_| AgentError::Backend("native MCP server state poisoned".into()))?;
+                if !state.is_current(&server, generation) {
+                    continue;
+                }
+                for session in sessions.values_mut() {
+                    if session.plugin.server_name == server {
+                        session.plugin = resolved.clone();
+                        session.platform = platform;
+                        session.tools = tools.clone();
+                    }
+                }
+            }
+            let _ = self.settle_mcp_server_attempt(
+                &server,
+                generation,
+                "connected",
+                None,
+                tools,
+            )?;
+        }
         Ok(())
     }
 
@@ -702,6 +810,7 @@ impl AgentBackend for NativeAgentBackend {
                 thread_id.to_string(),
                 NativeMcpSession {
                     plugin: resolved.clone(),
+                    platform,
                     tools: tools.clone(),
                 },
             );
