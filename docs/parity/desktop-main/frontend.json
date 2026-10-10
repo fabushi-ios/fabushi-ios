@@ -3000,11 +3000,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "iOS has lower-level mention/workflow/plugin primitives but no equivalent native Bot-composer suggestion state machine, fuzzy ranking/recents or keyboard-selection surface yet.",
-      "implementation_status": "mapped",
-      "production_evidence": "No new parallel suggestion data store introduced; future native state must consume existing workflow/plugin/Agent owners from MobileBotChat.",
-      "test_evidence": "No focused native projection/fuzzy/recents/scope-disconnect tests yet.",
-      "notes": "IOS-MAIN-DEP-EDITOR-SUGGESTION-PROVIDER-20261009: exact Desktop provider reviewed.",
+      "ios_platform_delta": "The single shipping MobileBotChat composer owns native suggestion state. It projects visible Agent/group/everyone rows and validated workflows, combines MCP and PR providers, performs normalized fuzzy ranking, recent-first ordering including emoji recents, keyboard move/select/dismiss, and uses account/MCP-account/Agent/reconnect/request generations. Root coordinator connection state is passed into the composer so every non-connected phase fails closed immediately while durable selected composer references remain intact; recovery refreshes through the existing reconnect owner.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (projectMobileEditorMentionSuggestions; projectMobileEditorWorkflowSuggestions; mobileEditorSuggestionRows; mobileEditorSuggestionScore; mobileEditorSuggestionNextIndex; mobileEditorSuggestionProviderIsAvailable; refreshEditorSuggestions; editorSuggestionScopeFingerprint); frontend/src/production/GrokMobileShell.swift (canonical MobileCoordinatorConnectionSnapshot phase passed as suggestionTransportConnected).",
+      "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers MCP/PR suggestion integration, fuzzy/hash selection, account/Agent fencing, emoji recent ordering and connected/account/Agent fail-closed provider availability. Same-final-HEAD GitHub Actions remain required before verified promotion.",
+      "notes": "Implemented through current PR #3 descendant 0b2776947cb4e47e3c32495dadd587b22f66d7d3. Transport disconnect no longer relies on reconnectGeneration alone; root connection phase closes transient rows immediately. Keep below verified until exact-head ordinary/protected CI succeeds.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
