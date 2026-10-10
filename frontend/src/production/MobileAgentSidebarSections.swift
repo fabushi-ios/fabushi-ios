@@ -8,6 +8,14 @@ struct MobileAgentSidebarSection: Codable, Identifiable, Equatable {
 }
 
 enum MobileAgentSidebarSections {
+    static let pinnedSectionID = "__pinned__"
+    static let unassignedSectionID = "__unassigned__"
+    private static let reservedSectionIDs: Set<String> = [
+        "__agents__",
+        pinnedSectionID,
+        unassignedSectionID,
+    ]
+
     static func canAssign(isPinned: Bool, isHidden: Bool) -> Bool {
         !isPinned && !isHidden
     }
@@ -18,7 +26,10 @@ enum MobileAgentSidebarSections {
         var result: [MobileAgentSidebarSection] = []
         for section in sections {
             let id = section.id.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !id.isEmpty, id != "__agents__", seenSections.insert(id).inserted else { continue }
+            guard !id.isEmpty,
+                  !reservedSectionIDs.contains(id),
+                  seenSections.insert(id).inserted
+            else { continue }
             var ids: [String] = []
             for agentId in section.agentIds where !agentId.isEmpty {
                 if claimedAgents.insert(agentId).inserted {
@@ -30,6 +41,54 @@ enum MobileAgentSidebarSections {
                 name: section.name,
                 agentIds: ids,
                 isCollapsed: section.isCollapsed
+            ))
+        }
+        return result
+    }
+
+    static func projected(
+        agentIds: [String],
+        pinnedAgentIds: Set<String>,
+        sections: [MobileAgentSidebarSection],
+        searching: Bool
+    ) -> [MobileAgentSidebarSection] {
+        var seen = Set<String>()
+        let orderedAgentIds = agentIds.filter { !$0.isEmpty && seen.insert($0).inserted }
+        let pinned = orderedAgentIds.filter { pinnedAgentIds.contains($0) }
+        var result: [MobileAgentSidebarSection] = []
+        if !pinned.isEmpty {
+            result.append(.init(
+                id: pinnedSectionID,
+                name: "置顶",
+                agentIds: pinned,
+                isCollapsed: false
+            ))
+        }
+
+        var assigned = Set<String>()
+        for section in normalized(sections) {
+            let ids = orderedAgentIds.filter {
+                !pinnedAgentIds.contains($0) && section.agentIds.contains($0)
+            }
+            guard !ids.isEmpty else { continue }
+            assigned.formUnion(ids)
+            result.append(.init(
+                id: section.id,
+                name: section.name,
+                agentIds: ids,
+                isCollapsed: searching ? false : section.isCollapsed
+            ))
+        }
+
+        let unassigned = orderedAgentIds.filter {
+            !pinnedAgentIds.contains($0) && !assigned.contains($0)
+        }
+        if !unassigned.isEmpty {
+            result.append(.init(
+                id: unassignedSectionID,
+                name: "未分组",
+                agentIds: unassigned,
+                isCollapsed: false
             ))
         }
         return result
@@ -75,7 +134,7 @@ enum MobileAgentSidebarSections {
         name: String
     ) -> [MobileAgentSidebarSection]? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, sectionId != "__agents__" else { return nil }
+        guard !trimmed.isEmpty, !reservedSectionIDs.contains(sectionId) else { return nil }
         return normalized(sections).map { section in
             var next = section
             if next.id == sectionId { next.name = trimmed }
@@ -87,7 +146,7 @@ enum MobileAgentSidebarSections {
         _ sections: [MobileAgentSidebarSection],
         sectionId: String
     ) -> [MobileAgentSidebarSection] {
-        guard sectionId != "__agents__" else { return normalized(sections) }
+        guard !reservedSectionIDs.contains(sectionId) else { return normalized(sections) }
         return normalized(sections).filter { $0.id != sectionId }
     }
 
@@ -95,7 +154,7 @@ enum MobileAgentSidebarSections {
         _ sections: [MobileAgentSidebarSection],
         sectionId: String
     ) -> [MobileAgentSidebarSection] {
-        guard sectionId != "__agents__" else { return normalized(sections) }
+        guard !reservedSectionIDs.contains(sectionId) else { return normalized(sections) }
         let rows = normalized(sections)
         guard rows.contains(where: { $0.id == sectionId }) else { return rows }
         return rows.map { section in

@@ -630,39 +630,26 @@ extension GrokMobileShell {
                         }
 
                         if !bots.isEmpty {
-                            if agentSidebarSections.isEmpty {
-                                sectionTitle("Bots  \(filteredBots.count)")
-                                ForEach(filteredBots) { bot in
-                                    botRow(
-                                        bot,
-                                        subtitle: mobileBotHomeSubtitle(bot),
-                                        badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
+                            let sidebarProjection = MobileAgentSidebarSections.projected(
+                                agentIds: filteredBots.map(\.id),
+                                pinnedAgentIds: pinnedBotIds,
+                                sections: agentSidebarSections,
+                                searching: !query.isEmpty
+                            )
+                            ForEach(sidebarProjection) { section in
+                                let sectionBots = filteredBots.filter { section.agentIds.contains($0.id) }
+                                if section.id == MobileAgentSidebarSections.pinnedSectionID
+                                    || section.id == MobileAgentSidebarSections.unassignedSectionID
+                                {
+                                    sectionTitle("\(section.name)  \(sectionBots.count)")
+                                } else {
+                                    agentSidebarSectionHeader(
+                                        section,
+                                        count: sectionBots.count
                                     )
                                 }
-                            } else {
-                                ForEach(agentSidebarSections) { section in
-                                    let sectionBots = filteredBots.filter { section.agentIds.contains($0.id) }
-                                    if !sectionBots.isEmpty {
-                                        agentSidebarSectionHeader(
-                                            section,
-                                            count: sectionBots.count
-                                        )
-                                        if !section.isCollapsed {
-                                            ForEach(sectionBots) { bot in
-                                                botRow(
-                                                    bot,
-                                                    subtitle: mobileBotHomeSubtitle(bot),
-                                                    badge: bot.isGroup ? "Group" : (bot.miniAppId == nil ? "Bot" : "Mini App Bot")
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                let assignedIds = Set(agentSidebarSections.flatMap(\.agentIds))
-                                let unassignedBots = filteredBots.filter { !assignedIds.contains($0.id) }
-                                if !unassignedBots.isEmpty {
-                                    sectionTitle("未分组  \(unassignedBots.count)")
-                                    ForEach(unassignedBots) { bot in
+                                if !section.isCollapsed {
+                                    ForEach(sectionBots) { bot in
                                         botRow(
                                             bot,
                                             subtitle: mobileBotHomeSubtitle(bot),

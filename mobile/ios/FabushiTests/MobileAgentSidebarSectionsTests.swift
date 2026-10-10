@@ -2,6 +2,70 @@ import XCTest
 @testable import Fabushi
 
 final class MobileAgentSidebarSectionsTests: XCTestCase {
+    func testProjectionKeepsPinnedNamedAndUnassignedSectionsInStableOrder() {
+        let sections = [
+            MobileAgentSidebarSection(id: "ops", name: "运营部", agentIds: ["b"], isCollapsed: false),
+            MobileAgentSidebarSection(id: "qa", name: "测试部", agentIds: ["c"], isCollapsed: true),
+        ]
+
+        let projected = MobileAgentSidebarSections.projected(
+            agentIds: ["a", "b", "c", "d"],
+            pinnedAgentIds: ["a"],
+            sections: sections,
+            searching: false
+        )
+
+        XCTAssertEqual(
+            projected.map(\.id),
+            [
+                MobileAgentSidebarSections.pinnedSectionID,
+                "ops",
+                "qa",
+                MobileAgentSidebarSections.unassignedSectionID,
+            ]
+        )
+        XCTAssertEqual(projected[0].agentIds, ["a"])
+        XCTAssertEqual(projected[1].agentIds, ["b"])
+        XCTAssertTrue(projected[2].isCollapsed)
+        XCTAssertEqual(projected[3].agentIds, ["d"])
+    }
+
+    func testProjectionMakesPinnedOwnershipWinAndSearchExpandsMatches() {
+        let sections = [
+            MobileAgentSidebarSection(id: "ops", name: "运营部", agentIds: ["a", "b"], isCollapsed: true),
+            MobileAgentSidebarSection(id: "empty", name: "空", agentIds: ["z"], isCollapsed: true),
+        ]
+
+        let projected = MobileAgentSidebarSections.projected(
+            agentIds: ["a", "b"],
+            pinnedAgentIds: ["a"],
+            sections: sections,
+            searching: true
+        )
+
+        XCTAssertEqual(
+            projected.map(\.id),
+            [MobileAgentSidebarSections.pinnedSectionID, "ops"]
+        )
+        XCTAssertEqual(projected[0].agentIds, ["a"])
+        XCTAssertEqual(projected[1].agentIds, ["b"])
+        XCTAssertFalse(projected[1].isCollapsed)
+    }
+
+    func testNormalizationRejectsAllSyntheticSectionIDsAndDuplicateOwnership() {
+        let normalized = MobileAgentSidebarSections.normalized([
+            .init(id: MobileAgentSidebarSections.pinnedSectionID, name: "fake pin", agentIds: ["a"]),
+            .init(id: "ops", name: "Ops", agentIds: ["a", "a", "b"]),
+            .init(id: "qa", name: "QA", agentIds: ["b", "c"]),
+            .init(id: MobileAgentSidebarSections.unassignedSectionID, name: "fake unassigned", agentIds: ["d"]),
+            .init(id: "__agents__", name: "fake agents", agentIds: ["e"]),
+        ])
+
+        XCTAssertEqual(normalized.map(\.id), ["ops", "qa"])
+        XCTAssertEqual(normalized[0].agentIds, ["a", "b"])
+        XCTAssertEqual(normalized[1].agentIds, ["c"])
+    }
+
     func testCollapseToggleChangesOnlyTargetSectionAndRoundTripsFoundationValue() {
         let input = [
             MobileAgentSidebarSection(id: "one", name: "One", agentIds: ["a"], isCollapsed: false),
