@@ -122,6 +122,7 @@ use mahayana_host_protocol::HostMode;
 use mahayana_host_protocol::ListenerIntegrationSummary;
 use mahayana_host_protocol::ListenerPlatform;
 use mahayana_host_protocol::LocalToolPermission;
+use mahayana_host_protocol::McpComposerReference;
 use mahayana_host_protocol::MemoryKind;
 use mahayana_host_protocol::MemoryProjectSummary;
 use mahayana_host_protocol::MemoryRecord;
@@ -12480,6 +12481,8 @@ impl FeatureHostController {
             None,
             Vec::new(),
             None,
+            Vec::new(),
+            None,
             false,
         )?;
         let operation_id = accepted.operation_id.clone().ok_or_else(|| {
@@ -12510,11 +12513,14 @@ impl FeatureHostController {
         mode_statement: Option<String>,
         model: Option<String>,
         attachments: Vec<AttachmentContext>,
+        rich_text: Option<String>,
+        mcp_references: Vec<McpComposerReference>,
         reply_to_message_id: Option<String>,
         is_fork: bool,
     ) -> Result<CommandAccepted, FeatureHostError> {
         self.require_authenticated_account()?;
         let text = normalized_chat_text(text, &attachments)?;
+        validate_mcp_composer_references(rich_text.as_deref(), &mcp_references)?;
         let bot_conversation_id = if let Some(agent_id) = agent_id.as_deref() {
             self.state()?
                 .bots
@@ -12622,6 +12628,14 @@ impl FeatureHostController {
         if let Some(mcp_context) = self.mcp_instruction_context()? {
             runtime_text = format!(
                 "{mcp_context}
+
+[Current turn]
+{runtime_text}"
+            );
+        }
+        if let Some(reference_context) = render_mcp_composer_reference_context(&mcp_references) {
+            runtime_text = format!(
+                "{reference_context}
 
 [Current turn]
 {runtime_text}"
@@ -13111,6 +13125,8 @@ impl FeatureHostController {
                 mode_statement,
                 model,
                 attachments,
+                rich_text,
+                mcp_references,
                 reply_to_message_id,
                 is_fork,
                 ..
@@ -13123,6 +13139,8 @@ impl FeatureHostController {
                 mode_statement,
                 model,
                 attachments,
+                rich_text,
+                mcp_references,
                 reply_to_message_id,
                 is_fork,
             ),
@@ -15421,6 +15439,105 @@ fn is_safe_automation_id(id: &str) -> bool {
         && id
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
+fn collect_workflow_reference_ids(value: &Value, output: &mut BTreeSet<String>) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                collect_workflow_reference_ids(value, output);
+            }
+        }
+        Value::Object(object) => {
+            if object.get("type").and_then(Value::as_str) == Some("workflowReference") {
+                if let Some(id) = object
+                    .get("attrs")
+                    .and_then(Value::as_object)
+                    .and_then(|attrs| attrs.get("id"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|id| !id.is_empty())
+                {
+                    output.insert(id.to_string());
+                }
+            }
+            for value in object.values() {
+                collect_workflow_reference_ids(value, output);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn validate_mcp_composer_references(
+    rich_text: Option<&str>,
+    references: &[McpComposerReference],
+) -> Result<(), FeatureHostError> {
+    if references.is_empty() {
+        return Ok(());
+    }
+    let rich_text = rich_text
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            FeatureHostError::Contract(
+                "MCP composer references require richText workflow-reference evidence".into(),
+            )
+        })?;
+    let document: Value = serde_json::from_str(rich_text)
+        .map_err(|_| FeatureHostError::Contract("MCP composer richText is invalid".into()))?;
+    let mut ids = BTreeSet::new();
+    collect_workflow_reference_ids(&document, &mut ids);
+
+    let mut seen = BTreeSet::new();
+    for reference in references {
+        let server_id = reference.server_id.trim();
+        let identifier = reference.server_identifier.trim();
+        let account_key = reference.account_key.trim();
+        let label = reference.label.trim();
+        let status = reference.status.trim();
+        if server_id.is_empty()
+            || identifier.is_empty()
+            || account_key.is_empty()
+            || label.is_empty()
+            || status.is_empty()
+            || reference.id != format!("mcp:{server_id}")
+            || !ids.contains(&reference.id)
+        {
+            return Err(FeatureHostError::Contract(
+                "MCP composer reference identity does not match richText".into(),
+            ));
+        }
+        let identity = format!("{identifier}\u{0}{account_key}");
+        if !seen.insert(identity) {
+            return Err(FeatureHostError::Contract(
+                "MCP composer reference identity is duplicated".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn render_mcp_composer_reference_context(
+    references: &[McpComposerReference],
+) -> Option<String> {
+    if references.is_empty() {
+        return None;
+    }
+    let mut lines = vec![
+        "[Referenced MCP connectors]".to_string(),
+        "The user explicitly referenced these connectors in the composer. Prefer tools from connected referenced connectors when relevant. For needs-auth, disabled, disconnected, initializing, or error states, report the state instead of pretending the connector is usable.".to_string(),
+    ];
+    for reference in references.iter().take(16) {
+        lines.push(format!(
+            "- {} — server={} account={} status={}",
+            clamp_line(&reference.label, 160),
+            clamp_line(&reference.server_identifier, 200),
+            clamp_line(&reference.account_key, 160),
+            clamp_line(&reference.status, 80),
+        ));
+    }
+    Some(lines.join("\n"))
 }
 
 fn render_mcp_instruction_context(
@@ -20068,6 +20185,26 @@ mod tests {
     }
 
     #[test]
+    fn mcp_composer_reference_requires_matching_workflow_reference_and_renders_hidden_context() {
+        let references = vec![McpComposerReference {
+            id: "mcp:17".into(),
+            server_id: "17".into(),
+            server_identifier: "github".into(),
+            account_key: "default".into(),
+            label: "GitHub".into(),
+            status: "connected".into(),
+            icon_url: None,
+        }];
+        let rich_text = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"workflowReference","attrs":{"id":"mcp:17","label":"GitHub"}}]}]}"#;
+        validate_mcp_composer_references(Some(rich_text), &references)
+            .expect("matching MCP workflow reference");
+        assert!(validate_mcp_composer_references(Some(r#"{"type":"doc"}"#), &references).is_err());
+        let context = render_mcp_composer_reference_context(&references).expect("reference context");
+        assert!(context.contains("server=github"));
+        assert!(context.contains("status=connected"));
+    }
+
+    #[test]
     fn mcp_instruction_context_is_sorted_bounded_and_hidden() {
         let instructions = std::collections::HashMap::from([
             ("zeta".into(), "Use read-only operations.".into()),
@@ -20584,6 +20721,8 @@ mod tests {
                 mode_statement: None,
                 model: None,
                 attachments: Vec::new(),
+                rich_text: None,
+                mcp_references: Vec::new(),
                 reply_to_message_id: None,
                 is_fork: false,
             })
