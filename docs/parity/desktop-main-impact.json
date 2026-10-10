@@ -3835,14 +3835,14 @@
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/cloud-agent-provider.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-production-gap-open",
-        "finding": "Reviewed current-main provider contract: bcId-scoped GetBackgroundComposerInfo, 5s live/60s recovery polling, terminal stop, account+agent scope generation fencing, Open in Cursor, plus name/prompt/branch/PR/files/line statistics. Commit 919787b064a3d0a3cf5e50fe2d485da22608fbff extends IOSCursorDashboardClient/IOSCloudAgentComposerInfo using the authoritative current-main protobuf wire fields and adds focused decoder/fallback tests. The shipping MobileBotChat send-message:cursor-agent projection/native leaf plus provider polling/open lifecycle are still missing, so this remains a production integration gap and is not promoted to implemented/verified."
+        "status": "current-main-reviewed-native-cloud-agent-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main provider contract is bcId-scoped GetBackgroundComposerInfo with 5s live / 60s recovery polling, terminal stop for finished/error/expired, account+agent generation fencing, Open in Cursor at https://cursor.com/agents/{bcId}, and branch/PR/files/line statistics. iOS commits 919787b064a3d0a3cf5e50fe2d485da22608fbff and b700e2eec5abf2b7135a78f90bb6005d31628e3c decode the authoritative protobuf fields, expose the typed Coordinator path through getCloudAgentInfo(includeFiles=false), project send-message:cursor-agent into shipping MobileBotChat, poll each visible bcId at 5s live / 60s recovery with account+Bot+bcId scope fencing, stop terminal states, and render branch/stats/PR/Open in Cursor. Focused decoder/projector tests are committed; exact-head GitHub Actions are pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/connector-actions.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-production-gap-open",
-        "finding": "Reviewed current-main connector provider lifecycle: normalized identity, catalog/server matching, open/close load, install/authenticate, external OAuth handoff/reopen/retry, pending/action state, team-policy fail-closed behavior, auth-completed refresh, request/generation fencing and dispose cleanup. iOS has canonical MCP account/catalog/OAuth/install managers, but MobileBotChat's recovered transcript-card projector does not currently project send-message:connector/connectors or render these provider actions. This remains a shipping integration gap and is not marked implemented/verified."
+        "status": "current-main-reviewed-native-connector-actions-implemented-pending-exact-head-ci",
+        "finding": "Desktop connector provider owns catalog+server load on open, close/dispose cleanup, normalized connector matching, install, authenticate, team-policy fail-closed, pending/action state, external OAuth waiting/reopen/retry, auth-completed refresh, and generation/request fencing. iOS commits 1ef9f3147df7e1dcb66ca374c3652496f81dcad0 and e438f412043dd7e6dc76826fee5636fd65257879 reuse the single SandMcpManager catalog/install plus the existing MarketplaceModel server/account/OAuth owner; send-message:connector/connectors now project into shipping MobileBotChat, card lifecycle opens/loads and closes/cleans its state, team-managed servers are non-actionable, installs route through manager.installEntry, authentication uses coordinator.mcp.authenticate, OAuth can reopen/retry and callback refreshes canonical servers, with account epoch/request/generation fencing inherited and card generation fencing added. Focused projector/matching tests are committed; exact-head Actions pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-catalog.ts",
@@ -3889,14 +3889,14 @@
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/mount-contract.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-native-mount-dependent-gaps-open",
-        "finding": "Desktop root mount composes scope, registry, widget interactions, cloud-agent provider and leaf providers into one transcript-card owner. iOS uses the shipping MobileBotChat + shared projector/native leaf composition rather than a second web mount, and existing widget/listener/reaction owners are wired there. Overall mount parity cannot be promoted while send-message:cursor-agent and connector/connectors shipping leaves remain open; this entry intentionally inherits those production gaps."
+        "status": "current-main-reviewed-native-mount-implemented-pending-exact-head-ci",
+        "finding": "Desktop root mount composes scope, registry, widget interactions, cloud-agent provider and leaf providers into one transcript-card owner. iOS uses shipping MobileBotChat + MarketplaceModel/shared projector/native leaves rather than a second web mount. The previously blocking cursor-agent and connector/connectors leaves are now wired through their canonical Coordinator/MCP owners, so the mount responsibility is implemented but remains unverified until the current exact-head Swift/UI/protected gates succeed."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/protocol.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-protocol-dependent-gaps-open",
-        "finding": "Current-main protocol strictly accepts send-message text/widget/cursor-agent/email-draft/slack-draft/auto-review-approval/listener-connect/secret-request/attachment/connector/connectors/local-tool-permission plus metadata/reactions and rejects malformed values. iOS shared/native projection already covers the implemented text/widget/draft/approval/listener/secret/attachment/permission responsibilities and fail-closed fallback, but cursor-agent and connector/connectors are not yet projected into native shipping leaves. Protocol closure remains open on those exact discriminants."
+        "status": "current-main-reviewed-native-protocol-implemented-pending-exact-head-ci",
+        "finding": "Current-main protocol strictly accepts send-message text/widget/cursor-agent/email-draft/slack-draft/auto-review-approval/listener-connect/secret-request/attachment/connector/connectors/local-tool-permission plus metadata/reactions and rejects malformed values. iOS native projection already covered text/widget/drafts/approval/listener/secret/attachment/local-permission and now also strictly projects cursor-agent, connector and connectors with malformed-field fail-closed behavior. Exact-head Swift/unit/UI evidence remains pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-actions.ts",
