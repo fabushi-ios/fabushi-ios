@@ -386,9 +386,9 @@
       "type": "blob",
       "sha": "a53f3ac53eef84f2c82fe82601e200a95a71cea2",
       "size": 616,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-electron-renderer-bootstrap",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Electron/Vite HTML bootstrap owns desktop-only CSP/root mounting and renderer stylesheet linkage. iOS does not ship an HTML renderer shell; replacement is the native SwiftUI application target rooted at mobile/ios/Fabushi/FabushiApp.swift and mobile/ios/project.yml. Equivalent security/product effects are enforced through iOS native navigation/WebView boundaries and ATS; final exact-head UI/security acceptance remains required."
     },
     {
       "path": "desktop/package-lock.json",
@@ -396,9 +396,9 @@
       "type": "blob",
       "sha": "4a0c5859c68b3f82a7332a397ba01288b61a5a33",
       "size": 267545,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-node-dependency-lock",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Locks the Electron/Vite/Playwright/Node dependency graph for the desktop package. iOS must not reuse that runtime graph; replacement dependency/build authority is mobile/ios/project.yml with pinned Swift packages plus iOS-owned Rust crates. Release provenance and license closure remain required under IOS-MAIN-AC-19."
     },
     {
       "path": "desktop/package.json",
@@ -406,9 +406,9 @@
       "type": "blob",
       "sha": "e129b603a48ce5bcde8d221ec5f777b038028a5b",
       "size": 6349,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-electron-build-and-release-contract",
+      "coverage_status": "reviewed-with-ios-release-replacement",
+      "reason": "Defines Desktop Electron runtime/build/package scripts, desktop app identity/protocol, native permission text, extra resources and macOS/Windows/Linux packaging. iOS replacement is mobile/ios/project.yml plus iOS-owned Rust prebuild, com.ombhrum.fabushi URL scheme/permission strings, ios-desktop-main-architecture.yml, ios-desktop-main-completeness.yml and ios-store-delivery.yml. Desktop JIT/Electron packaging is not copied; same product effects and release gates remain required."
     },
     {
       "path": "desktop/playwright.config.ts",
@@ -416,9 +416,9 @@
       "type": "blob",
       "sha": "5d93cc52f2d73dbaf60b52458ce494d1255817b7",
       "size": 509,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-electron-e2e-test-config",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Configures Desktop Playwright Electron/browser E2E execution, traces/screenshots/video and CI serialization. iOS replacement is the FabushiTests/FabushiUITests targets in mobile/ios/project.yml plus protected-account/completeness GitHub Actions and xcresult/artifact evidence. Playwright itself has no iOS shipping role."
     },
     {
       "path": "desktop/public/grok-parity.css",
@@ -426,9 +426,9 @@
       "type": "blob",
       "sha": "a68f409ac173ebd0bda3fffb75c2b131a70dde4f",
       "size": 17497,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-renderer-visual-style-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Product-owned Desktop visual styling for messenger shell, search, message/composer/info/settings/marketplace surfaces, agent-state accents and reduced-motion behavior. iOS does not reuse CSS; replacement is the native SwiftUI shipping shell and platform accessibility/motion behavior. Functional and visual parity, Dynamic Type/VoiceOver/localization/reduced-motion evidence remains pending final exact-head IOS-MAIN-AC-13 acceptance."
     },
     {
       "path": "desktop/resources/icon.png",
@@ -436,9 +436,9 @@
       "type": "blob",
       "sha": "8245ffe5e42e360fbcdb5e2f67c3dad6a13c39bf",
       "size": 299127,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-application-icon",
+      "coverage_status": "reviewed-with-native-ios-release-replacement",
+      "reason": "Desktop package icon asset. iOS replacement is mobile/ios/Fabushi/Assets.xcassets/AppIcon.appiconset with iPhone/iPad/App Store icon variants selected by ASSETCATALOG_COMPILER_APPICON_NAME in mobile/ios/project.yml. Final signed archive/TestFlight/App Store identity evidence remains required."
     },
     {
       "path": "desktop/resources/mac/entitlements.plist",
@@ -446,9 +446,9 @@
       "type": "blob",
       "sha": "9ab52e13b3361ee89590f7a92976258ae205b484",
       "size": 321,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-macos-runtime-entitlements",
+      "coverage_status": "reviewed-not-applicable-with-ios-release-replacement",
+      "reason": "macOS hardened-runtime Electron JIT/unsigned-executable-memory entitlements are platform-specific and must not be copied to iOS. iOS replacement is mobile/ios/Fabushi/Fabushi.entitlements plus platform capabilities declared by the iOS target; final signing/entitlement validation remains required."
     },
     {
       "path": "desktop/resources/mas/entitlements.mas.inherit.plist",
@@ -456,9 +456,9 @@
       "type": "blob",
       "sha": "96fce341a4b2fef8de4e28168d07e1423ad1e573",
       "size": 425,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-mas-child-entitlements",
+      "coverage_status": "reviewed-not-applicable-with-ios-release-replacement",
+      "reason": "Mac App Store inherited sandbox/JIT entitlements for Electron child processes are macOS-specific. Native iOS has no Electron child-process inheritance or JIT requirement; replacement capability boundary is the signed iOS app/extension entitlements and sandbox, including the broadcast extension where applicable."
     },
     {
       "path": "desktop/resources/mas/entitlements.mas.plist",
@@ -466,9 +466,9 @@
       "type": "blob",
       "sha": "b27cc6cf93c6a746b717f98bb609d201ccd134d2",
       "size": 678,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-mas-application-entitlements",
+      "coverage_status": "reviewed-not-applicable-with-ios-release-replacement",
+      "reason": "Mac App Store sandbox/network/files/microphone/camera plus Electron JIT entitlements are Desktop MAS packaging contracts. iOS replacement uses Apple-native sandbox/permission prompts, mobile/ios/Fabushi/Fabushi.entitlements, project.yml usage descriptions/background modes and app-extension entitlements. Final store signing/privacy/entitlement acceptance is still pending."
     },
     {
       "path": "desktop/scripts/assert-openbot-parity.mjs",
