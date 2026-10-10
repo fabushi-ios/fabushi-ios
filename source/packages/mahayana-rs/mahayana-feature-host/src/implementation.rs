@@ -6260,6 +6260,7 @@ impl FeatureHostController {
                 "unsafe workflow agent id: {agent_id}"
             )));
         }
+        let user_time_zone = self.host_settings_user_timezone_direct()?;
 
         match command {
             FeatureCommand::WorkflowList { .. } => {
@@ -6308,7 +6309,10 @@ impl FeatureHostController {
                 ..
             } => {
                 if let Some(mut trigger) = trigger {
-                    trigger.schedule = normalize_automation_schedule(&trigger.schedule)?;
+                    trigger.schedule = normalize_automation_schedule_with_timezone(
+                        &trigger.schedule,
+                        user_time_zone.as_deref(),
+                    )?;
                     let now = now_millis();
                     let automation_id = id.clone().unwrap_or_else(|| slugify_workflow_name(&name));
                     let automation = {
@@ -6341,7 +6345,11 @@ impl FeatureHostController {
                             last_run_at_ms,
                             next_run_at_ms: trigger
                                 .is_enabled
-                                .then(|| next_automation_run(&trigger.schedule, now))
+                                .then(|| next_automation_run_with_timezone(
+                                    &trigger.schedule,
+                                    now,
+                                    user_time_zone.as_deref(),
+                                ))
                                 .flatten(),
                         };
                         state
@@ -6406,7 +6414,11 @@ impl FeatureHostController {
                         ensure_automation_agent_scope(automation, Some(agent_id.as_str()))?;
                         automation.enabled = enabled;
                         automation.next_run_at_ms = if enabled {
-                            next_automation_run(&automation.schedule, now_millis())
+                            next_automation_run_with_timezone(
+                                &automation.schedule,
+                                now_millis(),
+                                user_time_zone.as_deref(),
+                            )
                         } else {
                             None
                         };
@@ -6632,7 +6644,11 @@ impl FeatureHostController {
                         last_run_at_ms: None,
                         next_run_at_ms: trigger
                             .is_enabled
-                            .then(|| next_automation_run(&trigger.schedule, now))
+                            .then(|| next_automation_run_with_timezone(
+                                    &trigger.schedule,
+                                    now,
+                                    user_time_zone.as_deref(),
+                                ))
                             .flatten(),
                     };
                     {
