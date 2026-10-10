@@ -1693,7 +1693,7 @@ internal struct MobileBotChat: View {
             Spacer()
             Button(action: onOpenSettings) {
                 HStack(spacing: 8) {
-                    ClothGhostAvatar(botId: bot.id, size: 28, active: busy)
+                    MobileAgentAvatar(bot: bot, size: 28, activeOverride: busy)
                     Text(bot.name).font(.system(size: 17, weight: .semibold))
                 }
                 .padding(.horizontal, 13).padding(.vertical, 7)
@@ -1748,7 +1748,7 @@ internal struct MobileBotChat: View {
                 LazyVStack(alignment: .leading, spacing: 7) {
                     if entries.isEmpty {
                         VStack(spacing: 13) {
-                            ClothGhostAvatar(botId: bot.id, size: 82)
+                            MobileAgentAvatar(bot: bot, size: 82)
                             Text(bot.name).font(.title2.bold())
                             if !bot.description.isEmpty {
                                 Text(bot.description)
@@ -2518,7 +2518,7 @@ internal struct MobileBotChat: View {
     ) -> some View {
         if entry.kind == .thinking {
             HStack(spacing: 7) {
-                ClothGhostAvatar(botId: bot.id, size: 22, active: true)
+                MobileAgentAvatar(bot: bot, size: 22, activeOverride: true)
                 Text(entry.actionTitle ?? "Thinking…").font(.caption).foregroundStyle(.secondary)
                 ProgressView().controlSize(.mini)
             }
@@ -2735,7 +2735,7 @@ internal struct MobileBotChat: View {
                         .padding(.leading, 12)
                 }
                 HStack(alignment: .bottom, spacing: 7) {
-                    ClothGhostAvatar(botId: bot.id, size: 20)
+                    MobileAgentAvatar(bot: bot, size: 20)
                         .opacity(adjacency.isContinuedToNext ? 0 : 1)
                         .accessibilityHidden(adjacency.isContinuedToNext)
                     VStack(alignment: .leading, spacing: 7) {

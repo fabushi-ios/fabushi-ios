@@ -220,6 +220,7 @@ internal struct MobileAgentAvatar: View {
     let bot: MobileBotSummary
     var size: CGFloat = 44
     var activeOverride = false
+    var badge: Color? = nil
 
     private var effectiveState: MobileAgentAvatarState {
         activeOverride && bot.avatarState == .idle ? .working : bot.avatarState
@@ -254,6 +255,15 @@ internal struct MobileAgentAvatar: View {
             }
         }
         .frame(width: size, height: size)
+        .overlay(alignment: .topTrailing) {
+            if let badge {
+                Circle()
+                    .fill(badge)
+                    .overlay(Circle().stroke(.white, lineWidth: 2))
+                    .frame(width: size * 0.23, height: size * 0.23)
+                    .offset(x: size * 0.02, y: size * 0.02)
+            }
+        }
         .accessibilityHidden(true)
     }
 

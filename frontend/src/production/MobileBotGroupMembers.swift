@@ -42,7 +42,7 @@ internal struct MobileBotGroupMembersSheet: View {
                                     openMemberChat(member)
                                 } label: {
                                     HStack(spacing: 12) {
-                                        ClothGhostAvatar(botId: member.id, size: 36)
+                                        MobileAgentAvatar(bot: member, size: 36)
                                         Text(member.name)
                                         Spacer()
                                     }
@@ -83,7 +83,7 @@ internal struct MobileBotGroupMembersSheet: View {
                                     beginAdd(candidate)
                                 } label: {
                                     HStack(spacing: 12) {
-                                        ClothGhostAvatar(botId: candidate.id, size: 34)
+                                        MobileAgentAvatar(bot: candidate, size: 34)
                                         Text(candidate.name)
                                         Spacer()
                                         if pendingAgentId == candidate.id {

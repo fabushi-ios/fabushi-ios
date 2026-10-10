@@ -698,7 +698,7 @@ extension GrokMobileShell {
                                 selectBotForConversation(bot)
                             } label: {
                                 HStack(spacing: 12) {
-                                    ClothGhostAvatar(botId: bot.id, size: 42, badge: .green)
+                                    MobileAgentAvatar(bot: bot, size: 42, activeOverride: bot.isRunning, badge: .green)
                                     Text(bot.name)
                                         .foregroundStyle(.primary)
                                         .lineLimit(1)
@@ -832,7 +832,7 @@ extension GrokMobileShell {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    ClothGhostAvatar(botId: bot.id, size: 47, badge: .green)
+                    MobileAgentAvatar(bot: bot, size: 47, activeOverride: bot.isRunning, badge: .green)
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 7) {
                             Text(bot.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(.black)
@@ -1115,7 +1115,16 @@ extension GrokMobileShell {
         NavigationStack {
             Form {
                 Section {
-                    HStack { Spacer(); ClothGhostAvatar(botId: botName.isEmpty ? "new-bot" : botName, size: 82, active: botBusy); Spacer() }
+                    HStack {
+                        Spacer()
+                        MobileOnboardingCharacter(
+                            colorId: botAvatarColor,
+                            shapeId: botAvatarShape,
+                            size: 82,
+                            state: botBusy ? .working : .idle
+                        )
+                        Spacer()
+                    }
                 }
                 Section("Name") {
                     TextField("Bot name", text: $botName)

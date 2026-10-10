@@ -4119,6 +4119,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-acknowledgement-implemented-pending-exact-head-ci",
         "finding": "Desktop renderer acknowledgement owns account+agent+nonce-scoped optimistic rows, dispatch/accepted/failed transitions, fresh-nonce failed retries that retain prior/logical nonce identity, exact transcript echo reconciliation, and scope/dispose cleanup. iOS MobileBotChat now scopes every optimistic send by account+Bot+nonce, fences async completion to that scope, exposes failed-send Retry with Desktop-compatible sand-resend-v1 logical nonce ancestry, accepts an old or fresh echo only for the exact scoped record, clears overlay state on Bot/account/dispose, and settles the local Mini App path instead of leaving it pending. iOS uses direct feature.execute rather than Desktop's renderer queue, so queued is a representable platform state but direct sends transition pending→dispatching. Focused XCTest covers scope and resend identity; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/agent-avatar.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-agent-avatar-implemented-pending-exact-head-ci",
+        "finding": "Desktop AgentAvatar dispatches custom artifact avatar first, then shared-room, group, and persona; persona shape/color fallback is deterministic from agentId, and visual state derives from awaiting-user/currentActivity/composing/running. iOS now preserves currentActivity as normalized MobileAgentAvatarState in the canonical Host roster projection, retains avatar fields/state through Mini App roster merge, parses isSharedRoom, and routes shipping chat/home/group-member agent identities through one MobileAgentAvatar owner. That owner reuses AvatarImagePolicy for data URLs, MobileOnboardingCharacter for the exact 8-shape/10-fallback-color persona catalog, the Desktop UTF-16 hash/PRNG resolver, shared-room native globe, group member composition with +N overflow, reduce-motion-safe activity presentation, and the pre-existing iOS status badge. New-Bot draft preview now reflects selected shape/color. Decorative All Hands and Human-conversation marks remain separate non-Agent identity surfaces. Focused AvatarEditorParityTests cover precedence, deterministic identities, activity priority, and roster/merge preservation; exact-head CI pending."
       }
     ]
   },
