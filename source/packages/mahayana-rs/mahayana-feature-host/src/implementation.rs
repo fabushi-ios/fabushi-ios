@@ -9176,13 +9176,21 @@ impl FeatureHostController {
             },
             output: String::new(),
         };
-        self.dispatch_legacy_memory_operation_with(
+        let failed_context = context.clone();
+        match self.dispatch_legacy_memory_operation_with(
             context,
             crate::turn_memory::build_extraction_system_prompt(),
             user_prompt,
             "extraction",
             dispatch,
-        )
+        ) {
+            Ok(()) => Ok(()),
+            Err(_) => self.finish_legacy_memory_operation_with_dispatch(
+                failed_context,
+                false,
+                dispatch,
+            ),
+        }
     }
 
     #[cfg(feature = "production")]
@@ -20006,6 +20014,540 @@ mod tests {
         assert_eq!(slack_args["channel_id"], "C012345");
         assert_eq!(slack_args["text"], "hello");
         assert_eq!(slack_args["thread_ts"], "1234.56");
+    }
+
+    #[cfg(feature = "production")]
+    fn memory_owner_controller(label: &str) -> FeatureHostController {
+        FeatureHostController::create_test_backend(
+            HostConfig {
+                profile_id: format!("memory-owner-{label}-{}", Uuid::new_v4()),
+                mode: HostMode::Test,
+            },
+            SurfacePlatform::Ios,
+            None,
+        )
+    }
+
+    #[cfg(feature = "production")]
+    fn memory_owner_observation(
+        operation_id: &str,
+        user: &str,
+        assistant: &str,
+    ) -> PendingMemoryTurn {
+        PendingMemoryTurn {
+            account_id: None,
+            agent_id: "mahayana-assistant".into(),
+            evidence_id: format!("evidence-{operation_id}"),
+            occurred_at: 1_900_000_000_000,
+            user: user.into(),
+            agent_messages: Vec::new(),
+            assistant: Some(assistant.into()),
+        }
+    }
+
+    #[cfg(feature = "production")]
+    fn memory_owner_message(
+        operation_id: &str,
+        message_id: &str,
+        text: &str,
+    ) -> RuntimeEvent {
+        RuntimeEvent::MessageCompleted {
+            operation_id: OperationId(operation_id.into()),
+            message: mahayana_core::Message {
+                id: mahayana_core::MessageId(message_id.into()),
+                conversation_id: ConversationId("internal:memory-owner-test".into()),
+                role: RuntimeMessageRole::Assistant,
+                text: text.into(),
+                created_at_ms: 1,
+                metadata: json!({}),
+            },
+        }
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shipping_memory_owner_evidence_mode_clears_episode_and_never_dispatches_legacy() {
+        let controller = memory_owner_controller("evidence");
+        controller.state().unwrap().memory_synthesis_enabled = true;
+        let memory_dir = controller
+            .memory_dir_for_agent("mahayana-assistant")
+            .expect("memory dir");
+        crate::turn_memory::record_pending_episode_turn(
+            &memory_dir,
+            &crate::turn_memory::EpisodeTurn {
+                ts: 1,
+                user: "old user".into(),
+                agent: "old agent".into(),
+            },
+        )
+        .expect("seed pending episode");
+
+        let operation_id = "memory-evidence".to_string();
+        {
+            let mut state = controller.state().unwrap();
+            state.operations.insert(operation_id.clone());
+            state.memory_turn_observations.insert(
+                operation_id.clone(),
+                memory_owner_observation(
+                    &operation_id,
+                    "Please remember this preference in future conversations.",
+                    "I will remember it.",
+                ),
+            );
+        }
+        controller
+            .translate_runtime_event(RuntimeEvent::OperationCompleted {
+                operation_id: OperationId(operation_id),
+            })
+            .expect("settle evidence turn");
+
+        assert!(crate::turn_memory::load_pending_episode_turns(&memory_dir).is_empty());
+        let state = controller.state().unwrap();
+        assert!(state.legacy_memory_operations.is_empty());
+        let evidence = state
+            .memory_synthesis_pending
+            .get("mahayana-assistant")
+            .and_then(|queue| queue.front())
+            .expect("queued synthesis evidence");
+        assert_eq!(
+            evidence.user,
+            "Please remember this preference in future conversations."
+        );
+        assert_eq!(evidence.assistant, "I will remember it.");
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shipping_memory_owner_disabled_synthesis_runs_legacy_extraction_and_writes_memory() {
+        let controller = memory_owner_controller("extract");
+        controller.state().unwrap().memory_synthesis_enabled = false;
+        let observation = memory_owner_observation(
+            "memory-extract",
+            "My enduring preference is concise release status reports.",
+            "I will keep release status reports concise.",
+        );
+        let mut sequence = 0usize;
+        let mut dispatch = |_stage: &str,
+                            _context: &LegacyMemoryOperation,
+                            _prompt: String|
+         -> Result<String, FeatureHostError> {
+            sequence += 1;
+            Ok(format!("legacy-extract-{sequence}"))
+        };
+        controller
+            .settle_completed_memory_turn_with_dispatch(observation, &mut dispatch)
+            .expect("start extraction");
+        let operation_id = controller
+            .state()
+            .unwrap()
+            .legacy_memory_operations
+            .keys()
+            .next()
+            .cloned()
+            .expect("legacy extraction operation");
+
+        controller
+            .translate_legacy_memory_runtime_event_with_dispatch(
+                memory_owner_message(
+                    &operation_id,
+                    "memory-extract-output",
+                    "profile: User prefers concise release status reports",
+                ),
+                &mut dispatch,
+            )
+            .expect("capture extraction");
+        controller
+            .translate_legacy_memory_runtime_event_with_dispatch(
+                RuntimeEvent::OperationCompleted {
+                    operation_id: OperationId(operation_id),
+                },
+                &mut dispatch,
+            )
+            .expect("finish extraction");
+        drop(dispatch);
+
+        let memory_dir = controller
+            .memory_dir_for_agent("mahayana-assistant")
+            .expect("memory dir");
+        assert!(list_memories(&memory_dir, 100).unwrap().iter().any(|memory| {
+            memory.content == "User prefers concise release status reports"
+        }));
+        assert_eq!(
+            crate::turn_memory::load_pending_episode_turns(&memory_dir).len(),
+            1
+        );
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shipping_memory_owner_six_turn_threshold_runs_one_summary_uses_latest_timestamp_and_clears() {
+        let controller = memory_owner_controller("episode");
+        controller.state().unwrap().memory_synthesis_enabled = false;
+        let mut sequence = 0usize;
+        let mut stages = Vec::new();
+        let mut dispatch = |stage: &str,
+                            _context: &LegacyMemoryOperation,
+                            _prompt: String|
+         -> Result<String, FeatureHostError> {
+            sequence += 1;
+            stages.push(stage.to_string());
+            Ok(format!("legacy-episode-{sequence}"))
+        };
+
+        for index in 0..6_i64 {
+            let mut observation = memory_owner_observation(
+                &format!("memory-episode-{index}"),
+                &format!(
+                    "Continue the migration decision {index} with enough detail to remember it."
+                ),
+                &format!("Recorded migration decision {index}."),
+            );
+            observation.occurred_at = 1_900_000_000_000 + index;
+            controller
+                .settle_completed_memory_turn_with_dispatch(observation, &mut dispatch)
+                .expect("start extraction");
+            let operation_id = controller
+                .state()
+                .unwrap()
+                .legacy_memory_operations
+                .iter()
+                .find_map(|(id, context)| {
+                    matches!(context.phase, LegacyMemoryPhase::Extraction { .. })
+                        .then(|| id.clone())
+                })
+                .expect("extraction operation");
+            controller
+                .translate_legacy_memory_runtime_event_with_dispatch(
+                    memory_owner_message(
+                        &operation_id,
+                        &format!("extract-output-{index}"),
+                        "NONE",
+                    ),
+                    &mut dispatch,
+                )
+                .unwrap();
+            controller
+                .translate_legacy_memory_runtime_event_with_dispatch(
+                    RuntimeEvent::OperationCompleted {
+                        operation_id: OperationId(operation_id),
+                    },
+                    &mut dispatch,
+                )
+                .unwrap();
+        }
+
+        assert_eq!(
+            stages
+                .iter()
+                .filter(|stage| stage.as_str() == "episode-summary")
+                .count(),
+            1
+        );
+        let summary_operation = controller
+            .state()
+            .unwrap()
+            .legacy_memory_operations
+            .iter()
+            .find_map(|(id, context)| {
+                matches!(context.phase, LegacyMemoryPhase::EpisodeSummary { .. })
+                    .then(|| id.clone())
+            })
+            .expect("episode summary operation");
+        controller
+            .translate_legacy_memory_runtime_event_with_dispatch(
+                memory_owner_message(
+                    &summary_operation,
+                    "episode-summary-output",
+                    "The migration advanced through six explicit decisions.",
+                ),
+                &mut dispatch,
+            )
+            .unwrap();
+        controller
+            .translate_legacy_memory_runtime_event_with_dispatch(
+                RuntimeEvent::OperationCompleted {
+                    operation_id: OperationId(summary_operation),
+                },
+                &mut dispatch,
+            )
+            .unwrap();
+        drop(dispatch);
+
+        let memory_dir = controller
+            .memory_dir_for_agent("mahayana-assistant")
+            .expect("memory dir");
+        assert!(crate::turn_memory::load_pending_episode_turns(&memory_dir).is_empty());
+        let episode = list_memories(&memory_dir, 100)
+            .unwrap()
+            .into_iter()
+            .find(|memory| memory.content.starts_with("[episode] "))
+            .expect("episode memory");
+        assert_eq!(episode.created_at, 1_900_000_000_005);
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shipping_memory_owner_agent_send_is_frozen_before_final_assistant() {
+        let controller = memory_owner_controller("agent-message");
+        controller.state().unwrap().memory_synthesis_enabled = true;
+        controller
+            .execute(FeatureCommand::BotCreate {
+                request_id: "memory-peer-create".into(),
+                name: "Memory Peer".into(),
+                description: "turn-local peer".into(),
+                title: "Peer".into(),
+                avatar: None,
+                avatar_shape: None,
+                avatar_color: None,
+            })
+            .expect("create peer");
+        let peer = drain(&controller)
+            .into_iter()
+            .find_map(|event| match event {
+                HostEvent::BotChanged { bot, .. } if bot.name == "Memory Peer" => Some(bot),
+                _ => None,
+            })
+            .expect("created peer");
+
+        let operation_id = "memory-agent-message".to_string();
+        {
+            let mut state = controller.state().unwrap();
+            state.operations.insert(operation_id.clone());
+            state.memory_turn_observations.insert(
+                operation_id.clone(),
+                memory_owner_observation(
+                    &operation_id,
+                    "Delegate the migration check to the peer and report back.",
+                    "",
+                ),
+            );
+        }
+        controller
+            .execute(FeatureCommand::AgentSend {
+                request_id: "memory-peer-send".into(),
+                from_agent_id: "mahayana-assistant".into(),
+                target_id: peer.id,
+                text: "Peer evidence came first.".into(),
+                images: Vec::new(),
+                priority: false,
+            })
+            .expect("send peer message");
+        controller
+            .translate_runtime_event(memory_owner_message(
+                &operation_id,
+                "memory-final-answer",
+                "Final assistant answer.",
+            ))
+            .expect("capture final assistant");
+        controller
+            .translate_runtime_event(RuntimeEvent::OperationCompleted {
+                operation_id: OperationId(operation_id),
+            })
+            .expect("settle turn");
+
+        let state = controller.state().unwrap();
+        let evidence = state
+            .memory_synthesis_pending
+            .get("mahayana-assistant")
+            .and_then(|queue| queue.front())
+            .expect("synthesis evidence");
+        assert_eq!(
+            evidence.assistant,
+            "Peer evidence came first.\nFinal assistant answer."
+        );
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shipping_memory_owner_failure_paths_clear_pending_episode_after_summary_attempt() {
+        let controller = memory_owner_controller("failure");
+        controller.state().unwrap().memory_synthesis_enabled = false;
+        let memory_dir = controller
+            .memory_dir_for_agent("mahayana-assistant")
+            .expect("memory dir");
+        for index in 0..5_i64 {
+            crate::turn_memory::record_pending_episode_turn(
+                &memory_dir,
+                &crate::turn_memory::EpisodeTurn {
+                    ts: index,
+                    user: format!("seed user {index}"),
+                    agent: format!("seed agent {index}"),
+                },
+            )
+            .unwrap();
+        }
+
+        let observation = memory_owner_observation(
+            "memory-dispatch-failure",
+            "This memorable sixth turn must survive extraction dispatch failure.",
+            "Settled.",
+        );
+        let mut failed_dispatch =
+            |_stage: &str,
+             _context: &LegacyMemoryOperation,
+             _prompt: String|
+             -> Result<String, FeatureHostError> {
+                Err(FeatureHostError::Contract("synthetic inference unavailable".into()))
+            };
+        controller
+            .settle_completed_memory_turn_with_dispatch(observation, &mut failed_dispatch)
+            .expect("dispatch failure is non-fatal settlement");
+        assert!(
+            crate::turn_memory::load_pending_episode_turns(&memory_dir).is_empty(),
+            "failed extraction dispatch still records the sixth turn, attempts summary, and clears"
+        );
+
+        for index in 0..5_i64 {
+            crate::turn_memory::record_pending_episode_turn(
+                &memory_dir,
+                &crate::turn_memory::EpisodeTurn {
+                    ts: 100 + index,
+                    user: format!("second seed user {index}"),
+                    agent: format!("second seed agent {index}"),
+                },
+            )
+            .unwrap();
+        }
+        let observation = memory_owner_observation(
+            "memory-runtime-failure",
+            "This second memorable sixth turn exercises terminal inference failure.",
+            "Settled again.",
+        );
+        let mut sequence = 0usize;
+        let mut dispatch = |_stage: &str,
+                            _context: &LegacyMemoryOperation,
+                            _prompt: String|
+         -> Result<String, FeatureHostError> {
+            sequence += 1;
+            Ok(format!("legacy-failure-{sequence}"))
+        };
+        controller
+            .settle_completed_memory_turn_with_dispatch(observation, &mut dispatch)
+            .unwrap();
+        let extraction_id = controller
+            .state()
+            .unwrap()
+            .legacy_memory_operations
+            .keys()
+            .next()
+            .cloned()
+            .expect("extraction operation");
+        controller
+            .translate_legacy_memory_runtime_event_with_dispatch(
+                RuntimeEvent::OperationFailed {
+                    operation_id: OperationId(extraction_id),
+                    code: "provider_error".into(),
+                    message: "extraction failed".into(),
+                },
+                &mut dispatch,
+            )
+            .unwrap();
+        let summary_id = controller
+            .state()
+            .unwrap()
+            .legacy_memory_operations
+            .iter()
+            .find_map(|(id, context)| {
+                matches!(context.phase, LegacyMemoryPhase::EpisodeSummary { .. })
+                    .then(|| id.clone())
+            })
+            .expect("summary after extraction failure");
+        controller
+            .translate_legacy_memory_runtime_event_with_dispatch(
+                RuntimeEvent::OperationFailed {
+                    operation_id: OperationId(summary_id),
+                    code: "provider_error".into(),
+                    message: "summary failed".into(),
+                },
+                &mut dispatch,
+            )
+            .unwrap();
+        assert!(crate::turn_memory::load_pending_episode_turns(&memory_dir).is_empty());
+    }
+
+    #[cfg(feature = "production")]
+    #[test]
+    fn shipping_memory_owner_cancel_close_and_account_change_fence_stale_writes() {
+        let controller = memory_owner_controller("fences");
+        controller.state().unwrap().memory_synthesis_enabled = false;
+        let operation_id = "memory-cancel".to_string();
+        {
+            let mut state = controller.state().unwrap();
+            state.operations.insert(operation_id.clone());
+            state.memory_turn_observations.insert(
+                operation_id.clone(),
+                memory_owner_observation(
+                    &operation_id,
+                    "A cancelled turn must not write memory.",
+                    "stale result",
+                ),
+            );
+        }
+        controller.interrupt(&operation_id).expect("cancel turn");
+        assert!(
+            !controller
+                .state()
+                .unwrap()
+                .memory_turn_observations
+                .contains_key(&operation_id)
+        );
+
+        let close_observation = memory_owner_observation(
+            "memory-close",
+            "A closing host must fence hidden memory inference.",
+            "stale result",
+        );
+        let mut sequence = 0usize;
+        let mut dispatch = |_stage: &str,
+                            _context: &LegacyMemoryOperation,
+                            _prompt: String|
+         -> Result<String, FeatureHostError> {
+            sequence += 1;
+            Ok(format!("legacy-close-{sequence}"))
+        };
+        controller
+            .settle_completed_memory_turn_with_dispatch(close_observation, &mut dispatch)
+            .unwrap();
+        assert!(!controller.state().unwrap().legacy_memory_operations.is_empty());
+        controller.close().expect("close Host");
+        assert!(controller.state().unwrap().legacy_memory_operations.is_empty());
+
+        let production = FeatureHostController::create_with_host_config(
+            HostConfig {
+                profile_id: format!("memory-account-fence-{}", Uuid::new_v4()),
+                mode: HostMode::Production,
+            },
+            SurfacePlatform::Ios,
+            isolated_host_config("memory-account-fence"),
+        )
+        .expect("create production memory fence Host");
+        *production.active_account_id.lock().unwrap() = Some("account-b".into());
+        production.state().unwrap().session_active = true;
+        production.state().unwrap().memory_synthesis_enabled = false;
+        let stale = PendingMemoryTurn {
+            account_id: Some("account-a".into()),
+            agent_id: "mahayana-assistant".into(),
+            evidence_id: "stale-account".into(),
+            occurred_at: 1_900_000_000_000,
+            user: "Old account memory must not cross the boundary.".into(),
+            agent_messages: Vec::new(),
+            assistant: Some("stale result".into()),
+        };
+        let dispatch_count = std::cell::Cell::new(0usize);
+        let mut stale_dispatch =
+            |_stage: &str,
+             _context: &LegacyMemoryOperation,
+             _prompt: String|
+             -> Result<String, FeatureHostError> {
+                dispatch_count.set(dispatch_count.get() + 1);
+                Ok("must-not-dispatch".into())
+            };
+        production
+            .settle_completed_memory_turn_with_dispatch(stale, &mut stale_dispatch)
+            .expect("stale account settlement is ignored");
+        assert_eq!(dispatch_count.get(), 0);
+        assert!(production.state().unwrap().legacy_memory_operations.is_empty());
+        production.close().expect("close production memory fence Host");
     }
 
     #[cfg(feature = "production")]
