@@ -1377,6 +1377,182 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         )
     }
 
+    func testNativeEditorSuggestionProjectsCanonicalRosterAndEveryone() {
+        let visible = MobileBotSummary(
+            id: "agent-1",
+            name: "Research Bot",
+            description: "Research",
+            title: "Researcher"
+        )
+        let group = MobileBotSummary(
+            id: "agent-2",
+            name: "Review Team",
+            description: "Review",
+            isGroup: true,
+            memberIds: ["a", "b"]
+        )
+        let hidden = MobileBotSummary(
+            id: "agent-hidden",
+            name: "Hidden",
+            description: "Hidden",
+            hidden: true
+        )
+
+        let rows = projectMobileEditorMentionSuggestions([visible, group, hidden])
+        XCTAssertEqual(rows.map(\.id), ["__everyone__", "agent-1", "agent-2"])
+        XCTAssertEqual(rows[0].insertion, "@everyone")
+        XCTAssertEqual(rows[1].subtitle, "Researcher")
+        XCTAssertEqual(rows[2].subtitle, "2 agents")
+        XCTAssertFalse(rows.contains(where: { $0.id == "agent-hidden" }))
+    }
+
+    func testNativeEditorSuggestionProjectsTriggeredAndReferenceWorkflows() {
+        let rows = projectMobileEditorWorkflowSuggestions([
+            [
+                "id": "daily",
+                "name": "Daily Review",
+                "description": "Review changes",
+                "trigger": [
+                    "schedule": "@daily",
+                    "isEnabled": true,
+                ],
+            ],
+            [
+                "id": "release",
+                "name": "Release Train",
+                "description": "Prepare release",
+            ],
+            [
+                "id": "bad-trigger",
+                "name": "Bad",
+                "trigger": ["schedule": ""],
+            ],
+        ])
+
+        XCTAssertEqual(rows.map(\.id), ["daily", "release"])
+        XCTAssertEqual(rows[0].triggerSchedule, "@daily")
+        XCTAssertEqual(rows[0].triggerEnabled, true)
+        XCTAssertNil(rows[1].triggerSchedule)
+
+        let mentionContext = try! XCTUnwrap(mobileEditorSuggestionContext("@rev"))
+        let mentionRows = mobileEditorSuggestionRows(
+            context: mentionContext,
+            assistants: [],
+            workflows: rows
+        )
+        XCTAssertEqual(mentionRows.map(\.id), ["daily"])
+
+        let slashContext = try! XCTUnwrap(mobileEditorSuggestionContext("/rel"))
+        let slashRows = mobileEditorSuggestionRows(
+            context: slashContext,
+            assistants: [],
+            workflows: rows
+        )
+        XCTAssertEqual(slashRows.map(\.id), ["release"])
+    }
+
+    func testNativeEditorSuggestionContextInsertionAndEmojiReuse() throws {
+        let mention = try XCTUnwrap(
+            mobileEditorSuggestionContext("Ask @Res")
+        )
+        XCTAssertEqual(mention.trigger, "@")
+        XCTAssertEqual(mention.query, "Res")
+
+        let assistant = MobileEditorSuggestionItem(
+            id: "agent-1",
+            category: .assistants,
+            label: "Research Bot",
+            insertion: "@Research Bot"
+        )
+        XCTAssertEqual(
+            applyMobileEditorSuggestion(
+                draft: "Ask @Res",
+                context: mention,
+                item: assistant
+            ),
+            "Ask @Research Bot "
+        )
+
+        let emojiContext = try XCTUnwrap(
+            mobileEditorSuggestionContext("Looks :hea")
+        )
+        XCTAssertEqual(emojiContext.trigger, ":")
+        let emojiRows = mobileEditorSuggestionRows(
+            context: emojiContext,
+            assistants: [],
+            workflows: []
+        )
+        XCTAssertTrue(emojiRows.contains(where: {
+            $0.category == .emoji && $0.subtitle?.contains("heart") == true
+        }))
+        XCTAssertLessThanOrEqual(emojiRows.count, 96)
+    }
+
+    func testNativeEditorSuggestionKeyboardSelectionWrapsAndBounds() {
+        XCTAssertEqual(
+            mobileEditorSuggestionNextIndex(
+                current: 0,
+                count: 3,
+                move: .previous
+            ),
+            2
+        )
+        XCTAssertEqual(
+            mobileEditorSuggestionNextIndex(
+                current: 2,
+                count: 3,
+                move: .next
+            ),
+            0
+        )
+        XCTAssertEqual(
+            mobileEditorSuggestionNextIndex(
+                current: 1,
+                count: 3,
+                move: .first
+            ),
+            0
+        )
+        XCTAssertEqual(
+            mobileEditorSuggestionNextIndex(
+                current: 1,
+                count: 3,
+                move: .last
+            ),
+            2
+        )
+        XCTAssertNil(
+            mobileEditorSuggestionNextIndex(
+                current: nil,
+                count: 0,
+                move: .next
+            )
+        )
+    }
+
+    func testNativeEditorSuggestionRecencyOnlyBreaksEqualSearchScores() throws {
+        let context = try XCTUnwrap(mobileEditorSuggestionContext("@"))
+        let alpha = MobileEditorSuggestionItem(
+            id: "alpha",
+            category: .assistants,
+            label: "Alpha",
+            insertion: "@Alpha"
+        )
+        let beta = MobileEditorSuggestionItem(
+            id: "beta",
+            category: .assistants,
+            label: "Beta",
+            insertion: "@Beta"
+        )
+        let rows = mobileEditorSuggestionRows(
+            context: context,
+            assistants: [alpha, beta],
+            workflows: [],
+            recentKeys: ["assistants:beta", "assistants:alpha"]
+        )
+        XCTAssertEqual(rows.map(\.id), ["beta", "alpha"])
+    }
+
     func testTranscriptLoadRetrySurfaceUsesCanonicalCopy() {
         XCTAssertEqual(MobileTranscriptLoadErrorCopy.title, "Couldn't load conversation")
         XCTAssertEqual(
