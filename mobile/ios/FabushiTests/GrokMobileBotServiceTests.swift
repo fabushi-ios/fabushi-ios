@@ -590,6 +590,67 @@ final class GrokMobileBotServiceTests: XCTestCase {
 
 
 
+    func testBotSubagentHistoryDecoderKeepsDesktopStatusesAndDropsMalformedRows() throws {
+        let decoded = GrokMobileBotService.parseSubagents([
+            [
+                "subagentId": "sub-running",
+                "subagentType": "task",
+                "title": "Research",
+                "status": "running",
+            ],
+            [
+                "subagentId": "sub-done",
+                "subagentType": "task",
+                "title": "Completed research",
+                "status": "done",
+            ],
+            [
+                "subagentId": "sub-error",
+                "subagentType": "ci",
+                "title": "Investigate CI",
+                "status": "error",
+            ],
+            [
+                "subagentId": "sub-aborted",
+                "subagentType": "task",
+                "title": "",
+                "status": "aborted",
+            ],
+            [
+                "subagentId": "bad-status",
+                "subagentType": "task",
+                "title": "Bad",
+                "status": "completed",
+            ],
+            [
+                "subagentId": "",
+                "subagentType": "task",
+                "title": "Missing id",
+                "status": "done",
+            ],
+        ])
+
+        XCTAssertEqual(decoded.map(\.subagentId), [
+            "sub-running", "sub-done", "sub-error", "sub-aborted",
+        ])
+        XCTAssertEqual(decoded.map(\.status), ["running", "done", "error", "aborted"])
+
+        let bot = try XCTUnwrap(GrokMobileBotService.parseBot([
+            "id": "agent-a",
+            "name": "Agent A",
+            "subagents": [
+                [
+                    "subagentId": "sub-done",
+                    "subagentType": "task",
+                    "title": "Completed research",
+                    "status": "done",
+                ],
+            ],
+        ]))
+        XCTAssertEqual(bot.subagents.first?.subagentId, "sub-done")
+        XCTAssertEqual(bot.subagents.first?.status, "done")
+    }
+
     func testAgentReplyReferencePreviewMatchesDesktopAndFailsClosed() {
         var text = MobileChatMessage(
             id: "history:m-1",
