@@ -2745,6 +2745,30 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-implemented-pending-exact-head",
         "finding": "Renderer model additions are split across native canonical owners: Human conversations/transcripts use MessagingModel, Agent roster upserts and membership/avatar metadata use GrokMobileBotService/MobileBotSummary, and legacy `grok`/`grok bot` names are normalized to Fabushi without rewriting custom names. Focused service tests cover the legacy-name projection. Exact-head Actions and global closure remain required."
+      },
+      {
+        "path": "frontend/src/production/production.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop CSS delta carries accessibility/layout product effects: robust font fallbacks, text scale, reduced motion, high contrast, new-Agent identity picker, transcript alignment, and forward-dialog states. iOS uses native SwiftUI/Dynamic Type/LayoutDirection/accessibility preferences plus shipping new-Agent/avatar and ForwardMessageSheet surfaces; CSS itself is platform-replaced, not copied. Exact-head UI/accessibility evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/contracts/desktop-bridge.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop adds typed callMedia and uiPreferences bridge contracts plus Fabushi bridge error branding. iOS platform replacement keeps call media under HumanCallMediaPort and UI preferences under MobileUiPreferencesStore→MahayanaCoordinator while IOSPreloadBridge remains the single raw FeatureHost receive owner; no competing Desktop-style bridge owner is introduced. Exact-head Actions remain required."
+      },
+      {
+        "path": "frontend/src/recovered/contracts/surface-notice.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop adds settings-ui-preferences and settings-call-media typed notice operations. Current iOS SettingsNoticeOperation contains the same exact wire values and SettingsNoticeControllerParityTests requires them in the canonical operation set; account/surface generation fencing stays under the single SettingsNoticeController. Exact-head Actions remain required."
+      },
+      {
+        "path": "frontend/src/recovered/features/access/cover/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop current-main changes the access-cover product heading from Grok Bot to Fabushi. Native iOS login/onboarding shipping surface presents Fabushi branding and preserves auth/account-scoped onboarding cancellation fencing. Exact-head protected UI evidence remains required."
       }
     ]
   },
