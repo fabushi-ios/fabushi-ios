@@ -186,9 +186,9 @@
       "type": "blob",
       "sha": "0954a11147b77275e1dc2043921141f6d397ed3c",
       "size": 16089,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-agent-network-e2e-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Desktop test proves the shipping Agent Network is reached through the authenticated workspace and remains responsive to real zoom/navigation. iOS replacement is FabushiAgentNetworkView.swift plus MobileAgentNetworkParityTests.swift, which cover feature-gate availability, graph/activity semantics, account/reconnect stale-result fencing, bounded scale/layout and native accessibility/open-target behavior. Electron/browser-login harness details are platform-specific; product behavior remains applicable."
     },
     {
       "path": "desktop/e2e/app-agent-surface.spec.ts",
@@ -196,9 +196,9 @@
       "type": "blob",
       "sha": "b9d673527856631050318d1b6e506060dc9c1294",
       "size": 9431,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-app-agent-surface-e2e-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Desktop test proves the packaged semantic App MCP has bounded snapshots, sensitive-value redaction, generation fencing, action/assert behavior and private publication. iOS replacement is FabushiAppAgentSurface.swift and FabushiAppAgentSurfaceTests.swift: fabushi.app status/snapshot/find/action/wait/assert, bounded element count, sensitive value omission, stale-generation rejection and deterministic find/assert are native shipping contracts. Desktop loopback discovery transport is not copied."
     },
     {
       "path": "desktop/e2e/credential-vault.spec.ts",
@@ -206,9 +206,9 @@
       "type": "blob",
       "sha": "c63f8987f70b05a43ab13c0291b62cf44f4fe340",
       "size": 7717,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-credential-vault-e2e-contract",
+      "coverage_status": "reviewed-with-ios-secret-storage-replacement",
+      "reason": "Desktop test proves plaintext remains opaque, cancelled edits do not persist, OS-backed encryption is required, rotation/listing do not expose secret values, and storage fails closed when secure encryption is unavailable. iOS carries the underlying secret-storage responsibility in repository-owned Mahayana secrets/keyring code and native secret validation; exact iOS UI/Keychain shipping-entrypoint evidence still requires independent ledger closure, so this file is reviewed as an active dependency contract rather than treated as complete."
     },
     {
       "path": "desktop/e2e/fcm-010-13-assistant-projection.spec.ts",
@@ -216,9 +216,9 @@
       "type": "blob",
       "sha": "f263733bf1d599e33de93e5265083f20d4d4e19b",
       "size": 11324,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-assistant-projection-e2e-contract",
+      "coverage_status": "reviewed-active-ios-product-contract",
+      "reason": "Desktop journey proves assistant semantic projection survives real workspace navigation/search/channel transitions and exposes the correct assistant/unread App Surface state. This is an applicable product responsibility on iOS; native App Agent Surface plus messaging projection owners and focused tests replace the Electron journey. Exact native end-to-end assistant/unread journey evidence remains required before product closure."
     },
     {
       "path": "desktop/e2e/fcm-010-13-unread-runtime-projection.spec.ts",
@@ -226,9 +226,9 @@
       "type": "blob",
       "sha": "4b7d2cdf2b9c46f644f428a59f859e4957258d98",
       "size": 4050,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-unread-runtime-projection-contract",
+      "coverage_status": "reviewed-with-ios-runtime-replacement",
+      "reason": "Desktop transport contract requires authoritative conversation.list refresh after conversation open and assistant completion so unread state is not stale. iOS repository-owned messaging core has actor-scoped unread/read-cursor persistence and reload tests, while native runtime projection must consume that authority. The Electron transport implementation is platform-specific; the refresh/projection invariant remains an active iOS requirement."
     },
     {
       "path": "desktop/e2e/grok-motion-parity.spec.ts",
