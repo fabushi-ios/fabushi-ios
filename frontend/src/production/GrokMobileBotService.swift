@@ -806,7 +806,8 @@ struct GrokMobileBotService {
                     isGroup: canonical.isGroup,
                     memberIds: canonical.memberIds,
                     conversationPartnerIds: canonical.conversationPartnerIds,
-                    isSharedRoom: canonical.isSharedRoom
+                    isSharedRoom: canonical.isSharedRoom,
+                    subagents: canonical.subagents
                 )
             } else {
                 byId[installedBot.id] = installedBot
@@ -978,6 +979,28 @@ struct GrokMobileBotService {
         }
     }
 
+    static func parseSubagents(_ value: Any?) -> [MobileBotSubagent] {
+        guard let rows = value as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
+        return rows.compactMap { row in
+            guard let subagentId = row["subagentId"] as? String,
+                  !subagentId.isEmpty,
+                  let subagentType = row["subagentType"] as? String,
+                  !subagentType.isEmpty,
+                  let title = row["title"] as? String,
+                  let status = row["status"] as? String,
+                  ["running", "done", "error", "aborted"].contains(status),
+                  seen.insert(subagentId).inserted
+            else { return nil }
+            return .init(
+                subagentId: subagentId,
+                subagentType: subagentType,
+                title: title,
+                status: status
+            )
+        }
+    }
+
     static func parseBot(_ row: [String: Any]) -> MobileBotSummary? {
         guard let id = row["id"] as? String, !id.isEmpty else { return nil }
         let explicitMiniAppId = (row["miniAppId"] as? String)?
@@ -1013,7 +1036,8 @@ struct GrokMobileBotService {
             miniAppId: miniAppId,
             menuButtonText: menuText?.isEmpty == false ? menuText : (miniAppId == nil ? nil : "打开应用"),
             conversationPartnerIds: parseConversationPartnerIds(row),
-            isSharedRoom: row["isSharedRoom"] as? Bool ?? false
+            isSharedRoom: row["isSharedRoom"] as? Bool ?? false,
+            subagents: parseSubagents(row["subagents"])
         )
     }
 
