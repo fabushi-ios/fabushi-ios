@@ -55,10 +55,19 @@ impl ConversationBlobStoreDb {
         busy_timeout_ms: u64,
         legacy_blob_db_path: Option<PathBuf>,
     ) -> Result<Self, ConversationBlobRecoveryError> {
+        let agent_id = agent_id.into();
         let blob_db_path = blob_db_path.into();
-        let db = ConversationBlobDb::open(&blob_db_path, busy_timeout_ms)?;
+        let db = ConversationBlobDb::open_with_options(
+            crate::conversation_blob_db::ConversationBlobDbOptions {
+                db_path: &blob_db_path,
+                busy_timeout_ms,
+                agent_id: &agent_id,
+                log: None,
+                on_recovery: None,
+            },
+        )?;
         let mut store = Self {
-            agent_id: agent_id.into(),
+            agent_id,
             blob_db_path,
             legacy_blob_db_path,
             db,
