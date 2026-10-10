@@ -140,6 +140,27 @@ internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let isPinned: Bool
 }
 
+internal func reconcileMessagingSyncBaseline(
+    current: [String: [ChatMessage]],
+    incoming: [String: [ChatMessage]],
+    observedBeforeBaseline: [String: Set<String>]
+) -> [String: [ChatMessage]] {
+    var reconciled = incoming
+    for (conversationId, observedIds) in observedBeforeBaseline where !observedIds.isEmpty {
+        let currentMessages = current[conversationId] ?? []
+        var baseline = reconciled[conversationId] ?? []
+        let incomingIds = Set(baseline.map(\.id))
+        let arrivedBeforeBaseline = currentMessages.filter { message in
+            observedIds.contains(message.id) && !incomingIds.contains(message.id)
+        }
+        if !arrivedBeforeBaseline.isEmpty {
+            baseline.append(contentsOf: arrivedBeforeBaseline)
+            reconciled[conversationId] = baseline
+        }
+    }
+    return reconciled
+}
+
 internal struct ForwardDestinationRequest: Identifiable, Equatable, Sendable {
     var id: String { conversationId }
     let conversationId: String
@@ -716,6 +737,12 @@ final class MessagingModel {
     }
 
     private func apply(_ envelopes: [[String: Any]]) {
+        // A live message event can race ahead of a later syncBatch in the same
+        // bridge settlement. Track only events observed in this apply pass so
+        // the authoritative baseline cannot erase them while stale cached rows
+        // from previous passes are still allowed to disappear.
+        var observedBeforeSyncByConversation: [String: Set<String>] = [:]
+
         for envelope in envelopes {
             guard let event = envelope["event"] as? [String: Any], let type = event["type"] as? String else { continue }
             switch type {
@@ -727,8 +754,14 @@ final class MessagingModel {
                 draftsByConversation = Dictionary(uniqueKeysWithValues: (event["drafts"] as? [[String: Any]] ?? []).compactMap(parseDraft).map { ($0.conversationId, $0) })
                 let rawMessages = event["messages"] as? [[String: Any]] ?? []
                 let messages = rawMessages.compactMap(parseMessage)
-                messagesByConversation = Dictionary(grouping: messages, by: \.conversationId)
-                searchAuthorByMessageId = Dictionary(
+                let incomingByConversation = Dictionary(grouping: messages, by: \.conversationId)
+                let previousAuthors = searchAuthorByMessageId
+                messagesByConversation = reconcileMessagingSyncBaseline(
+                    current: messagesByConversation,
+                    incoming: incomingByConversation,
+                    observedBeforeBaseline: observedBeforeSyncByConversation
+                )
+                var incomingAuthors = Dictionary(
                     uniqueKeysWithValues: rawMessages.compactMap { raw -> (String, String)? in
                         guard let id = raw["id"] as? String,
                               let senderId = raw["senderId"] as? String,
@@ -741,6 +774,15 @@ final class MessagingModel {
                         return (id, author)
                     }
                 )
+                for observedIds in observedBeforeSyncByConversation.values {
+                    for messageId in observedIds where incomingAuthors[messageId] == nil {
+                        if let author = previousAuthors[messageId] {
+                            incomingAuthors[messageId] = author
+                        }
+                    }
+                }
+                searchAuthorByMessageId = incomingAuthors
+                observedBeforeSyncByConversation.removeAll(keepingCapacity: true)
             case "conversationChanged":
                 if let raw = event["conversation"] as? [String: Any], let conversation = parseConversation(raw) { upsert(conversation) }
             case "conversationParticipantChanged":
@@ -770,6 +812,7 @@ final class MessagingModel {
                     var list = messagesByConversation[message.conversationId] ?? []
                     if let index = list.firstIndex(where: { $0.id == message.id }) { list[index] = message } else { list.append(message) }
                     messagesByConversation[message.conversationId] = list.sorted { $0.time < $1.time }
+                    observedBeforeSyncByConversation[message.conversationId, default: []].insert(message.id)
                     if let senderId = raw["senderId"] as? String,
                        let author = Self.searchAuthorName(
                         senderId: senderId,
