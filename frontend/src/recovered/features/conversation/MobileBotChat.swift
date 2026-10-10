@@ -1431,6 +1431,7 @@ internal struct MobileBotChat: View {
     @State private var errorText: String?
     @State private var openedMiniApp = false
     @State private var asyncTasksPresented = false
+    @State private var conversationOutlinePresented = false
     @State private var replyTargetId: String?
     @State private var replyIsFork = false
     @State private var linkMetadataFocusRevision = 0
@@ -1581,6 +1582,16 @@ internal struct MobileBotChat: View {
         }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
+        }
+        .sheet(isPresented: $conversationOutlinePresented) {
+            MobileConversationOutlinePanel(
+                agentId: bot.id,
+                agentName: bot.name,
+                accountKey: model.settingsNoticeAccountKey,
+                bridge: bridge,
+                reconnectGeneration: reconnectGeneration,
+                onClose: { conversationOutlinePresented = false }
+            )
         }
         .sheet(isPresented: $asyncTasksPresented) {
             MobileAsyncTasksPanel(
@@ -1786,6 +1797,18 @@ internal struct MobileBotChat: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Find in chat")
             .accessibilityIdentifier("mobile-bot-find")
+
+            Button {
+                conversationOutlinePresented = true
+            } label: {
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 38, height: 38)
+                    .background(Color.black.opacity(0.045), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Full conversation")
+            .accessibilityIdentifier("mobile-bot-full-conversation")
 
             Button {
                 asyncTasksPresented = true
@@ -2564,6 +2587,7 @@ internal struct MobileBotChat: View {
             .init(agentId: "mobile-bot-close", role: "button", name: "关闭 Bot 对话"),
             .init(agentId: "mobile-bot-settings", role: "button", name: "Bot 设置"),
             .init(agentId: "mobile-bot-find", role: "button", name: "Find in chat"),
+            .init(agentId: "mobile-bot-full-conversation", role: "button", name: "Full conversation"),
             .init(agentId: "mobile-bot-async-tasks", role: "button", name: "Async tasks"),
             .init(agentId: "mobile-bot-draft", role: "textbox", name: "Bot 消息"),
         ]

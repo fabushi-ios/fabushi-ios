@@ -4137,6 +4137,18 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-composer-implemented-pending-exact-head-ci",
         "finding": "Desktop ConversationComposer owns account+Agent-scoped text/attachment drafts, six-file native staging, attachment-only sends, remove/retry preservation, voice input that inserts into the existing draft, and send/voice busy gating. Shipping iOS now keeps attachments beside the existing account+Bot scoped draft owner, uses the native document picker, enforces the canonical 6-file and 25 MB/200 MB limits before upload, stages through the single canonical attachment.upload Host store with SHA-256/agent/account generation fencing, projects typed attachment contexts into chat.send, preserves attachments across optimistic retry, renders optimistic attachment chips, allows attachment-only Agent sends, and fails closed instead of silently dropping Mini App attachments. The Rust Host now accepts empty chat text only when at least one attachment exists, matching the Desktop submit/sendPrompt contract, while truly empty sends remain rejected. Native voice transcription now inserts into existing draft text and fences account changes. Focused Swift/Rust tests added; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/conversation-outline-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-outline-provider-implemented-pending-exact-head-ci",
+        "finding": "Desktop ConversationOutlineProvider strictly decodes user/assistant/thinking/send-message/tool-call items, scopes requests to account+Agent generations, aborts stale refreshes, refreshes on transport recovery and can poll retained running subagents. iOS already exposes the canonical getConversationOutline Coordinator method; shipping MobileConversationOutlinePanel now strictly decodes the same five item families, fences every reply by account+parent Agent+selected Agent+reconnect+generation, preserves last-known data on refresh failure, refreshes the main outline at 5s and running subagents at the Desktop 2s cadence, and reuses getAsyncTasks for known-running subagent identities. Focused scope/decoder tests added; exact-head CI pending. Historical completed/error/aborted subagent tab discovery remains intentionally outside this row until the getSubagents response schema is independently reviewed rather than guessed."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/conversation-outline-view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-outline-view-implemented-pending-exact-head-ci",
+        "finding": "Desktop ConversationOutlinePanel exposes a Full conversation surface with strict status states, expandable rows, first-line previews, tool status, close action and subagent tabs. iOS MobileBotChat now has a shipping Full conversation button and native SwiftUI sheet backed by the canonical Coordinator outline method, with loading/empty/error/last-known states, pull-to-refresh, expandable selectable detail, pending/failed tool presentation, native accessibility identifiers and tabs for canonical running subagents. The native layout replaces the movable Electron panel while preserving the product effect. Historical non-running subagent tabs remain a separately tracked follow-up until their authoritative getSubagents contract is reviewed."
       }
     ]
   },
