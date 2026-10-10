@@ -58,6 +58,7 @@ internal struct GrokMobileShell: View {
     @State var botSettingsRoutineID: String?
     @State var remoteComputerAgentTarget: MobileBotSummary?
     @State var botDrafts: [String: String] = [:]
+    @State var botComposerAttachments: [String: [MobileComposerAttachment]] = [:]
     @State var botTranscripts: [String: [MobileChatMessage]] = [:]
     @State var legacyOpen = false
     @State var legacyConversationID: String?
@@ -515,6 +516,7 @@ internal struct GrokMobileShell: View {
                 self.botSettingsTarget = self.bots.first(where: { $0.id == bot.id }) ?? bot
             },
             draft: botDraftBinding(for: bot.id),
+            composerAttachments: botComposerAttachmentBinding(for: bot.id),
             entries: botTranscriptBinding(for: bot.id)
         )
     }
@@ -527,6 +529,19 @@ internal struct GrokMobileShell: View {
         return Binding(
             get: { botDrafts[storageKey] ?? "" },
             set: { botDrafts[storageKey] = $0 }
+        )
+    }
+
+    private func botComposerAttachmentBinding(
+        for botID: String
+    ) -> Binding<[MobileComposerAttachment]> {
+        let storageKey = mobileBotConversationScopeKey(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID
+        )
+        return Binding(
+            get: { botComposerAttachments[storageKey] ?? [] },
+            set: { botComposerAttachments[storageKey] = $0 }
         )
     }
 

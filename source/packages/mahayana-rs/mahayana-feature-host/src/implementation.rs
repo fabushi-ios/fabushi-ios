@@ -12514,7 +12514,7 @@ impl FeatureHostController {
         is_fork: bool,
     ) -> Result<CommandAccepted, FeatureHostError> {
         self.require_authenticated_account()?;
-        let text = required(text, "chat text")?;
+        let text = normalized_chat_text(text, &attachments)?;
         let bot_conversation_id = if let Some(agent_id) = agent_id.as_deref() {
             self.state()?
                 .bots
@@ -12527,6 +12527,11 @@ impl FeatureHostController {
             .as_deref()
             .filter(|id| *id != "mahayana-assistant" && bot_conversation_id.is_none())
         {
+            if !attachments.is_empty() {
+                return Err(FeatureHostError::Contract(
+                    "Mini App chat attachments are not supported by this runtime".into(),
+                ));
+            }
             match self
                 .runtime()?
                 .execute(RuntimeCommand::ApproveLocalPluginTool {
@@ -13228,7 +13233,7 @@ impl FeatureHostController {
                 attachments,
                 ..
             } => {
-                let text = required(text, "chat text")?;
+                let text = normalized_chat_text(text, &attachments)?;
                 let operation_id = next_id(&mut state, "chat");
                 state.events.push_back(HostEvent::ChatMessage {
                     timestamp: timestamp(),
@@ -14924,6 +14929,20 @@ fn required(value: String, name: &str) -> Result<String, FeatureHostError> {
         )))
     } else {
         Ok(value.to_string())
+    }
+}
+
+fn normalized_chat_text(
+    value: String,
+    attachments: &[AttachmentContext],
+) -> Result<String, FeatureHostError> {
+    let value = value.trim().to_string();
+    if value.is_empty() && attachments.is_empty() {
+        Err(FeatureHostError::Contract(
+            "chat text or attachment must not be empty".into(),
+        ))
+    } else {
+        Ok(value)
     }
 }
 
@@ -20523,6 +20542,31 @@ mod tests {
                 .get(&operation_id)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn chat_payload_accepts_attachment_only_and_rejects_empty() {
+        let attachment = AttachmentContext {
+            id: "attachment-only".into(),
+            name: "notes.txt".into(),
+            mime_type: Some("text/plain".into()),
+            text: None,
+            path: Some("/tmp/notes.txt".into()),
+            size_bytes: Some(12),
+        };
+        assert_eq!(
+            normalized_chat_text("   ".into(), &[attachment]).expect("attachment-only chat"),
+            ""
+        );
+        assert_eq!(
+            normalized_chat_text("  hello  ".into(), &[]).expect("text chat"),
+            "hello"
+        );
+        assert!(matches!(
+            normalized_chat_text("   ".into(), &[]),
+            Err(FeatureHostError::Contract(message))
+                if message == "chat text or attachment must not be empty"
+        ));
     }
 
     #[test]

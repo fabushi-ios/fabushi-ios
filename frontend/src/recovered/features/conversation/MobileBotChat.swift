@@ -1,6 +1,8 @@
 import AVKit
+import CryptoKit
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 enum MobileTranscriptLoadErrorCopy {
     static let title = "Couldn't load conversation"
@@ -728,7 +730,8 @@ private func mobileTranscriptAdjacencySemantics(
         return .init(role: nil, groupKey: nil, isBubble: false, hasReaction: false)
     }
 
-    let hasAttachment = entry.attachmentProjection != nil
+    let hasAttachment = !entry.optimisticAttachments.isEmpty
+        || entry.attachmentProjection != nil
         || !(entry.attachmentURL?
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     let isSendMessageCard = entry.sendMessageTextProjection != nil
@@ -858,6 +861,7 @@ internal func projectMobileMessageCardSeam(
     let text = entry.sendMessageTextProjection?.content ?? entry.text
     let hasProjectedImages = !(entry.sendMessageTextProjection?.images.isEmpty ?? true)
     let standaloneEmoji = entry.role == .user
+        && entry.optimisticAttachments.isEmpty
         && entry.attachmentProjection == nil
         && entry.attachmentURL == nil
         && !hasProjectedImages
@@ -865,6 +869,7 @@ internal func projectMobileMessageCardSeam(
     let url: String?
     if entry.role == .user,
        !entry.fromUserPresent,
+       entry.optimisticAttachments.isEmpty,
        entry.attachmentProjection == nil,
        entry.attachmentURL == nil
     {
@@ -1369,6 +1374,41 @@ internal func mobileConversationHeaderStatus(_ bot: MobileBotSummary) -> String?
     bot.isRunning ? "Working" : nil
 }
 
+internal let mobileComposerAttachmentLimit = 6
+
+internal func mobileComposerHasPayload(
+    text: String,
+    attachments: [MobileComposerAttachment]
+) -> Bool {
+    !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty
+}
+
+internal func mergeMobileComposerVoiceTranscript(
+    existing: String,
+    transcript: String
+) -> String {
+    let inserted = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !inserted.isEmpty else { return existing }
+    guard !existing.isEmpty else { return inserted }
+    let separator = existing.last?.isWhitespace == true ? "" : " "
+    return existing + separator + inserted
+}
+
+internal func mobileComposerAttachmentCommandPayload(
+    _ attachment: MobileComposerAttachment
+) -> [String: Any] {
+    var payload: [String: Any] = [
+        "id": attachment.id,
+        "name": attachment.name,
+        "path": attachment.path,
+        "sizeBytes": attachment.sizeBytes,
+    ]
+    if let mimeType = attachment.mimeType, !mimeType.isEmpty {
+        payload["mimeType"] = mimeType
+    }
+    return payload
+}
+
 internal struct MobileBotChat: View {
     @Environment(\.scenePhase) private var scenePhase
     let bot: MobileBotSummary
@@ -1384,6 +1424,7 @@ internal struct MobileBotChat: View {
     let onOpenAutomation: (String) -> Void
 
     @Binding var draft: String
+    @Binding var composerAttachments: [MobileComposerAttachment]
     @Binding var entries: [MobileChatMessage]
     @State private var busy = false
     @State private var activeOperationId: String?
@@ -1401,6 +1442,9 @@ internal struct MobileBotChat: View {
     @State private var voiceTranscriber = OfflineSpeechTranscriber()
     @State private var transcribingVoice = false
     @State private var voiceInputGeneration = 0
+    @State private var attachmentImporterPresented = false
+    @State private var stagingAttachments = false
+    @State private var attachmentStageGeneration = 0
     @State private var reactionGeneration = 0
     @State private var cloudAgentInfoByBcId: [String: MobileCloudAgentInfo] = [:]
     @State private var cloudAgentErrorsByBcId: [String: String] = [:]
@@ -1488,6 +1532,7 @@ internal struct MobileBotChat: View {
         .onChange(of: bot.id) { _, _ in
             resetAcknowledgementScope()
             cancelVoiceInput()
+            invalidateComposerAttachmentStaging()
             invalidateReactionScope()
             resetCloudAgentState()
             approvalGeneration &+= 1
@@ -1510,6 +1555,8 @@ internal struct MobileBotChat: View {
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             resetAcknowledgementScope()
+            cancelVoiceInput()
+            invalidateComposerAttachmentStaging()
             invalidateReactionScope()
             resetCloudAgentState()
             resetLocalToolPermissionUI()
@@ -1518,6 +1565,7 @@ internal struct MobileBotChat: View {
         .onDisappear {
             resetAcknowledgementScope()
             cancelVoiceInput()
+            invalidateComposerAttachmentStaging()
             invalidateReactionScope()
             resetCloudAgentState()
             approvalGeneration &+= 1
@@ -1570,6 +1618,13 @@ internal struct MobileBotChat: View {
             )
         ) {
             threadSheet
+        }
+        .fileImporter(
+            isPresented: $attachmentImporterPresented,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            Task { await stageImportedComposerAttachments(result) }
         }
     }
 
@@ -2151,6 +2206,7 @@ internal struct MobileBotChat: View {
     private var composer: some View {
         VStack(spacing: 4) {
             editorSuggestionList
+            composerAttachmentStrip
             HStack(alignment: .bottom, spacing: 8) {
                 MobileComposerTextView(
                     text: $draft,
@@ -2189,6 +2245,7 @@ internal struct MobileBotChat: View {
                     normalizeEditorSuggestionSelection()
                 }
 
+                attachmentButton
                 miniAppButton
                 voiceInputButton
                 sendButton
@@ -2301,6 +2358,78 @@ internal struct MobileBotChat: View {
     }
 
     @ViewBuilder
+    private var composerAttachmentStrip: some View {
+        if !composerAttachments.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(Array(composerAttachments.enumerated()), id: \.offset) { index, attachment in
+                        HStack(spacing: 6) {
+                            Image(systemName: "paperclip")
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(attachment.name)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                Text(ByteCountFormatter.string(
+                                    fromByteCount: Int64(attachment.sizeBytes),
+                                    countStyle: .file
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            }
+                            Button {
+                                guard composerAttachments.indices.contains(index) else { return }
+                                composerAttachments.remove(at: index)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Remove \(attachment.name)")
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                        .accessibilityIdentifier("mobile-bot-composer-attachment-\(index)")
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+            .frame(maxHeight: 54)
+            .accessibilityIdentifier("mobile-bot-composer-attachments")
+        }
+    }
+
+    @ViewBuilder
+    private var attachmentButton: some View {
+        if bot.miniAppId == nil {
+            Button {
+                attachmentImporterPresented = true
+            } label: {
+                if stagingAttachments {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 39, height: 39)
+                } else {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 39, height: 39)
+                        .background(Color.black.opacity(0.075), in: Circle())
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                busy
+                    || stagingAttachments
+                    || voiceRecorder.isRecording
+                    || transcribingVoice
+                    || composerAttachments.count >= mobileComposerAttachmentLimit
+            )
+            .accessibilityLabel("Attach files")
+            .accessibilityIdentifier("mobile-bot-attach")
+        }
+    }
+
+    @ViewBuilder
     private var miniAppButton: some View {
         if bot.miniAppId == GlobalDharmaMiniAppBridge.globalDharmaId {
             Button {
@@ -2321,7 +2450,7 @@ internal struct MobileBotChat: View {
 
     @ViewBuilder
     private var voiceInputButton: some View {
-        if !busy && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !busy {
             Button {
                 if voiceRecorder.isRecording {
                     Task { await finishVoiceInput() }
@@ -2335,7 +2464,7 @@ internal struct MobileBotChat: View {
                     .frame(width: 39, height: 39)
                     .background(voiceRecorder.isRecording ? Color.red : Color.black, in: Circle())
             }
-            .disabled(transcribingVoice)
+            .disabled(transcribingVoice || stagingAttachments)
             .accessibilityIdentifier(voiceRecorder.isRecording ? "mobile-bot-voice-stop" : "mobile-bot-voice-start")
         }
     }
@@ -2354,7 +2483,14 @@ internal struct MobileBotChat: View {
                 .frame(width: 39, height: 39)
                 .background(busy ? Color.red : Color.black, in: Circle())
         }
-        .disabled(!busy && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(
+            !busy && (
+                !mobileComposerHasPayload(text: draft, attachments: composerAttachments)
+                    || stagingAttachments
+                    || voiceRecorder.isRecording
+                    || transcribingVoice
+            )
+        )
         .accessibilityIdentifier(busy ? "mobile-bot-stop" : "mobile-bot-send")
     }
 
@@ -4419,7 +4555,25 @@ internal struct MobileBotChat: View {
 
     @ViewBuilder
     private func attachmentContent(_ entry: MobileChatMessage) -> some View {
-        if let attachment = entry.attachmentProjection {
+        if !entry.optimisticAttachments.isEmpty {
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(Array(entry.optimisticAttachments.enumerated()), id: \.offset) { _, attachment in
+                    HStack(spacing: 6) {
+                        Image(systemName: "paperclip")
+                        Text(attachment.name)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                        Text(ByteCountFormatter.string(
+                            fromByteCount: Int64(attachment.sizeBytes),
+                            countStyle: .file
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .accessibilityIdentifier(Self.semanticId("mobile-bot-optimistic-attachments-\(entry.id)"))
+        } else if let attachment = entry.attachmentProjection {
             switch attachment.kind {
             case .box:
                 VStack(alignment: .leading, spacing: 4) {
@@ -4503,6 +4657,7 @@ internal struct MobileBotChat: View {
         guard !busy, !transcribingVoice, let recording = voiceRecorder.stop() else { return }
         let generation = voiceInputGeneration
         let agentId = bot.id
+        let accountKey = model.settingsNoticeAccountKey
         transcribingVoice = true
         defer {
             transcribingVoice = false
@@ -4510,13 +4665,19 @@ internal struct MobileBotChat: View {
         }
         do {
             let text = try await voiceTranscriber.transcribe(fileURL: recording.url)
-            guard generation == voiceInputGeneration, agentId == bot.id else { return }
-            draft = text
+            guard generation == voiceInputGeneration,
+                  agentId == bot.id,
+                  accountKey == model.settingsNoticeAccountKey
+            else { return }
+            draft = mergeMobileComposerVoiceTranscript(existing: draft, transcript: text)
             errorText = nil
         } catch is CancellationError {
             return
         } catch {
-            guard generation == voiceInputGeneration, agentId == bot.id else { return }
+            guard generation == voiceInputGeneration,
+                  agentId == bot.id,
+                  accountKey == model.settingsNoticeAccountKey
+            else { return }
             errorText = error.localizedDescription
         }
     }
@@ -4527,6 +4688,145 @@ internal struct MobileBotChat: View {
         voiceRecorder.cancel()
         voiceTranscriber.cancel()
         transcribingVoice = false
+    }
+
+    @MainActor
+    private func invalidateComposerAttachmentStaging() {
+        attachmentStageGeneration &+= 1
+        stagingAttachments = false
+        attachmentImporterPresented = false
+    }
+
+    @MainActor
+    private func stageImportedComposerAttachments(
+        _ result: Result<[URL], Error>
+    ) async {
+        let urls: [URL]
+        do {
+            urls = try result.get()
+        } catch {
+            errorText = error.localizedDescription
+            return
+        }
+
+        let capacity = max(0, mobileComposerAttachmentLimit - composerAttachments.count)
+        guard capacity > 0 else {
+            errorText = "You can attach up to \(mobileComposerAttachmentLimit) files."
+            return
+        }
+        let selected = Array(urls.prefix(capacity))
+        let droppedForLimit = max(0, urls.count - selected.count)
+        attachmentStageGeneration &+= 1
+        let generation = attachmentStageGeneration
+        let ownedAccount = model.settingsNoticeAccountKey
+        let ownedAgent = bot.id
+        stagingAttachments = true
+        errorText = droppedForLimit > 0
+            ? "You can attach up to \(mobileComposerAttachmentLimit) files."
+            : nil
+        defer {
+            if generation == attachmentStageGeneration {
+                stagingAttachments = false
+            }
+        }
+
+        for url in selected {
+            guard generation == attachmentStageGeneration,
+                  ownedAccount == model.settingsNoticeAccountKey,
+                  ownedAgent == bot.id
+            else { return }
+
+            do {
+                let prepared = try await Task.detached(priority: .userInitiated) {
+                    let didAccess = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if didAccess {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    let values = try url.resourceValues(
+                        forKeys: [.fileSizeKey, .nameKey, .contentTypeKey]
+                    )
+                    let name = values.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let filename = (name?.isEmpty == false ? name : nil) ?? url.lastPathComponent
+                    let limit = AttachmentLimits.attachmentByteLimit(forName: filename)
+                    if let fileSize = values.fileSize, fileSize > limit {
+                        throw AttachmentTooLargeError(limitBytes: limit)
+                    }
+                    let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+                    if data.isEmpty {
+                        throw NSError(
+                            domain: "Fabushi.MobileComposer",
+                            code: 1,
+                            userInfo: [NSLocalizedDescriptionKey: "\"\(filename)\" is empty, so it wasn't attached."]
+                        )
+                    }
+                    if data.count > limit {
+                        throw AttachmentTooLargeError(limitBytes: limit)
+                    }
+                    let hash = SHA256.hash(data: data)
+                        .map { String(format: "%02x", $0) }
+                        .joined()
+                    return (
+                        name: filename,
+                        mimeType: values.contentType?.preferredMIMEType,
+                        sizeBytes: data.count,
+                        bytesBase64: data.base64EncodedString(),
+                        hash: hash
+                    )
+                }.value
+
+                let requestId = "ios-composer-attachment-\(UUID().uuidString.lowercased())"
+                var uploadCommand: [String: Any] = [
+                    "type": "attachment.upload",
+                    "requestId": requestId,
+                    "agentId": ownedAgent,
+                    "filename": prepared.name,
+                    "bytesBase64": prepared.bytesBase64,
+                ]
+                if let mimeType = prepared.mimeType, !mimeType.isEmpty {
+                    uploadCommand["mimeType"] = mimeType
+                }
+                _ = try await bridge.request(
+                    method: "feature.execute",
+                    params: ["command": uploadCommand]
+                )
+                let stored = try await bridge.receiveFeatureEvent(
+                    deadlineMilliseconds: 15_000
+                ) { event in
+                    guard event["type"] as? String == "attachment.stored",
+                          let attachment = event["attachment"] as? [String: Any]
+                    else { return false }
+                    return attachment["id"] as? String == prepared.hash
+                        && attachment["agentId"] as? String == ownedAgent
+                }
+
+                guard generation == attachmentStageGeneration,
+                      ownedAccount == model.settingsNoticeAccountKey,
+                      ownedAgent == bot.id,
+                      let event = stored.value as? [String: Any],
+                      let attachment = event["attachment"] as? [String: Any],
+                      let path = attachment["path"] as? String,
+                      !path.isEmpty
+                else { return }
+
+                let sizeBytes = (attachment["sizeBytes"] as? NSNumber)?.intValue
+                    ?? prepared.sizeBytes
+                let mimeType = attachment["mimeType"] as? String ?? prepared.mimeType
+                composerAttachments.append(.init(
+                    id: prepared.hash,
+                    name: (attachment["name"] as? String) ?? prepared.name,
+                    path: path,
+                    mimeType: mimeType,
+                    sizeBytes: sizeBytes
+                ))
+            } catch is AttachmentTooLargeError {
+                let filename = url.lastPathComponent.isEmpty ? "file" : url.lastPathComponent
+                errorText = AttachmentLimits.formatTooLargeNotice(filename: filename)
+            } catch {
+                errorText = error.localizedDescription
+            }
+        }
     }
 
     @MainActor
@@ -4605,6 +4905,7 @@ internal struct MobileBotChat: View {
     private func appendOptimisticUserMessage(
         requestId: String,
         text: String,
+        attachments: [MobileComposerAttachment],
         replyTarget: String?,
         sendAsFork: Bool,
         priorNonces: [String] = []
@@ -4622,6 +4923,7 @@ internal struct MobileBotChat: View {
         row.optimisticAgentId = bot.id
         row.optimisticNonce = requestId
         row.optimisticPriorNonces = priorNonces
+        row.optimisticAttachments = attachments
         entries.append(row)
     }
 
@@ -4629,6 +4931,7 @@ internal struct MobileBotChat: View {
     private func dispatchOptimisticUserMessage(
         requestId: String,
         text: String,
+        attachments: [MobileComposerAttachment],
         replyTarget: String?,
         sendAsFork: Bool
     ) async {
@@ -4644,6 +4947,14 @@ internal struct MobileBotChat: View {
         entries[startIndex].optimisticDeliveryError = nil
 
         if let miniAppId = bot.miniAppId {
+            guard attachments.isEmpty else {
+                let message = "Attachments aren't supported by this Mini App chat."
+                entries[startIndex].optimisticDeliveryPhase = .failed
+                entries[startIndex].optimisticDeliveryError = message
+                errorText = message
+                busy = false
+                return
+            }
             let succeeded = await sendMiniApp(
                 pluginId: miniAppId,
                 text: text,
@@ -4671,6 +4982,9 @@ internal struct MobileBotChat: View {
                 "mode": "agent",
                 "isFork": sendAsFork,
             ]
+            if !attachments.isEmpty {
+                command["attachments"] = attachments.map(mobileComposerAttachmentCommandPayload)
+            }
             if let replyTarget { command["replyToMessageId"] = replyTarget }
             let result = try await bridge.request(
                 method: "feature.execute",
@@ -4725,8 +5039,19 @@ internal struct MobileBotChat: View {
     @MainActor
     private func send() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !busy else { return }
+        let attachments = composerAttachments
+        guard mobileComposerHasPayload(text: text, attachments: attachments),
+              !busy,
+              !stagingAttachments,
+              !voiceRecorder.isRecording,
+              !transcribingVoice
+        else { return }
+        if bot.miniAppId != nil && !attachments.isEmpty {
+            errorText = "Attachments aren't supported by this Mini App chat."
+            return
+        }
         draft = ""
+        composerAttachments = []
         busy = true
         errorText = nil
         let requestId = "ios-mobile-bot-chat-\(UUID().uuidString.lowercased())"
@@ -4737,12 +5062,14 @@ internal struct MobileBotChat: View {
         appendOptimisticUserMessage(
             requestId: requestId,
             text: text,
+            attachments: attachments,
             replyTarget: replyTarget,
             sendAsFork: sendAsFork
         )
         await dispatchOptimisticUserMessage(
             requestId: requestId,
             text: text,
+            attachments: attachments,
             replyTarget: replyTarget,
             sendAsFork: sendAsFork
         )
@@ -4771,6 +5098,7 @@ internal struct MobileBotChat: View {
         appendOptimisticUserMessage(
             requestId: freshNonce,
             text: entry.text,
+            attachments: entry.optimisticAttachments,
             replyTarget: entry.replyToMessageId,
             sendAsFork: entry.branched,
             priorNonces: priorNonces
@@ -4778,6 +5106,7 @@ internal struct MobileBotChat: View {
         await dispatchOptimisticUserMessage(
             requestId: freshNonce,
             text: entry.text,
+            attachments: entry.optimisticAttachments,
             replyTarget: entry.replyToMessageId,
             sendAsFork: entry.branched
         )

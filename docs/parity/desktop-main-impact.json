@@ -4131,6 +4131,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-chat-header-implemented-pending-exact-head-ci",
         "finding": "Desktop ChatHeader owns Agent identity/avatar, settings trigger, canonical isRunning Working copy, optional Shared Room entry, non-group Computer entry and trailing controls. Shipping iOS MobileBotChat already owns the native identity/settings trigger and keeps canonical avatarState; this change restores the explicit Working copy from bot.isRunning and exposes it to accessibility without coupling it to transient local busy animation. Shared Room and Computer are intentionally reorganized into the same MobileBotAgentSettings surface, where Shared Room uses the canonical account-scoped owner and Computer remains inside the non-group agent-only section; native Back/Find/Async controls are additive mobile presentation. Focused MobileChatHeaderParityTests fences the Working copy to canonical isRunning. Exact-head Swift/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/composer.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-composer-implemented-pending-exact-head-ci",
+        "finding": "Desktop ConversationComposer owns account+Agent-scoped text/attachment drafts, six-file native staging, attachment-only sends, remove/retry preservation, voice input that inserts into the existing draft, and send/voice busy gating. Shipping iOS now keeps attachments beside the existing account+Bot scoped draft owner, uses the native document picker, enforces the canonical 6-file and 25 MB/200 MB limits before upload, stages through the single canonical attachment.upload Host store with SHA-256/agent/account generation fencing, projects typed attachment contexts into chat.send, preserves attachments across optimistic retry, renders optimistic attachment chips, allows attachment-only Agent sends, and fails closed instead of silently dropping Mini App attachments. The Rust Host now accepts empty chat text only when at least one attachment exists, matching the Desktop submit/sendPrompt contract, while truly empty sends remain rejected. Native voice transcription now inserts into existing draft text and fences account changes. Focused Swift/Rust tests added; exact-head CI pending."
       }
     ]
   },

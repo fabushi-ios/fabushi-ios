@@ -688,6 +688,14 @@ enum MobileOptimisticDeliveryPhase: String, Equatable {
     case failed
 }
 
+struct MobileComposerAttachment: Equatable {
+    let id: String
+    let name: String
+    let path: String
+    let mimeType: String?
+    let sizeBytes: Int
+}
+
 struct MobileChatMessage: Identifiable, Equatable {
     let id: String
     let role: MobileChatRole
@@ -718,6 +726,7 @@ struct MobileChatMessage: Identifiable, Equatable {
     var attachmentFileName: String?
     var attachmentAlt: String?
     var attachmentProjection: MobileAttachmentCardProjection?
+    var optimisticAttachments: [MobileComposerAttachment] = []
     var sendMessageTextProjection: MobileSendMessageTextProjection?
     var timelineEvent: SandTimelineEvent?
     var timelineAutomationId: String?
