@@ -3783,6 +3783,42 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-computer-implemented-pending-exact-head-ci",
         "finding": "Desktop armed/recording/peer/save/discard controls map to the native RemoteComputerSurface teach recording bar and owner-backed actions, with elapsed duration and Host capture state rather than mock UI. Exact-head Swift/UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/notice/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-transcript-card-implemented-pending-exact-head-ci",
+        "finding": "Desktop notice cards are read-only transcript rows containing text plus the row timestamp. iOS projectMobileTranscriptCard maps notice payloads to MobileChatMessage.kind=.notice, preserves timestampMs into createdAt, renders the native row without message actions, and excludes notice rows from copy/reaction/forward semantics. Focused exact-head CI is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/permission-request/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-transcript-card-implemented-pending-exact-head-ci",
+        "finding": "The current-main permission-request leaf is explicitly retired/read-only and owns no bridge or action. iOS projects only a non-empty permission.title into MobileChatMessage.kind=.permissionRequest; the focused XCTest now asserts actionStatus is nil so this recovered leaf cannot be mistaken for the separate actionable auto-review approval surface. Exact-head CI is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/timeline-event-automation.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-timeline-event-implemented-pending-exact-head-ci",
+        "finding": "Automation-changed timeline cards preserve automationId, action, automationName, mapped action verb, timestamp and the user-visible Open routine affordance. iOS stores the ID in timelineAutomationId, renders the native timeline row, and the button invokes MobileBotChat.onOpenAutomation, which opens Agent settings focused on the exact routine. Malformed automation events fail closed. Exact-head Swift/UI CI is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/timeline-event-registry.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-timeline-event-implemented-pending-exact-head-ci",
+        "finding": "The four current-main timeline variants (name-changed, channel-connected, channel-disconnected, automation-changed) are projected by the native transcript-card boundary with strict required fields. Unknown/malformed recovered timeline cards return nil rather than inventing a generic event card; automation action verb semantics match created/updated/enabled/disabled/deleted. Exact-head CI is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/timeline-event-resolver.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-timeline-event-implemented-pending-exact-head-ci",
+        "finding": "Desktop lazy resolver/32px placeholder is a renderer-loading mechanism, replaced natively by direct SwiftUI dispatch on the projected MobileChatMessage.kind=.timelineEvent. Shipping MobileBotChat renders only successfully projected current-main event variants and passes automation navigation through the existing shell callback; no second registry/runtime owner is introduced. Exact-head UI CI is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/timeline-event.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-timeline-event-implemented-pending-exact-head-ci",
+        "finding": "Current-main non-automation event rows use the canonical descriptions Renamed to/Connected to/Disconnected from plus row timestamp and single-line presentation. iOS renders the projected text and createdAt timestamp in the native transcript row, keeps these rows non-message/non-actionable, and preserves strict projection before display. Exact-head CI is pending."
       }
     ]
   },
