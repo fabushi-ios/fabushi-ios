@@ -106,12 +106,12 @@ final class MobileMermaidRendererParityTests: XCTestCase {
         XCTAssertEqual(tasks.map(\.section), ["Build", "Build", "Ship"])
         XCTAssertEqual(tasks.map(\.label), ["Compile", "Package", "Release"])
         XCTAssertEqual(tasks.map(\.status), [.done, .active, .milestone])
-        XCTAssertEqual(tasks[0].startDay, 0, accuracy: 0.001)
-        XCTAssertEqual(tasks[0].durationDays, 2, accuracy: 0.001)
-        XCTAssertEqual(tasks[1].startDay, 2, accuracy: 0.001)
-        XCTAssertEqual(tasks[1].durationDays, 1, accuracy: 0.001)
-        XCTAssertEqual(tasks[2].startDay, 3, accuracy: 0.001)
-        XCTAssertEqual(tasks[2].durationDays, 0, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(tasks[0].startDay), 0, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(tasks[0].durationDays), 2, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(tasks[1].startDay), 2, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(tasks[1].durationDays), 1, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(tasks[2].startDay), 3, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(tasks[2].durationDays), 0, accuracy: 0.001)
     }
 
     func testNativeMermaidGanttFailsClosedForUnsupportedDateFormatAndComplexity() {

@@ -530,7 +530,7 @@ private func mobileMermaidGantt(lines: [String]) throws -> MobileMermaidDiagram 
             let format = String(line.dropFirst("dateFormat ".count))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .uppercased()
-            guard ["YYYY-MM-DD", "YYYY-MM-DD "].contains(format) || format == "YYYY-MM-DD" else {
+            guard format == "YYYY-MM-DD" else {
                 throw MobileMermaidParseError.malformed("native Gantt currently requires YYYY-MM-DD dateFormat")
             }
             continue
@@ -1027,16 +1027,6 @@ private struct MobileMermaidPieView: View {
     }
 }
 
-private struct MobileMermaidDiagramSurface: View {
-    let diagram: MobileMermaidDiagram
-
-    @ViewBuilder
-    var body: some View {
-        switch diagram {
-        case .graph(let direction, let nodes, let edges):
-            MobileMermaidGraphView(nodes: nodes, edges: edges, direction: direction)
-        case .sequence(let participants, let messages):
-            MobileMermaidSequenceView(participants: participants, messages: messages)
 private struct MobileMermaidGanttView: View {
     let title: String?
     let tasks: [MobileMermaidGanttTask]
@@ -1058,7 +1048,7 @@ private struct MobileMermaidGanttView: View {
             if let title, !title.isEmpty {
                 Text(title).font(.headline)
             }
-            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+            ForEach(Array(tasks.enumerated()), id: \.offset) { index, task in
                 if index == 0 || tasks[index - 1].section != task.section {
                     Text(task.section)
                         .font(.caption.weight(.semibold))
@@ -1078,13 +1068,13 @@ private struct MobileMermaidGanttView: View {
                             task.status == .milestone ? 0.08 : 0.25
                         )
                         let x = max(0, min(1, (start - minimumStart) / span))
-                        let width = max(6, min(1 - x, duration / span))
+                        let widthFraction = max(0.02, min(1 - x, duration / span))
                         ZStack(alignment: .leading) {
                             Capsule()
                                 .fill(Color.secondary.opacity(0.14))
                             Capsule()
                                 .fill(task.status == .done ? Color.secondary.opacity(0.65) : Color.accentColor.opacity(task.status == .critical ? 0.9 : 0.68))
-                                .frame(width: max(6, geometry.size.width * width))
+                                .frame(width: max(6, geometry.size.width * widthFraction))
                                 .offset(x: geometry.size.width * x)
                         }
                     }
