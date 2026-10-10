@@ -46,6 +46,35 @@ internal struct MobileAsyncTasksRequestScope: Equatable, Sendable {
     }
 }
 
+internal func mobileAsyncTaskMetadata(_ task: MobileAsyncTask) -> String {
+    let kind: String
+    switch task.kind {
+    case "subagent": kind = "Subagent"
+    case "shell": kind = "Shell"
+    case "cloud-agent": kind = "Cloud agent"
+    default: kind = task.kind
+    }
+    if let detail = task.detail?.trimmingCharacters(in: .whitespacesAndNewlines), !detail.isEmpty {
+        return "\(kind) · \(detail)"
+    }
+    return kind
+}
+
+internal func mobileAsyncTaskRelativeTime(timestampMs: Double, now: Date) -> String {
+    guard timestampMs > 0, timestampMs.isFinite else { return "" }
+    let elapsed = max(0, now.timeIntervalSince1970 - timestampMs / 1_000)
+    if elapsed < 60 { return "now" }
+    let minutes = Int(elapsed / 60)
+    if minutes < 60 { return "\(minutes)m ago" }
+    let hours = minutes / 60
+    if hours < 24 { return "\(hours)h ago" }
+    let days = hours / 24
+    if days < 30 { return "\(days)d ago" }
+    let months = days / 30
+    if months < 12 { return "\(months)mo ago" }
+    return "\(months / 12)y ago"
+}
+
 @MainActor
 internal struct MobileAsyncTasksPanel: View {
     let agentId: String
@@ -89,12 +118,12 @@ internal struct MobileAsyncTasksPanel: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(task.label)
                                     .font(.body.weight(.medium))
-                                Text(taskMetadata(task))
+                                Text(mobileAsyncTaskMetadata(task))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer(minLength: 8)
-                            Text(relativeTime(task.startedAtMs))
+                            Text(mobileAsyncTaskRelativeTime(timestampMs: task.startedAtMs, now: now))
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
@@ -199,32 +228,4 @@ internal struct MobileAsyncTasksPanel: View {
         }
     }
 
-    private func taskMetadata(_ task: MobileAsyncTask) -> String {
-        let kind: String
-        switch task.kind {
-        case "subagent": kind = "Subagent"
-        case "shell": kind = "Shell"
-        case "cloud-agent": kind = "Cloud agent"
-        default: kind = task.kind
-        }
-        if let detail = task.detail?.trimmingCharacters(in: .whitespacesAndNewlines), !detail.isEmpty {
-            return "(kind) · (detail)"
-        }
-        return kind
-    }
-
-    private func relativeTime(_ timestampMs: Double) -> String {
-        guard timestampMs > 0, timestampMs.isFinite else { return "" }
-        let elapsed = max(0, now.timeIntervalSince1970 - timestampMs / 1_000)
-        if elapsed < 60 { return "now" }
-        let minutes = Int(elapsed / 60)
-        if minutes < 60 { return "(minutes)m ago" }
-        let hours = minutes / 60
-        if hours < 24 { return "(hours)h ago" }
-        let days = hours / 24
-        if days < 30 { return "(days)d ago" }
-        let months = days / 30
-        if months < 12 { return "(months)mo ago" }
-        return "(months / 12)y ago"
-    }
 }

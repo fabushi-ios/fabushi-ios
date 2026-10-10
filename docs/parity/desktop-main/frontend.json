@@ -1102,9 +1102,13 @@
       "ios_language": "Swift XCTest/Rust tests",
       "ios_platform_delta": "Native XCTest plus existing Rust Host group contract tests replace node:test; production behavior is already owned by GrokMobileGroupMembersModel, MobileBotGroupMembers and canonical Host GroupList/GroupUpdate.",
       "implementation_status": "not-applicable",
-      "production_evidence": "",
-      "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Test-file-only replacement. Existing group-members model/bridge/view production rows remain separately verified; this row does not create a second group owner."
+      "production_evidence": "frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift covers individual-only candidates, 1-6 bounds, shared/nested rejection and account/reconnect fencing; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift covers canonical group.update payload.",
+      "notes": "Current-main test-file mechanism is not applicable on iOS and is replaced by focused XCTest over the shipping native/Host owner. No second group store is introduced; final exact-head evidence is still required.",
+      "ios_symbol": "GrokMobileGroupMembersModel; MobileBotGroupMembersSheet; GrokMobileBotService.groupUpdateCommand",
+      "ios_owner": "Native XCTest replaces the Desktop node:test file; production group membership remains owned by the existing Host-backed group roster/update path.",
+      "ios_runtime_entrypoint": "MobileBotChat group info -> MobileBotGroupMembersSheet -> GrokMobileGroupMembersModel -> GrokMobileBotService.groupUpdateCommand -> canonical Host group.update",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/clock.ts",
@@ -1117,9 +1121,13 @@
       "ios_language": "SwiftUI",
       "ios_platform_delta": "SwiftUI owns one panel-scoped 30-second refresh/age clock using structured concurrency. The task is created only while the panel is mounted, is cancelled on disposal/Agent identity change, and shares the provider refresh generation rather than creating per-row timers.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
-      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; exact-HEAD GitHub Actions pending",
-      "notes": "Re-reviewed against Desktop PR #20 final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Production wiring is implemented; current exact-HEAD CI/acceptance is still required before verified."
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers request-scope fencing and Desktop-equivalent age buckets.",
+      "notes": "Re-reviewed against Desktop main. A real native formatting defect that rendered literal placeholder text was repaired; one panel-scoped 30-second structured-concurrency loop replaces Desktop's shared observable clock without per-row timers.",
+      "ios_symbol": "MobileAsyncTasksPanel task lifetime; mobileAsyncTaskRelativeTime",
+      "ios_owner": "One SwiftUI panel task owns the 30-second age/refresh clock and is cancelled by view/Agent/reconnect identity replacement.",
+      "ios_runtime_entrypoint": "MobileBotChat -> MobileAsyncTasksPanel.task(id: agentId:reconnectGeneration)",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after async-task visible-time repair"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/provider.ts",
@@ -1132,9 +1140,13 @@
       "ios_language": "Swift/Rust",
       "ios_platform_delta": "The native provider calls canonical getAsyncTasks through IOSPreloadBridge/Coordinator into AppHost and the single FeatureHostController owner. It strictly decodes subagent/shell/cloud-agent rows, keys panel lifetime by Agent id + shell reconnect generation, generation-fences stale pre-reconnect and Agent-replacement requests, refreshes every 30 seconds/on pull-to-refresh, retains the last known snapshot across transient failures, and cancels with panel lifetime.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/GrokMobileShell.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers strict task decoding plus Agent/reconnect/local-generation request fencing; exact-head GitHub Actions pending",
-      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and provider.ts@ec3ade25819916697a0a30b4aedf806a6d93cd70. Current source closes the prior reconnect-generation gap; same-head acceptance remains required."
+      "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers strict task decoding, request identity fencing and visible formatting; descendant exact-head Actions pending.",
+      "notes": "Current native owner strictly decodes running subagent/shell/cloud-agent rows, retains last known rows on transient failure, polls at 30s/pull-to-refresh, and fences stale Agent/reconnect/generation completions. Capability-specific unavailable UI remains platform-adapted to a generic native unavailable/error state; final exact-head evidence remains required.",
+      "ios_symbol": "MobileAsyncTask.init; MobileAsyncTasksRequestScope; MobileAsyncTasksPanel.refresh",
+      "ios_owner": "MobileAsyncTasksPanel is the native presentation/provider owner over canonical IOSPreloadBridge getAsyncTasks; Rust Host remains task truth.",
+      "ios_runtime_entrypoint": "MobileBotChat -> MobileAsyncTasksPanel -> IOSPreloadBridge.getAsyncTasks -> Coordinator/AppHost/FeatureHost",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/view.tsx",
@@ -1148,8 +1160,12 @@
       "ios_platform_delta": "A native sheet replaces the movable DOM panel while preserving per-Agent scope, kind icon/label/detail, running state, live age, loading/empty/error-with-previous states and close/refresh actions. MobileBotChat exposes the shipping header entry and the same action through FabushiAppAgentSurface.",
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
-      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; exact-HEAD GitHub Actions pending",
-      "notes": "The panel is no longer UI-only: it is wired to canonical Rust Host state. Current-head compile/UI acceptance remains pending."
+      "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers strict decoding, kind/detail label projection and age buckets.",
+      "notes": "Native sheet replaces movable DOM geometry while preserving running task kind/detail/age, empty/loading/error-with-previous, close and refresh effects. This descendant repairs literal '(kind)'/'(minutes)' placeholder output so shipping text now matches Desktop semantics.",
+      "ios_symbol": "MobileAsyncTasksPanel; mobileAsyncTaskMetadata; mobileAsyncTaskRelativeTime",
+      "ios_owner": "SwiftUI Agent Info async-tasks surface backed by the canonical Host task snapshot.",
+      "ios_runtime_entrypoint": "MobileBotChat Agent header -> MobileAsyncTasksPanel",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after UI interpolation repair"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/controller.ts",

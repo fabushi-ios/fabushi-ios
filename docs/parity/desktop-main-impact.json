@@ -3513,6 +3513,30 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-signout-dialog-and-durable-auth-owner-implemented-pending-exact-head-ci",
         "finding": "Desktop destructive sign-out maps to AccountSignOutDialogView + MarketplaceModel.logout + IOSCursorAuthService.clearCredentials. Native busy state blocks duplicate/dismiss actions, failures keep the authenticated surface open, and closure waits for canonical logged-out projection; Keychain deletion/terminal settlement remain in the auth owner. Descendant exact-head evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info-members.contract.test.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-test-contract-replaced-native-xctest",
+        "finding": "Desktop group-members node:test contract is replaced by native XCTest over the shipping GrokMobileGroupMembersModel/Host group.update path. Individual-only candidates, 1-6 bounds, shared/nested rejection and account/reconnect fencing are covered; final exact-head evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/async-tasks/clock.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-panel-clock-implemented-pending-exact-head-ci",
+        "finding": "Desktop stable async-task clock maps to one panel-scoped 30-second Swift structured-concurrency loop keyed by Agent/reconnect identity. Descendant repairs literal placeholder age text and adds focused age-bucket tests; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/async-tasks/provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-host-backed-async-task-provider-implemented-pending-exact-head-ci",
+        "finding": "MobileAsyncTasksPanel strictly decodes canonical running task rows from getAsyncTasks, retains prior rows across transient failure, refreshes every 30s/on pull-to-refresh and fences Agent/reconnect/local generation. Host remains task truth; exact-head evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/agent-info/async-tasks/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-async-task-surface-repaired-pending-exact-head-ci",
+        "finding": "Native Async Tasks sheet preserves per-Agent task kind/detail/running state/age and empty/loading/error-with-previous behavior. This descendant fixes shipping literal '(kind)' and '(minutes)' placeholder output and adds focused formatting tests; exact-head UI/CI evidence pending."
       }
     ]
   },

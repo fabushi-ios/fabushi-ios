@@ -89,6 +89,27 @@ final class AsyncTasksParityTests: XCTestCase {
             "startedAtMs": 10.0,
         ]))
     }
+    func testAsyncTaskMetadataUsesVisibleKindAndDetailInsteadOfLiteralPlaceholders() throws {
+        let task = try XCTUnwrap(MobileAsyncTask(json: [
+            "kind": "shell",
+            "id": "shell-1",
+            "label": "Build",
+            "status": "running",
+            "startedAtMs": 1_000.0,
+            "detail": "cargo test",
+        ]))
+        XCTAssertEqual(mobileAsyncTaskMetadata(task), "Shell · cargo test")
+    }
+
+    func testAsyncTaskRelativeTimeMatchesDesktopAgeBuckets() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(mobileAsyncTaskRelativeTime(timestampMs: 999_990_000, now: now), "now")
+        XCTAssertEqual(mobileAsyncTaskRelativeTime(timestampMs: 999_700_000, now: now), "5m ago")
+        XCTAssertEqual(mobileAsyncTaskRelativeTime(timestampMs: 992_800_000, now: now), "2h ago")
+        XCTAssertEqual(mobileAsyncTaskRelativeTime(timestampMs: 827_200_000, now: now), "2d ago")
+        XCTAssertEqual(mobileAsyncTaskRelativeTime(timestampMs: 0, now: now), "")
+    }
+
     func testAsyncTaskRequestScopeRejectsAgentReconnectAndGenerationReplacement() {
         let scope = MobileAsyncTasksRequestScope(
             agentId: "agent-a",
