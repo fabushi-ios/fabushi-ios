@@ -3,6 +3,7 @@ name = "mahayana-app-host-mobile"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+build = "../../../host/build.rs"
 
 [package.metadata.fabushi]
 ios-deployment-target = "17.0"
@@ -23,6 +24,14 @@ tokio = { workspace = true, features = ["fs"] }
 url.workspace = true
 xml-rs = "0.8.29"
 zip = { workspace = true }
+prost = "0.13"
+pbjson = "0.7"
+pbjson-types = "0.7"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"
+
+[build-dependencies]
+prost-build = "0.13"
+pbjson-build = "0.7"
+protoc-bin-vendored = "3.2"
