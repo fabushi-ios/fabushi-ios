@@ -20166,13 +20166,6 @@ mod tests {
             )
             .expect("finish extraction");
         drop(dispatch);
-        assert_eq!(
-            stages
-                .iter()
-                .filter(|stage| stage.as_str() == "episode-summary")
-                .count(),
-            1
-        );
 
         let memory_dir = controller
             .memory_dir_for_agent("mahayana-assistant")
@@ -20273,6 +20266,13 @@ mod tests {
             )
             .unwrap();
         drop(dispatch);
+        assert_eq!(
+            stages
+                .iter()
+                .filter(|stage| stage.as_str() == "episode-summary")
+                .count(),
+            1
+        );
 
         let memory_dir = controller
             .memory_dir_for_agent("mahayana-assistant")
