@@ -89,6 +89,63 @@ final class AsyncTasksParityTests: XCTestCase {
             "startedAtMs": 10.0,
         ]))
     }
+    func testHistoricalSubagentTabsMergeRunningOverlayWithoutDroppingCompletedHistory() throws {
+        let historical = [
+            MobileBotSubagent(
+                subagentId: "sub-done",
+                subagentType: "task",
+                title: "Completed",
+                status: "done"
+            ),
+            MobileBotSubagent(
+                subagentId: "sub-running",
+                subagentType: "task",
+                title: "Old running title",
+                status: "running"
+            ),
+            MobileBotSubagent(
+                subagentId: "sub-error",
+                subagentType: "ci",
+                title: "Failed",
+                status: "error"
+            ),
+        ]
+        let running = [
+            try XCTUnwrap(MobileAsyncTask(json: [
+                "kind": "subagent",
+                "id": "sub-running",
+                "label": "Live running title",
+                "status": "running",
+                "startedAtMs": 10.0,
+                "subagentType": "research",
+            ])),
+            try XCTUnwrap(MobileAsyncTask(json: [
+                "kind": "subagent",
+                "id": "sub-new",
+                "label": "New live task",
+                "status": "running",
+                "startedAtMs": 11.0,
+                "subagentType": "task",
+            ])),
+        ]
+
+        let merged = mergeMobileOutlineSubagents(
+            historical: historical,
+            running: running
+        )
+
+        XCTAssertEqual(
+            merged.map(\.subagentId),
+            ["sub-done", "sub-running", "sub-error", "sub-new"]
+        )
+        XCTAssertEqual(merged[0].status, "done")
+        XCTAssertEqual(merged[1].status, "running")
+        XCTAssertEqual(merged[1].subagentType, "research")
+        XCTAssertEqual(merged[1].title, "Live running title")
+        XCTAssertEqual(merged[2].status, "error")
+        XCTAssertEqual(merged[3].status, "running")
+    }
+
     func testAsyncTaskMetadataUsesVisibleKindAndDetailInsteadOfLiteralPlaceholders() throws {
         let task = try XCTUnwrap(MobileAsyncTask(json: [
             "kind": "shell",
