@@ -2689,14 +2689,14 @@
       {
         "path": "frontend/src/production/ForwardMessageDialog.tsx",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-implemented-pending-exact-head",
-        "finding": "Shipping native Forward path reviewed against Desktop current main; implementation exists, but ledger status remains mapped until descendant exact-head Swift/UI evidence."
+        "status": "current-main-reviewed-native-forward-implemented-pending-exact-head-ci",
+        "finding": "Desktop chooser and shipping iOS ForwardMessageSheet are behaviorally aligned: canonical eligible-recipient search, native multi-select, sender/caption privacy coupling, stable per-destination idempotency identity, per-destination settlement, sent-row locking and failed-only retry. Focused tests now explicitly prove failed destinations are retried without successful destinations and reuse the same clientMessageId. Exact-head Swift/UI/protected evidence remains pending."
       },
       {
         "path": "frontend/src/production/forward-recipient-navigation.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-implemented-pending-exact-head",
-        "finding": "Shipping native Forward path reviewed against Desktop current main; implementation exists, but ledger status remains mapped until descendant exact-head Swift/UI evidence."
+        "status": "current-main-reviewed-native-forward-navigation-implemented-pending-exact-head-ci",
+        "finding": "SwiftUI KeyPress directly preserves Desktop bounded Arrow/Page/Home/End navigation, Return/Space toggle and Ctrl/Cmd+Return submit semantics; focused tests lock bounds, six-row paging and both modifier variants. Exact-head Swift/UI evidence remains pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/workspace/transcript.tsx",
