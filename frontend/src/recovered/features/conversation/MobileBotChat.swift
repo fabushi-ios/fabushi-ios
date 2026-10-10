@@ -2046,6 +2046,7 @@ internal struct MobileBotChat: View {
                 accountKey: model.settingsNoticeAccountKey,
                 bridge: bridge,
                 reconnectGeneration: reconnectGeneration,
+                historicalSubagents: bot.subagents,
                 onClose: { conversationOutlinePresented = false }
             )
         }
