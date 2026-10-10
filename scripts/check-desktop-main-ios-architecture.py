@@ -385,30 +385,79 @@ def verify_ios_owners(errors):
                 errors.append(f"FabushiApp.swift directly constructs runtime owner: {forbidden}")
 
 
-    # Desktop packaged acceptance now reads the canonical agent-avatar shape contract.
-    # iOS owns this natively: one reusable SwiftUI avatar shape must remain the source
-    # for the canonical Bot chat surfaces rather than mirroring Electron DOM selectors.
+    # Desktop packaged acceptance reads one canonical agent-avatar responsibility.
+    # iOS owns its platform-adapted dispatcher natively: custom image -> shared room ->
+    # group -> persona. Shipping Agent surfaces must call MobileAgentAvatar rather than
+    # bypassing that dispatcher through the legacy decorative ClothGhostAvatar.
     avatar_path = ROOT / "frontend/src/recovered/features/agent-info/ClothGhostAvatar.swift"
+    summary_path = ROOT / "frontend/src/recovered/features/agent-info/MobileBotSummary.swift"
+    bot_service_path = ROOT / "frontend/src/production/GrokMobileBotService.swift"
     bot_chat_path = ROOT / "frontend/src/recovered/features/conversation/MobileBotChat.swift"
+    group_members_path = ROOT / "frontend/src/production/MobileBotGroupMembers.swift"
+    home_path = ROOT / "frontend/src/production/GrokMobileShell+Home.swift"
+
     if not avatar_path.is_file():
-        errors.append("missing canonical native Bot avatar owner")
+        errors.append("missing canonical native Agent avatar owner")
     else:
         avatar_text = avatar_path.read_text(encoding="utf-8")
         for token in [
-            "private struct ClothGhostShape: Shape",
-            'accessibilityIdentifier("cloth-ghost-avatar")',
+            "internal struct MobileAgentAvatar: View",
+            "internal func mobileAgentAvatarKind",
+            "internal func mobileResolvePersonaColor",
+            "internal func mobileResolvePersonaShape",
+            "AvatarImagePolicy.data(fromImageDataURL:",
+            "MobileOnboardingCharacter(",
         ]:
             if token not in avatar_text:
-                errors.append(f"canonical native Bot avatar contract drift: missing {token}")
+                errors.append(f"canonical native Agent avatar contract drift: missing {token}")
+
+    if not summary_path.is_file():
+        errors.append("missing canonical native Agent summary projection")
+    elif "let avatarState: MobileAgentAvatarState" not in summary_path.read_text(encoding="utf-8"):
+        errors.append("native Agent summary dropped canonical avatar activity state")
+
+    if not bot_service_path.is_file():
+        errors.append("missing canonical native Bot roster adapter")
+    else:
+        service_text = bot_service_path.read_text(encoding="utf-8")
+        for token in [
+            'currentActivity: row["currentActivity"]',
+            'isSharedRoom: row["isSharedRoom"] as? Bool ?? false',
+            "avatarState: canonical.avatarState",
+            "avatarDataURL: canonical.avatarDataURL",
+        ]:
+            if token not in service_text:
+                errors.append(f"native Bot roster no longer preserves avatar authority: missing {token}")
 
     if not bot_chat_path.is_file():
         errors.append("missing native Bot chat surface")
     else:
         bot_chat_text = bot_chat_path.read_text(encoding="utf-8")
-        if bot_chat_text.count("ClothGhostAvatar(botId: bot.id") < 3:
+        if bot_chat_text.count("MobileAgentAvatar(bot: bot") < 4:
             errors.append(
-                "native Bot chat no longer reuses one canonical ClothGhostAvatar across visible agent surfaces"
+                "native Bot chat no longer reuses canonical MobileAgentAvatar across visible Agent surfaces"
             )
+        if "ClothGhostAvatar(botId: bot.id" in bot_chat_text:
+            errors.append("native Bot chat bypasses canonical MobileAgentAvatar")
+
+    if not group_members_path.is_file():
+        errors.append("missing native group-member Agent surface")
+    else:
+        group_text = group_members_path.read_text(encoding="utf-8")
+        for token in ["MobileAgentAvatar(bot: member", "MobileAgentAvatar(bot: candidate"]:
+            if token not in group_text:
+                errors.append(f"native group-member surface bypasses canonical avatar owner: missing {token}")
+        if "ClothGhostAvatar(botId: member.id" in group_text or "ClothGhostAvatar(botId: candidate.id" in group_text:
+            errors.append("native group-member surface bypasses canonical MobileAgentAvatar")
+
+    if not home_path.is_file():
+        errors.append("missing native Agent home surface")
+    else:
+        home_text = home_path.read_text(encoding="utf-8")
+        if home_text.count("MobileAgentAvatar(bot: bot") < 2:
+            errors.append("native Agent home rows no longer reuse canonical MobileAgentAvatar")
+        if "ClothGhostAvatar(botId: bot.id" in home_text:
+            errors.append("native Agent home rows bypass canonical MobileAgentAvatar")
 
     # Native owner composition and device security remain part of strict architecture.
     rust_host=ROOT / "source/packages/mahayana-rs/mahayana-host/src/lib.rs"
