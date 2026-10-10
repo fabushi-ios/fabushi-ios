@@ -1064,9 +1064,13 @@
       "ios_language": "SwiftUI/Swift",
       "ios_platform_delta": "SwiftUI uses ASWebAuthenticationSession through MarketplaceModel while account truth and browserStart/reopen/cancel/poll stay in IOSPreloadBridge -> Coordinator -> Rust Feature Host; active attempt identity takes precedence over busy state.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/account/session/sign-in-status.view.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/AccountSessionFrontendParityTests.swift",
-      "notes": "Implemented at source level; current-head ordinary/protected evidence must close before verified promotion."
+      "production_evidence": "frontend/src/recovered/features/account/session/sign-in-status.view.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/ios-main/account/cursor-auth.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AccountSessionFrontendParityTests.swift covers active-attempt/busy phase priority; current descendant exact-head ordinary/protected Actions are required for the retry-error reset shipping change.",
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native ASWebAuthenticationSession replaces the browser surface without moving credential truth into SwiftUI. Start/reopen/cancel remain canonical bridge operations; reopen/cancel now clear stale presentation errors before a new action, matching Desktop run() semantics. Keep implemented until descendant exact-head ordinary/protected evidence succeeds.",
+      "ios_symbol": "AccountSignInStatusView; MarketplaceModel.beginBrowserLogin/reopenBrowserLogin/cancelBrowserLogin; IOSCursorAuthService",
+      "ios_owner": "MarketplaceModel owns native sign-in presentation state; IOSCursorAuthService owns credential/login-attempt authority behind the typed preload/Coordinator boundary.",
+      "ios_runtime_entrypoint": "ContentView+HomeAuth -> AccountSignInStatusView -> MarketplaceModel -> IOSPreloadBridge feature.auth.browserStart/browserReopen/browserCancel -> IOSMainRuntime/Coordinator -> IOSCursorAuthService",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after account-session retry-state repair"
     },
     {
       "desktop_path": "frontend/src/recovered/features/account/session/sign-out.tsx",
@@ -1079,9 +1083,13 @@
       "ios_language": "SwiftUI/Swift",
       "ios_platform_delta": "Native sheet replaces desktop alert/focus trap. MarketplaceModel calls feature.auth.logout; UI disables cancel/confirm while busy and closes only after model.loggedIn is false.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/account/session/sign-out.view.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
-      "test_evidence": "mobile/ios/FabushiTests/AccountSessionFrontendParityTests.swift",
-      "notes": "Implemented at source level; current-head ordinary/protected evidence must close before verified promotion."
+      "production_evidence": "frontend/src/recovered/features/account/session/sign-out.view.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/ios-main/account/cursor-auth.swift",
+      "test_evidence": "mobile/ios/FabushiTests/AccountSessionFrontendParityTests.swift covers close-only-after-logged-out projection; session settlement/credential durability remain covered by the iOS auth/session contract suite; current descendant exact-head Actions pending.",
+      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native sheet replaces OverlayDialog: interactive dismiss/cancel/confirm are disabled while busy, errors keep the sheet open, and closure occurs only after the canonical logged-out projection. IOSCursorAuthService freezes the departing token, attempts both Keychain deletions, publishes logged-out state and ships terminal settlement without creating renderer-owned auth truth. Keep implemented until descendant exact-head evidence succeeds.",
+      "ios_symbol": "AccountSignOutDialogView.confirmSignOut; MarketplaceModel.logout; IOSCursorAuthService.logout/clearCredentials",
+      "ios_owner": "AccountSignOutDialogView owns only busy/error presentation; MarketplaceModel and IOSCursorAuthService retain canonical account/logout authority.",
+      "ios_runtime_entrypoint": "ContentView+HomeAuth -> AccountSignOutDialogView -> MarketplaceModel.logout -> IOSPreloadBridge feature.auth.logout -> IOSMainRuntime/Coordinator -> IOSCursorAuthService.clearCredentials",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after account-session dependency review"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info-members.contract.test.ts",

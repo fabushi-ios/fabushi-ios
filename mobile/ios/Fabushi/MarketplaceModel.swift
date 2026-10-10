@@ -2307,6 +2307,7 @@ final class MarketplaceModel {
 
     func reopenBrowserLogin() async {
         guard let attemptId = browserLoginAttemptId else { return }
+        loginError = nil
         do {
             let result = try await bridge.request(method: "feature.auth.browserReopen", params: ["attemptId": attemptId])
             guard let object = result.value as? [String: Any],
@@ -2330,6 +2331,7 @@ final class MarketplaceModel {
 
     private func cancelBrowserLoginAttempt() async {
         guard let attemptId = browserLoginAttemptId else { return }
+        loginError = nil
         do {
             _ = try await bridge.request(method: "feature.auth.browserCancel", params: ["attemptId": attemptId])
         } catch { loginError = error.localizedDescription }

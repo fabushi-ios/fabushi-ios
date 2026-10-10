@@ -3501,6 +3501,18 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-account-scoped-roster-snapshot-implemented-pending-exact-head-ci",
         "finding": "The account-scoped native roster snapshot owner restores schema-versioned cached rows, then performs canonical live Host roster loading with reconnect/account generation fencing and structured access/network/DNS failure preservation. It feeds first-box/access composition and selection state rather than maintaining a second roster owner. AccessCoverParityTests cover restored/live/failure/account isolation; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/account/session/sign-in-status.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-browser-auth-owner-implemented-pending-exact-head-ci",
+        "finding": "Desktop sign-in status presentation/start/reopen/cancel semantics map to AccountSignInStatusView + MarketplaceModel over the canonical preload/Coordinator/IOSCursorAuthService owner. Active attempt identity wins over busy state; retry actions now clear stale presentation errors before dispatch, while credentials remain Keychain/Host-owned. Descendant exact-head ordinary/protected evidence remains required."
+      },
+      {
+        "path": "frontend/src/recovered/features/account/session/sign-out.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-signout-dialog-and-durable-auth-owner-implemented-pending-exact-head-ci",
+        "finding": "Desktop destructive sign-out maps to AccountSignOutDialogView + MarketplaceModel.logout + IOSCursorAuthService.clearCredentials. Native busy state blocks duplicate/dismiss actions, failures keep the authenticated surface open, and closure waits for canonical logged-out projection; Keychain deletion/terminal settlement remain in the auth owner. Descendant exact-head evidence remains required."
       }
     ]
   },
