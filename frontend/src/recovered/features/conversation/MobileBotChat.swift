@@ -165,6 +165,7 @@ internal enum MobileEditorSuggestionCategory: String, Equatable {
     case assistants
     case automations
     case tools
+    case pullRequests
     case emoji
 }
 
@@ -189,6 +190,7 @@ internal struct MobileEditorSuggestionItem: Identifiable, Equatable {
     var keywords: [String] = []
     var iconURL: String?
     var mcpReference: MobileComposerMcpReference?
+    var prReference: MobileComposerPrReference?
 }
 
 internal struct MobileEditorSuggestionContext: Equatable {
@@ -392,21 +394,226 @@ internal func pruneMobileComposerMcpReferences(
     }
 }
 
+private func mobileEditorPrCandidateFromURL(_ rawValue: String) -> MobileComposerPrReference? {
+    let raw = rawValue.trimmingCharacters(in: CharacterSet(charactersIn: ".,;:!?"))
+    guard let url = URL(string: raw),
+          ["http", "https"].contains(url.scheme?.lowercased() ?? "")
+    else { return nil }
+    let host = url.host?.lowercased()
+    let parts = url.path.split(separator: "/").map(String.init)
+    let number: Int?
+    if (host == "github.com" || host == "www.github.com"),
+       parts.count >= 4,
+       parts[2] == "pull" {
+        number = Int(parts[3])
+    } else if host == "review.cursor.com",
+              parts.count >= 5,
+              parts[0] == "github",
+              parts[1] == "pr" {
+        number = Int(parts[4])
+    } else {
+        number = nil
+    }
+    guard let number, number > 0 else { return nil }
+    return .init(prNumber: number, title: nil, url: raw, source: "text", state: nil)
+}
+
+private func mobileEditorPrCandidatesFromText(_ text: String) -> [MobileComposerPrReference] {
+    guard let regex = try? NSRegularExpression(pattern: #"https?://[^\s<>()[\]]+"#) else {
+        return []
+    }
+    let ns = text as NSString
+    return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).compactMap { match in
+        mobileEditorPrCandidateFromURL(ns.substring(with: match.range))
+    }
+}
+
+private func mobileEditorPrPositiveNumber(_ value: Any?) -> Int? {
+    if let number = value as? NSNumber {
+        let result = number.intValue
+        return result > 0 ? result : nil
+    }
+    if let string = value as? String,
+       let result = Int(string),
+       result > 0 {
+        return result
+    }
+    return nil
+}
+
+private func mobileEditorPrOptionalText(_ value: Any?) -> String? {
+    guard let string = value as? String else { return nil }
+    let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+}
+
+private func mobileEditorPrCandidatesFromRichTextNode(
+    _ node: Any,
+    output: inout [MobileComposerPrReference]
+) {
+    guard let object = node as? [String: Any] else { return }
+    if object["type"] as? String == "prReference",
+       let attrs = object["attrs"] as? [String: Any],
+       let number = mobileEditorPrPositiveNumber(attrs["prNumber"]) {
+        output.append(.init(
+            prNumber: number,
+            title: mobileEditorPrOptionalText(attrs["title"]),
+            url: mobileEditorPrOptionalText(attrs["url"]),
+            source: "node",
+            state: nil
+        ))
+    } else if object["type"] as? String == "text" {
+        let text = object["text"] as? String ?? ""
+        output.append(contentsOf: mobileEditorPrCandidatesFromText(text))
+        if let marks = object["marks"] as? [[String: Any]] {
+            for mark in marks where mark["type"] as? String == "link" {
+                guard let attrs = mark["attrs"] as? [String: Any],
+                      let href = attrs["href"] as? String,
+                      let candidate = mobileEditorPrCandidateFromURL(href)
+                else { continue }
+                output.append(candidate)
+            }
+        }
+    }
+    if let children = object["content"] as? [Any] {
+        for child in children {
+            mobileEditorPrCandidatesFromRichTextNode(child, output: &output)
+        }
+    }
+}
+
+private func mobileEditorPrCandidatesFromEntry(_ entry: MobileChatMessage) -> [MobileComposerPrReference] {
+    if let richText = entry.richText,
+       !richText.isEmpty,
+       let data = richText.data(using: .utf8),
+       let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       root["type"] as? String == "doc" {
+        var output: [MobileComposerPrReference] = []
+        mobileEditorPrCandidatesFromRichTextNode(root, output: &output)
+        return output
+    }
+    return mobileEditorPrCandidatesFromText(entry.text)
+}
+
+internal func projectMobileEditorPrReferences(
+    entries: [MobileChatMessage],
+    cloudInfos: [String: MobileCloudAgentInfo],
+    ownedAccountKey: String,
+    currentAccountKey: String,
+    ownedAgentID: String,
+    currentAgentID: String
+) -> [MobileComposerPrReference] {
+    guard !ownedAccountKey.isEmpty,
+          !ownedAgentID.isEmpty,
+          ownedAccountKey == currentAccountKey,
+          ownedAgentID == currentAgentID
+    else { return [] }
+
+    let priority = ["text": 0, "cloud": 1, "node": 2]
+    var ordered: [Int] = []
+    var byNumber: [Int: MobileComposerPrReference] = [:]
+    func add(_ candidate: MobileComposerPrReference) {
+        guard candidate.prNumber > 0 else { return }
+        if let existing = byNumber[candidate.prNumber] {
+            if (priority[candidate.source] ?? -1) > (priority[existing.source] ?? -1) {
+                byNumber[candidate.prNumber] = candidate
+            }
+        } else {
+            ordered.append(candidate.prNumber)
+            byNumber[candidate.prNumber] = candidate
+        }
+    }
+
+    for entry in entries.reversed() {
+        for candidate in mobileEditorPrCandidatesFromEntry(entry) {
+            add(candidate)
+        }
+        if let bcId = entry.cloudAgentBcId,
+           let info = cloudInfos[bcId],
+           let number = info.prNumber.map(Int.init),
+           number > 0 {
+            add(.init(
+                prNumber: number,
+                title: mobileEditorPrOptionalText(info.name) ?? mobileEditorPrOptionalText(entry.actionTitle),
+                url: mobileEditorPrOptionalText(info.prURL),
+                source: "cloud",
+                state: mobileEditorPrOptionalText(info.prState)
+            ))
+        }
+    }
+    return ordered.compactMap { byNumber[$0] }
+}
+
+internal func projectMobileEditorPrSuggestionItems(
+    _ references: [MobileComposerPrReference]
+) -> [MobileEditorSuggestionItem] {
+    references.map { reference in
+        .init(
+            id: "pr:\(reference.prNumber)",
+            category: .pullRequests,
+            label: "#\(reference.prNumber)",
+            subtitle: reference.title,
+            insertion: "#\(reference.prNumber)",
+            keywords: [
+                String(reference.prNumber),
+                reference.title ?? "",
+                reference.url ?? "",
+                reference.state ?? "",
+            ],
+            prReference: reference
+        )
+    }
+}
+
+internal func pruneMobileComposerPrReferences(
+    draft: String,
+    references: [MobileComposerPrReference]
+) -> [MobileComposerPrReference] {
+    var seen = Set<Int>()
+    return references.filter { reference in
+        draft.contains("#\(reference.prNumber)")
+            && seen.insert(reference.prNumber).inserted
+    }
+}
+
 internal func mobileComposerRichText(
     draft: String,
-    references: [MobileComposerMcpReference]
+    references: [MobileComposerMcpReference],
+    prReferences: [MobileComposerPrReference] = []
 ) -> String? {
-    let active = pruneMobileComposerMcpReferences(draft: draft, references: references)
-    guard !active.isEmpty else { return nil }
+    let activeMcp = pruneMobileComposerMcpReferences(draft: draft, references: references)
+    let activePr = pruneMobileComposerPrReferences(draft: draft, references: prReferences)
 
-    struct Match {
+    struct NodeMatch {
         let range: Range<String.Index>
-        let reference: MobileComposerMcpReference
+        let node: [String: Any]
     }
-    var matches = active.compactMap { reference -> Match? in
-        guard let range = draft.range(of: "@\(reference.label)") else { return nil }
-        return Match(range: range, reference: reference)
+    var matches: [NodeMatch] = []
+    for reference in activeMcp {
+        guard let range = draft.range(of: "@\(reference.label)") else { continue }
+        var attrs: [String: Any] = [
+            "id": reference.workflowReferenceID,
+            "label": reference.label,
+        ]
+        if let iconURL = reference.iconURL, !iconURL.isEmpty {
+            attrs["iconUrl"] = iconURL
+        }
+        matches.append(.init(
+            range: range,
+            node: ["type": "workflowReference", "attrs": attrs]
+        ))
     }
+    for reference in activePr {
+        guard let range = draft.range(of: "#\(reference.prNumber)") else { continue }
+        var attrs: [String: Any] = ["prNumber": reference.prNumber]
+        if let title = reference.title, !title.isEmpty { attrs["title"] = title }
+        if let url = reference.url, !url.isEmpty { attrs["url"] = url }
+        matches.append(.init(
+            range: range,
+            node: ["type": "prReference", "attrs": attrs]
+        ))
+    }
+    guard !matches.isEmpty else { return nil }
     matches.sort { $0.range.lowerBound < $1.range.lowerBound }
 
     var content: [[String: Any]] = []
@@ -419,24 +626,11 @@ internal func mobileComposerRichText(
                 "text": String(draft[cursor..<match.range.lowerBound]),
             ])
         }
-        var attrs: [String: Any] = [
-            "id": match.reference.workflowReferenceID,
-            "label": match.reference.label,
-        ]
-        if let iconURL = match.reference.iconURL, !iconURL.isEmpty {
-            attrs["iconUrl"] = iconURL
-        }
-        content.append([
-            "type": "workflowReference",
-            "attrs": attrs,
-        ])
+        content.append(match.node)
         cursor = match.range.upperBound
     }
     if cursor < draft.endIndex {
         content.append(["type": "text", "text": String(draft[cursor...])])
-    }
-    guard content.contains(where: { $0["type"] as? String == "workflowReference" }) else {
-        return nil
     }
     let document: [String: Any] = [
         "type": "doc",
@@ -464,6 +658,7 @@ internal func mobileEditorSuggestionContext(
     let patterns: [(Character, String, Int)] = [
         ("@", #"(^|[\s(])@([^@#/:\n]{0,50})$"#, 2),
         ("/", #"(^|[\s(])/([^@#/:\n]{0,50})$"#, 2),
+        ("#", #"(^|[\s(])#([^@#/:\n]{0,50})$"#, 2),
         (":", #"(^|[^\p{L}\p{N}_:/]):([A-Za-z0-9_+\-]{2,50})$"#, 2),
     ]
     for (trigger, pattern, queryGroup) in patterns {
@@ -541,6 +736,7 @@ internal func mobileEditorSuggestionRows(
     assistants: [MobileEditorSuggestionItem],
     workflows: [MobileEditorSuggestionItem],
     mcpReferences: [MobileEditorSuggestionItem] = [],
+    prReferences: [MobileEditorSuggestionItem] = [],
     recentKeys: [String] = []
 ) -> [MobileEditorSuggestionItem] {
     guard let context else { return [] }
@@ -550,6 +746,8 @@ internal func mobileEditorSuggestionRows(
         source = assistants + workflows.filter { $0.triggerSchedule != nil } + mcpReferences
     case "/":
         source = workflows.filter { $0.triggerSchedule == nil }
+    case "#":
+        source = prReferences
     case ":":
         return mobileReactionPickerResults(
             query: context.query,
@@ -1692,6 +1890,7 @@ internal struct MobileBotChat: View {
     @State private var editorSuggestionWorkflows: [MobileEditorSuggestionItem] = []
     @State private var editorSuggestionMcpReferences: [MobileEditorSuggestionItem] = []
     @State private var composerMcpReferences: [MobileComposerMcpReference] = []
+    @State private var composerPrReferences: [MobileComposerPrReference] = []
     @State private var editorSuggestionStatus: MobileEditorSuggestionSourceStatus = .idle
     @State private var editorSuggestionGeneration = 0
     @State private var editorSuggestionActiveIndex: Int?
@@ -2411,12 +2610,26 @@ internal struct MobileBotChat: View {
         return projectMobileEditorMentionSuggestions(canonicalRoster)
     }
 
+    private var editorSuggestionPrReferences: [MobileEditorSuggestionItem] {
+        projectMobileEditorPrSuggestionItems(
+            projectMobileEditorPrReferences(
+                entries: entries,
+                cloudInfos: cloudAgentInfoByBcId,
+                ownedAccountKey: model.settingsNoticeAccountKey,
+                currentAccountKey: model.settingsNoticeAccountKey,
+                ownedAgentID: bot.id,
+                currentAgentID: bot.id
+            )
+        )
+    }
+
     private var editorSuggestionRows: [MobileEditorSuggestionItem] {
         mobileEditorSuggestionRows(
             context: editorSuggestionContext,
             assistants: editorSuggestionAssistants,
             workflows: editorSuggestionWorkflows,
             mcpReferences: editorSuggestionMcpReferences,
+            prReferences: editorSuggestionPrReferences,
             recentKeys: editorSuggestionRecents
         )
     }
@@ -2478,7 +2691,9 @@ internal struct MobileBotChat: View {
                                                     ? "bolt.circle"
                                                     : item.category == .tools
                                                         ? "puzzlepiece.extension"
-                                                        : "face.smiling")
+                                                        : item.category == .pullRequests
+                                                            ? "arrow.triangle.pull"
+                                                            : "face.smiling")
                                                 .foregroundStyle(.secondary)
                                         }
                                         VStack(alignment: .leading, spacing: 1) {
@@ -2571,6 +2786,10 @@ internal struct MobileBotChat: View {
                         draft: nextDraft,
                         references: composerMcpReferences
                     )
+                    composerPrReferences = pruneMobileComposerPrReferences(
+                        draft: nextDraft,
+                        references: composerPrReferences
+                    )
                     normalizeEditorSuggestionSelection()
                 }
 
@@ -2609,6 +2828,12 @@ internal struct MobileBotChat: View {
                 references: composerMcpReferences + [reference]
             )
         }
+        if let reference = item.prReference {
+            composerPrReferences = pruneMobileComposerPrReferences(
+                draft: draft,
+                references: composerPrReferences + [reference]
+            )
+        }
         let key = "\(item.category.rawValue):\(item.id)"
         editorSuggestionRecents = [key] + editorSuggestionRecents.filter { $0 != key }
         editorSuggestionRecents = Array(editorSuggestionRecents.prefix(50))
@@ -2633,6 +2858,7 @@ internal struct MobileBotChat: View {
         editorSuggestionWorkflows = []
         editorSuggestionMcpReferences = []
         composerMcpReferences = []
+        composerPrReferences = []
         editorSuggestionActiveIndex = nil
     }
 
@@ -5410,6 +5636,8 @@ internal struct MobileBotChat: View {
         text: String,
         attachments: [MobileComposerAttachment],
         mcpReferences: [MobileComposerMcpReference],
+        prReferences: [MobileComposerPrReference],
+        richText: String?,
         replyTarget: String?,
         sendAsFork: Bool,
         priorNonces: [String] = []
@@ -5429,6 +5657,8 @@ internal struct MobileBotChat: View {
         row.optimisticPriorNonces = priorNonces
         row.optimisticAttachments = attachments
         row.optimisticMcpReferences = mcpReferences
+        row.optimisticPrReferences = prReferences
+        row.richText = richText
         entries.append(row)
     }
 
@@ -5578,21 +5808,31 @@ internal struct MobileBotChat: View {
             draft: text,
             references: composerMcpReferences
         )
-        if bot.miniAppId != nil && (!attachments.isEmpty || !mcpReferences.isEmpty) {
-            errorText = "Attachments and MCP references aren't supported by this Mini App chat."
+        let prReferences = pruneMobileComposerPrReferences(
+            draft: text,
+            references: composerPrReferences
+        )
+        if bot.miniAppId != nil && (!attachments.isEmpty || !mcpReferences.isEmpty || !prReferences.isEmpty) {
+            errorText = "Attachments and rich references aren't supported by this Mini App chat."
             return
         }
-        let richText = mobileComposerRichText(draft: text, references: mcpReferences)
+        let richText = mobileComposerRichText(
+            draft: text,
+            references: mcpReferences,
+            prReferences: prReferences
+        )
         let requestId = "ios-mobile-bot-chat-\(UUID().uuidString.lowercased())"
         composerRecovery = .init(
             requestId: requestId,
             text: text,
             attachments: attachments,
-            mcpReferences: mcpReferences
+            mcpReferences: mcpReferences,
+            prReferences: prReferences
         )
         draft = ""
         composerAttachments = []
         composerMcpReferences = []
+        composerPrReferences = []
         busy = true
         errorText = nil
         let replyTarget = replyTargetId
@@ -5604,6 +5844,8 @@ internal struct MobileBotChat: View {
             text: text,
             attachments: attachments,
             mcpReferences: mcpReferences,
+            prReferences: prReferences,
+            richText: richText,
             replyTarget: replyTarget,
             sendAsFork: sendAsFork
         )
@@ -5640,11 +5882,16 @@ internal struct MobileBotChat: View {
             draft: entry.text,
             references: entry.optimisticMcpReferences
         )
+        let retryPrReferences = pruneMobileComposerPrReferences(
+            draft: entry.text,
+            references: entry.optimisticPrReferences
+        )
         composerRecovery = .init(
             requestId: freshNonce,
             text: entry.text,
             attachments: entry.optimisticAttachments,
-            mcpReferences: retryReferences
+            mcpReferences: retryReferences,
+            prReferences: retryPrReferences
         )
         busy = true
         errorText = nil
@@ -5653,6 +5900,12 @@ internal struct MobileBotChat: View {
             text: entry.text,
             attachments: entry.optimisticAttachments,
             mcpReferences: retryReferences,
+            prReferences: retryPrReferences,
+            richText: mobileComposerRichText(
+                draft: entry.text,
+                references: retryReferences,
+                prReferences: retryPrReferences
+            ),
             replyTarget: entry.replyToMessageId,
             sendAsFork: entry.branched,
             priorNonces: priorNonces
@@ -5662,7 +5915,11 @@ internal struct MobileBotChat: View {
             text: entry.text,
             attachments: entry.optimisticAttachments,
             mcpReferences: retryReferences,
-            richText: mobileComposerRichText(draft: entry.text, references: retryReferences),
+            richText: mobileComposerRichText(
+                draft: entry.text,
+                references: retryReferences,
+                prReferences: retryPrReferences
+            ),
             replyTarget: entry.replyToMessageId,
             sendAsFork: entry.branched
         )
