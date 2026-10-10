@@ -4220,6 +4220,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-math-renderer-implemented-pending-exact-head-ci",
         "finding": "Desktop shipped-KaTeX math user effect is replaced by an iOS-native SwiftMath 1.7.3 renderer pinned in the XcodeGen project. Assistant transcript text now recognizes \\(...\\), \\[...\\] and $$...$$ while single-dollar text remains ordinary text; valid expressions are rendered locally with bundled math fonts, invalid expressions fall back to selectable readable source, and no WebView/CDN/second runtime is introduced. MIT notice/provenance and focused parser/fallback tests are included; exact-head build/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/media-viewer.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-media-zoom-implemented-gallery-identity-open",
+        "finding": "Desktop media viewer behavior was re-read at current main. Shipping iOS MediaViewer now implements native image zoom/pan/fit with the same bounded 1x–5x scale, pan disabled at fit scale, double-tap reset, and transform reset across load/close while preserving existing generation-fenced blob loading, video, PDF, spreadsheet and export paths. Multi-attachment filmstrip is deliberately not synthesized: the canonical iOS Human ChatMessage projection exposes a single media object and no verified batchId/clientNonce grouping identity. Row remains mapped until a real gallery identity/product contract and exact-head device evidence close."
       }
     ]
   },

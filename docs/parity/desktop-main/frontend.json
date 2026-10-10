@@ -3067,11 +3067,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MediaViewer.swift",
       "ios_language": "SwiftUI + AVKit + PDFKit",
-      "ios_platform_delta": "Native MediaViewer already loads canonical message blobs, previews images/video and exports files; current production now also previews PDF through PDFKit with the Desktop 25 MiB cap. Desktop-style multi-attachment gallery/filmstrip and exact zoom/pan/focus restoration semantics remain open.",
+      "ios_platform_delta": "Native MediaViewer remains the canonical Human attachment byte/open/export owner. It already previews image/video/PDF (25 MiB cap) and spreadsheets; current production now gives image previews Desktop-equivalent bounded 1x–5x zoom, drag pan only while zoomed, double-tap fit/reset, and resets transforms on message replacement/close. The canonical Human ChatMessage schema carries one media object per message and currently exposes no batchId/clientNonce/gallery identity, so Desktop multi-attachment filmstrip grouping is intentionally not fabricated and remains open until a real grouping identity is available.",
       "implementation_status": "mapped",
-      "production_evidence": "MediaViewer.swift is the existing single native viewer; PDFKit was added there without creating a second attachment transport.",
-      "test_evidence": "SharedMediaParityTests.testNativePdfPreviewDetectionAndDesktopPreviewCap plus existing attachment classification/limits tests; gallery parity remains required.",
-      "notes": "IOS-MAIN-DEP-MEDIA-VIEWER-20261009: exact Desktop media-viewer.tsx reviewed; PDF subresponsibility implemented, gallery remains.",
+      "production_evidence": "mobile/ios/Fabushi/MediaViewer.swift (NativeMediaImageTransform plus native photo gesture composition, generation-fenced blob load/cleanup, PDF/video/spreadsheet/file paths); frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift remains the shipping Human media opener. Canonical MessagingModel.parseMessage exposes one content.data.media per ChatMessage and no batch/gallery key.",
+      "test_evidence": "mobile/ios/FabushiTests/MediaViewerParityTests.swift covers 1x–5x clamp, fit reset, pan gating and accumulated pan; existing media/PDF/spreadsheet tests cover other native paths. Gallery/filmstrip identity and current exact-head device/UI evidence remain open.",
+      "notes": "IOS-MAIN-DEP-MEDIA-VIEWER-20261011: exact Desktop media-viewer.tsx remains partially open. Native image zoom/pan/fit is now production-composed on descendant of 11a0742a560cd894c2ac75d78ee32578b3901caf; multi-attachment gallery is not claimed because the canonical iOS Human message projection has no verified batch/clientNonce grouping field. Keep mapped.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {

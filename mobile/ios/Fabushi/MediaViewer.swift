@@ -5,6 +5,37 @@ import UIKit
 
 let nativePdfPreviewByteCap = 25 * 1024 * 1024
 
+internal struct NativeMediaImageTransform: Equatable {
+    static let minimumScale: CGFloat = 1
+    static let maximumScale: CGFloat = 5
+
+    var scale: CGFloat = minimumScale
+    var offset: CGSize = .zero
+
+    static func clampedScale(_ value: CGFloat) -> CGFloat {
+        min(maximumScale, max(minimumScale, value))
+    }
+
+    func zoomed(by factor: CGFloat) -> NativeMediaImageTransform {
+        let nextScale = Self.clampedScale(scale * factor)
+        if nextScale <= Self.minimumScale {
+            return .init()
+        }
+        return .init(scale: nextScale, offset: offset)
+    }
+
+    func panned(by translation: CGSize) -> NativeMediaImageTransform {
+        guard scale > Self.minimumScale else { return .init() }
+        return .init(
+            scale: scale,
+            offset: .init(
+                width: offset.width + translation.width,
+                height: offset.height + translation.height
+            )
+        )
+    }
+}
+
 internal func isNativePdfAttachment(mimeType: String?, fileName: String?) -> Bool {
     if mimeType?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "application/pdf" {
         return true
@@ -44,6 +75,9 @@ struct MediaViewer: View {
     @State private var errorMessage: String?
     @State private var loading = true
     @State private var loadGeneration = 0
+    @State private var imageTransform = NativeMediaImageTransform()
+    @GestureState private var imageMagnification: CGFloat = 1
+    @GestureState private var imageDragTranslation: CGSize = .zero
 
     var body: some View {
         NavigationStack {
@@ -76,11 +110,41 @@ struct MediaViewer: View {
             ContentUnavailableView("无法打开媒体", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
                 .foregroundStyle(.white)
         } else if message.contentType == "photo", let data, let image = UIImage(data: data) {
-            ScrollView([.horizontal, .vertical]) {
+            GeometryReader { proxy in
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: UIScreen.main.bounds.width, minHeight: UIScreen.main.bounds.height * 0.72)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .scaleEffect(effectiveImageScale)
+                    .offset(effectiveImageOffset)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        MagnificationGesture()
+                            .updating($imageMagnification) { value, state, _ in
+                                state = value
+                            }
+                            .onEnded { value in
+                                imageTransform = imageTransform.zoomed(by: value)
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 4)
+                            .updating($imageDragTranslation) { value, state, _ in
+                                guard effectiveImageScale > NativeMediaImageTransform.minimumScale else {
+                                    state = .zero
+                                    return
+                                }
+                                state = value.translation
+                            }
+                            .onEnded { value in
+                                imageTransform = imageTransform.panned(by: value.translation)
+                            }
+                    )
+                    .onTapGesture(count: 2) {
+                        resetImageTransform()
+                    }
+                    .accessibilityLabel(message.mediaFileName ?? "Image preview")
+                    .accessibilityHint("Pinch to zoom, drag to pan, double tap to fit")
             }
         } else if message.contentType == "video", let localURL {
             VideoPlayer(player: AVPlayer(url: localURL)).ignoresSafeArea(edges: .bottom)
@@ -111,6 +175,23 @@ struct MediaViewer: View {
         }
     }
 
+    private var effectiveImageScale: CGFloat {
+        NativeMediaImageTransform.clampedScale(imageTransform.scale * imageMagnification)
+    }
+
+    private var effectiveImageOffset: CGSize {
+        guard effectiveImageScale > NativeMediaImageTransform.minimumScale else { return .zero }
+        return .init(
+            width: imageTransform.offset.width + imageDragTranslation.width,
+            height: imageTransform.offset.height + imageDragTranslation.height
+        )
+    }
+
+    @MainActor
+    private func resetImageTransform() {
+        imageTransform = .init()
+    }
+
     private var mediaTitle: String {
         switch message.contentType {
         case "photo": "图片"
@@ -123,6 +204,7 @@ struct MediaViewer: View {
     private func load() async {
         loadGeneration = loadGeneration == Int.max ? 1 : loadGeneration + 1
         let generation = loadGeneration
+        resetImageTransform()
         if let staleURL = localURL { try? FileManager.default.removeItem(at: staleURL) }
         data = nil
         localURL = nil
@@ -172,6 +254,7 @@ struct MediaViewer: View {
     @MainActor
     private func invalidateLoadAndCleanUp() {
         loadGeneration = loadGeneration == Int.max ? 1 : loadGeneration + 1
+        resetImageTransform()
         if let localURL { try? FileManager.default.removeItem(at: localURL) }
         data = nil
         localURL = nil
