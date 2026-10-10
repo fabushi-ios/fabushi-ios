@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 pub const SAND_BOX_UPLOADS_DIR: &str = "/workspace/uploads";
@@ -29,13 +29,26 @@ fn normalize_posix(path: &str) -> String {
         match part {
             "" | "." => {}
             ".." => {
-                parts.pop();
+                if parts.last().is_some_and(|part| part != &"..") {
+                    parts.pop();
+                } else if !absolute {
+                    parts.push("..");
+                }
             }
             value => parts.push(value),
         }
     }
-    let joined = parts.join("/");
-    if absolute { format!("/{joined}") } else { joined }
+    if absolute {
+        if parts.is_empty() {
+            "/".into()
+        } else {
+            format!("/{}", parts.join("/"))
+        }
+    } else if parts.is_empty() {
+        ".".into()
+    } else {
+        parts.join("/")
+    }
 }
 
 pub fn resolve_box_workspace_path(box_path: &str) -> String {
@@ -120,23 +133,27 @@ where
     Ok(data.len())
 }
 
+fn unique_paths_in_input_order(paths: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    paths
+        .iter()
+        .filter(|path| seen.insert((*path).clone()))
+        .cloned()
+        .collect()
+}
+
 pub async fn download_box_files<Context, BoxType>(
     context: Arc<Context>,
     box_: Arc<BoxType>,
     agent_id: String,
     box_paths: &[String],
     max_concurrency: Option<usize>,
-) -> Result<BTreeMap<String, Vec<u8>>, BoxTransferError>
+) -> Result<Vec<(String, Vec<u8>)>, BoxTransferError>
 where
     Context: Send + Sync + 'static,
     BoxType: TransferBox<Context> + 'static,
 {
-    let unique = box_paths
-        .iter()
-        .cloned()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
+    let unique = unique_paths_in_input_order(box_paths);
     let limit = max_concurrency
         .unwrap_or(DEFAULT_BOX_TRANSFER_CONCURRENCY)
         .max(1);
@@ -164,7 +181,20 @@ where
             downloaded.insert(path, bytes);
         }
     }
-    Ok(downloaded)
+
+    unique
+        .into_iter()
+        .map(|path| {
+            downloaded
+                .remove(&path)
+                .map(|bytes| (path.clone(), bytes))
+                .ok_or_else(|| {
+                    BoxTransferError::Read(format!(
+                        "download from box {path} produced no bytes"
+                    ))
+                })
+        })
+        .collect()
 }
 
 pub async fn upload_box_files<Context, BoxType>(
@@ -178,7 +208,7 @@ where
     Context: Send + Sync + 'static,
     BoxType: TransferBox<Context> + 'static,
 {
-    let mut seen = BTreeSet::new();
+    let mut seen = HashSet::new();
     let unique = uploads
         .iter()
         .filter(|(path, _)| seen.insert(path.clone()))
@@ -217,6 +247,8 @@ mod tests {
     use super::*;
     use std::convert::Infallible;
     use std::sync::Mutex;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::sync::Notify;
 
     #[derive(Default)]
     struct BoxStub {
@@ -264,6 +296,8 @@ mod tests {
             resolve_box_workspace_path("/workspace/a/../b"),
             "/workspace/b"
         );
+        assert_eq!(resolve_box_workspace_path("/"), "/");
+        assert_eq!(normalize_posix("../a"), "../a");
     }
 
     #[tokio::test]
@@ -295,25 +329,122 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn batch_upload_deduplicates_paths() {
+    async fn batch_download_preserves_first_input_order_and_deduplicates() {
+        let box_ = Arc::new(BoxStub::default());
+        box_.files.lock().unwrap().extend([
+            ("/workspace/z".into(), vec![1]),
+            ("/workspace/a".into(), vec![2]),
+            ("/workspace/m".into(), vec![3]),
+        ]);
+        let result = download_box_files(
+            Arc::new(()),
+            box_,
+            "agent".into(),
+            &[
+                "/workspace/z".into(),
+                "/workspace/a".into(),
+                "/workspace/z".into(),
+                "/workspace/m".into(),
+            ],
+            Some(3),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            result,
+            vec![
+                ("/workspace/z".into(), vec![1]),
+                ("/workspace/a".into(), vec![2]),
+                ("/workspace/m".into(), vec![3]),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn batch_upload_preserves_first_input_order_and_first_value() {
         let box_ = Arc::new(BoxStub::default());
         let paths = upload_box_files(
             Arc::new(()),
             box_.clone(),
             "agent".into(),
             &[
-                ("/workspace/a".into(), vec![1]),
+                ("/workspace/z".into(), vec![1]),
                 ("/workspace/a".into(), vec![2]),
-                ("/workspace/b".into(), vec![3]),
+                ("/workspace/z".into(), vec![9]),
             ],
             Some(2),
         )
         .await
         .unwrap();
-        assert_eq!(paths, vec!["/workspace/a", "/workspace/b"]);
+        assert_eq!(paths, vec!["/workspace/z", "/workspace/a"]);
         assert_eq!(
-            box_.files.lock().unwrap().get("/workspace/a"),
+            box_.files.lock().unwrap().get("/workspace/z"),
             Some(&vec![1])
+        );
+    }
+
+    struct ConcurrencyBox {
+        active: AtomicUsize,
+        max_active: AtomicUsize,
+        release: Notify,
+        entered: AtomicUsize,
+    }
+
+    impl TransferBox<()> for ConcurrencyBox {
+        type Error = Infallible;
+
+        fn download_file<'a>(
+            &'a self,
+            _context: &'a (),
+            _agent_id: &'a str,
+            path: &'a str,
+        ) -> impl std::future::Future<Output = Result<Vec<u8>, Self::Error>> + Send + 'a {
+            async move {
+                let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+                self.max_active.fetch_max(active, Ordering::SeqCst);
+                let entered = self.entered.fetch_add(1, Ordering::SeqCst) + 1;
+                if entered < 2 {
+                    self.release.notified().await;
+                } else {
+                    self.release.notify_waiters();
+                }
+                self.active.fetch_sub(1, Ordering::SeqCst);
+                Ok(path.as_bytes().to_vec())
+            }
+        }
+
+        fn upload_file<'a>(
+            &'a self,
+            _context: &'a (),
+            _agent_id: &'a str,
+            _path: &'a str,
+            _data: &'a [u8],
+        ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send + 'a {
+            async move { Ok(()) }
+        }
+    }
+
+    #[tokio::test]
+    async fn batch_download_runs_up_to_configured_concurrency() {
+        let box_ = Arc::new(ConcurrencyBox {
+            active: AtomicUsize::new(0),
+            max_active: AtomicUsize::new(0),
+            release: Notify::new(),
+            entered: AtomicUsize::new(0),
+        });
+        let result = download_box_files(
+            Arc::new(()),
+            box_.clone(),
+            "agent".into(),
+            &["a".into(), "b".into(), "c".into()],
+            Some(2),
+        )
+        .await
+        .unwrap();
+        assert_eq!(box_.max_active.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            result.into_iter().map(|(path, _)| path).collect::<Vec<_>>(),
+            vec!["a", "b", "c"]
         );
     }
 }
