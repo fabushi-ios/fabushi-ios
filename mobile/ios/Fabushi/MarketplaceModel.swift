@@ -706,22 +706,33 @@ struct MobileComposerMcpReference: Equatable, Sendable {
     let iconURL: String?
 }
 
+struct MobileComposerPrReference: Equatable, Sendable {
+    let prNumber: Int
+    let title: String?
+    let url: String?
+    let source: String
+    let state: String?
+}
+
 struct MobileComposerRecovery: Equatable {
     let requestId: String
     let text: String
     let attachments: [MobileComposerAttachment]
     let mcpReferences: [MobileComposerMcpReference]
+    let prReferences: [MobileComposerPrReference]
 
     init(
         requestId: String,
         text: String,
         attachments: [MobileComposerAttachment],
-        mcpReferences: [MobileComposerMcpReference] = []
+        mcpReferences: [MobileComposerMcpReference] = [],
+        prReferences: [MobileComposerPrReference] = []
     ) {
         self.requestId = requestId
         self.text = text
         self.attachments = attachments
         self.mcpReferences = mcpReferences
+        self.prReferences = prReferences
     }
 }
 
@@ -757,6 +768,8 @@ struct MobileChatMessage: Identifiable, Equatable {
     var attachmentProjection: MobileAttachmentCardProjection?
     var optimisticAttachments: [MobileComposerAttachment] = []
     var optimisticMcpReferences: [MobileComposerMcpReference] = []
+    var optimisticPrReferences: [MobileComposerPrReference] = []
+    var richText: String?
     var sendMessageTextProjection: MobileSendMessageTextProjection?
     var timelineEvent: SandTimelineEvent?
     var timelineAutomationId: String?
