@@ -1,5 +1,12 @@
 import SwiftUI
 
+internal func mobileBotConversationScopeKey(
+    accountScopeKey: String,
+    agentID: String
+) -> String {
+    "\(accountScopeKey.utf8.count)#\(accountScopeKey)\(agentID.utf8.count)#\(agentID)"
+}
+
 internal struct GrokMobileShell: View {
     @Bindable var model: MarketplaceModel
     @Bindable var messaging: MessagingModel
@@ -513,16 +520,24 @@ internal struct GrokMobileShell: View {
     }
 
     private func botDraftBinding(for botID: String) -> Binding<String> {
-        Binding(
-            get: { botDrafts[botID] ?? "" },
-            set: { botDrafts[botID] = $0 }
+        let storageKey = mobileBotConversationScopeKey(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID
+        )
+        return Binding(
+            get: { botDrafts[storageKey] ?? "" },
+            set: { botDrafts[storageKey] = $0 }
         )
     }
 
     private func botTranscriptBinding(for botID: String) -> Binding<[MobileChatMessage]> {
-        Binding(
-            get: { botTranscripts[botID] ?? [] },
-            set: { botTranscripts[botID] = $0 }
+        let storageKey = mobileBotConversationScopeKey(
+            accountScopeKey: mobileAccountScopeKey,
+            agentID: botID
+        )
+        return Binding(
+            get: { botTranscripts[storageKey] ?? [] },
+            set: { botTranscripts[storageKey] = $0 }
         )
     }
 

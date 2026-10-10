@@ -2815,8 +2815,14 @@
       {
         "path": "frontend/src/recovered/features/conversation/workspace/rich-text-editor.tsx",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-ios-native-replacement-pending-ime-acceptance",
-        "finding": "Desktop current-main adds Web/ProseMirror IME composition fencing (compositionstart/compositionend), prevents Enter/Escape and external setContent synchronization while composition is active, and sets dir=auto. Native iOS shipping MobileBotChat uses SwiftUI TextField(axis:.vertical) bound directly to the canonical draft, so there is no DOM/ProseMirror transaction or setContent owner to port; UIKit/SwiftUI owns marked-text composition and bidirectional text. The equivalent product requirement is retained: marked text must not be prematurely submitted or overwritten during account/Agent/draft transitions. This row remains pending exact-head Xcode/UI evidence with an IME composition acceptance case; no verified promotion is claimed."
+        "status": "current-main-reviewed-implemented-pending-exact-head-ime-ci",
+        "finding": "Desktop current-main IME composition fencing is now implemented in the shipping native Agent composer through MobileComposerTextView/MobileComposerTextCoordinator: real UIKit markedTextRange owns composition, external draft/scope synchronization is deferred, Enter/Escape do not submit while composing, completed composition commits to its owning account+Agent scope, a newly selected scope is restored without cross-account leakage, and natural bidi direction is explicit. GrokMobileShell also scopes draft/transcript caches by account+Agent. Focused real-UIKit marked-text XCTest plus a shipping composer UI test were added; verified promotion still waits for descendant exact-head Actions/protected evidence and aggregate closure."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/workspace/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-not-applicable-with-native-replacement-pending-exact-head",
+        "finding": "Exact current-main CSS delta is presentation-only: Darwin traffic-light/titlebar spacing plus prompt unicode-bidi:plaintext and font fallback. macOS window-control geometry has no iOS runtime analogue; native SwiftUI safe-area/navigation owns that effect. Prompt bidi/font behavior is now explicitly owned by MobileComposerUITextView using Dynamic Type/system fonts and natural writing direction, with focused UIKit and shipping UI evidence. No conversation protocol/state responsibility is waived; final iPhone/iPad layout/accessibility/device acceptance remains required."
       }
     ]
   },

@@ -1337,7 +1337,7 @@ internal struct MobileBotChat: View {
     @State private var findQuery = ""
     @State private var findIndex: Int?
     @State private var forwardMessage: MobileChatMessage?
-    @FocusState private var promptFocused: Bool
+    @State private var composerFocusGeneration = 0
     @FocusState private var findFocused: Bool
     @FocusState private var reactionPickerFocusedId: String?
 
@@ -1390,9 +1390,6 @@ internal struct MobileBotChat: View {
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             invalidateReactionScope()
             invalidateEditorSuggestions()
-        }
-        .onChange(of: focusPromptGeneration) { _, _ in
-            promptFocused = true
         }
         .onDisappear {
             cancelVoiceInput()
@@ -1925,44 +1922,31 @@ internal struct MobileBotChat: View {
         VStack(spacing: 4) {
             editorSuggestionList
             HStack(alignment: .bottom, spacing: 8) {
-                TextField("Message", text: $draft, axis: .vertical)
-                    .focused($promptFocused)
-                    .lineLimit(1...5)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(Color.black.opacity(0.055), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .onChange(of: draft) { _, _ in
-                        normalizeEditorSuggestionSelection()
-                    }
-                    .onSubmit {
+                MobileComposerTextView(
+                    text: $draft,
+                    scopeKey: mobileBotConversationScopeKey(
+                        accountScopeKey: model.settingsNoticeAccountKey,
+                        agentID: bot.id
+                    ),
+                    focusGeneration: focusPromptGeneration &+ composerFocusGeneration,
+                    onSubmit: {
                         if chooseActiveEditorSuggestion() { return }
                         if !busy {
                             Task { await send() }
                         }
+                    },
+                    onEscape: {
+                        guard !editorSuggestionRows.isEmpty else { return }
+                        editorSuggestionActiveIndex = nil
                     }
-                    .onKeyPress(phases: .down) { press in
-                        guard !editorSuggestionRows.isEmpty else { return .ignored }
-                        let move: MobileEditorSuggestionMove?
-                        switch press.key {
-                        case .upArrow:
-                            move = press.modifiers.contains(.command) ? .first : .previous
-                        case .downArrow:
-                            move = press.modifiers.contains(.command) ? .last : .next
-                        case .escape:
-                            editorSuggestionActiveIndex = nil
-                            return .handled
-                        default:
-                            move = nil
-                        }
-                        guard let move else { return .ignored }
-                        editorSuggestionActiveIndex = mobileEditorSuggestionNextIndex(
-                            current: editorSuggestionActiveIndex,
-                            count: editorSuggestionRows.count,
-                            move: move
-                        )
-                        return .handled
-                    }
-                    .accessibilityIdentifier("mobile-bot-draft")
+                )
+                .background(
+                    Color.black.opacity(0.055),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .onChange(of: draft) { _, _ in
+                    normalizeEditorSuggestionSelection()
+                }
 
                 miniAppButton
                 voiceInputButton
@@ -1996,7 +1980,7 @@ internal struct MobileBotChat: View {
         editorSuggestionRecents = [key] + editorSuggestionRecents.filter { $0 != key }
         editorSuggestionRecents = Array(editorSuggestionRecents.prefix(50))
         editorSuggestionActiveIndex = nil
-        promptFocused = true
+        composerFocusGeneration &+= 1
     }
 
     @MainActor

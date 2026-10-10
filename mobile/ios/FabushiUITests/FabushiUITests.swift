@@ -172,6 +172,36 @@ final class FabushiUITests: XCTestCase {
     }
 
     @MainActor
+    func testNativeAgentComposerIsShippingTextViewAndAcceptsBidiCommittedText() throws {
+        let app = launchAuthenticatedApp()
+
+        let shellBack = app.buttons["grok-mobile-back"]
+        XCTAssertTrue(shellBack.waitForExistence(timeout: 5))
+        shellBack.tap()
+
+        let grokHome = app.descendants(matching: .any)["grok-mobile-home"]
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 10))
+
+        let researchBot = app.staticTexts["Research Bot"]
+        XCTAssertTrue(researchBot.waitForExistence(timeout: 10))
+        researchBot.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["mobile-bot-chat"].waitForExistence(timeout: 10)
+        )
+        let composer = app.textViews["mobile-bot-draft"]
+        XCTAssertTrue(
+            composer.waitForExistence(timeout: 10),
+            "Expected the shipping Agent composer to be the native UITextView IME owner."
+        )
+        composer.tap()
+        composer.typeText("中文 مرحبا")
+        let committed = composer.value as? String ?? ""
+        XCTAssertTrue(committed.contains("中文"))
+        XCTAssertTrue(committed.contains("مرحبا"))
+    }
+
+    @MainActor
     func testMiniAppOpensAndClosesDedicatedWebMcpSurface() throws {
         let app = launchAuthenticatedApp()
         openMarketplace(in: app)
