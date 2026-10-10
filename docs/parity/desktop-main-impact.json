@@ -3171,6 +3171,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-retired-fast-lane-removed-pending-exact-head-ci",
         "finding": "Current-main removes the CHAT-013 short-conversation classifier, fast-lane system instruction, and zero-tool schema override from the routed provider runtime; all turns now keep the canonical routed tool schema. iOS had retained the equivalent first-party fast lane in mahayana-native-engine, so the shipping owner was corrected: the classifier/constants/direct-text terminal bypass and zero-tool projection were removed, visible turns use the normal buffered delivery path, and a focused contract asserts simple first-party turns retain send_message/react_to_message. Exact-head GitHub Actions evidence remains pending."
+      },
+      {
+        "path": "source/host/src/runner/sand_auto_review_summaries.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-brand-copy-ios-native",
+        "finding": "Exact current-main delta is limited to five user-facing summary strings replacing Grok Bot's computer with Fabushi's computer; control flow, tool classification, summary truncation, state, retries, persistence, and approval semantics are unchanged. iOS repository search has no remaining 'Grok Bot' product copy, and native shipping surfaces already use Fabushi identity, so no new production owner or state-machine work is required."
       }
     ]
   },
