@@ -9,6 +9,7 @@ use crate::engine::topic_id_from_root;
 use crate::engine::{Command, EngineError, Event, MessagingEngine};
 use crate::message::{
     ClientMessageId, DeliveryState, FormattedText, Message, MessageContent, MessageId,
+    ReactionSummary,
 };
 use crate::payment::Money;
 use crate::protocol::{
@@ -292,6 +293,521 @@ impl<S: MessagingStateStore> MessagingService<S> {
                     "trusted assistant projection did not persist its message".into(),
                 )
             })
+    }
+
+
+    /// Return the canonical remote Human message id bound to one durable local
+    /// Fabushi message. The binding lives in the same account-scoped snapshot as
+    /// the message and never replaces the local idempotency key.
+    pub fn remote_message_id_for_local(
+        &self,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+    ) -> Option<&str> {
+        self.engine
+            .state()
+            .remote_message_ids
+            .get(conversation_id)
+            .and_then(|messages| messages.get(message_id))
+            .map(String::as_str)
+    }
+
+    pub fn local_message_id_for_remote(
+        &self,
+        conversation_id: &ConversationId,
+        remote_message_id: &str,
+    ) -> Option<MessageId> {
+        self.engine
+            .state()
+            .remote_message_ids
+            .get(conversation_id)
+            .and_then(|messages| {
+                messages
+                    .iter()
+                    .find(|(_, remote)| remote.as_str() == remote_message_id)
+                    .map(|(local, _)| local.clone())
+            })
+    }
+
+    pub fn remote_blob_resource_id(&self, local_blob_id: &str) -> Option<&str> {
+        self.engine
+            .state()
+            .remote_blob_resource_ids
+            .get(local_blob_id)
+            .map(String::as_str)
+    }
+
+    pub fn trusted_bind_remote_blob_resource(
+        &mut self,
+        local_blob_id: &str,
+        remote_resource_id: &str,
+        now_ms: i64,
+    ) -> Result<(), MessagingServiceError> {
+        let local_blob_id = local_blob_id.trim();
+        let remote_resource_id = remote_resource_id.trim();
+        if local_blob_id.is_empty() || remote_resource_id.is_empty() {
+            return Err(MessagingServiceError::Invariant(
+                "remote blob binding requires non-empty local and remote ids".into(),
+            ));
+        }
+        if let Some(existing) = self
+            .engine
+            .state()
+            .remote_blob_resource_ids
+            .get(local_blob_id)
+        {
+            if existing == remote_resource_id {
+                return Ok(());
+            }
+            return Err(MessagingServiceError::Invariant(format!(
+                "local blob {local_blob_id} is already bound to a different remote resource"
+            )));
+        }
+        if self
+            .engine
+            .state()
+            .remote_blob_resource_ids
+            .iter()
+            .any(|(local, remote)| local != local_blob_id && remote == remote_resource_id)
+        {
+            return Err(MessagingServiceError::Invariant(format!(
+                "remote resource {remote_resource_id} is already bound to a different local blob"
+            )));
+        }
+        self.engine
+            .state_mut()
+            .remote_blob_resource_ids
+            .insert(local_blob_id.to_string(), remote_resource_id.to_string());
+        self.persist(now_ms)
+    }
+
+    pub fn trusted_upsert_direct_conversation(
+        &mut self,
+        viewer_actor_id: &ActorId,
+        viewer_actor: Actor,
+        peer_actor: Actor,
+        conversation: Conversation,
+        now_ms: i64,
+    ) -> Result<Vec<ServerEnvelope>, MessagingServiceError> {
+        if &viewer_actor.id != viewer_actor_id
+            || !matches!(viewer_actor.kind, ActorKind::Human)
+            || !matches!(peer_actor.kind, ActorKind::Human)
+            || !matches!(conversation.kind, ConversationKind::Direct)
+        {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "trusted remote direct conversation requires two Human identities and a direct conversation".into(),
+            ));
+        }
+        let actual = conversation
+            .participants
+            .iter()
+            .map(|participant| participant.actor_id.clone())
+            .collect::<BTreeSet<_>>();
+        let expected = [viewer_actor_id.clone(), peer_actor.id.clone()]
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        if actual != expected || conversation.participants.len() != 2 {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "trusted remote direct conversation participants do not match the authenticated Human and remote peer".into(),
+            ));
+        }
+
+        let mut staged = MessagingEngine::from_state(self.engine.state().clone());
+        let mut events = Vec::new();
+        events.extend(staged.execute(Command::UpsertActor { actor: viewer_actor })?);
+        events.extend(staged.execute(Command::UpsertActor { actor: peer_actor })?);
+        events.extend(staged.execute(Command::UpsertConversation { conversation })?);
+        self.engine = staged;
+        self.cursor = self.cursor.saturating_add(events.len() as u64);
+        let responses = events
+            .into_iter()
+            .filter_map(|event| self.project_event(viewer_actor_id, event, now_ms))
+            .collect::<Vec<_>>();
+        let journal = self.journal_entries(viewer_actor_id, &responses);
+        self.persist_with_events(now_ms, &journal)?;
+        Ok(responses)
+    }
+
+    pub fn trusted_local_message_for_client_id(
+        &self,
+        actor_id: &ActorId,
+        conversation_id: &ConversationId,
+        client_message_id: &ClientMessageId,
+    ) -> Option<Message> {
+        let message_id = stable_message_id(actor_id, client_message_id);
+        self.engine
+            .state()
+            .messages
+            .get(conversation_id)
+            .and_then(|messages| messages.get(&message_id))
+            .cloned()
+    }
+
+    pub fn trusted_prepare_remote_send(
+        &mut self,
+        actor_id: &ActorId,
+        command: &ClientCommand,
+        now_ms: i64,
+    ) -> Result<(Message, Vec<ServerEnvelope>), MessagingServiceError> {
+        let (conversation_id, client_message_id) = match command {
+            ClientCommand::SendMessage {
+                conversation_id,
+                client_message_id,
+                ..
+            } => (conversation_id.clone(), client_message_id.clone()),
+            ClientCommand::ForwardMessage {
+                destination_conversation_id,
+                client_message_id,
+                ..
+            } => (destination_conversation_id.clone(), client_message_id.clone()),
+            _ => {
+                return Err(MessagingServiceError::Invariant(
+                    "trusted remote send only accepts sendMessage or forwardMessage".into(),
+                ));
+            }
+        };
+        self.validate_command_authorization(actor_id, command, now_ms)?;
+        if let Some(replay) = self.idempotent_send_replay(actor_id, command, now_ms)? {
+            let message_id = stable_message_id(actor_id, &client_message_id);
+            let message = self
+                .engine
+                .state()
+                .messages
+                .get(&conversation_id)
+                .and_then(|messages| messages.get(&message_id))
+                .cloned()
+                .ok_or_else(|| {
+                    MessagingServiceError::Invariant(
+                        "idempotent remote send replay could not resolve its durable message".into(),
+                    )
+                })?;
+            return Ok((message, replay));
+        }
+
+        let mut commands = self.project_command(actor_id, command.clone(), now_ms);
+        if commands.len() != 2
+            || !matches!(commands.get(1), Some(Command::AcknowledgeMessage { .. }))
+        {
+            return Err(MessagingServiceError::Invariant(
+                "remote send projection did not produce queue + acknowledgement".into(),
+            ));
+        }
+        let queue = commands.remove(0);
+        let mut staged = MessagingEngine::from_state(self.engine.state().clone());
+        let events = staged.execute(queue)?;
+        self.engine = staged;
+        self.cursor = self.cursor.saturating_add(events.len() as u64);
+        let responses = events
+            .into_iter()
+            .filter_map(|event| self.project_event(actor_id, event, now_ms))
+            .collect::<Vec<_>>();
+        let journal = self.journal_entries(actor_id, &responses);
+        self.persist_with_events(now_ms, &journal)?;
+
+        let message_id = stable_message_id(actor_id, &client_message_id);
+        let message = self
+            .engine
+            .state()
+            .messages
+            .get(&conversation_id)
+            .and_then(|messages| messages.get(&message_id))
+            .cloned()
+            .ok_or_else(|| {
+                MessagingServiceError::Invariant(
+                    "remote send queue did not persist its pending message".into(),
+                )
+            })?;
+        Ok((message, responses))
+    }
+
+    fn authoritative_reaction_events(
+        staged: &mut MessagingEngine,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+        reactions: &[ReactionSummary],
+    ) -> Result<Vec<Event>, MessagingServiceError> {
+        let existing = staged
+            .state()
+            .messages
+            .get(conversation_id)
+            .and_then(|messages| messages.get(message_id))
+            .ok_or_else(|| EngineError::MessageNotFound {
+                conversation_id: conversation_id.clone(),
+                message_id: message_id.clone(),
+            })?
+            .reactions
+            .clone();
+        let mut events = Vec::new();
+        for old in existing {
+            if !reactions.iter().any(|reaction| reaction.reaction == old.reaction) {
+                events.extend(staged.execute(Command::SetReaction {
+                    conversation_id: conversation_id.clone(),
+                    message_id: message_id.clone(),
+                    reaction: ReactionSummary {
+                        reaction: old.reaction,
+                        count: 0,
+                        chosen_by_me: false,
+                        recent_actor_ids: Vec::new(),
+                    },
+                })?);
+            }
+        }
+        for reaction in reactions {
+            events.extend(staged.execute(Command::SetReaction {
+                conversation_id: conversation_id.clone(),
+                message_id: message_id.clone(),
+                reaction: reaction.clone(),
+            })?);
+        }
+        Ok(events)
+    }
+
+    fn bind_remote_message_id(
+        staged: &mut MessagingEngine,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+        remote_message_id: &str,
+    ) -> Result<(), MessagingServiceError> {
+        let remote_message_id = remote_message_id.trim();
+        if remote_message_id.is_empty() {
+            return Err(MessagingServiceError::Invariant(
+                "remote message binding requires a non-empty server id".into(),
+            ));
+        }
+        let bindings = staged.state().remote_message_ids.get(conversation_id);
+        if let Some(existing) = bindings.and_then(|messages| messages.get(message_id)) {
+            if existing == remote_message_id {
+                return Ok(());
+            }
+            return Err(MessagingServiceError::Invariant(format!(
+                "local message {} is already bound to remote message {}",
+                message_id.0, existing
+            )));
+        }
+        if bindings.is_some_and(|messages| {
+            messages
+                .iter()
+                .any(|(local, remote)| local != message_id && remote == remote_message_id)
+        }) {
+            return Err(MessagingServiceError::Invariant(format!(
+                "remote message {remote_message_id} is already bound to another local message"
+            )));
+        }
+        staged
+            .state_mut()
+            .remote_message_ids
+            .entry(conversation_id.clone())
+            .or_default()
+            .insert(message_id.clone(), remote_message_id.to_string());
+        Ok(())
+    }
+
+    pub fn trusted_settle_remote_send(
+        &mut self,
+        viewer_actor_id: &ActorId,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+        remote_message_id: &str,
+        accepted_at_ms: i64,
+        delivery_state: DeliveryState,
+        reactions: Vec<ReactionSummary>,
+        now_ms: i64,
+    ) -> Result<Vec<ServerEnvelope>, MessagingServiceError> {
+        self.validate_trusted_assistant_target(viewer_actor_id, conversation_id)?;
+        let message = self
+            .engine
+            .state()
+            .messages
+            .get(conversation_id)
+            .and_then(|messages| messages.get(message_id))
+            .ok_or_else(|| EngineError::MessageNotFound {
+                conversation_id: conversation_id.clone(),
+                message_id: message_id.clone(),
+            })?;
+        if &message.sender_id != viewer_actor_id {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "remote send settlement can only acknowledge the authenticated Human's message".into(),
+            ));
+        }
+
+        let mut staged = MessagingEngine::from_state(self.engine.state().clone());
+        Self::bind_remote_message_id(
+            &mut staged,
+            conversation_id,
+            message_id,
+            remote_message_id,
+        )?;
+        let mut events = staged.execute(Command::AcknowledgeMessage {
+            conversation_id: conversation_id.clone(),
+            local_message_id: message_id.clone(),
+            server_message_id: message_id.clone(),
+            accepted_at_ms,
+        })?;
+        if delivery_state != DeliveryState::Sent {
+            events.extend(staged.execute(Command::SetDeliveryState {
+                conversation_id: conversation_id.clone(),
+                message_id: message_id.clone(),
+                state: delivery_state,
+            })?);
+        }
+        events.extend(Self::authoritative_reaction_events(
+            &mut staged,
+            conversation_id,
+            message_id,
+            &reactions,
+        )?);
+        self.engine = staged;
+        self.cursor = self.cursor.saturating_add(events.len() as u64);
+        let responses = events
+            .into_iter()
+            .filter_map(|event| self.project_event(viewer_actor_id, event, now_ms))
+            .collect::<Vec<_>>();
+        let journal = self.journal_entries(viewer_actor_id, &responses);
+        self.persist_with_events(now_ms, &journal)?;
+        Ok(responses)
+    }
+
+    pub fn trusted_import_remote_message(
+        &mut self,
+        viewer_actor_id: &ActorId,
+        message: Message,
+        client_message_id: ClientMessageId,
+        remote_message_id: Option<String>,
+        now_ms: i64,
+    ) -> Result<Vec<ServerEnvelope>, MessagingServiceError> {
+        self.validate_trusted_assistant_target(viewer_actor_id, &message.conversation_id)?;
+        let conversation = self
+            .engine
+            .state()
+            .conversations
+            .get(&message.conversation_id)
+            .ok_or_else(|| EngineError::ConversationNotFound(message.conversation_id.clone()))?;
+        if !conversation
+            .participants
+            .iter()
+            .any(|participant| participant.actor_id == message.sender_id)
+        {
+            return Err(MessagingServiceError::UnauthorizedCommand(
+                "remote Human message sender is not a conversation participant".into(),
+            ));
+        }
+        if matches!(message.delivery_state, DeliveryState::Pending { .. }) {
+            return Err(MessagingServiceError::Invariant(
+                "server-authoritative remote messages cannot be imported as Pending".into(),
+            ));
+        }
+
+        if let Some(existing) = self
+            .engine
+            .state()
+            .messages
+            .get(&message.conversation_id)
+            .and_then(|messages| messages.get(&message.id))
+        {
+            if existing.sender_id != message.sender_id
+                || existing.content != message.content
+                || existing.reply_to_message_id != message.reply_to_message_id
+                || existing.thread_root_message_id != message.thread_root_message_id
+                || existing.scheduled_at_ms != message.scheduled_at_ms
+                || existing.silent != message.silent
+                || existing.protected_content != message.protected_content
+            {
+                return Err(MessagingServiceError::Invariant(format!(
+                    "remote message {} was replayed with conflicting immutable content",
+                    message.id.0
+                )));
+            }
+        }
+
+        let conversation_id = message.conversation_id.clone();
+        let message_id = message.id.clone();
+        let target_delivery = message.delivery_state.clone();
+        let target_reactions = message.reactions.clone();
+        let mut staged = MessagingEngine::from_state(self.engine.state().clone());
+        let mut events = Vec::new();
+        if !staged
+            .state()
+            .messages
+            .get(&conversation_id)
+            .is_some_and(|messages| messages.contains_key(&message_id))
+        {
+            events.extend(staged.execute(Command::QueueMessage {
+                conversation_id: conversation_id.clone(),
+                local_message_id: message_id.clone(),
+                client_message_id,
+                sender_id: message.sender_id.clone(),
+                content: message.content.clone(),
+                reply_to_message_id: message.reply_to_message_id.clone(),
+                thread_root_message_id: message.thread_root_message_id.clone(),
+                created_at_ms: message.created_at_ms,
+                scheduled_at_ms: message.scheduled_at_ms,
+                silent: message.silent,
+                protected_content: message.protected_content,
+            })?);
+        }
+        if let Some(remote_message_id) = remote_message_id.as_deref() {
+            Self::bind_remote_message_id(
+                &mut staged,
+                &conversation_id,
+                &message_id,
+                remote_message_id,
+            )?;
+        }
+        events.extend(staged.execute(Command::AcknowledgeMessage {
+            conversation_id: conversation_id.clone(),
+            local_message_id: message_id.clone(),
+            server_message_id: message_id.clone(),
+            accepted_at_ms: message.created_at_ms,
+        })?);
+        if target_delivery != DeliveryState::Sent {
+            events.extend(staged.execute(Command::SetDeliveryState {
+                conversation_id: conversation_id.clone(),
+                message_id: message_id.clone(),
+                state: target_delivery,
+            })?);
+        }
+        events.extend(Self::authoritative_reaction_events(
+            &mut staged,
+            &conversation_id,
+            &message_id,
+            &target_reactions,
+        )?);
+        self.engine = staged;
+        self.cursor = self.cursor.saturating_add(events.len() as u64);
+        let responses = events
+            .into_iter()
+            .filter_map(|event| self.project_event(viewer_actor_id, event, now_ms))
+            .collect::<Vec<_>>();
+        let journal = self.journal_entries(viewer_actor_id, &responses);
+        self.persist_with_events(now_ms, &journal)?;
+        Ok(responses)
+    }
+
+    pub fn trusted_replace_remote_reactions(
+        &mut self,
+        viewer_actor_id: &ActorId,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+        reactions: Vec<ReactionSummary>,
+        now_ms: i64,
+    ) -> Result<Vec<ServerEnvelope>, MessagingServiceError> {
+        self.validate_trusted_assistant_target(viewer_actor_id, conversation_id)?;
+        let mut staged = MessagingEngine::from_state(self.engine.state().clone());
+        let events = Self::authoritative_reaction_events(
+            &mut staged,
+            conversation_id,
+            message_id,
+            &reactions,
+        )?;
+        self.engine = staged;
+        self.cursor = self.cursor.saturating_add(events.len() as u64);
+        let responses = events
+            .into_iter()
+            .filter_map(|event| self.project_event(viewer_actor_id, event, now_ms))
+            .collect::<Vec<_>>();
+        let journal = self.journal_entries(viewer_actor_id, &responses);
+        self.persist_with_events(now_ms, &journal)?;
+        Ok(responses)
     }
 
     pub fn handle(

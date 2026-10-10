@@ -451,6 +451,16 @@ pub struct MessagingState {
     pub conversations: BTreeMap<ConversationId, Conversation>,
     pub folders: BTreeMap<String, ConversationFolder>,
     pub messages: BTreeMap<ConversationId, BTreeMap<MessageId, Message>>,
+    /// Shipping Human transport metadata. Local Fabushi message identifiers stay
+    /// stable for idempotency while this account-scoped sidecar records the
+    /// canonical server message identifier used by reply/reaction/reconnect.
+    #[serde(default)]
+    pub remote_message_ids: BTreeMap<ConversationId, BTreeMap<MessageId, String>>,
+    /// Local blob id -> canonical remote Human attachment resource id. Keeping
+    /// this durable prevents retrying a failed message dispatch from uploading
+    /// the same attachment again.
+    #[serde(default)]
+    pub remote_blob_resource_ids: BTreeMap<String, String>,
     pub read_cursors: BTreeMap<ConversationId, BTreeMap<ActorId, MessageId>>,
     pub topic_read_cursors:
         BTreeMap<ConversationId, BTreeMap<ActorId, BTreeMap<String, MessageId>>>,
@@ -733,6 +743,9 @@ impl MessagingEngine {
     }
     pub fn state(&self) -> &MessagingState {
         &self.state
+    }
+    pub(crate) fn state_mut(&mut self) -> &mut MessagingState {
+        &mut self.state
     }
     pub fn into_state(self) -> MessagingState {
         self.state
