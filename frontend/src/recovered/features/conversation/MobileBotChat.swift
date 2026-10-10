@@ -1369,6 +1369,9 @@ internal struct MobileBotChat: View {
         .task(id: cloudAgentScopeFingerprint) {
             await pollVisibleCloudAgents()
         }
+        .task(id: connectorCardScopeFingerprint) {
+            await runConnectorCardLifecycle()
+        }
         .task(id: editorSuggestionScopeFingerprint) {
             await refreshEditorSuggestions()
         }
@@ -1469,6 +1472,37 @@ internal struct MobileBotChat: View {
             await model.refreshListenerIntegrations()
             do {
                 try await Task.sleep(for: .seconds(5))
+            } catch {
+                return
+            }
+        }
+    }
+
+    private var visibleConnectorNames: [String] {
+        normalizeMobileConnectorNames(
+            entries.flatMap { $0.connectorNames ?? [] }
+        )
+    }
+
+    private var connectorCardScopeFingerprint: String {
+        [
+            model.settingsNoticeAccountKey,
+            bot.id,
+            visibleConnectorNames.map(normalizeMobileConnectorName).joined(separator: ","),
+        ].joined(separator: "|")
+    }
+
+    @MainActor
+    private func runConnectorCardLifecycle() async {
+        guard !visibleConnectorNames.isEmpty else {
+            model.closeConnectorCards()
+            return
+        }
+        await model.openConnectorCards()
+        defer { model.closeConnectorCards() }
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: .seconds(60))
             } catch {
                 return
             }
@@ -2488,6 +2522,8 @@ internal struct MobileBotChat: View {
         } else if entry.kind == .action {
             if let bcId = entry.cloudAgentBcId {
                 cloudAgentCard(entry, bcId: bcId)
+            } else if let connectors = entry.connectorNames {
+                connectorCard(entry, connectors: connectors)
             } else if let widget = mobileTranscriptWidgetProjection(entry) {
                 transcriptWidgetCard(entry, projection: widget)
             } else if let draft = mobileTranscriptDraftProjection(entry.canonicalTranscriptCard) {
@@ -3355,6 +3391,70 @@ internal struct MobileBotChat: View {
         .padding(10)
         .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityIdentifier(Self.semanticId("mobile-bot-secret-request-\(entry.id)"))
+    }
+
+    @ViewBuilder
+    private func connectorCard(_ entry: MobileChatMessage, connectors: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            if let detail = entry.actionDetail,
+               !detail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            if connectors.isEmpty {
+                Text("No connectors requested.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(connectors.enumerated()), id: \.offset) { _, connector in
+                    let server = MarketplaceModel.connectorServer(
+                        model.mcpServers,
+                        connector: connector,
+                        serverIdHint: connectors.count == 1 ? entry.connectorServerIdHint : nil
+                    )
+                    let key = MarketplaceModel.connectorCardKey(connector)
+                    let action = model.connectorCardActions[key]
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(connector).font(.caption.weight(.semibold))
+                            Text(
+                                server?.managedByTeamPluginPolicy == true || server?.isTeamServer == true
+                                    ? "Managed by team"
+                                    : server?.status ?? action ?? "Available"
+                            )
+                            .font(.caption2).foregroundStyle(.secondary)
+                            if let error = model.connectorCardErrors[key], !error.isEmpty {
+                                Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2)
+                            }
+                        }
+                        Spacer()
+                        if server?.managedByTeamPluginPolicy == true || server?.isTeamServer == true {
+                            Text("Managed").font(.caption2).foregroundStyle(.secondary)
+                        } else if server?.status == "connected" || server?.status == "ready" || action == "ready" {
+                            Label("Connected", systemImage: "checkmark.circle.fill")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        } else if action == "waiting" {
+                            Button("Reopen") {
+                                model.reopenConnectorCard(connector: connector)
+                            }
+                            .buttonStyle(.bordered).controlSize(.small)
+                        } else {
+                            Button(action == "failed" ? "Retry" : "Connect") {
+                                Task {
+                                    await model.connectConnectorCard(
+                                        connector: connector,
+                                        serverIdHint: connectors.count == 1 ? entry.connectorServerIdHint : nil
+                                    )
+                                }
+                            }
+                            .buttonStyle(.borderedProminent).controlSize(.small)
+                            .disabled(action == "installing" || action == "authenticating")
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityIdentifier(Self.semanticId("mobile-bot-connectors-(entry.id)"))
     }
 
     @ViewBuilder

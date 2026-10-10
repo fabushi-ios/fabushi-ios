@@ -1207,6 +1207,29 @@ final class CoordinatorMcpSurface {
                 "unpublished": true,
             ])
 
+        case "coordinator.mcp.catalog":
+            let forceRefresh = params["forceRefresh"] as? Bool ?? false
+            let entries = try await manager.getCatalog(forceRefresh: forceRefresh)
+            return .handled([
+                "entries": entries.map { entry in
+                    [
+                        "id": entry.id,
+                        "name": entry.name,
+                        "displayName": entry.displayName,
+                        "connectors": entry.connectors.map(\.name),
+                    ] as [String: Any]
+                },
+            ])
+
+        case "coordinator.mcp.install":
+            guard let entryId = nonEmptyString(params["entryId"]) else {
+                throw SandMcpConfigError("MCP marketplace entry id is required.")
+            }
+            let values = (params["values"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+            try await manager.installEntry(entryId: entryId, values: values)
+            let state = try await manager.listServers()
+            return .handled(["servers": state.servers.map(projectServer)])
+
         case "coordinator.mcp.servers":
             let state = try await manager.listServers()
             return .handled(["servers": state.servers.map(projectServer)])

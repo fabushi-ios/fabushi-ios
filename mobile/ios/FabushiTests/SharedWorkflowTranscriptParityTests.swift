@@ -1744,4 +1744,79 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         ], expectedBcId: "bc_123")).isTerminal)
     }
 
+    func testConnectorTranscriptCardsProjectStrictSingularAndDedupedPluralForms() throws {
+        let singular = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "connector-1",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "connector",
+                        "connector": "GitHub",
+                        "reason": "Needed for the repo",
+                        "serverId": "server-github",
+                        "suggestions": ["github", "GitHub"],
+                        "variant": "compact",
+                    ],
+                ],
+            ],
+            operationId: "op-connector"
+        ))
+        XCTAssertEqual(singular.connectorNames, ["GitHub"])
+        XCTAssertEqual(singular.connectorServerIdHint, "server-github")
+        XCTAssertEqual(singular.connectorSuggestions, ["github", "GitHub"])
+
+        let plural = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "connectors-1",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "connectors",
+                        "connectors": ["GitHub", "git-hub", "Slack", "***"],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+        XCTAssertEqual(plural.connectorNames, ["GitHub", "Slack"])
+        XCTAssertNil(projectMobileTranscriptCard(
+            event: [
+                "entryId": "bad-connector",
+                "card": [
+                    "kind": "send-message",
+                    "message": ["type": "connector", "connector": "GitHub", "reason": 42],
+                ],
+            ],
+            operationId: nil
+        ))
+    }
+
+    func testConnectorMatchingPrefersDefaultAccountAndFailsClosedForTeamPolicy() throws {
+        let servers = [
+            MarketplaceMcpServer(
+                serverId: "team", name: "GitHub", serverIdentifier: "github",
+                accountKey: "team", transport: "http", status: "needsAuth",
+                statusDetail: nil, toolCount: 1, disabledToolCount: 0,
+                isTeamServer: true, pluginId: "101", isRequired: true,
+                managedByTeamPluginPolicy: true
+            ),
+            MarketplaceMcpServer(
+                serverId: "default", name: "GitHub", serverIdentifier: "github",
+                accountKey: DEFAULT_MCP_ACCOUNT_KEY, transport: "http", status: "needsAuth",
+                statusDetail: nil, toolCount: 1, disabledToolCount: 0,
+                isTeamServer: false, pluginId: "101", isRequired: false,
+                managedByTeamPluginPolicy: false
+            ),
+        ]
+        XCTAssertEqual(
+            MarketplaceModel.connectorServer(servers, connector: "git-hub")?.serverId,
+            "default"
+        )
+        XCTAssertTrue(try XCTUnwrap(
+            MarketplaceModel.connectorServer(servers, connector: "github", accountKey: "team")
+        ).managedByTeamPluginPolicy)
+        XCTAssertEqual(normalizeMobileConnectorNames(["GitHub", "git-hub", "Slack"]), ["GitHub", "Slack"])
+    }
+
 }

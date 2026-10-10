@@ -694,6 +694,10 @@ struct MobileChatMessage: Identifiable, Equatable {
     var actionStatus: String?
     var listenerPlatform: String?
     var cloudAgentBcId: String?
+    var connectorNames: [String]?
+    var connectorServerIdHint: String?
+    var connectorSuggestions: [String] = []
+    var connectorVariant: String?
     var canonicalTranscriptCard: MobileCanonicalTranscriptCardPayload?
     var handoffRequestId: String?
     var handoffAgentId: String?
@@ -1307,6 +1311,45 @@ func projectMobileTranscriptCard(
                 createdAt: createdAt
             )
         }
+        if type == "connector" {
+            guard let rawConnector = message["connector"] as? String else { return nil }
+            let connector = rawConnector.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !connector.isEmpty else { return nil }
+            for key in ["reason", "serverId", "variant"] {
+                if message[key] != nil, !(message[key] is String) { return nil }
+            }
+            if message["suggestions"] != nil, !(message["suggestions"] is [String]) { return nil }
+            return MobileChatMessage(
+                id: entryId,
+                role: .assistant,
+                text: "",
+                kind: .action,
+                operationId: operationId,
+                actionTitle: connector,
+                actionDetail: message["reason"] as? String,
+                actionStatus: "waiting",
+                connectorNames: [connector],
+                connectorServerIdHint: message["serverId"] as? String,
+                connectorSuggestions: message["suggestions"] as? [String] ?? [],
+                connectorVariant: message["variant"] as? String,
+                createdAt: createdAt
+            )
+        }
+        if type == "connectors" {
+            guard let rawConnectors = message["connectors"] as? [String] else { return nil }
+            let connectors = normalizeMobileConnectorNames(rawConnectors)
+            return MobileChatMessage(
+                id: entryId,
+                role: .assistant,
+                text: "",
+                kind: .action,
+                operationId: operationId,
+                actionTitle: "Connectors",
+                actionStatus: "waiting",
+                connectorNames: connectors,
+                createdAt: createdAt
+            )
+        }
         return nil
     }
 
@@ -1527,6 +1570,28 @@ struct PluginPermissionRequest: Identifiable, Equatable {
     var id: String { pluginId }
 }
 
+struct MobileConnectorCatalogEntry: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let displayName: String
+    let connectors: [String]
+}
+
+func normalizeMobileConnectorName(_ value: String) -> String {
+    String(value.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) })
+}
+
+func normalizeMobileConnectorNames(_ values: [String]) -> [String] {
+    var seen = Set<String>()
+    var output: [String] = []
+    for value in values {
+        let normalized = normalizeMobileConnectorName(value)
+        guard !normalized.isEmpty, seen.insert(normalized).inserted else { continue }
+        output.append(value)
+    }
+    return output
+}
+
 struct MarketplaceMcpServer: Identifiable, Equatable, Sendable {
     let serverId: String
     let name: String
@@ -1631,6 +1696,9 @@ final class MarketplaceModel {
     var listenerAuthorizingPlatform: String?
     var listenerIntegrationErrors: [String: String] = [:]
     var mcpServers: [MarketplaceMcpServer] = []
+    var connectorCatalog: [MobileConnectorCatalogEntry] = []
+    var connectorCardActions: [String: String] = [:]
+    var connectorCardErrors: [String: String] = [:]
     var mcpToolsByServerId: [String: [MarketplaceMcpTool]] = [:]
     var mcpLoading = false
     var mcpLoadingServerId: String?
@@ -1680,6 +1748,10 @@ final class MarketplaceModel {
     @ObservationIgnored private var mcpOAuthGeneration = 0
     @ObservationIgnored private var mcpAccountEpoch = 0
     @ObservationIgnored private var mcpServerRequestSerial = 0
+    @ObservationIgnored private var connectorCardGeneration = 0
+    @ObservationIgnored private var connectorCardRequestSerial = 0
+    @ObservationIgnored private var connectorCardAuthorizationURLByKey: [String: URL] = [:]
+    @ObservationIgnored private var connectorCardActiveOAuthKey: String?
     @ObservationIgnored private var mcpToolRequestSerial: [String: Int] = [:]
     @ObservationIgnored private var mcpMutationSerial: [String: Int] = [:]
     @ObservationIgnored private var privateSkillRequestSerial = 0
@@ -1959,6 +2031,13 @@ final class MarketplaceModel {
     }
 
     private func resetMcpState() {
+        connectorCardGeneration = connectorCardGeneration == Int.max ? 1 : connectorCardGeneration + 1
+        connectorCardRequestSerial = connectorCardRequestSerial == Int.max ? 1 : connectorCardRequestSerial + 1
+        connectorCatalog = []
+        connectorCardActions = [:]
+        connectorCardErrors = [:]
+        connectorCardAuthorizationURLByKey = [:]
+        connectorCardActiveOAuthKey = nil
         mcpAccountEpoch = mcpAccountEpoch == Int.max ? 1 : mcpAccountEpoch + 1
         mcpServerRequestSerial = mcpServerRequestSerial == Int.max ? 1 : mcpServerRequestSerial + 1
         listenerRequestSerial = listenerRequestSerial == Int.max ? 1 : listenerRequestSerial + 1
@@ -3466,6 +3545,225 @@ final class MarketplaceModel {
         }
     }
 
+    nonisolated static func connectorCardKey(_ connector: String, accountKey: String? = nil) -> String {
+        "\(normalizeMobileConnectorName(connector)):\(accountKey ?? DEFAULT_MCP_ACCOUNT_KEY)"
+    }
+
+    nonisolated static func connectorCatalogEntry(
+        _ catalog: [MobileConnectorCatalogEntry],
+        connector: String
+    ) -> MobileConnectorCatalogEntry? {
+        let wanted = normalizeMobileConnectorName(connector)
+        guard !wanted.isEmpty else { return nil }
+        return catalog.first { entry in
+            [entry.id, entry.name, entry.displayName] + entry.connectors
+                .contains { normalizeMobileConnectorName($0) == wanted }
+        }
+    }
+
+    nonisolated static func connectorServer(
+        _ servers: [MarketplaceMcpServer],
+        connector: String,
+        accountKey: String? = nil,
+        serverIdHint: String? = nil
+    ) -> MarketplaceMcpServer? {
+        if let serverIdHint {
+            let normalizedHint = serverIdHint.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !normalizedHint.isEmpty,
+               let exact = servers.first(where: { $0.serverId == normalizedHint }) {
+                if let accountKey {
+                    return exact.accountKey == accountKey ? exact : nil
+                }
+                return exact
+            }
+        }
+        let wanted = normalizeMobileConnectorName(connector)
+        guard !wanted.isEmpty else { return nil }
+        let matches = servers.filter { server in
+            [server.serverIdentifier, server.name, server.serverId, server.pluginId ?? ""]
+                .contains { normalizeMobileConnectorName($0) == wanted }
+        }
+        if let accountKey {
+            return matches.first(where: { $0.accountKey == accountKey })
+        }
+        return matches.first(where: { $0.accountKey == DEFAULT_MCP_ACCOUNT_KEY }) ?? matches.first
+    }
+
+    func openConnectorCards() async {
+        connectorCardGeneration = connectorCardGeneration == Int.max ? 1 : connectorCardGeneration + 1
+        connectorCardActions = [:]
+        connectorCardErrors = [:]
+        connectorCardAuthorizationURLByKey = [:]
+        await loadConnectorCardData()
+    }
+
+    func closeConnectorCards() {
+        connectorCardGeneration = connectorCardGeneration == Int.max ? 1 : connectorCardGeneration + 1
+        connectorCardRequestSerial = connectorCardRequestSerial == Int.max ? 1 : connectorCardRequestSerial + 1
+        if connectorCardActiveOAuthKey != nil {
+            mcpOAuthGeneration = mcpOAuthGeneration == Int.max ? 1 : mcpOAuthGeneration + 1
+            mcpOAuthSession?.cancel()
+            mcpOAuthSession = nil
+        }
+        connectorCardActiveOAuthKey = nil
+        connectorCardAuthorizationURLByKey = [:]
+        connectorCardActions = [:]
+        connectorCardErrors = [:]
+    }
+
+    func loadConnectorCardData() async {
+        guard loggedIn else {
+            closeConnectorCards()
+            return
+        }
+        let generation = connectorCardGeneration
+        connectorCardRequestSerial = connectorCardRequestSerial == Int.max ? 1 : connectorCardRequestSerial + 1
+        let serial = connectorCardRequestSerial
+        do {
+            let response = try await bridge.request(
+                method: "coordinator.mcp.catalog",
+                params: ["forceRefresh": false]
+            )
+            guard generation == connectorCardGeneration,
+                  serial == connectorCardRequestSerial,
+                  let object = response.value as? [String: Any],
+                  let rows = object["entries"] as? [[String: Any]]
+            else { return }
+            connectorCatalog = rows.compactMap { row in
+                guard let id = row["id"] as? String,
+                      let name = row["name"] as? String,
+                      let displayName = row["displayName"] as? String,
+                      let connectors = row["connectors"] as? [String]
+                else { return nil }
+                return .init(id: id, name: name, displayName: displayName, connectors: connectors)
+            }
+            await refreshMcpServers()
+        } catch {
+            guard generation == connectorCardGeneration,
+                  serial == connectorCardRequestSerial else { return }
+            connectorCardErrors["__load__"] = error.localizedDescription
+        }
+    }
+
+    func connectConnectorCard(
+        connector rawConnector: String,
+        accountKey: String? = nil,
+        serverIdHint: String? = nil
+    ) async {
+        let connector = rawConnector.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = Self.connectorCardKey(connector, accountKey: accountKey)
+        guard !connector.isEmpty,
+              connectorCardActions[key] != "installing",
+              connectorCardActions[key] != "authenticating"
+        else { return }
+        let generation = connectorCardGeneration
+        connectorCardErrors.removeValue(forKey: key)
+
+        var server = Self.connectorServer(
+            mcpServers,
+            connector: connector,
+            accountKey: accountKey,
+            serverIdHint: serverIdHint
+        )
+        if server == nil {
+            guard let entry = Self.connectorCatalogEntry(connectorCatalog, connector: connector) else {
+                connectorCardActions[key] = "unavailable"
+                return
+            }
+            connectorCardActions[key] = "installing"
+            do {
+                _ = try await bridge.request(
+                    method: "coordinator.mcp.install",
+                    params: ["entryId": entry.id]
+                )
+                guard generation == connectorCardGeneration else { return }
+                await refreshMcpServers()
+                guard generation == connectorCardGeneration else { return }
+                server = Self.connectorServer(
+                    mcpServers,
+                    connector: connector,
+                    accountKey: accountKey,
+                    serverIdHint: serverIdHint
+                )
+            } catch {
+                guard generation == connectorCardGeneration else { return }
+                connectorCardActions[key] = "failed"
+                connectorCardErrors[key] = error.localizedDescription
+                return
+            }
+        }
+
+        guard let server else {
+            connectorCardActions[key] = "unavailable"
+            return
+        }
+        if server.isTeamServer || server.managedByTeamPluginPolicy {
+            connectorCardActions[key] = "managed"
+            return
+        }
+        if server.status == "connected" || server.status == "ready" {
+            connectorCardActions[key] = "ready"
+            return
+        }
+        guard ["needsAuth", "disconnected", "error"].contains(server.status) else {
+            connectorCardActions[key] = "unavailable"
+            return
+        }
+
+        connectorCardActions[key] = "authenticating"
+        do {
+            let response = try await bridge.request(
+                method: "coordinator.mcp.authenticate",
+                params: [
+                    "serverId": server.serverId,
+                    "accountKey": server.accountKey,
+                    "forceReauth": false,
+                ]
+            )
+            guard generation == connectorCardGeneration,
+                  let value = response.value as? [String: Any],
+                  let status = value["status"] as? String
+            else { return }
+            if status == McpAuthStartStatus.started.rawValue {
+                guard let rawURL = value["authorizationUrl"] as? String,
+                      let validated = validateAuthorizationUrl(rawURL),
+                      let url = URL(string: validated)
+                else {
+                    connectorCardActions[key] = "failed"
+                    connectorCardErrors[key] = "Connector authorization URL is invalid."
+                    return
+                }
+                connectorCardAuthorizationURLByKey[key] = url
+                connectorCardActions[key] = "waiting"
+                connectorCardActiveOAuthKey = key
+                presentMcpOAuth(url, connectorActionKey: key)
+            } else {
+                await refreshMcpServers()
+                guard generation == connectorCardGeneration else { return }
+                connectorCardActions[key] = "ready"
+            }
+        } catch {
+            guard generation == connectorCardGeneration else { return }
+            connectorCardActions[key] = "failed"
+            connectorCardErrors[key] = error.localizedDescription
+        }
+    }
+
+    func retryConnectorCard(connector: String, accountKey: String? = nil, serverIdHint: String? = nil) async {
+        await connectConnectorCard(
+            connector: connector,
+            accountKey: accountKey,
+            serverIdHint: serverIdHint
+        )
+    }
+
+    func reopenConnectorCard(connector: String, accountKey: String? = nil) {
+        let key = Self.connectorCardKey(connector, accountKey: accountKey)
+        guard let url = connectorCardAuthorizationURLByKey[key] else { return }
+        connectorCardActiveOAuthKey = key
+        presentMcpOAuth(url, connectorActionKey: key)
+    }
+
     func refreshMcpBackendStatus() async {
         guard loggedIn else {
             mcpBackendLoggedIn = false
@@ -3591,7 +3889,8 @@ final class MarketplaceModel {
 
     private func presentMcpOAuth(
         _ url: URL,
-        listenerPlatform: String? = nil
+        listenerPlatform: String? = nil,
+        connectorActionKey: String? = nil
     ) {
         mcpOAuthGeneration = mcpOAuthGeneration == Int.max ? 1 : mcpOAuthGeneration + 1
         let generation = mcpOAuthGeneration
@@ -3606,6 +3905,9 @@ final class MarketplaceModel {
             Task { @MainActor in
                 guard let self, self.mcpOAuthGeneration == generation else { return }
                 self.mcpOAuthSession = nil
+                if self.connectorCardActiveOAuthKey == connectorActionKey {
+                    self.connectorCardActiveOAuthKey = nil
+                }
                 defer {
                     if let listenerPlatform,
                        self.listenerAuthorizingPlatform == listenerPlatform {
@@ -3627,6 +3929,15 @@ final class MarketplaceModel {
                             }
                         }
                         await self.refreshMcpServers()
+                        if let connectorActionKey {
+                            self.connectorCardActions[connectorActionKey] = outcome == "success" ? "ready" : "failed"
+                            if outcome == "success" {
+                                self.connectorCardErrors.removeValue(forKey: connectorActionKey)
+                                self.connectorCardAuthorizationURLByKey.removeValue(forKey: connectorActionKey)
+                            } else {
+                                self.connectorCardErrors[connectorActionKey] = outcome ?? "MCP OAuth callback failed."
+                            }
+                        }
                         if listenerPlatform != nil {
                             await self.refreshListenerIntegrations()
                         }
