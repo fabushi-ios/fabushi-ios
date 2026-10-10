@@ -3285,6 +3285,12 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-fabushi-identity-contract-implemented-pending-exact-head-ci",
         "finding": "Desktop current-main contract updates root/subagent assistant identity to Fabushi. iOS canonical default_system_instructions now explicitly binds product/assistant identity to Fabushi and forbids model/vendor/historical identity substitution, while runtime_model_instructions supplies provider/model metadata separately; focused prompt tests are present. Exact-head CI pending."
+      },
+      {
+        "path": "source/host/tests/session_gateway_contract.rs",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-human-messaging-and-call-gateway-implemented-pending-exact-head-ci",
+        "finding": "Desktop current-main greatly expands shipping session-gateway acceptance across Human conversation ownership, attachment upload/reply server identity, ambiguous-send restart recovery without reupload, backend-authoritative reactions, bounded multi-device history gap recovery, Host/device-scoped ICE credentials, backend-ordered CallSession materialization, incoming-call discovery, and lifecycle/signaling/reconnect/restart fencing. iOS current production owns these responsibilities across fabushi-messaging-core (durable Pending delivery, stable client identity, persisted remote message/resource bindings, authoritative reaction replacement), FeatureHost shipping Human transport (account-scoped attachment upload/download, reply/reaction server identity, bounded reconnect gap paging and canonical transcript materialization), and mahayana-app-host-mobile CallSessionStore (authenticated Human scope, backend event cursor/order checks, device-scoped ICE retrieval, incoming discovery, terminal/media/signaling fences and restart durability). These are shipping owners, not fixtures; exact-head required rust-host/build/protected evidence is still pending, so this path is not verified."
       }
     ]
   },
