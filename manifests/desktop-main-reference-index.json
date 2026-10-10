@@ -3,17 +3,17 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-    "tree": "3d2a0ad250ca82d0cf3b7bd917d8eca7400e5c31",
+    "commit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
+    "tree": "ed56d351521842550b541f37de3d567f027eeda9",
     "mode": "live-main",
-    "observedAt": "2026-10-08"
+    "observedAt": "2026-10-11"
   },
   "roots": [
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 7950,
-  "selectedTreeSha256": "38a5a6c5086b57ff2518165dcab8d4ab7c02fe5c1f7b163c78ce419de4481045",
+  "fileCount": 7951,
+  "selectedTreeSha256": "85adf0b64c517cfdc72a1d52078977683748714a5ec893a8d30b992d7052febc",
   "groups": [
     {
       "name": "frontend",
@@ -58,7 +58,7 @@
     {
       "name": "source-mahayana",
       "path": "manifests/desktop-main/source-mahayana.json",
-      "fileCount": 5329
+      "fileCount": 5330
     },
     {
       "name": "source-mime-types.d.ts",

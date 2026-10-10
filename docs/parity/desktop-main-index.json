@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-    "tree": "3d2a0ad250ca82d0cf3b7bd917d8eca7400e5c31",
+    "commit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
+    "tree": "ed56d351521842550b541f37de3d567f027eeda9",
     "mode": "live-main"
   },
-  "rowCount": 7950,
+  "rowCount": 7951,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "main-rebaseline-snapshot-not-responsibility-closure",
   "statusPolicy": {
@@ -58,7 +58,7 @@
     {
       "name": "source-mahayana",
       "path": "docs/parity/desktop-main/source-mahayana.json",
-      "rowCount": 5329
+      "rowCount": 5330
     },
     {
       "name": "source-mime-types.d.ts",
