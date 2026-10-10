@@ -1089,6 +1089,18 @@ internal func reconcileMobileConversationBaseline(
     }
 }
 
+struct MobileSecretRequestFence: Equatable {
+    let accountKey: String
+    let agentId: String
+    let generation: Int
+
+    func accepts(accountKey: String, agentId: String, generation: Int) -> Bool {
+        self.accountKey == accountKey
+            && self.agentId == agentId
+            && self.generation == generation
+    }
+}
+
 private struct MobileLinkMetadataCard: View {
     let url: String
     let model: MarketplaceModel
@@ -1333,6 +1345,7 @@ internal struct MobileBotChat: View {
     @State private var transcriptDraftErrors: [String: String] = [:]
     @State private var secretDrafts: [String: String] = [:]
     @State private var secretPendingEntryIds: Set<String> = []
+    @State private var secretRequestGeneration = 0
     @State private var secretProvidedEntryIds: Set<String> = []
     @State private var secretErrors: [String: String] = [:]
     @State private var findPresented = false
@@ -3297,6 +3310,7 @@ internal struct MobileBotChat: View {
 
     @MainActor
     private func resetSecretRequestUI() {
+        secretRequestGeneration = secretRequestGeneration == Int.max ? 1 : secretRequestGeneration + 1
         secretDrafts.removeAll()
         secretPendingEntryIds.removeAll()
         secretProvidedEntryIds.removeAll()
@@ -3316,17 +3330,40 @@ internal struct MobileBotChat: View {
               !secretPendingEntryIds.contains(entry.id)
         else { return }
 
+        let fence = MobileSecretRequestFence(
+            accountKey: model.settingsNoticeAccountKey,
+            agentId: bot.id,
+            generation: secretRequestGeneration
+        )
         secretPendingEntryIds.insert(entry.id)
         secretErrors.removeValue(forKey: entry.id)
-        defer { secretPendingEntryIds.remove(entry.id) }
+        defer {
+            if fence.accepts(
+                accountKey: model.settingsNoticeAccountKey,
+                agentId: bot.id,
+                generation: secretRequestGeneration
+            ) {
+                secretPendingEntryIds.remove(entry.id)
+            }
+        }
         do {
             try await model.provideTranscriptSecret(
                 secretRequestId: secret.requestId,
                 value: value
             )
+            guard fence.accepts(
+                accountKey: model.settingsNoticeAccountKey,
+                agentId: bot.id,
+                generation: secretRequestGeneration
+            ) else { return }
             secretDrafts[entry.id] = ""
             secretProvidedEntryIds.insert(entry.id)
         } catch {
+            guard fence.accepts(
+                accountKey: model.settingsNoticeAccountKey,
+                agentId: bot.id,
+                generation: secretRequestGeneration
+            ) else { return }
             secretErrors[entry.id] = error.localizedDescription
         }
     }

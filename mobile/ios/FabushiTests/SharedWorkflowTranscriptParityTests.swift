@@ -1819,4 +1819,16 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(normalizeMobileConnectorNames(["GitHub", "git-hub", "Slack"]), ["GitHub", "Slack"])
     }
 
+    func testSecretRequestFenceRejectsAccountAgentAndGenerationReplacement() {
+        let fence = MobileSecretRequestFence(
+            accountKey: "account-a",
+            agentId: "agent-1",
+            generation: 4
+        )
+        XCTAssertTrue(fence.accepts(accountKey: "account-a", agentId: "agent-1", generation: 4))
+        XCTAssertFalse(fence.accepts(accountKey: "account-b", agentId: "agent-1", generation: 4))
+        XCTAssertFalse(fence.accepts(accountKey: "account-a", agentId: "agent-2", generation: 4))
+        XCTAssertFalse(fence.accepts(accountKey: "account-a", agentId: "agent-1", generation: 5))
+    }
+
 }
