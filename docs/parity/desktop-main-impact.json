@@ -3357,6 +3357,18 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-ios-app-store-update-replacement",
         "finding": "Desktop self-update command is not portable to App Store iOS. The shipping replacement keeps update status/check policy in IOSUpdateServiceWiring/SandUpdateService while binary install/upgrade is owned by App Store/TestFlight; Desktop quit-and-install/restart-install actions are explicitly not exposed. This is a platform replacement, not a waived user/release responsibility, and App Store/TestFlight AC evidence remains separately required."
+      },
+      {
+        "path": "frontend/src/production/bootstrap.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-native-bootstrap-implemented-pending-exact-head-ci",
+        "finding": "Current-main renderer bootstrap is a fail-closed composition boundary: protected bridge/runtime and mount must exist before shipping UI starts. iOS replaces DOM/StrictMode mounting with the single SwiftUI FabushiApp/FabushiSceneRoot composition and a throwing FabushiRuntime initializer that constructs IOSMainRuntime/IOSPreloadBridge rather than substituting a production fallback. This is a platform bootstrap replacement; current/final exact-head ordinary/protected Actions remain required."
+      },
+      {
+        "path": "frontend/src/production/coordinator-client.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-coordinator-client-implemented-pending-exact-head-ci",
+        "finding": "Current-main Coordinator client responsibilities are present in the native port stack: protocol-version ready validation, correlated requests/replies, typed failures, event delivery, cancellation, protocol-breach shutdown and settlement of every pending continuation. IOSCoordinatorRuntime owns whole-port restart/replacement and monotonically fences accepted generations so stale ports cannot regain authority; dispose closes the live owner. Focused Coordinator architecture/contracts exist, but final exact-head CI remains required."
       }
     ]
   },
