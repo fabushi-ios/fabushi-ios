@@ -12,6 +12,16 @@ private struct TestLocalToolGate: SandLocalToolGate {
     }
 }
 
+
+private actor RecordingRemoteRunnerTransport: RemoteRunnerTransport {
+    private(set) var calls: [(String, CoordinatorPayload)] = []
+
+    func dispatch(method: String, params: CoordinatorPayload) async throws -> CoordinatorPayload {
+        calls.append((method, params))
+        return .object(["ok": .bool(true)])
+    }
+}
+
 final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
     func testLocalExecProcessIdentityRequiresExactGenerationArguments() {
         let command = "/opt/fabushi/local-exec --sand-local-exec-generation=g-1 --serve"
@@ -128,6 +138,31 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         XCTAssertEqual(process, .remote)
         XCTAssertEqual(box, .remote)
         XCTAssertEqual(arbitrary, .unavailable("spawnArbitraryProcess"))
+    }
+
+    func testProductionLocalExecRejectsUnknownMethodsBeforeRemoteDispatch() async throws {
+        let transport = RecordingRemoteRunnerTransport()
+        let executor = IOSProductionLocalExecutor(remoteTransport: transport)
+
+        do {
+            _ = try await executor.execute(method: "spawnArbitraryProcess")
+            XCTFail("unknown local-exec methods must fail closed")
+        } catch let error as LocalCapabilityRunner.RunnerError {
+            switch error {
+            case .unsupported(let name):
+                XCTAssertEqual(name, "spawnArbitraryProcess")
+            case .permissionDenied:
+                XCTFail("unexpected permission error")
+            }
+        }
+
+        XCTAssertTrue(await transport.calls.isEmpty)
+
+        let result = try await executor.execute(method: "shell.exec")
+        XCTAssertEqual(result, .object(["ok": .bool(true)]))
+        let calls = await transport.calls
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(calls[0].0, "local-exec.shell.exec")
     }
 
     func testMcpCustomInstructionSelectionIsBoundedDeduplicatedAndStable() {
