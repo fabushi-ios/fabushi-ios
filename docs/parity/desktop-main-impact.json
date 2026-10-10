@@ -4083,6 +4083,36 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-widget-interactions-implemented-pending-exact-head-ci",
         "finding": "Desktop adapter serializes respondToWidget/dismissWidget, accepts only authoritative replies, tracks idle/pending/answered/dismissed, rolls back rejected/errors and fences scope/dispose generations. iOS resolveTranscriptWidget uses the canonical feature/Host widget action path, waits for the matching transcript.card update, fences Bot generation, updates only the matching entry, preserves pending/error rollback behavior, and resumes the accepted operation when returned. SwiftUI is the sole presentation owner; exact-head tests/CI remain pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/message-card-seam.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-message-card-seam-implemented-pending-exact-head-ci",
+        "finding": "Desktop projects ordinary user/assistant message-card semantics, strict HTTPS bare-link delegation, source trust, standalone-emoji guards, fromUser metadata, copy and adjacency without introducing a second transcript owner. iOS projectMobileMessageCardSeam reuses canonical MobileChatMessage; this descendant change makes isFromUser depend on explicit fromUser metadata, blocks URL-card delegation for that case, and prevents attachment/image-bearing emoji from becoming standalone. Focused XCTest covers the guards; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/tool-results/model.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-tool-result-model-implemented-pending-exact-head-ci",
+        "finding": "Desktop normalizes file-edit/file-write/shell result state across running/success/error/denied/rejected/cancelled/background plus output/diff/summary/streaming. iOS MobileToolResultCard/MobileToolResultStore implements the same read-only status model over authoritative ClientSideToolV2 call/result protobuf events; focused relay tests cover terminal/error/malformed behavior. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/tool-results/proto-adapter.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-client-side-tool-proto-adapter-implemented-pending-exact-head-ci",
+        "finding": "Desktop accepts only generated ClientSideToolV2 tools 7/15/38, exact toolCallId/tool matching and monotonic sequences. iOS source/shared/client-side-tool-v2-projection.swift decodes the same wire fields, rejects unsupported/mismatched/out-of-order updates, preserves edit/shell/background/error semantics and receives only the canonical renderer-port event family. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/tool-results/transcript-boundary.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-tool-result-transcript-boundary-implemented-pending-exact-head-ci",
+        "finding": "Desktop joins typed tool updates to the existing generic transcript feed and never creates a transcript entry from a typed update without a matching tool-call row. iOS now preserves that invariant: conversation baseline strictly projects Desktop-shaped generic tool-call rows, live agent.step becomes toolCall only with an explicit non-empty toolCallId, and mobileToolResultForEntry returns a typed card only for the exact generic row and agent scope. Account changes clear the canonical store and Bot scope selects the correct agent result set. Exact-head CI/protected live evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/tool-results/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-read-only-tool-result-view-implemented-pending-exact-head-ci",
+        "finding": "Desktop ToolResultCard is read-only and collapsible, showing heading/status, working directory, streaming detail and diff with no copy/open/reveal/execution controls. Shipping MobileBotChat now renders the exact matched MobileToolResultCard inside its generic tool-call row using native DisclosureGroup and selectable text, while unmatched typed events remain invisible. Exact-head Swift/UI evidence pending."
       }
     ]
   },

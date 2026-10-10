@@ -137,6 +137,111 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertNil(mobileTranscriptCopyText(urlCard))
     }
 
+    func testMessageCardSeamPreservesFromUserAndStandaloneEmojiGuards() throws {
+        var bareLink = MobileChatMessage(
+            id: "user-link",
+            role: .user,
+            text: "https://example.com/path"
+        )
+        var seam = projectMobileMessageCardSeam(bareLink)
+        XCTAssertFalse(seam.isFromUser)
+        XCTAssertEqual(seam.url, "https://example.com/path")
+
+        bareLink.fromUserPresent = true
+        seam = projectMobileMessageCardSeam(bareLink)
+        XCTAssertTrue(seam.isFromUser)
+        XCTAssertNil(seam.url)
+
+        var emoji = MobileChatMessage(id: "emoji", role: .user, text: "👍")
+        XCTAssertTrue(projectMobileMessageCardSeam(emoji).isStandaloneEmoji)
+        emoji.attachmentURL = "https://example.com/file.txt"
+        XCTAssertFalse(projectMobileMessageCardSeam(emoji).isStandaloneEmoji)
+
+        let imageEmoji = MobileChatMessage(
+            id: "emoji-image",
+            role: .user,
+            text: "👍",
+            sendMessageTextProjection: .init(
+                id: "emoji-image",
+                content: "👍",
+                images: [.init(url: "https://example.com/a.png", alt: nil)],
+                channel: nil,
+                streaming: false,
+                timestampMs: nil,
+                presentation: .text
+            )
+        )
+        XCTAssertFalse(projectMobileMessageCardSeam(imageEmoji).isStandaloneEmoji)
+    }
+
+    func testToolResultBoundaryRequiresGenericToolCallRowAndExactAgentScope() throws {
+        let card = MobileToolResultCard(
+            agentId: "agent-1",
+            toolCallId: "tool-1",
+            kind: .shell,
+            status: .success,
+            path: nil,
+            command: "pwd",
+            workingDirectory: "/workspace",
+            summary: "",
+            output: "/workspace\n",
+            diff: "",
+            isStreaming: false,
+            isBackground: false,
+            sequence: 2
+        )
+        var generic = MobileChatMessage(
+            id: "tool-call:tool-1",
+            role: .assistant,
+            text: "",
+            kind: .toolCall
+        )
+        generic.toolCallId = "tool-1"
+        generic.toolName = "Terminal"
+        generic.toolStatus = "done"
+
+        XCTAssertEqual(
+            mobileToolResultForEntry(
+                generic,
+                cardsByAgent: ["agent-1": [card]],
+                agentId: "agent-1"
+            ),
+            card
+        )
+        XCTAssertNil(mobileToolResultForEntry(
+            generic,
+            cardsByAgent: ["agent-1": [card]],
+            agentId: "agent-2"
+        ))
+        XCTAssertNil(mobileToolResultForEntry(
+            MobileChatMessage(id: "action", role: .assistant, text: "", kind: .action),
+            cardsByAgent: ["agent-1": [card]],
+            agentId: "agent-1"
+        ))
+
+        let projected = try XCTUnwrap(projectMobileConversationWindowEntries([
+            "kind": "tool-call",
+            "id": "tool-1",
+            "name": "Terminal",
+            "status": "running",
+            "summary": "Running pwd",
+            "timestampMs": 1_234,
+        ]))
+        XCTAssertEqual(projected.count, 1)
+        XCTAssertEqual(projected[0].kind, .toolCall)
+        XCTAssertEqual(projected[0].toolCallId, "tool-1")
+        XCTAssertEqual(projected[0].toolName, "Terminal")
+        XCTAssertEqual(projected[0].toolStatus, "running")
+        XCTAssertEqual(projected[0].toolSummary, "Running pwd")
+        XCTAssertNil(projectMobileConversationWindowEntries([
+            "kind": "tool-call",
+            "id": "tool-1",
+            "name": "Terminal",
+            "status": "unknown",
+            "timestampMs": 1_234,
+        ]))
+    }
+
     func testBotFindSearchUsesOnlyMainTranscriptCopyableTextAndWrapsMatches() {
         let root = MobileChatMessage(
             id: "root",

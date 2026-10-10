@@ -11,6 +11,7 @@ enum MobileChatRole: String, Equatable {
 enum MobileChatEntryKind: String, Equatable {
     case message
     case action
+    case toolCall
     case thinking
     case handoff
     case notice
@@ -725,6 +726,11 @@ struct MobileChatMessage: Identifiable, Equatable {
     var optimisticDeliveryPhase: MobileOptimisticDeliveryPhase?
     var optimisticDeliveryError: String?
     var createdAt = Date()
+    var fromUserPresent = false
+    var toolCallId: String?
+    var toolName: String?
+    var toolStatus: String?
+    var toolSummary: String?
 }
 
 enum MobileAutoReviewResolution: String, Equatable {
@@ -3396,7 +3402,13 @@ final class MarketplaceModel {
                             chatMessages[index].branched = event["branched"] as? Bool ?? false
                         }
                     } else if !chatMessages.contains(where: { $0.role == .user && $0.text == eventText }) {
-                        chatMessages.append(MobileChatMessage(id: "user:\(UUID().uuidString)", role: .user, text: eventText))
+                        var userMessage = MobileChatMessage(
+                            id: "user:\(UUID().uuidString)",
+                            role: .user,
+                            text: eventText
+                        )
+                        userMessage.fromUserPresent = event["fromUser"] != nil && !(event["fromUser"] is NSNull)
+                        chatMessages.append(userMessage)
                     }
                 case "chat.delta":
                     guard event["operationId"] as? String == operationId else { continue }
@@ -3407,7 +3419,28 @@ final class MarketplaceModel {
                     guard eventOperationId == operationId else { continue }
                     let title = event["title"] as? String ?? "助手动作"
                     let stepId = event["stepId"] as? String ?? "step-\(UUID().uuidString)"
-                    upsertAction(operationId: operationId, stepId: stepId, title: title, detail: event["detail"] as? String, status: event["status"] as? String ?? "completed")
+                    let detail = event["detail"] as? String
+                    let status = event["status"] as? String ?? "completed"
+                    if let rawToolCallId = event["toolCallId"] as? String {
+                        let toolCallId = rawToolCallId.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !toolCallId.isEmpty {
+                            upsertToolCall(
+                                operationId: operationId,
+                                toolCallId: toolCallId,
+                                name: title,
+                                summary: detail,
+                                status: status
+                            )
+                            continue
+                        }
+                    }
+                    upsertAction(
+                        operationId: operationId,
+                        stepId: stepId,
+                        title: title,
+                        detail: detail,
+                        status: status
+                    )
                 case "transcript.card":
                     guard let row = projectMobileTranscriptCard(
                         event: event,
@@ -3454,6 +3487,13 @@ final class MarketplaceModel {
             chatMessages[index].actionStatus == "running" {
             chatMessages[index].actionStatus = status
         }
+        let toolStatus = status == "completed" ? "done" : status
+        for index in chatMessages.indices where chatMessages[index].kind == .toolCall &&
+            chatMessages[index].operationId == operationId &&
+            ["pending", "running"].contains(chatMessages[index].toolStatus ?? "") {
+            chatMessages[index].toolStatus = toolStatus
+            chatMessages[index].actionStatus = toolStatus
+        }
     }
 
     private func upsertAssistantMessage(operationId: String, text: String, append: Bool) {
@@ -3469,6 +3509,35 @@ final class MarketplaceModel {
         let id = "action:\(operationId):\(stepId)"
         let entry = MobileChatMessage(id: id, role: .assistant, text: "", kind: .action, operationId: operationId, actionTitle: title, actionDetail: detail, actionStatus: status)
         if let index = chatMessages.firstIndex(where: { $0.id == id }) { chatMessages[index] = entry } else { chatMessages.append(entry) }
+    }
+
+    private func upsertToolCall(
+        operationId: String,
+        toolCallId: String,
+        name: String,
+        summary: String?,
+        status: String
+    ) {
+        let id = "tool-call:\(toolCallId)"
+        var entry = MobileChatMessage(
+            id: id,
+            role: .assistant,
+            text: "",
+            kind: .toolCall,
+            operationId: operationId,
+            actionTitle: name,
+            actionDetail: summary,
+            actionStatus: status
+        )
+        entry.toolCallId = toolCallId
+        entry.toolName = name
+        entry.toolStatus = status
+        entry.toolSummary = summary
+        if let index = chatMessages.firstIndex(where: { $0.id == id }) {
+            chatMessages[index] = entry
+        } else {
+            chatMessages.append(entry)
+        }
     }
 
     func refreshAccountUsage() async {

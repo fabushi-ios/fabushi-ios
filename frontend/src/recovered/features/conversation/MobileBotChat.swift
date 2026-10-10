@@ -534,13 +534,52 @@ internal func projectMobileConversationWindowMessage(_ row: [String: Any]) -> Mo
         reactions: projectMobileTranscriptReactions(row["reactions"]),
         branched: row["branched"] as? Bool ?? false
     )
+    message.fromUserPresent = row["fromUser"] != nil && !(row["fromUser"] is NSNull)
     message.createdAt = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1_000)
+    return message
+}
+
+internal func projectMobileConversationWindowToolCall(
+    _ row: [String: Any]
+) -> MobileChatMessage? {
+    guard row["kind"] as? String == "tool-call",
+          let id = (row["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !id.isEmpty,
+          let name = (row["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !name.isEmpty,
+          let status = row["status"] as? String,
+          ["pending", "running", "done", "failed", "error", "aborted"].contains(status),
+          let timestampMs = GrokMobileBotService.int64Value(row["timestampMs"])
+    else { return nil }
+    if row["summary"] != nil && !(row["summary"] is String) && !(row["summary"] is NSNull) {
+        return nil
+    }
+
+    let summary = row["summary"] as? String
+    var message = MobileChatMessage(
+        id: "tool-call:\(id)",
+        role: .assistant,
+        text: "",
+        kind: .toolCall,
+        actionTitle: name,
+        actionDetail: summary,
+        actionStatus: status
+    )
+    message.toolCallId = id
+    message.toolName = name
+    message.toolStatus = status
+    message.toolSummary = summary
+    message.createdAt = Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1_000)
     return message
 }
 
 internal func projectMobileConversationWindowEntries(
     _ row: [String: Any]
 ) -> [MobileChatMessage]? {
+    if row["kind"] as? String == "tool-call" {
+        guard let toolCall = projectMobileConversationWindowToolCall(row) else { return nil }
+        return [toolCall]
+    }
     guard var message = projectMobileConversationWindowMessage(row) else { return nil }
     var projected: [MobileChatMessage] = []
     let cards: [[String: Any]]
@@ -770,9 +809,15 @@ internal func projectMobileMessageCardSeam(
     }
 
     let text = entry.sendMessageTextProjection?.content ?? entry.text
-    let standaloneEmoji = entry.role == .user && mobileTranscriptStandaloneEmoji(text)
+    let hasProjectedImages = !(entry.sendMessageTextProjection?.images.isEmpty ?? true)
+    let standaloneEmoji = entry.role == .user
+        && entry.attachmentProjection == nil
+        && entry.attachmentURL == nil
+        && !hasProjectedImages
+        && mobileTranscriptStandaloneEmoji(text)
     let url: String?
     if entry.role == .user,
+       !entry.fromUserPresent,
        entry.attachmentProjection == nil,
        entry.attachmentURL == nil
     {
@@ -788,11 +833,23 @@ internal func projectMobileMessageCardSeam(
 
     return .init(
         isSourceTrusted: entry.role == .assistant,
-        isFromUser: entry.role == .user,
+        isFromUser: entry.role == .user && entry.fromUserPresent,
         isStandaloneEmoji: standaloneEmoji,
         url: url,
         copyText: mobileTranscriptCopyText(entry)
     )
+}
+
+internal func mobileToolResultForEntry(
+    _ entry: MobileChatMessage,
+    cardsByAgent: [String: [MobileToolResultCard]],
+    agentId: String
+) -> MobileToolResultCard? {
+    guard entry.kind == .toolCall,
+          let toolCallId = entry.toolCallId?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !toolCallId.isEmpty
+    else { return nil }
+    return cardsByAgent[agentId]?.first { $0.toolCallId == toolCallId }
 }
 
 internal enum MobileReplyReferencePreview: Equatable {
@@ -2524,6 +2581,8 @@ internal struct MobileBotChat: View {
             }
             .padding(.vertical, 4)
             .accessibilityIdentifier(Self.semanticId("mobile-bot-timeline-event-\(entry.id)"))
+        } else if entry.kind == .toolCall {
+            toolResultCard(entry)
         } else if entry.kind == .action {
             if let bcId = entry.cloudAgentBcId {
                 cloudAgentCard(entry, bcId: bcId)
@@ -2669,6 +2728,79 @@ internal struct MobileBotChat: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func toolResultCard(_ entry: MobileChatMessage) -> some View {
+        let snapshot = mobileToolResultForEntry(
+            entry,
+            cardsByAgent: model.toolResultCardsByAgent,
+            agentId: bot.id
+        )
+        let heading = snapshot?.path
+            ?? snapshot?.command
+            ?? entry.toolName
+            ?? entry.actionTitle
+            ?? "Tool"
+        let status = snapshot?.status.rawValue
+            ?? entry.toolStatus
+            ?? entry.actionStatus
+            ?? "running"
+        let detail: String = {
+            guard let snapshot else {
+                return entry.toolSummary ?? entry.actionDetail ?? ""
+            }
+            if !snapshot.summary.isEmpty { return snapshot.summary }
+            if !snapshot.diff.isEmpty { return snapshot.diff }
+            return snapshot.output
+        }()
+
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 8) {
+                if let workingDirectory = snapshot?.workingDirectory, !workingDirectory.isEmpty {
+                    Text(workingDirectory)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .accessibilityLabel(
+                            snapshot?.isStreaming == true
+                                ? "Streaming tool result"
+                                : "Tool result"
+                        )
+                }
+                if let diff = snapshot?.diff, !diff.isEmpty {
+                    Text(diff)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .accessibilityLabel(snapshot?.path ?? snapshot?.kind.rawValue ?? "Tool diff")
+                }
+            }
+            .padding(.top, 6)
+        } label: {
+            HStack(spacing: 8) {
+                Text(heading)
+                    .font(.system(.caption, design: .monospaced).weight(.semibold))
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                Text(status)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            Color.black.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            Self.semanticId("mobile-bot-tool-result-\(entry.toolCallId ?? entry.id)")
+        )
     }
 
     @MainActor
