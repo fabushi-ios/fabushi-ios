@@ -1092,7 +1092,7 @@ impl CodexAgentInner {
                             "name": plugin.name,
                             "displayName": display_name,
                             "description": description,
-                            "marketplace": marketplace.name,
+                            "marketplace": marketplace.name.clone(),
                             "installed": plugin.installed,
                             "enabled": plugin.enabled,
                             "keywords": plugin.keywords,
@@ -1105,7 +1105,8 @@ impl CodexAgentInner {
                         break;
                     }
                 }
-                Ok(json!({"plugins": plugins, "truncated": plugins.len() >= 30}))
+                let truncated = plugins.len() >= 30;
+                Ok(json!({"plugins": plugins, "truncated": truncated}))
             }
             "get_plugin" => {
                 let Some(token) = required_string_argument(&params.arguments, "pluginId") else {
