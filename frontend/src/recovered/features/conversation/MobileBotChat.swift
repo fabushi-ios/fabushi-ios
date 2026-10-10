@@ -739,9 +739,16 @@ internal func mobileEditorSuggestionRows(
     case "#":
         source = prReferences
     case ":":
+        let recentEmojiIds = recentKeys.compactMap { key -> String? in
+            let prefix = "emoji:"
+            guard key.hasPrefix(prefix) else { return nil }
+            let id = String(key.dropFirst(prefix.count))
+            return id.isEmpty ? nil : id
+        }
         return mobileReactionPickerResults(
             query: context.query,
-            category: .all
+            category: .all,
+            recentIds: recentEmojiIds
         ).map {
             .init(
                 id: $0.id,
