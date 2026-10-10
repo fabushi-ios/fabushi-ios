@@ -2,6 +2,20 @@ import XCTest
 @testable import Fabushi
 
 final class MobileComposerParityTests: XCTestCase {
+    func testConversationHeaderSuppressesComputerForGroups() {
+        let agent = MobileBotSummary(id: "agent", name: "Agent", description: "")
+        XCTAssertTrue(MobileConversationHeaderControlPolicy.project(agent: agent).showsComputer)
+
+        let group = MobileBotSummary(
+            id: "group",
+            name: "Group",
+            description: "",
+            isGroup: true,
+            memberIds: ["a", "b"]
+        )
+        XCTAssertFalse(MobileConversationHeaderControlPolicy.project(agent: group).showsComputer)
+    }
+
     private let attachment = MobileComposerAttachment(
         id: "abc123",
         name: "notes.txt",

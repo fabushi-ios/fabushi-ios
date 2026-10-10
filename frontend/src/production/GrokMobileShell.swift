@@ -513,6 +513,11 @@ internal struct GrokMobileShell: View {
                 self.botSettingsRoutineID = nil
                 self.botSettingsTarget = self.bots.first(where: { $0.id == bot.id }) ?? bot
             },
+            onOpenComputer: {
+                guard !bot.isGroup else { return }
+                self.remoteComputerAgentTarget =
+                    self.bots.first(where: { $0.id == bot.id }) ?? bot
+            },
             onOpenAutomation: { automationId in
                 self.botSettingsRoutineID = automationId
                 self.botSettingsTarget = self.bots.first(where: { $0.id == bot.id }) ?? bot

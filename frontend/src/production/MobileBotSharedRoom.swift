@@ -43,11 +43,17 @@ internal enum MobileBotSharedRoomActionPolicy {
     }
 }
 
+internal enum MobileBotSharedRoomTriggerPresentation {
+    case settings
+    case header
+}
+
 internal struct MobileBotSharedRoomTrigger: View {
     let agent: MobileBotSummary
     let roster: [MobileBotSummary]
     let bridge: IOSPreloadBridge
     let accountScopeKey: String
+    var presentation: MobileBotSharedRoomTriggerPresentation = .settings
 
     @State private var state: GrokMobileSharedRoomModel.SharingState?
     @State private var opened = false
@@ -65,23 +71,53 @@ internal struct MobileBotSharedRoomTrigger: View {
             if let snapshot,
                snapshot.state.isEnabled,
                snapshot.room != nil {
-                Section("共享房间") {
+                if presentation == .header {
                     Button {
                         opened = true
                     } label: {
-                        HStack {
-                            Label("管理共享房间", systemImage: "person.2")
-                            Spacer()
-                            if !snapshot.requests.isEmpty {
-                                Text("\(snapshot.requests.count)")
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(.red.opacity(0.14), in: Capsule())
+                        Image(systemName: "person.2")
+                            .font(.system(size: 16, weight: .medium))
+                            .frame(width: 38, height: 38)
+                            .background(Color.black.opacity(0.045), in: Circle())
+                            .overlay(alignment: .topTrailing) {
+                                if !snapshot.requests.isEmpty {
+                                    Text("\(min(snapshot.requests.count, 99))")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .background(.red, in: Capsule())
+                                        .offset(x: 4, y: -3)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Shared room")
+                    .accessibilityValue(
+                        snapshot.requests.isEmpty
+                            ? "No pending join requests"
+                            : "\(snapshot.requests.count) pending join requests"
+                    )
+                    .accessibilityIdentifier("mobile-bot-shared-room")
+                } else {
+                    Section("共享房间") {
+                        Button {
+                            opened = true
+                        } label: {
+                            HStack {
+                                Label("管理共享房间", systemImage: "person.2")
+                                Spacer()
+                                if !snapshot.requests.isEmpty {
+                                    Text("\(snapshot.requests.count)")
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 3)
+                                        .background(.red.opacity(0.14), in: Capsule())
+                                }
                             }
                         }
+                        .accessibilityIdentifier("mobile-shared-room-open")
                     }
-                    .accessibilityIdentifier("mobile-shared-room-open")
                 }
             }
         }

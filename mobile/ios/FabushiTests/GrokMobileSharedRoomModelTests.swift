@@ -256,4 +256,15 @@ final class GrokMobileSharedRoomModelTests: XCTestCase {
         )
     }
 
+    func testHeaderPresentationUsesSameSharedRoomLifecycleOwner() {
+        XCTAssertEqual(
+            String(describing: MobileBotSharedRoomTriggerPresentation.header),
+            "header"
+        )
+        XCTAssertEqual(
+            String(describing: MobileBotSharedRoomTriggerPresentation.settings),
+            "settings"
+        )
+    }
+
 }

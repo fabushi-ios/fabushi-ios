@@ -1974,6 +1974,14 @@ internal func mobileComposerAttachmentCommandPayload(
     return payload
 }
 
+internal struct MobileConversationHeaderControlPolicy: Equatable {
+    let showsComputer: Bool
+
+    static func project(agent: MobileBotSummary) -> Self {
+        .init(showsComputer: !agent.isGroup)
+    }
+}
+
 internal struct MobileBotChat: View {
     @Environment(\.scenePhase) private var scenePhase
     let bot: MobileBotSummary
@@ -1987,6 +1995,7 @@ internal struct MobileBotChat: View {
     let focusPromptGeneration: Int
     let onClose: () -> Void
     let onOpenSettings: () -> Void
+    let onOpenComputer: () -> Void
     let onOpenAutomation: (String) -> Void
 
     @Binding var draft: String
@@ -2381,6 +2390,27 @@ internal struct MobileBotChat: View {
             .accessibilityValue(mobileConversationHeaderStatus(bot) ?? "")
             .accessibilityIdentifier("mobile-bot-settings")
             Spacer()
+
+            MobileBotSharedRoomTrigger(
+                agent: bot,
+                roster: availableBots,
+                bridge: bridge,
+                accountScopeKey: model.settingsNoticeAccountKey,
+                presentation: .header
+            )
+
+            if MobileConversationHeaderControlPolicy.project(agent: bot).showsComputer {
+                Button(action: onOpenComputer) {
+                    Image(systemName: "desktopcomputer")
+                        .font(.system(size: 16, weight: .medium))
+                        .frame(width: 38, height: 38)
+                        .background(Color.black.opacity(0.045), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Computer")
+                .accessibilityIdentifier("mobile-bot-computer")
+            }
+
             Button {
                 openFind()
             } label: {
@@ -3417,6 +3447,11 @@ internal struct MobileBotChat: View {
             "mobile-bot-async-tasks": .init(allowed: ["invoke"]) { _ in asyncTasksPresented = true },
             "mobile-bot-draft": .init(allowed: ["setValue"]) { value in draft = value ?? "" },
         ]
+        if MobileConversationHeaderControlPolicy.project(agent: bot).showsComputer {
+            let computerId = "mobile-bot-computer"
+            elements.append(.init(agentId: computerId, role: "button", name: "Computer"))
+            actions[computerId] = .init(allowed: ["invoke"]) { _ in onOpenComputer() }
+        }
         actions[sendId] = .init(allowed: ["invoke"]) { _ in
             if busy { Task { await stop() } } else { Task { await send() } }
         }

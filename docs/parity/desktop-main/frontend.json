@@ -2824,11 +2824,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "MobileBotChat.chatHeader already owns back/settings, ClothGhostAvatar, bot name/activity and async-task access. Desktop computer-control/shared-room/group-specific header affordances are not all composed into this native header yet.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat.chatHeader is the shipping native header and uses the canonical bot/settings/task owners.",
-      "test_evidence": "Current mobile chat UI tests cover protected header selectors; focused computer/shared-room/group header parity remains open.",
-      "notes": "IOS-MAIN-DEP-CHAT-HEADER-20261009: exact Desktop chat-header.tsx reviewed.",
+      "ios_platform_delta": "MobileBotChat.chatHeader is the single native conversation header. It composes MobileAgentAvatar identity/status/settings with native trailing find/outline/async-task controls, reuses MobileBotSharedRoomTrigger in compact header presentation for the canonical sharing.state/sheet lifecycle, and routes non-group Computer directly through GrokMobileShell.remoteComputerAgentTarget to the existing RemoteComputerSurface. Group conversations suppress Computer exactly as Desktop; browser-specific header layout is adapted to iOS controls.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (chatHeader, MobileConversationHeaderControlPolicy, App-Agent computer action); frontend/src/production/MobileBotSharedRoom.swift (same MobileBotSharedRoomTrigger lifecycle with .header presentation); frontend/src/production/GrokMobileShell.swift (onOpenComputer -> existing remoteComputerAgentTarget -> RemoteComputerSurface).",
+      "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers group-specific Computer suppression; mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift covers sharing-state projection/fencing/action policy and header/settings presentation enum. Current exact-head ordinary/protected Actions remain required before verified.",
+      "notes": "IOS-MAIN-DEP-CHAT-HEADER-20261011: shared-room and Computer controls now use their pre-existing canonical owners from the shipping header; no duplicate sharing or remote-computer runtime was introduced. Keep below verified pending exact-head CI/protected evidence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
