@@ -8479,7 +8479,24 @@ impl FeatureHostController {
                 self.active_account_root(self.workflow_root_path.as_deref());
             let memory_prompt = account_memory_root
                 .as_deref()
-                .map(|root| render_memory_system_prompt(&root.join(&member.id).join("memory")))
+                .map(|root| {
+                    let names = state
+                        .bots
+                        .iter()
+                        .map(|(id, bot)| (id.clone(), bot.name.clone()))
+                        .collect::<BTreeMap<_, _>>();
+                    let shared = crate::shared_memory::render_shared_memory_prompt(
+                        root,
+                        &member.id,
+                        &names,
+                    );
+                    let own = render_memory_system_prompt(&root.join(&member.id).join("memory"));
+                    [shared, own]
+                        .into_iter()
+                        .filter(|section| !section.is_empty())
+                        .collect::<Vec<_>>()
+                        .join("\n\n")
+                })
                 .unwrap_or_default();
             let workflow_catalog = match (
                 account_workflow_root.as_deref(),
@@ -10142,17 +10159,34 @@ impl FeatureHostController {
             );
         }
         if is_safe_memory_agent_id(memory_agent_id) {
-            if let Ok(memory_dir) = self.memory_dir_for_agent(memory_agent_id) {
-                let memory_prompt = render_memory_system_prompt(&memory_dir);
+            let account_memory_root = self.active_account_root(self.memory_root_path.as_deref());
+            if let Some(account_memory_root) = account_memory_root.as_deref() {
+                let names = self
+                    .state()?
+                    .bots
+                    .iter()
+                    .map(|(id, bot)| (id.clone(), bot.name.clone()))
+                    .collect::<BTreeMap<_, _>>();
+                let shared_memory_prompt = crate::shared_memory::render_shared_memory_prompt(
+                    account_memory_root,
+                    memory_agent_id,
+                    &names,
+                );
+                let own_memory_prompt =
+                    render_memory_system_prompt(&account_memory_root.join(memory_agent_id).join("memory"));
+                let memory_prompt = [shared_memory_prompt, own_memory_prompt]
+                    .into_iter()
+                    .filter(|section| !section.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
                 if !memory_prompt.is_empty() {
                     runtime_text = format!(
-                        "[Persistent agent memory]\n{memory_prompt}\n\n[Current turn]\n{runtime_text}"
+                        "[Persistent memory]\n{memory_prompt}\n\n[Current turn]\n{runtime_text}"
                     );
                 }
             }
             let account_workflow_root =
                 self.active_account_root(self.workflow_root_path.as_deref());
-            let account_memory_root = self.active_account_root(self.memory_root_path.as_deref());
             if let (Some(workflow_root), Some(agent_root)) = (
                 account_workflow_root.as_deref(),
                 account_memory_root.as_deref(),
