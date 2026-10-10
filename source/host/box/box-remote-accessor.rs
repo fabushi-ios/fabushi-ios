@@ -222,6 +222,9 @@ pub enum BoxRemoteExecError<ClientError> {
         stack_trace: Option<String>,
         error_code: Option<String>,
     },
+    Protocol {
+        message: String,
+    },
 }
 
 pub struct BoxRemoteExecManager<Client> {
@@ -256,33 +259,74 @@ impl<Client> BoxRemoteExecManager<Client> {
     where
         Client: BoxRemoteExecClient<Context, ServerMessage, ClientMessage>,
     {
-        let request = serialize(self.take_id());
+        let request_id = self.take_id();
+        let request = serialize(request_id);
         let envelopes = self
             .client
             .exec(context, request)
             .await
             .map_err(BoxRemoteExecError::Client)?;
         let mut messages = Vec::new();
+        let mut stream_closed = false;
         for envelope in envelopes {
+            if stream_closed {
+                return Err(BoxRemoteExecError::Protocol {
+                    message: format!(
+                        "remote exec {request_id} produced an envelope after stream close"
+                    ),
+                });
+            }
             match envelope {
                 BoxRemoteExecEnvelope::ExecClientMessage(message) => {
                     messages.push(message);
                 }
                 BoxRemoteExecEnvelope::ExecClientControlMessage(
                     BoxRemoteExecControlMessage::Throw {
+                        id,
                         error,
                         stack_trace,
                         error_code,
-                        ..
                     },
                 ) => {
+                    if id.is_some_and(|id| id != request_id) {
+                        return Err(BoxRemoteExecError::Protocol {
+                            message: format!(
+                                "remote exec throw id did not match request {request_id}"
+                            ),
+                        });
+                    }
                     return Err(BoxRemoteExecError::RemoteThrow {
                         message: error,
                         stack_trace,
                         error_code,
                     });
                 }
-                BoxRemoteExecEnvelope::ExecClientControlMessage(_)
+                BoxRemoteExecEnvelope::ExecClientControlMessage(
+                    BoxRemoteExecControlMessage::Heartbeat { id },
+                ) => {
+                    if id != request_id {
+                        return Err(BoxRemoteExecError::Protocol {
+                            message: format!(
+                                "remote exec heartbeat id {id} did not match request {request_id}"
+                            ),
+                        });
+                    }
+                }
+                BoxRemoteExecEnvelope::ExecClientControlMessage(
+                    BoxRemoteExecControlMessage::StreamClose { id },
+                ) => {
+                    if id != request_id {
+                        return Err(BoxRemoteExecError::Protocol {
+                            message: format!(
+                                "remote exec close id {id} did not match request {request_id}"
+                            ),
+                        });
+                    }
+                    stream_closed = true;
+                }
+                BoxRemoteExecEnvelope::ExecClientControlMessage(
+                    BoxRemoteExecControlMessage::Empty,
+                )
                 | BoxRemoteExecEnvelope::Empty => {}
             }
         }
@@ -386,6 +430,53 @@ mod tests {
         assert_eq!(*manager.next_id.lock().unwrap(), 2);
     }
 
+    struct InvalidControlClient {
+        envelopes: Vec<BoxRemoteExecEnvelope<&'static str>>,
+    }
+
+    impl BoxRemoteExecClient<(), u64, &'static str> for InvalidControlClient {
+        type Error = ();
+
+        async fn exec(
+            &self,
+            _context: &(),
+            _request: u64,
+        ) -> Result<Vec<BoxRemoteExecEnvelope<&'static str>>, Self::Error> {
+            Ok(self.envelopes.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn remote_exec_rejects_control_identity_mismatch() {
+        let manager = BoxRemoteExecManager::new(InvalidControlClient {
+            envelopes: vec![BoxRemoteExecEnvelope::ExecClientControlMessage(
+                BoxRemoteExecControlMessage::Heartbeat { id: 7 },
+            )],
+        });
+        assert!(matches!(
+            manager.create_exec_instance(&(), |id| id).await,
+            Err(BoxRemoteExecError::Protocol { message })
+                if message.contains("heartbeat id 7")
+        ));
+    }
+
+    #[tokio::test]
+    async fn remote_exec_rejects_messages_after_stream_close() {
+        let manager = BoxRemoteExecManager::new(InvalidControlClient {
+            envelopes: vec![
+                BoxRemoteExecEnvelope::ExecClientControlMessage(
+                    BoxRemoteExecControlMessage::StreamClose { id: 0 },
+                ),
+                BoxRemoteExecEnvelope::ExecClientMessage("late"),
+            ],
+        });
+        assert!(matches!(
+            manager.create_exec_instance(&(), |id| id).await,
+            Err(BoxRemoteExecError::Protocol { message })
+                if message.contains("after stream close")
+        ));
+    }
+
     struct ThrowingClient;
 
     impl BoxRemoteExecClient<(), (), ()> for ThrowingClient {
@@ -399,7 +490,7 @@ mod tests {
             Ok(vec![
                 BoxRemoteExecEnvelope::ExecClientControlMessage(
                     BoxRemoteExecControlMessage::Throw {
-                        id: Some(1),
+                        id: Some(0),
                         error: "remote boom".into(),
                         stack_trace: Some("stack".into()),
                         error_code: Some("REMOTE".into()),
