@@ -2808,11 +2808,11 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/agent-info/ClothGhostAvatar.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "ClothGhostAvatar is the single native animated avatar owner with deterministic bot color, activity animation, reduced-motion handling and badge support. Exact Desktop data-URL precedence, group/shared-room composition and the full persona activity-state/shape palette are not yet represented.",
-      "implementation_status": "mapped",
-      "production_evidence": "ClothGhostAvatar is mounted by MobileBotChat header/transcript and preserves one native avatar owner; no duplicate avatar system introduced.",
-      "test_evidence": "Existing native avatar/UI coverage proves the shipping owner; focused data/group/shared-room/activity parity remains required.",
-      "notes": "IOS-MAIN-DEP-AGENT-AVATAR-20261009: exact Desktop agent-avatar.tsx reviewed; partial native replacement, not complete parity.",
+      "ios_platform_delta": "MobileAgentAvatar is the single native Agent identity leaf. It preserves Desktop dispatcher precedence (validated data URL -> shared room -> group -> persona), deterministic persona shape/color, roster-driven activity state, member stack/+N, native reduced-motion animation and status badge. Browser pointer-follow/spin/emphasis controls are platform-replaced by native activity/reduce-motion presentation rather than creating a second avatar runtime.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/agent-info/ClothGhostAvatar.swift (MobileAgentAvatar, mobileAgentAvatarKind, mobileResolvePersonaColor/mobileResolvePersonaShape, groupAvatar, personaAvatar); shipping frontend/src/recovered/features/conversation/MobileBotChat.swift mounts MobileAgentAvatar in header, empty state, thinking and assistant transcript rows; canonical GrokMobileBotService roster projection supplies avatar data/shape/color/shared-room/group/activity state.",
+      "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift covers dispatcher precedence and deterministic fallbacks, Desktop activity-state priority, and roster/Mini App merge preservation; current exact-head ordinary/protected Actions remain required before verified promotion.",
+      "notes": "IOS-MAIN-DEP-AGENT-AVATAR-20261011: current Desktop Agent-avatar user-visible responsibility is implemented in the native shipping owner. Web-only pointer-follow/spin/emphasis mechanics are replaced by native activity/reduce-motion animation. Keep below verified until exact-head CI/protected evidence succeeds.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
