@@ -1846,6 +1846,7 @@ internal struct MobileBotChat: View {
     let messaging: MessagingModel
     let appAgentSurface: FabushiAppAgentSurface
     let reconnectGeneration: Int
+    let suggestionTransportConnected: Bool
     let focusPromptGeneration: Int
     let onClose: () -> Void
     let onOpenSettings: () -> Void
@@ -2641,6 +2642,7 @@ internal struct MobileBotChat: View {
             model.mcpBackendAccountKey,
             bot.id,
             String(reconnectGeneration),
+            String(suggestionTransportConnected),
         ].joined(separator: "|")
     }
 
@@ -2890,10 +2892,17 @@ internal struct MobileBotChat: View {
         let ownedMcpAccount = model.mcpBackendAccountKey
         let ownedAgent = bot.id
         let ownedReconnect = reconnectGeneration
-        guard !ownedAccount.isEmpty, !ownedAgent.isEmpty else {
+        guard suggestionTransportConnected,
+              !ownedAccount.isEmpty,
+              !ownedAgent.isEmpty
+        else {
+            // Match Desktop's transport subscription: any non-connected state
+            // immediately makes the provider unavailable without discarding
+            // already-selected durable composer references.
             editorSuggestionStatus = .unavailable
             editorSuggestionWorkflows = []
             editorSuggestionMcpReferences = []
+            editorSuggestionActiveIndex = nil
             return
         }
 
@@ -2921,6 +2930,7 @@ internal struct MobileBotChat: View {
                     && event["agentId"] as? String == ownedAgent
             }
             guard generation == editorSuggestionGeneration,
+                  suggestionTransportConnected,
                   model.settingsNoticeAccountKey == ownedAccount,
                   bot.id == ownedAgent,
                   reconnectGeneration == ownedReconnect,
@@ -2934,6 +2944,7 @@ internal struct MobileBotChat: View {
             sourceFailed = true
         } catch {
             guard generation == editorSuggestionGeneration,
+                  suggestionTransportConnected,
                   model.settingsNoticeAccountKey == ownedAccount,
                   bot.id == ownedAgent,
                   reconnectGeneration == ownedReconnect
@@ -2945,6 +2956,7 @@ internal struct MobileBotChat: View {
         do {
             let snapshot = try await model.refreshMcpReferenceSnapshot()
             guard generation == editorSuggestionGeneration,
+                  suggestionTransportConnected,
                   model.settingsNoticeAccountKey == ownedAccount,
                   bot.id == ownedAgent,
                   reconnectGeneration == ownedReconnect
@@ -2966,6 +2978,7 @@ internal struct MobileBotChat: View {
             sourceFailed = true
         } catch {
             guard generation == editorSuggestionGeneration,
+                  suggestionTransportConnected,
                   model.settingsNoticeAccountKey == ownedAccount,
                   bot.id == ownedAgent,
                   reconnectGeneration == ownedReconnect
