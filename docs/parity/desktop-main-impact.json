@@ -3651,6 +3651,66 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-shared-room-implemented-pending-exact-head-ci",
         "finding": "Shipping Agent Settings uses MobileBotSharedRoomTrigger as the native replacement. The management entry is rendered only when Host-projected sharing is enabled and the selected Agent resolves to a real room, and it exposes the room-scoped pending join-request count before opening the management sheet. No local room is fabricated. Current exact-head UI/protected evidence is pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "Current-main routine lifecycle maps to shipping MobileBotRoutinesController over IOSPreloadBridge/feature.execute and the canonical Host automation owner. Loading/empty/failed/unavailable projection, per-routine mutation/run pending state, refresh request fencing, generation reset and malformed payload fail-closed behavior are implemented; exact-head CI remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/run-history-clock.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "Desktop's lazy agents-now-tick clock maps to MobileBotRoutineRunHistoryClock: one 30-second timer exists only while subscribed, effective timezone is override??etected??TC, timezone changes publish immediately, and teardown stops the timer. Focused XCTest covers timer start/stop, timezone and dispose behavior; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/run-history-provider.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "Run history remains embedded in canonical automation snapshots with no invented history RPC. MobileBotRoutineRunHistoryProvider scopes projection to account/Agent/routine, refreshes on reconnect, fences generation/request completion, resets the controller on owner changes, and the shipping section now unsubscribes rather than permanently disposing the provider on transient SwiftUI disappearance so reappearance can resume the same owner. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/run-history.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "MobileBotRoutineRunHistoryModel preserves running/ok/error status semantics, detail/event title precedence, relative/day/week/year timestamp labels and timezone projection. The shipping SwiftUI surface now renders the full Desktop run list instead of truncating to five rows; focused XCTest covers presentation and non-truncation. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/schedule-editor.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "The native Routine editor is a SwiftUI replacement over the same canonical trigger state: 15-minute schedule choices, editable custom schedule, 1-8 trigger bound, validation before save and native cancel/save behavior are wired to the shipping automation owner. Browser-only DOM/focus mechanics are replaced natively; exact-head Swift/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/schedule.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "Desktop schedule normalization/cron aliases/@every/timezone validation maps to source/shared/automation-schedule.swift and MobileBotRoutineSchedule. The shipping editor consumes the same parser/validator and 96 quarter-hour choices; focused tests cover accepted and rejected forms. Exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/trigger-draft-controller.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "MobileBotRoutineTriggerDraftController is the native staged trigger owner with an eight-row cap, raw draft versus last-valid state, pending mutation fencing, invalid custom schedule rejection, close-time revert/focus-return state and dispose generation fencing. It serializes only through canonical trigger validation; exact-head focused test evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/trigger-schema.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "source/shared/automations.swift carries the native canonical trigger schema for schedule, Slack, GitHub, Microsoft Teams, Linear, Sentry and PagerDuty, including group/listener wire projection, GitHub repo/branch and allowlist validation, emoji normalization, integration filters and fail-closed decode. No second automation protocol owner is introduced; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "Desktop CSS carries presentation only. Shipping SwiftUI Section/Form/Toggle/Button/Menu/ProgressView replaces browser layout and disabled/loading/error states without adding a runtime owner; product state remains in MobileBotRoutinesController and Host. Native accessibility/device evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/automations/routines/view.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-routines-implemented-pending-exact-head-ci",
+        "finding": "MobileBotRoutinesSection is reachable from shipping MobileBotAgentSettings and uses the real IOSPreloadBridge??ost automation command path for list/create/update/enable/delete/run-now. Current-main review found and repaired enabled-first list ordering, full run-history visibility and transient-disappear resubscription semantics; focused XCTest was added, while exact-head unit/UI/protected evidence is still pending."
       }
     ]
   },

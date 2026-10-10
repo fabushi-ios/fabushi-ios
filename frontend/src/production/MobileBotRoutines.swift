@@ -879,6 +879,16 @@ internal enum MobileBotRoutinesModel {
         return snapshot.value.first { $0.id == automationId }
     }
 
+    static func orderedForList(_ routines: [MobileBotRoutine]) -> [MobileBotRoutine] {
+        routines.enumerated()
+            .sorted { left, right in
+                if left.element.isEnabled != right.element.isEnabled {
+                    return left.element.isEnabled && !right.element.isEnabled
+                }
+                return left.offset < right.offset
+            }
+            .map(\.element)
+    }
     static func parseAutomation(_ row: [String: Any]) -> MobileBotRoutine? {
         guard let id = nonEmptyString(row["id"]),
               let agentId = nonEmptyString(row["agentId"]),
@@ -1599,7 +1609,6 @@ internal struct MobileBotRoutinesSection: View {
         .onDisappear {
             runHistoryProviderStop?()
             runHistoryProviderStop = nil
-            runHistoryProvider.dispose()
             controller.reset()
         }
     }
@@ -1619,7 +1628,7 @@ internal struct MobileBotRoutinesSection: View {
 
     @ViewBuilder
     private func routines(_ routines: [MobileBotRoutine]) -> some View {
-        ForEach(routines) { routine in
+        ForEach(MobileBotRoutinesModel.orderedForList(routines)) { routine in
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -1878,7 +1887,7 @@ internal struct MobileBotRoutineInlineRunHistory: View {
 
     var body: some View {
         let _ = revision
-        let state = visibleState(snapshot)
+        let state = Self.visibleState(snapshot)
 
         VStack(alignment: .leading, spacing: 4) {
             Text("Run history")
@@ -1894,7 +1903,7 @@ internal struct MobileBotRoutineInlineRunHistory: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(state.rows.prefix(5)) { row in
+                ForEach(state.rows) { row in
                     HStack(spacing: 6) {
                         Text(row.timestampLabel)
                             .font(.caption2)
@@ -1914,7 +1923,7 @@ internal struct MobileBotRoutineInlineRunHistory: View {
         }
     }
 
-    private func visibleState(
+    static func visibleState(
         _ snapshot: MobileBotRoutineRunHistorySnapshot
     ) -> (rows: [MobileBotRoutineRunPresentation], loading: Bool, error: String?) {
         switch snapshot {

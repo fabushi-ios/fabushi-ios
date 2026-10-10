@@ -195,6 +195,24 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         )
     }
 
+    func testRoutineListOrdersEnabledBeforePausedAndKeepsPeerOrder() throws {
+        var paused = valid
+        paused["id"] = "paused"
+        paused["enabled"] = false
+        var enabledFirst = valid
+        enabledFirst["id"] = "enabled-first"
+        var enabledSecond = valid
+        enabledSecond["id"] = "enabled-second"
+        let routines = try [
+            MobileBotRoutinesModel.parseAutomation(paused),
+            MobileBotRoutinesModel.parseAutomation(enabledFirst),
+            MobileBotRoutinesModel.parseAutomation(enabledSecond),
+        ].map { try XCTUnwrap($0) }
+        XCTAssertEqual(
+            MobileBotRoutinesModel.orderedForList(routines).map(\.id),
+            ["enabled-first", "enabled-second", "paused"]
+        )
+    }
     func testCommandsStayOnCanonicalHostAutomationSurface() {
         let list = MobileBotRoutinesModel.commandList(
             agentId: "agent-1",
@@ -651,6 +669,67 @@ final class GrokMobileRoutinesControllerTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testRunHistoryProviderCanResumeAfterAllViewSubscribersLeave() {
+        let fake = FakeRoutinesController(snapshot: .ready([providerRoutine()]))
+        var clockStarts = 0
+        var clockStops = 0
+        let clock = MobileBotRoutineRunHistoryClock(
+            initialTimeZone: MobileBotRoutineTimeZoneState(
+                detectedTimeZone: "UTC",
+                overrideTimeZone: nil
+            ),
+            scheduler: { _, _, _ in
+                clockStarts += 1
+                return { clockStops += 1 }
+            }
+        )
+        let provider = MobileBotRoutineRunHistoryProvider(
+            controller: fake,
+            clock: clock,
+            initialScope: MobileBotRoutineRunHistoryScope(
+                accountKey: "account-a",
+                agentId: "agent-1",
+                automationId: "routine-1"
+            )
+        )
+        let stopFirst = provider.subscribe {}
+        stopFirst()
+        XCTAssertEqual(fake.subscriptions, 1)
+        XCTAssertEqual(fake.unsubscriptions, 1)
+        XCTAssertEqual(clockStarts, 1)
+        XCTAssertEqual(clockStops, 1)
+        let stopSecond = provider.subscribe {}
+        XCTAssertEqual(fake.subscriptions, 2)
+        XCTAssertEqual(clockStarts, 2)
+        stopSecond()
+        XCTAssertEqual(fake.unsubscriptions, 2)
+        XCTAssertEqual(clockStops, 2)
+    }
+    @MainActor
+    func testRunHistoryInlineSurfaceDoesNotTruncateDesktopRows() {
+        let scope = MobileBotRoutineRunHistoryScope(
+            accountKey: "account-a",
+            agentId: "agent-1",
+            automationId: "routine-1"
+        )
+        let rows = (0..<7).map { index in
+            MobileBotRoutineRunPresentation(
+                id: "run-\(index)",
+                title: nil,
+                timestampLabel: "\(index) min ago",
+                status: .ok,
+                accessibilityLabel: "Succeeded",
+                iconName: "check",
+                statusRole: false
+            )
+        }
+        let state = MobileBotRoutineInlineRunHistory.visibleState(
+            .ready(scope: scope, rows: rows, pending: false)
+        )
+        XCTAssertEqual(state.rows.map(\.id), rows.map(\.id))
+        XCTAssertEqual(state.rows.count, 7)
+    }
     @MainActor
     func testRunHistoryProviderDisposeUnsubscribesAndFencesNotifications() {
         let fake = FakeRoutinesController(snapshot: .ready([providerRoutine()]))
