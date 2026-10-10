@@ -20,4 +20,44 @@ final class VoiceRecorderParityTests: XCTestCase {
         XCTAssertEqual(VoiceRecorder.normalizedWaveformLevel(decibels: 0), 1, accuracy: 0.0001)
         XCTAssertEqual(VoiceRecorder.normalizedWaveformLevel(decibels: 4), 1, accuracy: 0.0001)
     }
+    @MainActor
+    func testWaveformHistoryUsesRealBoundedMeterSamples() {
+        var samples: [Double] = []
+        for index in 0..<40 {
+            samples = VoiceRecorder.appendingWaveformSample(
+                samples,
+                level: Double(index) / 20,
+                limit: 9
+            )
+        }
+        XCTAssertEqual(samples.count, 9)
+        XCTAssertTrue(samples.allSatisfy { $0 >= 0 && $0 <= 1 })
+        XCTAssertEqual(samples.last, 1, accuracy: 0.0001)
+    }
+
+    @MainActor
+    func testVoiceFailureCodesMatchDesktopUserFacingClasses() {
+        XCTAssertEqual(
+            VoiceRecorderErrorCode.microphonePermissionDenied.rawValue,
+            "MICROPHONE_PERMISSION_DENIED"
+        )
+        XCTAssertEqual(
+            VoiceRecorderErrorCode.audioDeviceUnavailable.rawValue,
+            "AUDIO_DEVICE_UNAVAILABLE"
+        )
+        XCTAssertEqual(
+            VoiceRecorderErrorCode.recordingError.rawValue,
+            "RECORDING_ERROR"
+        )
+        XCTAssertFalse(
+            VoiceRecorder.userMessage(for: .microphonePermissionDenied).isEmpty
+        )
+        XCTAssertFalse(
+            VoiceRecorder.userMessage(for: .audioDeviceUnavailable).isEmpty
+        )
+        XCTAssertFalse(
+            VoiceRecorder.userMessage(for: .recordingError).isEmpty
+        )
+    }
+
 }

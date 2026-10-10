@@ -2774,7 +2774,7 @@ internal struct MobileBotChat: View {
                     Circle().fill(Color.red).frame(width: 8, height: 8)
                     Text("正在录音 \(voiceRecorder.elapsedSeconds / 60):\(String(format: "%02d", voiceRecorder.elapsedSeconds % 60))")
                         .font(.caption.weight(.semibold))
-                    MobileVoiceWaveform(level: voiceRecorder.waveformLevel)
+                    MobileVoiceWaveform(samples: voiceRecorder.waveformSamples)
                         .frame(width: 58, height: 18)
                         .accessibilityHidden(true)
                 }
@@ -2793,21 +2793,25 @@ internal struct MobileBotChat: View {
     }
 
     private struct MobileVoiceWaveform: View {
-        let level: Double
+        let samples: [Double]
+
+        private var visibleSamples: [Double] {
+            let tail = Array(samples.suffix(9))
+            return Array(repeating: 0.08, count: max(0, 9 - tail.count)) + tail
+        }
 
         var body: some View {
             HStack(alignment: .center, spacing: 2) {
-                ForEach(0..<9, id: \.self) { index in
-                    let emphasis = 0.55 + Double((index * 7) % 5) * 0.11
+                ForEach(Array(visibleSamples.enumerated()), id: \.offset) { _, sample in
                     Capsule()
                         .fill(.secondary)
                         .frame(
                             width: 3,
-                            height: max(3, 16 * (0.18 + min(1, level) * emphasis))
+                            height: max(3, 16 * (0.18 + min(1, max(0, sample)) * 0.82))
                         )
                 }
             }
-            .animation(.easeOut(duration: 0.16), value: level)
+            .animation(.easeOut(duration: 0.16), value: samples)
         }
     }
 
@@ -5602,7 +5606,13 @@ internal struct MobileBotChat: View {
 
     @MainActor
     private func finishVoiceInput() async {
-        guard !busy, !transcribingVoice, let recording = voiceRecorder.stop() else { return }
+        guard !busy, !transcribingVoice else { return }
+        guard let recording = voiceRecorder.stop() else {
+            if let recorderError = voiceRecorder.errorMessage {
+                errorText = recorderError
+            }
+            return
+        }
         let generation = voiceInputGeneration
         let agentId = bot.id
         let accountKey = model.settingsNoticeAccountKey
