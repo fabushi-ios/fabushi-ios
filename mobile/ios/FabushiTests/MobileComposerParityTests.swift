@@ -397,6 +397,29 @@ final class MobileComposerParityTests: XCTestCase {
         )
     }
 
+    func testEditorSuggestionProviderFailsClosedOutsideConnectedScopedTransport() {
+        XCTAssertTrue(mobileEditorSuggestionProviderIsAvailable(
+            transportConnected: true,
+            accountKey: "account-a",
+            agentID: "agent-a"
+        ))
+        XCTAssertFalse(mobileEditorSuggestionProviderIsAvailable(
+            transportConnected: false,
+            accountKey: "account-a",
+            agentID: "agent-a"
+        ))
+        XCTAssertFalse(mobileEditorSuggestionProviderIsAvailable(
+            transportConnected: true,
+            accountKey: "",
+            agentID: "agent-a"
+        ))
+        XCTAssertFalse(mobileEditorSuggestionProviderIsAvailable(
+            transportConnected: true,
+            accountKey: "account-a",
+            agentID: ""
+        ))
+    }
+
     func testEditorEmojiSuggestionsUseRecordedRecency() throws {
         let first = try XCTUnwrap(mobileReactionCatalog.first)
         let second = try XCTUnwrap(mobileReactionCatalog.dropFirst().first)
