@@ -55,4 +55,66 @@ final class MobileAgentSidebarSectionsTests: XCTestCase {
             []
         )
     }
+    func testSidebarVisualProjectionMatchesDesktopStatusPriorityAndIdentity() {
+        let blocked = MobileBotSummary(
+            id: "blocked",
+            name: "Blocked",
+            description: "",
+            title: "  Reviewer  ",
+            unread: true,
+            isComposingMessage: true,
+            waitingReason: "Approval required",
+            isRunning: true
+        )
+        let blockedProjection = projectMobileSidebarAgentVisual(blocked, isPinned: true)
+        XCTAssertEqual(blockedProjection.statusBadge, .blocked)
+        XCTAssertEqual(blockedProjection.statusLabel, "Needs attention")
+        XCTAssertFalse(blockedProjection.isTyping)
+        XCTAssertFalse(blockedProjection.isWorking)
+        XCTAssertEqual(blockedProjection.title, "Reviewer")
+        XCTAssertTrue(blockedProjection.isPinned)
+        XCTAssertEqual(mobileBotHomeSubtitle(blocked), "Approval required")
+
+        let typing = MobileBotSummary(
+            id: "typing",
+            name: "Typing",
+            description: "",
+            unread: false,
+            isComposingMessage: true,
+            waitingReason: nil,
+            isRunning: false
+        )
+        let typingProjection = projectMobileSidebarAgentVisual(typing, isPinned: false)
+        XCTAssertEqual(typingProjection.statusBadge, .working)
+        XCTAssertEqual(typingProjection.statusLabel, "Working")
+        XCTAssertTrue(typingProjection.isTyping)
+        XCTAssertTrue(typingProjection.isWorking)
+        XCTAssertEqual(mobileBotHomeSubtitle(typing), "正在输入…")
+
+        let unread = MobileBotSummary(
+            id: "unread",
+            name: "Unread",
+            description: "",
+            unread: true,
+            isRunning: true
+        )
+        XCTAssertEqual(
+            projectMobileSidebarAgentVisual(unread, isPinned: false).statusBadge,
+            .unread,
+            "Unread marker must win over the working presence marker"
+        )
+
+        let group = MobileBotSummary(
+            id: "group",
+            name: "Group",
+            description: "",
+            title: "must-not-render",
+            isGroup: true
+        )
+        XCTAssertNil(projectMobileSidebarAgentVisual(group, isPinned: false).title)
+
+        let idle = MobileBotSummary(id: "idle", name: "Idle", description: "")
+        XCTAssertNil(projectMobileSidebarAgentVisual(idle, isPinned: false).statusBadge)
+    }
+
 }

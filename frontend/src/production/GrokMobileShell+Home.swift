@@ -175,13 +175,83 @@ internal func reduceMobileRootNotificationEvent(
     }
 }
 
+internal enum MobileSidebarAgentStatusBadge: Equatable, Sendable {
+    case working
+    case blocked
+    case unread
+}
+
+internal struct MobileSidebarAgentVisualProjection: Equatable, Sendable {
+    let isTyping: Bool
+    let isWorking: Bool
+    let statusBadge: MobileSidebarAgentStatusBadge?
+    let statusLabel: String?
+    let title: String?
+    let isPinned: Bool
+}
+
+internal func projectMobileSidebarAgentVisual(
+    _ bot: MobileBotSummary,
+    isPinned: Bool
+) -> MobileSidebarAgentVisualProjection {
+    let isBlocked = bot.waitingReason != nil
+    let isTyping = !isBlocked && bot.isComposingMessage
+    let isWorking = !isBlocked && (bot.isRunning || isTyping)
+    let statusBadge: MobileSidebarAgentStatusBadge?
+    let statusLabel: String?
+    if isBlocked {
+        statusBadge = .blocked
+        statusLabel = "Needs attention"
+    } else if bot.unread {
+        statusBadge = .unread
+        statusLabel = "Unread activity"
+    } else if isWorking {
+        statusBadge = .working
+        statusLabel = "Working"
+    } else {
+        statusBadge = nil
+        statusLabel = nil
+    }
+
+    let title: String?
+    if bot.isGroup {
+        title = nil
+    } else if let candidate = bot.title?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !candidate.isEmpty
+    {
+        title = candidate
+    } else {
+        title = nil
+    }
+
+    return .init(
+        isTyping: isTyping,
+        isWorking: isWorking,
+        statusBadge: statusBadge,
+        statusLabel: statusLabel,
+        title: title,
+        isPinned: isPinned
+    )
+}
+
+private func mobileSidebarAgentBadgeColor(
+    _ status: MobileSidebarAgentStatusBadge?
+) -> Color? {
+    switch status {
+    case .working: .green
+    case .blocked: .orange
+    case .unread: Color.accentColor
+    case nil: nil
+    }
+}
+
 internal func mobileBotHomeSubtitle(_ bot: MobileBotSummary) -> String {
-    if bot.isComposingMessage { return "正在输入…" }
     if let waitingReason = bot.waitingReason?.trimmingCharacters(in: .whitespacesAndNewlines),
        !waitingReason.isEmpty
     {
         return waitingReason
     }
+    if bot.isComposingMessage { return "正在输入…" }
     if let preview = bot.lastMessagePreview?.trimmingCharacters(in: .whitespacesAndNewlines),
        !preview.isEmpty
     {
@@ -700,10 +770,40 @@ extension GrokMobileShell {
                                 selectBotForConversation(bot)
                             } label: {
                                 HStack(spacing: 12) {
-                                    MobileAgentAvatar(bot: bot, size: 42, activeOverride: bot.isRunning, badge: .green)
-                                    Text(bot.name)
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
+                                    let projection = projectMobileSidebarAgentVisual(
+                                        bot,
+                                        isPinned: pinnedBotIds.contains(bot.id)
+                                    )
+                                    MobileAgentAvatar(
+                                        bot: bot,
+                                        size: 42,
+                                        activeOverride: projection.isWorking,
+                                        badge: mobileSidebarAgentBadgeColor(projection.statusBadge)
+                                    )
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 5) {
+                                            Text(bot.name)
+                                                .foregroundStyle(.primary)
+                                                .lineLimit(1)
+                                            if let title = projection.title {
+                                                Text(title)
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                            if projection.isPinned {
+                                                Image(systemName: "pin.fill")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.secondary)
+                                                    .accessibilityLabel("Pinned")
+                                            }
+                                        }
+                                        if let statusLabel = projection.statusLabel {
+                                            Text(statusLabel)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
                                     Spacer()
                                 }
                                 .contentShape(Rectangle())
@@ -839,7 +939,11 @@ extension GrokMobileShell {
     }
 
     func botRow(_ bot: MobileBotSummary, subtitle: String, badge: String) -> some View {
-        HStack(spacing: 0) {
+        let projection = projectMobileSidebarAgentVisual(
+            bot,
+            isPinned: pinnedBotIds.contains(bot.id)
+        )
+        return HStack(spacing: 0) {
             Button {
                 if bot.isGroup && !bot.isSharedRoom {
                     groupMembersTarget = bot
@@ -848,11 +952,38 @@ extension GrokMobileShell {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    MobileAgentAvatar(bot: bot, size: 47, activeOverride: bot.isRunning, badge: .green)
+                    MobileAgentAvatar(
+                        bot: bot,
+                        size: 47,
+                        activeOverride: projection.isWorking,
+                        badge: mobileSidebarAgentBadgeColor(projection.statusBadge)
+                    )
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 7) {
-                            Text(bot.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(.black)
-                            Text(badge).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 7).padding(.vertical, 3).background(Color.black.opacity(0.045), in: Capsule())
+                            Text(bot.name)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.black)
+                            if let title = projection.title {
+                                Text(title)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black.opacity(0.045), in: Capsule())
+                            } else {
+                                Text(badge)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black.opacity(0.045), in: Capsule())
+                            }
+                            if projection.isPinned {
+                                Image(systemName: "pin.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityLabel("Pinned")
+                            }
                         }
                         Text(subtitle)
                             .font(.system(size: 14))
@@ -860,11 +991,21 @@ extension GrokMobileShell {
                             .lineLimit(1)
                     }
                     Spacer()
-                    if bot.unread {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 8, height: 8)
-                            .accessibilityLabel("未读")
+                    if let status = projection.statusBadge {
+                        Group {
+                            switch status {
+                            case .blocked:
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundStyle(.orange)
+                            case .unread:
+                                Circle()
+                                    .fill(Color.accentColor)
+                                    .frame(width: 8, height: 8)
+                            case .working:
+                                EmptyView()
+                            }
+                        }
+                        .accessibilityLabel(projection.statusLabel ?? "")
                     }
                     if let updatedAtMs = bot.updatedAtMs, updatedAtMs > 0 {
                         Text(Date(timeIntervalSince1970: Double(updatedAtMs) / 1000), style: .relative)
@@ -877,6 +1018,8 @@ extension GrokMobileShell {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(bot.name)
+            .accessibilityValue(projection.statusLabel ?? "Idle")
             .accessibilityIdentifier(
                 bot.miniAppId.map { "grok-mobile-miniapp-bot-\($0)" }
                     ?? "grok-mobile-bot-\(bot.id)"
