@@ -8,6 +8,180 @@ enum MobileTranscriptLoadErrorCopy {
     static let retry = "Retry"
 }
 
+internal enum MobileReactionPickerCategory: String, CaseIterable, Identifiable {
+    case all = "All"
+    case people = "Smileys & People"
+    case nature = "Animals & Nature"
+    case food = "Food & Drink"
+    case activities = "Activities"
+    case travel = "Travel & Places"
+    case objects = "Objects"
+    case symbols = "Symbols"
+    case flags = "Flags"
+
+    var id: String { rawValue }
+}
+
+internal struct MobileReactionCatalogItem: Identifiable, Equatable {
+    let emoji: String
+    let name: String
+    let category: MobileReactionPickerCategory
+
+    var id: String { "\(category.rawValue):\(emoji)" }
+}
+
+private func mobileReactionCatalogItems(
+    _ category: MobileReactionPickerCategory,
+    _ rows: [(String, String)]
+) -> [MobileReactionCatalogItem] {
+    rows.map { MobileReactionCatalogItem(emoji: $0.0, name: $0.1, category: category) }
+}
+
+internal let mobileReactionCatalog: [MobileReactionCatalogItem] = [
+    mobileReactionCatalogItems(.people, [
+        ("😀", "grinning face"), ("😃", "smiling face"), ("😄", "smiling eyes"),
+        ("😁", "beaming face"), ("😆", "laughing face"), ("😅", "sweat smile"),
+        ("😂", "tears of joy"), ("🤣", "rolling laughing"), ("😊", "warm smile"),
+        ("😍", "heart eyes"), ("🥰", "smiling hearts"), ("😘", "kiss"),
+        ("😎", "cool sunglasses"), ("🤔", "thinking"), ("😮", "surprised"),
+        ("😢", "crying"), ("😭", "loud crying"), ("😡", "angry"),
+        ("👍", "thumbs up approve"), ("👎", "thumbs down disapprove"), ("👏", "clap"),
+        ("🙏", "folded hands thanks"), ("💪", "strong flex"), ("🤝", "handshake"),
+    ]),
+    mobileReactionCatalogItems(.nature, [
+        ("🐶", "dog"), ("🐱", "cat"), ("🐭", "mouse"), ("🐹", "hamster"),
+        ("🐰", "rabbit"), ("🦊", "fox"), ("🐻", "bear"), ("🐼", "panda"),
+        ("🐨", "koala"), ("🐯", "tiger"), ("🦁", "lion"), ("🐮", "cow"),
+        ("🐷", "pig"), ("🐸", "frog"), ("🐵", "monkey"), ("🐔", "chicken"),
+        ("🐧", "penguin"), ("🐦", "bird"), ("🦄", "unicorn"), ("🐝", "bee"),
+        ("🌸", "cherry blossom flower"), ("🌹", "rose flower"), ("🌻", "sunflower"),
+        ("🌈", "rainbow"),
+    ]),
+    mobileReactionCatalogItems(.food, [
+        ("🍎", "apple"), ("🍊", "orange"), ("🍋", "lemon"), ("🍌", "banana"),
+        ("🍉", "watermelon"), ("🍇", "grapes"), ("🍓", "strawberry"), ("🫐", "blueberries"),
+        ("🍒", "cherries"), ("🍑", "peach"), ("🥭", "mango"), ("🍍", "pineapple"),
+        ("🥑", "avocado"), ("🍕", "pizza"), ("🍔", "burger"), ("🍟", "fries"),
+        ("🌮", "taco"), ("🍣", "sushi"), ("🍜", "noodles"), ("🍰", "cake"),
+        ("🍪", "cookie"), ("☕️", "coffee"), ("🍵", "tea"), ("🥂", "cheers"),
+    ]),
+    mobileReactionCatalogItems(.activities, [
+        ("⚽️", "soccer football"), ("🏀", "basketball"), ("🏈", "american football"),
+        ("⚾️", "baseball"), ("🎾", "tennis"), ("🏐", "volleyball"), ("🏓", "ping pong"),
+        ("🏸", "badminton"), ("🥊", "boxing"), ("🏆", "trophy winner"), ("🥇", "gold medal"),
+        ("🎯", "target"), ("🎮", "game"), ("🎲", "dice"), ("🎸", "guitar"),
+        ("🎹", "piano"), ("🎤", "microphone"), ("🎧", "headphones"), ("🎨", "art"),
+        ("🎬", "movie"), ("📚", "books"), ("🧩", "puzzle"), ("🚴", "cycling"),
+        ("🏃", "running"),
+    ]),
+    mobileReactionCatalogItems(.travel, [
+        ("🚗", "car"), ("🚕", "taxi"), ("🚌", "bus"), ("🚎", "trolleybus"),
+        ("🏎️", "race car"), ("🚓", "police car"), ("🚑", "ambulance"), ("🚒", "fire engine"),
+        ("🚲", "bicycle"), ("✈️", "airplane"), ("🚀", "rocket"), ("🚁", "helicopter"),
+        ("🚂", "train"), ("🚇", "metro"), ("⛵️", "sailboat"), ("🚢", "ship"),
+        ("🏠", "home house"), ("🏢", "office"), ("🏖️", "beach"), ("🏔️", "mountain"),
+        ("🌋", "volcano"), ("🗺️", "map"), ("🌍", "earth world"), ("🌙", "moon"),
+    ]),
+    mobileReactionCatalogItems(.objects, [
+        ("⌚️", "watch"), ("📱", "phone"), ("💻", "laptop computer"), ("⌨️", "keyboard"),
+        ("🖥️", "desktop computer"), ("🖨️", "printer"), ("📷", "camera"), ("💡", "light bulb idea"),
+        ("🔦", "flashlight"), ("📕", "book"), ("✏️", "pencil"), ("📝", "memo note"),
+        ("📌", "pin"), ("📎", "paperclip"), ("🔒", "lock"), ("🔑", "key"),
+        ("🔨", "hammer"), ("🧰", "toolbox"), ("🧲", "magnet"), ("🧪", "test tube"),
+        ("🩺", "stethoscope"), ("💊", "medicine"), ("🎁", "gift"), ("💎", "gem"),
+    ]),
+    mobileReactionCatalogItems(.symbols, [
+        ("❤️", "red heart love"), ("🧡", "orange heart"), ("💛", "yellow heart"),
+        ("💚", "green heart"), ("💙", "blue heart"), ("💜", "purple heart"),
+        ("🖤", "black heart"), ("🤍", "white heart"), ("💔", "broken heart"),
+        ("💕", "two hearts"), ("💯", "hundred perfect"), ("💥", "boom"),
+        ("✨", "sparkles"), ("🔥", "fire"), ("⭐️", "star"), ("🎉", "party celebration"),
+        ("✅", "check correct"), ("❌", "cross wrong"), ("⚠️", "warning"),
+        ("❓", "question"), ("❗️", "exclamation"), ("➕", "plus"), ("➖", "minus"),
+        ("♻️", "recycle"),
+    ]),
+    mobileReactionCatalogItems(.flags, [
+        ("🏳️", "white flag"), ("🏴", "black flag"), ("🏁", "checkered flag"),
+        ("🚩", "red flag"), ("🇺🇸", "united states flag"), ("🇨🇳", "china flag"),
+        ("🇯🇵", "japan flag"), ("🇰🇷", "korea flag"), ("🇬🇧", "united kingdom flag"),
+        ("🇫🇷", "france flag"), ("🇩🇪", "germany flag"), ("🇮🇳", "india flag"),
+        ("🇨🇦", "canada flag"), ("🇦🇺", "australia flag"), ("🇧🇷", "brazil flag"),
+        ("🇸🇬", "singapore flag"),
+    ]),
+].flatMap { $0 }
+
+internal func mobileReactionPickerResults(
+    query: String,
+    category: MobileReactionPickerCategory,
+    limit: Int = 96
+) -> [MobileReactionCatalogItem] {
+    let boundedLimit = max(0, min(limit, 96))
+    guard boundedLimit > 0 else { return [] }
+    let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let tokens = normalized.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+    return mobileReactionCatalog.filter { item in
+        guard category == .all || item.category == category else { return false }
+        guard !tokens.isEmpty else { return true }
+        let haystack = "\(item.emoji) \(item.name) \(item.category.rawValue)".lowercased()
+        return tokens.allSatisfy { haystack.contains($0) }
+    }
+    .prefix(boundedLimit)
+    .map { $0 }
+}
+
+internal func isMobileReactionActionable(_ entry: MobileChatMessage) -> Bool {
+    guard entry.kind == .message,
+          !entry.streaming,
+          entry.optimisticDeliveryPhase == nil,
+          let canonicalId = entry.canonicalMessageId?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+          !canonicalId.isEmpty
+    else { return false }
+    return true
+}
+
+internal func mobileReactionPickerAccessibilityLabel(
+    _ item: MobileReactionCatalogItem,
+    reactedByCurrentUser: Bool
+) -> String {
+    reactedByCurrentUser
+        ? "\(item.name), \(item.emoji), reacted by you"
+        : "\(item.name), \(item.emoji), not reacted"
+}
+
+internal enum MobileReactionPickerMove: Equatable {
+    case left
+    case right
+    case up
+    case down
+    case first
+    case last
+}
+
+internal func mobileReactionPickerNextIndex(
+    current: Int?,
+    count: Int,
+    columns: Int,
+    move: MobileReactionPickerMove
+) -> Int? {
+    guard count > 0, columns > 0 else { return nil }
+    let index = min(max(current ?? 0, 0), count - 1)
+    switch move {
+    case .left:
+        return max(0, index - 1)
+    case .right:
+        return min(count - 1, index + 1)
+    case .up:
+        return max(0, index - columns)
+    case .down:
+        return min(count - 1, index + columns)
+    case .first:
+        return 0
+    case .last:
+        return count - 1
+    }
+}
+
 
 internal func isMobileBotVisibleAssistantCompletion(
     _ event: [String: Any],
@@ -675,6 +849,8 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerPresented = false
     @State private var reactionPickerTargetId: String?
     @State private var reactionPickerDraft = ""
+    @State private var reactionPickerSearch = ""
+    @State private var reactionPickerCategory: MobileReactionPickerCategory = .all
     @State private var approvalGeneration = 0
     @State private var transcriptBaselineGeneration = 0
     @State private var transcriptBaselineError: String?
@@ -698,6 +874,7 @@ internal struct MobileBotChat: View {
     @State private var forwardMessage: MobileChatMessage?
     @FocusState private var promptFocused: Bool
     @FocusState private var findFocused: Bool
+    @FocusState private var reactionPickerFocusedId: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -2401,10 +2578,11 @@ internal struct MobileBotChat: View {
     }
 
     private static let quickReactionEmojis = ["👍", "👎", "❤️", "😂", "🎉", "😮"]
+    private let reactionPickerColumnCount = 6
 
     @ViewBuilder
     private func reactionMenu(_ entry: MobileChatMessage) -> some View {
-        if entry.kind == .message, !entry.streaming {
+        if isMobileReactionActionable(entry) {
             Menu("React") {
                 ForEach(Self.quickReactionEmojis, id: \.self) { emoji in
                     Button(emoji) { toggleReaction(entry, emoji: emoji) }
@@ -2418,6 +2596,7 @@ internal struct MobileBotChat: View {
     @ViewBuilder
     private func reactionPills(_ entry: MobileChatMessage) -> some View {
         let pills = projectMobileReactionPills(entry.reactions)
+        let canToggle = isMobileReactionActionable(entry)
         if !pills.isEmpty {
             HStack(spacing: 5) {
                 ForEach(pills) { pill in
@@ -2438,14 +2617,17 @@ internal struct MobileBotChat: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(!canToggle)
                     .accessibilityLabel(
                         "\(pill.emoji), \(pill.count) reaction\(pill.count == 1 ? "" : "s")"
                             + (pill.chosenByMe ? ", selected by you" : "")
                     )
                     .accessibilityHint(
-                        pill.reactors.isEmpty
-                            ? "Toggle reaction"
-                            : "Reactors: \(pill.reactors.joined(separator: ", "))"
+                        canToggle
+                            ? (pill.reactors.isEmpty
+                                ? "Toggle reaction"
+                                : "Reactors: \(pill.reactors.joined(separator: ", "))")
+                            : "Reaction unavailable until this message is settled."
                     )
                     .accessibilityIdentifier(
                         Self.semanticId("mobile-bot-reaction-\(entry.id)-\(pill.emoji)")
@@ -2455,42 +2637,195 @@ internal struct MobileBotChat: View {
         }
     }
 
+    private var reactionPickerTarget: MobileChatMessage? {
+        guard let targetId = reactionPickerTargetId,
+              let entry = entries.first(where: { $0.id == targetId }),
+              isMobileReactionActionable(entry)
+        else { return nil }
+        return entry
+    }
+
+    private var reactionPickerResults: [MobileReactionCatalogItem] {
+        mobileReactionPickerResults(
+            query: reactionPickerSearch,
+            category: reactionPickerCategory
+        )
+    }
+
     private var reactionPickerSheet: some View {
         NavigationStack {
-            Form {
-                Section("Quick reactions") {
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible()), count: 3),
-                        spacing: 12
-                    ) {
-                        ForEach(Self.quickReactionEmojis, id: \.self) { emoji in
-                            Button(emoji) {
-                                reactionPickerDraft = emoji
-                                submitReactionPicker()
-                            }
-                            .font(.title2)
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Label("Category", systemImage: "square.grid.2x2")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Picker("Reaction category", selection: $reactionPickerCategory) {
+                        ForEach(MobileReactionPickerCategory.allCases) { category in
+                            Text(category.rawValue).tag(category)
                         }
                     }
-                    .padding(.vertical, 6)
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("mobile-bot-reaction-picker-category")
                 }
-                Section("Custom reaction") {
-                    TextField("Emoji", text: $reactionPickerDraft)
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+
+                Divider()
+
+                if reactionPickerResults.isEmpty {
+                    ContentUnavailableView.search(text: reactionPickerSearch)
+                        .accessibilityIdentifier("mobile-bot-reaction-picker-empty")
+                } else {
+                    ScrollView {
+                        LazyVGrid(
+                            columns: Array(
+                                repeating: GridItem(.flexible(minimum: 36), spacing: 8),
+                                count: reactionPickerColumnCount
+                            ),
+                            spacing: 8
+                        ) {
+                            ForEach(Array(reactionPickerResults.enumerated()), id: \.element.id) { index, item in
+                                let reacted = reactionPickerTarget?.myReactions.contains(item.emoji) == true
+                                Button {
+                                    submitReactionPicker(emoji: item.emoji)
+                                } label: {
+                                    ZStack(alignment: .topTrailing) {
+                                        Text(item.emoji)
+                                            .font(.title2)
+                                            .frame(maxWidth: .infinity, minHeight: 44)
+                                        if reacted {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.caption)
+                                                .symbolRenderingMode(.hierarchical)
+                                                .accessibilityHidden(true)
+                                        }
+                                    }
+                                    .padding(4)
+                                    .background(
+                                        reacted ? Color.accentColor.opacity(0.14) : Color.clear,
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .focused($reactionPickerFocusedId, equals: item.id)
+                                .accessibilityLabel(
+                                    mobileReactionPickerAccessibilityLabel(
+                                        item,
+                                        reactedByCurrentUser: reacted
+                                    )
+                                )
+                                .accessibilityValue(reacted ? "Selected" : "Not selected")
+                                .accessibilityHint(
+                                    reacted
+                                        ? "Activate to remove this reaction."
+                                        : "Activate to add this reaction."
+                                )
+                                .accessibilityIdentifier(
+                                    "mobile-bot-reaction-picker-item-\(index)"
+                                )
+                            }
+                        }
+                        .padding()
+                        .onKeyPress(phases: .down) { press in
+                            guard reactionPickerFocusedId != nil else { return .ignored }
+                            let move: MobileReactionPickerMove?
+                            switch press.key {
+                            case .leftArrow:
+                                move = .left
+                            case .rightArrow:
+                                move = .right
+                            case .upArrow:
+                                move = press.modifiers.contains(.command) ? .first : .up
+                            case .downArrow:
+                                move = press.modifiers.contains(.command) ? .last : .down
+                            default:
+                                move = nil
+                            }
+                            guard let move else { return .ignored }
+                            moveReactionPickerFocus(move)
+                            return .handled
+                        }
+                    }
+                    .accessibilityIdentifier("mobile-bot-reaction-picker-catalog")
+                }
+
+                Divider()
+
+                HStack(spacing: 8) {
+                    TextField("Custom emoji", text: $reactionPickerDraft)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         .accessibilityIdentifier("mobile-bot-reaction-picker-input")
+                    Button("Add") { submitReactionPicker() }
+                        .disabled(normalizeMobileReactionInput(reactionPickerDraft) == nil)
+                        .accessibilityIdentifier("mobile-bot-reaction-picker-custom-add")
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+
+                Text("Hardware keyboard: use arrow keys in the grid; ⌘↑ and ⌘↓ are the native first/last equivalents for Home/End.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                    .accessibilityIdentifier("mobile-bot-reaction-picker-keyboard-help")
             }
             .navigationTitle("React")
+            .searchable(
+                text: $reactionPickerSearch,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search reactions"
+            )
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { reactionPickerPresented = false }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { submitReactionPicker() }
-                        .disabled(normalizeMobileReactionInput(reactionPickerDraft) == nil)
-                }
+            }
+            .onAppear {
+                normalizeReactionPickerFocus()
+            }
+            .onChange(of: reactionPickerSearch) { _, _ in
+                normalizeReactionPickerFocus()
+            }
+            .onChange(of: reactionPickerCategory) { _, _ in
+                normalizeReactionPickerFocus()
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .accessibilityIdentifier("mobile-bot-reaction-picker")
+    }
+
+    @MainActor
+    private func normalizeReactionPickerFocus() {
+        let results = reactionPickerResults
+        guard !results.isEmpty else {
+            reactionPickerFocusedId = nil
+            return
+        }
+        if let current = reactionPickerFocusedId,
+           results.contains(where: { $0.id == current })
+        {
+            return
+        }
+        reactionPickerFocusedId = results[0].id
+    }
+
+    @MainActor
+    private func moveReactionPickerFocus(_ move: MobileReactionPickerMove) {
+        let results = reactionPickerResults
+        let currentIndex = reactionPickerFocusedId.flatMap { focusedId in
+            results.firstIndex(where: { $0.id == focusedId })
+        }
+        guard let next = mobileReactionPickerNextIndex(
+            current: currentIndex,
+            count: results.count,
+            columns: reactionPickerColumnCount,
+            move: move
+        ) else {
+            reactionPickerFocusedId = nil
+            return
+        }
+        reactionPickerFocusedId = results[next].id
     }
 
     @MainActor
@@ -2499,34 +2834,45 @@ internal struct MobileBotChat: View {
         reactionPickerPresented = false
         reactionPickerTargetId = nil
         reactionPickerDraft = ""
+        reactionPickerSearch = ""
+        reactionPickerCategory = .all
+        reactionPickerFocusedId = nil
     }
 
     @MainActor
     private func openReactionPicker(_ entry: MobileChatMessage) {
+        guard isMobileReactionActionable(entry) else { return }
         reactionPickerTargetId = entry.id
         reactionPickerDraft = ""
+        reactionPickerSearch = ""
+        reactionPickerCategory = .all
+        reactionPickerFocusedId = nil
         reactionPickerPresented = true
     }
 
     @MainActor
-    private func submitReactionPicker() {
+    private func submitReactionPicker(emoji rawEmoji: String? = nil) {
         guard let targetId = reactionPickerTargetId,
-              let emoji = normalizeMobileReactionInput(reactionPickerDraft),
-              let entry = entries.first(where: { $0.id == targetId })
+              let emoji = normalizeMobileReactionInput(rawEmoji ?? reactionPickerDraft),
+              let entry = entries.first(where: { $0.id == targetId }),
+              isMobileReactionActionable(entry)
         else { return }
         reactionPickerPresented = false
         reactionPickerTargetId = nil
         reactionPickerDraft = ""
+        reactionPickerSearch = ""
+        reactionPickerCategory = .all
+        reactionPickerFocusedId = nil
         toggleReaction(entry, emoji: emoji)
     }
 
     @MainActor
     private func toggleReaction(_ entry: MobileChatMessage, emoji rawEmoji: String) {
         guard let emoji = normalizeMobileReactionInput(rawEmoji),
-              entry.kind == .message, !entry.streaming,
-              let index = entries.firstIndex(where: { $0.id == entry.id })
+              let index = entries.firstIndex(where: { $0.id == entry.id }),
+              isMobileReactionActionable(entries[index]),
+              let entryId = entries[index].canonicalMessageId
         else { return }
-        let entryId = entry.canonicalMessageId ?? entry.id
         let had = entries[index].myReactions.contains(emoji)
         if had {
             entries[index].reactions.removeAll { $0.emoji == emoji && $0.by == "me" }
