@@ -53,7 +53,7 @@ final class RunnerParityTests: XCTestCase {
 
         _ = try await server.execute(.write(
             path: "/workspace/a.bin",
-            fileBytesBase64: "AQID",
+            fileBytes: "AQID",
             toolCallId: "tool-write"
         ))
         _ = try await server.execute(.redactedRead(
@@ -84,7 +84,7 @@ final class RunnerParityTests: XCTestCase {
         }
         XCTAssertEqual(writeRoot["case"], .string("writeArgs"))
         XCTAssertEqual(writeArgs["path"], .string("/workspace/a.bin"))
-        XCTAssertEqual(writeArgs["fileBytesBase64"], .string("AQID"))
+        XCTAssertEqual(writeArgs["fileBytes"], .string("AQID"))
         XCTAssertEqual(writeArgs["toolCallId"], .string("tool-write"))
 
         guard case .object(let readRoot) = params[1],
@@ -100,9 +100,9 @@ final class RunnerParityTests: XCTestCase {
             return XCTFail("expected typed stream payload")
         }
         XCTAssertEqual(streamRoot["case"], .string("shellStreamArgs"))
-        XCTAssertEqual(streamArgs["timeoutMs"], .number(5_000))
-        XCTAssertEqual(streamArgs["hardTimeoutMs"], .number(30_000))
-        XCTAssertEqual(streamArgs["timeoutBehavior"], .string("background"))
+        XCTAssertEqual(streamArgs["timeout"], .number(5_000))
+        XCTAssertEqual(streamArgs["hardTimeout"], .number(30_000))
+        XCTAssertEqual(streamArgs["timeoutBehavior"], .number(2))
         XCTAssertEqual(streamArgs["closeStdin"], .bool(false))
 
         guard case .object(let stdinRoot) = params[3],
