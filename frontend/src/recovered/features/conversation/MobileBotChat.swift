@@ -206,6 +206,16 @@ internal enum MobileEditorSuggestionMove: Equatable {
     case last
 }
 
+internal func mobileEditorSuggestionProviderIsAvailable(
+    transportConnected: Bool,
+    accountKey: String,
+    agentID: String
+) -> Bool {
+    transportConnected
+        && !accountKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && !agentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
 private func mobileEditorSuggestionNonEmpty(_ value: Any?) -> String? {
     guard let string = value as? String else { return nil }
     let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2892,10 +2902,11 @@ internal struct MobileBotChat: View {
         let ownedMcpAccount = model.mcpBackendAccountKey
         let ownedAgent = bot.id
         let ownedReconnect = reconnectGeneration
-        guard suggestionTransportConnected,
-              !ownedAccount.isEmpty,
-              !ownedAgent.isEmpty
-        else {
+        guard mobileEditorSuggestionProviderIsAvailable(
+            transportConnected: suggestionTransportConnected,
+            accountKey: ownedAccount,
+            agentID: ownedAgent
+        ) else {
             // Match Desktop's transport subscription: any non-connected state
             // immediately makes the provider unavailable without discarding
             // already-selected durable composer references.
