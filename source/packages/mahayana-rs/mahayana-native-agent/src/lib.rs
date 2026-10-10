@@ -1126,7 +1126,8 @@ mod tests {
 
     #[test]
     fn native_send_message_completion_becomes_the_canonical_visible_agent_message() {
-        let conversation_id = ConversationId::new("mahayana-ai:agent:test")\n            .expect("valid conversation id");
+        let conversation_id = ConversationId::new("mahayana-ai:agent:test")
+            .expect("valid conversation id");
         let event = native_send_message_event(
             &conversation_id,
             &json!({
