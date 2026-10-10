@@ -103,6 +103,10 @@ impl NativeMcpServerStateStore {
         true
     }
 
+    fn remove(&mut self, server_identifier: &str) -> bool {
+        self.by_server.remove(server_identifier).is_some()
+    }
+
     fn projected(&self) -> Vec<Value> {
         self.by_server
             .iter()
@@ -525,8 +529,32 @@ impl AgentBackend for NativeAgentBackend {
         Ok(Vec::new())
     }
 
-    async fn remove_mcp_server(&self, _server: &str) -> Result<bool, AgentError> {
-        Ok(false)
+    async fn remove_mcp_server(&self, server: &str) -> Result<bool, AgentError> {
+        let mut removed = false;
+        {
+            let mut sessions = self
+                .mcp_sessions
+                .lock()
+                .map_err(|_| AgentError::Backend("native MCP session registry poisoned".into()))?;
+            let before = sessions.len();
+            sessions.retain(|_, session| session.plugin.server_name != server);
+            removed |= sessions.len() != before;
+        }
+        {
+            let mut state = self
+                .mcp_server_state
+                .lock()
+                .map_err(|_| AgentError::Backend("native MCP server state poisoned".into()))?;
+            removed |= state.remove(server);
+        }
+        {
+            let mut policies = self
+                .disabled_tools
+                .lock()
+                .map_err(|_| AgentError::Backend("MCP tool policy registry poisoned".into()))?;
+            removed |= policies.remove(server).is_some();
+        }
+        Ok(removed)
     }
 
     async fn mcp_custom_instructions(&self) -> Result<HashMap<String, String>, AgentError> {
@@ -1096,6 +1124,28 @@ mod mcp_state_projection_tests {
         assert_eq!(projected[0]["status"], "error");
         assert_eq!(projected[0]["statusDetail"], "transport handshake failed");
         assert_eq!(projected[0]["tools"].as_array().map(Vec::len), Some(0));
+    }
+
+    #[test]
+    fn production_mcp_state_store_remove_invalidates_older_settlement() {
+        let mut store = NativeMcpServerStateStore::default();
+        let generation = store
+            .begin("calendar", "calendar-plugin")
+            .expect("generation");
+        assert!(store.remove("calendar"));
+        assert!(!store.remove("calendar"));
+        assert!(!store.settle(
+            "calendar",
+            generation,
+            "connected",
+            None,
+            vec![json!({"name": "stale-after-remove"})],
+        ));
+        assert!(store.projected().is_empty());
+        let replacement = store
+            .begin("calendar", "calendar-plugin")
+            .expect("replacement generation");
+        assert!(replacement > generation);
     }
 
     #[test]
