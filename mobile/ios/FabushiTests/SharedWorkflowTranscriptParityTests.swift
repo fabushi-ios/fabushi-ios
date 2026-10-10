@@ -342,6 +342,26 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(widget.respondedValue, "ship")
         XCTAssertFalse(widget.dismissed)
 
+        let skippedMessage = try XCTUnwrap(projectMobileCanonicalHostTranscriptCard(
+            event: [
+                "entryId": "message-1-card-skipped",
+                "card": [
+                    "kind": "widget",
+                    "widget": [
+                        "prompt": "Move on?",
+                        "options": [["label": "Wait", "value": "wait"]],
+                        "dismissOnMoveOn": true,
+                    ],
+                    "widgetSkipped": true,
+                ],
+            ],
+            operationId: nil
+        ))
+        let skipped = try XCTUnwrap(mobileTranscriptWidgetProjection(skippedMessage))
+        XCTAssertTrue(skipped.skipped)
+        XCTAssertTrue(skipped.dismissed, "Host-persisted widgetSkipped is a terminal dismissed state on iOS.")
+        XCTAssertEqual(skippedMessage.actionStatus, "completed")
+
         let historyEntries = try XCTUnwrap(projectMobileConversationWindowEntries([
             "id": "message-1",
             "role": "assistant",

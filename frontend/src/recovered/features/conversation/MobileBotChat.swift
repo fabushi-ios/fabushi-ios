@@ -3067,6 +3067,18 @@ internal struct MobileBotChat: View {
                             )
                         )
                         .disabled(pending)
+                        .onSubmit {
+                            let value = (widgetCustomAnswers[entry.id] ?? "")
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !pending, !value.isEmpty else { return }
+                            Task {
+                                await resolveTranscriptWidget(
+                                    entry: entry,
+                                    value: value,
+                                    dismiss: false
+                                )
+                            }
+                        }
                         Button("Submit") {
                             Task {
                                 await resolveTranscriptWidget(

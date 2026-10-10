@@ -327,11 +327,12 @@ func mobileTranscriptWidgetProjection(
     if card["respondedValue"] != nil, card["respondedValue"] is String == false { return nil }
     if card["widgetDismissed"] != nil, card["widgetDismissed"] is Bool == false { return nil }
     if card["widgetSkipped"] != nil, card["widgetSkipped"] is Bool == false { return nil }
+    let skipped = card["widgetSkipped"] as? Bool ?? false
     return .init(
         widget: widget,
         respondedValue: card["respondedValue"] as? String,
-        dismissed: card["widgetDismissed"] as? Bool ?? false,
-        skipped: card["widgetSkipped"] as? Bool ?? false
+        dismissed: (card["widgetDismissed"] as? Bool ?? false) || skipped,
+        skipped: skipped
     )
 }
 
@@ -524,12 +525,13 @@ func projectMobileCanonicalHostTranscriptCard(
         let responded = (card["respondedValue"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let dismissed = card["widgetDismissed"] as? Bool ?? false
+        let skipped = card["widgetSkipped"] as? Bool ?? false
         return .init(
             id: entryId, role: .assistant, text: "", kind: .action,
             operationId: operationId,
             actionTitle: prompt,
             actionDetail: rawWidget["helpText"] as? String,
-            actionStatus: (responded?.isEmpty == false || dismissed) ? "completed" : "waiting",
+            actionStatus: (responded?.isEmpty == false || dismissed || skipped) ? "completed" : "waiting",
             canonicalTranscriptCard: payload,
             createdAt: createdAt
         )
