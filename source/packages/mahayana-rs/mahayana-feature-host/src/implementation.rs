@@ -20170,14 +20170,25 @@ mod tests {
         )
         .is_err());
 
-        let summary = summarize_automation_schedule_next_7_days(
+        let daily_summary = summarize_automation_schedule_next_7_days(
+            "0 9 * * *",
+            Some("America/Los_Angeles"),
+            before_dst,
+        );
+        assert_eq!(daily_summary.scheduled_fires_next_7_days, 7);
+        assert!(daily_summary.fires_on_weekend);
+        assert!(!daily_summary.fires_overnight);
+
+        // 02:00 does not exist on the spring-forward day in this IANA zone.
+        // The scheduler must not synthesize an impossible wall-clock firing.
+        let dst_gap_summary = summarize_automation_schedule_next_7_days(
             "0 2 * * *",
             Some("America/Los_Angeles"),
             before_dst,
         );
-        assert_eq!(summary.scheduled_fires_next_7_days, 7);
-        assert!(summary.fires_on_weekend);
-        assert!(summary.fires_overnight);
+        assert_eq!(dst_gap_summary.scheduled_fires_next_7_days, 6);
+        assert!(dst_gap_summary.fires_on_weekend);
+        assert!(dst_gap_summary.fires_overnight);
     }
 
     #[test]
