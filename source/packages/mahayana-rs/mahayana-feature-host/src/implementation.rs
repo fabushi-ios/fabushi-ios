@@ -291,6 +291,7 @@ struct PendingMemoryTurn {
     evidence_id: String,
     occurred_at: i64,
     user: String,
+    agent_messages: Vec<String>,
     assistant: Option<String>,
 }
 
@@ -8991,10 +8992,18 @@ impl FeatureHostController {
         let Some(assistant) = observation.assistant.as_deref().map(str::trim).filter(|v| !v.is_empty()) else {
             return Ok(());
         };
-        let user = crate::memory_synthesis::bounded_evidence_text(&observation.user);
-        let assistant = crate::memory_synthesis::bounded_evidence_text(assistant);
+        let exchange = crate::turn_memory::build_turn_memory_exchange(
+            observation.user,
+            observation.agent_messages,
+            assistant,
+        );
+        let user = crate::memory_synthesis::bounded_evidence_text(&exchange.user);
+        let assistant = crate::memory_synthesis::bounded_evidence_text(&exchange.agent);
         if user.is_empty() && assistant.is_empty() {
             return Ok(());
+        }
+        if let Ok(memory_dir) = self.memory_dir_for_agent(&observation.agent_id) {
+            let _ = crate::turn_memory::clear_pending_episode_turns(&memory_dir);
         }
         let evidence = crate::memory_synthesis::MemoryEvidence {
             id: observation.evidence_id,
@@ -11189,6 +11198,7 @@ impl FeatureHostController {
                     evidence_id: request_id.clone(),
                     occurred_at: now_millis(),
                     user: text.clone(),
+                    agent_messages: Vec::new(),
                     assistant: None,
                 },
             );

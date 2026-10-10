@@ -16,6 +16,7 @@ mod send_message_shaping;
 mod shared_memory;
 mod memory_metadata;
 mod memory_synthesis;
+mod turn_memory;
 
 #[expect(clippy::collapsible_if, clippy::unneeded_wildcard_pattern)]
 #[path = "implementation.rs"]
