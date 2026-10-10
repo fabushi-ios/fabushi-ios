@@ -1553,6 +1553,124 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(rows.map(\.id), ["beta", "alpha"])
     }
 
+    func testNativeMessageCardSeamProjectsTrustedUserEmojiURLAndCopy() {
+        let assistant = MobileChatMessage(
+            id: "assistant",
+            role: .assistant,
+            text: "Trusted answer",
+            canonicalMessageId: "assistant"
+        )
+        let assistantSeam = projectMobileMessageCardSeam(assistant)
+        XCTAssertTrue(assistantSeam.isSourceTrusted)
+        XCTAssertFalse(assistantSeam.isFromUser)
+        XCTAssertEqual(assistantSeam.copyText, "Trusted answer")
+        XCTAssertNil(assistantSeam.url)
+
+        let emoji = MobileChatMessage(
+            id: "emoji",
+            role: .user,
+            text: "👍",
+            canonicalMessageId: "emoji"
+        )
+        let emojiSeam = projectMobileMessageCardSeam(emoji)
+        XCTAssertTrue(emojiSeam.isFromUser)
+        XCTAssertTrue(emojiSeam.isStandaloneEmoji)
+        XCTAssertEqual(emojiSeam.copyText, "👍")
+
+        let link = MobileChatMessage(
+            id: "link",
+            role: .user,
+            text: "https://example.com/path",
+            canonicalMessageId: "link"
+        )
+        XCTAssertEqual(
+            projectMobileMessageCardSeam(link).url,
+            "https://example.com/path"
+        )
+    }
+
+    func testNativeMessageCardSeamRejectsUnsafeOrNonBareLinks() {
+        for text in [
+            "http://example.com",
+            "javascript:alert(1)",
+            "https://example.com mixed",
+            "See https://example.com",
+        ] {
+            let entry = MobileChatMessage(
+                id: text,
+                role: .user,
+                text: text,
+                canonicalMessageId: text
+            )
+            XCTAssertNil(
+                projectMobileMessageCardSeam(entry).url,
+                "Should fail closed for \(text)"
+            )
+        }
+
+        let assistantLink = MobileChatMessage(
+            id: "assistant-link",
+            role: .assistant,
+            text: "https://example.com",
+            canonicalMessageId: "assistant-link"
+        )
+        XCTAssertNil(projectMobileMessageCardSeam(assistantLink).url)
+
+        let notice = MobileChatMessage(
+            id: "notice",
+            role: .assistant,
+            text: "https://example.com",
+            kind: .notice
+        )
+        XCTAssertEqual(
+            projectMobileMessageCardSeam(notice),
+            .init(
+                isSourceTrusted: false,
+                isFromUser: false,
+                isStandaloneEmoji: false,
+                url: nil,
+                copyText: nil
+            )
+        )
+    }
+
+    func testNativeMessageCardSeamPreservesSendMessageCardCopyContract() {
+        let plain = MobileChatMessage(
+            id: "plain",
+            role: .assistant,
+            text: "",
+            canonicalMessageId: "plain",
+            sendMessageTextProjection: .init(
+                id: "plain",
+                content: "copy me",
+                images: [],
+                streaming: false,
+                presentation: .text
+            )
+        )
+        XCTAssertEqual(projectMobileMessageCardSeam(plain).copyText, "copy me")
+
+        let card = MobileChatMessage(
+            id: "card",
+            role: .user,
+            text: "",
+            canonicalMessageId: "card",
+            sendMessageTextProjection: .init(
+                id: "card",
+                content: "https://example.com",
+                images: [],
+                streaming: false,
+                presentation: .urlCard("https://example.com")
+            )
+        )
+        let seam = projectMobileMessageCardSeam(card)
+        XCTAssertEqual(seam.url, "https://example.com/")
+        XCTAssertNil(
+            seam.copyText,
+            "URL cards keep navigation semantics instead of exposing a second copy owner."
+        )
+    }
+
     func testTranscriptLoadRetrySurfaceUsesCanonicalCopy() {
         XCTAssertEqual(MobileTranscriptLoadErrorCopy.title, "Couldn't load conversation")
         XCTAssertEqual(
