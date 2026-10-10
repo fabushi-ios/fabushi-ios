@@ -1243,6 +1243,140 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertFalse(isMobileReactionActionable(notice))
     }
 
+    func testNativeTranscriptAdjacencyProjectsSixFieldGroupingContract() {
+        let entries = [
+            MobileChatMessage(
+                id: "u1",
+                role: .user,
+                text: "one",
+                canonicalMessageId: "u1"
+            ),
+            MobileChatMessage(
+                id: "u2",
+                role: .user,
+                text: "two",
+                canonicalMessageId: "u2"
+            ),
+            MobileChatMessage(
+                id: "a1",
+                role: .assistant,
+                text: "answer",
+                canonicalMessageId: "a1"
+            ),
+        ]
+
+        let adjacency = projectMobileTranscriptAdjacency(entries)
+        XCTAssertEqual(adjacency.count, 3)
+
+        XCTAssertFalse(adjacency[0].isContinuedFromPrev)
+        XCTAssertTrue(adjacency[0].isContinuedToNext)
+        XCTAssertFalse(adjacency[0].isGroupStart)
+        XCTAssertTrue(adjacency[0].isRunStart)
+        XCTAssertFalse(adjacency[0].isGroupEnd)
+
+        XCTAssertTrue(adjacency[1].isContinuedFromPrev)
+        XCTAssertFalse(adjacency[1].isContinuedToNext)
+        XCTAssertFalse(adjacency[1].isRunStart)
+        XCTAssertTrue(adjacency[1].isGroupEnd)
+
+        XCTAssertFalse(adjacency[2].isContinuedFromPrev)
+        XCTAssertTrue(
+            adjacency[2].isContinuedToNext,
+            "Assistant indicator seam remains open until a thread chip or reaction closes it."
+        )
+        XCTAssertTrue(adjacency[2].isGroupStart)
+        XCTAssertTrue(adjacency[2].isRunStart)
+        XCTAssertFalse(adjacency[2].isGroupEnd)
+    }
+
+    func testNativeTranscriptAdjacencyThreadChipAndSpecialRowsBreakSeams() {
+        var first = MobileChatMessage(
+            id: "a1",
+            role: .assistant,
+            text: "one",
+            canonicalMessageId: "a1"
+        )
+        let second = MobileChatMessage(
+            id: "a2",
+            role: .assistant,
+            text: "two",
+            canonicalMessageId: "a2"
+        )
+        let notice = MobileChatMessage(
+            id: "notice",
+            role: .assistant,
+            text: "notice",
+            kind: .notice
+        )
+
+        var adjacency = projectMobileTranscriptAdjacency(
+            [first, second],
+            threadChipEntryIDs: ["a1"]
+        )
+        XCTAssertTrue(adjacency[0].isFollowedByThreadChip)
+        XCTAssertFalse(adjacency[0].isContinuedToNext)
+        XCTAssertFalse(adjacency[1].isContinuedFromPrev)
+
+        first.reactions = [.init(emoji: "👍", by: "me")]
+        adjacency = projectMobileTranscriptAdjacency([first])
+        XCTAssertFalse(
+            adjacency[0].isContinuedToNext,
+            "A reaction closes the assistant indicator seam."
+        )
+
+        adjacency = projectMobileTranscriptAdjacency([first, notice, second])
+        XCTAssertEqual(adjacency[1], .empty)
+        XCTAssertFalse(adjacency[2].isContinuedFromPrev)
+        XCTAssertTrue(adjacency[2].isRunStart)
+    }
+
+    func testNativeTranscriptAdjacencyExcludesNonBubbleMessageVariants() {
+        let emoji = MobileChatMessage(
+            id: "emoji",
+            role: .user,
+            text: "👍",
+            canonicalMessageId: "emoji"
+        )
+        let attachment = MobileChatMessage(
+            id: "attachment",
+            role: .user,
+            text: "",
+            canonicalMessageId: "attachment",
+            attachmentURL: "file:///tmp/a.txt"
+        )
+        let sendCard = MobileChatMessage(
+            id: "send",
+            role: .assistant,
+            text: "https://example.com",
+            canonicalMessageId: "send",
+            sendMessageTextProjection: .init(
+                id: "send",
+                content: "https://example.com",
+                images: [],
+                streaming: false,
+                presentation: .urlCard("https://example.com")
+            )
+        )
+        let imageMarkdown = MobileChatMessage(
+            id: "image-markdown",
+            role: .assistant,
+            text: "![alt](https://example.com/a.png)",
+            canonicalMessageId: "image-markdown"
+        )
+
+        let adjacency = projectMobileTranscriptAdjacency([
+            emoji,
+            attachment,
+            sendCard,
+            imageMarkdown,
+        ])
+        XCTAssertEqual(adjacency.count, 4)
+        XCTAssertTrue(adjacency.allSatisfy { !$0.isContinuedFromPrev })
+        XCTAssertTrue(
+            adjacency.allSatisfy { !$0.isFollowedByThreadChip }
+        )
+    }
+
     func testTranscriptLoadRetrySurfaceUsesCanonicalCopy() {
         XCTAssertEqual(MobileTranscriptLoadErrorCopy.title, "Couldn't load conversation")
         XCTAssertEqual(
