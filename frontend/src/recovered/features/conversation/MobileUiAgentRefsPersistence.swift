@@ -8,7 +8,7 @@ internal enum MobileUiAgentRefsPersistence {
 
     private struct Envelope: Codable, Equatable {
         let schemaVersion: Int
-        var recentsByAgent: [String: [String]]
+        var recentKeys: [String]
     }
 
     static func normalizedRecentKeys(_ values: [String]) -> [String] {
@@ -49,23 +49,21 @@ internal enum MobileUiAgentRefsPersistence {
         normalizedRecentKeys([key] + existing.filter { $0 != key })
     }
 
-    static func emojiCatalogIDs(from recentKeys: [String]) -> [String] {
-        recentKeys.compactMap { key in
+    static func emojiValues(from recentKeys: [String]) -> [String] {
+        normalizedRecentKeys(recentKeys).compactMap { key in
             guard key.hasPrefix("emoji:") else { return nil }
-            let id = String(key.dropFirst("emoji:".count))
+            let emoji = String(key.dropFirst("emoji:".count))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            return id.isEmpty ? nil : id
+            return emoji.isEmpty ? nil : emoji
         }
     }
 
     static func loadRecentKeys(
         accountScopeKey: String,
-        agentID: String,
         defaults: UserDefaults = .standard
     ) -> [String] {
         let account = accountScopeKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let agent = agentID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !account.isEmpty, !agent.isEmpty,
+        guard !account.isEmpty,
               let key = storageKey(account),
               let data = defaults.data(forKey: key)
         else { return [] }
@@ -78,50 +76,30 @@ internal enum MobileUiAgentRefsPersistence {
             return []
         }
         guard envelope.schemaVersion == schemaVersion else {
-            // Preserve a future schema for a newer build instead of deleting it.
+            defaults.removeObject(forKey: key)
             return []
         }
-        return normalizedRecentKeys(envelope.recentsByAgent[agent] ?? [])
+        return normalizedRecentKeys(envelope.recentKeys)
     }
 
     static func persistRecentKeys(
         _ values: [String],
         accountScopeKey: String,
-        agentID: String,
         defaults: UserDefaults = .standard
     ) {
         let account = accountScopeKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let agent = agentID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !account.isEmpty, !agent.isEmpty,
+        guard !account.isEmpty,
               let key = storageKey(account)
         else { return }
 
-        var recentsByAgent: [String: [String]] = [:]
-        if let data = defaults.data(forKey: key),
-           let existing = try? JSONDecoder().decode(Envelope.self, from: data),
-           existing.schemaVersion == schemaVersion
-        {
-            recentsByAgent = existing.recentsByAgent.mapValues(normalizedRecentKeys)
-        } else if defaults.object(forKey: key) != nil {
-            // The only current iOS persisted format is v1. Corrupt current-schema
-            // state is cleared rather than restored into a different account.
-            defaults.removeObject(forKey: key)
-        }
-
         let normalized = normalizedRecentKeys(values)
         if normalized.isEmpty {
-            recentsByAgent.removeValue(forKey: agent)
-        } else {
-            recentsByAgent[agent] = normalized
-        }
-
-        if recentsByAgent.isEmpty {
             defaults.removeObject(forKey: key)
             return
         }
         let envelope = Envelope(
             schemaVersion: schemaVersion,
-            recentsByAgent: recentsByAgent
+            recentKeys: normalized
         )
         guard let data = try? JSONEncoder().encode(envelope) else { return }
         defaults.set(data, forKey: key)

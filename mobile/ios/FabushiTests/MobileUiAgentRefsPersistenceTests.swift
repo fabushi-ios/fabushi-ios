@@ -3,75 +3,88 @@ import XCTest
 
 final class MobileUiAgentRefsPersistenceTests: XCTestCase {
     @MainActor
-    func testRecentsPersistAcrossRelaunchWithAccountAndAgentIsolation() throws {
+    func testRecentsPersistAcrossRelaunchAtAccountScope() throws {
         let suite = "FabushiTests.MobileUiAgentRefs.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        var agentA: [String] = []
+        var recents: [String] = []
         for index in 0..<28 {
-            agentA = MobileUiAgentRefsPersistence.recordingRecent(
+            recents = MobileUiAgentRefsPersistence.recordingRecent(
                 "assistants:agent-\(index)",
-                existing: agentA
+                existing: recents
             )
         }
         for index in 0..<58 {
-            agentA = MobileUiAgentRefsPersistence.recordingRecent(
+            recents = MobileUiAgentRefsPersistence.recordingRecent(
                 "emoji:emoji-\(index)",
-                existing: agentA
+                existing: recents
             )
         }
         MobileUiAgentRefsPersistence.persistRecentKeys(
-            agentA,
+            recents,
             accountScopeKey: "account-a",
-            agentID: "agent-a",
-            defaults: defaults
-        )
-        MobileUiAgentRefsPersistence.persistRecentKeys(
-            ["tools:github"],
-            accountScopeKey: "account-a",
-            agentID: "agent-b",
             defaults: defaults
         )
 
-        let restoredA = MobileUiAgentRefsPersistence.loadRecentKeys(
+        let restored = MobileUiAgentRefsPersistence.loadRecentKeys(
             accountScopeKey: "account-a",
-            agentID: "agent-a",
             defaults: defaults
         )
-        XCTAssertEqual(restoredA.filter { $0.hasPrefix("assistants:") }.count, 20)
-        XCTAssertEqual(restoredA.filter { $0.hasPrefix("emoji:") }.count, 50)
-        XCTAssertEqual(
-            MobileUiAgentRefsPersistence.loadRecentKeys(
-                accountScopeKey: "account-a",
-                agentID: "agent-b",
-                defaults: defaults
-            ),
-            ["tools:github"]
-        )
+        XCTAssertEqual(restored.filter { $0.hasPrefix("assistants:") }.count, 20)
+        XCTAssertEqual(restored.filter { $0.hasPrefix("emoji:") }.count, 50)
         XCTAssertTrue(
             MobileUiAgentRefsPersistence.loadRecentKeys(
                 accountScopeKey: "account-b",
-                agentID: "agent-a",
                 defaults: defaults
             ).isEmpty
         )
     }
 
     @MainActor
-    func testCorruptEnvelopeIsClearedFailClosed() throws {
+    func testSameAccountRecentsAreSharedAcrossAgentSwitches() throws {
+        let suite = "FabushiTests.MobileUiAgentRefs.Shared.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let values = ["assistants:alpha", "tools:github", "emoji:👍"]
+        MobileUiAgentRefsPersistence.persistRecentKeys(
+            values,
+            accountScopeKey: "account-a",
+            defaults: defaults
+        )
+        XCTAssertEqual(
+            MobileUiAgentRefsPersistence.loadRecentKeys(
+                accountScopeKey: "account-a",
+                defaults: defaults
+            ),
+            values
+        )
+    }
+
+    @MainActor
+    func testCorruptAndWrongSchemaEnvelopesAreClearedFailClosed() throws {
         let suite = "FabushiTests.MobileUiAgentRefs.Corrupt.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let key = try XCTUnwrap(
             MobileUiAgentRefsPersistence.storageKey("account-a")
         )
-        defaults.set(Data("not-json".utf8), forKey: key)
 
+        defaults.set(Data("not-json".utf8), forKey: key)
         XCTAssertTrue(
             MobileUiAgentRefsPersistence.loadRecentKeys(
                 accountScopeKey: "account-a",
-                agentID: "agent-a",
+                defaults: defaults
+            ).isEmpty
+        )
+        XCTAssertNil(defaults.object(forKey: key))
+
+        let wrongSchema = #"{"schemaVersion":2,"recentKeys":["assistants:a"]}"#
+        defaults.set(Data(wrongSchema.utf8), forKey: key)
+        XCTAssertTrue(
+            MobileUiAgentRefsPersistence.loadRecentKeys(
+                accountScopeKey: "account-a",
                 defaults: defaults
             ).isEmpty
         )
@@ -79,29 +92,29 @@ final class MobileUiAgentRefsPersistenceTests: XCTestCase {
     }
 
     @MainActor
-    func testEmojiCatalogIdsShareTheCanonicalRecentSlice() {
+    func testEmojiValuesStoreActualEmojiNotCatalogIds() {
         let keys = [
             "assistants:alpha",
-            "emoji:smile",
+            "emoji:👍",
             "automations:daily",
-            "emoji:wave",
+            "emoji:❤️",
         ]
         XCTAssertEqual(
-            MobileUiAgentRefsPersistence.emojiCatalogIDs(from: keys),
-            ["smile", "wave"]
+            MobileUiAgentRefsPersistence.emojiValues(from: keys),
+            ["👍", "❤️"]
         )
     }
 
     @MainActor
-    func testUnknownRecentCategoriesAreRejected() {
+    func testUnknownRecentCategoriesAndDuplicatesAreRejected() {
         XCTAssertEqual(
             MobileUiAgentRefsPersistence.normalizedRecentKeys([
                 "assistants:a",
                 "unknown:x",
-                "emoji:e",
+                "emoji:👍",
                 "assistants:a",
             ]),
-            ["assistants:a", "emoji:e"]
+            ["assistants:a", "emoji:👍"]
         )
     }
 }

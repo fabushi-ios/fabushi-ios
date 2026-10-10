@@ -4184,12 +4184,12 @@
         "path": "frontend/src/recovered/features/conversation/workspace/editor-suggestion-provider.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-editor-suggestion-provider-implemented-pending-exact-head-ci",
-        "finding": "Desktop suggestion state machine owns trusted Agent/everyone/workflow projection, fuzzy + recent ranking, emoji recents, keyboard selection, account/Agent request cancellation and non-connected transport fail-closed behavior. Shipping iOS MobileBotChat now owns the equivalent single native state machine, including MCP/PR integration; GrokMobileShell passes the canonical root Coordinator connection phase, so loading/reconnecting/unreachable clear transient suggestion rows immediately while durable selected references remain. Reconnect/request generations prevent stale writes, account/Agent/disappear invalidate the owner, and focused tests cover emoji recency and transport/account/Agent fail-closed behavior. Exact-head CI is pending."
+        "finding": "Desktop suggestion state combines trusted live Agent/workflow/emoji sources with account-level recency and request fencing. Shipping iOS keeps live provider requests fenced by account+Agent+reconnect generation, but recency now correctly remains one account slice across Agent switches: mention keys are bounded to 20, actual emoji to 50 and mapped to current catalog IDs only for ranking. Exact-head CI is pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/workspace/editor-suggestion-production-adapter.ts",
         "status": "current-main-reviewed-native-editor-suggestion-adapter-implemented-pending-exact-head-ci",
-        "finding": "Desktop production adapter binds mention/workflow/emoji sources, scope recents and skill icons into the prompt editor and disposes the controller with composer scope. Shipping iOS MobileBotChat now provides the equivalent single native adapter across @, /, # and : rows, renders workflow/tool icon URLs, isolates recency by App account + Agent instead of one View-global array, fails closed on non-connected transport, and fences refreshes by account/Agent/reconnect/request generation. Focused MobileComposerParityTests cover scoped recents, empty-query recent emoji, workflow icon projection and transport fencing. Exact-head CI remains pending."
+        "finding": "Desktop adapter binds mention/workflow/emoji sources and account recents into the prompt editor. Shipping iOS keeps one MobileBotChat adapter across @, /, # and :, restores/persists one App-account recency slice, shares actual emoji with reaction UI, and fences only live source refresh by Agent/reconnect/request generation. Exact-head CI remains pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/workspace/find-in-chat.tsx",
@@ -4230,8 +4230,8 @@
       {
         "path": "frontend/src/recovered/features/conversation/workspace/sidebar-collapse-state.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-native-sidebar-collapse-implemented-recents-unification-open",
-        "finding": "Shipping iOS Home now consumes the already-authoritative MobileAgentSidebarSection.isCollapsed state: an accessible chevron toggles a real section, collapsed rows disappear, expansion restores them, and the mutation flows through existing applyAgentSidebarSections -> setHostSidebarSections with account-scoped fallback/rollback. Focused tests cover exact toggle, canonical round-trip and cross-account fallback isolation. Aggregate row stays mapped because Desktop ui-agent-refs also unifies mention/emoji recents, which iOS still owns separately."
+        "status": "current-main-reviewed-native-ui-agent-refs-implemented-pending-exact-head-ci",
+        "finding": "Desktop ui-agent-refs is account-scoped: Host/sidebar pin+collapse ownership is preserved separately in iOS, while one MobileUiAgentRefsPersistence envelope now holds assistants/automations/tools mention MRU (20) plus actual-emoji MRU (50) for the whole App account. Composer and all reaction entry points share it; Agent switches reuse it; corrupt/wrong-schema data is cleared fail-closed. Exact-head CI is pending."
       }
     ]
   },

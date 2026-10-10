@@ -463,67 +463,36 @@ final class MobileComposerParityTests: XCTestCase {
         XCTAssertEqual(rows.dropFirst().first?.id, first.id)
     }
 
-    func testEditorSuggestionRecentsRemainAccountAndAgentScoped() {
-        var storage: [String: [String]] = [:]
-        let accountAAgentA = mobileEditorSuggestionRecentsScopeKey(
-            accountKey: "account-a",
-            agentID: "agent-a"
-        )
-        storage[accountAAgentA] = mobileEditorSuggestionRecordRecent(
-            "assistants:alpha",
-            existing: []
-        )
-        storage[accountAAgentA] = mobileEditorSuggestionRecordRecent(
-            "emoji:smile",
-            existing: storage[accountAAgentA] ?? []
-        )
+    @MainActor
+    func testEditorSuggestionRecentsRemainAccountScopedAcrossAgentSwitches() throws {
+        let suite = "FabushiTests.MobileComposerRecents.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
 
+        let recents = MobileUiAgentRefsPersistence.recordingRecent(
+            "emoji:👍",
+            existing: MobileUiAgentRefsPersistence.recordingRecent(
+                "assistants:alpha",
+                existing: []
+            )
+        )
+        MobileUiAgentRefsPersistence.persistRecentKeys(
+            recents,
+            accountScopeKey: "account-a",
+            defaults: defaults
+        )
         XCTAssertEqual(
-            mobileEditorSuggestionRecents(
-                storage,
-                accountKey: "account-a",
-                agentID: "agent-a"
+            MobileUiAgentRefsPersistence.loadRecentKeys(
+                accountScopeKey: "account-a",
+                defaults: defaults
             ),
-            ["emoji:smile", "assistants:alpha"]
+            ["emoji:👍", "assistants:alpha"]
         )
         XCTAssertTrue(
-            mobileEditorSuggestionRecents(
-                storage,
-                accountKey: "account-b",
-                agentID: "agent-a"
+            MobileUiAgentRefsPersistence.loadRecentKeys(
+                accountScopeKey: "account-b",
+                defaults: defaults
             ).isEmpty
-        )
-        XCTAssertTrue(
-            mobileEditorSuggestionRecents(
-                storage,
-                accountKey: "account-a",
-                agentID: "agent-b"
-            ).isEmpty
-        )
-
-        let accountBAgentA = mobileEditorSuggestionRecentsScopeKey(
-            accountKey: "account-b",
-            agentID: "agent-a"
-        )
-        storage[accountBAgentA] = mobileEditorSuggestionRecordRecent(
-            "assistants:beta",
-            existing: []
-        )
-        XCTAssertEqual(
-            mobileEditorSuggestionRecents(
-                storage,
-                accountKey: "account-a",
-                agentID: "agent-a"
-            ),
-            ["emoji:smile", "assistants:alpha"]
-        )
-        XCTAssertEqual(
-            mobileEditorSuggestionRecents(
-                storage,
-                accountKey: "account-b",
-                agentID: "agent-a"
-            ),
-            ["assistants:beta"]
         )
     }
 

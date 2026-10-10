@@ -216,36 +216,6 @@ internal func mobileEditorSuggestionProviderIsAvailable(
         && !agentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
 
-internal func mobileEditorSuggestionRecentsScopeKey(
-    accountKey: String,
-    agentID: String
-) -> String {
-    mobileBotConversationScopeKey(
-        accountScopeKey: accountKey,
-        agentID: agentID
-    )
-}
-
-internal func mobileEditorSuggestionRecents(
-    _ storage: [String: [String]],
-    accountKey: String,
-    agentID: String
-) -> [String] {
-    storage[mobileEditorSuggestionRecentsScopeKey(
-        accountKey: accountKey,
-        agentID: agentID
-    )] ?? []
-}
-
-internal func mobileEditorSuggestionRecordRecent(
-    _ key: String,
-    existing: [String],
-    limit: Int = 50
-) -> [String] {
-    guard limit > 0 else { return [] }
-    return Array(([key] + existing.filter { $0 != key }).prefix(limit))
-}
-
 private func mobileEditorSuggestionNonEmpty(_ value: Any?) -> String? {
     guard let string = value as? String else { return nil }
     let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2054,7 +2024,6 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerDraft = ""
     @State private var reactionPickerSearch = ""
     @State private var reactionPickerCategory: MobileReactionPickerCategory = .all
-    @State private var reactionPickerRecentIds: [String] = []
     @State private var editorSuggestionWorkflows: [MobileEditorSuggestionItem] = []
     @State private var editorSuggestionMcpReferences: [MobileEditorSuggestionItem] = []
     @State private var composerMcpReferences: [MobileComposerMcpReference] = []
@@ -2062,7 +2031,7 @@ internal struct MobileBotChat: View {
     @State private var editorSuggestionStatus: MobileEditorSuggestionSourceStatus = .idle
     @State private var editorSuggestionGeneration = 0
     @State private var editorSuggestionActiveIndex: Int?
-    @State private var editorSuggestionRecentsByScope: [String: [String]] = [:]
+    @State private var uiAgentRecentKeys: [String] = []
     @State private var approvalGeneration = 0
     @State private var localToolPermissionGeneration = 0
     @State private var localToolPermissionPendingEntryIds: Set<String> = []
@@ -2198,6 +2167,7 @@ internal struct MobileBotChat: View {
             cancelVoiceInput()
             invalidateComposerAttachmentStaging()
             invalidateReactionScope()
+            restoreEditorSuggestionRecents()
             resetCloudAgentState()
             resetLocalToolPermissionUI()
             invalidateEditorSuggestions()
@@ -2851,62 +2821,49 @@ internal struct MobileBotChat: View {
         )
     }
 
-    private var editorSuggestionRecentsScopeKey: String {
-        mobileEditorSuggestionRecentsScopeKey(
-            accountKey: model.settingsNoticeAccountKey,
-            agentID: bot.id
-        )
+    private var uiAgentEmojiRecentCatalogIds: [String] {
+        MobileUiAgentRefsPersistence.emojiValues(from: uiAgentRecentKeys)
+            .compactMap { emoji in
+                mobileReactionCatalog.first(where: { $0.emoji == emoji })?.id
+            }
+    }
+
+    private var reactionPickerRecentIds: [String] {
+        uiAgentEmojiRecentCatalogIds
     }
 
     private var editorSuggestionRecents: [String] {
-        mobileEditorSuggestionRecents(
-            editorSuggestionRecentsByScope,
-            accountKey: model.settingsNoticeAccountKey,
-            agentID: bot.id
-        )
+        uiAgentRecentKeys.compactMap { key in
+            guard key.hasPrefix("emoji:") else { return key }
+            let emoji = String(key.dropFirst("emoji:".count))
+            guard let catalogID = mobileReactionCatalog.first(where: { $0.emoji == emoji })?.id
+            else { return nil }
+            return "emoji:\(catalogID)"
+        }
     }
 
     private var editorSuggestionRecentsPersistenceScopeFingerprint: String {
-        model.settingsNoticeAccountKey + "\u{0}" + bot.id
+        model.settingsNoticeAccountKey
     }
 
     @MainActor
     private func restoreEditorSuggestionRecents() {
         let accountKey = model.settingsNoticeAccountKey
-        let agentID = bot.id
-        let scopeKey = mobileEditorSuggestionRecentsScopeKey(
-            accountKey: accountKey,
-            agentID: agentID
-        )
         let restored = MobileUiAgentRefsPersistence.loadRecentKeys(
-            accountScopeKey: accountKey,
-            agentID: agentID
+            accountScopeKey: accountKey
         )
-        guard accountKey == model.settingsNoticeAccountKey,
-              agentID == bot.id
-        else { return }
-        editorSuggestionRecentsByScope = [scopeKey: restored]
-        reactionPickerRecentIds =
-            MobileUiAgentRefsPersistence.emojiCatalogIDs(from: restored)
+        guard accountKey == model.settingsNoticeAccountKey else { return }
+        uiAgentRecentKeys = restored
     }
 
     @MainActor
     private func persistEditorSuggestionRecents(_ values: [String]) {
-        let accountKey = model.settingsNoticeAccountKey
-        let agentID = bot.id
-        let scopeKey = mobileEditorSuggestionRecentsScopeKey(
-            accountKey: accountKey,
-            agentID: agentID
-        )
         let normalized = MobileUiAgentRefsPersistence.normalizedRecentKeys(values)
-        editorSuggestionRecentsByScope[scopeKey] = normalized
+        uiAgentRecentKeys = normalized
         MobileUiAgentRefsPersistence.persistRecentKeys(
             normalized,
-            accountScopeKey: accountKey,
-            agentID: agentID
+            accountScopeKey: model.settingsNoticeAccountKey
         )
-        reactionPickerRecentIds =
-            MobileUiAgentRefsPersistence.emojiCatalogIDs(from: normalized)
     }
 
     private var editorSuggestionScopeFingerprint: String {
@@ -3126,11 +3083,13 @@ internal struct MobileBotChat: View {
                 references: composerPrReferences + [reference]
             )
         }
-        let key = "\(item.category.rawValue):\(item.id)"
+        let recentKey = item.category == .emoji
+            ? "emoji:\(item.label)"
+            : "\(item.category.rawValue):\(item.id)"
         persistEditorSuggestionRecents(
             MobileUiAgentRefsPersistence.recordingRecent(
-                key,
-                existing: editorSuggestionRecents
+                recentKey,
+                existing: uiAgentRecentKeys
             )
         )
         editorSuggestionActiveIndex = nil
@@ -5208,7 +5167,7 @@ internal struct MobileBotChat: View {
                             ForEach(Array(reactionPickerResults.enumerated()), id: \.element.id) { index, item in
                                 let reacted = reactionPickerTarget?.myReactions.contains(item.emoji) == true
                                 Button {
-                                    submitReactionPicker(emoji: item.emoji, recentCatalogId: item.id)
+                                    submitReactionPicker(emoji: item.emoji)
                                 } label: {
                                     ZStack(alignment: .topTrailing) {
                                         Text(item.emoji)
@@ -5373,22 +5332,13 @@ internal struct MobileBotChat: View {
 
     @MainActor
     private func submitReactionPicker(
-        emoji rawEmoji: String? = nil,
-        recentCatalogId: String? = nil
+        emoji rawEmoji: String? = nil
     ) {
         guard let targetId = reactionPickerTargetId,
               let emoji = normalizeMobileReactionInput(rawEmoji ?? reactionPickerDraft),
               let entry = entries.first(where: { $0.id == targetId }),
               isMobileReactionActionable(entry)
         else { return }
-        if let recentCatalogId {
-            persistEditorSuggestionRecents(
-                MobileUiAgentRefsPersistence.recordingRecent(
-                    "emoji:\(recentCatalogId)",
-                    existing: editorSuggestionRecents
-                )
-            )
-        }
         reactionPickerPresented = false
         reactionPickerTargetId = nil
         reactionPickerDraft = ""
@@ -5405,6 +5355,12 @@ internal struct MobileBotChat: View {
               isMobileReactionActionable(entries[index]),
               let entryId = entries[index].canonicalMessageId
         else { return }
+        persistEditorSuggestionRecents(
+            MobileUiAgentRefsPersistence.recordingRecent(
+                "emoji:\(emoji)",
+                existing: uiAgentRecentKeys
+            )
+        )
         let had = entries[index].myReactions.contains(emoji)
         if had {
             entries[index].reactions.removeAll { $0.emoji == emoji && $0.by == "me" }
