@@ -165,7 +165,7 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
             canonicalMessageId: "user"
         )
 
-        let searchable = mobileBotChatSearchEntries([root, branched, notice, user])
+        let searchable = mobileBotChatSearchEntries([root, branched, notice, user], botName: "Agent")
         XCTAssertEqual(searchable.map(\.id), ["root", "user"])
 
         let matches = chatSearchMatches(searchable, query: "ALPHA")
