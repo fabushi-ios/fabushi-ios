@@ -663,6 +663,15 @@ pub struct MemoryRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryProjectSummary {
+    pub slug: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum TrayAction {
     OpenUrl {
@@ -1807,6 +1816,40 @@ pub enum FeatureCommand {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         project: Option<String>,
     },
+    #[serde(rename = "memory.projectList")]
+    MemoryProjectList {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+    },
+    #[serde(rename = "memory.projectCreate")]
+    MemoryProjectCreate {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        slug: String,
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+    },
+    #[serde(rename = "memory.projectJoin")]
+    MemoryProjectJoin {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        slug: String,
+    },
+    #[serde(rename = "memory.projectLeave")]
+    MemoryProjectLeave {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        slug: String,
+    },
     #[serde(rename = "tray.list")]
     TrayList {
         #[serde(rename = "requestId")]
@@ -2201,6 +2244,10 @@ impl FeatureCommand {
             | Self::MemoryScopedAdd { request_id, .. }
             | Self::MemoryScopedRemove { request_id, .. }
             | Self::MemoryScopedClear { request_id, .. }
+            | Self::MemoryProjectList { request_id, .. }
+            | Self::MemoryProjectCreate { request_id, .. }
+            | Self::MemoryProjectJoin { request_id, .. }
+            | Self::MemoryProjectLeave { request_id, .. }
             | Self::TrayList { request_id }
             | Self::TrayDismiss { request_id, .. }
             | Self::TrayClear { request_id }
@@ -2803,6 +2850,22 @@ pub enum HostEvent {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         project: Option<String>,
     },
+    #[serde(rename = "memory.projectsListed")]
+    MemoryProjectsListed {
+        timestamp: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        projects: Vec<MemoryProjectSummary>,
+    },
+    #[serde(rename = "memory.projectChanged")]
+    MemoryProjectChanged {
+        timestamp: String,
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        action: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<MemoryProjectSummary>,
+    },
     #[serde(rename = "tray.listed")]
     TrayListed {
         timestamp: String,
@@ -3113,6 +3176,8 @@ impl HostEvent {
             Self::RemoteComputerChanged { .. } => "remoteComputer.changed",
             Self::MemoryListed { .. } => "memory.listed",
             Self::MemoryChanged { .. } => "memory.changed",
+            Self::MemoryProjectsListed { .. } => "memory.projectsListed",
+            Self::MemoryProjectChanged { .. } => "memory.projectChanged",
             Self::TrayListed { .. } => "tray.listed",
             Self::TrayChanged { .. } => "tray.changed",
             Self::WorkflowListed { .. } => "workflow.listed",

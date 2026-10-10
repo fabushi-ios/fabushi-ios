@@ -37,6 +37,13 @@ internal struct MobileMemoryRecord: Identifiable, Equatable {
     let kind: MobileMemoryKind
 }
 
+internal struct MobileMemoryProject: Identifiable, Equatable {
+    var id: String { slug }
+    let slug: String
+    let name: String
+    let description: String?
+}
+
 internal enum MobileBotMemoryModel {
     static func normalizedProject(_ value: String, scope: MobileMemoryScope) -> String? {
         guard scope == .project else { return nil }
@@ -153,6 +160,86 @@ internal enum MobileBotMemoryModel {
         return event["project"] == nil
     }
 
+    static func projectListCommand(agentId: String, requestId: String) -> [String: Any] {
+        [
+            "type": "memory.projectList",
+            "requestId": requestId,
+            "agentId": agentId,
+        ]
+    }
+
+    static func projectCreateCommand(
+        agentId: String,
+        slug: String,
+        name: String,
+        description: String,
+        requestId: String
+    ) -> [String: Any]? {
+        let slug = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !slug.isEmpty, !name.isEmpty else { return nil }
+        var command: [String: Any] = [
+            "type": "memory.projectCreate",
+            "requestId": requestId,
+            "agentId": agentId,
+            "slug": slug,
+            "name": name,
+        ]
+        let description = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !description.isEmpty {
+            command["description"] = description
+        }
+        return command
+    }
+
+    static func projectJoinCommand(
+        agentId: String,
+        slug: String,
+        requestId: String
+    ) -> [String: Any]? {
+        let slug = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !slug.isEmpty else { return nil }
+        return [
+            "type": "memory.projectJoin",
+            "requestId": requestId,
+            "agentId": agentId,
+            "slug": slug,
+        ]
+    }
+
+    static func projectLeaveCommand(
+        agentId: String,
+        slug: String,
+        requestId: String
+    ) -> [String: Any]? {
+        let slug = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !slug.isEmpty else { return nil }
+        return [
+            "type": "memory.projectLeave",
+            "requestId": requestId,
+            "agentId": agentId,
+            "slug": slug,
+        ]
+    }
+
+    static func projects(from event: [String: Any]) -> [MobileMemoryProject]? {
+        guard let rows = event["projects"] as? [[String: Any]] else { return nil }
+        var projects: [MobileMemoryProject] = []
+        for row in rows {
+            guard let slug = row["slug"] as? String,
+                  !slug.isEmpty,
+                  let name = row["name"] as? String,
+                  !name.isEmpty
+            else { return nil }
+            projects.append(.init(
+                slug: slug,
+                name: name,
+                description: row["description"] as? String
+            ))
+        }
+        return projects
+    }
+
     static func records(from event: [String: Any]) -> [MobileMemoryRecord]? {
         guard let rows = event["memories"] as? [[String: Any]] else { return nil }
         var parsed: [MobileMemoryRecord] = []
@@ -190,6 +277,9 @@ internal struct MobileBotMemorySection: View {
     @State private var kind: MobileMemoryKind = .profile
     @State private var contentDraft = ""
     @State private var records: [MobileMemoryRecord] = []
+    @State private var projects: [MobileMemoryProject] = []
+    @State private var projectNameDraft = ""
+    @State private var projectDescriptionDraft = ""
     @State private var loading = false
     @State private var mutating = false
     @State private var failure: String?
@@ -226,11 +316,56 @@ internal struct MobileBotMemorySection: View {
             .accessibilityIdentifier("mobile-agent-memory-scope")
 
             if scope == .project {
-                TextField("已加入的 Project slug", text: $projectDraft)
+                if !projects.isEmpty {
+                    Picker("已加入 Project", selection: $projectDraft) {
+                        Text("选择 Project").tag("")
+                        ForEach(projects) { project in
+                            Text(project.name).tag(project.slug)
+                        }
+                    }
+                    .disabled(mutating)
+                    .accessibilityIdentifier("mobile-agent-memory-project-picker")
+                }
+
+                TextField("Project slug", text: $projectDraft)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .disabled(mutating)
                     .accessibilityIdentifier("mobile-agent-memory-project")
+
+                DisclosureGroup("管理 Projects") {
+                    TextField("新 Project 名称", text: $projectNameDraft)
+                        .disabled(mutating)
+                        .accessibilityIdentifier("mobile-agent-memory-project-name")
+                    TextField("描述", text: $projectDescriptionDraft, axis: .vertical)
+                        .lineLimit(2...4)
+                        .disabled(mutating)
+                        .accessibilityIdentifier("mobile-agent-memory-project-description")
+                    HStack {
+                        Button("创建并加入") {
+                            Task { await createProject() }
+                        }
+                        .disabled(
+                            mutating
+                                || projectDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                || projectNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        )
+                        Button("加入") {
+                            Task { await joinProject() }
+                        }
+                        .disabled(
+                            mutating
+                                || projectDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        )
+                        Button("离开", role: .destructive) {
+                            Task { await leaveProject() }
+                        }
+                        .disabled(
+                            mutating
+                                || projectDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        )
+                    }
+                }
             }
 
             if loading {
@@ -324,6 +459,7 @@ internal struct MobileBotMemorySection: View {
         }
         .task(id: taskIdentity) {
             generation &+= 1
+            await reloadProjects()
             await reload()
         }
         .confirmationDialog(
@@ -340,6 +476,120 @@ internal struct MobileBotMemorySection: View {
         }
         .onDisappear {
             generation &+= 1
+        }
+    }
+
+    @MainActor
+    private func reloadProjects() async {
+        let fence = generation
+        do {
+            let requestId = "ios-mobile-memory-project-list-(UUID().uuidString.lowercased())"
+            _ = try await bridge.request(
+                method: "feature.execute",
+                params: [
+                    "command": MobileBotMemoryModel.projectListCommand(
+                        agentId: agentId,
+                        requestId: requestId
+                    ),
+                ]
+            )
+            let result = try await bridge.receiveFeatureEvent(deadlineMilliseconds: 2_560) { event in
+                event["type"] as? String == "memory.projectsListed"
+                    && event["agentId"] as? String == agentId
+            }
+            try Task.checkCancellation()
+            guard fence == generation,
+                  let event = result.value as? [String: Any],
+                  let next = MobileBotMemoryModel.projects(from: event)
+            else { return }
+            projects = next
+            if scope == .project,
+               let current = project,
+               !next.contains(where: { $0.slug == current })
+            {
+                projectDraft = ""
+                records = []
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard fence == generation else { return }
+            failure = "读取 Project membership 失败：(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func createProject() async {
+        guard !mutating,
+              let command = MobileBotMemoryModel.projectCreateCommand(
+                agentId: agentId,
+                slug: projectDraft,
+                name: projectNameDraft,
+                description: projectDescriptionDraft,
+                requestId: "ios-mobile-memory-project-create-(UUID().uuidString.lowercased())"
+              )
+        else { return }
+        if await mutateProject(command) {
+            projectNameDraft = ""
+            projectDescriptionDraft = ""
+        }
+    }
+
+    @MainActor
+    private func joinProject() async {
+        guard !mutating,
+              let command = MobileBotMemoryModel.projectJoinCommand(
+                agentId: agentId,
+                slug: projectDraft,
+                requestId: "ios-mobile-memory-project-join-(UUID().uuidString.lowercased())"
+              )
+        else { return }
+        _ = await mutateProject(command)
+    }
+
+    @MainActor
+    private func leaveProject() async {
+        guard !mutating,
+              let command = MobileBotMemoryModel.projectLeaveCommand(
+                agentId: agentId,
+                slug: projectDraft,
+                requestId: "ios-mobile-memory-project-leave-(UUID().uuidString.lowercased())"
+              )
+        else { return }
+        let leaving = project
+        if await mutateProject(command), project == leaving {
+            projectDraft = ""
+            records = []
+        }
+    }
+
+    @MainActor
+    private func mutateProject(_ command: [String: Any]) async -> Bool {
+        let fence = generation
+        mutating = true
+        failure = nil
+        do {
+            _ = try await bridge.request(
+                method: "feature.execute",
+                params: ["command": command]
+            )
+            _ = try await bridge.receiveFeatureEvent(deadlineMilliseconds: 2_560) { event in
+                event["type"] as? String == "memory.projectChanged"
+                    && event["agentId"] as? String == agentId
+            }
+            try Task.checkCancellation()
+            guard fence == generation else { return false }
+            mutating = false
+            await reloadProjects()
+            await reload()
+            return true
+        } catch is CancellationError {
+            return false
+        } catch {
+            guard fence == generation else { return false }
+            mutating = false
+            failure = "更新 Project membership 失败：(error.localizedDescription)"
+            return false
         }
     }
 

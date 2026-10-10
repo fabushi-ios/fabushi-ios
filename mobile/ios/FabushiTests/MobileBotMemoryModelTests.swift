@@ -92,4 +92,50 @@ final class MobileBotMemoryModelTests: XCTestCase {
         malformed["memories"] = [["id": "m1", "content": "missing kind"]]
         XCTAssertNil(MobileBotMemoryModel.records(from: malformed))
     }
+
+    func testProjectCommandsAndProjectionStayAgentScoped() {
+        let list = MobileBotMemoryModel.projectListCommand(
+            agentId: "agent-a",
+            requestId: "projects"
+        )
+        XCTAssertEqual(list["type"] as? String, "memory.projectList")
+        XCTAssertEqual(list["agentId"] as? String, "agent-a")
+
+        let create = MobileBotMemoryModel.projectCreateCommand(
+            agentId: "agent-a",
+            slug: " alpha ",
+            name: " Alpha Project ",
+            description: " shared work ",
+            requestId: "create"
+        )
+        XCTAssertEqual(create?["slug"] as? String, "alpha")
+        XCTAssertEqual(create?["name"] as? String, "Alpha Project")
+        XCTAssertEqual(create?["description"] as? String, "shared work")
+
+        XCTAssertNil(
+            MobileBotMemoryModel.projectCreateCommand(
+                agentId: "agent-a",
+                slug: "alpha",
+                name: "   ",
+                description: "",
+                requestId: "bad"
+            )
+        )
+
+        let event: [String: Any] = [
+            "type": "memory.projectsListed",
+            "agentId": "agent-a",
+            "projects": [
+                ["slug": "alpha", "name": "Alpha", "description": "One"],
+                ["slug": "beta", "name": "Beta"],
+            ],
+        ]
+        XCTAssertEqual(
+            MobileBotMemoryModel.projects(from: event),
+            [
+                MobileMemoryProject(slug: "alpha", name: "Alpha", description: "One"),
+                MobileMemoryProject(slug: "beta", name: "Beta", description: nil),
+            ]
+        )
+    }
 }

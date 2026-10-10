@@ -106,6 +106,7 @@ use mahayana_host_protocol::ListenerIntegrationSummary;
 use mahayana_host_protocol::ListenerPlatform;
 use mahayana_host_protocol::LocalToolPermission;
 use mahayana_host_protocol::MemoryKind;
+use mahayana_host_protocol::MemoryProjectSummary;
 use mahayana_host_protocol::MemoryRecord;
 use mahayana_host_protocol::MemoryScope;
 use mahayana_host_protocol::MessageDraft;
@@ -2480,6 +2481,15 @@ impl FeatureHostController {
         }
         if matches!(
             &command,
+            FeatureCommand::MemoryProjectList { .. }
+                | FeatureCommand::MemoryProjectCreate { .. }
+                | FeatureCommand::MemoryProjectJoin { .. }
+                | FeatureCommand::MemoryProjectLeave { .. }
+        ) {
+            return self.execute_memory_project(command);
+        }
+        if matches!(
+            &command,
             FeatureCommand::MemoryList { .. }
                 | FeatureCommand::MemoryAdd { .. }
                 | FeatureCommand::MemoryRemove { .. }
@@ -4634,6 +4644,103 @@ impl FeatureHostController {
             }
         }
         Ok(())
+    }
+
+    fn execute_memory_project(
+        &self,
+        command: FeatureCommand,
+    ) -> Result<CommandAccepted, FeatureHostError> {
+        let request_id = command.request_id().to_string();
+        let agent_id = match &command {
+            FeatureCommand::MemoryProjectList { agent_id, .. }
+            | FeatureCommand::MemoryProjectCreate { agent_id, .. }
+            | FeatureCommand::MemoryProjectJoin { agent_id, .. }
+            | FeatureCommand::MemoryProjectLeave { agent_id, .. } => agent_id.clone(),
+            _ => unreachable!("non-project-memory command routed to project executor"),
+        };
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            if !state.bots.contains_key(&agent_id) {
+                return Err(FeatureHostError::Contract(format!("unknown bot: {agent_id}")));
+            }
+        }
+        if !is_safe_memory_agent_id(&agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unsafe memory agent id: {agent_id}"
+            )));
+        }
+        let account_agents_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("memory storage is unavailable".into()))?;
+
+        match command {
+            FeatureCommand::MemoryProjectList { .. } => {
+                let projects =
+                    crate::shared_memory::list_joined_projects(&account_agents_root, &agent_id)
+                        .map_err(FeatureHostError::Contract)?;
+                self.state()?.events.push_back(HostEvent::MemoryProjectsListed {
+                    timestamp: timestamp(),
+                    agent_id,
+                    projects,
+                });
+            }
+            FeatureCommand::MemoryProjectCreate {
+                slug,
+                name,
+                description,
+                ..
+            } => {
+                let project = crate::shared_memory::create_or_join_project(
+                    &account_agents_root,
+                    &agent_id,
+                    &slug,
+                    &name,
+                    description.as_deref(),
+                )
+                .map_err(FeatureHostError::Contract)?;
+                self.state()?.events.push_back(HostEvent::MemoryProjectChanged {
+                    timestamp: timestamp(),
+                    agent_id,
+                    action: "createdOrJoined".into(),
+                    project: Some(project),
+                });
+            }
+            FeatureCommand::MemoryProjectJoin { slug, .. } => {
+                let project = crate::shared_memory::join_project(
+                    &account_agents_root,
+                    &agent_id,
+                    &slug,
+                )
+                .map_err(FeatureHostError::Contract)?;
+                self.state()?.events.push_back(HostEvent::MemoryProjectChanged {
+                    timestamp: timestamp(),
+                    agent_id,
+                    action: "joined".into(),
+                    project: Some(project),
+                });
+            }
+            FeatureCommand::MemoryProjectLeave { slug, .. } => {
+                let project = crate::shared_memory::leave_project(
+                    &account_agents_root,
+                    &agent_id,
+                    &slug,
+                )
+                .map_err(FeatureHostError::Contract)?;
+                self.state()?.events.push_back(HostEvent::MemoryProjectChanged {
+                    timestamp: timestamp(),
+                    agent_id,
+                    action: "left".into(),
+                    project,
+                });
+            }
+            _ => unreachable!("non-project-memory command routed to project executor"),
+        }
+
+        Ok(CommandAccepted {
+            request_id,
+            operation_id: None,
+        })
     }
 
     fn execute_memory(&self, command: FeatureCommand) -> Result<CommandAccepted, FeatureHostError> {

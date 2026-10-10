@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use mahayana_host_protocol::{MemoryKind, MemoryRecord, MemoryScope};
+use mahayana_host_protocol::{MemoryKind, MemoryProjectSummary, MemoryRecord, MemoryScope};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -19,7 +19,7 @@ struct ScopedFact {
     order: usize,
 }
 
-fn safe_component(value: &str) -> bool {
+pub(crate) fn safe_component(value: &str) -> bool {
     !value.is_empty()
         && value
             .chars()
@@ -194,7 +194,7 @@ fn render_scoped_sections(
     lines.join("\n")
 }
 
-fn read_memberships(agent_root: &Path) -> BTreeSet<String> {
+pub(crate) fn read_memberships(agent_root: &Path) -> BTreeSet<String> {
     let Ok(raw) = fs::read_to_string(agent_root.join("projects.json")) else {
         return BTreeSet::new();
     };
@@ -294,6 +294,176 @@ pub(crate) fn resolve_scoped_memory_dir(
             Ok(project_dir.join("memory").join("agents").join(own_agent_id))
         }
     }
+}
+
+fn write_atomic(path: &Path, body: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = PathBuf::from(format!("{}.{}.tmp", path.display(), std::process::id()));
+    fs::write(&temporary, body)?;
+    match fs::rename(&temporary, path) {
+        Ok(()) => Ok(()),
+        Err(first) if path.exists() => {
+            fs::remove_file(path)?;
+            fs::rename(&temporary, path).map_err(|_| first)
+        }
+        Err(error) => {
+            let _ = fs::remove_file(&temporary);
+            Err(error)
+        }
+    }
+}
+
+fn write_memberships(agent_root: &Path, slugs: &BTreeSet<String>) -> Result<(), String> {
+    let body = serde_json::to_string_pretty(&serde_json::json!({
+        "projects": slugs.iter().cloned().collect::<Vec<_>>()
+    }))
+    .map_err(|error| format!("serialize project membership: {error}"))?;
+    write_atomic(
+        &agent_root.join("projects.json"),
+        format!("{body}\n").as_bytes(),
+    )
+    .map_err(|error| format!("write project membership: {error}"))
+}
+
+fn project_frontmatter(project_dir: &Path, slug: &str) -> MemoryProjectSummary {
+    let raw = fs::read_to_string(project_dir.join("project.md")).unwrap_or_default();
+    let mut in_frontmatter = false;
+    let mut name = None;
+    let mut description = None;
+    for line in raw.lines().map(str::trim) {
+        if line == "---" {
+            if in_frontmatter {
+                break;
+            }
+            in_frontmatter = true;
+            continue;
+        }
+        if !in_frontmatter {
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("name:") {
+            let value = value.trim().trim_matches(['"', '\'']);
+            if !value.is_empty() {
+                name = Some(value.to_string());
+            }
+        } else if let Some(value) = line.strip_prefix("description:") {
+            let value = value.trim().trim_matches(['"', '\'']);
+            if !value.is_empty() {
+                description = Some(value.to_string());
+            }
+        }
+    }
+    MemoryProjectSummary {
+        slug: slug.to_string(),
+        name: name.unwrap_or_else(|| slug.to_string()),
+        description,
+    }
+}
+
+pub(crate) fn list_joined_projects(
+    account_agents_root: &Path,
+    agent_id: &str,
+) -> Result<Vec<MemoryProjectSummary>, String> {
+    if !safe_component(agent_id) {
+        return Err(format!("unsafe memory agent id: {agent_id}"));
+    }
+    let sand_root = account_agents_root.parent().unwrap_or(account_agents_root);
+    let agent_root = account_agents_root.join(agent_id);
+    let mut membership = read_memberships(&agent_root);
+    let before = membership.len();
+    membership.retain(|slug| sand_root.join("projects").join(slug).is_dir());
+    if membership.len() != before {
+        write_memberships(&agent_root, &membership)?;
+    }
+    Ok(membership
+        .into_iter()
+        .map(|slug| project_frontmatter(&sand_root.join("projects").join(&slug), &slug))
+        .collect())
+}
+
+pub(crate) fn create_or_join_project(
+    account_agents_root: &Path,
+    agent_id: &str,
+    slug: &str,
+    name: &str,
+    description: Option<&str>,
+) -> Result<MemoryProjectSummary, String> {
+    if !safe_component(agent_id) {
+        return Err(format!("unsafe memory agent id: {agent_id}"));
+    }
+    let slug = slug.trim();
+    if !safe_component(slug) {
+        return Err(format!("invalid project slug: {slug}"));
+    }
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("a project needs a non-empty name".into());
+    }
+    let sand_root = account_agents_root.parent().unwrap_or(account_agents_root);
+    let project_dir = sand_root.join("projects").join(slug);
+    if !project_dir.exists() {
+        fs::create_dir_all(&project_dir)
+            .map_err(|error| format!("create project {slug}: {error}"))?;
+        let body = format!(
+            "---\nname: {}\ndescription: {}\n---\n",
+            name,
+            description.unwrap_or_default().trim()
+        );
+        write_atomic(&project_dir.join("project.md"), body.as_bytes())
+            .map_err(|error| format!("write project {slug}: {error}"))?;
+    }
+    join_project(account_agents_root, agent_id, slug)?;
+    Ok(project_frontmatter(&project_dir, slug))
+}
+
+pub(crate) fn join_project(
+    account_agents_root: &Path,
+    agent_id: &str,
+    slug: &str,
+) -> Result<MemoryProjectSummary, String> {
+    if !safe_component(agent_id) {
+        return Err(format!("unsafe memory agent id: {agent_id}"));
+    }
+    let slug = slug.trim();
+    if !safe_component(slug) {
+        return Err(format!("invalid project slug: {slug}"));
+    }
+    let sand_root = account_agents_root.parent().unwrap_or(account_agents_root);
+    let project_dir = sand_root.join("projects").join(slug);
+    if !project_dir.is_dir() {
+        return Err(format!("no project {slug} exists"));
+    }
+    let agent_root = account_agents_root.join(agent_id);
+    let mut membership = read_memberships(&agent_root);
+    membership.insert(slug.to_string());
+    write_memberships(&agent_root, &membership)?;
+    Ok(project_frontmatter(&project_dir, slug))
+}
+
+pub(crate) fn leave_project(
+    account_agents_root: &Path,
+    agent_id: &str,
+    slug: &str,
+) -> Result<Option<MemoryProjectSummary>, String> {
+    if !safe_component(agent_id) {
+        return Err(format!("unsafe memory agent id: {agent_id}"));
+    }
+    let slug = slug.trim();
+    if !safe_component(slug) {
+        return Err(format!("invalid project slug: {slug}"));
+    }
+    let sand_root = account_agents_root.parent().unwrap_or(account_agents_root);
+    let project_dir = sand_root.join("projects").join(slug);
+    let summary = project_dir
+        .is_dir()
+        .then(|| project_frontmatter(&project_dir, slug));
+    let agent_root = account_agents_root.join(agent_id);
+    let mut membership = read_memberships(&agent_root);
+    membership.remove(slug);
+    write_memberships(&agent_root, &membership)?;
+    Ok(summary)
 }
 
 pub(crate) fn render_shared_memory_prompt(
@@ -437,6 +607,43 @@ mod tests {
         );
         assert!(rendered.contains("[via Planner]"));
         assert!(rendered.contains("[episode] booked Tokyo"));
+        let _ = fs::remove_dir_all(sand);
+    }
+
+    #[test]
+    fn project_membership_create_join_leave_and_prune_are_durable() {
+        let sand = fixture_root("membership");
+        let agents = sand.join("agents");
+        fs::create_dir_all(agents.join("agent-a")).expect("agent");
+
+        let created = create_or_join_project(
+            &agents,
+            "agent-a",
+            "alpha",
+            "Alpha Project",
+            Some("shared work"),
+        )
+        .expect("create");
+        assert_eq!(created.slug, "alpha");
+        assert_eq!(created.name, "Alpha Project");
+        assert!(read_memberships(&agents.join("agent-a")).contains("alpha"));
+
+        fs::create_dir_all(sand.join("projects/beta")).expect("beta");
+        fs::write(
+            sand.join("projects/beta/project.md"),
+            "---\nname: Beta\ndescription: second\n---\n",
+        )
+        .expect("beta metadata");
+        join_project(&agents, "agent-a", "beta").expect("join");
+        let projects = list_joined_projects(&agents, "agent-a").expect("list");
+        assert_eq!(projects.iter().map(|project| project.slug.as_str()).collect::<Vec<_>>(), vec!["alpha", "beta"]);
+
+        leave_project(&agents, "agent-a", "alpha").expect("leave");
+        assert!(!read_memberships(&agents.join("agent-a")).contains("alpha"));
+
+        fs::remove_dir_all(sand.join("projects/beta")).expect("remove beta");
+        assert!(list_joined_projects(&agents, "agent-a").expect("prune").is_empty());
+        assert!(read_memberships(&agents.join("agent-a")).is_empty());
         let _ = fs::remove_dir_all(sand);
     }
 
