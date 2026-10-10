@@ -67,6 +67,12 @@ struct LoginBlob: View {
     }
 }
 
+internal struct HumanMediaRetryDraft: Equatable {
+    let conversationId: String
+    let attachments: [OutgoingChatAttachment]
+    let plan: HumanMediaGroupRetryPlan
+}
+
 struct ContentView: View {
     @Bindable var model: MarketplaceModel
     @Bindable var messaging: MessagingModel
@@ -124,6 +130,7 @@ struct ContentView: View {
     @State var chatSearchLoading = false
     @State var chatSearchError: String?
     @State var attachmentPickerPresented = false
+    @State var humanMediaRetry: HumanMediaRetryDraft?
     @State var locationSharePresented = false
     @State var locationService = LocationService()
     @State var voiceRecorder = VoiceRecorder()

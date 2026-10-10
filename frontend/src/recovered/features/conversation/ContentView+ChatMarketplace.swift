@@ -871,6 +871,34 @@ extension ContentView {
                         .padding(.vertical, 6)
                         .background(.ultraThinMaterial)
                     }
+                    if let retry = humanMediaRetry,
+                       retry.conversationId == conversation.id
+                    {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise.circle.fill")
+                                .foregroundStyle(.orange)
+                            Text("附件组已发送 \(retry.plan.nextIndex)/\(retry.plan.totalCount)")
+                                .font(.caption)
+                            Spacer()
+                            Button("重试剩余附件") {
+                                sendHumanAttachments(
+                                    conversationId: conversation.id,
+                                    attachments: retry.attachments,
+                                    retryPlan: retry.plan
+                                )
+                            }
+                            .font(.caption.weight(.semibold))
+                            Button {
+                                humanMediaRetry = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .accessibilityLabel("Discard attachment retry")
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial)
+                    }
                     if voiceRecorder.isRecording {
                         HStack(spacing: 10) {
                             Circle().fill(Color.red).frame(width: 9, height: 9)
@@ -987,6 +1015,9 @@ extension ContentView {
             humanHandoffAgents = []
             humanHandoffBusy = false
             humanHandoffError = nil
+            if humanMediaRetry?.conversationId != conversation.id {
+                humanMediaRetry = nil
+            }
             if let bridge {
                 do {
                     let agents = try await GrokMobileBotService(bridge: bridge).loadOnboardingAgents()
@@ -1046,16 +1077,10 @@ extension ContentView {
                         )
                     )
                 }
-                Task {
-                    do {
-                        try await messaging.sendAttachments(
-                            conversationId: conversation.id,
-                            attachments: attachments
-                        )
-                    } catch {
-                        model.message = "附件发送失败：\(error.localizedDescription)"
-                    }
-                }
+                sendHumanAttachments(
+                    conversationId: conversation.id,
+                    attachments: attachments
+                )
             } catch {
                 model.message = "读取附件失败：\(error.localizedDescription)"
             }
@@ -1233,6 +1258,35 @@ extension ContentView {
         }
         chatSearchMatchIndex = next
         chatSearchTargetID = matches[next].entryId
+    }
+
+    func sendHumanAttachments(
+        conversationId: String,
+        attachments: [OutgoingChatAttachment],
+        retryPlan: HumanMediaGroupRetryPlan? = nil
+    ) {
+        Task {
+            do {
+                try await messaging.sendAttachments(
+                    conversationId: conversationId,
+                    attachments: attachments,
+                    retryPlan: retryPlan
+                )
+                guard selectedConversation?.id == conversationId else { return }
+                humanMediaRetry = nil
+            } catch let partial as HumanMediaGroupSendError {
+                guard selectedConversation?.id == conversationId else { return }
+                humanMediaRetry = .init(
+                    conversationId: conversationId,
+                    attachments: attachments,
+                    plan: partial.retryPlan
+                )
+                model.message = partial.localizedDescription
+            } catch {
+                guard selectedConversation?.id == conversationId else { return }
+                model.message = "附件发送失败：\(error.localizedDescription)"
+            }
+        }
     }
 
     func sendMessage(in conversation: ConversationSummary, silent: Bool = false, scheduledAtMs: Int64? = nil) {

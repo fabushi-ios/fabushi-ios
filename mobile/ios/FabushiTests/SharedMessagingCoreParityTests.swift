@@ -2,6 +2,39 @@ import XCTest
 @testable import Fabushi
 
 final class SharedMessagingCoreParityTests: XCTestCase {
+    func testHumanMediaGroupRetryPlanPreservesChildIdentityAndSuffix() throws {
+        let plan = HumanMediaGroupRetryPlan(
+            groupId: "group-a",
+            nextIndex: 2,
+            totalCount: 4
+        )
+        XCTAssertEqual(
+            validatedHumanMediaGroupRetryStart(plan, attachmentCount: 4),
+            2
+        )
+        XCTAssertEqual(
+            humanMediaGroupClientMessageId(groupId: plan.groupId, index: 0, totalCount: 4),
+            "ios-media-group:group-a:0:4"
+        )
+        XCTAssertEqual(
+            humanMediaGroupClientMessageId(groupId: plan.groupId, index: 2, totalCount: 4),
+            "ios-media-group:group-a:2:4"
+        )
+        XCTAssertNil(
+            validatedHumanMediaGroupRetryStart(
+                .init(groupId: "group-a", nextIndex: 4, totalCount: 4),
+                attachmentCount: 4
+            )
+        )
+        XCTAssertNil(
+            validatedHumanMediaGroupRetryStart(
+                .init(groupId: "group-a", nextIndex: 2, totalCount: 5),
+                attachmentCount: 4
+            )
+        )
+    }
+
+
     private func chatMessage(
         id: String,
         conversationId: String = "conversation-1",

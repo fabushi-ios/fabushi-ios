@@ -132,6 +132,47 @@ internal struct OutgoingChatAttachment: Equatable, Sendable {
     let data: Data
 }
 
+internal struct HumanMediaGroupRetryPlan: Equatable, Sendable {
+    let groupId: String
+    let nextIndex: Int
+    let totalCount: Int
+}
+
+internal enum HumanMediaGroupSendError: LocalizedError {
+    case partial(plan: HumanMediaGroupRetryPlan, message: String)
+
+    var retryPlan: HumanMediaGroupRetryPlan {
+        switch self {
+        case .partial(let plan, _): plan
+        }
+    }
+
+    var errorDescription: String? {
+        switch self {
+        case .partial(let plan, let message):
+            return "附件组已发送 \(plan.nextIndex)/\(plan.totalCount)，可从失败位置继续：\(message)"
+        }
+    }
+}
+
+internal func humanMediaGroupClientMessageId(groupId: String, index: Int, totalCount: Int) -> String {
+    "ios-media-group:\(groupId):\(index):\(totalCount)"
+}
+
+internal func validatedHumanMediaGroupRetryStart(
+    _ plan: HumanMediaGroupRetryPlan?,
+    attachmentCount: Int
+) -> Int? {
+    guard let plan else { return 0 }
+    guard attachmentCount > 1,
+          plan.totalCount == attachmentCount,
+          !plan.groupId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          plan.nextIndex >= 0,
+          plan.nextIndex < attachmentCount
+    else { return nil }
+    return plan.nextIndex
+}
+
 internal struct ChatMessage: Identifiable, Equatable, Sendable {
     let id: String
     let conversationId: String
@@ -451,7 +492,8 @@ final class MessagingModel {
 
     func sendAttachments(
         conversationId: String,
-        attachments: [OutgoingChatAttachment]
+        attachments: [OutgoingChatAttachment],
+        retryPlan: HumanMediaGroupRetryPlan? = nil
     ) async throws {
         guard !attachments.isEmpty else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空附件组")
@@ -462,17 +504,27 @@ final class MessagingModel {
         guard attachments.allSatisfy({ !$0.data.isEmpty }) else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("不能发送空文件")
         }
+        guard let retryStart = validatedHumanMediaGroupRetryStart(
+            retryPlan,
+            attachmentCount: attachments.count
+        ) else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("附件组重试状态已失效")
+        }
+        let groupId: String? = attachments.count > 1
+            ? (retryPlan?.groupId ?? UUID().uuidString.lowercased())
+            : nil
         try await ensureIdentity()
 
         struct UploadedAttachment {
             let input: OutgoingChatAttachment
+            let originalIndex: Int
             let blobId: String
             let content: [String: Any]
         }
 
         var uploaded: [UploadedAttachment] = []
         do {
-            for attachment in attachments {
+            for (originalIndex, attachment) in attachments.enumerated().dropFirst(retryStart) {
                 let blobId = "blob-\(UUID().uuidString.lowercased())"
                 let createdAt = Int64(Date().timeIntervalSince1970 * 1000)
                 _ = try await execute(command: [
@@ -531,25 +583,37 @@ final class MessagingModel {
                         "data": ["media": media, "caption": caption],
                     ]
                 }
-                uploaded.append(.init(input: attachment, blobId: blobId, content: content))
+                uploaded.append(.init(
+                    input: attachment,
+                    originalIndex: originalIndex,
+                    blobId: blobId,
+                    content: content
+                ))
             }
         } catch {
             for item in uploaded {
                 _ = try? await execute(command: ["type": "deleteBlob", "blobId": item.blobId])
             }
+            if let groupId {
+                throw HumanMediaGroupSendError.partial(
+                    plan: .init(groupId: groupId, nextIndex: retryStart, totalCount: attachments.count),
+                    message: error.localizedDescription
+                )
+            }
             throw error
         }
 
-        let groupId = attachments.count > 1
-            ? UUID().uuidString.lowercased()
-            : nil
         var sentCount = 0
         do {
-            for (index, item) in uploaded.enumerated() {
+            for item in uploaded {
                 try Task.checkCancellation()
                 let clientMessageId: String
                 if let groupId {
-                    clientMessageId = "ios-media-group:\(groupId):\(index):\(uploaded.count)"
+                    clientMessageId = humanMediaGroupClientMessageId(
+                        groupId: groupId,
+                        index: item.originalIndex,
+                        totalCount: attachments.count
+                    )
                 } else {
                     clientMessageId = "ios:\(UUID().uuidString.lowercased())"
                 }
@@ -569,6 +633,16 @@ final class MessagingModel {
         } catch {
             for item in uploaded.dropFirst(sentCount) {
                 _ = try? await execute(command: ["type": "deleteBlob", "blobId": item.blobId])
+            }
+            if let groupId {
+                throw HumanMediaGroupSendError.partial(
+                    plan: .init(
+                        groupId: groupId,
+                        nextIndex: min(attachments.count - 1, retryStart + sentCount),
+                        totalCount: attachments.count
+                    ),
+                    message: error.localizedDescription
+                )
             }
             throw error
         }
