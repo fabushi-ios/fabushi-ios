@@ -21,6 +21,14 @@ pub enum RemoteShellResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemoteWriteResult {
+    Success,
+    Error(String),
+    Rejected(String),
+    Other(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SandBoxFileTransferError {
     Transfer(String),
     SignalKilled(String),
@@ -76,6 +84,18 @@ pub fn describe_shell_failure(result: &RemoteShellResult) -> String {
     }
 }
 
+pub fn describe_write_failure(result: &RemoteWriteResult) -> String {
+    match result {
+        RemoteWriteResult::Success => "success".into(),
+        RemoteWriteResult::Error(error) => format!("error: {error}"),
+        RemoteWriteResult::Rejected(reason) => format!("rejected: {reason}"),
+        RemoteWriteResult::Other(case) if !case.is_empty() => {
+            format!("{case}: {case}")
+        }
+        RemoteWriteResult::Other(_) => "unknown: unknown".into(),
+    }
+}
+
 pub fn as_transient_box_shell_error(
     result: &RemoteShellResult,
     context: &str,
@@ -118,7 +138,7 @@ pub trait FileTransferRemoteRunner<Context> {
         box_path: &str,
         data: &[u8],
         tool_call_id: &str,
-    ) -> Result<(), Self::Error>;
+    ) -> Result<RemoteWriteResult, Self::Error>;
 }
 
 pub async fn run_box_shell<Context, Runner>(
@@ -174,14 +194,33 @@ pub async fn write_file_bytes_via_exec_daemon<Context, Runner>(
 where
     Runner: FileTransferRemoteRunner<Context>,
 {
-    runner
+    let result = runner
         .write_file_bytes(context, box_path, data, TRANSFER_TOOL_CALL_ID)
         .await
         .map_err(|error| {
             SandBoxFileTransferError::Transfer(format!(
                 "upload to box {box_path} failed: {error}"
             ))
-        })
+        })?;
+    match result {
+        RemoteWriteResult::Success => Ok(()),
+        RemoteWriteResult::Error(error) => {
+            Err(SandBoxFileTransferError::Transfer(format!(
+                "upload to box {box_path} failed (error): {error}"
+            )))
+        }
+        RemoteWriteResult::Rejected(reason) => {
+            Err(SandBoxFileTransferError::Transfer(format!(
+                "upload to box {box_path} failed (rejected): {reason}"
+            )))
+        }
+        RemoteWriteResult::Other(case) => {
+            let case = if case.is_empty() { "unknown".into() } else { case };
+            Err(SandBoxFileTransferError::Transfer(format!(
+                "upload to box {box_path} failed ({case}): {case}"
+            )))
+        }
+    }
 }
 
 fn parent_posix(path: &str) -> &str {
@@ -223,7 +262,7 @@ where
         return Err(error);
     }
 
-    run_box_shell(
+    if let Err(error) = run_box_shell(
         context,
         runner,
         &format!(
@@ -233,17 +272,41 @@ where
         ),
     )
     .await
+    {
+        let _ = run_box_shell(
+            context,
+            runner,
+            &format!("rm -f -- {}", shell_single_quote(&part)),
+        )
+        .await;
+        return Err(error);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::convert::Infallible;
+    use std::collections::VecDeque;
     use std::sync::Mutex;
 
     struct Runner {
         shell: Mutex<Vec<HostShellArgs>>,
+        shell_results: Mutex<VecDeque<RemoteShellResult>>,
         writes: Mutex<Vec<(String, Vec<u8>, String)>>,
+        write_result: Mutex<RemoteWriteResult>,
+    }
+
+    impl Runner {
+        fn successful() -> Self {
+            Self {
+                shell: Mutex::new(Vec::new()),
+                shell_results: Mutex::new(VecDeque::new()),
+                writes: Mutex::new(Vec::new()),
+                write_result: Mutex::new(RemoteWriteResult::Success),
+            }
+        }
     }
 
     impl FileTransferRemoteRunner<()> for Runner {
@@ -255,10 +318,15 @@ mod tests {
             args: HostShellArgs,
         ) -> Result<RemoteShellResult, Self::Error> {
             self.shell.lock().unwrap().push(args);
-            Ok(RemoteShellResult::Success {
-                exit_code: 0,
-                stderr: String::new(),
-            })
+            Ok(self
+                .shell_results
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or(RemoteShellResult::Success {
+                    exit_code: 0,
+                    stderr: String::new(),
+                }))
         }
 
         async fn write_file_bytes(
@@ -267,13 +335,13 @@ mod tests {
             box_path: &str,
             data: &[u8],
             tool_call_id: &str,
-        ) -> Result<(), Self::Error> {
+        ) -> Result<RemoteWriteResult, Self::Error> {
             self.writes.lock().unwrap().push((
                 box_path.into(),
                 data.to_vec(),
                 tool_call_id.into(),
             ));
-            Ok(())
+            Ok(self.write_result.lock().unwrap().clone())
         }
     }
 
@@ -302,11 +370,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn write_preserves_typed_remote_result_branches() {
+        for (result, marker) in [
+            (RemoteWriteResult::Error("disk full".into()), "(error): disk full"),
+            (RemoteWriteResult::Rejected("policy".into()), "(rejected): policy"),
+            (RemoteWriteResult::Other("permission-denied".into()), "(permission-denied): permission-denied"),
+        ] {
+            let runner = Runner::successful();
+            *runner.write_result.lock().unwrap() = result;
+            let error = write_file_bytes_via_exec_daemon(
+                &(),
+                &runner,
+                "/workspace/a",
+                b"x",
+            )
+            .await
+            .unwrap_err();
+            assert!(matches!(
+                error,
+                SandBoxFileTransferError::Transfer(message)
+                    if message.contains(marker)
+            ));
+        }
+    }
+
+    #[tokio::test]
     async fn upload_uses_part_file_then_atomic_remote_move() {
-        let runner = Runner {
-            shell: Mutex::new(Vec::new()),
-            writes: Mutex::new(Vec::new()),
-        };
+        let runner = Runner::successful();
         upload_file_via_exec_daemon(
             &(),
             &runner,
@@ -329,5 +419,64 @@ mod tests {
         assert_eq!(shell.len(), 2);
         assert!(shell[0].command.contains("mkdir -p"));
         assert!(shell[1].command.contains("mv -f"));
+    }
+
+    #[tokio::test]
+    async fn typed_write_failure_cleans_part_file() {
+        let runner = Runner::successful();
+        *runner.write_result.lock().unwrap() =
+            RemoteWriteResult::Rejected("policy".into());
+        let error = upload_file_via_exec_daemon(
+            &(),
+            &runner,
+            "/workspace/uploads/a.txt",
+            b"hello",
+            "deadbeef",
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            SandBoxFileTransferError::Transfer(message)
+                if message.contains("(rejected): policy")
+        ));
+        let shell = runner.shell.lock().unwrap();
+        assert_eq!(shell.len(), 2);
+        assert!(shell[1].command.contains("rm -f"));
+        assert!(shell[1].command.contains(".sand-deadbeef.part"));
+    }
+
+    #[tokio::test]
+    async fn atomic_move_failure_also_cleans_part_file() {
+        let runner = Runner::successful();
+        runner.shell_results.lock().unwrap().extend([
+            RemoteShellResult::Success {
+                exit_code: 0,
+                stderr: String::new(),
+            },
+            RemoteShellResult::Failure {
+                exit_code: 1,
+                signal: String::new(),
+                stderr: "rename failed".into(),
+                aborted: false,
+            },
+            RemoteShellResult::Success {
+                exit_code: 0,
+                stderr: String::new(),
+            },
+        ]);
+        assert!(upload_file_via_exec_daemon(
+            &(),
+            &runner,
+            "/workspace/uploads/a.txt",
+            b"hello",
+            "deadbeef",
+        )
+        .await
+        .is_err());
+        let shell = runner.shell.lock().unwrap();
+        assert_eq!(shell.len(), 3);
+        assert!(shell[1].command.contains("mv -f"));
+        assert!(shell[2].command.contains("rm -f"));
     }
 }
