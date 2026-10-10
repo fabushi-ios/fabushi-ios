@@ -16,6 +16,8 @@ final class RemoteComputerTeachRecordingTests: XCTestCase {
         var statusCalls = 0
         var starts: [(String, String)] = []
         var stops: [(String, Bool)] = []
+        var suspendNextStart = false
+        var startContinuation: CheckedContinuation<TeachRecordingStatus, Never>?
 
         func status() async throws -> TeachRecordingStatus {
             statusCalls += 1
@@ -24,7 +26,19 @@ final class RemoteComputerTeachRecordingTests: XCTestCase {
 
         func start(agentID: String, entryPoint: String) async throws -> TeachRecordingStatus {
             starts.append((agentID, entryPoint))
+            if suspendNextStart {
+                suspendNextStart = false
+                return await withCheckedContinuation { continuation in
+                    startContinuation = continuation
+                }
+            }
             return startValue
+        }
+
+        func resumeStart() {
+            let continuation = startContinuation
+            startContinuation = nil
+            continuation?.resume(returning: startValue)
         }
 
         func stop(agentID: String, save: Bool) async throws -> TeachRecordingStatus {
@@ -154,6 +168,43 @@ final class RemoteComputerTeachRecordingTests: XCTestCase {
         XCTAssertEqual(source.statusCalls, 2)
         XCTAssertEqual(owner.status.state, .idle)
         XCTAssertEqual(capture.stops.last, false)
+    }
+
+    func testResetWhileStartIsInFlightWaitsForLateStartThenDiscardsIt() async {
+        let source = FakeSource()
+        source.suspendNextStart = true
+        let capture = FakeCapture()
+        let owner = RemoteComputerTeachRecordingOwner(
+            source: source,
+            capture: capture
+        )
+
+        let startTask = Task {
+            await owner.start(
+                agentID: "agent-a",
+                entryPoint: "fullscreen_title_bar"
+            )
+        }
+        for _ in 0..<20 where source.startContinuation == nil {
+            await Task.yield()
+        }
+        XCTAssertNotNil(source.startContinuation)
+        XCTAssertEqual(owner.status.state, .recording)
+
+        owner.reset()
+        XCTAssertEqual(owner.status.state, .idle)
+        XCTAssertTrue(source.stops.isEmpty)
+
+        source.resumeStart()
+        await startTask.value
+        for _ in 0..<20 where source.stops.isEmpty {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(source.stops.last?.0, "agent-a")
+        XCTAssertEqual(source.stops.last?.1, false)
+        XCTAssertFalse(capture.isRecording)
+        XCTAssertEqual(owner.status.state, .idle)
     }
 
     func testResetDiscardsActiveTeachSessionAndClearsArm() async {
