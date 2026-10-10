@@ -691,7 +691,7 @@ impl<S: MessagingStateStore> MessagingService<S> {
                 "remote Human message sender is not a conversation participant".into(),
             ));
         }
-        if matches!(message.delivery_state, DeliveryState::Pending { .. }) {
+        if matches!(&message.delivery_state, DeliveryState::Pending { .. }) {
             return Err(MessagingServiceError::Invariant(
                 "server-authoritative remote messages cannot be imported as Pending".into(),
             ));

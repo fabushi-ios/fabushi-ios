@@ -222,6 +222,13 @@ final class MessagingModel {
 
     func createDirect(contact: MessagingContact) async throws -> ConversationSummary? {
         try await ensureIdentity()
+        if let existing = conversations.first(where: { conversation in
+            conversation.kind == .direct
+                && conversation.participants.contains(where: { $0.actorId == actorId })
+                && conversation.participants.contains(where: { $0.actorId == contact.id })
+        }) {
+            return existing
+        }
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         let id = "direct:\(UUID().uuidString.lowercased())"
         let participants: [[String: Any]] = [

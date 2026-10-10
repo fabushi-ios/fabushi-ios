@@ -18,11 +18,28 @@ use chrono::Utc;
 use crate::channel_management::AgentChannelStore;
 use crate::client_side_tool_v2::{ClientSideToolV2Producer, FAMILY as CLIENT_SIDE_TOOL_V2_FAMILY};
 use fabushi_messaging_core::BlobId;
+use fabushi_messaging_core::BlobMetadata as MessagingBlobMetadata;
+use fabushi_messaging_core::ClientCommand as MessagingClientCommand;
 use fabushi_messaging_core::ClientEnvelope as MessagingClientEnvelope;
+use fabushi_messaging_core::ClientMessageId as MessagingClientMessageId;
+use fabushi_messaging_core::Conversation as MessagingConversation;
+use fabushi_messaging_core::ConversationId as MessagingConversationId;
+use fabushi_messaging_core::ConversationKind as MessagingConversationKind;
+use fabushi_messaging_core::DeliveryState as MessagingDeliveryState;
 use fabushi_messaging_core::FileBlobStore;
+use fabushi_messaging_core::FormattedText as MessagingFormattedText;
 use fabushi_messaging_core::JsonFileStateStore;
+use fabushi_messaging_core::MediaRef as MessagingMediaRef;
+use fabushi_messaging_core::Message as MessagingMessage;
+use fabushi_messaging_core::MessageContent as MessagingMessageContent;
+use fabushi_messaging_core::MessageId as MessagingMessageId;
 use fabushi_messaging_core::MessagingService;
-use fabushi_messaging_core::{AccessGrant, AccessScope, ActorId, FileAccessTokenStore};
+use fabushi_messaging_core::Participant as MessagingParticipant;
+use fabushi_messaging_core::ParticipantRole as MessagingParticipantRole;
+use fabushi_messaging_core::PresenceStatus as MessagingPresenceStatus;
+use fabushi_messaging_core::ReactionSummary as MessagingReactionSummary;
+use fabushi_messaging_core::ServerEnvelope as MessagingServerEnvelope;
+use fabushi_messaging_core::{AccessGrant, AccessScope, Actor as MessagingActor, ActorId, FileAccessTokenStore};
 #[cfg(feature = "production")]
 use mahayana_core::ApprovalDecision as RuntimeApprovalDecision;
 #[cfg(feature = "production")]
@@ -188,6 +205,78 @@ const GROUP_MAX_MEMBERS: usize = 6;
 const REMOTE_DEVICE_SECRET_MAX_ENTRIES: usize = 256;
 const REMOTE_DEVICE_SECRET_MAX_BYTES: u64 = 256 * 1024;
 static MESSAGING_IO_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+#[cfg(feature = "production")]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ShippingRemoteHumanContact {
+    #[serde(default)]
+    id: Value,
+    #[serde(default)]
+    user_id: Value,
+    #[serde(default)]
+    username: String,
+    #[serde(default)]
+    display_name: String,
+    #[serde(default)]
+    avatar_url: Option<String>,
+    #[serde(default)]
+    status: String,
+}
+
+#[cfg(feature = "production")]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ShippingRemoteHumanAttachment {
+    resource_id: String,
+    name: String,
+    content_type: String,
+    size: u64,
+    created_at: String,
+}
+
+#[cfg(feature = "production")]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ShippingRemoteHumanReaction {
+    emoji: String,
+    count: u64,
+    reacted_by_me: bool,
+}
+
+#[cfg(feature = "production")]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ShippingRemoteHumanMessage {
+    id: Value,
+    sender_user_id: Value,
+    #[serde(default)]
+    sender_username: Option<String>,
+    recipient_user_id: Value,
+    #[serde(default)]
+    recipient_username: Option<String>,
+    #[serde(default)]
+    text: String,
+    #[serde(default)]
+    client_request_id: Option<String>,
+    created_at: String,
+    #[serde(default)]
+    read_at: Option<String>,
+    #[serde(default)]
+    is_outgoing: bool,
+    #[serde(default)]
+    reply_to_message_id: Option<Value>,
+    #[serde(default)]
+    attachments: Vec<ShippingRemoteHumanAttachment>,
+    #[serde(default)]
+    reactions: Vec<ShippingRemoteHumanReaction>,
+    #[serde(default)]
+    silent: bool,
+    #[serde(default)]
+    scheduled_at_ms: Option<i64>,
+    #[serde(default)]
+    delivery_state: Option<String>,
+}
 
 #[derive(Debug, Clone)]
 struct GroupRunState {
@@ -2891,6 +2980,971 @@ impl FeatureHostController {
         })
     }
 
+
+    #[cfg(feature = "production")]
+    fn shipping_remote_peer_id(
+        service: &MessagingService<JsonFileStateStore>,
+        viewer_actor_id: &ActorId,
+        conversation_id: &MessagingConversationId,
+    ) -> Option<String> {
+        let conversation = service.engine().state().conversations.get(conversation_id)?;
+        if !matches!(conversation.kind, MessagingConversationKind::Direct) {
+            return None;
+        }
+        let mut peers = conversation
+            .participants
+            .iter()
+            .filter(|participant| &participant.actor_id != viewer_actor_id)
+            .filter_map(|participant| {
+                participant
+                    .actor_id
+                    .0
+                    .strip_prefix("human:platform:")
+                    .map(str::to_string)
+            })
+            .collect::<Vec<_>>();
+        peers.sort();
+        peers.dedup();
+        (peers.len() == 1).then(|| peers.remove(0))
+    }
+
+    #[cfg(feature = "production")]
+    fn shipping_account_id(&self) -> Result<String, FeatureHostError> {
+        self.active_account_id
+            .lock()
+            .map_err(|_| FeatureHostError::StatePoisoned)?
+            .clone()
+            .ok_or_else(|| {
+                FeatureHostError::Contract(
+                    "shipping Human messaging requires an authenticated Fabushi account".into(),
+                )
+            })
+    }
+
+    #[cfg(feature = "production")]
+    fn upload_shipping_human_attachment(
+        &self,
+        service: &mut MessagingService<JsonFileStateStore>,
+        messaging_root: &Path,
+        media: &MessagingMediaRef,
+        now_ms: i64,
+    ) -> Result<String, FeatureHostError> {
+        if let Some(existing) = service.remote_blob_resource_id(&media.id) {
+            return Ok(existing.to_string());
+        }
+        let blob_id = BlobId::new(media.id.clone())
+            .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        let blob_store = FileBlobStore::new(messaging_root.join("blobs"));
+        let metadata = blob_store
+            .metadata(&blob_id)
+            .map_err(|error| FeatureHostError::Contract(format!(
+                "Human attachment {} is not available in the account-scoped blob store: {error}",
+                media.id
+            )))?;
+        if media.size_bytes.is_some_and(|size| size != metadata.size_bytes)
+            || media
+                .mime_type
+                .as_deref()
+                .is_some_and(|mime| mime != metadata.mime_type)
+        {
+            return Err(FeatureHostError::Contract(
+                "Human attachment message metadata does not match the durable blob".into(),
+            ));
+        }
+        let mut bytes = Vec::with_capacity(metadata.size_bytes as usize);
+        let mut offset = 0_u64;
+        while offset < metadata.size_bytes {
+            let length = (metadata.size_bytes - offset)
+                .min(fabushi_messaging_core::MAX_BLOB_RANGE_BYTES);
+            let chunk = blob_store
+                .read_range(&blob_id, offset, length)
+                .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+            if chunk.is_empty() {
+                return Err(FeatureHostError::Contract(
+                    "Human attachment blob read made no progress".into(),
+                ));
+            }
+            offset = offset.saturating_add(chunk.len() as u64);
+            bytes.extend_from_slice(&chunk);
+        }
+        let response = self.runtime()?.product_execute(
+            "mahayana.messages.resource.upload",
+            &json!({
+                "name": metadata.file_name,
+                "contentType": metadata.mime_type,
+                "dataBase64": base64::engine::general_purpose::STANDARD.encode(&bytes),
+            }),
+        )?;
+        let resource: ShippingRemoteHumanAttachment = serde_json::from_value(
+            response
+                .get("resource")
+                .cloned()
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "Human attachment upload response omitted resource".into(),
+                ))?,
+        )
+        .map_err(|error| FeatureHostError::Contract(format!(
+            "Human attachment upload response is invalid: {error}"
+        )))?;
+        if resource.resource_id.trim().is_empty()
+            || resource.size != metadata.size_bytes
+            || resource.content_type != metadata.mime_type
+        {
+            return Err(FeatureHostError::Contract(
+                "Human attachment upload returned mismatched canonical metadata".into(),
+            ));
+        }
+        service
+            .trusted_bind_remote_blob_resource(&media.id, &resource.resource_id, now_ms)
+            .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        Ok(resource.resource_id)
+    }
+
+    #[cfg(feature = "production")]
+    fn shipping_outbound_text_and_media(
+        message: &MessagingMessage,
+    ) -> Result<(String, Option<MessagingMediaRef>), FeatureHostError> {
+        let value = match &message.content {
+            MessagingMessageContent::Text { text } => (text.text.trim().to_string(), None),
+            MessagingMessageContent::Photo { media, caption, .. }
+            | MessagingMessageContent::Video { media, caption, .. }
+            | MessagingMessageContent::Animation { media, caption }
+            | MessagingMessageContent::Audio { media, caption, .. }
+            | MessagingMessageContent::Voice { media, caption, .. }
+            | MessagingMessageContent::Document { media, caption } => {
+                (caption.text.trim().to_string(), Some(media.clone()))
+            }
+            MessagingMessageContent::VideoNote { media }
+            | MessagingMessageContent::Sticker { media, .. } => {
+                (String::new(), Some(media.clone()))
+            }
+            _ => {
+                return Err(FeatureHostError::Contract(
+                    "the canonical Human backend supports text and file/media attachments for direct messages; this content type cannot be sent remotely".into(),
+                ));
+            }
+        };
+        if value.0.is_empty() && value.1.is_none() {
+            return Err(FeatureHostError::Contract(
+                "remote Human message requires text or attachment content".into(),
+            ));
+        }
+        Ok(value)
+    }
+
+    #[cfg(feature = "production")]
+    fn validate_shipping_remote_settlement(
+        service: &MessagingService<JsonFileStateStore>,
+        viewer_actor_id: &ActorId,
+        local_user_id: &str,
+        peer_user_id: &str,
+        local_message: &MessagingMessage,
+        client_message_id: &MessagingClientMessageId,
+        remote: &ShippingRemoteHumanMessage,
+        expected_text: &str,
+        expected_resources: &[String],
+        expected_reply: Option<&str>,
+    ) -> Result<(String, i64), FeatureHostError> {
+        let remote_id = shipping_identity_text(&remote.id)?;
+        let sender = shipping_identity_text(&remote.sender_user_id)?;
+        let recipient = shipping_identity_text(&remote.recipient_user_id)?;
+        let remote_reply = remote
+            .reply_to_message_id
+            .as_ref()
+            .map(shipping_identity_text)
+            .transpose()?;
+        let resources = remote
+            .attachments
+            .iter()
+            .map(|attachment| attachment.resource_id.clone())
+            .collect::<Vec<_>>();
+        if sender != local_user_id
+            || recipient != peer_user_id
+            || remote.text != expected_text
+            || remote.client_request_id.as_deref() != Some(client_message_id.0.as_str())
+            || remote_reply.as_deref() != expected_reply
+            || resources != expected_resources
+            || &local_message.sender_id != viewer_actor_id
+        {
+            return Err(FeatureHostError::Contract(
+                "Human message backend returned a mismatched canonical settlement".into(),
+            ));
+        }
+        let accepted_at_ms = shipping_timestamp_ms(&remote.created_at)?;
+        if let Some(bound) = service.remote_message_id_for_local(
+            &local_message.conversation_id,
+            &local_message.id,
+        ) {
+            if bound != remote_id {
+                return Err(FeatureHostError::Contract(
+                    "Human message local id is already bound to another server message".into(),
+                ));
+            }
+        }
+        Ok((remote_id, accepted_at_ms))
+    }
+
+    #[cfg(feature = "production")]
+    fn dispatch_shipping_human_message(
+        &self,
+        service: &mut MessagingService<JsonFileStateStore>,
+        messaging_root: &Path,
+        viewer_actor_id: &ActorId,
+        local_user_id: &str,
+        peer_user_id: &str,
+        message: &MessagingMessage,
+        client_message_id: &MessagingClientMessageId,
+        now_ms: i64,
+    ) -> Result<Vec<MessagingServerEnvelope>, FeatureHostError> {
+        if service
+            .remote_message_id_for_local(&message.conversation_id, &message.id)
+            .is_some()
+        {
+            return Ok(Vec::new());
+        }
+        let (text, media) = Self::shipping_outbound_text_and_media(message)?;
+        let resources = if let Some(media) = media.as_ref() {
+            vec![self.upload_shipping_human_attachment(
+                service,
+                messaging_root,
+                media,
+                now_ms,
+            )?]
+        } else {
+            Vec::new()
+        };
+        let reply_to_remote = message
+            .reply_to_message_id
+            .as_ref()
+            .map(|reply| {
+                service
+                    .remote_message_id_for_local(&message.conversation_id, reply)
+                    .map(str::to_string)
+                    .ok_or_else(|| {
+                        FeatureHostError::Contract(
+                            "remote Human reply target has no canonical server message id".into(),
+                        )
+                    })
+            })
+            .transpose()?;
+
+        let response = self.runtime()?.product_execute(
+            "mahayana.messages.send",
+            &json!({
+                "contact": peer_user_id,
+                "text": text,
+                "clientRequestId": client_message_id.0,
+                "replyToMessageId": reply_to_remote,
+                "attachments": resources
+                    .iter()
+                    .map(|resource_id| json!({"resourceId": resource_id}))
+                    .collect::<Vec<_>>(),
+                "silent": message.silent,
+                "scheduledAtMs": message.scheduled_at_ms,
+            }),
+        )?;
+        let remote: ShippingRemoteHumanMessage = serde_json::from_value(
+            response
+                .get("message")
+                .cloned()
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "Human message send response omitted canonical message".into(),
+                ))?,
+        )
+        .map_err(|error| FeatureHostError::Contract(format!(
+            "Human message send response is invalid: {error}"
+        )))?;
+        let (remote_id, accepted_at_ms) = Self::validate_shipping_remote_settlement(
+            service,
+            viewer_actor_id,
+            local_user_id,
+            peer_user_id,
+            message,
+            client_message_id,
+            &remote,
+            &text,
+            &resources,
+            reply_to_remote.as_deref(),
+        )?;
+        service
+            .trusted_settle_remote_send(
+                viewer_actor_id,
+                &message.conversation_id,
+                &message.id,
+                &remote_id,
+                accepted_at_ms,
+                shipping_delivery_state(&remote),
+                shipping_reactions(&remote.reactions, viewer_actor_id),
+                now_ms,
+            )
+            .map_err(|error| FeatureHostError::Contract(error.to_string()))
+    }
+
+    #[cfg(feature = "production")]
+    fn materialize_shipping_attachment(
+        &self,
+        service: &mut MessagingService<JsonFileStateStore>,
+        messaging_root: &Path,
+        attachment: &ShippingRemoteHumanAttachment,
+        fallback_created_at_ms: i64,
+        now_ms: i64,
+    ) -> Result<MessagingMediaRef, FeatureHostError> {
+        let resource_id = attachment.resource_id.trim();
+        if resource_id.is_empty() || attachment.name.trim().is_empty() || attachment.content_type.trim().is_empty() || attachment.size == 0 {
+            return Err(FeatureHostError::Contract(
+                "remote Human attachment metadata is incomplete".into(),
+            ));
+        }
+        let local_blob_id = shipping_remote_blob_id(resource_id);
+        let blob_id = BlobId::new(local_blob_id.clone())
+            .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        let blob_store = FileBlobStore::new(messaging_root.join("blobs"));
+        let expected_metadata = MessagingBlobMetadata {
+            id: blob_id.clone(),
+            file_name: attachment.name.clone(),
+            mime_type: attachment.content_type.clone(),
+            size_bytes: attachment.size,
+            content_hash: None,
+            created_at_ms: shipping_timestamp_ms(&attachment.created_at)
+                .unwrap_or(fallback_created_at_ms),
+        };
+
+        let already_complete = blob_store
+            .metadata(&blob_id)
+            .ok()
+            .is_some_and(|metadata| metadata == expected_metadata);
+        if !already_complete {
+            let response = self.runtime()?.product_execute(
+                "mahayana.messages.resource.download",
+                &json!({"resourceId": resource_id}),
+            )?;
+            let resource = response
+                .get("resource")
+                .and_then(Value::as_object)
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "Human attachment download response omitted resource".into(),
+                ))?;
+            let returned_id = resource
+                .get("resourceId")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let returned_content_type = resource
+                .get("contentType")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let returned_size = resource
+                .get("size")
+                .and_then(Value::as_u64)
+                .unwrap_or_default();
+            let encoded = resource
+                .get("dataBase64")
+                .and_then(Value::as_str)
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "Human attachment download response omitted bytes".into(),
+                ))?;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .map_err(|error| FeatureHostError::Contract(format!(
+                    "Human attachment download base64 is invalid: {error}"
+                )))?;
+            if returned_id != resource_id
+                || returned_content_type != attachment.content_type
+                || returned_size != attachment.size
+                || bytes.len() as u64 != attachment.size
+            {
+                return Err(FeatureHostError::Contract(
+                    "Human attachment download returned mismatched canonical metadata".into(),
+                ));
+            }
+            let status = blob_store
+                .begin_upload(&expected_metadata)
+                .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+            if !status.complete {
+                let offset = status.uploaded_bytes as usize;
+                if offset > bytes.len() {
+                    return Err(FeatureHostError::Contract(
+                        "Human attachment partial blob exceeds downloaded resource".into(),
+                    ));
+                }
+                if offset < bytes.len() {
+                    blob_store
+                        .append_chunk(&blob_id, status.uploaded_bytes, &bytes[offset..])
+                        .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+                }
+                blob_store
+                    .finish_upload(&blob_id)
+                    .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+            }
+        }
+        service
+            .trusted_bind_remote_blob_resource(&local_blob_id, resource_id, now_ms)
+            .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        Ok(MessagingMediaRef {
+            id: local_blob_id,
+            file_name: Some(attachment.name.clone()),
+            mime_type: Some(attachment.content_type.clone()),
+            size_bytes: Some(attachment.size),
+            width: None,
+            height: None,
+            duration_ms: None,
+            thumbnail_id: None,
+            local_path: None,
+            remote_url: Some(format!("fabushi-resource://{resource_id}")),
+            content_hash: None,
+        })
+    }
+
+    #[cfg(feature = "production")]
+    fn materialize_shipping_remote_message(
+        &self,
+        service: &mut MessagingService<JsonFileStateStore>,
+        messaging_root: &Path,
+        viewer_actor_id: &ActorId,
+        local_user_id: &str,
+        peer_user_id: &str,
+        conversation_id: &MessagingConversationId,
+        remote: &ShippingRemoteHumanMessage,
+        now_ms: i64,
+    ) -> Result<(), FeatureHostError> {
+        let remote_id = shipping_identity_text(&remote.id)?;
+        let sender = shipping_identity_text(&remote.sender_user_id)?;
+        let recipient = shipping_identity_text(&remote.recipient_user_id)?;
+        let valid_pair = (sender == local_user_id && recipient == peer_user_id)
+            || (sender == peer_user_id && recipient == local_user_id);
+        if !valid_pair {
+            return Err(FeatureHostError::Contract(
+                "remote Human history row does not belong to the requested direct conversation".into(),
+            ));
+        }
+        let sender_actor_id = if sender == local_user_id {
+            viewer_actor_id.clone()
+        } else {
+            ActorId::new(format!("human:platform:{peer_user_id}"))
+        };
+        let created_at_ms = shipping_timestamp_ms(&remote.created_at)?;
+        let remote_reply = remote
+            .reply_to_message_id
+            .as_ref()
+            .map(shipping_identity_text)
+            .transpose()?;
+        let reply_to_message_id = remote_reply.as_deref().map(|remote_reply_id| {
+            service
+                .local_message_id_for_remote(conversation_id, remote_reply_id)
+                .unwrap_or_else(|| shipping_remote_message_local_id(remote_reply_id))
+        });
+
+        if sender == local_user_id {
+            if let Some(client_request_id) = remote
+                .client_request_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                let client_message_id = MessagingClientMessageId(client_request_id.to_string());
+                if let Some(existing) = service.trusted_local_message_for_client_id(
+                    viewer_actor_id,
+                    conversation_id,
+                    &client_message_id,
+                ) {
+                    let (expected_text, media) = Self::shipping_outbound_text_and_media(&existing)?;
+                    let expected_resources = if let Some(media) = media.as_ref() {
+                        vec![service
+                            .remote_blob_resource_id(&media.id)
+                            .ok_or_else(|| FeatureHostError::Contract(
+                                "pending outbound Human attachment has no persisted remote resource binding".into(),
+                            ))?
+                            .to_string()]
+                    } else {
+                        Vec::new()
+                    };
+                    let expected_reply = existing
+                        .reply_to_message_id
+                        .as_ref()
+                        .map(|reply| {
+                            service
+                                .remote_message_id_for_local(conversation_id, reply)
+                                .map(str::to_string)
+                                .ok_or_else(|| FeatureHostError::Contract(
+                                    "outbound Human reply has no persisted remote target".into(),
+                                ))
+                        })
+                        .transpose()?;
+                    Self::validate_shipping_remote_settlement(
+                        service,
+                        viewer_actor_id,
+                        local_user_id,
+                        peer_user_id,
+                        &existing,
+                        &client_message_id,
+                        remote,
+                        &expected_text,
+                        &expected_resources,
+                        expected_reply.as_deref(),
+                    )?;
+                    service
+                        .trusted_settle_remote_send(
+                            viewer_actor_id,
+                            conversation_id,
+                            &existing.id,
+                            &remote_id,
+                            created_at_ms,
+                            shipping_delivery_state(remote),
+                            shipping_reactions(&remote.reactions, viewer_actor_id),
+                            now_ms,
+                        )
+                        .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+                    return Ok(());
+                }
+            }
+        }
+
+        let mut projected = Vec::<(MessagingMessageId, MessagingMessageContent, bool)>::new();
+        let text = remote.text.trim().to_string();
+        let anchor_id = shipping_remote_message_local_id(&remote_id);
+        if !text.is_empty() {
+            projected.push((
+                anchor_id.clone(),
+                MessagingMessageContent::Text {
+                    text: MessagingFormattedText::plain(text),
+                },
+                true,
+            ));
+        }
+        for (index, attachment) in remote.attachments.iter().enumerate() {
+            let media = self.materialize_shipping_attachment(
+                service,
+                messaging_root,
+                attachment,
+                created_at_ms,
+                now_ms,
+            )?;
+            let content = shipping_attachment_content(media, &attachment.content_type);
+            let is_anchor = projected.is_empty() && index == 0;
+            let message_id = if is_anchor {
+                anchor_id.clone()
+            } else {
+                MessagingMessageId::new(format!("{}:attachment:{}", anchor_id.0, index + 1))
+            };
+            projected.push((message_id, content, is_anchor));
+        }
+        if projected.is_empty() {
+            return Err(FeatureHostError::Contract(
+                "remote Human message has neither text nor attachments".into(),
+            ));
+        }
+
+        let reactions = shipping_reactions(&remote.reactions, viewer_actor_id);
+        for (index, (message_id, content, is_anchor)) in projected.into_iter().enumerate() {
+            let message = MessagingMessage {
+                id: message_id,
+                conversation_id: conversation_id.clone(),
+                sender_id: sender_actor_id.clone(),
+                content,
+                reply_to_message_id: reply_to_message_id.clone(),
+                thread_root_message_id: None,
+                forward_origin: None,
+                reply_markup: None,
+                reactions: if is_anchor { reactions.clone() } else { Vec::new() },
+                delivery_state: shipping_delivery_state(remote),
+                created_at_ms,
+                edited_at_ms: None,
+                scheduled_at_ms: remote.scheduled_at_ms,
+                silent: remote.silent,
+                protected_content: false,
+                pinned: false,
+                deleted: false,
+            };
+            service
+                .trusted_import_remote_message(
+                    viewer_actor_id,
+                    message,
+                    MessagingClientMessageId(format!("remote:{remote_id}:{index}")),
+                    is_anchor.then(|| remote_id.clone()),
+                    now_ms,
+                )
+                .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn sync_shipping_human_messaging(
+        &self,
+        service: &mut MessagingService<JsonFileStateStore>,
+        messaging_root: &Path,
+        viewer_actor_id: &ActorId,
+        now_ms: i64,
+    ) -> Result<(), FeatureHostError> {
+        const PAGE_LIMIT: usize = 200;
+        const MAX_GAP_PAGES: usize = 32;
+
+        let local_user_id = self.shipping_account_id()?;
+        if actor_id_for_account_id(&local_user_id) != *viewer_actor_id {
+            return Err(FeatureHostError::Contract(
+                "shipping Human messaging actor does not match the authenticated account".into(),
+            ));
+        }
+        let viewer_actor = service
+            .engine()
+            .state()
+            .actors
+            .get(viewer_actor_id)
+            .cloned()
+            .unwrap_or_else(|| MessagingActor::human(viewer_actor_id.0.clone(), "当前用户"));
+
+        let response = self
+            .runtime()?
+            .product_execute("mahayana.contacts.list", &json!({}))?;
+        let friends_value = response
+            .pointer("/data/friends")
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new()));
+        let friends: Vec<ShippingRemoteHumanContact> = serde_json::from_value(friends_value)
+            .map_err(|error| FeatureHostError::Contract(format!(
+                "Human contact sync response is invalid: {error}"
+            )))?;
+
+        for contact in friends {
+            let peer_user_id = if !contact.user_id.is_null() {
+                shipping_identity_text(&contact.user_id)?
+            } else {
+                shipping_identity_text(&contact.id)?
+            };
+            if peer_user_id == local_user_id {
+                return Err(FeatureHostError::Contract(
+                    "Human contact sync returned the authenticated account as its own peer".into(),
+                ));
+            }
+            let peer_actor_id = ActorId::new(format!("human:platform:{peer_user_id}"));
+            let display_name = [contact.display_name.trim(), contact.username.trim()]
+                .into_iter()
+                .find(|value| !value.is_empty())
+                .unwrap_or(peer_user_id.as_str())
+                .to_string();
+            let mut peer_actor = MessagingActor::human(peer_actor_id.0.clone(), display_name.clone());
+            peer_actor.username = (!contact.username.trim().is_empty())
+                .then(|| contact.username.trim().to_string());
+            peer_actor.avatar_url = contact.avatar_url.clone();
+            peer_actor.capabilities = vec!["messages".into(), "calls".into()];
+            peer_actor.presence.status = if contact.status.eq_ignore_ascii_case("online") {
+                MessagingPresenceStatus::Online
+            } else {
+                MessagingPresenceStatus::Offline
+            };
+
+            let conversation_id = MessagingConversationId::new(
+                shipping_direct_conversation_id(&local_user_id, &peer_user_id),
+            );
+            let participants = vec![
+                MessagingParticipant {
+                    actor_id: viewer_actor_id.clone(),
+                    role: MessagingParticipantRole::Owner,
+                    joined_at_ms: now_ms,
+                    muted_until_ms: None,
+                },
+                MessagingParticipant {
+                    actor_id: peer_actor_id.clone(),
+                    role: MessagingParticipantRole::Member,
+                    joined_at_ms: now_ms,
+                    muted_until_ms: None,
+                },
+            ];
+            let mut conversation = service
+                .engine()
+                .state()
+                .conversations
+                .get(&conversation_id)
+                .cloned()
+                .unwrap_or_else(|| {
+                    MessagingConversation::direct(
+                        conversation_id.0.clone(),
+                        display_name.clone(),
+                        participants.clone(),
+                        now_ms,
+                    )
+                });
+            conversation.kind = MessagingConversationKind::Direct;
+            conversation.title = display_name;
+            conversation.participants = participants;
+            conversation.owner_id = Some(viewer_actor_id.clone());
+            service
+                .trusted_upsert_direct_conversation(
+                    viewer_actor_id,
+                    viewer_actor.clone(),
+                    peer_actor,
+                    conversation,
+                    now_ms,
+                )
+                .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+
+            let pending = service
+                .engine()
+                .state()
+                .messages
+                .get(&conversation_id)
+                .into_iter()
+                .flat_map(|messages| messages.values())
+                .filter_map(|message| match &message.delivery_state {
+                    MessagingDeliveryState::Pending { client_message_id }
+                        if &message.sender_id == viewer_actor_id =>
+                    {
+                        Some((message.clone(), client_message_id.clone()))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            for (message, client_message_id) in pending {
+                let _ = self.dispatch_shipping_human_message(
+                    service,
+                    messaging_root,
+                    viewer_actor_id,
+                    &local_user_id,
+                    &peer_user_id,
+                    &message,
+                    &client_message_id,
+                    now_ms,
+                );
+            }
+
+            let known = service
+                .engine()
+                .state()
+                .remote_message_ids
+                .get(&conversation_id)
+                .map(|bindings| bindings.values().cloned().collect::<BTreeSet<_>>())
+                .unwrap_or_default();
+            let mut before: Option<String> = None;
+            let mut unseen_pages: Vec<Vec<ShippingRemoteHumanMessage>> = Vec::new();
+            let mut pages_read = 0usize;
+            loop {
+                let page_response = self.runtime()?.product_execute(
+                    "mahayana.messages.list",
+                    &json!({
+                        "contact": peer_user_id,
+                        "limit": PAGE_LIMIT,
+                        "before": before,
+                    }),
+                )?;
+                let page_value = page_response
+                    .pointer("/data/messages")
+                    .cloned()
+                    .unwrap_or_else(|| Value::Array(Vec::new()));
+                let page: Vec<ShippingRemoteHumanMessage> = serde_json::from_value(page_value)
+                    .map_err(|error| FeatureHostError::Contract(format!(
+                        "Human message sync page is invalid: {error}"
+                    )))?;
+                if page.is_empty() {
+                    break;
+                }
+                pages_read += 1;
+                let mut overlap_at = None;
+                for (index, remote) in page.iter().enumerate().rev() {
+                    let remote_id = shipping_identity_text(&remote.id)?;
+                    if known.contains(&remote_id) {
+                        overlap_at = Some(index);
+                        break;
+                    }
+                }
+                let unseen_start = overlap_at.map_or(0, |index| index + 1);
+                if unseen_start < page.len() {
+                    unseen_pages.push(page[unseen_start..].to_vec());
+                }
+                if overlap_at.is_some() || page.len() < PAGE_LIMIT {
+                    break;
+                }
+                if pages_read >= MAX_GAP_PAGES {
+                    return Err(FeatureHostError::Contract(format!(
+                        "Human message reconnect gap exceeded bounded recovery window of {} messages",
+                        PAGE_LIMIT * MAX_GAP_PAGES
+                    )));
+                }
+                let next_before = page
+                    .first()
+                    .map(|message| message.created_at.trim())
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| FeatureHostError::Contract(
+                        "Human message sync page omitted its oldest timestamp".into(),
+                    ))?
+                    .to_string();
+                if before.as_deref() == Some(next_before.as_str()) {
+                    return Err(FeatureHostError::Contract(
+                        "Human message sync cursor did not advance".into(),
+                    ));
+                }
+                before = Some(next_before);
+            }
+            for page in unseen_pages.into_iter().rev() {
+                for remote in page {
+                    self.materialize_shipping_remote_message(
+                        service,
+                        messaging_root,
+                        viewer_actor_id,
+                        &local_user_id,
+                        &peer_user_id,
+                        &conversation_id,
+                        &remote,
+                        now_ms,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn execute_production_messaging_envelope(
+        &self,
+        service: &mut MessagingService<JsonFileStateStore>,
+        messaging_root: &Path,
+        envelope: MessagingClientEnvelope,
+        now_ms: i64,
+    ) -> Result<Vec<MessagingServerEnvelope>, FeatureHostError> {
+        let actor_id = envelope.context.actor_id.clone();
+        match envelope.command.clone() {
+            MessagingClientCommand::Sync { .. } => {
+                self.sync_shipping_human_messaging(
+                    service,
+                    messaging_root,
+                    &actor_id,
+                    now_ms,
+                )?;
+                service
+                    .handle(envelope, now_ms)
+                    .map_err(|error| FeatureHostError::Contract(error.to_string()))
+            }
+            command @ (MessagingClientCommand::SendMessage { .. }
+            | MessagingClientCommand::ForwardMessage { .. }) => {
+                let conversation_id = match &command {
+                    MessagingClientCommand::SendMessage { conversation_id, .. } => {
+                        conversation_id.clone()
+                    }
+                    MessagingClientCommand::ForwardMessage {
+                        destination_conversation_id,
+                        ..
+                    } => destination_conversation_id.clone(),
+                    _ => unreachable!(),
+                };
+                let Some(peer_user_id) = Self::shipping_remote_peer_id(
+                    service,
+                    &actor_id,
+                    &conversation_id,
+                ) else {
+                    return service
+                        .handle(envelope, now_ms)
+                        .map_err(|error| FeatureHostError::Contract(error.to_string()));
+                };
+                let local_user_id = self.shipping_account_id()?;
+                let client_message_id = match &command {
+                    MessagingClientCommand::SendMessage { client_message_id, .. }
+                    | MessagingClientCommand::ForwardMessage { client_message_id, .. } => {
+                        client_message_id.clone()
+                    }
+                    _ => unreachable!(),
+                };
+                let (message, mut responses) = service
+                    .trusted_prepare_remote_send(&actor_id, &command, now_ms)
+                    .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+                responses.extend(self.dispatch_shipping_human_message(
+                    service,
+                    messaging_root,
+                    &actor_id,
+                    &local_user_id,
+                    &peer_user_id,
+                    &message,
+                    &client_message_id,
+                    now_ms,
+                )?);
+                Ok(responses)
+            }
+            MessagingClientCommand::SetReaction {
+                conversation_id,
+                message_id,
+                reaction,
+            } => {
+                let Some(remote_message_id) = service
+                    .remote_message_id_for_local(&conversation_id, &message_id)
+                    .map(str::to_string)
+                else {
+                    return service
+                        .handle(envelope, now_ms)
+                        .map_err(|error| FeatureHostError::Contract(error.to_string()));
+                };
+                if Self::shipping_remote_peer_id(service, &actor_id, &conversation_id).is_none() {
+                    return Err(FeatureHostError::Contract(
+                        "remote message binding exists outside a shipping Human direct conversation".into(),
+                    ));
+                }
+                let response = self.runtime()?.product_execute(
+                    "mahayana.messages.reaction.set",
+                    &json!({
+                        "messageId": remote_message_id,
+                        "emoji": reaction.reaction,
+                        "active": reaction.chosen_by_me,
+                    }),
+                )?;
+                let returned_id = response
+                    .get("messageId")
+                    .map(shipping_identity_text)
+                    .transpose()?
+                    .ok_or_else(|| FeatureHostError::Contract(
+                        "Human reaction response omitted messageId".into(),
+                    ))?;
+                if returned_id != remote_message_id {
+                    return Err(FeatureHostError::Contract(
+                        "Human reaction backend returned a mismatched message id".into(),
+                    ));
+                }
+                let remote_reactions: Vec<ShippingRemoteHumanReaction> = serde_json::from_value(
+                    response
+                        .get("reactions")
+                        .cloned()
+                        .unwrap_or_else(|| Value::Array(Vec::new())),
+                )
+                .map_err(|error| FeatureHostError::Contract(format!(
+                    "Human reaction response is invalid: {error}"
+                )))?;
+                service
+                    .trusted_replace_remote_reactions(
+                        &actor_id,
+                        &conversation_id,
+                        &message_id,
+                        shipping_reactions(&remote_reactions, &actor_id),
+                        now_ms,
+                    )
+                    .map_err(|error| FeatureHostError::Contract(error.to_string()))
+            }
+            MessagingClientCommand::EditMessage {
+                ref conversation_id,
+                ref message_id,
+                ..
+            } if service
+                .remote_message_id_for_local(conversation_id, message_id)
+                .is_some() =>
+            {
+                Err(FeatureHostError::Contract(
+                    "canonical remote Human messaging does not expose message editing; refusing a local-only divergence".into(),
+                ))
+            }
+            MessagingClientCommand::DeleteMessages {
+                ref conversation_id,
+                ref message_ids,
+                ..
+            } if message_ids.iter().any(|message_id| {
+                service
+                    .remote_message_id_for_local(conversation_id, message_id)
+                    .is_some()
+            }) =>
+            {
+                Err(FeatureHostError::Contract(
+                    "canonical remote Human messaging does not expose message deletion; refusing a local-only divergence".into(),
+                ))
+            }
+            _ => service
+                .handle(envelope, now_ms)
+                .map_err(|error| FeatureHostError::Contract(error.to_string())),
+        }
+    }
+
     /// Executes one messaging envelope against the exact same persistent
     /// `MessagingService` used by desktop and also returns the resulting server
     /// envelopes to native shells. The envelopes are still projected onto the
@@ -2917,8 +3971,23 @@ impl FeatureHostController {
             FileBlobStore::new(messaging_root.join("blobs")),
         )
         .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
+        let now_ms = now_millis();
+        #[cfg(feature = "production")]
+        let responses = if matches!(self.config.mode, HostMode::Production) {
+            self.execute_production_messaging_envelope(
+                &mut service,
+                &messaging_root,
+                client_envelope,
+                now_ms,
+            )?
+        } else {
+            service
+                .handle(client_envelope, now_ms)
+                .map_err(|error| FeatureHostError::Contract(error.to_string()))?
+        };
+        #[cfg(not(feature = "production"))]
         let responses = service
-            .handle(client_envelope, now_millis())
+            .handle(client_envelope, now_ms)
             .map_err(|error| FeatureHostError::Contract(error.to_string()))?;
         let envelopes = responses
             .into_iter()
@@ -17243,6 +18312,128 @@ fn account_scoped_path(base: &Path, account_id: &str) -> PathBuf {
 #[cfg(feature = "production")]
 fn actor_id_for_account_id(account_id: &str) -> ActorId {
     ActorId::new(format!("human:account:{}", account_fingerprint(account_id)))
+}
+
+
+#[cfg(feature = "production")]
+fn shipping_identity_text(value: &Value) -> Result<String, FeatureHostError> {
+    match value {
+        Value::String(value) => {
+            let value = value.trim();
+            if value.is_empty() {
+                Err(FeatureHostError::Contract(
+                    "Human transport identity is empty".into(),
+                ))
+            } else {
+                Ok(value.to_string())
+            }
+        }
+        Value::Number(value) => Ok(value.to_string()),
+        _ => Err(FeatureHostError::Contract(
+            "Human transport identity is invalid".into(),
+        )),
+    }
+}
+
+#[cfg(feature = "production")]
+fn shipping_direct_conversation_id(local_user_id: &str, peer_user_id: &str) -> String {
+    let mut participant_ids = [
+        local_user_id.trim().to_string(),
+        peer_user_id.trim().to_string(),
+    ];
+    participant_ids.sort();
+    let mut digest = Sha256::new();
+    for participant_id in participant_ids {
+        digest.update((participant_id.len() as u64).to_be_bytes());
+        digest.update(participant_id.as_bytes());
+    }
+    format!("human-direct-{:x}", digest.finalize())
+}
+
+#[cfg(feature = "production")]
+fn shipping_remote_message_local_id(remote_message_id: &str) -> MessagingMessageId {
+    let digest = Sha256::digest(remote_message_id.trim().as_bytes());
+    MessagingMessageId::new(format!("human-server-message:{digest:x}"))
+}
+
+#[cfg(feature = "production")]
+fn shipping_remote_blob_id(remote_resource_id: &str) -> String {
+    let digest = Sha256::digest(remote_resource_id.trim().as_bytes());
+    format!("human-remote-{digest:x}")
+}
+
+#[cfg(feature = "production")]
+fn shipping_timestamp_ms(value: &str) -> Result<i64, FeatureHostError> {
+    chrono::DateTime::parse_from_rfc3339(value.trim())
+        .map(|timestamp| timestamp.timestamp_millis())
+        .map_err(|error| FeatureHostError::Contract(format!(
+            "Human transport timestamp is invalid: {error}"
+        )))
+}
+
+#[cfg(feature = "production")]
+fn shipping_delivery_state(remote: &ShippingRemoteHumanMessage) -> MessagingDeliveryState {
+    match remote.delivery_state.as_deref().unwrap_or("sent") {
+        "read" => MessagingDeliveryState::Read,
+        "delivered" => MessagingDeliveryState::Delivered,
+        "failed" => MessagingDeliveryState::Failed {
+            code: "remote-delivery-failed".into(),
+            retryable: true,
+        },
+        _ if remote.read_at.is_some() => MessagingDeliveryState::Read,
+        _ => MessagingDeliveryState::Sent,
+    }
+}
+
+#[cfg(feature = "production")]
+fn shipping_reactions(
+    reactions: &[ShippingRemoteHumanReaction],
+    viewer_actor_id: &ActorId,
+) -> Vec<MessagingReactionSummary> {
+    reactions
+        .iter()
+        .filter(|reaction| !reaction.emoji.trim().is_empty() && reaction.count > 0)
+        .map(|reaction| MessagingReactionSummary {
+            reaction: reaction.emoji.clone(),
+            count: reaction.count.min(u32::MAX as u64) as u32,
+            chosen_by_me: reaction.reacted_by_me,
+            recent_actor_ids: reaction
+                .reacted_by_me
+                .then(|| vec![viewer_actor_id.clone()])
+                .unwrap_or_default(),
+        })
+        .collect()
+}
+
+#[cfg(feature = "production")]
+fn shipping_attachment_content(
+    media: MessagingMediaRef,
+    content_type: &str,
+) -> MessagingMessageContent {
+    let caption = MessagingFormattedText::plain("");
+    if content_type.starts_with("image/") {
+        MessagingMessageContent::Photo {
+            media,
+            caption,
+            spoiler: false,
+        }
+    } else if content_type.starts_with("video/") {
+        MessagingMessageContent::Video {
+            media,
+            caption,
+            spoiler: false,
+            streaming: true,
+        }
+    } else if content_type.starts_with("audio/") {
+        MessagingMessageContent::Audio {
+            media,
+            caption,
+            title: None,
+            performer: None,
+        }
+    } else {
+        MessagingMessageContent::Document { media, caption }
+    }
 }
 
 #[cfg(test)]
