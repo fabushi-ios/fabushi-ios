@@ -136,9 +136,9 @@
       "type": "blob",
       "sha": "53e560bae4c4a1e5e10677b0089f7bb5e54bc012",
       "size": 2659,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-product-architecture-context",
+      "coverage_status": "reviewed-governance-and-product-context",
+      "reason": "Desktop README defines standalone source boundaries and the current Fabushi/FBCP product direction, including existing-owner absorption and GitHub-Actions-only verification. iOS uses live Desktop main as authority and its native owners; README is contextual authority, not runtime code."
     },
     {
       "path": "RUST_RUNTIME_SOURCE.md",
@@ -146,9 +146,9 @@
       "type": "blob",
       "sha": "ec1c31b5f1326cbc85dd29c893d13a4d2a9efa5a",
       "size": 802,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-rust-provenance",
+      "coverage_status": "reviewed-runtime-provenance",
+      "reason": "Documents the older standalone Desktop Rust restoration roots and host entrypoint. iOS does not consume those paths directly; applicable current Rust behavior is independently mirrored into iOS-owned source/packages and verified by current rust-host/completeness gates."
     },
     {
       "path": "chatgpt-vps-control/lib/app-agent-surface-client.d.ts",
@@ -156,9 +156,9 @@
       "type": "blob",
       "sha": "bd318104e09985c448ac867c3a8fda33545ae318",
       "size": 754,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-app-agent-surface-client-contract",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Declares Desktop automation client operations status/snapshot/find/action/wait/assert and cancellation. iOS replacement is the native FabushiAppAgentSurface and its focused tests/protected journeys; Desktop loopback discovery file and fabushi.desktop appId are platform-specific."
     },
     {
       "path": "chatgpt-vps-control/lib/app-agent-surface-client.js",
@@ -166,9 +166,9 @@
       "type": "blob",
       "sha": "587aff30570ecfc59a989e41108a6f4d1c4e7505",
       "size": 6148,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-app-agent-surface-client-runtime",
+      "coverage_status": "reviewed-with-native-ios-replacement",
+      "reason": "Implements private bounded loopback discovery, bearer-token calls, operation allowlist, response limits, timeout/cancellation and unavailable projection for Desktop automation. iOS uses native FabushiAppAgentSurface/Coordinator boundaries and protected-account UI acceptance rather than a local filesystem/loopback HTTP discovery channel; the security properties remain required in native form."
     },
     {
       "path": "contracts/automation/cross-platform-journeys.json",
@@ -176,9 +176,9 @@
       "type": "blob",
       "sha": "82989197f0801c39ac81cdaf7f4c8d841875e1ed",
       "size": 1585,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "cross-platform-product-acceptance-contract",
+      "coverage_status": "reviewed-active-ios-replacement",
+      "reason": "Defines cross-platform auth/runtime/chat/marketplace/MiniApp/capability-approval/interrupt/session-clear journeys. These are applicable product acceptance responsibilities; iOS replacement is current protected Global Dharma/session workflows plus native UI/runtime tests. The contract is not waived even though action drivers differ."
     },
     {
       "path": "desktop/e2e/agent-network-responsive.spec.ts",
