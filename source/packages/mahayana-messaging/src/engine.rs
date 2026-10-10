@@ -9,7 +9,8 @@ use crate::conversation::{
     NotificationSettings, TopicDraft,
 };
 use crate::message::{
-    ClientMessageId, DeliveryState, ForwardPrivacy, Message, MessageContent, MessageId,
+    ClientMessageId, DeliveryState, ForwardPrivacy, MediaGroupMetadata, Message, MessageContent,
+    MessageId,
     ReactionSummary,
 };
 use crate::miniapp::{
@@ -1137,6 +1138,11 @@ impl MessagingEngine {
                 if client_message_id.0.trim().is_empty() || client_message_id.0.len() > 200 {
                     return Err(EngineError::InvalidClientMessageId);
                 }
+                let media_group = if message_content_uses_media(&content) {
+                    MediaGroupMetadata::from_client_message_id(&client_message_id)
+                } else {
+                    None
+                };
                 if self
                     .state
                     .messages
@@ -1153,6 +1159,7 @@ impl MessagingEngine {
                     conversation_id,
                     sender_id,
                     content,
+                    media_group,
                     reply_to_message_id,
                     thread_root_message_id,
                     forward_origin: None,
@@ -1376,6 +1383,7 @@ impl MessagingEngine {
                     conversation_id: destination_conversation_id,
                     sender_id,
                     content,
+                    media_group: None,
                     reply_to_message_id: None,
                     thread_root_message_id,
                     forward_origin,

@@ -3503,7 +3503,8 @@ mod remote_transport_tests {
     #[test]
     fn remote_send_persists_pending_then_settles_without_renaming_local_id() {
         let (mut service, viewer, _peer, conversation_id) = remote_service_fixture();
-        let client_message_id = ClientMessageId("ios:nonce-1".into());
+        let client_message_id =
+            ClientMessageId("ios-media-group:fixture-group:0:2".into());
         let command = ClientCommand::SendMessage {
             conversation_id: conversation_id.clone(),
             client_message_id: client_message_id.clone(),
@@ -3524,6 +3525,14 @@ mod remote_transport_tests {
             DeliveryState::Pending { client_message_id: ref pending_id }
                 if pending_id == &client_message_id
         ));
+        assert_eq!(
+            pending.media_group,
+            Some(crate::message::MediaGroupMetadata {
+                id: "fixture-group".into(),
+                index: 0,
+                count: 2,
+            })
+        );
         let local_id = pending.id.clone();
 
         service
@@ -3568,6 +3577,14 @@ mod remote_transport_tests {
             .expect("idempotent replay");
         assert_eq!(replay.id, local_id);
         assert_eq!(replay.delivery_state, DeliveryState::Delivered);
+        assert_eq!(
+            replay.media_group,
+            Some(crate::message::MediaGroupMetadata {
+                id: "fixture-group".into(),
+                index: 0,
+                count: 2,
+            })
+        );
     }
 
     #[test]
@@ -3581,6 +3598,7 @@ mod remote_transport_tests {
             content: MessageContent::Text {
                 text: FormattedText::plain("remote hello"),
             },
+            media_group: None,
             reply_to_message_id: None,
             thread_root_message_id: None,
             forward_origin: None,

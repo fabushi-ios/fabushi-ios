@@ -19,6 +19,53 @@ pub struct ClientMessageId(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MediaGroupMetadata {
+    pub id: String,
+    pub index: u16,
+    pub count: u16,
+}
+
+impl MediaGroupMetadata {
+    pub const CLIENT_MESSAGE_PREFIX: &'static str = "ios-media-group:";
+    pub const MAX_GROUP_ITEMS: u16 = 64;
+
+    pub fn from_client_message_id(value: &ClientMessageId) -> Option<Self> {
+        let payload = value.0.strip_prefix(Self::CLIENT_MESSAGE_PREFIX)?;
+        let mut parts = payload.rsplitn(3, ':');
+        let count = parts.next()?.parse::<u16>().ok()?;
+        let index = parts.next()?.parse::<u16>().ok()?;
+        let id = parts.next()?.trim();
+        if id.is_empty()
+            || id.len() > 128
+            || count < 2
+            || count > Self::MAX_GROUP_ITEMS
+            || index >= count
+            || !id.chars().all(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
+            })
+        {
+            return None;
+        }
+        Some(Self {
+            id: id.to_string(),
+            index,
+            count,
+        })
+    }
+
+    pub fn client_message_id(&self) -> ClientMessageId {
+        ClientMessageId(format!(
+            "{}{}:{}:{}",
+            Self::CLIENT_MESSAGE_PREFIX,
+            self.id,
+            self.index,
+            self.count
+        ))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TextEntity {
     pub offset_utf16: u32,
     pub length_utf16: u32,
@@ -290,6 +337,8 @@ pub struct Message {
     pub conversation_id: ConversationId,
     pub sender_id: ActorId,
     pub content: MessageContent,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_group: Option<MediaGroupMetadata>,
     pub reply_to_message_id: Option<MessageId>,
     pub thread_root_message_id: Option<MessageId>,
     pub forward_origin: Option<String>,
@@ -303,4 +352,36 @@ pub struct Message {
     pub protected_content: bool,
     pub pinned: bool,
     pub deleted: bool,
+}
+
+#[cfg(test)]
+mod media_group_metadata_tests {
+    use super::{ClientMessageId, MediaGroupMetadata};
+
+    #[test]
+    fn structured_media_client_ids_round_trip_and_reject_invalid_groups() {
+        let metadata = MediaGroupMetadata {
+            id: "7c0c58b1-4bdb-4e7f-b7d1-f8ca78f5e5dd".into(),
+            index: 1,
+            count: 3,
+        };
+        let client_id = metadata.client_message_id();
+        assert_eq!(
+            MediaGroupMetadata::from_client_message_id(&client_id),
+            Some(metadata)
+        );
+
+        for invalid in [
+            "ios-media-group:g:0:1",
+            "ios-media-group:g:2:2",
+            "ios-media-group:g:0:65",
+            "ios-media-group:bad/group:0:2",
+            "ios:ordinary",
+        ] {
+            assert_eq!(
+                MediaGroupMetadata::from_client_message_id(&ClientMessageId(invalid.into())),
+                None
+            );
+        }
+    }
 }
