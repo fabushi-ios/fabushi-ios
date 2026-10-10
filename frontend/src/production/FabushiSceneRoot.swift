@@ -247,14 +247,13 @@ private struct FabushiProductionSceneRoot: View {
                     system: systemDynamicTypeSize
                 )
             )
-            .environment(
-                \.accessibilityReduceMotion,
-                systemReduceMotion || runtime.uiPreferencesStore.preferences.reducedMotion
-            )
-            .environment(
-                \.colorSchemeContrast,
-                runtime.uiPreferencesStore.preferences.highContrast ? .increased : systemColorSchemeContrast
-            )
+            .transaction { transaction in
+                if systemReduceMotion || runtime.uiPreferencesStore.preferences.reducedMotion {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+            }
+            .contrast(runtime.uiPreferencesStore.preferences.highContrast ? 1.15 : 1)
             .environment(\.mobileUiPreferencesStore, runtime.uiPreferencesStore)
             .environment(\.humanCallMediaPort, runtime.humanCallMediaPort)
             .task {
