@@ -102,7 +102,7 @@ internal func mobileOutlineToolLabel(_ name: String) -> String {
         }
         output.append(character)
     }
-    return output.prefix(1).uppercased() + output.dropFirst()
+    return output.prefix(1).uppercased() + String(output.dropFirst())
 }
 
 internal func decodeMobileConversationOutline(_ raw: Any) -> [MobileConversationOutlineItem]? {
