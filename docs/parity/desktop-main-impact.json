@@ -3847,8 +3847,8 @@
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-catalog.ts",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-        "status": "current-main-reviewed-production-gap-open",
-        "finding": "Desktop ships the complete emoji asset catalog (compact/messages/iamcal/emojibase), skin variants, alias merge/search and 96-result ranking. iOS ships a native categorized/searchable MobileReactionCatalog with >96 entries plus arbitrary custom-emoji input, but the built-in searchable catalog is curated and does not yet preserve the complete Desktop alias/skin/full-catalog browse/search surface. Arbitrary reactions remain possible through the native custom field, but full catalog parity is still open; do not mark verified."
+        "status": "current-main-reviewed-native-full-catalog-implemented-pending-exact-head-ci",
+        "finding": "Desktop complete emoji catalog semantics are now implemented in shipping iOS. A pinned GitHub Actions generator reads emojibase-data@17.0.0 English compact/messages/iamcal/emojibase inputs and commits an iOS-owned generated Swift catalog plus provenance: 1,914 base entries + 2,030 skin variants = 3,944 projected entries. MobileBotChat uses those generated aliases/search strings/skin variants and preserves Desktop whole-query contains filtering, exact-before-secondary ranking, recent-ID ordering inside each tier, category filtering and strict 96-result cap while SwiftUI remains the native presentation owner. Focused XCTest covers count, alias thumbsup, skin wave_tone3/base hexcode, tier ordering, recency, category and cap. Production commit d994e40d8f1fdc824b72b09e5095559a8928153a; exact-head Actions remain pending."
       },
       {
         "path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-picker-content.css",
@@ -3981,6 +3981,42 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-url-card-implemented-pending-exact-head-ci",
         "finding": "Desktop normalizes only HTTP(S), caches per URL, renders bare-link/legacy-link metadata, and heals watched failures on reconnect/window focus while successful values remain cached. iOS MarketplaceModel validates/projects/caches successful link metadata and never caches failures; commit 1f08d935e8d275e54994059132c06e91701a7823 adds reconnect plus scene-active healing revisions to remount failed card loads while successful cards resolve from cache. Exact-head compile/UI evidence pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/view.css",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-adapted-presentation-accounted",
+        "finding": "This stylesheet intentionally defines no new selector; immutable Desktop card chunks own browser utility classes. iOS has no CSS runtime and replaces this responsibility with native SwiftUI spacing/background/grid/sheet presentation in MobileBotChat. There is no independent product state, protocol, service, or runtime owner to port; product behavior remains tracked by the individual native leaf responsibilities."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/attachment.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-attachment-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf dispatches the already-audited attachment projection into box, legacy-link, media and generic-link/file presentation and fences asynchronous media resolution on unmount. Shipping MobileBotChat uses the canonical typed attachment projection and native attachmentContent/media/file/link surfaces, including sandbox/file/HTTP classification and native lifecycle cancellation inherited from the conversation owner. No second attachment runtime is introduced; exact-head Swift/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/auto-review-approval.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-auto-review-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf presents pending/settled auto-review requests, surface copy, redacted proposed rules, Allow once/Always allow/Deny, durable-rule fallback and stale/unavailable states over the canonical action controller. MobileBotChat's native permission-request card is wired to the previously-audited approval owner, preserves secret redaction, pending/submitting/settled/stale/failed states, durable Always-allow rule persistence with one-time fallback, and account/Bot generation fencing. Exact-head UI/unit evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/cloud-agent.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-cloud-agent-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf watches bcId-scoped cloud-agent info and renders loading/status, prompt, branch, PR number/link, files/lines stats, Open in Cursor and View PR while disabling stale cards. Shipping MobileBotChat now renders the same user-visible fields from the canonical Coordinator IOSCursorDashboardClient path, with 5s live/60s recovery polling, terminal stop, HTTPS PR validation, account+Bot scope fencing and fixed Swift interpolation for URLs/stats/accessibility IDs. Exact-head compile/UI/protected evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/connector.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-connector-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop singular connector leaf resolves canonical server/catalog identity, fail-closes team policy, shows Added/Add/Authorize/waiting/failed lifecycle, supports OAuth Reopen/Retry and bounded suggestions. Shipping MobileBotChat routes the singular send-message:connector projection through the single MarketplaceModel canonical MCP catalog/install/OAuth/account manager with serverId hints, policy disablement, pending/action states, external OAuth handoff/reopen/retry and scope cleanup. Exact-head protected/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/connectors.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-connectors-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop plural connector leaf normalizes/deduplicates connector names and renders each row against the same canonical provider/action lifecycle. iOS strictly projects send-message:connectors, normalizes visible connector identities, opens one canonical connector-card lifecycle for the scoped list, reuses MarketplaceModel install/auth/reopen/retry/team-policy state and disposes it when the visible list/scope disappears. Exact-head Swift/UI/protected evidence remains pending."
       }
     ]
   },
