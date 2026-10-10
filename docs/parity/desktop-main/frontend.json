@@ -347,9 +347,9 @@
       "implementation_status": "mapped",
       "production_evidence": "ForwardMessageSheet calls MessagingModel.searchForwardRecipients/listForwardRecipients for eligible results, tracks multi-selection, enforces dropCaptions=>dropSenderNames, calls forwardMessageBatch over stable per-destination IDs, records every settlement, disables already-sent rows and retries only pending/failed destinations. It is presented from the shipping Human conversation message action path.",
       "test_evidence": "ForwardMessageParityTests covers bounded recipient navigation and settled-message eligibility; current descendant adds pure shortcut coverage for both Desktop Ctrl+Enter and Cmd+Enter semantics. Exact-head Swift/UI CI is pending.",
-      "notes": "IOS-MAIN-FORWARD-001: current Desktop ForwardMessageDialog.tsx read at locked main. Shipping iOS behavior is present; keep mapped until descendant exact-head Swift/UI/protected evidence confirms the updated shortcut and the broader Forward path.",
+      "notes": "IOS-MAIN-FORWARD-001: current Desktop ForwardMessageDialog.tsx read at locked main. Shipping iOS behavior is present; keep mapped until descendant exact-head Swift/UI/protected evidence confirms the updated shortcut and the broader Forward path. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "frontend/src/production/ProductionRenderer.tsx",
@@ -574,9 +574,9 @@
       "implementation_status": "mapped",
       "production_evidence": "ForwardRecipientNavigation.nextIndex is used by ForwardMessageSheet.onKeyPress. The shipping handler now accepts both .command and .control Return submission while ordinary Return/Space toggles the active eligible recipient.",
       "test_evidence": "ForwardMessageParityTests locks empty/bounded Arrow movement, Home/End, six-row Page movement, invalid-index clamp, and both command/control submit shortcut variants. Exact-head Swift CI pending.",
-      "notes": "IOS-MAIN-FORWARD-NAV-002: current Desktop navigation utility read and directly ported; status remains mapped until the new exact HEAD passes required Swift/UI checks.",
+      "notes": "IOS-MAIN-FORWARD-NAV-002: current Desktop navigation utility read and directly ported; status remains mapped until the new exact HEAD passes required Swift/UI checks. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence.",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "authority_review_state": "current-main-reviewed"
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "frontend/src/production/group-members-root.ts",
@@ -3478,10 +3478,10 @@
       "implementation_status": "mapped",
       "production_evidence": "Human chat presents ForwardMessageSheet from message actions. Agent forwarding uses mobileBotForwardMessageId to reject missing canonical IDs, streaming, pending/acceptedAwaitingEcho/failed phases and empty non-attachment content.",
       "test_evidence": "ForwardMessageParityTests.testAgentForwardRequiresSettledCanonicalMessageIdentity covers the Agent settlement/actionability gate. Exact-head UI evidence remains pending.",
-      "notes": "IOS-MAIN-FORWARD-TRANSCRIPT-001: current Desktop transcript Forward actionability reviewed; native paths are real but stay mapped until same-head required UI checks finish.",
+      "notes": "IOS-MAIN-FORWARD-TRANSCRIPT-001: current Desktop transcript Forward actionability reviewed; native paths are real but stay mapped until same-head required UI checks finish. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "current-main-reviewed",
+      "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
@@ -4182,10 +4182,10 @@
       "implementation_status": "mapped",
       "production_evidence": "The tested ForwardRecipientNavigation helper is called directly by the shipping SwiftUI ForwardMessageSheet key handler.",
       "test_evidence": "ForwardMessageParityTests covers navigation clamp/page size and the descendant test covers Cmd+Enter and Ctrl+Enter acceptance plus rejection of bare/non-Return cases. Exact-head test run pending.",
-      "notes": "IOS-MAIN-FORWARD-TEST-002: current Desktop contract read and mapped to native focused XCTest; remains mapped pending exact-head run.",
+      "notes": "IOS-MAIN-FORWARD-TEST-002: current Desktop contract read and mapped to native focused XCTest; remains mapped pending exact-head run. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "current-main-reviewed",
+      "authority_review_state": "requires-current-main-review",
       "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
     },
     {
