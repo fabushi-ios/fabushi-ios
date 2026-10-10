@@ -260,6 +260,125 @@ final class MobileComposerParityTests: XCTestCase {
         XCTAssertEqual(after.first?.subtitle, "connected")
     }
 
+    func testPrReferencesPreferNodeOverCloudOverTextAndDeduplicateByNumber() throws {
+        var text = MobileChatMessage(
+            id: "text",
+            role: .user,
+            text: "See https://github.com/acme/repo/pull/42 and https://github.com/acme/repo/pull/43."
+        )
+        text.canonicalMessageId = "text"
+        var cloud = MobileChatMessage(
+            id: "cloud",
+            role: .assistant,
+            text: "",
+            kind: .action,
+            actionTitle: "Cloud task",
+            cloudAgentBcId: "bc-42"
+        )
+        cloud.canonicalMessageId = "cloud"
+        var node = MobileChatMessage(
+            id: "node",
+            role: .user,
+            text: "#42"
+        )
+        node.richText = #"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"prReference","attrs":{"prNumber":42,"title":"Node title","url":"https://github.com/acme/repo/pull/42"}}]}]}"#
+        let info = MobileCloudAgentInfo(
+            bcId: "bc-42",
+            status: "finished",
+            name: "Cloud title",
+            prompt: nil,
+            branchName: nil,
+            filesChanged: nil,
+            linesAdded: nil,
+            linesRemoved: nil,
+            prURL: "https://github.com/acme/repo/pull/42",
+            prState: "open",
+            prNumber: 42
+        )
+
+        let references = projectMobileEditorPrReferences(
+            entries: [text, cloud, node],
+            cloudInfos: ["bc-42": info],
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-a",
+            ownedAgentID: "agent-a",
+            currentAgentID: "agent-a"
+        )
+
+        XCTAssertEqual(references.map(\.prNumber), [42, 43])
+        XCTAssertEqual(references[0].source, "node")
+        XCTAssertEqual(references[0].title, "Node title")
+        XCTAssertEqual(references[1].source, "text")
+    }
+
+    func testPrReferenceScopeFencingAndHashSuggestion() {
+        let entry = MobileChatMessage(
+            id: "text",
+            role: .user,
+            text: "https://review.cursor.com/github/pr/acme/repo/88"
+        )
+        XCTAssertTrue(projectMobileEditorPrReferences(
+            entries: [entry],
+            cloudInfos: [:],
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-b",
+            ownedAgentID: "agent-a",
+            currentAgentID: "agent-a"
+        ).isEmpty)
+        let references = projectMobileEditorPrReferences(
+            entries: [entry],
+            cloudInfos: [:],
+            ownedAccountKey: "account-a",
+            currentAccountKey: "account-a",
+            ownedAgentID: "agent-a",
+            currentAgentID: "agent-a"
+        )
+        let items = projectMobileEditorPrSuggestionItems(references)
+        let context = mobileEditorSuggestionContext("#8")
+        XCTAssertEqual(context?.trigger, "#")
+        let rows = mobileEditorSuggestionRows(
+            context: context,
+            assistants: [],
+            workflows: [],
+            prReferences: items
+        )
+        XCTAssertEqual(rows.first?.label, "#88")
+        XCTAssertEqual(rows.first?.prReference?.prNumber, 88)
+    }
+
+    func testPrReferenceRichTextSurvivesAlongsideMcpWorkflowReference() throws {
+        let mcp = MobileComposerMcpReference(
+            workflowReferenceID: "mcp:17",
+            serverId: "17",
+            serverIdentifier: "github",
+            accountKey: "default",
+            label: "GitHub",
+            status: "connected",
+            iconURL: nil
+        )
+        let pr = MobileComposerPrReference(
+            prNumber: 42,
+            title: "Fix lifecycle",
+            url: "https://github.com/acme/repo/pull/42",
+            source: "node",
+            state: "open"
+        )
+        let richText = try XCTUnwrap(
+            mobileComposerRichText(
+                draft: "@GitHub inspect #42",
+                references: [mcp],
+                prReferences: [pr]
+            )
+        )
+        XCTAssertTrue(richText.contains(#"\"type\":\"workflowReference\""#))
+        XCTAssertTrue(richText.contains(#"\"type\":\"prReference\""#))
+        XCTAssertTrue(richText.contains(#"\"prNumber\":42"#))
+        XCTAssertEqual(
+            pruneMobileComposerPrReferences(draft: "inspect", references: [pr]),
+            []
+        )
+    }
+
     func testStageFailureNoticeAggregatesLikeDesktop() {
         XCTAssertEqual(
             mobileComposerStageFailureNotice([
