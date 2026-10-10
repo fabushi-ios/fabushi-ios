@@ -23,110 +23,83 @@ internal enum MobileReactionPickerCategory: String, CaseIterable, Identifiable {
 }
 
 internal struct MobileReactionCatalogItem: Identifiable, Equatable {
+    let id: String
     let emoji: String
     let name: String
     let category: MobileReactionPickerCategory
+    let shortcodes: [String]
+    let search: String
+    let hexcode: String
+    let baseHexcode: String?
+    let isSkinVariant: Bool
 
-    var id: String { "\(category.rawValue):\(emoji)" }
+    init(
+        id: String? = nil,
+        emoji: String,
+        name: String,
+        category: MobileReactionPickerCategory,
+        shortcodes: [String] = [],
+        search: String? = nil,
+        hexcode: String = "",
+        baseHexcode: String? = nil,
+        isSkinVariant: Bool = false
+    ) {
+        self.id = id ?? "\(category.rawValue):\(emoji)"
+        self.emoji = emoji
+        self.name = name
+        self.category = category
+        self.shortcodes = shortcodes
+        self.search = search ?? ([name, id ?? "", shortcodes.joined(separator: " ")]
+            .joined(separator: " ")
+            .lowercased())
+        self.hexcode = hexcode
+        self.baseHexcode = baseHexcode
+        self.isSkinVariant = isSkinVariant
+    }
 }
 
-private func mobileReactionCatalogItems(
-    _ category: MobileReactionPickerCategory,
-    _ rows: [(String, String)]
-) -> [MobileReactionCatalogItem] {
-    rows.map { MobileReactionCatalogItem(emoji: $0.0, name: $0.1, category: category) }
-}
-
-internal let mobileReactionCatalog: [MobileReactionCatalogItem] = [
-    mobileReactionCatalogItems(.people, [
-        ("😀", "grinning face"), ("😃", "smiling face"), ("😄", "smiling eyes"),
-        ("😁", "beaming face"), ("😆", "laughing face"), ("😅", "sweat smile"),
-        ("😂", "tears of joy"), ("🤣", "rolling laughing"), ("😊", "warm smile"),
-        ("😍", "heart eyes"), ("🥰", "smiling hearts"), ("😘", "kiss"),
-        ("😎", "cool sunglasses"), ("🤔", "thinking"), ("😮", "surprised"),
-        ("😢", "crying"), ("😭", "loud crying"), ("😡", "angry"),
-        ("👍", "thumbs up approve"), ("👎", "thumbs down disapprove"), ("👏", "clap"),
-        ("🙏", "folded hands thanks"), ("💪", "strong flex"), ("🤝", "handshake"),
-    ]),
-    mobileReactionCatalogItems(.nature, [
-        ("🐶", "dog"), ("🐱", "cat"), ("🐭", "mouse"), ("🐹", "hamster"),
-        ("🐰", "rabbit"), ("🦊", "fox"), ("🐻", "bear"), ("🐼", "panda"),
-        ("🐨", "koala"), ("🐯", "tiger"), ("🦁", "lion"), ("🐮", "cow"),
-        ("🐷", "pig"), ("🐸", "frog"), ("🐵", "monkey"), ("🐔", "chicken"),
-        ("🐧", "penguin"), ("🐦", "bird"), ("🦄", "unicorn"), ("🐝", "bee"),
-        ("🌸", "cherry blossom flower"), ("🌹", "rose flower"), ("🌻", "sunflower"),
-        ("🌈", "rainbow"),
-    ]),
-    mobileReactionCatalogItems(.food, [
-        ("🍎", "apple"), ("🍊", "orange"), ("🍋", "lemon"), ("🍌", "banana"),
-        ("🍉", "watermelon"), ("🍇", "grapes"), ("🍓", "strawberry"), ("🫐", "blueberries"),
-        ("🍒", "cherries"), ("🍑", "peach"), ("🥭", "mango"), ("🍍", "pineapple"),
-        ("🥑", "avocado"), ("🍕", "pizza"), ("🍔", "burger"), ("🍟", "fries"),
-        ("🌮", "taco"), ("🍣", "sushi"), ("🍜", "noodles"), ("🍰", "cake"),
-        ("🍪", "cookie"), ("☕️", "coffee"), ("🍵", "tea"), ("🥂", "cheers"),
-    ]),
-    mobileReactionCatalogItems(.activities, [
-        ("⚽️", "soccer football"), ("🏀", "basketball"), ("🏈", "american football"),
-        ("⚾️", "baseball"), ("🎾", "tennis"), ("🏐", "volleyball"), ("🏓", "ping pong"),
-        ("🏸", "badminton"), ("🥊", "boxing"), ("🏆", "trophy winner"), ("🥇", "gold medal"),
-        ("🎯", "target"), ("🎮", "game"), ("🎲", "dice"), ("🎸", "guitar"),
-        ("🎹", "piano"), ("🎤", "microphone"), ("🎧", "headphones"), ("🎨", "art"),
-        ("🎬", "movie"), ("📚", "books"), ("🧩", "puzzle"), ("🚴", "cycling"),
-        ("🏃", "running"),
-    ]),
-    mobileReactionCatalogItems(.travel, [
-        ("🚗", "car"), ("🚕", "taxi"), ("🚌", "bus"), ("🚎", "trolleybus"),
-        ("🏎️", "race car"), ("🚓", "police car"), ("🚑", "ambulance"), ("🚒", "fire engine"),
-        ("🚲", "bicycle"), ("✈️", "airplane"), ("🚀", "rocket"), ("🚁", "helicopter"),
-        ("🚂", "train"), ("🚇", "metro"), ("⛵️", "sailboat"), ("🚢", "ship"),
-        ("🏠", "home house"), ("🏢", "office"), ("🏖️", "beach"), ("🏔️", "mountain"),
-        ("🌋", "volcano"), ("🗺️", "map"), ("🌍", "earth world"), ("🌙", "moon"),
-    ]),
-    mobileReactionCatalogItems(.objects, [
-        ("⌚️", "watch"), ("📱", "phone"), ("💻", "laptop computer"), ("⌨️", "keyboard"),
-        ("🖥️", "desktop computer"), ("🖨️", "printer"), ("📷", "camera"), ("💡", "light bulb idea"),
-        ("🔦", "flashlight"), ("📕", "book"), ("✏️", "pencil"), ("📝", "memo note"),
-        ("📌", "pin"), ("📎", "paperclip"), ("🔒", "lock"), ("🔑", "key"),
-        ("🔨", "hammer"), ("🧰", "toolbox"), ("🧲", "magnet"), ("🧪", "test tube"),
-        ("🩺", "stethoscope"), ("💊", "medicine"), ("🎁", "gift"), ("💎", "gem"),
-    ]),
-    mobileReactionCatalogItems(.symbols, [
-        ("❤️", "red heart love"), ("🧡", "orange heart"), ("💛", "yellow heart"),
-        ("💚", "green heart"), ("💙", "blue heart"), ("💜", "purple heart"),
-        ("🖤", "black heart"), ("🤍", "white heart"), ("💔", "broken heart"),
-        ("💕", "two hearts"), ("💯", "hundred perfect"), ("💥", "boom"),
-        ("✨", "sparkles"), ("🔥", "fire"), ("⭐️", "star"), ("🎉", "party celebration"),
-        ("✅", "check correct"), ("❌", "cross wrong"), ("⚠️", "warning"),
-        ("❓", "question"), ("❗️", "exclamation"), ("➕", "plus"), ("➖", "minus"),
-        ("♻️", "recycle"),
-    ]),
-    mobileReactionCatalogItems(.flags, [
-        ("🏳️", "white flag"), ("🏴", "black flag"), ("🏁", "checkered flag"),
-        ("🚩", "red flag"), ("🇺🇸", "united states flag"), ("🇨🇳", "china flag"),
-        ("🇯🇵", "japan flag"), ("🇰🇷", "korea flag"), ("🇬🇧", "united kingdom flag"),
-        ("🇫🇷", "france flag"), ("🇩🇪", "germany flag"), ("🇮🇳", "india flag"),
-        ("🇨🇦", "canada flag"), ("🇦🇺", "australia flag"), ("🇧🇷", "brazil flag"),
-        ("🇸🇬", "singapore flag"),
-    ]),
-].flatMap { $0 }
+internal let mobileReactionCatalog: [MobileReactionCatalogItem] = mobileDesktopEmojiCatalog
 
 internal func mobileReactionPickerResults(
     query: String,
     category: MobileReactionPickerCategory,
-    limit: Int = 96
+    limit: Int = 96,
+    recentIds: [String] = []
 ) -> [MobileReactionCatalogItem] {
     let boundedLimit = max(0, min(limit, 96))
     guard boundedLimit > 0 else { return [] }
-    let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    let tokens = normalized.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-    return mobileReactionCatalog.filter { item in
-        guard category == .all || item.category == category else { return false }
-        guard !tokens.isEmpty else { return true }
-        let haystack = "\(item.emoji) \(item.name) \(item.category.rawValue)".lowercased()
-        return tokens.allSatisfy { haystack.contains($0) }
+    let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    var exact: [(Int, MobileReactionCatalogItem)] = []
+    var secondary: [(Int, MobileReactionCatalogItem)] = []
+
+    for (sourceIndex, item) in mobileReactionCatalog.enumerated() {
+        guard category == .all || item.category == category else { continue }
+        if normalizedQuery.isEmpty {
+            exact.append((sourceIndex, item))
+            continue
+        }
+        guard item.search.contains(normalizedQuery) else { continue }
+        let name = item.name.lowercased()
+        let isExact = item.id.lowercased().hasPrefix(normalizedQuery)
+            || item.shortcodes.contains(where: { $0.lowercased().hasPrefix(normalizedQuery) })
+            || name.hasPrefix(normalizedQuery)
+            || name.contains(" " + normalizedQuery)
+        (isExact ? exact : secondary).append((sourceIndex, item))
     }
-    .prefix(boundedLimit)
-    .map { $0 }
+
+    var recentOrder: [String: Int] = [:]
+    for (index, id) in recentIds.enumerated() where recentOrder[id] == nil {
+        recentOrder[id] = index
+    }
+    func ordered(_ values: [(Int, MobileReactionCatalogItem)]) -> [MobileReactionCatalogItem] {
+        values.sorted { left, right in
+            let leftRecent = recentOrder[left.1.id] ?? Int.max
+            let rightRecent = recentOrder[right.1.id] ?? Int.max
+            if leftRecent != rightRecent { return leftRecent < rightRecent }
+            return left.0 < right.0
+        }.map(\.1)
+    }
+    return Array((ordered(exact) + ordered(secondary)).prefix(boundedLimit))
 }
 
 internal func isMobileReactionActionable(_ entry: MobileChatMessage) -> Bool {
@@ -1328,6 +1301,7 @@ internal struct MobileBotChat: View {
     @State private var reactionPickerDraft = ""
     @State private var reactionPickerSearch = ""
     @State private var reactionPickerCategory: MobileReactionPickerCategory = .all
+    @State private var reactionPickerRecentIds: [String] = []
     @State private var editorSuggestionWorkflows: [MobileEditorSuggestionItem] = []
     @State private var editorSuggestionStatus: MobileEditorSuggestionSourceStatus = .idle
     @State private var editorSuggestionGeneration = 0
@@ -3686,7 +3660,8 @@ internal struct MobileBotChat: View {
     private var reactionPickerResults: [MobileReactionCatalogItem] {
         mobileReactionPickerResults(
             query: reactionPickerSearch,
-            category: reactionPickerCategory
+            category: reactionPickerCategory,
+            recentIds: reactionPickerRecentIds
         )
     }
 
@@ -3725,7 +3700,7 @@ internal struct MobileBotChat: View {
                             ForEach(Array(reactionPickerResults.enumerated()), id: \.element.id) { index, item in
                                 let reacted = reactionPickerTarget?.myReactions.contains(item.emoji) == true
                                 Button {
-                                    submitReactionPicker(emoji: item.emoji)
+                                    submitReactionPicker(emoji: item.emoji, recentCatalogId: item.id)
                                 } label: {
                                     ZStack(alignment: .topTrailing) {
                                         Text(item.emoji)
@@ -3889,12 +3864,22 @@ internal struct MobileBotChat: View {
     }
 
     @MainActor
-    private func submitReactionPicker(emoji rawEmoji: String? = nil) {
+    private func submitReactionPicker(
+        emoji rawEmoji: String? = nil,
+        recentCatalogId: String? = nil
+    ) {
         guard let targetId = reactionPickerTargetId,
               let emoji = normalizeMobileReactionInput(rawEmoji ?? reactionPickerDraft),
               let entry = entries.first(where: { $0.id == targetId }),
               isMobileReactionActionable(entry)
         else { return }
+        if let recentCatalogId {
+            reactionPickerRecentIds.removeAll { $0 == recentCatalogId }
+            reactionPickerRecentIds.insert(recentCatalogId, at: 0)
+            if reactionPickerRecentIds.count > 24 {
+                reactionPickerRecentIds.removeLast(reactionPickerRecentIds.count - 24)
+            }
+        }
         reactionPickerPresented = false
         reactionPickerTargetId = nil
         reactionPickerDraft = ""

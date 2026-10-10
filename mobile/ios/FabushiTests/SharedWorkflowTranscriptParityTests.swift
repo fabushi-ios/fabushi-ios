@@ -1086,28 +1086,53 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertNil(messages[0].optimisticDeliveryError)
     }
 
-    func testNativeReactionPickerCatalogSearchCategoryAndLimit() {
-        XCTAssertGreaterThan(mobileReactionCatalog.count, 96)
+    func testNativeReactionPickerCatalogSearchCategoryAliasesSkinsRankingAndLimit() throws {
+        XCTAssertEqual(mobileDesktopEmojiCatalogSourcePackage, "emojibase-data@17.0.0")
+        XCTAssertEqual(mobileReactionCatalog.count, 3_944)
+        XCTAssertEqual(mobileReactionCatalog.filter(\.isSkinVariant).count, 2_030)
 
-        let limited = mobileReactionPickerResults(
-            query: "",
-            category: .all
-        )
+        let limited = mobileReactionPickerResults(query: "", category: .all)
         XCTAssertEqual(limited.count, 96)
 
-        let cats = mobileReactionPickerResults(
-            query: "cat",
-            category: .nature
-        )
-        XCTAssertTrue(cats.contains(where: { $0.emoji == "🐱" }))
+        let cats = mobileReactionPickerResults(query: "cat", category: .nature)
+        XCTAssertTrue(cats.contains(where: { $0.emoji == "🐱" || $0.emoji == "🐈" }))
         XCTAssertTrue(cats.allSatisfy { $0.category == .nature })
 
-        let heart = mobileReactionPickerResults(
-            query: "heart",
-            category: .symbols
+        let alias = try XCTUnwrap(
+            mobileReactionPickerResults(query: "thumbsup", category: .people)
+                .first(where: { $0.emoji == "👍" })
         )
-        XCTAssertFalse(heart.isEmpty)
-        XCTAssertTrue(heart.allSatisfy { $0.category == .symbols })
+        XCTAssertEqual(alias.id, "+1")
+        XCTAssertTrue(alias.shortcodes.contains("thumbsup"))
+        XCTAssertTrue(alias.search.contains("thumbsup"))
+
+        let skin = try XCTUnwrap(
+            mobileReactionPickerResults(query: "wave_tone3", category: .people)
+                .first(where: { $0.emoji == "👋🏽" })
+        )
+        XCTAssertTrue(skin.isSkinVariant)
+        XCTAssertEqual(skin.baseHexcode, "1F44B")
+
+        let prefixRanked = mobileReactionPickerResults(query: "cat", category: .nature)
+        let cat2Index = try XCTUnwrap(prefixRanked.firstIndex(where: { $0.id == "cat2" }))
+        let blackCatIndex = try XCTUnwrap(prefixRanked.firstIndex(where: { $0.id == "black_cat" }))
+        XCTAssertLessThan(cat2Index, blackCatIndex)
+
+        let recencyRanked = mobileReactionPickerResults(
+            query: "cat",
+            category: .nature,
+            recentIds: ["black_cat", "cat2"]
+        )
+        XCTAssertEqual(recencyRanked.first?.id, "cat2", "Desktop ranking keeps exact matches ahead of secondary recents.")
+        let blackCat = try XCTUnwrap(recencyRanked.firstIndex(where: { $0.id == "black_cat" }))
+        let otherSecondary = recencyRanked.enumerated().first(where: {
+            $0.element.id != "black_cat" &&
+            !$0.element.id.hasPrefix("cat") &&
+            !$0.element.name.lowercased().hasPrefix("cat")
+        })?.offset
+        if let otherSecondary {
+            XCTAssertLessThan(blackCat, otherSecondary)
+        }
 
         XCTAssertTrue(
             mobileReactionPickerResults(
