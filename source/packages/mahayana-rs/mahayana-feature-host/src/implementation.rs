@@ -310,6 +310,10 @@ struct MemorySynthesisOperation {
     agent_id: String,
     snapshot: crate::memory_metadata::SynthesisSnapshot,
     evidence: Vec<crate::memory_synthesis::MemoryEvidence>,
+    temporal: bool,
+    attempt: usize,
+    synthesis_started_at_ms: i64,
+    attempt_started_at_ms: i64,
     phase: MemorySynthesisPhase,
     output: String,
 }
@@ -646,9 +650,21 @@ struct FeatureState {
     memory_synthesis_pending:
         BTreeMap<String, VecDeque<crate::memory_synthesis::MemoryEvidence>>,
     #[cfg(feature = "production")]
+    memory_synthesis_temporal: BTreeSet<String>,
+    #[cfg(feature = "production")]
+    memory_synthesis_due_at_ms: BTreeMap<String, i64>,
+    #[cfg(feature = "production")]
+    memory_synthesis_attempts: BTreeMap<String, usize>,
+    #[cfg(feature = "production")]
+    memory_synthesis_started_at_ms: BTreeMap<String, i64>,
+    #[cfg(feature = "production")]
+    memory_synthesis_pending_order: VecDeque<String>,
+    #[cfg(feature = "production")]
     memory_synthesis_operations: BTreeMap<String, MemorySynthesisOperation>,
     #[cfg(feature = "production")]
     memory_synthesis_active_agents: BTreeSet<String>,
+    #[cfg(feature = "production")]
+    memory_synthesis_next_temporal_poll_at_ms: i64,
     automation_operations: BTreeMap<String, (String, String)>,
     routine_executions: BTreeMap<String, RoutineExecution>,
     routine_operation_epochs: BTreeMap<String, u64>,
@@ -699,9 +715,21 @@ impl Default for FeatureState {
             #[cfg(feature = "production")]
             memory_synthesis_pending: BTreeMap::new(),
             #[cfg(feature = "production")]
+            memory_synthesis_temporal: BTreeSet::new(),
+            #[cfg(feature = "production")]
+            memory_synthesis_due_at_ms: BTreeMap::new(),
+            #[cfg(feature = "production")]
+            memory_synthesis_attempts: BTreeMap::new(),
+            #[cfg(feature = "production")]
+            memory_synthesis_started_at_ms: BTreeMap::new(),
+            #[cfg(feature = "production")]
+            memory_synthesis_pending_order: VecDeque::new(),
+            #[cfg(feature = "production")]
             memory_synthesis_operations: BTreeMap::new(),
             #[cfg(feature = "production")]
             memory_synthesis_active_agents: BTreeSet::new(),
+            #[cfg(feature = "production")]
+            memory_synthesis_next_temporal_poll_at_ms: 0,
             automation_operations: BTreeMap::new(),
             routine_executions: BTreeMap::new(),
             routine_operation_epochs: BTreeMap::new(),
@@ -7947,6 +7975,10 @@ impl FeatureHostController {
     ) -> Result<Option<HostEvent>, FeatureHostError> {
         self.advance_pending_routine()?;
         self.fire_due_automation()?;
+        #[cfg(feature = "production")]
+        if self.config.mode == HostMode::Production {
+            self.advance_memory_synthesis_schedule(now_millis())?;
+        }
         if let Some(event) = self.state()?.events.pop_front() {
             return Ok(Some(event));
         }
@@ -7959,7 +7991,21 @@ impl FeatureHostController {
         }
         match self.config.mode {
             HostMode::Test => Ok(None),
-            HostMode::Production => self.receive_production(timeout),
+            HostMode::Production => {
+                #[cfg(feature = "production")]
+                {
+                    let effective = self.memory_synthesis_receive_timeout(timeout, now_millis())?;
+                    let event = self.receive_production(effective)?;
+                    if event.is_none() {
+                        self.advance_memory_synthesis_schedule(now_millis())?;
+                    }
+                    Ok(event)
+                }
+                #[cfg(not(feature = "production"))]
+                {
+                    self.receive_production(timeout)
+                }
+            }
         }
     }
 
@@ -8225,6 +8271,15 @@ impl FeatureHostController {
             if reset_runtime {
                 self.retire_routines_for_account_change()?;
                 self.retire_background_recoveries_for_account_change()?;
+                let synthesis_operations = self
+                    .state()?
+                    .memory_synthesis_operations
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                for operation_id in synthesis_operations {
+                    let _ = self.runtime()?.interrupt(OperationId(operation_id));
+                }
                 self.runtime()?.reset_session()?;
             }
             let account_id = next_account_id.as_deref();
@@ -8312,8 +8367,14 @@ impl FeatureHostController {
             state.human_handoff_operations.clear();
             state.memory_turn_observations.clear();
             state.memory_synthesis_pending.clear();
+            state.memory_synthesis_temporal.clear();
+            state.memory_synthesis_due_at_ms.clear();
+            state.memory_synthesis_attempts.clear();
+            state.memory_synthesis_started_at_ms.clear();
+            state.memory_synthesis_pending_order.clear();
             state.memory_synthesis_operations.clear();
             state.memory_synthesis_active_agents.clear();
+            state.memory_synthesis_next_temporal_poll_at_ms = 0;
             state.automation_operations.clear();
             state.routine_executions.clear();
             state.routine_epoch = state.routine_epoch.wrapping_add(1).max(1);
@@ -8603,7 +8664,7 @@ impl FeatureHostController {
 
     pub fn close(&self) -> Result<(), FeatureHostError> {
         self.set_routine_quiescing(true)?;
-        let operation_ids = {
+        let (operation_ids, memory_synthesis_operation_ids) = {
             let mut state = self.state()?;
             if state.closed {
                 return Ok(());
@@ -8647,6 +8708,18 @@ impl FeatureHostController {
             state.operations.clear();
             state.operation_agents.clear();
             state.human_handoff_operations.clear();
+            state.memory_turn_observations.clear();
+            state.memory_synthesis_pending.clear();
+            state.memory_synthesis_temporal.clear();
+            state.memory_synthesis_due_at_ms.clear();
+            state.memory_synthesis_attempts.clear();
+            state.memory_synthesis_started_at_ms.clear();
+            state.memory_synthesis_pending_order.clear();
+            let memory_synthesis_operation_ids =
+                state.memory_synthesis_operations.keys().cloned().collect::<Vec<_>>();
+            state.memory_synthesis_operations.clear();
+            state.memory_synthesis_active_agents.clear();
+            state.memory_synthesis_next_temporal_poll_at_ms = 0;
             *self
                 .client_side_tool_v2
                 .lock()
@@ -8654,7 +8727,7 @@ impl FeatureHostController {
             state.events.push_back(HostEvent::HostClosed {
                 timestamp: timestamp(),
             });
-            operation_ids
+            (operation_ids, memory_synthesis_operation_ids)
         };
 
         if self.config.mode == HostMode::Production {
@@ -8663,6 +8736,9 @@ impl FeatureHostController {
                 if !operation_id.starts_with("host-task-") {
                     let _ = self.runtime()?.interrupt(OperationId(operation_id));
                 }
+            }
+            for operation_id in memory_synthesis_operation_ids {
+                let _ = self.runtime()?.interrupt(OperationId(operation_id));
             }
             #[cfg(not(feature = "production"))]
             return Err(FeatureHostError::ProductionUnavailable);
@@ -8900,16 +8976,19 @@ impl FeatureHostController {
     }
 
     #[cfg(feature = "production")]
+    fn emit_memory_synthesis_report(&self, report: crate::memory_synthesis::SynthesisReport) {
+        let value = crate::memory_synthesis::synthesis_telemetry_value(&report);
+        if let Ok(encoded) = serde_json::to_string(&value) {
+            eprintln!("{encoded}");
+        }
+    }
+
+    #[cfg(feature = "production")]
     fn enqueue_memory_synthesis_observation(
         &self,
         observation: PendingMemoryTurn,
     ) -> Result<(), FeatureHostError> {
-        let Some(assistant) = observation
-            .assistant
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        else {
+        let Some(assistant) = observation.assistant.as_deref().map(str::trim).filter(|v| !v.is_empty()) else {
             return Ok(());
         };
         let user = crate::memory_synthesis::bounded_evidence_text(&observation.user);
@@ -8923,74 +9002,198 @@ impl FeatureHostController {
             user,
             assistant,
         };
+        let now = now_millis();
+        let mut dropped = Vec::new();
         {
             let mut state = self.state()?;
-            if !state
-                .memory_synthesis_pending
-                .contains_key(&observation.agent_id)
-                && state.memory_synthesis_pending.len()
-                    >= crate::memory_synthesis::MAX_PENDING_AGENTS
-            {
-                return Ok(());
+            let known = state.memory_synthesis_pending.contains_key(&observation.agent_id)
+                || state.memory_synthesis_temporal.contains(&observation.agent_id);
+            if !known && state.memory_synthesis_pending_order.len() >= crate::memory_synthesis::MAX_PENDING_AGENTS {
+                if let Some(oldest) = state.memory_synthesis_pending_order.pop_front() {
+                    let count = state.memory_synthesis_pending.remove(&oldest).map(|q| q.len()).unwrap_or(0);
+                    state.memory_synthesis_temporal.remove(&oldest);
+                    state.memory_synthesis_due_at_ms.remove(&oldest);
+                    state.memory_synthesis_attempts.remove(&oldest);
+                    state.memory_synthesis_started_at_ms.remove(&oldest);
+                    dropped.push((oldest, count));
+                }
             }
-            let queue = state
-                .memory_synthesis_pending
-                .entry(observation.agent_id.clone())
-                .or_default();
+            if !state.memory_synthesis_pending_order.contains(&observation.agent_id) {
+                state.memory_synthesis_pending_order.push_back(observation.agent_id.clone());
+            }
+            let queue = state.memory_synthesis_pending.entry(observation.agent_id.clone()).or_default();
             if queue.len() >= crate::memory_synthesis::MAX_PENDING_EVIDENCE_PER_AGENT {
                 queue.pop_front();
+                dropped.push((observation.agent_id.clone(), 1));
             }
             queue.push_back(evidence);
+            state.memory_synthesis_due_at_ms.insert(
+                observation.agent_id.clone(),
+                now.saturating_add(crate::memory_synthesis::MEMORY_SYNTHESIS_DEBOUNCE_MS),
+            );
+            state.memory_synthesis_attempts.insert(observation.agent_id.clone(), 1);
+            state.memory_synthesis_started_at_ms.remove(&observation.agent_id);
         }
-        self.start_next_memory_synthesis(&observation.agent_id)
+        for (agent_id, evidence_count) in dropped {
+            self.emit_memory_synthesis_report(crate::memory_synthesis::SynthesisReport {
+                outcome: crate::memory_synthesis::SynthesisReportOutcome::Dropped,
+                agent_id: Some(agent_id),
+                evidence_count,
+                input_memory_count: 0,
+                change_count: 0,
+                duration_ms: 0,
+            });
+        }
+        Ok(())
     }
 
     #[cfg(feature = "production")]
-    fn start_next_memory_synthesis(&self, agent_id: &str) -> Result<(), FeatureHostError> {
-        let account_id = self
-            .active_account_id
-            .lock()
-            .map_err(|_| FeatureHostError::StatePoisoned)?
-            .clone();
-        let Some(account_id) = account_id else {
+    fn queue_due_temporal_memory_synthesis(&self, now: i64) -> Result<(), FeatureHostError> {
+        {
+            let mut state = self.state()?;
+            if state.closed || !state.session_active || state.memory_synthesis_next_temporal_poll_at_ms > now {
+                return Ok(());
+            }
+            state.memory_synthesis_next_temporal_poll_at_ms =
+                now.saturating_add(crate::memory_synthesis::MEMORY_SYNTHESIS_POLL_INTERVAL_MS);
+        }
+        let Some(root) = self.active_account_root(self.memory_root_path.as_deref()) else {
             return Ok(());
         };
-        let evidence = {
-            let mut state = self.state()?;
-            if state.memory_synthesis_active_agents.contains(agent_id) {
-                return Ok(());
-            }
-            let Some(queue) = state.memory_synthesis_pending.get_mut(agent_id) else {
-                return Ok(());
-            };
-            if queue.is_empty() {
-                state.memory_synthesis_pending.remove(agent_id);
-                return Ok(());
-            }
-            let evidence = queue.drain(..).collect::<Vec<_>>();
-            state.memory_synthesis_pending.remove(agent_id);
-            state
-                .memory_synthesis_active_agents
-                .insert(agent_id.to_string());
-            evidence
-        };
-        let restore = evidence.clone();
-        if let Err(error) =
-            self.start_memory_synthesis_proposal(agent_id, &account_id, evidence)
-        {
-            let still_current = self.memory_synthesis_account_is_current(&account_id)?;
-            let mut state = self.state()?;
-            state.memory_synthesis_active_agents.remove(agent_id);
-            if still_current {
-                let queue = state
-                    .memory_synthesis_pending
-                    .entry(agent_id.to_string())
-                    .or_default();
-                for item in restore.into_iter().rev() {
-                    queue.push_front(item);
+        let mut candidates = BTreeSet::new();
+        if let Ok(entries) = std::fs::read_dir(&root) {
+            for entry in entries.flatten() {
+                let Some(agent_id) = entry.file_name().to_str().map(str::to_owned) else { continue; };
+                if is_safe_memory_agent_id(&agent_id) && entry.path().join("memory").is_dir() {
+                    candidates.insert(agent_id);
                 }
             }
-            return Err(error);
+        }
+        let mut due = Vec::new();
+        for agent_id in candidates {
+            if due.len() >= crate::memory_synthesis::MAX_TEMPORAL_TARGETS_PER_SWEEP { break; }
+            let memory_dir = root.join(&agent_id).join("memory");
+            let Ok(snapshot) = crate::memory_metadata::prepare_synthesis_snapshot(&memory_dir) else { continue; };
+            if !snapshot.memories.is_empty() && crate::memory_metadata::is_temporal_review_due(&memory_dir, now) {
+                due.push(agent_id);
+            }
+        }
+        let mut state = self.state()?;
+        for agent_id in due {
+            if !state.memory_synthesis_pending_order.contains(&agent_id) {
+                if state.memory_synthesis_pending_order.len() >= crate::memory_synthesis::MAX_PENDING_AGENTS { break; }
+                state.memory_synthesis_pending_order.push_back(agent_id.clone());
+            }
+            state.memory_synthesis_temporal.insert(agent_id.clone());
+            state.memory_synthesis_due_at_ms.insert(agent_id.clone(), now);
+            state.memory_synthesis_attempts.entry(agent_id).or_insert(1);
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn memory_synthesis_receive_timeout(&self, requested: Duration, now: i64) -> Result<Duration, FeatureHostError> {
+        if requested == Duration::ZERO { return Ok(Duration::ZERO); }
+        let state = self.state()?;
+        if !state.session_active || state.closed { return Ok(requested); }
+        let mut next = Some(if state.memory_synthesis_next_temporal_poll_at_ms <= 0 {
+            now
+        } else {
+            state.memory_synthesis_next_temporal_poll_at_ms
+        });
+        for due in state.memory_synthesis_due_at_ms.values().copied() {
+            next = Some(next.map_or(due, |current| current.min(due)));
+        }
+        for operation in state.memory_synthesis_operations.values() {
+            let deadline = operation.attempt_started_at_ms
+                .saturating_add(crate::memory_synthesis::MEMORY_SYNTHESIS_DEADLINE_MS);
+            next = Some(next.map_or(deadline, |current| current.min(deadline)));
+        }
+        let wait_ms = next.unwrap_or(now).saturating_sub(now).max(0) as u64;
+        Ok(requested.min(Duration::from_millis(wait_ms)))
+    }
+
+    #[cfg(feature = "production")]
+    fn advance_memory_synthesis_schedule(&self, now: i64) -> Result<(), FeatureHostError> {
+        self.queue_due_temporal_memory_synthesis(now)?;
+        let expired = {
+            let state = self.state()?;
+            state.memory_synthesis_operations.iter()
+                .filter(|(_, op)| now >= op.attempt_started_at_ms.saturating_add(crate::memory_synthesis::MEMORY_SYNTHESIS_DEADLINE_MS))
+                .map(|(id, _)| id.clone()).collect::<Vec<_>>()
+        };
+        for operation_id in expired {
+            let _ = self.runtime()?.interrupt(OperationId(operation_id.clone()));
+            self.fail_memory_synthesis_operation(
+                &operation_id,
+                crate::memory_synthesis::SynthesisReportOutcome::Failed,
+                0,
+                now,
+            )?;
+        }
+        let due_agents = {
+            let state = self.state()?;
+            state.memory_synthesis_pending_order.iter()
+                .filter(|agent_id| {
+                    !state.memory_synthesis_active_agents.contains(*agent_id)
+                        && state.memory_synthesis_due_at_ms.get(*agent_id).is_some_and(|due| *due <= now)
+                })
+                .cloned().collect::<Vec<_>>()
+        };
+        for agent_id in due_agents {
+            self.start_next_memory_synthesis(&agent_id, now)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn start_next_memory_synthesis(&self, agent_id: &str, now: i64) -> Result<(), FeatureHostError> {
+        let account_id = self.active_account_id.lock().map_err(|_| FeatureHostError::StatePoisoned)?.clone();
+        let Some(account_id) = account_id else { return Ok(()); };
+        let (evidence, temporal, attempt, synthesis_started_at_ms) = {
+            let mut state = self.state()?;
+            if state.memory_synthesis_active_agents.contains(agent_id)
+                || state.memory_synthesis_due_at_ms.get(agent_id).is_some_and(|due| *due > now)
+            { return Ok(()); }
+            let evidence = state.memory_synthesis_pending.remove(agent_id).unwrap_or_default().into_iter().collect::<Vec<_>>();
+            let temporal = state.memory_synthesis_temporal.remove(agent_id);
+            if evidence.is_empty() && !temporal {
+                state.memory_synthesis_due_at_ms.remove(agent_id);
+                state.memory_synthesis_attempts.remove(agent_id);
+                state.memory_synthesis_started_at_ms.remove(agent_id);
+                state.memory_synthesis_pending_order.retain(|id| id != agent_id);
+                return Ok(());
+            }
+            let attempt = state.memory_synthesis_attempts.remove(agent_id).unwrap_or(1).max(1);
+            let started = state.memory_synthesis_started_at_ms.remove(agent_id).filter(|v| *v > 0).unwrap_or(now);
+            state.memory_synthesis_due_at_ms.remove(agent_id);
+            state.memory_synthesis_pending_order.retain(|id| id != agent_id);
+            state.memory_synthesis_active_agents.insert(agent_id.to_string());
+            (evidence, temporal, attempt, started)
+        };
+        if self.start_memory_synthesis_proposal(
+            agent_id, &account_id, evidence.clone(), temporal, attempt, synthesis_started_at_ms, now
+        ).is_err() {
+            let snapshot = self.memory_dir_for_agent(agent_id).ok()
+                .and_then(|dir| crate::memory_metadata::prepare_synthesis_snapshot(&dir).ok())
+                .unwrap_or(crate::memory_metadata::SynthesisSnapshot { fingerprint: String::new(), memories: Vec::new() });
+            self.retry_or_finish_memory_synthesis(
+                MemorySynthesisOperation {
+                    account_id,
+                    agent_id: agent_id.to_string(),
+                    snapshot,
+                    evidence,
+                    temporal,
+                    attempt,
+                    synthesis_started_at_ms,
+                    attempt_started_at_ms: now,
+                    phase: MemorySynthesisPhase::Proposal,
+                    output: String::new(),
+                },
+                crate::memory_synthesis::SynthesisReportOutcome::Failed,
+                0,
+                now,
+            )?;
         }
         Ok(())
     }
@@ -9001,6 +9204,10 @@ impl FeatureHostController {
         agent_id: &str,
         account_id: &str,
         evidence: Vec<crate::memory_synthesis::MemoryEvidence>,
+        temporal: bool,
+        attempt: usize,
+        synthesis_started_at_ms: i64,
+        attempt_started_at_ms: i64,
     ) -> Result<(), FeatureHostError> {
         if !self.memory_synthesis_account_is_current(account_id)? {
             return Err(FeatureHostError::Contract(
@@ -9010,13 +9217,31 @@ impl FeatureHostController {
         let memory_dir = self.memory_dir_for_agent(agent_id)?;
         let snapshot = crate::memory_metadata::prepare_synthesis_snapshot(&memory_dir)
             .map_err(FeatureHostError::Contract)?;
-        let prompt =
-            crate::memory_synthesis::proposal_prompt(&snapshot, &evidence, now_millis());
+        if snapshot.memories.is_empty() && evidence.is_empty() {
+            if temporal {
+                let _ = crate::memory_metadata::mark_temporal_review(&memory_dir, attempt_started_at_ms);
+            }
+            self.emit_memory_synthesis_report(crate::memory_synthesis::SynthesisReport {
+                outcome: crate::memory_synthesis::SynthesisReportOutcome::NoWork,
+                agent_id: Some(agent_id.to_string()),
+                evidence_count: 0,
+                input_memory_count: 0,
+                change_count: 0,
+                duration_ms: attempt_started_at_ms.saturating_sub(synthesis_started_at_ms),
+            });
+            self.finish_memory_synthesis_agent(agent_id)?;
+            return Ok(());
+        }
+        let prompt = crate::memory_synthesis::proposal_prompt(&snapshot, &evidence, attempt_started_at_ms);
         let context = MemorySynthesisOperation {
             account_id: account_id.to_string(),
             agent_id: agent_id.to_string(),
             snapshot,
             evidence,
+            temporal,
+            attempt,
+            synthesis_started_at_ms,
+            attempt_started_at_ms,
             phase: MemorySynthesisPhase::Proposal,
             output: String::new(),
         };
@@ -9045,6 +9270,10 @@ impl FeatureHostController {
             agent_id: context.agent_id,
             snapshot: context.snapshot,
             evidence: context.evidence,
+            temporal: context.temporal,
+            attempt: context.attempt,
+            synthesis_started_at_ms: context.synthesis_started_at_ms,
+            attempt_started_at_ms: context.attempt_started_at_ms,
             phase: MemorySynthesisPhase::Verification { changes },
             output: String::new(),
         };
@@ -9087,89 +9316,173 @@ impl FeatureHostController {
 
     #[cfg(feature = "production")]
     fn finish_memory_synthesis_agent(&self, agent_id: &str) -> Result<(), FeatureHostError> {
-        self.state()?
-            .memory_synthesis_active_agents
-            .remove(agent_id);
-        self.start_next_memory_synthesis(agent_id)
+        self.state()?.memory_synthesis_active_agents.remove(agent_id);
+        Ok(())
     }
 
     #[cfg(feature = "production")]
-    fn finish_memory_synthesis_operation(
+    fn retry_or_finish_memory_synthesis(
+        &self,
+        context: MemorySynthesisOperation,
+        outcome: crate::memory_synthesis::SynthesisReportOutcome,
+        change_count: usize,
+        now: i64,
+    ) -> Result<(), FeatureHostError> {
+        self.finish_memory_synthesis_agent(&context.agent_id)?;
+        if self.memory_synthesis_account_is_current(&context.account_id)?
+            && context.attempt < crate::memory_synthesis::MEMORY_SYNTHESIS_RETRY_ATTEMPTS
+            && !self.state()?.closed
+        {
+            let due = now.saturating_add(crate::memory_synthesis::retry_delay_ms(context.attempt));
+            let mut state = self.state()?;
+            if !state.memory_synthesis_pending_order.contains(&context.agent_id) {
+                state.memory_synthesis_pending_order.push_front(context.agent_id.clone());
+            }
+            let queue = state.memory_synthesis_pending.entry(context.agent_id.clone()).or_default();
+            for item in context.evidence.iter().cloned().rev() {
+                if !queue.iter().any(|existing| existing.id == item.id) { queue.push_front(item); }
+            }
+            if context.temporal { state.memory_synthesis_temporal.insert(context.agent_id.clone()); }
+            state.memory_synthesis_due_at_ms.insert(context.agent_id.clone(), due);
+            state.memory_synthesis_attempts.insert(context.agent_id.clone(), context.attempt + 1);
+            state.memory_synthesis_started_at_ms.insert(context.agent_id.clone(), context.synthesis_started_at_ms);
+            return Ok(());
+        }
+        if context.temporal {
+            if let Ok(memory_dir) = self.memory_dir_for_agent(&context.agent_id) {
+                let _ = crate::memory_metadata::mark_temporal_review(&memory_dir, now);
+            }
+        }
+        self.emit_memory_synthesis_report(crate::memory_synthesis::SynthesisReport {
+            outcome,
+            agent_id: Some(context.agent_id),
+            evidence_count: context.evidence.len(),
+            input_memory_count: context.snapshot.memories.len(),
+            change_count,
+            duration_ms: now.saturating_sub(context.synthesis_started_at_ms),
+        });
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn fail_memory_synthesis_operation(
         &self,
         operation_id: &str,
+        outcome: crate::memory_synthesis::SynthesisReportOutcome,
+        change_count: usize,
+        now: i64,
     ) -> Result<(), FeatureHostError> {
-        let Some(context) = self
-            .state()?
-            .memory_synthesis_operations
-            .remove(operation_id)
-        else {
+        let context = self.state()?.memory_synthesis_operations.remove(operation_id);
+        if let Some(context) = context {
+            self.retry_or_finish_memory_synthesis(context, outcome, change_count, now)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "production")]
+    fn finish_memory_synthesis_operation(&self, operation_id: &str) -> Result<(), FeatureHostError> {
+        let Some(context) = self.state()?.memory_synthesis_operations.remove(operation_id) else {
             return Ok(());
         };
+        let now = now_millis();
         if !self.memory_synthesis_account_is_current(&context.account_id)? {
             return self.finish_memory_synthesis_agent(&context.agent_id);
         }
-
         match context.phase.clone() {
             MemorySynthesisPhase::Proposal => {
-                let Some(raw) =
-                    crate::memory_synthesis::parse_json_object(&context.output)
-                else {
-                    return self.finish_memory_synthesis_agent(&context.agent_id);
+                let Some(raw) = crate::memory_synthesis::parse_json_object(&context.output) else {
+                    return self.retry_or_finish_memory_synthesis(context, crate::memory_synthesis::SynthesisReportOutcome::InvalidOutput, 0, now);
                 };
-                let Some(changes) =
-                    crate::memory_synthesis::parse_memory_synthesis_changes(&raw)
-                else {
-                    return self.finish_memory_synthesis_agent(&context.agent_id);
+                let Some(changes) = crate::memory_synthesis::parse_memory_synthesis_changes(&raw) else {
+                    return self.retry_or_finish_memory_synthesis(context, crate::memory_synthesis::SynthesisReportOutcome::InvalidOutput, 0, now);
                 };
-                if !crate::memory_synthesis::uses_known_evidence(
-                    &context.evidence,
-                    &changes,
-                ) || !crate::memory_synthesis::protects_explicit_memories(
-                    &context.snapshot,
-                    &changes,
-                ) {
-                    return self.finish_memory_synthesis_agent(&context.agent_id);
+                if !crate::memory_synthesis::uses_known_evidence(&context.evidence, &changes, context.temporal) {
+                    return self.retry_or_finish_memory_synthesis(context, crate::memory_synthesis::SynthesisReportOutcome::InvalidOutput, changes.len(), now);
+                }
+                if !crate::memory_synthesis::protects_explicit_memories(&context.snapshot, &changes) {
+                    return self.retry_or_finish_memory_synthesis(context, crate::memory_synthesis::SynthesisReportOutcome::Rejected, changes.len(), now);
                 }
                 if changes.is_empty() {
+                    if context.temporal {
+                        if let Ok(memory_dir) = self.memory_dir_for_agent(&context.agent_id) {
+                            let _ = crate::memory_metadata::mark_temporal_review(&memory_dir, now);
+                        }
+                    }
+                    self.emit_memory_synthesis_report(crate::memory_synthesis::SynthesisReport {
+                        outcome: crate::memory_synthesis::SynthesisReportOutcome::NoWork,
+                        agent_id: Some(context.agent_id.clone()),
+                        evidence_count: context.evidence.len(),
+                        input_memory_count: context.snapshot.memories.len(),
+                        change_count: 0,
+                        duration_ms: now.saturating_sub(context.synthesis_started_at_ms),
+                    });
                     return self.finish_memory_synthesis_agent(&context.agent_id);
                 }
-                if self
-                    .start_memory_synthesis_verification(context.clone(), changes)
-                    .is_err()
-                {
-                    return self.finish_memory_synthesis_agent(&context.agent_id);
+                let change_count = changes.len();
+                if self.start_memory_synthesis_verification(context.clone(), changes).is_err() {
+                    return self.retry_or_finish_memory_synthesis(context, crate::memory_synthesis::SynthesisReportOutcome::Failed, change_count, now);
                 }
                 Ok(())
             }
             MemorySynthesisPhase::Verification { changes } => {
-                if crate::memory_synthesis::parse_verification_approved(&context.output)
-                    == Some(true)
-                {
-                    let memory_dir = self.memory_dir_for_agent(&context.agent_id)?;
-                    let store_changes = changes
-                        .iter()
-                        .map(crate::memory_synthesis::MemoryChange::to_store_change)
-                        .collect::<Vec<_>>();
-                    if matches!(
-                        crate::memory_metadata::apply_synthesis(
-                            &memory_dir,
-                            &context.snapshot,
-                            &store_changes,
-                            now_millis(),
-                        ),
-                        Ok(crate::memory_metadata::SynthesisApplyResult::Stale)
-                    ) {
+                match crate::memory_synthesis::parse_verification_approved(&context.output) {
+                    Some(true) => {}
+                    Some(false) => return self.retry_or_finish_memory_synthesis(context, crate::memory_synthesis::SynthesisReportOutcome::Rejected, changes.len(), now),
+                    None => return self.retry_or_finish_memory_synthesis(context, crate::memory_synthesis::SynthesisReportOutcome::InvalidOutput, changes.len(), now),
+                }
+                let memory_dir = self.memory_dir_for_agent(&context.agent_id)?;
+                let store_changes = changes.iter().map(crate::memory_synthesis::MemoryChange::to_store_change).collect::<Vec<_>>();
+                match crate::memory_metadata::apply_synthesis(&memory_dir, &context.snapshot, &store_changes, now) {
+                    Ok(crate::memory_metadata::SynthesisApplyResult::Committed) => {
+                        self.emit_memory_synthesis_report(crate::memory_synthesis::SynthesisReport {
+                            outcome: crate::memory_synthesis::SynthesisReportOutcome::Committed,
+                            agent_id: Some(context.agent_id.clone()),
+                            evidence_count: context.evidence.len(),
+                            input_memory_count: context.snapshot.memories.len(),
+                            change_count: changes.len(),
+                            duration_ms: now.saturating_sub(context.synthesis_started_at_ms),
+                        });
+                        self.finish_memory_synthesis_agent(&context.agent_id)
+                    }
+                    Ok(crate::memory_metadata::SynthesisApplyResult::Stale) => {
+                        self.finish_memory_synthesis_agent(&context.agent_id)?;
+                        self.emit_memory_synthesis_report(crate::memory_synthesis::SynthesisReport {
+                            outcome: crate::memory_synthesis::SynthesisReportOutcome::Stale,
+                            agent_id: Some(context.agent_id.clone()),
+                            evidence_count: context.evidence.len(),
+                            input_memory_count: context.snapshot.memories.len(),
+                            change_count: changes.len(),
+                            duration_ms: now.saturating_sub(context.synthesis_started_at_ms),
+                        });
                         let mut state = self.state()?;
-                        let queue = state
-                            .memory_synthesis_pending
-                            .entry(context.agent_id.clone())
-                            .or_default();
-                        for item in context.evidence.iter().cloned().rev() {
-                            queue.push_front(item);
+                        if !state.memory_synthesis_pending_order.contains(&context.agent_id) {
+                            state.memory_synthesis_pending_order.push_front(context.agent_id.clone());
                         }
+                        let queue = state.memory_synthesis_pending.entry(context.agent_id.clone()).or_default();
+                        for item in context.evidence.iter().cloned().rev() {
+                            if !queue.iter().any(|existing| existing.id == item.id) { queue.push_front(item); }
+                        }
+                        if context.temporal { state.memory_synthesis_temporal.insert(context.agent_id.clone()); }
+                        state.memory_synthesis_due_at_ms.insert(context.agent_id.clone(), now.saturating_add(crate::memory_synthesis::MEMORY_SYNTHESIS_DEBOUNCE_MS));
+                        state.memory_synthesis_attempts.insert(context.agent_id.clone(), 1);
+                        state.memory_synthesis_started_at_ms.remove(&context.agent_id);
+                        Ok(())
+                    }
+                    Ok(crate::memory_metadata::SynthesisApplyResult::Invalid) | Err(_) => {
+                        if context.temporal {
+                            let _ = crate::memory_metadata::mark_temporal_review(&memory_dir, now);
+                        }
+                        self.emit_memory_synthesis_report(crate::memory_synthesis::SynthesisReport {
+                            outcome: crate::memory_synthesis::SynthesisReportOutcome::InvalidOutput,
+                            agent_id: Some(context.agent_id.clone()),
+                            evidence_count: context.evidence.len(),
+                            input_memory_count: context.snapshot.memories.len(),
+                            change_count: changes.len(),
+                            duration_ms: now.saturating_sub(context.synthesis_started_at_ms),
+                        });
+                        self.finish_memory_synthesis_agent(&context.agent_id)
                     }
                 }
-                self.finish_memory_synthesis_agent(&context.agent_id)
             }
         }
     }
@@ -9200,13 +9513,12 @@ impl FeatureHostController {
             }
             RuntimeEvent::OperationInterrupted { operation_id, .. }
             | RuntimeEvent::OperationFailed { operation_id, .. } => {
-                let context = self
-                    .state()?
-                    .memory_synthesis_operations
-                    .remove(&operation_id.to_string());
-                if let Some(context) = context {
-                    self.finish_memory_synthesis_agent(&context.agent_id)?;
-                }
+                self.fail_memory_synthesis_operation(
+                    &operation_id.to_string(),
+                    crate::memory_synthesis::SynthesisReportOutcome::Failed,
+                    0,
+                    now_millis(),
+                )?;
             }
             RuntimeEvent::ApprovalRequested { operation_id, .. } => {
                 let _ = self.runtime()?.interrupt(operation_id);
@@ -16940,6 +17252,20 @@ mod tests {
             state
                 .operation_agents
                 .insert("operation-1".into(), "agent-a".into());
+            state
+                .memory_synthesis_pending
+                .entry("agent-a".into())
+                .or_default()
+                .push_back(crate::memory_synthesis::MemoryEvidence {
+                    id: "evidence-close".into(),
+                    occurred_at: 1,
+                    user: "u".into(),
+                    assistant: "a".into(),
+                });
+            state.memory_synthesis_pending_order.push_back("agent-a".into());
+            state.memory_synthesis_due_at_ms.insert("agent-a".into(), 16_000);
+            state.memory_synthesis_active_agents.insert("agent-b".into());
+            state.memory_synthesis_next_temporal_poll_at_ms = 3_600_000;
             state.awaited_operations.insert("operation-1".into());
             state
                 .operation_terminals
@@ -16991,6 +17317,15 @@ mod tests {
         assert!(state.pending_approvals.is_empty());
         assert!(state.operations.is_empty());
         assert!(state.operation_agents.is_empty());
+        assert!(state.memory_synthesis_pending.is_empty());
+        assert!(state.memory_synthesis_temporal.is_empty());
+        assert!(state.memory_synthesis_due_at_ms.is_empty());
+        assert!(state.memory_synthesis_attempts.is_empty());
+        assert!(state.memory_synthesis_started_at_ms.is_empty());
+        assert!(state.memory_synthesis_pending_order.is_empty());
+        assert!(state.memory_synthesis_operations.is_empty());
+        assert!(state.memory_synthesis_active_agents.is_empty());
+        assert_eq!(state.memory_synthesis_next_temporal_poll_at_ms, 0);
         assert!(state.automation_operations.is_empty());
         assert!(state.awaited_operations.is_empty());
         assert!(state.operation_terminals.is_empty());

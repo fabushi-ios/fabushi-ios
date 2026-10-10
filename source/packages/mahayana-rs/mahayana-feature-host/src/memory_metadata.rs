@@ -120,7 +120,8 @@ pub(crate) fn refresh_path(memory_dir: &Path) -> PathBuf {
 }
 
 const SYNTHESIS_INPUT_LIMIT: usize = 512;
-const SYNTHESIS_REFRESH_INTERVAL_MS: i64 = 86_400_000;
+const SYNTHESIS_REFRESH_INTERVAL_MS: i64 =
+    crate::memory_synthesis::MEMORY_SYNTHESIS_REFRESH_INTERVAL_MS;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SynthesisMemory {
