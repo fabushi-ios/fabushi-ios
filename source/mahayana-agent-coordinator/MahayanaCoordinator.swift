@@ -635,6 +635,37 @@ final class MahayanaCoordinator {
                 throw IOSClientPausedError()
             }
         }
+        if method == "getCloudAgentInfo" {
+            guard let rawBcId = params["bcId"] as? String,
+                  params["includeFiles"] as? Bool == false
+            else { throw CoordinatorError.invalidParams }
+            let bcId = rawBcId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !bcId.isEmpty else { throw CoordinatorError.invalidParams }
+            let info = try await cloudAgentInfo(bcId: bcId)
+            let status: String
+            switch info.status {
+            case 1: status = "running"
+            case 2: status = "finished"
+            case 3: status = "error"
+            case 4: status = "creating"
+            case 5: status = "expired"
+            default: status = "unknown"
+            }
+            var value: [String: Any] = [
+                "bcId": bcId,
+                "status": status,
+            ]
+            if let name = info.name { value["name"] = name }
+            if let prompt = info.prompt { value["prompt"] = prompt }
+            if let branchName = info.branchName { value["branchName"] = branchName }
+            if let filesChanged = info.filesChanged { value["filesChanged"] = filesChanged }
+            if let linesAdded = info.linesAdded { value["linesAdded"] = linesAdded }
+            if let linesRemoved = info.linesRemoved { value["linesRemoved"] = linesRemoved }
+            if let prURL = info.prURL { value["prUrl"] = prURL }
+            if let prState = info.prState { value["prState"] = prState }
+            if let prNumber = info.prNumber { value["prNumber"] = Int(prNumber) }
+            return JSONResult(value: value)
+        }
         if method == "getOnboardingSeen" {
             guard let settingsStore else { throw CoordinatorError.unavailable }
             _ = await hostSettingsReconciler?.reconcileIfReadable()

@@ -1681,4 +1681,67 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(MobileTranscriptLoadErrorCopy.retry, "Retry")
     }
 
+    func testCursorAgentTranscriptCardProjectsAuthoritativeBcIdAndTitle() throws {
+        let message = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "cloud-card-1",
+                "timestampMs": 1_700_000_000_000,
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "cursor-agent",
+                        "bcId": "bc_123",
+                        "title": "Refactor auth",
+                    ],
+                ],
+            ],
+            operationId: "op-cloud"
+        ))
+        XCTAssertEqual(message.kind, .action)
+        XCTAssertEqual(message.cloudAgentBcId, "bc_123")
+        XCTAssertEqual(message.actionTitle, "Refactor auth")
+        XCTAssertEqual(message.canonicalMessageId, "cloud-card-1")
+        XCTAssertNil(projectMobileTranscriptCard(
+            event: [
+                "entryId": "bad-cloud-card",
+                "card": [
+                    "kind": "send-message",
+                    "message": ["type": "cursor-agent", "bcId": "   "],
+                ],
+            ],
+            operationId: nil
+        ))
+    }
+
+    func testCloudAgentInfoProjectionRequiresExactBcIdAndPreservesStats() throws {
+        let info = try XCTUnwrap(projectMobileCloudAgentInfo([
+            "bcId": "bc_123",
+            "status": "running",
+            "name": "Agent run",
+            "prompt": "Do work",
+            "branchName": "cursor/work",
+            "filesChanged": 4,
+            "linesAdded": 21,
+            "linesRemoved": 5,
+            "prUrl": "https://github.com/acme/repo/pull/9",
+            "prState": "open",
+            "prNumber": 9,
+        ], expectedBcId: "bc_123"))
+        XCTAssertEqual(info.status, "running")
+        XCTAssertFalse(info.isTerminal)
+        XCTAssertEqual(info.branchName, "cursor/work")
+        XCTAssertEqual(info.filesChanged, 4)
+        XCTAssertEqual(info.linesAdded, 21)
+        XCTAssertEqual(info.linesRemoved, 5)
+        XCTAssertEqual(info.prNumber, 9)
+        XCTAssertNil(projectMobileCloudAgentInfo([
+            "bcId": "different",
+            "status": "running",
+        ], expectedBcId: "bc_123"))
+        XCTAssertTrue(try XCTUnwrap(projectMobileCloudAgentInfo([
+            "bcId": "bc_123",
+            "status": "finished",
+        ], expectedBcId: "bc_123")).isTerminal)
+    }
+
 }

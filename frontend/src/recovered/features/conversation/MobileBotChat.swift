@@ -1306,6 +1306,8 @@ internal struct MobileBotChat: View {
     @State private var transcribingVoice = false
     @State private var voiceInputGeneration = 0
     @State private var reactionGeneration = 0
+    @State private var cloudAgentInfoByBcId: [String: MobileCloudAgentInfo] = [:]
+    @State private var cloudAgentErrorsByBcId: [String: String] = [:]
     @State private var reactionPickerPresented = false
     @State private var reactionPickerTargetId: String?
     @State private var reactionPickerDraft = ""
@@ -1364,12 +1366,16 @@ internal struct MobileBotChat: View {
         .task(id: listenerScopeFingerprint) {
             await pollVisibleListenerIntegrations()
         }
+        .task(id: cloudAgentScopeFingerprint) {
+            await pollVisibleCloudAgents()
+        }
         .task(id: editorSuggestionScopeFingerprint) {
             await refreshEditorSuggestions()
         }
         .onChange(of: bot.id) { _, _ in
             cancelVoiceInput()
             invalidateReactionScope()
+            resetCloudAgentState()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
             transcriptBaselineError = nil
@@ -1389,11 +1395,13 @@ internal struct MobileBotChat: View {
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
             invalidateReactionScope()
+            resetCloudAgentState()
             invalidateEditorSuggestions()
         }
         .onDisappear {
             cancelVoiceInput()
             invalidateReactionScope()
+            resetCloudAgentState()
             approvalGeneration &+= 1
             transcriptBaselineGeneration &+= 1
             widgetGeneration &+= 1
@@ -1459,6 +1467,70 @@ internal struct MobileBotChat: View {
         guard !visibleListenerPlatforms.isEmpty else { return }
         while !Task.isCancelled {
             await model.refreshListenerIntegrations()
+            do {
+                try await Task.sleep(for: .seconds(5))
+            } catch {
+                return
+            }
+        }
+    }
+
+    private var visibleCloudAgentIds: [String] {
+        Array(Set(entries.compactMap { message in
+            message.cloudAgentBcId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }.filter { !$0.isEmpty })).sorted()
+    }
+
+    private var cloudAgentScopeFingerprint: String {
+        [
+            model.settingsNoticeAccountKey,
+            bot.id,
+            visibleCloudAgentIds.joined(separator: ","),
+        ].joined(separator: "|")
+    }
+
+    @MainActor
+    private func resetCloudAgentState() {
+        cloudAgentInfoByBcId.removeAll()
+        cloudAgentErrorsByBcId.removeAll()
+    }
+
+    @MainActor
+    private func pollVisibleCloudAgents() async {
+        let scope = cloudAgentScopeFingerprint
+        let ids = visibleCloudAgentIds
+        guard !ids.isEmpty else {
+            resetCloudAgentState()
+            return
+        }
+        var nextPollAt: [String: Date] = [:]
+        while !Task.isCancelled {
+            var hasNonterminal = false
+            let now = Date()
+            for bcId in ids {
+                if Task.isCancelled || cloudAgentScopeFingerprint != scope { return }
+                if cloudAgentInfoByBcId[bcId]?.isTerminal == true { continue }
+                hasNonterminal = true
+                if let next = nextPollAt[bcId], next > now { continue }
+                do {
+                    let info = try await model.cloudAgentInfo(bcId: bcId)
+                    guard !Task.isCancelled, cloudAgentScopeFingerprint == scope else { return }
+                    cloudAgentInfoByBcId[bcId] = info
+                    cloudAgentErrorsByBcId.removeValue(forKey: bcId)
+                    if info.isTerminal {
+                        nextPollAt[bcId] = .distantFuture
+                    } else {
+                        nextPollAt[bcId] = Date().addingTimeInterval(5)
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard !Task.isCancelled, cloudAgentScopeFingerprint == scope else { return }
+                    cloudAgentErrorsByBcId[bcId] = error.localizedDescription
+                    nextPollAt[bcId] = Date().addingTimeInterval(60)
+                }
+            }
+            if !hasNonterminal { return }
             do {
                 try await Task.sleep(for: .seconds(5))
             } catch {
@@ -2414,7 +2486,9 @@ internal struct MobileBotChat: View {
             .padding(.vertical, 4)
             .accessibilityIdentifier(Self.semanticId("mobile-bot-timeline-event-\(entry.id)"))
         } else if entry.kind == .action {
-            if let widget = mobileTranscriptWidgetProjection(entry) {
+            if let bcId = entry.cloudAgentBcId {
+                cloudAgentCard(entry, bcId: bcId)
+            } else if let widget = mobileTranscriptWidgetProjection(entry) {
                 transcriptWidgetCard(entry, projection: widget)
             } else if let draft = mobileTranscriptDraftProjection(entry.canonicalTranscriptCard) {
                 transcriptDraftCard(entry, draft: draft)
@@ -3281,6 +3355,59 @@ internal struct MobileBotChat: View {
         .padding(10)
         .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityIdentifier(Self.semanticId("mobile-bot-secret-request-\(entry.id)"))
+    }
+
+    @ViewBuilder
+    private func cloudAgentCard(_ entry: MobileChatMessage, bcId: String) -> some View {
+        let info = cloudAgentInfoByBcId[bcId]
+        let error = cloudAgentErrorsByBcId[bcId]
+        let title = info?.name ?? entry.actionTitle ?? "Cloud agent"
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: info?.isTerminal == true ? "checkmark.circle" : "cloud")
+                    .foregroundStyle(info?.status == "error" ? .red : .secondary)
+                Text(title).font(.caption.weight(.semibold))
+                Spacer(minLength: 8)
+                Text(info?.status.capitalized ?? (error == nil ? "Loading" : "Unavailable"))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(info?.status == "error" || error != nil ? .red : .secondary)
+            }
+            if let prompt = info?.prompt, !prompt.isEmpty {
+                Text(prompt).font(.caption2).foregroundStyle(.secondary).lineLimit(3)
+            }
+            if let branch = info?.branchName, !branch.isEmpty {
+                Label(branch, systemImage: "arrow.triangle.branch")
+                    .font(.caption2.monospaced()).foregroundStyle(.secondary)
+            }
+            if let info,
+               info.filesChanged != nil || info.linesAdded != nil || info.linesRemoved != nil {
+                Text("Files (info.filesChanged ?? 0) · +(info.linesAdded ?? 0) −(info.linesRemoved ?? 0)")
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            if let error, !error.isEmpty {
+                Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2)
+            }
+            HStack(spacing: 8) {
+                if let cursorURL = URL(string: "https://cursor.com/agents/(bcId)") {
+                    Link("Open in Cursor", destination: cursorURL)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-open-(bcId)"))
+                }
+                if let rawPR = info?.prURL,
+                   let prURL = URL(string: rawPR),
+                   prURL.scheme?.lowercased() == "https",
+                   prURL.host != nil {
+                    Link(info?.prNumber.map { "View PR #($0)" } ?? "View PR", destination: prURL)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-pr-(bcId)"))
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityIdentifier(Self.semanticId("mobile-bot-cloud-agent-(bcId)"))
     }
 
     @ViewBuilder

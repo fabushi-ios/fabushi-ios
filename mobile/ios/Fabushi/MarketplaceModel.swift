@@ -25,6 +25,65 @@ enum MahayanaChatPumpOutcome: Equatable {
     var shouldSettleLifecycle: Bool { self == .terminal }
 }
 
+struct MobileCloudAgentInfo: Equatable, Sendable {
+    let bcId: String
+    let status: String
+    var name: String?
+    var prompt: String?
+    var branchName: String?
+    var filesChanged: Int?
+    var linesAdded: Int?
+    var linesRemoved: Int?
+    var prURL: String?
+    var prState: String?
+    var prNumber: Int32?
+
+    var isTerminal: Bool {
+        status == "finished" || status == "error" || status == "expired"
+    }
+}
+
+func projectMobileCloudAgentInfo(_ value: Any, expectedBcId: String) -> MobileCloudAgentInfo? {
+    guard let object = value as? [String: Any],
+          let bcId = (object["bcId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+          bcId == expectedBcId,
+          let status = object["status"] as? String,
+          ["creating", "running", "finished", "error", "expired", "unknown"].contains(status)
+    else { return nil }
+
+    func string(_ key: String) -> String? {
+        guard let raw = object[key] as? String else { return nil }
+        let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
+    }
+    func integer(_ key: String) -> Int? {
+        guard let number = object[key] as? NSNumber else { return nil }
+        let value = number.intValue
+        return value >= 0 ? value : nil
+    }
+    let prNumber: Int32?
+    if let number = object["prNumber"] as? NSNumber,
+       number.int64Value >= 0,
+       number.int64Value <= Int64(Int32.max) {
+        prNumber = Int32(number.int64Value)
+    } else {
+        prNumber = nil
+    }
+    return .init(
+        bcId: bcId,
+        status: status,
+        name: string("name"),
+        prompt: string("prompt"),
+        branchName: string("branchName"),
+        filesChanged: integer("filesChanged"),
+        linesAdded: integer("linesAdded"),
+        linesRemoved: integer("linesRemoved"),
+        prURL: string("prUrl"),
+        prState: string("prState"),
+        prNumber: prNumber
+    )
+}
+
 struct MobileLinkMetadata: Equatable {
     let url: String
     var title: String?
@@ -634,6 +693,7 @@ struct MobileChatMessage: Identifiable, Equatable {
     var actionDetail: String?
     var actionStatus: String?
     var listenerPlatform: String?
+    var cloudAgentBcId: String?
     var canonicalTranscriptCard: MobileCanonicalTranscriptCardPayload?
     var handoffRequestId: String?
     var handoffAgentId: String?
@@ -1227,6 +1287,26 @@ func projectMobileTranscriptCard(
                 } ?? createdAt
             )
         }
+        if type == "cursor-agent" {
+            guard let rawBcId = message["bcId"] as? String else { return nil }
+            let bcId = rawBcId.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !bcId.isEmpty else { return nil }
+            if message["title"] != nil, !(message["title"] is String) { return nil }
+            let title = (message["title"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return MobileChatMessage(
+                id: entryId,
+                role: .assistant,
+                text: "",
+                kind: .action,
+                operationId: operationId,
+                actionTitle: title?.isEmpty == false ? title : "Cloud agent",
+                actionStatus: "running",
+                canonicalMessageId: entryId,
+                cloudAgentBcId: bcId,
+                createdAt: createdAt
+            )
+        }
         return nil
     }
 
@@ -1682,6 +1762,24 @@ final class MarketplaceModel {
             imageDataURL: optionalString("imageDataUrl"),
             faviconDataURL: optionalString("faviconDataUrl")
         )
+    }
+
+    func cloudAgentInfo(bcId rawBcId: String) async throws -> MobileCloudAgentInfo {
+        let bcId = rawBcId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bcId.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let accountKey = settingsNoticeAccountKey
+        let result = try await bridge.request(
+            method: "getCloudAgentInfo",
+            params: ["bcId": bcId, "includeFiles": false]
+        )
+        guard settingsNoticeAccountKey == accountKey,
+              let projected = projectMobileCloudAgentInfo(result.value, expectedBcId: bcId)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return projected
     }
 
     func linkMetadata(for rawURL: String) async throws -> MobileLinkMetadata {
