@@ -1392,9 +1392,9 @@
       "type": "blob",
       "sha": "326aaac11c33146350795cfe4a4d0f38c992ec68",
       "size": 348,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/01-WBS原子任务.md",
@@ -1402,9 +1402,9 @@
       "type": "blob",
       "sha": "4dfc491b025055f43e88bff30d3d977e9ff4bf00",
       "size": 844,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/02-里程碑.md",
@@ -1412,9 +1412,9 @@
       "type": "blob",
       "sha": "f615d349df77de7be7adc0fd6de2b9b3f7138b4b",
       "size": 251,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/03-验收追踪矩阵.md",
@@ -1422,9 +1422,9 @@
       "type": "blob",
       "sha": "0b3e72363250483c0abc7d2ec32722df256a7c2d",
       "size": 463,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/04-风险登记.md",
@@ -1432,9 +1432,9 @@
       "type": "blob",
       "sha": "f76b32069b74050b7cd5282a54bc96bf0177aef3",
       "size": 530,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Risks around over-dedup, operation identity adoption and startup hydration remain useful failure-mode provenance, but current iOS must prove its own ordering/stale-result/account fencing."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/05-状态报告.md",
@@ -1442,9 +1442,9 @@
       "type": "blob",
       "sha": "9c1c5a1717873c8bebc9822ae70c78f58092efe4",
       "size": 2802,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. This report also records later live-reply and Stop-settlement defects; those user effects remain applicable regressions, but its Desktop release attempts are historical evidence only."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/06-依赖与阻塞.md",
@@ -1452,9 +1452,9 @@
       "type": "blob",
       "sha": "79317ae08a1e3d146ceb206248fdd5107aa4867f",
       "size": 373,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/07-变更日志.md",
@@ -1462,9 +1462,9 @@
       "type": "blob",
       "sha": "e3fd92c8a43248a6f9e1fc1da5226cf4b52d1770",
       "size": 486,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/08-问题与行动项.md",
@@ -1472,9 +1472,9 @@
       "type": "blob",
       "sha": "2f47aa41d4ddaf06acac20171c9c95f8117db97f",
       "size": 302,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T01-stream-coalescing.md",
@@ -1482,9 +1482,9 @@
       "type": "blob",
       "sha": "b26e85959e2068e0c7a74c8e61ce813c5f90daa0",
       "size": 693,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Stream coalescing/final dedupe remains an applicable product effect and is validated only through current native transcript/runtime rows."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T02-single-turn.md",
@@ -1492,9 +1492,9 @@
       "type": "blob",
       "sha": "9266ee5e6859c6138c1753916bccad0f7c5deb69",
       "size": 576,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. The task's provisional pre-Host assistant implementation is explicitly superseded and is not copied to iOS; only the one-canonical-assistant-turn product invariant survives."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T03-composer-layout.md",
@@ -1502,9 +1502,9 @@
       "type": "blob",
       "sha": "374e35e4ce0ec402e2d967eeae252f3c2dbbdfe2",
       "size": 453,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Composer visibility during long/streaming transcripts remains an applicable UI effect; Desktop CSS/flex implementation is not reused."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T04-fast-bot-hydration.md",
@@ -1512,9 +1512,9 @@
       "type": "blob",
       "sha": "e82224a5ae785c614858cf5a664d19a7b13f638b",
       "size": 507,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Fast account Bot/Mini App hydration remains an applicable product effect; iOS must prove it through current account/runtime owners rather than inherit this task status."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T05-ci-acceptance.md",
@@ -1522,9 +1522,9 @@
       "type": "blob",
       "sha": "8a814b8d23fb64a1b4c2e41e211b4f53e6abffb7",
       "size": 274,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Old Desktop renderer/Electron/Rust CI requirements are historical and cannot satisfy iOS exact-head Actions."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/management/tasks/FDS-P0001-T06-main-integration.md",
@@ -1532,9 +1532,9 @@
       "type": "blob",
       "sha": "2e4a39412af086c6bf7de82274d2e5bfacc9e9b9",
       "size": 254,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Desktop protected-main integration is historical; iOS has its own PR #3 merge/main/release closure."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/runbooks/README.md",
@@ -1542,9 +1542,9 @@
       "type": "blob",
       "sha": "1966fb1c3c3e1276829919eb003e1c8fdbbe4b3c",
       "size": 340,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. Desktop rollback guidance is platform-specific; iOS release/rollback is governed by the current iOS parity/release acceptance."
     },
     {
       "path": "projects/desktop-chat-streaming-parity/source/README.md",
@@ -1552,9 +1552,9 @@
       "type": "blob",
       "sha": "b1386bc99cabc89acefc09f6a740c5d7aa0a85a0",
       "size": 659,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "historical-desktop-project-record",
+      "coverage_status": "reviewed-provenance-only",
+      "reason": "Historical Desktop chat-streaming project management/source record. The project SOURCE_OF_TRUTH is superseded by the newer active runtime parity specification where conflicts exist, especially the obsolete pre-Host provisional assistant surface. iOS does not inherit old branch/task/CI completion; applicable current product effects are traced through canonical Desktop-main source rows and native iOS owners. User-media/reference intake is provenance only; external Grok patterns are not source authority and no supplied media is required in the iOS repository."
     },
     {
       "path": "projects/fabushi-communication-platform/SOURCE_OF_TRUTH.md",
