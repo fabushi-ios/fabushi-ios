@@ -452,9 +452,48 @@ internal func isMobileBotVisibleAssistantCompletion(
     return !text.isEmpty || attachment != nil
 }
 
+private let mobileAcknowledgementResendPrefix = "sand-resend-v1:"
+
+internal func mobileAcknowledgementLogicalNonce(_ nonce: String) -> String {
+    guard nonce.hasPrefix(mobileAcknowledgementResendPrefix) else { return nonce }
+    let encoded = String(nonce.dropFirst(mobileAcknowledgementResendPrefix.count))
+    guard let separator = encoded.firstIndex(of: ":") else { return nonce }
+    let lengthText = String(encoded[..<separator])
+    guard let length = Int(lengthText), length > 0 else { return nonce }
+    let start = encoded.index(after: separator)
+    guard let end = encoded.index(start, offsetBy: length, limitedBy: encoded.endIndex),
+          end < encoded.endIndex,
+          encoded[end] == ":",
+          encoded.index(after: end) < encoded.endIndex
+    else { return nonce }
+    return String(encoded[start..<end])
+}
+
+internal func mobileAcknowledgementRetryNonce(logicalNonce: String, retryToken: String) -> String {
+    let logical = mobileAcknowledgementLogicalNonce(logicalNonce)
+    return "\(mobileAcknowledgementResendPrefix)\(logical.count):\(logical):\(retryToken)"
+}
+
+private func mobileAcknowledgementRecordMatches(
+    _ message: MobileChatMessage,
+    nonce: String
+) -> Bool {
+    let logical = mobileAcknowledgementLogicalNonce(nonce)
+    let candidates = [
+        message.optimisticNonce,
+        message.canonicalMessageId,
+        message.id,
+    ].compactMap { $0 } + message.optimisticPriorNonces
+    return candidates.contains {
+        $0 == nonce || mobileAcknowledgementLogicalNonce($0) == logical
+    }
+}
+
 @discardableResult
 internal func applyMobileOptimisticUserEcho(
     _ event: [String: Any],
+    accountKey: String,
+    agentId: String,
     messages: inout [MobileChatMessage]
 ) -> Bool {
     guard event["type"] as? String == "chat.message",
@@ -464,7 +503,11 @@ internal func applyMobileOptimisticUserEcho(
     let messageId = rawMessageId.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !messageId.isEmpty,
           let index = messages.firstIndex(where: {
-              $0.role == .user && ($0.canonicalMessageId ?? $0.id) == messageId
+              $0.role == .user
+                  && $0.optimisticDeliveryPhase != nil
+                  && $0.optimisticAccountKey == accountKey
+                  && $0.optimisticAgentId == agentId
+                  && mobileAcknowledgementRecordMatches($0, nonce: messageId)
           })
     else { return false }
 
@@ -1435,6 +1478,7 @@ internal struct MobileBotChat: View {
             await refreshEditorSuggestions()
         }
         .onChange(of: bot.id) { _, _ in
+            resetAcknowledgementScope()
             cancelVoiceInput()
             invalidateReactionScope()
             resetCloudAgentState()
@@ -1457,12 +1501,14 @@ internal struct MobileBotChat: View {
             invalidateEditorSuggestions()
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
+            resetAcknowledgementScope()
             invalidateReactionScope()
             resetCloudAgentState()
             resetLocalToolPermissionUI()
             invalidateEditorSuggestions()
         }
         .onDisappear {
+            resetAcknowledgementScope()
             cancelVoiceInput()
             invalidateReactionScope()
             resetCloudAgentState()
@@ -2618,15 +2664,15 @@ internal struct MobileBotChat: View {
                     threadAffordance(entry)
                     if let phase = entry.optimisticDeliveryPhase {
                         HStack(spacing: 5) {
-                            if phase == .pending || phase == .acceptedAwaitingEcho {
+                            if phase != .failed {
                                 ProgressView().controlSize(.mini).tint(.white)
                             } else {
                                 Image(systemName: "exclamationmark.circle.fill")
                             }
                             Text(
-                                phase == .pending ? "Sending…"
-                                    : phase == .acceptedAwaitingEcho ? "Waiting for sync…"
-                                    : "Failed to send"
+                                phase == .acceptedAwaitingEcho ? "Waiting for sync…"
+                                    : phase == .failed ? "Failed to send"
+                                    : "Sending…"
                             )
                             .font(.caption2.weight(.semibold))
                         }
@@ -2670,6 +2716,11 @@ internal struct MobileBotChat: View {
                     }
                     if let copyText = seam.copyText {
                         Button("Copy") { UIPasteboard.general.string = copyText }
+                    }
+                    if entry.optimisticDeliveryPhase == .failed {
+                        Button("Retry") {
+                            Task { await retryFailedSend(entry) }
+                        }
                     }
                     reactionMenu(entry)
                 }
@@ -4528,6 +4579,134 @@ internal struct MobileBotChat: View {
     }
 
     @MainActor
+    private func resetAcknowledgementScope() {
+        entries.removeAll { $0.optimisticDeliveryPhase != nil }
+        activeOperationId = nil
+        busy = false
+    }
+
+    @MainActor
+    private func appendOptimisticUserMessage(
+        requestId: String,
+        text: String,
+        replyTarget: String?,
+        sendAsFork: Bool,
+        priorNonces: [String] = []
+    ) {
+        var row = MobileChatMessage(
+            id: requestId,
+            role: .user,
+            text: text,
+            canonicalMessageId: requestId,
+            replyToMessageId: replyTarget,
+            branched: sendAsFork,
+            optimisticDeliveryPhase: .pending
+        )
+        row.optimisticAccountKey = model.settingsNoticeAccountKey
+        row.optimisticAgentId = bot.id
+        row.optimisticNonce = requestId
+        row.optimisticPriorNonces = priorNonces
+        entries.append(row)
+    }
+
+    @MainActor
+    private func dispatchOptimisticUserMessage(
+        requestId: String,
+        text: String,
+        replyTarget: String?,
+        sendAsFork: Bool
+    ) async {
+        let ownedAccountKey = model.settingsNoticeAccountKey
+        let ownedBotId = bot.id
+        guard let startIndex = entries.firstIndex(where: {
+            $0.id == requestId
+                && $0.optimisticAccountKey == ownedAccountKey
+                && $0.optimisticAgentId == ownedBotId
+                && $0.optimisticNonce == requestId
+        }) else { return }
+        entries[startIndex].optimisticDeliveryPhase = .dispatching
+        entries[startIndex].optimisticDeliveryError = nil
+
+        if let miniAppId = bot.miniAppId {
+            let succeeded = await sendMiniApp(
+                pluginId: miniAppId,
+                text: text,
+                operationId: requestId
+            )
+            guard model.settingsNoticeAccountKey == ownedAccountKey,
+                  bot.id == ownedBotId,
+                  let index = entries.firstIndex(where: {
+                      $0.id == requestId && $0.optimisticNonce == requestId
+                  })
+            else { return }
+            entries[index].optimisticDeliveryPhase = succeeded ? nil : .failed
+            entries[index].optimisticDeliveryError = succeeded ? nil : errorText
+            activeOperationId = nil
+            busy = false
+            return
+        }
+
+        do {
+            var command: [String: Any] = [
+                "type": "chat.send",
+                "requestId": requestId,
+                "text": text,
+                "agentId": ownedBotId,
+                "mode": "agent",
+                "isFork": sendAsFork,
+            ]
+            if let replyTarget { command["replyToMessageId"] = replyTarget }
+            let result = try await bridge.request(
+                method: "feature.execute",
+                params: ["command": command]
+            )
+            guard model.settingsNoticeAccountKey == ownedAccountKey,
+                  bot.id == ownedBotId,
+                  let index = entries.firstIndex(where: {
+                      $0.id == requestId
+                          && $0.optimisticAccountKey == ownedAccountKey
+                          && $0.optimisticAgentId == ownedBotId
+                          && $0.optimisticNonce == requestId
+                  })
+            else { return }
+
+            let accepted = result.value as? [String: Any]
+            let operationId = accepted?["operationId"] as? String ?? requestId
+            entries[index].optimisticDeliveryPhase = .acceptedAwaitingEcho
+            entries[index].optimisticDeliveryError = nil
+            activeOperationId = operationId
+            entries.append(MobileChatMessage(
+                id: "thinking:\(operationId)",
+                role: .assistant,
+                text: "",
+                kind: .thinking,
+                operationId: operationId,
+                actionTitle: "Thinking",
+                actionStatus: "running"
+            ))
+            await pump(operationId: operationId)
+        } catch {
+            guard model.settingsNoticeAccountKey == ownedAccountKey,
+                  bot.id == ownedBotId
+            else { return }
+            let message = error.localizedDescription
+            if let index = entries.firstIndex(where: {
+                $0.id == requestId
+                    && $0.optimisticAccountKey == ownedAccountKey
+                    && $0.optimisticAgentId == ownedBotId
+                    && $0.optimisticNonce == requestId
+            }) {
+                entries[index].optimisticDeliveryPhase = .failed
+                entries[index].optimisticDeliveryError = message
+            }
+            errorText = message
+        }
+        guard model.settingsNoticeAccountKey == ownedAccountKey, bot.id == ownedBotId else { return }
+        activeOperationId = nil
+        busy = false
+    }
+
+    @MainActor
     private func send() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !busy else { return }
@@ -4539,53 +4718,57 @@ internal struct MobileBotChat: View {
         let sendAsFork = replyIsFork
         replyTargetId = nil
         replyIsFork = false
-        entries.append(MobileChatMessage(
-            id: requestId,
-            role: .user,
+        appendOptimisticUserMessage(
+            requestId: requestId,
             text: text,
-            canonicalMessageId: requestId,
-            replyToMessageId: replyTarget,
-            branched: sendAsFork,
-            optimisticDeliveryPhase: .pending
-        ))
-
-        if let miniAppId = bot.miniAppId {
-            await sendMiniApp(pluginId: miniAppId, text: text, operationId: requestId)
-            activeOperationId = nil
-            busy = false
-            return
-        }
-
-        do {
-            var command: [String: Any] = ["type": "chat.send", "requestId": requestId, "text": text, "agentId": bot.id, "mode": "agent", "isFork": sendAsFork]
-            if let replyTarget { command["replyToMessageId"] = replyTarget }
-            let result = try await bridge.request(
-                method: "feature.execute",
-                params: ["command": command]
-            )
-            let accepted = result.value as? [String: Any]
-            let operationId = accepted?["operationId"] as? String ?? requestId
-            if let index = entries.firstIndex(where: { $0.id == requestId && $0.role == .user }) {
-                entries[index].optimisticDeliveryPhase = .acceptedAwaitingEcho
-                entries[index].optimisticDeliveryError = nil
-            }
-            activeOperationId = operationId
-            entries.append(MobileChatMessage(id: "thinking:\(operationId)", role: .assistant, text: "", kind: .thinking, operationId: operationId, actionTitle: "Thinking", actionStatus: "running"))
-            await pump(operationId: operationId)
-        } catch {
-            let message = error.localizedDescription
-            if let index = entries.firstIndex(where: { $0.id == requestId && $0.role == .user }) {
-                entries[index].optimisticDeliveryPhase = .failed
-                entries[index].optimisticDeliveryError = message
-            }
-            errorText = message
-        }
-        activeOperationId = nil
-        busy = false
+            replyTarget: replyTarget,
+            sendAsFork: sendAsFork
+        )
+        await dispatchOptimisticUserMessage(
+            requestId: requestId,
+            text: text,
+            replyTarget: replyTarget,
+            sendAsFork: sendAsFork
+        )
     }
 
     @MainActor
-    private func sendMiniApp(pluginId: String, text: String, operationId: String) async {
+    private func retryFailedSend(_ entry: MobileChatMessage) async {
+        guard !busy,
+              entry.role == .user,
+              entry.optimisticDeliveryPhase == .failed,
+              entry.optimisticAccountKey == model.settingsNoticeAccountKey,
+              entry.optimisticAgentId == bot.id,
+              let oldNonce = entry.optimisticNonce,
+              !oldNonce.isEmpty
+        else { return }
+
+        let logicalNonce = mobileAcknowledgementLogicalNonce(oldNonce)
+        let freshNonce = mobileAcknowledgementRetryNonce(
+            logicalNonce: logicalNonce,
+            retryToken: UUID().uuidString.lowercased()
+        )
+        let priorNonces = entry.optimisticPriorNonces + [oldNonce]
+        entries.removeAll { $0.id == entry.id }
+        busy = true
+        errorText = nil
+        appendOptimisticUserMessage(
+            requestId: freshNonce,
+            text: entry.text,
+            replyTarget: entry.replyToMessageId,
+            sendAsFork: entry.branched,
+            priorNonces: priorNonces
+        )
+        await dispatchOptimisticUserMessage(
+            requestId: freshNonce,
+            text: entry.text,
+            replyTarget: entry.replyToMessageId,
+            sendAsFork: entry.branched
+        )
+    }
+
+    @MainActor
+    private func sendMiniApp(pluginId: String, text: String, operationId: String) async -> Bool {
         activeOperationId = operationId
         entries.append(MobileChatMessage(
             id: "thinking:\(operationId)",
@@ -4608,7 +4791,7 @@ internal struct MobileBotChat: View {
                     text: reply?.isEmpty == false ? reply! : "全球法布施没有把这条输入解析成可执行命令。",
                     operationId: operationId
                 ))
-                return
+                return true
             }
             let command = routed["command"] as? [String: Any]
             let slash = command?["slash"] as? String ?? ""
@@ -4620,7 +4803,7 @@ internal struct MobileBotChat: View {
                     text: "已通过统一 Mini App 路由解析\(slash.isEmpty ? "" : "为 \(slash)")。该 Tool 需要宿主明确批准；iOS 不会静默执行写入或破坏性调用。",
                     operationId: operationId
                 ))
-                return
+                return true
             }
             guard (execution["kind"] as? String) == "mcp-http",
                   let tool = execution["tool"] as? String,
@@ -4640,6 +4823,7 @@ internal struct MobileBotChat: View {
                 text: GlobalDharmaMiniAppBridge.resultText(result),
                 operationId: operationId
             ))
+            return true
         } catch {
             removeThinking(operationId)
             errorText = error.localizedDescription
@@ -4649,6 +4833,7 @@ internal struct MobileBotChat: View {
                 text: "Mini App 调用失败：\(error.localizedDescription)",
                 operationId: operationId
             ))
+            return false
         }
     }
 
@@ -4827,7 +5012,12 @@ internal struct MobileBotChat: View {
                     }
                 case "chat.message":
                     if event["role"] as? String == "user" {
-                        _ = applyMobileOptimisticUserEcho(event, messages: &entries)
+                        _ = applyMobileOptimisticUserEcho(
+                            event,
+                            accountKey: model.settingsNoticeAccountKey,
+                            agentId: bot.id,
+                            messages: &entries
+                        )
                         continue
                     }
                     guard isMobileBotVisibleAssistantCompletion(event, operationId: operationId) else { continue }
@@ -4869,9 +5059,51 @@ internal struct MobileBotChat: View {
                     removeThinking(operationId)
                     upsertAssistant(operationId, text: event["delta"] as? String ?? "", append: true, streaming: true)
                 case "agent.step":
+                    let title = event["title"] as? String ?? "Working"
+                    let detail = event["detail"] as? String
+                    let status = event["status"] as? String ?? "completed"
+                    if let rawToolCallId = event["toolCallId"] as? String {
+                        let toolCallId = rawToolCallId.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !toolCallId.isEmpty {
+                            let id = "tool-call:\(toolCallId)"
+                            var row = MobileChatMessage(
+                                id: id,
+                                role: .assistant,
+                                text: "",
+                                kind: .toolCall,
+                                operationId: operationId,
+                                actionTitle: title,
+                                actionDetail: detail,
+                                actionStatus: status
+                            )
+                            row.toolCallId = toolCallId
+                            row.toolName = title
+                            row.toolStatus = status
+                            row.toolSummary = detail
+                            if let index = entries.firstIndex(where: { $0.id == id }) {
+                                entries[index] = row
+                            } else {
+                                entries.append(row)
+                            }
+                            continue
+                        }
+                    }
                     let id = "action:\(operationId):\((event["stepId"] as? String) ?? UUID().uuidString)"
-                    let row = MobileChatMessage(id: id, role: .assistant, text: "", kind: .action, operationId: operationId, actionTitle: event["title"] as? String ?? "Working", actionDetail: event["detail"] as? String, actionStatus: event["status"] as? String ?? "completed")
-                    if let index = entries.firstIndex(where: { $0.id == id }) { entries[index] = row } else { entries.append(row) }
+                    let row = MobileChatMessage(
+                        id: id,
+                        role: .assistant,
+                        text: "",
+                        kind: .action,
+                        operationId: operationId,
+                        actionTitle: title,
+                        actionDetail: detail,
+                        actionStatus: status
+                    )
+                    if let index = entries.firstIndex(where: { $0.id == id }) {
+                        entries[index] = row
+                    } else {
+                        entries.append(row)
+                    }
                 case "model.routed":
                     let id = "action:\(operationId):model"
                     let provider = event["provider"] as? String ?? ""
@@ -4884,13 +5116,17 @@ internal struct MobileBotChat: View {
                         operationId: eventOperationId
                     ) else { continue }
                     if let index = entries.firstIndex(where: { $0.id == row.id }) { entries[index] = row } else { entries.append(row) }
-                case "operation.completed", "operation.interrupted":
+                case "operation.completed":
                     removeThinking(operationId)
-                    finishAssistant(operationId)
+                    finishAssistant(operationId, toolStatus: "done")
+                    return
+                case "operation.interrupted":
+                    removeThinking(operationId)
+                    finishAssistant(operationId, toolStatus: "aborted")
                     return
                 case "operation.failed":
                     removeThinking(operationId)
-                    finishAssistant(operationId)
+                    finishAssistant(operationId, toolStatus: "failed")
                     errorText = event["message"] as? String ?? "Bot run failed"
                     return
                 default:
@@ -4918,9 +5154,15 @@ internal struct MobileBotChat: View {
         }
     }
 
-    private func finishAssistant(_ operationId: String) {
+    private func finishAssistant(_ operationId: String, toolStatus: String? = nil) {
         for index in entries.indices where entries[index].operationId == operationId && entries[index].role == .assistant {
             entries[index].streaming = false
+            if entries[index].kind == .toolCall,
+               ["pending", "running"].contains(entries[index].toolStatus ?? ""),
+               let toolStatus {
+                entries[index].toolStatus = toolStatus
+                entries[index].actionStatus = toolStatus
+            }
         }
     }
 }

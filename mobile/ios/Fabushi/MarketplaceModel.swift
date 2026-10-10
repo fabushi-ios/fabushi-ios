@@ -682,6 +682,8 @@ func projectMobileCanonicalHostTranscriptCard(
 
 enum MobileOptimisticDeliveryPhase: String, Equatable {
     case pending
+    case queued
+    case dispatching
     case acceptedAwaitingEcho
     case failed
 }
@@ -731,6 +733,10 @@ struct MobileChatMessage: Identifiable, Equatable {
     var toolName: String?
     var toolStatus: String?
     var toolSummary: String?
+    var optimisticAccountKey: String?
+    var optimisticAgentId: String?
+    var optimisticNonce: String?
+    var optimisticPriorNonces: [String] = []
 }
 
 enum MobileAutoReviewResolution: String, Equatable {

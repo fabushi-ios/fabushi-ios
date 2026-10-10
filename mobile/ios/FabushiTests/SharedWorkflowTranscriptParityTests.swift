@@ -1292,34 +1292,63 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(reconciled[0].text, "persisted version")
     }
 
-    func testOptimisticUserEchoSettlesOnlyExactDurableMessageIdentity() {
-        var messages = [
-            MobileChatMessage(
-                id: "ios-mobile-bot-chat-request-7",
-                role: .user,
-                text: "pending",
-                canonicalMessageId: "ios-mobile-bot-chat-request-7",
-                optimisticDeliveryPhase: .acceptedAwaitingEcho,
-                optimisticDeliveryError: "old error"
-            )
-        ]
+    func testOptimisticUserEchoSettlesOnlyExactScopedNonceOrRetryHistory() {
+        var message = MobileChatMessage(
+            id: "sand-resend-v1:25:ios-mobile-bot-chat-old:retry-1",
+            role: .user,
+            text: "pending",
+            canonicalMessageId: "sand-resend-v1:25:ios-mobile-bot-chat-old:retry-1",
+            optimisticDeliveryPhase: .acceptedAwaitingEcho,
+            optimisticDeliveryError: "old error"
+        )
+        message.optimisticAccountKey = "account-a"
+        message.optimisticAgentId = "agent-a"
+        message.optimisticNonce = "sand-resend-v1:25:ios-mobile-bot-chat-old:retry-1"
+        message.optimisticPriorNonces = ["ios-mobile-bot-chat-old"]
+        var messages = [message]
 
         XCTAssertFalse(applyMobileOptimisticUserEcho([
             "type": "chat.message",
             "role": "user",
-            "messageId": "different-request",
+            "messageId": "ios-mobile-bot-chat-old",
             "text": "pending",
-        ], messages: &messages))
+        ], accountKey: "account-b", agentId: "agent-a", messages: &messages))
+        XCTAssertFalse(applyMobileOptimisticUserEcho([
+            "type": "chat.message",
+            "role": "user",
+            "messageId": "ios-mobile-bot-chat-old",
+            "text": "pending",
+        ], accountKey: "account-a", agentId: "agent-b", messages: &messages))
         XCTAssertEqual(messages[0].optimisticDeliveryPhase, .acceptedAwaitingEcho)
 
         XCTAssertTrue(applyMobileOptimisticUserEcho([
             "type": "chat.message",
             "role": "user",
-            "messageId": "ios-mobile-bot-chat-request-7",
+            "messageId": "ios-mobile-bot-chat-old",
             "text": "pending",
-        ], messages: &messages))
+        ], accountKey: "account-a", agentId: "agent-a", messages: &messages))
         XCTAssertNil(messages[0].optimisticDeliveryPhase)
         XCTAssertNil(messages[0].optimisticDeliveryError)
+        XCTAssertEqual(messages[0].canonicalMessageId, "ios-mobile-bot-chat-old")
+    }
+
+    func testAcknowledgementRetryNoncePreservesLogicalNonce() {
+        let retry = mobileAcknowledgementRetryNonce(
+            logicalNonce: "ios-mobile-bot-chat-old",
+            retryToken: "retry-2"
+        )
+        XCTAssertEqual(
+            mobileAcknowledgementLogicalNonce(retry),
+            "ios-mobile-bot-chat-old"
+        )
+        XCTAssertEqual(
+            mobileAcknowledgementLogicalNonce("plain-nonce"),
+            "plain-nonce"
+        )
+        XCTAssertEqual(
+            mobileAcknowledgementLogicalNonce("sand-resend-v1:not-a-length:x:y"),
+            "sand-resend-v1:not-a-length:x:y"
+        )
     }
 
     func testNativeReactionPickerCatalogSearchCategoryAliasesSkinsRankingAndLimit() throws {
