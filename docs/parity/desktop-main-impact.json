@@ -4017,6 +4017,72 @@
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-native-connectors-leaf-implemented-pending-exact-head-ci",
         "finding": "Desktop plural connector leaf normalizes/deduplicates connector names and renders each row against the same canonical provider/action lifecycle. iOS strictly projects send-message:connectors, normalizes visible connector identities, opens one canonical connector-card lifecycle for the scoped list, reuses MarketplaceModel install/auth/reopen/retry/team-policy state and disposes it when the visible list/scope disappears. Exact-head Swift/UI/protected evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/email-draft.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-email-draft-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf renders editable/sending/sent email draft state with recipient/subject/body validation over the draft action provider. Shipping MobileBotChat projects canonical emailDraft payloads, exposes native recipient/subject/body editors, validates recipient addresses/body, and routes Send/Discard through MarketplaceModel.resolveTranscriptDraft with pending/terminal/error state. Native SwiftUI replaces browser collapse/presentation while preserving the product action lifecycle; exact-head Swift/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/index.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-non-runtime-export-accounted",
+        "finding": "This file is an export barrel for transcript-card leaves and owns no independent runtime state, protocol, service, persistence or user effect. iOS accounts the exported responsibilities at their native leaf owners instead of creating a second aggregate runtime."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/link-card.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-link-card-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf subscribes to link metadata, loads on demand, renders title/description/hostname/image and opens the authoritative external URL. iOS uses MarketplaceModel safe HTTP(S) link metadata projection/cache with native URL presentation, lifecycle refresh/failure healing and existing focused tests that reject malformed/non-web URLs. Exact-head UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/listener-connect.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-listener-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf consumes canonical listener integration state and connect action for supported GitHub/Slack listeners. Shipping MobileBotChat renders the native listener card, continuously refreshes visible integrations every five seconds, reuses the canonical listener connect/OAuth account manager with HTTPS external authorization, and fences account/Bot/lifecycle changes. Exact-head protected/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/local-tool-permission.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-local-tool-permission-implemented-pending-exact-head-ci",
+        "finding": "A real shipping gap was found and fixed in 3130c0ccc690e494dfc72c0c54453c68cc091374. iOS now strictly projects send-message:local-tool-permission asks and renders a native prompt using the existing canonical Coordinator get/set permission+ceiling APIs and Host resolveLocalToolPermission owner. Always/Never durable writes degrade to allow-once/deny on persistence rejection as Desktop does; Always fail-closes until team ceiling is loaded/permits it; pending/stale callbacks are fenced by account+Bot+generation. Focused XCTest covers projection, terminal status, malformed asks, fallback and ceiling behavior. Exact-head CI remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/secret-request.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-secret-request-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf presents pending/provided secret request state and submits through the canonical secret action provider without exposing the value in transcript text. iOS uses a native SecureField secretRequestCard, canonical secret.provide action path and generation/scope fencing, preserving provided/terminal state and avoiding plaintext transcript persistence. Exact-head protected/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/send-message-text.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-text-leaf-implemented-pending-exact-head-ci",
+        "finding": "This leaf is the presentation consumer of the previously-audited send-message:text projection. iOS projectMobileSendMessageText preserves streaming/image guards, bare-link URL-card gating, channel/timestamp semantics and feeds the native message/link presentation owner; focused tests already exercise these guards. Exact-head evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/shared.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-ios-adapted-shared-leaf-contract-implemented",
+        "finding": "Desktop shared leaf code supplies React provider/scope/version/adjacency helpers rather than an independent product service. iOS replaces this with the single MobileBotChat native owner, typed projections, account/Bot generation fencing and native adjacency/grouping helpers; no duplicate runtime/provider is introduced."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/slack-draft.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-slack-draft-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop leaf renders editable/sending/sent Slack draft target/thread/body state over the draft action provider. iOS projects canonical slackDraft payloads into native target/thread/body UI and routes Send/Discard through the same canonical transcript draft action path with pending/error/terminal state. Exact-head Swift/UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/widget.tsx",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-widget-leaf-implemented-pending-exact-head-ci",
+        "finding": "Desktop widget leaf owns choice keyboard shortcuts, custom answer, dismiss, answered/dismissed presentation and dismiss-on-move-on terminal semantics over the canonical widget adapter. iOS already had A/B/... hardware shortcuts, custom answer, dismiss, pending/error/answered UI and canonical respond/dismiss transport. A production gap where Host-persisted widgetSkipped was decoded but ignored was fixed in 9422b0268661fe775e62a7d646b6531ae94101a6: skipped cards now project as terminal dismissed/completed and custom native TextField Enter submits. Focused XCTest covers the persisted skipped terminal state. Exact-head UI evidence remains pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/conversation/cards/transcript-card/widget-interactions.ts",
+        "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+        "status": "current-main-reviewed-native-widget-interactions-implemented-pending-exact-head-ci",
+        "finding": "Desktop adapter serializes respondToWidget/dismissWidget, accepts only authoritative replies, tracks idle/pending/answered/dismissed, rolls back rejected/errors and fences scope/dispose generations. iOS resolveTranscriptWidget uses the canonical feature/Host widget action path, waits for the matching transcript.card update, fences Bot generation, updates only the matching entry, preserves pending/error rollback behavior, and resumes the accepted operation when returned. SwiftUI is the sole presentation owner; exact-head tests/CI remain pending."
       }
     ]
   },
