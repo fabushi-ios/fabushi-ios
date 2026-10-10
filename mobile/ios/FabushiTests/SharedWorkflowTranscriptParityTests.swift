@@ -489,6 +489,7 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         ))
         XCTAssertEqual(permission.kind, .permissionRequest)
         XCTAssertEqual(permission.text, "Camera")
+        XCTAssertNil(permission.actionStatus, "Retired permission-request transcript cards stay read-only and must not become approval actions.")
 
         let renamed = try XCTUnwrap(projectMobileTranscriptCard(
             event: [
