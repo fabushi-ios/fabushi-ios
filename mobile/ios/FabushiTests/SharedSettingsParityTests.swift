@@ -617,21 +617,21 @@ final class SharedSettingsParityTests: XCTestCase {
             XCTAssertEqual(store.getUserTimeZoneOverride(), "Asia/Tokyo")
         }
 
-        XCTAssertEqual(
-            try await coordinator.request(method: "getLocalToolPermission").value as? String,
-            "ask"
+        let initialLocalPermission = try await coordinator.request(
+            method: "getLocalToolPermission"
         )
-        XCTAssertEqual(
-            try await coordinator.request(method: "getLocalToolPermissionCeiling").value as? String,
-            "ask"
+        XCTAssertEqual(initialLocalPermission.value as? String, "ask")
+
+        let initialLocalPermissionCeiling = try await coordinator.request(
+            method: "getLocalToolPermissionCeiling"
         )
-        XCTAssertEqual(
-            try await coordinator.request(
-                method: "setLocalToolPermission",
-                params: ["permission": "never"]
-            ).value as? String,
-            "never"
+        XCTAssertEqual(initialLocalPermissionCeiling.value as? String, "ask")
+
+        let updatedLocalPermission = try await coordinator.request(
+            method: "setLocalToolPermission",
+            params: ["permission": "never"]
         )
+        XCTAssertEqual(updatedLocalPermission.value as? String, "never")
         XCTAssertEqual(store.getLocalToolPermission(), "never")
 
         do {
