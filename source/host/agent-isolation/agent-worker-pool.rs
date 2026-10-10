@@ -293,11 +293,15 @@ impl AgentWorkerPool {
             .state
             .lock()
             .map_err(|_| Self::poisoned("agent worker pool"))?;
-        if let Some(active) = state.active_ops.get_mut(blob_db_path) {
-            *active = active.saturating_sub(1);
-            if *active == 0 && !state.workers.contains_key(blob_db_path) {
-                state.active_ops.remove(blob_db_path);
+        let became_idle = match state.active_ops.get_mut(blob_db_path) {
+            Some(active) => {
+                *active = active.saturating_sub(1);
+                *active == 0
             }
+            None => false,
+        };
+        if became_idle && !state.workers.contains_key(blob_db_path) {
+            state.active_ops.remove(blob_db_path);
         }
         Ok(())
     }
@@ -326,14 +330,9 @@ impl AgentWorkerPool {
             return;
         }
         if let Ok(mut state) = self.state.lock() {
-            let lane = state.workers.remove(blob_db_path);
+            state.workers.remove(blob_db_path);
             state.active_ops.remove(blob_db_path);
             state.next_request_ids.remove(blob_db_path);
-            lane;
-            state.next_request_ids.remove(blob_db_path);
-            if state.active_ops.get(blob_db_path).copied().unwrap_or(0) == 0 {
-                state.active_ops.remove(blob_db_path);
-            }
         }
     }
 
@@ -545,7 +544,10 @@ impl AgentWorkerPool {
                 .state
                 .lock()
                 .map_err(|_| Self::poisoned("agent worker pool"))?;
-            state.workers.remove(blob_db_path)
+            let lane = state.workers.remove(blob_db_path);
+            state.active_ops.remove(blob_db_path);
+            state.next_request_ids.remove(blob_db_path);
+            lane
         };
         if let Some(lane) = lane {
             let mut worker = lane
