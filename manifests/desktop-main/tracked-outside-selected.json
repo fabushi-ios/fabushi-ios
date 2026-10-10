@@ -536,9 +536,9 @@
       "type": "blob",
       "sha": "432f7824636820c09d7526f7c7668de5dcfe5001",
       "size": 7096,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-bootstrap-diagnostic-contract",
+      "coverage_status": "reviewed-with-ios-focused-replacement",
+      "reason": "Electron/Playwright diagnostic probes renderer bootstrap, native/runtime bridges, auth/onboarding progression, persistence and canonical conversation/bot/group runtime hydration with bounded waits. iOS replacement is native protected-account/UI acceptance plus runtime status/projection tests on the shipping SwiftUI app; Electron window/DOM probing is not reused."
     },
     {
       "path": "desktop/scripts/macos-session-recorder.sh",
@@ -546,9 +546,9 @@
       "type": "blob",
       "sha": "7ef7b98c5347620237372b9c0e22a156f56b4d1b",
       "size": 15122,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-macos-visual-evidence-recorder",
+      "coverage_status": "reviewed-not-applicable-with-ios-release-replacement",
+      "reason": "macOS CI evidence recorder validates a playable screen-capture movie with fail-closed runner/display probes. iOS does not use macOS screencapture/host display drivers; replacement evidence comes from iOS UI test xcresult/screenshots/video where available plus physical-device/TestFlight acceptance artifacts in completeness/store-delivery. The requirement for inspectable visual evidence remains."
     },
     {
       "path": "desktop/scripts/macos-session-video.swift",
@@ -556,9 +556,9 @@
       "type": "blob",
       "sha": "9cee416603834fef04ab88fbe8ce59fc43efccdd",
       "size": 8521,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-macos-evidence-video-tool",
+      "coverage_status": "reviewed-not-applicable-with-ios-release-replacement",
+      "reason": "AVFoundation helper encodes/validates macOS session-recorder frames into a playable H.264 movie. It is test-evidence tooling, not product runtime. iOS replacement is native XCTest/xcresult/device evidence collection; this exact macOS frame encoder has no shipping iOS responsibility."
     },
     {
       "path": "desktop/scripts/notarize-after-sign.cjs",
@@ -566,9 +566,9 @@
       "type": "blob",
       "sha": "8530f874e873d544c23902c4b07b096f943a1f4d",
       "size": 8081,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-macos-signing-notarization-contract",
+      "coverage_status": "reviewed-with-ios-release-replacement",
+      "reason": "Re-signs nested macOS Host/ASR binaries with canonical identifiers, seals the Electron app and optionally submits/staples Apple notarization. iOS replacement is native code signing/export/TestFlight/App Store delivery in ios-store-delivery.yml and completeness gates; macOS notarization/stapling and Developer ID nested binary mechanics are not copied."
     },
     {
       "path": "desktop/scripts/stage-host.mjs",
@@ -576,9 +576,9 @@
       "type": "blob",
       "sha": "9716731f10d58b465a6c54ed4f07faa5939d9fdd",
       "size": 2185,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-host-staging-build-script",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Copies Desktop Host, Coordinator and box-exec executables into Electron resources/bin after Rust builds. iOS preserves Coordinator/Host/Runner responsibilities but links/builds iOS-owned Rust through scripts/build-mahayana-ios.sh and Xcode project settings; no sidecar executable staging is permitted/needed on iOS."
     },
     {
       "path": "desktop/scripts/test-bot-conversation.cjs",
@@ -586,9 +586,9 @@
       "type": "blob",
       "sha": "815882c4492c6f748c57df4e8d826b0e41c63857",
       "size": 2790,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-bot-conversation-component-contract",
+      "coverage_status": "reviewed-with-ios-focused-replacement",
+      "reason": "Desktop component test checks grouped agent steps/operation isolation/stopped state, explicit complete-HTML Mini App affordance, inert unsafe Markdown and Mini App result cards. iOS replacement is native Bot/Agent conversation and Mini App Swift/XCTest/UI coverage through the shipping surfaces; the React SSR harness itself is platform-specific."
     },
     {
       "path": "desktop/tsconfig.fabushi-product.json",
@@ -596,9 +596,9 @@
       "type": "blob",
       "sha": "758803dc9d4955e085099e916bdef93b3621c507",
       "size": 443,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-typescript-product-contract-config",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Desktop TypeScript compiler configuration for Fabushi account policy/service contract tests. iOS equivalent account/product contracts live in iOS-owned Rust/Swift targets and are built/tested by Cargo/Xcode in GitHub Actions; this TS compilation mechanism is not applicable."
     },
     {
       "path": "desktop/tsconfig.grok-electron.json",
@@ -606,9 +606,9 @@
       "type": "blob",
       "sha": "df86dd60642e621d03ad71fa7c7a11c6127f4ea1",
       "size": 3382,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-electron-contract-typecheck-config",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "TypeScript contract compilation set covering Desktop shared/Electron/preload/update/MCP/local-exec boundaries. Each applicable product responsibility is tracked in selected-source ledgers and mapped to native iOS/Rust owners; the Electron TypeScript compilation aggregate itself is replaced by Rust/Swift architecture/build/test gates."
     },
     {
       "path": "desktop/tsconfig.json",
@@ -616,9 +616,9 @@
       "type": "blob",
       "sha": "bbd1695ae4f24b4002a8f979c78237aa99c009d2",
       "size": 1614,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-renderer-typescript-build-config",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Desktop React/Vite renderer TypeScript configuration, aliases and production entry coverage. iOS uses Swift 6/XcodeGen project configuration and native source roots; React/Vite typechecking is not an iOS build dependency, while underlying product responsibilities remain in the source ledger."
     },
     {
       "path": "desktop/vite.config.ts",
@@ -626,9 +626,9 @@
       "type": "blob",
       "sha": "62e32ef4499400c8c2f4c5446ddd6ae97b7de3fa",
       "size": 1010,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-vite-renderer-build-config",
+      "coverage_status": "reviewed-not-applicable-with-replacement",
+      "reason": "Desktop Vite/React renderer bundling, aliases, dev server and dist output configuration. Native iOS ships no Vite renderer bundle; replacement is the Xcode application target and native SwiftUI composition in mobile/ios/project.yml. Mini App/Web content remains separately controlled by its native WebMCP/WebView owners."
     },
     {
       "path": "docs/adr/FBCP-ADR-002-payment-settlement.md",
