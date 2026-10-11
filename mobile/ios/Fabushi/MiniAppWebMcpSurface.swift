@@ -1360,9 +1360,7 @@ private struct MiniAppWebView: UIViewRepresentable {
 
             if tool.approval != "none" {
                 guard await requestApproval(tool) else {
-                    throw MahayanaCoordinator.CoordinatorError.requestFailed(
-                        "用户取消了 WebMCP Tool 调用"
-                    )
+                    throw MiniAppWebMcpApprovalDenied()
                 }
                 guard activeBridgeSession == session,
                       activeLocalSource == source
