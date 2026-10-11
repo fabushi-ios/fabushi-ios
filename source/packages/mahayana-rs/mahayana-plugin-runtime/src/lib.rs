@@ -23,7 +23,7 @@ use std::time::Duration;
 use tar::Archive;
 use url::Url;
 use uuid::Uuid;
-use zip::ZipArchive;
+use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 const DEFAULT_MAX_ARTIFACT_BYTES: usize = 100 * 1024 * 1024;
 
@@ -724,6 +724,162 @@ pub fn compute_fabapp_draft_digest(manifest: &FabappManifest) -> Result<String, 
     Ok(format!("{:x}", digest.finalize()))
 }
 
+pub fn prepare_local_generated_fabapp_manifest(
+    app_id: &str,
+    publisher_id: &str,
+    version: &str,
+    display_name: &str,
+    entrypoint: &str,
+    requested_capabilities: Vec<String>,
+    resources: &BTreeMap<String, (String, Vec<u8>)>,
+) -> Result<FabappManifest, RuntimeError> {
+    if resources.is_empty() || resources.len() > FABAPP_MAX_FILES {
+        return Err(RuntimeError::FabappManifest(
+            "local-generated draft resources are empty or too large".into(),
+        ));
+    }
+    let mut files = BTreeMap::new();
+    let mut expanded = 0_u64;
+    for (path, (mime, data)) in resources {
+        validate_fabapp_path(path)?;
+        expanded = expanded
+            .checked_add(data.len() as u64)
+            .ok_or_else(|| RuntimeError::FabappPolicy("expanded size overflow".into()))?;
+        if expanded > FABAPP_MAX_EXPANDED_BYTES {
+            return Err(RuntimeError::FabappPolicy(
+                "local-generated draft exceeds expanded size limit".into(),
+            ));
+        }
+        let expected = fabapp_expected_mime(path).ok_or_else(|| {
+            RuntimeError::FabappPolicy(format!("unsupported packaged resource type {path}"))
+        })?;
+        if mime != expected {
+            return Err(RuntimeError::FabappPolicy(format!(
+                "MIME mismatch for {path}: expected {expected}"
+            )));
+        }
+        files.insert(
+            path.clone(),
+            FabappFileRecord {
+                sha256: format!("{:x}", Sha256::digest(data)),
+                bytes: data.len() as u64,
+                mime: mime.clone(),
+            },
+        );
+    }
+
+    let mut manifest = FabappManifest {
+        manifest_version: 1,
+        package_class: Some(FabappPackageClass::LocalGenerated),
+        app_id: app_id.to_string(),
+        publisher_id: publisher_id.to_string(),
+        version: version.to_string(),
+        display_name: display_name.to_string(),
+        entrypoint: entrypoint.to_string(),
+        runtime: "web".into(),
+        min_host_api: FABAPP_HOST_API_V1,
+        offline_core: true,
+        requested_capabilities,
+        network_policy: FabappNetworkPolicy {
+            mode: "deny".into(),
+            allowed_origins: Vec::new(),
+        },
+        files,
+        local_author: Some(FabappLocalAuthorBinding {
+            account_scope: "0".repeat(64),
+            draft_digest: "0".repeat(64),
+            user_approval_id: "draft".into(),
+            creation_transaction_id: "draft".into(),
+        }),
+        signature: FabappSignature {
+            algorithm: "Ed25519".into(),
+            key_id: "draft".into(),
+            value: "AA".into(),
+        },
+    };
+    validate_fabapp_manifest(&manifest)?;
+    manifest.local_author = None;
+    manifest.signature = FabappSignature {
+        algorithm: "Ed25519".into(),
+        key_id: String::new(),
+        value: String::new(),
+    };
+    Ok(manifest)
+}
+
+pub fn fabapp_signing_payload(manifest: &FabappManifest) -> Result<Vec<u8>, RuntimeError> {
+    let mut unsigned = serde_json::to_value(manifest)
+        .map_err(|error| RuntimeError::FabappManifest(error.to_string()))?;
+    let object = unsigned
+        .as_object_mut()
+        .ok_or_else(|| RuntimeError::FabappManifest("manifest must be object".into()))?;
+    object.remove("signature");
+    let canonical = jcs_canonicalize(&unsigned)?;
+    let mut message = Vec::with_capacity(FABAPP_SIGNATURE_DOMAIN.len() + canonical.len());
+    message.extend_from_slice(FABAPP_SIGNATURE_DOMAIN);
+    message.extend_from_slice(canonical.as_bytes());
+    Ok(message)
+}
+
+pub fn build_fabapp_package(
+    manifest: &FabappManifest,
+    resources: &BTreeMap<String, (String, Vec<u8>)>,
+) -> Result<Vec<u8>, RuntimeError> {
+    validate_fabapp_manifest(manifest)?;
+    if resources.len() != manifest.files.len()
+        || resources.keys().any(|path| !manifest.files.contains_key(path))
+        || manifest.files.keys().any(|path| !resources.contains_key(path))
+    {
+        return Err(RuntimeError::FabappPolicy(
+            "package resources must exactly match manifest file table".into(),
+        ));
+    }
+    for (path, record) in &manifest.files {
+        let (mime, data) = resources
+            .get(path)
+            .ok_or_else(|| RuntimeError::FabappPolicy(format!("missing manifest file {path}")))?;
+        if mime != &record.mime
+            || data.len() as u64 != record.bytes
+            || format!("{:x}", Sha256::digest(data)) != record.sha256
+        {
+            return Err(RuntimeError::FabappPolicy(format!(
+                "package resource changed after approval: {path}"
+            )));
+        }
+    }
+
+    let cursor = Cursor::new(Vec::<u8>::new());
+    let mut writer = ZipWriter::new(cursor);
+    let options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Stored)
+        .unix_permissions(0o644);
+    writer
+        .start_file("manifest.json", options)
+        .map_err(|error| RuntimeError::FabappArchive(error.to_string()))?;
+    writer
+        .write_all(
+            &serde_json::to_vec(manifest)
+                .map_err(|error| RuntimeError::FabappManifest(error.to_string()))?,
+        )
+        .map_err(RuntimeError::Io)?;
+    for (path, (_, data)) in resources {
+        writer
+            .start_file(path, options)
+            .map_err(|error| RuntimeError::FabappArchive(error.to_string()))?;
+        writer.write_all(data).map_err(RuntimeError::Io)?;
+    }
+    let bytes = writer
+        .finish()
+        .map_err(|error| RuntimeError::FabappArchive(error.to_string()))?
+        .into_inner();
+    if bytes.len() > FABAPP_MAX_COMPRESSED_BYTES {
+        return Err(RuntimeError::FabappPolicy(
+            "package compressed size exceeds limit".into(),
+        ));
+    }
+    Ok(bytes)
+}
+
 pub fn verify_fabapp_bytes(
     bytes: &[u8],
     trust: &FabappTrustContext,
@@ -1105,16 +1261,7 @@ fn verify_fabapp_signature(
         .map_err(|_| RuntimeError::FabappSignature)?;
     let signature = Signature::from_slice(&signature_bytes)
         .map_err(|_| RuntimeError::FabappSignature)?;
-    let mut unsigned = serde_json::to_value(manifest)
-        .map_err(|error| RuntimeError::FabappManifest(error.to_string()))?;
-    let object = unsigned
-        .as_object_mut()
-        .ok_or_else(|| RuntimeError::FabappManifest("manifest must be object".into()))?;
-    object.remove("signature");
-    let canonical = jcs_canonicalize(&unsigned)?;
-    let mut message = Vec::with_capacity(FABAPP_SIGNATURE_DOMAIN.len() + canonical.len());
-    message.extend_from_slice(FABAPP_SIGNATURE_DOMAIN);
-    message.extend_from_slice(canonical.as_bytes());
+    let message = fabapp_signing_payload(manifest)?;
     key.verify(&message, &signature)
         .map_err(|_| RuntimeError::FabappSignature)
 }
@@ -3401,6 +3548,58 @@ mod tests {
         assert!(installer.uninstall("cleanup-plugin").unwrap());
         assert!(!temp.path().join("cleanup-plugin").exists());
         assert!(!installer.uninstall("cleanup-plugin").unwrap());
+    }
+
+    #[test]
+    fn local_generated_builder_binds_exact_resources_and_signing_payload() {
+        let signing = SigningKey::from_bytes(&[31_u8; 32]);
+        let mut resources = BTreeMap::from([
+            ("index.html".to_string(), ("text/html".to_string(), b"<html>safe</html>".to_vec())),
+            ("app.js".to_string(), ("text/javascript".to_string(), b"window.ok=true".to_vec())),
+        ]);
+        let mut manifest = prepare_local_generated_fabapp_manifest(
+            "local.fabushi.a1234.app",
+            "local.fabushi.a1234",
+            "1.0.0",
+            "Generated App",
+            "index.html",
+            vec!["storage.local".into()],
+            &resources,
+        )
+        .unwrap();
+        let draft = compute_fabapp_draft_digest(&manifest).unwrap();
+        manifest.local_author = Some(FabappLocalAuthorBinding {
+            account_scope: "a".repeat(64),
+            draft_digest: draft.clone(),
+            user_approval_id: "approval-1".into(),
+            creation_transaction_id: "transaction-1".into(),
+        });
+        manifest.signature.key_id = "local-key".into();
+        let payload = fabapp_signing_payload(&manifest).unwrap();
+        manifest.signature.value = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(signing.sign(&payload).to_bytes());
+        let package = build_fabapp_package(&manifest, &resources).unwrap();
+        let verified = verify_fabapp_bytes(
+            &package,
+            &FabappTrustContext::LocalGenerated(LocalGeneratedFabappTrust {
+                account_scope: "a".repeat(64),
+                publisher_id: "local.fabushi.a1234".into(),
+                reserved_app_id: "local.fabushi.a1234.app".into(),
+                approved_draft_digest: draft,
+                user_approval_id: "approval-1".into(),
+                creation_transaction_id: "transaction-1".into(),
+                key_id: "local-key".into(),
+                public_key: signing.verifying_key().to_bytes(),
+            }),
+        )
+        .unwrap();
+        assert_eq!(verified.manifest.app_id, "local.fabushi.a1234.app");
+
+        resources.get_mut("app.js").unwrap().1.push(b'!');
+        assert!(matches!(
+            build_fabapp_package(&manifest, &resources),
+            Err(RuntimeError::FabappPolicy(_))
+        ));
     }
 
     #[test]
