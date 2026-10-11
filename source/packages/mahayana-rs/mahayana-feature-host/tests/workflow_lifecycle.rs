@@ -3,14 +3,14 @@ use mahayana_host_protocol::{FeatureCommand, HostConfig, HostMode, SurfacePlatfo
 use uuid::Uuid;
 
 fn controller() -> FeatureHostController {
-    FeatureHostController::create_test_backend(
+    FeatureHostController::create(
         HostConfig {
             profile_id: format!("workflow-crud-{}", Uuid::new_v4()),
             mode: HostMode::Test,
         },
         SurfacePlatform::Ios,
-        None,
     )
+    .expect("create canonical test-mode Feature Host")
 }
 
 #[test]
