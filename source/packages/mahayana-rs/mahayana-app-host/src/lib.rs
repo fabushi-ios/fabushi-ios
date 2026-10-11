@@ -2708,10 +2708,23 @@ impl AppHost {
     }
 
     /// Deterministically settle the canonical feature Host before the process-local
-    /// app-host owner is released. FeatureHostController::close owns operation
-    /// interruption and pending approval/session cleanup; this layer only exposes
-    /// that existing owner to composition roots that need ordered shutdown.
+    /// app-host owner is released. Plugin runtimes are torn down first so no
+    /// account-scoped JavaScript task survives the owner that supplied its grants.
     pub fn close(&self) -> Result<(), AppHostError> {
+        {
+            let mut bindings = self
+                .runtime_accounts
+                .lock()
+                .map_err(|_| AppHostError::Operation("plugin runtime account lock poisoned".into()))?;
+            let mut host = self
+                .js
+                .lock()
+                .map_err(|_| AppHostError::Operation("JavaScript host lock poisoned".into()))?;
+            for plugin_id in bindings.keys() {
+                let _ = host.disable_plugin(plugin_id);
+            }
+            bindings.clear();
+        }
         self.feature
             .close()
             .map_err(|error| AppHostError::Operation(error.to_string()))

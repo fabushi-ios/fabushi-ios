@@ -1883,6 +1883,7 @@ final class MarketplaceModel {
     var loading = false
     var installingPluginId: String?
     var accountRosterRevision = 0
+    var installedPluginIds: Set<String> = []
     var plugins: [MarketplacePlugin] = []
     var pluginBrowserTab: MarketplaceBrowserTab = .marketplace
     var privateSkillOwnershipFilter: MarketplaceSkillOwnershipFilter = .all
@@ -2366,6 +2367,7 @@ final class MarketplaceModel {
         if previousMcpScope != globalDharmaAccountScope || !loggedIn {
             resetMcpState()
             resetToolResultCards()
+            installedPluginIds = []
         }
 
         guard let user = auth?["user"] as? [String: Any] else {
@@ -5028,6 +5030,17 @@ final class MarketplaceModel {
             let object = result.value as? [String: Any]
             let rows = object?["plugins"] as? [[String: Any]] ?? []
             plugins = rows.compactMap(Self.marketplacePlugin(from:))
+            if loggedIn {
+                let installed = try await bridge.request(method: "feature.plugin.listInstalled")
+                let installedRows = (installed.value as? [String: Any])?["plugins"] as? [[String: Any]] ?? []
+                installedPluginIds = Set(installedRows.compactMap { row in
+                    (row["pluginId"] as? String)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .nonEmpty
+                })
+            } else {
+                installedPluginIds = []
+            }
             message = "原生 iOS · Rust Host 已连接"
         } catch {
             let notice = "市场加载失败：\(error.localizedDescription)"
@@ -5086,6 +5099,7 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App 已本地安装，但 Fabushi 账号/Bot 同步未完成")
             }
             accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
+            installedPluginIds.insert(pluginId)
             installingPluginId = nil
             publishPluginsNotice(
                 .install,
@@ -5108,6 +5122,45 @@ final class MarketplaceModel {
             let notice = "安装失败：\(error.localizedDescription)"
             message = notice
             publishPluginsNotice(.install, kind: .error, message: notice, fence: noticeFence)
+        }
+    }
+
+    func remove(_ plugin: MarketplacePlugin) async {
+        let noticeFence = settingsNoticeController.makeFence()
+        let pluginId = plugin.pluginId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard loggedIn, !pluginId.isEmpty else {
+            let notice = "请先登录后再移除插件"
+            message = notice
+            publishPluginsNotice(.remove, kind: .error, message: notice, fence: noticeFence)
+            return
+        }
+        installingPluginId = pluginId
+        message = "正在移除 \(pluginId)…"
+        do {
+            _ = try await bridge.request(
+                method: "feature.plugin.uninstall",
+                params: ["pluginId": pluginId]
+            )
+            let accountRemoval = try await bridge.request(
+                method: "feature.marketplace.remove",
+                params: ["pluginId": pluginId]
+            )
+            guard let object = accountRemoval.value as? [String: Any],
+                  object["removed"] != nil || object["miniAppId"] as? String == pluginId
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            installedPluginIds.remove(pluginId)
+            accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
+            installingPluginId = nil
+            let notice = "\(pluginId) 已从当前账号移除"
+            message = notice
+            publishPluginsNotice(.remove, kind: .success, message: notice, fence: noticeFence)
+        } catch {
+            installingPluginId = nil
+            let notice = "移除失败：\(error.localizedDescription)"
+            message = notice
+            publishPluginsNotice(.remove, kind: .error, message: notice, fence: noticeFence)
         }
     }
 

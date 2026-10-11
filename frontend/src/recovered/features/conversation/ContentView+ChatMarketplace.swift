@@ -1917,6 +1917,14 @@ extension ContentView {
                                 }
                                 .disabled(plugin.latestVersion == nil || model.installingPluginId != nil)
                                 .accessibilityIdentifier("install-\(plugin.pluginId)")
+
+                                if model.installedPluginIds.contains(plugin.pluginId) {
+                                    Button("移除", role: .destructive) {
+                                        Task { await model.remove(plugin) }
+                                    }
+                                    .disabled(model.installingPluginId != nil)
+                                    .accessibilityIdentifier("remove-\(plugin.pluginId)")
+                                }
                             }
                         }
                     }
