@@ -32,7 +32,7 @@ final class VoiceRecorderParityTests: XCTestCase {
         }
         XCTAssertEqual(samples.count, 9)
         XCTAssertTrue(samples.allSatisfy { $0 >= 0 && $0 <= 1 })
-        XCTAssertEqual(samples.last, 1, accuracy: 0.0001)
+        XCTAssertEqual(samples.last ?? -1, 1, accuracy: 0.0001)
     }
 
     @MainActor

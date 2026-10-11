@@ -156,7 +156,8 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
             }
         }
 
-        XCTAssertTrue(await transport.calls.isEmpty)
+        let rejectedCalls = await transport.calls
+        XCTAssertTrue(rejectedCalls.isEmpty)
 
         let result = try await executor.execute(method: "shell.exec")
         XCTAssertEqual(result, .object(["ok": .bool(true)]))

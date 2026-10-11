@@ -2067,6 +2067,7 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         XCTAssertEqual(
             projectMobileMessageCardSeam(notice),
             .init(
+                isSpecialVariant: false,
                 isSourceTrusted: false,
                 isFromUser: false,
                 isStandaloneEmoji: false,
