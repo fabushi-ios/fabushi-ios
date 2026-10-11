@@ -1016,6 +1016,32 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return try IOSCursorDashboardProto.decodeBackgroundComposerInfo(response)
     }
 
+    func isAnysphereUser(timeoutMs: Int = 10_000) async throws -> Bool {
+        let response = try await rpc("GetTeams", body: [:], timeoutMs: timeoutMs)
+        let teams = response["teams"] as? [[String: Any]] ?? []
+        return teams.contains { team in
+            let id: Int
+            if let value = team["id"] as? NSNumber {
+                id = value.intValue
+            } else if let value = team["id"] as? String, let parsed = Int(value) {
+                id = parsed
+            } else {
+                id = -1
+            }
+            let seats: Int
+            if let value = team["seats"] as? NSNumber {
+                seats = value.intValue
+            } else if let value = team["seats"] as? String, let parsed = Int(value) {
+                seats = parsed
+            } else {
+                seats = 0
+            }
+            return id == 1
+                && team["hasBilling"] as? Bool == true
+                && seats > 0
+        }
+    }
+
     func getSkillPublishTeams(timeoutMs: Int = 10_000) async throws -> [IOSCursorSkillPublishTeam] {
         let response = try await protoRPC(
             "GetTeams",

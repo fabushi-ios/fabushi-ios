@@ -814,6 +814,10 @@ pub struct ProductHostSettings {
     /// settings owner; there is deliberately no second time-zone authority.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub user_timezone_by_account: BTreeMap<String, String>,
+    /// Native Main owns experiment evaluation. Host only receives the current
+    /// authenticated account's bounded override projection.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub feature_flag_overrides_by_account: BTreeMap<String, BTreeMap<String, bool>>,
 }
 
 impl Default for ProductHostSettings {
@@ -833,6 +837,7 @@ impl Default for ProductHostSettings {
             sandbox_runtime: SandboxRuntime::default(),
             has_seen_onboarding_by_account: BTreeMap::new(),
             user_timezone_by_account: BTreeMap::new(),
+            feature_flag_overrides_by_account: BTreeMap::new(),
         }
     }
 }

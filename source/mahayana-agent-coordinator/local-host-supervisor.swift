@@ -3,13 +3,16 @@ import Foundation
 struct MahayanaHostSettingsSnapshot: Equatable, Sendable {
     let hasSeenOnboarding: Bool?
     let userTimeZone: String?
+    let featureFlagOverrides: [String: Bool]
 
     init(
         hasSeenOnboarding: Bool?,
-        userTimeZone: String? = nil
+        userTimeZone: String? = nil,
+        featureFlagOverrides: [String: Bool] = [:]
     ) {
         self.hasSeenOnboarding = hasSeenOnboarding
         self.userTimeZone = userTimeZone
+        self.featureFlagOverrides = featureFlagOverrides
     }
 }
 
@@ -105,6 +108,21 @@ final class MahayanaLocalHostSupervisor {
         return try Self.decodeHostSettings(response.value)
     }
 
+    @discardableResult
+    func pushHostFeatureFlagOverrides(
+        _ overrides: [String: Bool]
+    ) async throws -> MahayanaHostSettingsSnapshot {
+        let response = try await request(
+            method: "setHostSettings",
+            params: [
+                "settings": [
+                    "featureFlagOverrides": overrides,
+                ],
+            ]
+        )
+        return try Self.decodeHostSettings(response.value)
+    }
+
     private static func decodeHostSettings(
         _ value: Any
     ) throws -> MahayanaHostSettingsSnapshot {
@@ -136,9 +154,19 @@ final class MahayanaLocalHostSupervisor {
         } else {
             userTimeZone = nil
         }
+        let featureFlagOverrides: [String: Bool]
+        if let rawOverrides = object["featureFlagOverrides"] {
+            guard let overrides = rawOverrides as? [String: Bool] else {
+                throw MahayanaHostSettingsTransportError.invalidResponse
+            }
+            featureFlagOverrides = overrides
+        } else {
+            featureFlagOverrides = [:]
+        }
         return .init(
             hasSeenOnboarding: seen,
-            userTimeZone: userTimeZone
+            userTimeZone: userTimeZone,
+            featureFlagOverrides: featureFlagOverrides
         )
     }
 

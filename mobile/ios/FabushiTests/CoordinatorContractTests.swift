@@ -30,6 +30,7 @@ private final class TestCoordinatorPort: CoordinatorPort {
 private final class TestHostSettingsRequester: MahayanaHostRequesting, @unchecked Sendable {
     var remoteSeen: Bool?
     var remoteTimeZone: String?
+    var remoteFeatureFlagOverrides: [String: Bool] = [:]
     var requests: [(String, [String: Any])] = []
     var failReads = false
     var failWrites = false
@@ -44,6 +45,7 @@ private final class TestHostSettingsRequester: MahayanaHostRequesting, @unchecke
             return .init(value: [
                 "hasSeenOnboarding": remoteSeen.map { $0 as Any } ?? NSNull(),
                 "userTimeZone": remoteTimeZone.map { $0 as Any } ?? NSNull(),
+                "featureFlagOverrides": remoteFeatureFlagOverrides,
             ])
         }
         if method == "setHostSettings" {
@@ -72,10 +74,15 @@ private final class TestHostSettingsRequester: MahayanaHostRequesting, @unchecke
                     throw NSError(domain: "host-settings", code: 422)
                 }
             }
+            if let overrides = settings["featureFlagOverrides"] as? [String: Bool] {
+                touched = true
+                remoteFeatureFlagOverrides = overrides
+            }
             guard touched else { throw NSError(domain: "host-settings", code: 400) }
             return .init(value: [
                 "hasSeenOnboarding": remoteSeen.map { $0 as Any } ?? NSNull(),
                 "userTimeZone": remoteTimeZone.map { $0 as Any } ?? NSNull(),
+                "featureFlagOverrides": remoteFeatureFlagOverrides,
             ])
         }
         throw NSError(domain: "host-settings", code: 404)
@@ -124,6 +131,26 @@ final class CoordinatorContractTests: XCTestCase {
         let timeZone = try await supervisor.pushHostUserTimeZone("America/Los_Angeles")
         XCTAssertEqual(timeZone.userTimeZone, "America/Los_Angeles")
         XCTAssertEqual(host.remoteTimeZone, "America/Los_Angeles")
+    }
+
+    @MainActor
+    func testHostSettingsFeatureFlagOverridesUseCanonicalSetHostSettingsTransport() async throws {
+        let host = TestHostSettingsRequester()
+        let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
+        let projected = try await supervisor.pushHostFeatureFlagOverrides([
+            "sand_client_pause": true,
+            "sand_agent_network": false,
+        ])
+        XCTAssertEqual(
+            projected.featureFlagOverrides,
+            ["sand_client_pause": true, "sand_agent_network": false]
+        )
+        XCTAssertEqual(host.remoteFeatureFlagOverrides, projected.featureFlagOverrides)
+        let settings = try XCTUnwrap(host.requests.last?.1["settings"] as? [String: Any])
+        XCTAssertEqual(
+            settings["featureFlagOverrides"] as? [String: Bool],
+            projected.featureFlagOverrides
+        )
     }
 
     @MainActor

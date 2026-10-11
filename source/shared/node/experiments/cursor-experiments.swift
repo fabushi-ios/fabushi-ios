@@ -6,6 +6,26 @@ let POLL_JITTER_FRACTION = 0.3
 let BOOTSTRAP_TIMEOUT_MS = 30_000
 let GATE_READY_TIMEOUT_MS = 10_000
 
+enum SandExperimentRefreshTrigger: String, Sendable {
+    case startup
+    case poll
+    case authChange = "auth_change"
+    case manual
+}
+
+struct SandExperimentBootstrapFetchRequest: @unchecked Sendable {
+    let backendUrl: String
+    let getAccessToken: @Sendable (String) async throws -> String
+    let getMachineId: @Sendable () async throws -> String
+    let env: [String: String]
+    let timeoutSeconds: TimeInterval
+    let session: URLSession
+}
+
+typealias SandExperimentBootstrapFetcher = @Sendable (
+    SandExperimentBootstrapFetchRequest
+) async throws -> StatsigBootstrapResult
+
 func computePollDelayMs(
     baseIntervalMs: Int,
     jitterRoll: Double,
@@ -47,6 +67,26 @@ struct SandExperimentSnapshot: Equatable, Sendable {
     var sandModelExperiment: SandModelExperimentState?
     var sandModelFilterAllowedIds: [String]
     var featureFlagOverrides: [String: Bool]
+}
+
+func sandExperimentSnapshotFoundation(_ snapshot: SandExperimentSnapshot) -> [String: Any] {
+    var value: [String: Any] = [
+        "isInitialized": snapshot.isInitialized,
+        "featureGates": snapshot.featureGates,
+        "experiments": snapshot.experiments.mapValues { $0.mapValues(foundationValue) },
+        "dynamicConfigs": snapshot.dynamicConfigs.mapValues { $0.mapValues(foundationValue) },
+        "sandModelFilterAllowedIds": snapshot.sandModelFilterAllowedIds,
+        "featureFlagOverrides": snapshot.featureFlagOverrides,
+    ]
+    if let model = snapshot.sandModelExperiment {
+        value["sandModelExperiment"] = [
+            "active": model.active,
+            "arm": model.arm.rawValue,
+        ]
+    } else {
+        value["sandModelExperiment"] = NSNull()
+    }
+    return value
 }
 
 private struct SandHydratedExperiment {
@@ -125,6 +165,7 @@ final class SandExperimentService: @unchecked Sendable {
     private let env: [String: String]
     private let isDevBuild: Bool
     private let productFeatureGateDefaults: [String: Bool]
+    private let bootstrapFetcher: SandExperimentBootstrapFetcher
 
     private var remoteGates: [String: Bool] = [:]
     private var experiments: [String: SandHydratedExperiment] = [:]
@@ -138,17 +179,31 @@ final class SandExperimentService: @unchecked Sendable {
     private var isAnysphereUser = false
     private var disposed = false
     private var pollTask: Task<Void, Never>?
+    private var authRevision: UInt64 = 0
+    private var refreshRevision: UInt64 = 0
+    private var rateLimitedUntilMs: Int64?
 
     init(
         getCacheDir: @escaping @Sendable () -> String,
         isDevBuild: Bool = false,
         env: [String: String] = ProcessInfo.processInfo.environment,
-        productFeatureGateDefaults: [String: Bool] = [:]
+        productFeatureGateDefaults: [String: Bool] = [:],
+        bootstrapFetcher: @escaping SandExperimentBootstrapFetcher = { request in
+            try await fetchStatsigBootstrap(
+                backendUrl: request.backendUrl,
+                getAccessToken: request.getAccessToken,
+                getMachineId: request.getMachineId,
+                env: request.env,
+                timeoutSeconds: request.timeoutSeconds,
+                session: request.session
+            )
+        }
     ) {
         self.getCacheDir = getCacheDir
         self.isDevBuild = isDevBuild
         self.env = env
         self.productFeatureGateDefaults = productFeatureGateDefaults
+        self.bootstrapFetcher = bootstrapFetcher
         overrideStore = SandFeatureFlagOverrideStore(getCacheDir: getCacheDir)
         if isDevBuild { overrideStore.hydrateFromDisk() }
     }
@@ -187,57 +242,143 @@ final class SandExperimentService: @unchecked Sendable {
         task?.cancel()
     }
 
+    func handleAuthChange() {
+        lock.lock()
+        authRevision = authRevision == UInt64.max ? 1 : authRevision + 1
+        refreshRevision = refreshRevision == UInt64.max ? 1 : refreshRevision + 1
+        rateLimitedUntilMs = nil
+        lock.unlock()
+    }
+
+    func resetFeatureFlagOverridesForAccountTransition() {
+        overrideStore.clearAll()
+        overrideStore.persist()
+        refreshGateProperties()
+        publishSnapshot()
+    }
+
     func refresh(
         backendUrl: String,
         getAccessToken: @escaping @Sendable (String) async throws -> String,
         getMachineId: @escaping @Sendable () async throws -> String,
+        trigger: SandExperimentRefreshTrigger = .manual,
         session: URLSession = .shared
     ) async {
-        guard !isDisposed() else { return }
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
+        lock.lock()
+        if disposed {
+            lock.unlock()
+            return
+        }
+        if trigger != .authChange,
+           let until = rateLimitedUntilMs,
+           until > nowMs {
+            lock.unlock()
+            reportExperimentsDiagnostic(.init(
+                kind: "bootstrap_rate_limit_wait",
+                metadata: [
+                    "trigger": trigger.rawValue,
+                    "retryAfterMs": String(until - nowMs),
+                ]
+            ))
+            return
+        }
+        refreshRevision = refreshRevision == UInt64.max ? 1 : refreshRevision + 1
+        let expectedRefreshRevision = refreshRevision
+        let expectedAuthRevision = authRevision
+        lock.unlock()
+
         do {
-            let result = try await fetchStatsigBootstrap(
+            try Task.checkCancellation()
+            let result = try await bootstrapFetcher(.init(
                 backendUrl: backendUrl,
                 getAccessToken: getAccessToken,
                 getMachineId: getMachineId,
                 env: env,
                 timeoutSeconds: Double(BOOTSTRAP_TIMEOUT_MS) / 1_000,
                 session: session
-            )
-            guard let config = result.config else {
-                if result.retryAfterMs != nil {
-                    reportExperimentsDiagnostic(.init(
-                        kind: "bootstrap_rate_limited",
-                        metadata: ["retryAfterMs": String(result.retryAfterMs ?? 0)]
-                    ))
+            ))
+            try Task.checkCancellation()
+
+            if let retryAfterMs = result.retryAfterMs {
+                lock.lock()
+                if !disposed,
+                   refreshRevision == expectedRefreshRevision,
+                   authRevision == expectedAuthRevision {
+                    rateLimitedUntilMs = Int64(Date().timeIntervalSince1970 * 1_000)
+                        + Int64(max(0, retryAfterMs))
                 }
+                lock.unlock()
+                reportExperimentsDiagnostic(.init(
+                    kind: "bootstrap_rate_limited",
+                    metadata: [
+                        "trigger": trigger.rawValue,
+                        "retryAfterMs": String(retryAfterMs),
+                    ]
+                ))
+            }
+            guard let config = result.config else { return }
+            let fetchedAt = Int64(Date().timeIntervalSince1970 * 1_000)
+            guard hydrate(
+                config: config,
+                fetchedAtMs: fetchedAt,
+                live: true,
+                expectedRefreshRevision: expectedRefreshRevision,
+                expectedAuthRevision: expectedAuthRevision
+            ) else {
+                reportExperimentsDiagnostic(.init(
+                    kind: "bootstrap_discarded_auth_changed",
+                    metadata: ["trigger": trigger.rawValue]
+                ))
                 return
             }
-            let fetchedAt = Int64(Date().timeIntervalSince1970 * 1_000)
-            hydrate(config: config, fetchedAtMs: fetchedAt, live: true)
+            lock.lock()
+            rateLimitedUntilMs = nil
+            lock.unlock()
             saveCachedBootstrap(
                 getCacheDir(),
-                cache: .init(config: config, userId: readStatsigBootstrapUserId(config), fetchedAtMs: fetchedAt)
+                cache: .init(
+                    config: config,
+                    userId: readStatsigBootstrapUserId(config),
+                    fetchedAtMs: fetchedAt
+                )
             )
             reportExperimentsDiagnostic(.init(
                 kind: "bootstrap_resolved",
                 metadata: [
+                    "trigger": trigger.rawValue,
                     "authenticated": hasAuthenticatedStatsigBootstrap() ? "true" : "false",
                     "gatesOnCount": String(getSnapshot().featureGates.values.filter { $0 }.count),
                 ]
             ))
+        } catch is CancellationError {
+            reportExperimentsDiagnostic(.init(
+                kind: "bootstrap_cancelled",
+                metadata: ["trigger": trigger.rawValue]
+            ))
         } catch {
             reportExperimentsDiagnostic(.init(
                 kind: "bootstrap_failed",
-                metadata: ["errorClass": errorLogTag(error)]
+                metadata: [
+                    "trigger": trigger.rawValue,
+                    "errorClass": errorLogTag(error),
+                ]
             ))
         }
     }
 
-    func hydrate(config: String, fetchedAtMs: Int64? = nil, live: Bool = true) {
+    @discardableResult
+    func hydrate(
+        config: String,
+        fetchedAtMs: Int64? = nil,
+        live: Bool = true,
+        expectedRefreshRevision: UInt64? = nil,
+        expectedAuthRevision: UInt64? = nil
+    ) -> Bool {    func hydrate(config: String, fetchedAtMs: Int64? = nil, live: Bool = true) {
         guard let data = config.data(using: .utf8),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             reportExperimentsDiagnostic(.init(kind: "bootstrap_hydrate_failed"))
-            return
+            return false
         }
 
         var gates: [String: Bool] = [:]
@@ -267,6 +408,16 @@ final class SandExperimentService: @unchecked Sendable {
 
         let userId = readStatsigBootstrapUserId(config)
         lock.lock()
+        if let expectedRefreshRevision,
+           refreshRevision != expectedRefreshRevision {
+            lock.unlock()
+            return false
+        }
+        if let expectedAuthRevision,
+           authRevision != expectedAuthRevision {
+            lock.unlock()
+            return false
+        }
         remoteGates = gates
         experiments = hydratedExperiments
         dynamicConfigs = configs
@@ -277,6 +428,7 @@ final class SandExperimentService: @unchecked Sendable {
         lock.unlock()
         refreshGateProperties()
         publishSnapshot()
+        return true
     }
 
     func subscribe(_ listener: @escaping @Sendable (SandExperimentSnapshot) -> Void) -> () -> Void {
@@ -438,6 +590,44 @@ final class SandExperimentService: @unchecked Sendable {
         publishSnapshot()
     }
 
+    func setAllFeatureFlagOverridesToBundledValues() {
+        guard canUseFeatureFlagOverrides() else { return }
+        overrideStore.setAllToBundledDefaults()
+        overrideStore.persist()
+        refreshGateProperties()
+        publishSnapshot()
+    }
+
+    func replaceFeatureFlagOverrides(_ replacements: [String: Bool]) {
+        overrideStore.replaceAll(replacements)
+        overrideStore.persist()
+        refreshGateProperties()
+        publishSnapshot()
+    }
+
+    func getFeatureFlagOverridesRecord() -> [String: Bool] {
+        overrideStore.activeOverrides()
+    }
+
+    func applyFeatureFlagOverrideCommand(_ command: [String: Any]) {
+        guard let kind = command["kind"] as? String else { return }
+        switch kind {
+        case "set":
+            guard let name = command["name"] as? String,
+                  let value = command["value"] as? Bool else { return }
+            setFeatureFlagOverride(name, value: value)
+        case "clear":
+            guard let name = command["name"] as? String else { return }
+            clearFeatureFlagOverride(name)
+        case "clear-all":
+            clearAllFeatureFlagOverrides()
+        case "set-all-bundled":
+            setAllFeatureFlagOverridesToBundledValues()
+        default:
+            return
+        }
+    }
+
     func getExperiment(_ name: String) -> [String: IOSExperimentConfigValue] {
         let fallback = IOS_EXPERIMENT_FALLBACKS[name] ?? [:]
         lock.lock()
@@ -515,6 +705,9 @@ final class SandExperimentService: @unchecked Sendable {
         stopPolling()
         lock.lock()
         disposed = true
+        authRevision = authRevision == UInt64.max ? 1 : authRevision + 1
+        refreshRevision = refreshRevision == UInt64.max ? 1 : refreshRevision + 1
+        rateLimitedUntilMs = nil
         listeners.removeAll()
         let properties = Array(gateProperties.values)
         gateProperties.removeAll()

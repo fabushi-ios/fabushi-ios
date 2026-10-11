@@ -109,6 +109,16 @@ final class IOSMainRuntime {
                     level: projection.level,
                     metadata: projection.metadata
                 )
+            },
+            experimentDiagnosticReporter: { diagnostic in
+                var metadata = diagnostic.metadata
+                metadata["area"] = "experiments"
+                metadata["kind"] = diagnostic.kind
+                reporter.report(
+                    .localExecLifecycle,
+                    level: diagnostic.kind.contains("failed") ? .error : .warn,
+                    metadata: metadata
+                )
             }
         )
         self.coordinator = coordinator

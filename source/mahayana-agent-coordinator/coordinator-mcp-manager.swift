@@ -651,6 +651,7 @@ final class CoordinatorMcpSurface {
     private let avatarImageGenerator: CursorGenerateImageService
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
     private let isClientPaused: @MainActor () -> Bool
+    private var experimentAuthObserver: ((IOSCursorAuthStatus) -> Void)?
     private var computerMigrationWatchTask: Task<Void, Never>?
     private var computerMigrationResumeOffsetKey = ""
     private var computerMigrationStatus: [String: Any]?
@@ -746,9 +747,6 @@ final class CoordinatorMcpSurface {
             },
             reportFailure: reportFailure
         )
-        cursorAuth.setStatusObserver { [weak localToolPermissionCeilingSynchronizer] status in
-            localToolPermissionCeilingSynchronizer?.consume(status)
-        }
         let avatarImageGenerator = createCursorGenerateImageService(
             client: IOSCursorGenerateImageClient(credentials: credentials),
             modelId: SAND_DEFAULT_MODEL_ID
@@ -817,7 +815,7 @@ final class CoordinatorMcpSurface {
         dependencies.effectivePluginsProvider = {
             try await fetchEffectiveUserPlugins(accountDependencies)
         }
-        return .init(
+        let surface = CoordinatorMcpSurface(
             manager: SandMcpManager(deps: dependencies),
             port: port,
             cursorAuth: cursorAuth,
@@ -826,6 +824,38 @@ final class CoordinatorMcpSurface {
             localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
             isClientPaused: isClientPaused
         )
+        cursorAuth.setStatusObserver { [weak surface] status in
+            surface?.consumeCursorAuthStatus(status)
+        }
+        return surface
+    }
+
+    private func consumeCursorAuthStatus(_ status: IOSCursorAuthStatus) {
+        localToolPermissionCeilingSynchronizer.consume(status)
+        experimentAuthObserver?(status)
+    }
+
+    func setExperimentAuthObserver(_ observer: ((IOSCursorAuthStatus) -> Void)?) {
+        experimentAuthObserver = observer
+        guard observer != nil else { return }
+        Task { @MainActor [weak self] in
+            guard let self, let observer = self.experimentAuthObserver else { return }
+            observer(await self.cursorAuth.status())
+        }
+    }
+
+    func experimentAccessToken(backendURL: String) async throws -> String {
+        try await cursorAuth.getValidAccessToken(backendURL: backendURL)
+    }
+
+    func experimentMachineID() async throws -> String {
+        try await cursorAuth.getMachineID()
+    }
+
+    func experimentIsAnysphereUser() async throws -> Bool {
+        let status = await cursorAuth.status()
+        guard status.loggedIn else { return false }
+        return try await dashboard.isAnysphereUser()
     }
 
     func updateAccountScope(_ scope: String?) {
@@ -841,7 +871,7 @@ final class CoordinatorMcpSurface {
         port.updateAccountScope(next)
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.localToolPermissionCeilingSynchronizer.consume(await self.cursorAuth.status())
+            self.consumeCursorAuthStatus(await self.cursorAuth.status())
         }
     }
 

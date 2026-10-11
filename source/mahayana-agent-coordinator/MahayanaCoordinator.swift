@@ -373,6 +373,13 @@ final class MahayanaCoordinator {
     private let transportStageRecorder: TransportStageRecorder
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
     private var autoReviewHostSyncNeeded = true
+    private var experimentSnapshotUnsubscribe: (() -> Void)?
+    private var experimentRefreshTask: Task<Void, Never>?
+    private var experimentMembershipTask: Task<Void, Never>?
+    private var experimentOverridePushTask: Task<Void, Never>?
+    private var experimentMembershipGeneration: UInt64 = 0
+    private var experimentOverrideGeneration: UInt64 = 0
+    private var lastProjectedExperimentOverrides: [String: Bool]?
     private var localToolApprovalAccountScope: String?
     private var localToolApprovalScopeRevision: UInt64 = 0
     private var localToolApprovalCleanupStatus = "idle"
@@ -502,8 +509,12 @@ final class MahayanaCoordinator {
         passkeyProvider: (any PasskeyProviding)? = nil,
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
-        mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
+        mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
+        experimentDiagnosticReporter: ((ExperimentDiagnostic) -> Void)? = nil
     ) throws -> MahayanaCoordinator {
+        if let experimentDiagnosticReporter {
+            pinExperimentsDiagnosticsReporter(experimentDiagnosticReporter)
+        }
         let experimentCacheDirectory = appDataDirectory
             .appendingPathComponent("experiments", isDirectory: true)
         let experimentService = SandExperimentService(
@@ -512,7 +523,7 @@ final class MahayanaCoordinator {
             productFeatureGateDefaults: ["sand_agent_network": true]
         )
         experimentService.startFromCache()
-        return MahayanaCoordinator(
+        let coordinator = MahayanaCoordinator(
             hostSupervisor: try MahayanaLocalHostSupervisor.make(
                 appDataDirectory: appDataDirectory,
                 featureHostTest: featureHostTest
@@ -526,6 +537,8 @@ final class MahayanaCoordinator {
             mcpFailureReporter: mcpFailureReporter,
             mcpAuthTelemetryReporter: mcpAuthTelemetryReporter
         )
+        coordinator.startExperimentRuntime()
+        return coordinator
     }
 
     func sharedSettingsSnapshot() -> SandStoredSettings {
@@ -621,6 +634,128 @@ final class MahayanaCoordinator {
         experimentService?.getConfiguredDefaultModel()
     }
 
+    private func emitExperimentSnapshot(_ snapshot: SandExperimentSnapshot) {
+        guard let payload = try? CoordinatorPayload.fromFoundation(
+            sandExperimentSnapshotFoundation(snapshot)
+        ) else { return }
+        rendererEventSink?("experiments-changed", payload)
+    }
+
+    private func refreshExperiments(_ trigger: SandExperimentRefreshTrigger) async {
+        guard let experimentService, let mcpSurface else { return }
+        await experimentService.refresh(
+            backendUrl: getConfiguredBackendUrl(),
+            getAccessToken: { backendURL in
+                try await mcpSurface.experimentAccessToken(backendURL: backendURL)
+            },
+            getMachineId: {
+                try await mcpSurface.experimentMachineID()
+            },
+            trigger: trigger
+        )
+    }
+
+    private func startExperimentRuntime() {
+        guard let experimentService, let mcpSurface else { return }
+        experimentSnapshotUnsubscribe?()
+        experimentSnapshotUnsubscribe = experimentService.subscribe { [weak self] snapshot in
+            Task { @MainActor [weak self] in
+                self?.handleExperimentSnapshot(snapshot)
+            }
+        }
+        mcpSurface.setExperimentAuthObserver { [weak self] status in
+            self?.handleExperimentAuthStatus(status)
+        }
+        experimentService.startPolling { [weak self] in
+            guard let self else { return }
+            await self.refreshExperiments(.poll)
+        }
+        emitExperimentSnapshot(experimentService.getSnapshot())
+        experimentRefreshTask?.cancel()
+        experimentRefreshTask = Task { @MainActor [weak self] in
+            await self?.refreshExperiments(.startup)
+        }
+    }
+
+    private func handleExperimentAuthStatus(_ status: IOSCursorAuthStatus) {
+        guard let experimentService else { return }
+        experimentService.handleAuthChange()
+        experimentRefreshTask?.cancel()
+        experimentRefreshTask = Task { @MainActor [weak self] in
+            await self?.refreshExperiments(.authChange)
+        }
+
+        experimentMembershipGeneration = experimentMembershipGeneration == UInt64.max
+            ? 1
+            : experimentMembershipGeneration + 1
+        let generation = experimentMembershipGeneration
+        experimentMembershipTask?.cancel()
+        guard status.loggedIn,
+              localToolApprovalAccountScope != nil,
+              let mcpSurface else {
+            experimentService.setIsAnysphereUser(false)
+            return
+        }
+        let expectedScope = localToolApprovalAccountScope
+        experimentMembershipTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let isMember = try await mcpSurface.experimentIsAnysphereUser()
+                guard !Task.isCancelled,
+                      self.experimentMembershipGeneration == generation,
+                      self.localToolApprovalAccountScope == expectedScope
+                else { return }
+                experimentService.setIsAnysphereUser(isMember)
+            } catch {
+                guard !Task.isCancelled,
+                      self.experimentMembershipGeneration == generation,
+                      self.localToolApprovalAccountScope == expectedScope
+                else { return }
+                experimentService.setIsAnysphereUser(false)
+                reportExperimentsDiagnostic(.init(
+                    kind: "membership_refresh_failed",
+                    metadata: ["errorClass": errorLogTag(error)]
+                ))
+            }
+        }
+    }
+
+    private func handleExperimentSnapshot(_ snapshot: SandExperimentSnapshot) {
+        emitExperimentSnapshot(snapshot)
+        guard localToolApprovalAccountScope != nil else { return }
+        let overrides = snapshot.featureFlagOverrides
+        guard lastProjectedExperimentOverrides != overrides else { return }
+
+        experimentOverrideGeneration = experimentOverrideGeneration == UInt64.max
+            ? 1
+            : experimentOverrideGeneration + 1
+        let generation = experimentOverrideGeneration
+        let expectedHostGeneration = hostSupervisor.generation
+        let expectedScope = localToolApprovalAccountScope
+        experimentOverridePushTask?.cancel()
+        experimentOverridePushTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await self.hostSupervisor.pushHostFeatureFlagOverrides(overrides)
+                guard !Task.isCancelled,
+                      self.experimentOverrideGeneration == generation,
+                      self.hostSupervisor.generation == expectedHostGeneration,
+                      self.localToolApprovalAccountScope == expectedScope
+                else { return }
+                self.lastProjectedExperimentOverrides = overrides
+            } catch {
+                guard !Task.isCancelled,
+                      self.experimentOverrideGeneration == generation,
+                      self.localToolApprovalAccountScope == expectedScope
+                else { return }
+                reportExperimentsDiagnostic(.init(
+                    kind: "host_override_push_failed",
+                    metadata: ["errorClass": errorLogTag(error)]
+                ))
+            }
+        }
+    }
+
     func setRendererEventSink(_ sink: ((String, CoordinatorPayload) -> Void)?) {
         rendererEventSink = sink
     }
@@ -670,6 +805,7 @@ final class MahayanaCoordinator {
     }
 
     func updateAccountSettingsScope(_ accountScope: String?) {
+        let previousExperimentScope = localToolApprovalAccountScope
         localToolApprovalScopeRevision &+= 1
         localToolApprovalAccountScope = accountScope?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -678,6 +814,19 @@ final class MahayanaCoordinator {
         }
         localToolApprovalCleanupStatus = "idle"
         localToolApprovalCleanupFailure = nil
+        if previousExperimentScope != localToolApprovalAccountScope {
+            experimentMembershipGeneration = experimentMembershipGeneration == UInt64.max
+                ? 1
+                : experimentMembershipGeneration + 1
+            experimentOverrideGeneration = experimentOverrideGeneration == UInt64.max
+                ? 1
+                : experimentOverrideGeneration + 1
+            experimentMembershipTask?.cancel()
+            experimentOverridePushTask?.cancel()
+            lastProjectedExperimentOverrides = nil
+            experimentService?.setIsAnysphereUser(false)
+            experimentService?.resetFeatureFlagOverridesForAccountTransition()
+        }
         if let accountScope {
             settingsStore?.scopeToAccount(accountScope)
             hostSettingsReconciler?.scopeToAccount(accountScope)
@@ -687,6 +836,9 @@ final class MahayanaCoordinator {
         }
         autoReviewHostSyncNeeded = true
         mcpSurface?.updateAccountScope(accountScope)
+        if let experimentService, localToolApprovalAccountScope != nil {
+            handleExperimentSnapshot(experimentService.getSnapshot())
+        }
     }
 
     private func localToolApprovalCleanupStateObject() -> [String: Any] {
@@ -904,6 +1056,27 @@ final class MahayanaCoordinator {
             if clientPauseControl.isPaused && Self.isClientPauseBlockedMethod(method) {
                 throw IOSClientPausedError()
             }
+        }
+        if method == "sand:experiments-snapshot-sync" || method == "experiments.getSnapshot" {
+            guard let snapshot = experimentService?.getSnapshot() else {
+                return JSONResult(value: NSNull())
+            }
+            return JSONResult(value: sandExperimentSnapshotFoundation(snapshot))
+        }
+        if method == "experiments.applyFeatureFlagOverrideCommand" {
+            guard let experimentService else { throw CoordinatorError.unavailable }
+            let command = (params["command"] as? [String: Any]) ?? params
+            guard command["kind"] is String else { throw CoordinatorError.invalidParams }
+            experimentService.applyFeatureFlagOverrideCommand(command)
+            return JSONResult(value: sandExperimentSnapshotFoundation(experimentService.getSnapshot()))
+        }
+        if method == "experiments.refreshNow" {
+            guard experimentService != nil else { throw CoordinatorError.unavailable }
+            await refreshExperiments(.manual)
+            guard let snapshot = experimentService?.getSnapshot() else {
+                return JSONResult(value: NSNull())
+            }
+            return JSONResult(value: sandExperimentSnapshotFoundation(snapshot))
         }
         if method == "getCloudAgentInfo" {
             guard let rawBcId = params["bcId"] as? String,
@@ -1344,6 +1517,15 @@ final class MahayanaCoordinator {
         inFlight.removeAll()
         clientSideToolV2Relay.clear()
         rendererEventSink = nil
+        experimentSnapshotUnsubscribe?()
+        experimentSnapshotUnsubscribe = nil
+        experimentRefreshTask?.cancel()
+        experimentRefreshTask = nil
+        experimentMembershipTask?.cancel()
+        experimentMembershipTask = nil
+        experimentOverridePushTask?.cancel()
+        experimentOverridePushTask = nil
+        mcpSurface?.setExperimentAuthObserver(nil)
         experimentService?.dispose()
     }
 }

@@ -168,6 +168,37 @@ final class CursorProfileParityTests: XCTestCase {
         XCTAssertEqual(action["message"] as? String, "Done")
     }
 
+    func testAnysphereMembershipRequiresTeamOneBillingAndPositiveSeats() async throws {
+        let member = IOSCursorDashboardClient(
+            credentials: profileCredentials(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                XCTAssertEqual(request.url?.path, "/aiserver.v1.DashboardService/GetTeams")
+                return try jsonResponse(request, [
+                    "teams": [
+                        ["id": 8, "hasBilling": true, "seats": 100],
+                        ["id": 1, "hasBilling": true, "seats": 3],
+                    ],
+                ])
+            }
+        )
+        XCTAssertTrue(try await member.isAnysphereUser())
+
+        let notMember = IOSCursorDashboardClient(
+            credentials: profileCredentials(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                try jsonResponse(request, [
+                    "teams": [
+                        ["id": 1, "hasBilling": false, "seats": 3],
+                        ["id": 1, "hasBilling": true, "seats": 0],
+                    ],
+                ])
+            }
+        )
+        XCTAssertFalse(try await notMember.isAnysphereUser())
+    }
+
     func testCancelTrialReturnsStableResultInsteadOfThrowing() async {
         let client = IOSCursorDashboardClient(
             credentials: profileCredentials(),

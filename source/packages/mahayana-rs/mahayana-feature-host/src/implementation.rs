@@ -9973,6 +9973,68 @@ impl FeatureHostController {
         Ok(normalized)
     }
 
+    /// Read only the current authenticated account's experiment override
+    /// projection. TTL and eligibility remain native Main responsibilities.
+    pub fn host_settings_feature_flag_overrides_direct(
+        &self,
+    ) -> Result<BTreeMap<String, bool>, FeatureHostError> {
+        let account_id = self.host_settings_account_id()?;
+        let state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state
+            .settings
+            .feature_flag_overrides_by_account
+            .get(&account_id)
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    /// Replace the current authenticated account's bounded override projection.
+    pub fn set_feature_flag_overrides_direct(
+        &self,
+        overrides: BTreeMap<String, bool>,
+    ) -> Result<BTreeMap<String, bool>, FeatureHostError> {
+        if overrides.len() > 2_048 {
+            return Err(FeatureHostError::Contract(
+                "feature-flag override projection is too large".into(),
+            ));
+        }
+        if overrides.keys().any(|name| {
+            name.is_empty()
+                || name.len() > 128
+                || !name.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric()
+                        || matches!(byte, b'_' | b'-' | b'.' | b':')
+                })
+        }) {
+            return Err(FeatureHostError::Contract(
+                "feature-flag override projection contains an invalid name".into(),
+            ));
+        }
+        let account_id = self.host_settings_account_id()?;
+        let settings = {
+            let mut state = self.state()?;
+            ensure_open(&state)?;
+            if overrides.is_empty() {
+                state.settings.feature_flag_overrides_by_account.remove(&account_id);
+            } else {
+                state
+                    .settings
+                    .feature_flag_overrides_by_account
+                    .insert(account_id, overrides.clone());
+            }
+            state.settings.clone()
+        };
+        if let Some(path) = self.settings_path.as_deref() {
+            persist_product_host_settings(path, &settings)?;
+        }
+        self.state()?.events.push_back(HostEvent::SettingsChanged {
+            timestamp: timestamp(),
+            settings,
+        });
+        Ok(overrides)
+    }
+
     /// Main settings are canonical on iOS; the Host receives this bounded
     /// runtime projection before execution so approval matching has one owner.
     pub fn set_auto_review_rules_direct(
@@ -20053,6 +20115,38 @@ mod tests {
                 .set_has_seen_onboarding_direct(None)
                 .expect("clear onboarding"),
             None
+        );
+    }
+
+    #[test]
+    fn direct_feature_flag_override_projection_is_replace_all_and_clearable() {
+        let controller = controller();
+        drain(&controller);
+
+        let first = BTreeMap::from([
+            ("sand_client_pause".to_string(), true),
+            ("sand_agent_network".to_string(), false),
+        ]);
+        assert_eq!(
+            controller
+                .set_feature_flag_overrides_direct(first.clone())
+                .expect("set feature flag overrides"),
+            first
+        );
+        assert_eq!(
+            controller
+                .host_settings_feature_flag_overrides_direct()
+                .expect("read feature flag overrides"),
+            first
+        );
+        controller
+            .set_feature_flag_overrides_direct(BTreeMap::new())
+            .expect("clear feature flag overrides");
+        assert!(
+            controller
+                .host_settings_feature_flag_overrides_direct()
+                .expect("read cleared feature flag overrides")
+                .is_empty()
         );
     }
 

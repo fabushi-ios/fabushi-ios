@@ -1,6 +1,28 @@
 import XCTest
 @testable import Fabushi
 
+private actor ExperimentBootstrapScript {
+    private var callCount = 0
+    private let first: StatsigBootstrapResult
+    private let second: StatsigBootstrapResult
+
+    init(first: StatsigBootstrapResult, second: StatsigBootstrapResult) {
+        self.first = first
+        self.second = second
+    }
+
+    func next() async throws -> StatsigBootstrapResult {
+        callCount += 1
+        if callCount == 1 {
+            try await Task.sleep(for: .milliseconds(60))
+            return first
+        }
+        return second
+    }
+
+    func calls() -> Int { callCount }
+}
+
 final class SharedExperimentServiceParityTests: XCTestCase {
     private func makeRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -149,4 +171,66 @@ final class SharedExperimentServiceParityTests: XCTestCase {
         XCTAssertFalse(service.checkFeatureGate("sand_multitask"))
         XCTAssertTrue(service.getSnapshot().isInitialized)
     }
+    func testAuthChangeFencesStaleBootstrapAndLatestIdentityWins() async throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let oldConfig = #"{"user":{"userID":"old-user"},"featureGates":{"sand_client_pause":{"value":false}}}"#
+        let newConfig = #"{"user":{"userID":"new-user"},"featureGates":{"sand_client_pause":{"value":true}}}"#
+        let script = ExperimentBootstrapScript(
+            first: .init(config: oldConfig),
+            second: .init(config: newConfig)
+        )
+        let service = SandExperimentService(
+            getCacheDir: { root.path },
+            bootstrapFetcher: { _ in try await script.next() }
+        )
+
+        let first = Task {
+            await service.refresh(
+                backendUrl: "https://backend.example.test",
+                getAccessToken: { _ in "old-token" },
+                getMachineId: { "machine" },
+                trigger: .startup
+            )
+        }
+        try await Task.sleep(for: .milliseconds(10))
+        service.handleAuthChange()
+        await service.refresh(
+            backendUrl: "https://backend.example.test",
+            getAccessToken: { _ in "new-token" },
+            getMachineId: { "machine" },
+            trigger: .authChange
+        )
+        await first.value
+
+        XCTAssertEqual(await script.calls(), 2)
+        XCTAssertTrue(service.checkFeatureGate("sand_client_pause"))
+        XCTAssertTrue(service.hasAuthenticatedStatsigBootstrap())
+    }
+
+    func testOverrideCommandSurfaceMatchesDesktopReplaceAndBundledContracts() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let service = SandExperimentService(getCacheDir: { root.path }, isDevBuild: true)
+
+        service.applyFeatureFlagOverrideCommand([
+            "kind": "set",
+            "name": "sand_client_pause",
+            "value": true,
+        ])
+        XCTAssertEqual(service.getFeatureFlagOverridesRecord()["sand_client_pause"], true)
+
+        service.applyFeatureFlagOverrideCommand(["kind": "clear-all"])
+        XCTAssertTrue(service.getFeatureFlagOverridesRecord().isEmpty)
+
+        service.applyFeatureFlagOverrideCommand(["kind": "set-all-bundled"])
+        XCTAssertEqual(service.getFeatureFlagOverridesRecord().count, BUNDLED_FEATURE_FLAGS.count)
+        service.replaceFeatureFlagOverrides([
+            "sand_client_pause": false,
+            "definitely_not_a_real_flag": true,
+        ])
+        XCTAssertEqual(service.getFeatureFlagOverridesRecord(), ["sand_client_pause": false])
+    }
+
 }

@@ -791,9 +791,14 @@ impl AppHost {
                     .feature
                     .host_settings_user_timezone_direct()
                     .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                let feature_flag_overrides = self
+                    .feature
+                    .host_settings_feature_flag_overrides_direct()
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
                 Ok(json!({
                     "hasSeenOnboarding": has_seen_onboarding,
                     "userTimeZone": user_time_zone,
+                    "featureFlagOverrides": feature_flag_overrides,
                 }))
             }
             "setHostSettings" => {
@@ -811,11 +816,9 @@ impl AppHost {
                     let value = match raw {
                         Value::Bool(value) => Some(*value),
                         Value::Null => None,
-                        _ => {
-                            return Err(AppHostError::InvalidRequest(
-                                "hasSeenOnboarding must be boolean or null".into(),
-                            ));
-                        }
+                        _ => return Err(AppHostError::InvalidRequest(
+                            "hasSeenOnboarding must be boolean or null".into(),
+                        )),
                     };
                     self.feature
                         .set_has_seen_onboarding_direct(value)
@@ -826,14 +829,24 @@ impl AppHost {
                     let value = match raw {
                         Value::String(value) => Some(value.clone()),
                         Value::Null => None,
-                        _ => {
-                            return Err(AppHostError::InvalidRequest(
-                                "userTimeZone must be an IANA string or null".into(),
-                            ));
-                        }
+                        _ => return Err(AppHostError::InvalidRequest(
+                            "userTimeZone must be an IANA string or null".into(),
+                        )),
                     };
                     self.feature
                         .set_user_timezone_direct(value)
+                        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                }
+                if let Some(raw) = object.get("featureFlagOverrides") {
+                    touched = true;
+                    let overrides = serde_json::from_value::<
+                        std::collections::BTreeMap<String, bool>
+                    >(raw.clone())
+                    .map_err(|error| AppHostError::InvalidRequest(format!(
+                        "featureFlagOverrides must be a boolean map: {error}"
+                    )))?;
+                    self.feature
+                        .set_feature_flag_overrides_direct(overrides)
                         .map_err(|error| AppHostError::Operation(error.to_string()))?;
                 }
                 if !touched {
@@ -849,9 +862,14 @@ impl AppHost {
                     .feature
                     .host_settings_user_timezone_direct()
                     .map_err(|error| AppHostError::Operation(error.to_string()))?;
+                let feature_flag_overrides = self
+                    .feature
+                    .host_settings_feature_flag_overrides_direct()
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
                 Ok(json!({
                     "hasSeenOnboarding": has_seen_onboarding,
                     "userTimeZone": user_time_zone,
+                    "featureFlagOverrides": feature_flag_overrides,
                 }))
             }
             "feature.settings.localToolPermission" => {
