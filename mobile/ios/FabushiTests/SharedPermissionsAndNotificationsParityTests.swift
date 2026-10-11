@@ -287,6 +287,146 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testNotificationControllerSeedsThenSchedulesDoneAndFencesStaleGeneration() async {
+        actor Scheduler: IOSAgentNotificationScheduling {
+            var authorization: IOSAgentNotificationAuthorization = .authorized
+            var scheduled: [(String, String, Bool, [String: String])] = []
+            var clears = 0
+
+            func authorizationState() async -> IOSAgentNotificationAuthorization { authorization }
+            func requestAuthorization() async -> Bool {
+                authorization = .authorized
+                return true
+            }
+            func schedule(
+                identifier: String,
+                title: String,
+                body: String,
+                silent: Bool,
+                userInfo: [String: String]
+            ) async throws {
+                scheduled.append((identifier, body, silent, userInfo))
+            }
+            func clearAgentNotifications() async { clears += 1 }
+            func snapshot() -> ([(String, String, Bool, [String: String])], Int) {
+                (scheduled, clears)
+            }
+        }
+
+        let scheduler = Scheduler()
+        let controller = IOSAgentNotificationController(scheduler: scheduler)
+        let baseline = NotificationSnapshot(
+            id: "agent-1", name: "Builder", isRunning: true,
+            awaitingReason: nil, notifyEnabled: true, isHiddenFromSidebar: false,
+            lastMessageId: "m1", lastMessagePreview: "Working"
+        )
+        await controller.update(
+            agents: [baseline],
+            accountScope: "account-a",
+            isAppActive: false,
+            generation: 1,
+            nowMs: 1_000
+        )
+        XCTAssertTrue((await scheduler.snapshot()).0.isEmpty)
+
+        let done = NotificationSnapshot(
+            id: "agent-1", name: "Builder", isRunning: false,
+            awaitingReason: nil, notifyEnabled: true, isHiddenFromSidebar: false,
+            lastMessageId: "m2", lastMessagePreview: "Finished"
+        )
+        await controller.update(
+            agents: [done],
+            accountScope: "account-a",
+            isAppActive: false,
+            generation: 2,
+            nowMs: 10_000
+        )
+        let scheduled = (await scheduler.snapshot()).0
+        XCTAssertEqual(scheduled.count, 1)
+        XCTAssertEqual(scheduled[0].1, "Finished")
+        XCTAssertTrue(scheduled[0].2)
+        XCTAssertEqual(
+            scheduled[0].3[IOSAgentNotificationController.agentIdUserInfoKey],
+            "agent-1"
+        )
+        XCTAssertEqual(
+            scheduled[0].3[IOSAgentNotificationController.accountScopeUserInfoKey],
+            "account-a"
+        )
+
+        await controller.update(
+            agents: [baseline],
+            accountScope: "account-a",
+            isAppActive: false,
+            generation: 1,
+            nowMs: 20_000
+        )
+        XCTAssertEqual((await scheduler.snapshot()).0.count, 1)
+
+        await controller.reset(generation: 3)
+        XCTAssertEqual((await scheduler.snapshot()).1, 1)
+    }
+
+    func testNotificationControllerSuppressesForegroundAndHiddenTransitions() async {
+        actor Scheduler: IOSAgentNotificationScheduling {
+            var scheduled = 0
+            func authorizationState() async -> IOSAgentNotificationAuthorization { .authorized }
+            func requestAuthorization() async -> Bool { true }
+            func schedule(
+                identifier: String,
+                title: String,
+                body: String,
+                silent: Bool,
+                userInfo: [String: String]
+            ) async throws { scheduled += 1 }
+            func clearAgentNotifications() async {}
+            func count() -> Int { scheduled }
+        }
+
+        let scheduler = Scheduler()
+        let controller = IOSAgentNotificationController(scheduler: scheduler)
+        let running = NotificationSnapshot(
+            id: "agent-1", name: "Builder", isRunning: true,
+            awaitingReason: nil, notifyEnabled: true, isHiddenFromSidebar: false,
+            lastMessageId: "m1", lastMessagePreview: nil
+        )
+        await controller.update(
+            agents: [running], accountScope: "account-a",
+            isAppActive: false, generation: 1, nowMs: 1_000
+        )
+        let foregroundDone = NotificationSnapshot(
+            id: "agent-1", name: "Builder", isRunning: false,
+            awaitingReason: nil, notifyEnabled: true, isHiddenFromSidebar: false,
+            lastMessageId: "m2", lastMessagePreview: "Done"
+        )
+        await controller.update(
+            agents: [foregroundDone], accountScope: "account-a",
+            isAppActive: true, generation: 2, nowMs: 10_000
+        )
+        XCTAssertEqual(await scheduler.count(), 0)
+
+        await controller.reset(generation: 3)
+        let hiddenRunning = NotificationSnapshot(
+            id: "agent-1", name: "Builder", isRunning: true,
+            awaitingReason: nil, notifyEnabled: true, isHiddenFromSidebar: true,
+            lastMessageId: "m3", lastMessagePreview: nil
+        )
+        await controller.update(
+            agents: [hiddenRunning], accountScope: "account-a",
+            isAppActive: false, generation: 4, nowMs: 20_000
+        )
+        let hiddenWaiting = NotificationSnapshot(
+            id: "agent-1", name: "Builder", isRunning: true,
+            awaitingReason: "Need approval", notifyEnabled: true, isHiddenFromSidebar: true,
+            lastMessageId: "m4", lastMessagePreview: nil
+        )
+        await controller.update(
+            agents: [hiddenWaiting], accountScope: "account-a",
+            isAppActive: false, generation: 5, nowMs: 30_000
+        )
+        XCTAssertEqual(await scheduler.count(), 0)
+    }
+
     func testIosWebauthnAvailabilityUsesNativeSignerPlatforms() {
         XCTAssertTrue(sandWebauthnSignerShips("ios"))
         XCTAssertTrue(sandWebauthnSignerShips("iPadOS"))
