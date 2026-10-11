@@ -5104,7 +5104,7 @@ final class MarketplaceModel {
         do {
             let metadata = try await bridge.request(
                 method: "feature.marketplace.release",
-                params: ["pluginId": plugin.pluginId, "version": version]
+                params: ["pluginId": plugin.pluginId, "version": version, "platform": "ios"]
             )
             guard let release = (metadata.value as? [String: Any])?["releaseManifest"] as? [String: Any] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
@@ -5296,7 +5296,7 @@ final class MarketplaceModel {
         }
         let metadata = try await bridge.request(
             method: "feature.marketplace.release",
-            params: ["pluginId": plugin.pluginId, "version": version]
+            params: ["pluginId": plugin.pluginId, "version": version, "platform": "ios"]
         )
         guard let metadataObject = metadata.value as? [String: Any],
               let release = metadataObject["releaseManifest"] as? [String: Any]
