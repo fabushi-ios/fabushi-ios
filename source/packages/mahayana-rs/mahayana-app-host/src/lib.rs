@@ -4297,6 +4297,7 @@ mod fabushi_shipping_inference_tests {
             trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
             enabled: true,
             created_at_ms: 10,
+            runs: Vec::new(),
             last_run_at_ms: Some(20),
             next_run_at_ms: Some(30),
         })
@@ -4327,6 +4328,7 @@ mod fabushi_shipping_inference_tests {
             }),
             enabled: true,
             created_at_ms: 10,
+            runs: Vec::new(),
             last_run_at_ms: None,
             next_run_at_ms: None,
         })
@@ -4356,6 +4358,7 @@ mod fabushi_shipping_inference_tests {
             }),
             enabled: true,
             created_at_ms: 10,
+            runs: Vec::new(),
             last_run_at_ms: None,
             next_run_at_ms: None,
         })
@@ -4387,6 +4390,7 @@ mod fabushi_shipping_inference_tests {
             }),
             enabled: true,
             created_at_ms: 10,
+            runs: Vec::new(),
             last_run_at_ms: None,
             next_run_at_ms: None,
         })
@@ -4407,6 +4411,7 @@ mod fabushi_shipping_inference_tests {
             }),
             enabled: true,
             created_at_ms: 10,
+            runs: Vec::new(),
             last_run_at_ms: None,
             next_run_at_ms: None,
         })
@@ -4443,6 +4448,7 @@ mod fabushi_shipping_inference_tests {
             }),
             enabled: true,
             created_at_ms: 10,
+            runs: Vec::new(),
             last_run_at_ms: None,
             next_run_at_ms: None,
         })

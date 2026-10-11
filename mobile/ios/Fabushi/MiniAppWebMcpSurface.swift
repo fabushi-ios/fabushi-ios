@@ -1356,39 +1356,35 @@ private struct MiniAppWebView: UIViewRepresentable {
                   JSONSerialization.isValidJSONObject(arguments)
             else { throw CancellationError() }
 
-            let result: Any = try await withCheckedThrowingContinuation { continuation in
-                webView.callAsyncJavaScript(
-                    """
-                    const bridge = window.__fabushiWebMcp;
-                    if (!bridge || typeof bridge.invokeLocalFromHost !== 'function') {
-                      throw new Error('Active page has no Host-callable WebMCP implementation');
-                    }
-                    return await bridge.invokeLocalFromHost(
-                      name,
-                      input,
-                      pluginInstanceId,
-                      nonce,
-                      generation
-                    );
-                    """,
-                    arguments: [
-                        "name": name,
-                        "input": arguments,
-                        "pluginInstanceId": session.pluginInstanceId,
-                        "nonce": session.nonce,
-                        "generation": NSNumber(value: session.generation),
-                    ],
-                    in: nil,
-                    in: .page
-                ) { result in
-                    continuation.resume(with: result)
+            let result = try await webView.callAsyncJavaScript(
+                """
+                const bridge = window.__fabushiWebMcp;
+                if (!bridge || typeof bridge.invokeLocalFromHost !== 'function') {
+                  throw new Error('Active page has no Host-callable WebMCP implementation');
                 }
-            }
+                return await bridge.invokeLocalFromHost(
+                  name,
+                  input,
+                  pluginInstanceId,
+                  nonce,
+                  generation
+                );
+                """,
+                arguments: [
+                    "name": name,
+                    "input": arguments,
+                    "pluginInstanceId": session.pluginInstanceId,
+                    "nonce": session.nonce,
+                    "generation": NSNumber(value: session.generation),
+                ],
+                in: nil,
+                contentWorld: .page
+            )
 
             guard activeBridgeSession == session,
                   activeLocalSource == source
             else { throw CancellationError() }
-            return result
+            return result as Any
         }
 
         private func requestApproval(_ tool: MiniAppToolContract) async -> Bool {
