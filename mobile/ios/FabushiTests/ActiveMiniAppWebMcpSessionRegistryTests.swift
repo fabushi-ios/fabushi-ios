@@ -54,6 +54,21 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual(result["revision"] as? Int, 3)
         XCTAssertEqual(result["marker"] as? String, "live-page")
 
+        let traces = registry.traces(accountKey: "account-a", pluginId: "global-dharma")
+        XCTAssertEqual(traces.count, 1)
+        let trace = try XCTUnwrap(traces.first)
+        XCTAssertFalse(trace.callId.isEmpty)
+        XCTAssertEqual(trace.sequence, 1)
+        XCTAssertEqual(trace.version, "1.0.0")
+        XCTAssertEqual(trace.artifactSha256, String(repeating: "a", count: 64))
+        XCTAssertEqual(trace.pluginInstanceId, "global-dharma:instance-1")
+        XCTAssertEqual(trace.nonceIdentifier, "fnv64-0fe8256aeb557e14")
+        XCTAssertEqual(trace.generation, 7)
+        XCTAssertEqual(trace.toolName, "status")
+        XCTAssertEqual(trace.permissionDecision, "not-required")
+        XCTAssertEqual(trace.stateRevision, 3)
+        XCTAssertEqual(trace.outcome, "success")
+
         XCTAssertNil(try await registry.callIfActive(
             accountKey: "account-b",
             pluginId: "global-dharma",
@@ -116,6 +131,49 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             arguments: [:]
         )
         XCTAssertEqual(value?.value as? String, "new")
+    }
+
+    func testDeniedMutationProducesOrderedFailClosedTrace() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.practice.record",
+            description: "mutate local state",
+            approval: "confirm"
+        )
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.1.0",
+            artifactSha256: String(repeating: "c", count: 64),
+            pluginInstanceId: "global-dharma:instance-denied",
+            nonce: "nonce-denied",
+            generation: 11,
+            tools: [tool]
+        ) { _, _ in
+            throw MiniAppWebMcpApprovalDenied()
+        }
+
+        do {
+            _ = try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.practice.record",
+                arguments: ["label": "should-not-run"]
+            )
+            XCTFail("Denied mutation must not return a result")
+        } catch is MiniAppWebMcpApprovalDenied {
+            // Expected.
+        }
+
+        let traces = registry.traces(accountKey: "account-a", pluginId: "global-dharma")
+        XCTAssertEqual(traces.count, 1)
+        let trace = try XCTUnwrap(traces.first)
+        XCTAssertEqual(trace.sequence, 1)
+        XCTAssertEqual(trace.toolName, "offline.practice.record")
+        XCTAssertEqual(trace.permissionDecision, "denied")
+        XCTAssertNil(trace.stateRevision)
+        XCTAssertEqual(trace.outcome, "denied")
     }
 
     func testBridgeSessionGenerationParticipatesInAuthorization() {
