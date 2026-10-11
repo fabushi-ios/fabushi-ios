@@ -1625,6 +1625,24 @@ struct MiniAppToolContract: Equatable, Sendable {
     }
 }
 
+struct LocalMiniAppDraftTransaction: Equatable, Sendable {
+    let accountScope: String
+    let transactionId: String
+    let reservedAppId: String
+    let publisherId: String
+}
+
+struct LocalMiniAppInstallApproval: Equatable, Sendable {
+    let accountScope: String
+    let transactionId: String
+    let reservedAppId: String
+    let publisherId: String
+    let draftDigest: String
+    let userApprovalId: String
+    let keyId: String
+    let publicKeyBase64URL: String
+}
+
 struct LocalMiniAppSource: Equatable, Sendable {
     let pluginId: String
     let version: String
@@ -1923,6 +1941,7 @@ final class MarketplaceModel {
     @ObservationIgnored private var privateSkillRequestSerial = 0
     @ObservationIgnored private var privateSkillScopeGeneration = 0
     @ObservationIgnored private let toolResultStore = MobileToolResultStore()
+    @ObservationIgnored private let localMiniAppSigningAuthority = LocalMiniAppSigningAuthority()
     @ObservationIgnored private var toolResultRendererObserver: UUID?
 
     init(bridge: IOSPreloadBridge) {
@@ -5188,6 +5207,124 @@ final class MarketplaceModel {
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
+    }
+
+    func beginGeneratedMiniAppDraft() async throws -> LocalMiniAppDraftTransaction {
+        guard loggedIn else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Sign in before creating a local Mini App."
+            )
+        }
+        let response = try await bridge.request(
+            method: "feature.plugin.localDraft.begin"
+        )
+        guard let object = response.value as? [String: Any],
+              object["protocol"] as? String == "fabushi.local-miniapp-draft.v1",
+              let accountScope = object["accountScope"] as? String,
+              accountScope.count == 64,
+              let transactionId = object["transactionId"] as? String,
+              let reservedAppId = object["reservedAppId"] as? String,
+              let publisherId = object["publisherId"] as? String
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return LocalMiniAppDraftTransaction(
+            accountScope: accountScope,
+            transactionId: transactionId,
+            reservedAppId: reservedAppId,
+            publisherId: publisherId
+        )
+    }
+
+    func approveGeneratedMiniAppDraft(
+        _ transaction: LocalMiniAppDraftTransaction,
+        draftDigest: String
+    ) async throws -> LocalMiniAppInstallApproval {
+        guard loggedIn,
+              draftDigest.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let descriptor = try await localMiniAppSigningAuthority.descriptor(
+            accountScope: transaction.accountScope
+        )
+        let response = try await bridge.request(
+            method: "feature.plugin.localDraft.approve",
+            params: [
+                "transactionId": transaction.transactionId,
+                "draftDigest": draftDigest,
+                "keyId": descriptor.keyId,
+                "publicKeyBase64": descriptor.publicKeyBase64URL,
+            ]
+        )
+        guard let object = response.value as? [String: Any],
+              object["protocol"] as? String == "fabushi.local-miniapp-approval.v1",
+              object["accountScope"] as? String == transaction.accountScope,
+              object["transactionId"] as? String == transaction.transactionId,
+              object["reservedAppId"] as? String == transaction.reservedAppId,
+              object["publisherId"] as? String == transaction.publisherId,
+              object["draftDigest"] as? String == draftDigest,
+              object["keyId"] as? String == descriptor.keyId,
+              let userApprovalId = object["userApprovalId"] as? String
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return LocalMiniAppInstallApproval(
+            accountScope: transaction.accountScope,
+            transactionId: transaction.transactionId,
+            reservedAppId: transaction.reservedAppId,
+            publisherId: transaction.publisherId,
+            draftDigest: draftDigest,
+            userApprovalId: userApprovalId,
+            keyId: descriptor.keyId,
+            publicKeyBase64URL: descriptor.publicKeyBase64URL
+        )
+    }
+
+    func signGeneratedMiniAppManifestPayload(
+        _ payload: Data,
+        approval: LocalMiniAppInstallApproval
+    ) async throws -> String {
+        guard loggedIn, !payload.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let signature = try await localMiniAppSigningAuthority.sign(
+            payload,
+            accountScope: approval.accountScope
+        )
+        return signature.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    @discardableResult
+    func installGeneratedMiniAppPackage(
+        _ package: Data,
+        approval: LocalMiniAppInstallApproval
+    ) async throws -> LocalMiniAppSource {
+        guard loggedIn, !package.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let response = try await bridge.request(
+            method: "feature.plugin.installLocalFabapp",
+            params: [
+                "packageBase64": package.base64EncodedString(),
+                "userApprovalId": approval.userApprovalId,
+                "keyId": approval.keyId,
+                "publicKeyBase64": approval.publicKeyBase64URL,
+            ]
+        )
+        guard let object = response.value as? [String: Any],
+              object["protocol"] as? String == "fabushi.local-miniapp-install.v1",
+              object["accountScope"] as? String == approval.accountScope,
+              object["userApprovalId"] as? String == approval.userApprovalId,
+              let pointer = object["pointer"] as? [String: Any],
+              pointer["pluginId"] as? String == approval.reservedAppId
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return try await localMiniAppSource(pluginId: approval.reservedAppId)
     }
 
     private func localMiniAppSource(pluginId: String) async throws -> LocalMiniAppSource {
