@@ -3621,6 +3621,7 @@ mod tests {
             version: "1.0.0".into(),
             permissions: Vec::new(),
             artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
             install: None,
         };
         let root = tempfile::tempdir().unwrap();
@@ -3753,6 +3754,7 @@ mod tests {
             version: "1.0.0".into(),
             permissions: vec!["network".into()],
             artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
             install: None,
         };
         let temp = tempfile::tempdir().unwrap();
@@ -3792,6 +3794,7 @@ mod tests {
             version: "1.0.0".into(),
             permissions: Vec::new(),
             artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
             install: None,
         };
         let release_v2 = ExternalReleaseManifest {
@@ -3949,6 +3952,7 @@ mod tests {
             version: "1.0.0".into(),
             permissions: vec!["network".into()],
             artifacts: vec![artifact.clone()],
+            fabapp_trust: None,
             install: None,
         };
         let temp = tempfile::tempdir().unwrap();
@@ -4080,6 +4084,7 @@ mod tests {
                 version: version.into(),
                 permissions: vec!["storage.local".into()],
                 artifacts: vec![artifact.clone()],
+                fabapp_trust: None,
                 install: None,
             }
         }
