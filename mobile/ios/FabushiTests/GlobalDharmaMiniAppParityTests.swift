@@ -348,6 +348,28 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertFalse(MarketplaceModel.requiresActiveLocalWebMcpSession(pluginId: "other-miniapp"))
     }
 
+    func testGlobalDharmaOnlyGatesExactProtectedLocalCapability() {
+        XCTAssertEqual(
+            MarketplaceModel.protectedMiniAppCapability(
+                pluginId: "global-dharma",
+                toolName: "local.prayer-wheel.start"
+            ),
+            "local.prayer-wheel.start"
+        )
+        XCTAssertNil(
+            MarketplaceModel.protectedMiniAppCapability(
+                pluginId: "global-dharma",
+                toolName: "offline.state.read"
+            )
+        )
+        XCTAssertNil(
+            MarketplaceModel.protectedMiniAppCapability(
+                pluginId: "other-miniapp",
+                toolName: "local.prayer-wheel.start"
+            )
+        )
+    }
+
     func testGlobalDharmaStatusFallbackIsReadOnlyAndNarrow() {
         let tool = MarketplaceModel.globalDharmaStatusFallbackTool
         XCTAssertEqual(tool.name, "status")
