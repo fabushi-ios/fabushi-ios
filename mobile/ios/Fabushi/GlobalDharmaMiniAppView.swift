@@ -244,8 +244,8 @@ private struct GlobalDharmaWebView: UIViewRepresentable {
         <body><main>
           <div class="hero"><div class="eyebrow">FABUSHI MINI APP · IOS</div><h1>全球法布施</h1><div class="muted">Bot 与此 Web UI 通过同一官方 WebMCP、同一 Fabushi 账号作用域和同一服务端运行状态工作。</div><div id="account" class="account"></div></div>
           <section><div class="title">WEBMCP TOOLS</div><div id="tools" class="tools"></div></section>
-          <section><div class="title">BOT / WEB UI 共享状态</div><div class="panel"><div id="runtimeStatus">正在恢复共享状态…</div><pre id="output"></pre></div></section>
-          <section><div class="title">本地转经轮 · CNY 1080 买断</div><div class="panel"><div id="entitlement" class="muted">正在读取 canonical entitlement…</div><div class="commerce-row"><button id="buy" class="action primary">¥1080 买断</button><button id="restore" class="action secondary">恢复购买</button></div></div></section>
+          <section><div class="title">BOT / WEB UI 共享状态</div><div class="panel"><div id="runtimeStatus">离线免费功能已就绪；联网服务仅在明确调用时使用</div><pre id="output"></pre></div></section>
+          <section><div class="title">本地转经轮 · CNY 1080 买断</div><div class="panel"><div id="entitlement" class="muted">受保护能力仅在执行、购买或恢复时联网核验；免费功能不预查权益</div><div class="commerce-row"><button id="buy" class="action primary">¥1080 买断</button><button id="restore" class="action secondary">恢复购买</button></div></div></section>
           <script>
           (()=>{
             const testMode=\(testMode);let account=\(accountJSON);let seq=0;const pending=new Map();
@@ -265,7 +265,7 @@ private struct GlobalDharmaWebView: UIViewRepresentable {
             async function refreshEntitlement(){try{const state=await post('entitlement');document.getElementById('entitlement').textContent=(state.allowed?'本地转经轮：已解锁':'本地转经轮：未解锁')+' · '+state.reason+(state.activeRails?.length?' · '+state.activeRails.join(', '):'');const buy=document.getElementById('buy');buy.textContent=testMode?'¥1080 买断（测试）':'¥1080 买断';buy.disabled=state.allowed||!testMode;if(!testMode&&!state.allowed)document.getElementById('entitlement').textContent+=' · 生产 provider 未在此界面绕过，保持 fail-closed';}catch(error){document.getElementById('entitlement').textContent='权益读取失败 · '+String(error?.message||error);}}
             document.getElementById('buy').onclick=async()=>{const button=document.getElementById('buy');button.disabled=true;try{const result=await post('purchaseLifetime');document.getElementById('entitlement').textContent=result.message;await refreshEntitlement();}catch(error){document.getElementById('entitlement').textContent='购买失败 · '+String(error?.message||error);}finally{if(testMode)button.disabled=false;}};
             document.getElementById('restore').onclick=async()=>{const button=document.getElementById('restore');button.disabled=true;try{const result=await post('restorePurchases');document.getElementById('entitlement').textContent=result.message;await refreshEntitlement();}catch(error){document.getElementById('entitlement').textContent='恢复失败 · '+String(error?.message||error);}finally{button.disabled=false;}};
-            renderAccount();window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:'global-dharma',tools:definitions.map(x=>x.name)}}));restoreSharedRuntime();refreshEntitlement();
+            renderAccount();window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:'global-dharma',tools:definitions.map(x=>x.name)}}));
           })();
           </script>
         </main></body></html>
