@@ -59,6 +59,24 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         )
     }
 
+    func testGeneratedMiniAppPreviewDigestChangesForEveryByteMutation() {
+        let first = generatedMiniAppPreviewDigest("<html><body>draft one</body></html>")
+        let same = generatedMiniAppPreviewDigest("<html><body>draft one</body></html>")
+        let changed = generatedMiniAppPreviewDigest("<html><body>draft two</body></html>")
+        XCTAssertEqual(first, same)
+        XCTAssertNotEqual(first, changed)
+        XCTAssertEqual(first.count, 64)
+        XCTAssertTrue(first.allSatisfy { $0.isHexDigit })
+    }
+
+    func testGeneratedPreviewOriginNeverReceivesInstalledWebMcpBridgeTrust() {
+        XCTAssertFalse(
+            isTrustedWebMcpBridgeURL(
+                URL(string: "https://preview.miniapp.local.fabushi.invalid/drafts/deadbeef/")
+            )
+        )
+    }
+
     func testWebMcpBridgeTrustIsBoundedToCanonicalLocalAndHostedOrigins() {
         XCTAssertTrue(isTrustedWebMcpBridgeHost("miniapp.local.fabushi.invalid"))
         XCTAssertTrue(isTrustedWebMcpBridgeHost("fabushi.ombhrum.com"))
