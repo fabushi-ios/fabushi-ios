@@ -1205,6 +1205,7 @@ impl AppHost {
             }
             "feature.marketplace.browse" => self.marketplace_browse(params),
             "feature.marketplace.release" => self.marketplace_release(params),
+            "feature.marketplace.added" => self.marketplace_added(),
             "feature.marketplace.add" => self.marketplace_add(params),
             "feature.marketplace.remove" => self.marketplace_remove(params),
             "feature.plugin.install" => self.install_plugin(params),
@@ -1525,6 +1526,31 @@ impl AppHost {
         }
         self.product
             .marketplace_release_metadata(plugin_id, version)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn marketplace_added(&self) -> Result<Value, AppHostError> {
+        if self.feature_mode == AppHostFeatureMode::Test {
+            let plugins = self
+                .list_installed_plugins()?
+                .get("plugins")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|pointer| {
+                    let plugin_id = pointer
+                        .get("pluginId")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_string();
+                    json!({"pluginId": plugin_id, "id": plugin_id})
+                })
+                .collect::<Vec<_>>();
+            return Ok(json!({"apps": plugins}));
+        }
+        self.product
+            .marketplace_added()
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 

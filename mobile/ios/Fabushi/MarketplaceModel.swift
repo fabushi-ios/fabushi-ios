@@ -5031,13 +5031,23 @@ final class MarketplaceModel {
             let rows = object?["plugins"] as? [[String: Any]] ?? []
             plugins = rows.compactMap(Self.marketplacePlugin(from:))
             if loggedIn {
-                let installed = try await bridge.request(method: "feature.plugin.listInstalled")
-                let installedRows = (installed.value as? [String: Any])?["plugins"] as? [[String: Any]] ?? []
-                installedPluginIds = Set(installedRows.compactMap { row in
+                let localInstalled = try await bridge.request(method: "feature.plugin.listInstalled")
+                let localRows = (localInstalled.value as? [String: Any])?["plugins"] as? [[String: Any]] ?? []
+                var canonicalIds = Set(localRows.compactMap { row in
                     (row["pluginId"] as? String)?
                         .trimmingCharacters(in: .whitespacesAndNewlines)
                         .nonEmpty
                 })
+                let accountInstalled = try await bridge.request(method: "feature.marketplace.added")
+                let accountRows = (accountInstalled.value as? [String: Any])?["apps"] as? [[String: Any]] ?? []
+                for row in accountRows {
+                    let id = ((row["pluginId"] as? String) ?? (row["id"] as? String))?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if let id, !id.isEmpty {
+                        canonicalIds.insert(id)
+                    }
+                }
+                installedPluginIds = canonicalIds
             } else {
                 installedPluginIds = []
             }
