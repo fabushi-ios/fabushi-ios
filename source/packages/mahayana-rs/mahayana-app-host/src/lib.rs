@@ -9,7 +9,9 @@ use mahayana_host_protocol::{
 use mahayana_js_runtime::{DeepSeekJsHost, scan_package_compatibility};
 use mahayana_native_engine::ProcessExecution;
 use mahayana_plugin_runtime::{
-    ExternalReleaseManifest, FabappTrustContext, InstalledPluginPointer,
+    build_fabapp_package, compute_fabapp_draft_digest, fabapp_signing_payload,
+    prepare_local_generated_fabapp_manifest, ExternalReleaseManifest, FabappLocalAuthorBinding,
+    FabappManifest, FabappSignature, FabappTrustContext, InstalledPluginPointer,
     LocalGeneratedFabappTrust, PermissionManager, PluginInstaller, PluginState,
 };
 use mahayana_product::MahayanaProductClient;
@@ -147,7 +149,29 @@ struct LocalFabappDraftTransaction {
     publisher_id: String,
     state: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    draft_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     approval_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalFabappPreparedResource {
+    mime: String,
+    data_base64: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalFabappPreparedDraft {
+    schema_version: u32,
+    account_scope: String,
+    account_generation: String,
+    transaction_id: String,
+    draft_digest: String,
+    manifest: FabappManifest,
+    resources: BTreeMap<String, LocalFabappPreparedResource>,
+    total_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1169,7 +1193,11 @@ impl AppHost {
             // Trusted native-shell only. WebMCP and Agent tool surfaces never receive
             // these methods, signing keys, or install authority.
             "feature.plugin.localDraft.begin" => self.begin_local_fabapp_draft(),
+            "feature.plugin.localDraft.prepare" => self.prepare_local_fabapp_draft(params),
             "feature.plugin.localDraft.approve" => self.approve_local_fabapp_draft(params),
+            "feature.plugin.localDraft.signingPayload" => {
+                self.local_fabapp_signing_payload(params)
+            }
             "feature.plugin.installLocalFabapp" => self.install_local_fabapp(params),
             "feature.plugin.uninstall" => self.uninstall_plugin(params),
             "feature.plugin.rollback" => self.rollback_plugin(params),
@@ -1683,8 +1711,9 @@ impl AppHost {
             .or_else(|error| {
                 if matches!(platform, "ios" | "android") {
                     installer.install_with_commit_guard(&release, "mobile", preferred, || {
-                        self.current_plugin_account_scope()
-                            .is_ok_and(|scope| scope == account.scope)
+                        self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                            scope == account.scope && generation == account.generation
+                        })
                     })
                 } else {
                     Err(error)
@@ -1710,6 +1739,7 @@ impl AppHost {
             reserved_app_id: reserved_app_id.clone(),
             publisher_id: publisher_id.clone(),
             state: "draft".into(),
+            draft_digest: None,
             approval_id: None,
         };
         let path = account
@@ -1724,6 +1754,155 @@ impl AppHost {
             "transactionId": transaction_id,
             "reservedAppId": reserved_app_id,
             "publisherId": publisher_id,
+        }))
+    }
+
+    fn prepare_local_fabapp_draft(&self, params: Value) -> Result<Value, AppHostError> {
+        const LOCAL_DRAFT_MAX_BYTES: u64 = 32 * 1024 * 1024;
+
+        let transaction_id =
+            strict_hex_identifier(string_param(&params, "transactionId")?, 32, "transactionId")?;
+        let version = string_param(&params, "version")?;
+        let display_name = string_param(&params, "displayName")?;
+        let entrypoint = string_param(&params, "entrypoint")?;
+        let capabilities = params
+            .get("requestedCapabilities")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                AppHostError::InvalidRequest("requestedCapabilities must be an array".into())
+            })?
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| {
+                        AppHostError::InvalidRequest(
+                            "requestedCapabilities must contain strings".into(),
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let files = params
+            .get("files")
+            .and_then(Value::as_object)
+            .ok_or_else(|| AppHostError::InvalidRequest("files must be an object".into()))?;
+        if files.is_empty() {
+            return Err(AppHostError::InvalidRequest(
+                "local Mini App draft must contain files".into(),
+            ));
+        }
+
+        let account = self.plugin_account_context()?;
+        let transaction_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{transaction_id}.json"));
+        let mut transaction: LocalFabappDraftTransaction = serde_json::from_slice(
+            &std::fs::read(&transaction_path).map_err(|_| {
+                AppHostError::Operation("local Mini App draft transaction was not found".into())
+            })?,
+        )
+        .map_err(|error| {
+            AppHostError::Operation(format!("invalid local draft transaction: {error}"))
+        })?;
+        if transaction.schema_version != 1
+            || !matches!(transaction.state.as_str(), "draft" | "prepared")
+            || transaction.approval_id.is_some()
+            || transaction.account_scope != account.scope
+            || transaction.account_generation != account.generation
+        {
+            return Err(AppHostError::Operation(
+                "local Mini App draft transaction is stale or already approved".into(),
+            ));
+        }
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+
+        let mut resources = BTreeMap::<String, (String, Vec<u8>)>::new();
+        let mut persisted = BTreeMap::<String, LocalFabappPreparedResource>::new();
+        let mut total_bytes = 0_u64;
+        for (path, raw) in files {
+            let object = raw.as_object().ok_or_else(|| {
+                AppHostError::InvalidRequest(format!("file {path} must be an object"))
+            })?;
+            let mime = object
+                .get("mime")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    AppHostError::InvalidRequest(format!("file {path} is missing mime"))
+                })?
+                .to_string();
+            let encoded = object
+                .get("dataBase64")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    AppHostError::InvalidRequest(format!("file {path} is missing dataBase64"))
+                })?;
+            let data = base64::engine::general_purpose::STANDARD
+                .decode(encoded.as_bytes())
+                .map_err(|_| {
+                    AppHostError::InvalidRequest(format!("file {path} dataBase64 is invalid"))
+                })?;
+            total_bytes = total_bytes
+                .checked_add(data.len() as u64)
+                .ok_or_else(|| AppHostError::InvalidRequest("draft size overflow".into()))?;
+            if total_bytes > LOCAL_DRAFT_MAX_BYTES {
+                return Err(AppHostError::InvalidRequest(
+                    "local Mini App draft exceeds 32 MiB".into(),
+                ));
+            }
+            persisted.insert(
+                path.clone(),
+                LocalFabappPreparedResource {
+                    mime: mime.clone(),
+                    data_base64: base64::engine::general_purpose::STANDARD.encode(&data),
+                },
+            );
+            resources.insert(path.clone(), (mime, data));
+        }
+
+        let manifest = prepare_local_generated_fabapp_manifest(
+            &transaction.reserved_app_id,
+            &transaction.publisher_id,
+            version,
+            display_name,
+            entrypoint,
+            capabilities,
+            &resources,
+        )
+        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let draft_digest = compute_fabapp_draft_digest(&manifest)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let prepared = LocalFabappPreparedDraft {
+            schema_version: 1,
+            account_scope: account.scope.clone(),
+            account_generation: account.generation.clone(),
+            transaction_id: transaction_id.clone(),
+            draft_digest: draft_digest.clone(),
+            manifest: manifest.clone(),
+            resources: persisted,
+            total_bytes,
+        };
+        let prepared_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{transaction_id}.prepared.json"));
+        atomic_write_json(&prepared_path, &prepared)?;
+        transaction.state = "prepared".into();
+        transaction.draft_digest = Some(draft_digest.clone());
+        atomic_write_json(&transaction_path, &transaction)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+
+        Ok(json!({
+            "protocol": "fabushi.local-miniapp-draft-prepared.v1",
+            "accountScope": account.scope,
+            "transactionId": transaction_id,
+            "reservedAppId": transaction.reserved_app_id,
+            "publisherId": transaction.publisher_id,
+            "draftDigest": draft_digest,
+            "totalBytes": total_bytes,
+            "requestedCapabilities": manifest.requested_capabilities,
+            "files": manifest.files,
         }))
     }
 
@@ -1742,13 +1921,34 @@ impl AppHost {
                 .map_err(|_| AppHostError::Operation("local Mini App draft transaction was not found".into()))?,
         )
         .map_err(|error| AppHostError::Operation(format!("invalid local draft transaction: {error}")))?;
+        let prepared_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{transaction_id}.prepared.json"));
+        let prepared: LocalFabappPreparedDraft = serde_json::from_slice(
+            &std::fs::read(&prepared_path).map_err(|_| {
+                AppHostError::Operation("local Mini App prepared draft was not found".into())
+            })?,
+        )
+        .map_err(|error| {
+            AppHostError::Operation(format!("invalid local prepared draft: {error}"))
+        })?;
         if transaction.schema_version != 1
-            || transaction.state != "draft"
+            || transaction.state != "prepared"
             || transaction.account_scope != account.scope
             || transaction.account_generation != account.generation
+            || transaction.draft_digest.as_deref() != Some(draft_digest.as_str())
+            || prepared.schema_version != 1
+            || prepared.account_scope != account.scope
+            || prepared.account_generation != account.generation
+            || prepared.transaction_id != transaction_id
+            || prepared.draft_digest != draft_digest
+            || compute_fabapp_draft_digest(&prepared.manifest)
+                .map_err(|error| AppHostError::Operation(error.to_string()))?
+                != draft_digest
         {
             return Err(AppHostError::Operation(
-                "local Mini App draft transaction is stale or already approved".into(),
+                "local Mini App draft approval does not match the prepared bytes".into(),
             ));
         }
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
@@ -1790,24 +1990,111 @@ impl AppHost {
         }))
     }
 
+    fn local_fabapp_signing_payload(&self, params: Value) -> Result<Value, AppHostError> {
+        let approval_id = strict_hex_identifier(
+            string_param(&params, "userApprovalId")?,
+            32,
+            "userApprovalId",
+        )?;
+        let account = self.plugin_account_context()?;
+        let approval_path = account
+            .root
+            .join(".local-authorizations")
+            .join(format!("{approval_id}.json"));
+        let approval: LocalFabappHostApproval = serde_json::from_slice(
+            &std::fs::read(&approval_path).map_err(|_| {
+                AppHostError::Operation("local Mini App approval was not found".into())
+            })?,
+        )
+        .map_err(|error| {
+            AppHostError::Operation(format!("invalid local Mini App approval: {error}"))
+        })?;
+        if approval.schema_version != 1
+            || approval.state != "approved"
+            || approval.account_scope != account.scope
+            || approval.account_generation != account.generation
+            || approval.user_approval_id != approval_id
+        {
+            return Err(AppHostError::Operation(
+                "local Mini App approval is stale or consumed".into(),
+            ));
+        }
+        let prepared_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{}.prepared.json", approval.transaction_id));
+        let prepared: LocalFabappPreparedDraft = serde_json::from_slice(
+            &std::fs::read(&prepared_path).map_err(|_| {
+                AppHostError::Operation("local Mini App prepared draft was not found".into())
+            })?,
+        )
+        .map_err(|error| {
+            AppHostError::Operation(format!("invalid local prepared draft: {error}"))
+        })?;
+        if prepared.draft_digest != approval.draft_digest
+            || prepared.account_scope != account.scope
+            || prepared.account_generation != account.generation
+            || prepared.transaction_id != approval.transaction_id
+        {
+            return Err(AppHostError::Operation(
+                "local Mini App prepared draft no longer matches approval".into(),
+            ));
+        }
+        let mut manifest = prepared.manifest;
+        manifest.local_author = Some(FabappLocalAuthorBinding {
+            account_scope: account.scope.clone(),
+            draft_digest: approval.draft_digest.clone(),
+            user_approval_id: approval.user_approval_id.clone(),
+            creation_transaction_id: approval.transaction_id.clone(),
+        });
+        manifest.signature = FabappSignature {
+            algorithm: "Ed25519".into(),
+            key_id: approval.key_id.clone(),
+            value: String::new(),
+        };
+        let payload = fabapp_signing_payload(&manifest)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        Ok(json!({
+            "protocol": "fabushi.local-miniapp-signing-payload.v1",
+            "accountScope": account.scope,
+            "transactionId": approval.transaction_id,
+            "userApprovalId": approval.user_approval_id,
+            "draftDigest": approval.draft_digest,
+            "signingPayloadBase64": base64::engine::general_purpose::STANDARD.encode(payload),
+        }))
+    }
+
     fn install_local_fabapp(&self, params: Value) -> Result<Value, AppHostError> {
-        let approval_id = strict_hex_identifier(string_param(&params, "userApprovalId")?, 32, "userApprovalId")?;
-        let package_base64 = string_param(&params, "packageBase64")?;
+        let approval_id = strict_hex_identifier(
+            string_param(&params, "userApprovalId")?,
+            32,
+            "userApprovalId",
+        )?;
+        let signature_value = string_param(&params, "signatureBase64URL")?.trim().to_string();
+        let signature_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(signature_value.as_bytes())
+            .map_err(|_| AppHostError::InvalidRequest("signatureBase64URL is invalid".into()))?;
+        if signature_bytes.len() != 64 {
+            return Err(AppHostError::InvalidRequest(
+                "Ed25519 signature must be 64 bytes".into(),
+            ));
+        }
         let key_id = strict_ascii_identifier(string_param(&params, "keyId")?, "keyId")?;
         let public_key = decode_ed25519_public_key(string_param(&params, "publicKeyBase64")?)?;
-        let package = base64::engine::general_purpose::STANDARD
-            .decode(package_base64.as_bytes())
-            .map_err(|_| AppHostError::InvalidRequest("packageBase64 is invalid".into()))?;
         let account = self.plugin_account_context()?;
         let approval_path = account
             .root
             .join(".local-authorizations")
             .join(format!("{approval_id}.json"));
         let mut approval: LocalFabappHostApproval = serde_json::from_slice(
-            &std::fs::read(&approval_path)
-                .map_err(|_| AppHostError::Operation("local Mini App approval was not found".into()))?,
+            &std::fs::read(&approval_path).map_err(|_| {
+                AppHostError::Operation("local Mini App approval was not found".into())
+            })?,
         )
-        .map_err(|error| AppHostError::Operation(format!("invalid local Mini App approval: {error}")))?;
+        .map_err(|error| {
+            AppHostError::Operation(format!("invalid local Mini App approval: {error}"))
+        })?;
         if approval.schema_version != 1
             || approval.state != "approved"
             || approval.account_scope != account.scope
@@ -1817,11 +2104,62 @@ impl AppHost {
             || approval.public_key_sha256 != format!("{:x}", Sha256::digest(public_key))
         {
             return Err(AppHostError::Operation(
-                "local Mini App approval is stale, consumed, or does not match the signing key".into(),
+                "local Mini App approval is stale, consumed, or does not match the signing key"
+                    .into(),
+            ));
+        }
+        let prepared_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{}.prepared.json", approval.transaction_id));
+        let prepared: LocalFabappPreparedDraft = serde_json::from_slice(
+            &std::fs::read(&prepared_path).map_err(|_| {
+                AppHostError::Operation("local Mini App prepared draft was not found".into())
+            })?,
+        )
+        .map_err(|error| {
+            AppHostError::Operation(format!("invalid local prepared draft: {error}"))
+        })?;
+        if prepared.schema_version != 1
+            || prepared.account_scope != account.scope
+            || prepared.account_generation != account.generation
+            || prepared.transaction_id != approval.transaction_id
+            || prepared.draft_digest != approval.draft_digest
+            || compute_fabapp_draft_digest(&prepared.manifest)
+                .map_err(|error| AppHostError::Operation(error.to_string()))?
+                != approval.draft_digest
+        {
+            return Err(AppHostError::Operation(
+                "local Mini App approved draft bytes changed before install".into(),
             ));
         }
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
 
+        let mut resources = BTreeMap::<String, (String, Vec<u8>)>::new();
+        for (path, resource) in &prepared.resources {
+            let data = base64::engine::general_purpose::STANDARD
+                .decode(resource.data_base64.as_bytes())
+                .map_err(|_| {
+                    AppHostError::Operation(format!(
+                        "prepared local Mini App resource {path} is corrupt"
+                    ))
+                })?;
+            resources.insert(path.clone(), (resource.mime.clone(), data));
+        }
+        let mut manifest = prepared.manifest;
+        manifest.local_author = Some(FabappLocalAuthorBinding {
+            account_scope: account.scope.clone(),
+            draft_digest: approval.draft_digest.clone(),
+            user_approval_id: approval.user_approval_id.clone(),
+            creation_transaction_id: approval.transaction_id.clone(),
+        });
+        manifest.signature = FabappSignature {
+            algorithm: "Ed25519".into(),
+            key_id: approval.key_id.clone(),
+            value: signature_value,
+        };
+        let package = build_fabapp_package(&manifest, &resources)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let trust = FabappTrustContext::LocalGenerated(LocalGeneratedFabappTrust {
             account_scope: account.scope.clone(),
             publisher_id: approval.publisher_id.clone(),
@@ -1845,6 +2183,19 @@ impl AppHost {
 
         approval.state = "consumed".into();
         atomic_write_json(&approval_path, &approval)?;
+        let transaction_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{}.json", approval.transaction_id));
+        if let Ok(bytes) = std::fs::read(&transaction_path) {
+            if let Ok(mut transaction) =
+                serde_json::from_slice::<LocalFabappDraftTransaction>(&bytes)
+            {
+                transaction.state = "installed".into();
+                let _ = atomic_write_json(&transaction_path, &transaction);
+            }
+        }
+        let _ = std::fs::remove_file(&prepared_path);
         Ok(json!({
             "protocol": "fabushi.local-miniapp-install.v1",
             "pointer": pointer,
