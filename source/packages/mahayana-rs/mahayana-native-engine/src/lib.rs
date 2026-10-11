@@ -59,6 +59,10 @@ const PROVIDER_CONTINUATION_INITIAL_BACKOFF: Duration = Duration::from_millis(50
 pub enum ProcessExecution {
     #[default]
     Host,
+    /// Mobile/Web hosts must not spawn arbitrary processes in the app sandbox.
+    /// Their user-visible shell/process capability is supplied by a platform
+    /// Remote Runner outside this native engine boundary.
+    Unavailable,
     LocalDocker {
         docker_path: PathBuf,
         image: String,
@@ -96,7 +100,7 @@ impl NativeEngineConfig {
             max_model_turns: DEFAULT_MAX_MODEL_TURNS,
             enable_process_tools: false,
             approval_timeout_ms: DEFAULT_APPROVAL_TIMEOUT_MS,
-            process_execution: ProcessExecution::Host,
+            process_execution: ProcessExecution::Unavailable,
             session_state_path: None,
         }
     }
@@ -3129,6 +3133,12 @@ fn run_process(
         return Err(KernelError::PolicyDenied("invalid process program".into()));
     }
     let output = match execution {
+        ProcessExecution::Unavailable => {
+            return Err(KernelError::CapabilityUnavailable(
+                "process execution is unavailable in this native engine; use the platform Remote Runner"
+                    .into(),
+            ));
+        }
         ProcessExecution::Host => Command::new(program).args(args).current_dir(root).output(),
         ProcessExecution::LocalDocker { docker_path, image } => {
             let canonical_root = root
@@ -3982,6 +3992,31 @@ mod tests {
                 (Some("function_call_output"), Some("call-b")),
             ]
         );
+    }
+
+    #[test]
+    fn embedded_engine_never_defaults_to_host_process_execution() {
+        let config = NativeEngineConfig::embedded("model");
+        assert!(!config.enable_process_tools);
+        assert!(matches!(
+            config.process_execution,
+            ProcessExecution::Unavailable
+        ));
+    }
+
+    #[test]
+    fn unavailable_process_execution_fails_closed_without_spawning() {
+        let error = run_process(
+            &ProcessExecution::Unavailable,
+            Path::new("."),
+            "definitely-must-not-run",
+            &[],
+        )
+        .expect_err("mobile process execution must fail closed");
+        assert!(matches!(error, KernelError::CapabilityUnavailable(_)));
+        assert!(error
+            .to_string()
+            .contains("platform Remote Runner"));
     }
 
     #[test]

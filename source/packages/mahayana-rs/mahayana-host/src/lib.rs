@@ -397,6 +397,16 @@ impl NativeRunnerComposition {
     }
 }
 
+fn effective_process_execution(
+    profile: BuildProfile,
+    requested: ProcessExecution,
+) -> ProcessExecution {
+    match profile {
+        BuildProfile::DesktopFull => requested,
+        BuildProfile::MobileEmbedded | BuildProfile::WebWasm => ProcessExecution::Unavailable,
+    }
+}
+
 fn build_runtime(
     create: HostCreateConfig,
     product_client: MahayanaProductClient,
@@ -584,7 +594,8 @@ fn build_runtime(
                 NativeEngineConfig::embedded(runtime_config.model.model.clone())
             }
         };
-        engine_config.process_execution = create.process_execution.clone();
+        engine_config.process_execution =
+            effective_process_execution(runtime_config.build_profile, create.process_execution.clone());
         engine_config.session_state_path = runtime_config
             .data_dir
             .as_ref()
@@ -824,6 +835,28 @@ mod tests {
         fn provider_mode(&self) -> ModelProviderMode {
             ModelProviderMode::LocalModel
         }
+    }
+
+    #[test]
+    fn mobile_and_web_profiles_cannot_inherit_host_process_execution() {
+        assert!(matches!(
+            effective_process_execution(BuildProfile::MobileEmbedded, ProcessExecution::Host),
+            ProcessExecution::Unavailable
+        ));
+        assert!(matches!(
+            effective_process_execution(
+                BuildProfile::WebWasm,
+                ProcessExecution::LocalDocker {
+                    docker_path: PathBuf::from("docker"),
+                    image: "example.test/fabushi@sha256:deadbeef".into(),
+                },
+            ),
+            ProcessExecution::Unavailable
+        ));
+        assert!(matches!(
+            effective_process_execution(BuildProfile::DesktopFull, ProcessExecution::Host),
+            ProcessExecution::Host
+        ));
     }
 
     #[test]

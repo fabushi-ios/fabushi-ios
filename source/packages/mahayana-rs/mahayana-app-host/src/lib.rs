@@ -1,5 +1,5 @@
 use base64::Engine as _;
-use mahayana_core::{ModelProviderMode, RuntimeConfig};
+use mahayana_core::{BuildProfile, ModelProviderMode, RuntimeConfig};
 use mahayana_feature_host::FeatureHostController;
 use mahayana_host::HostCreateConfig;
 use mahayana_host_protocol::{
@@ -3198,6 +3198,34 @@ fn configured_fabushi_model() -> String {
     resolve_fabushi_model(std::env::var("FABUSHI_RESPONSES_MODEL").ok())
 }
 
+fn runtime_build_profile_for_surface(platform: SurfacePlatform) -> BuildProfile {
+    match platform {
+        SurfacePlatform::Ios | SurfacePlatform::Android => BuildProfile::MobileEmbedded,
+        SurfacePlatform::Wasm => BuildProfile::WebWasm,
+        SurfacePlatform::Electron | SurfacePlatform::Mock => BuildProfile::DesktopFull,
+    }
+}
+
+fn process_execution_for_surface(platform: SurfacePlatform) -> ProcessExecution {
+    match platform {
+        SurfacePlatform::Ios | SurfacePlatform::Android | SurfacePlatform::Wasm => {
+            ProcessExecution::Unavailable
+        }
+        SurfacePlatform::Electron | SurfacePlatform::Mock => {
+            if std::env::var("MAHAYANA_SANDBOX_RUNTIME").as_deref() == Ok("local-docker") {
+                ProcessExecution::LocalDocker {
+                    docker_path: std::env::var_os("MAHAYANA_DOCKER_BIN")
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| PathBuf::from("docker")),
+                    image: std::env::var("MAHAYANA_DOCKER_IMAGE").unwrap_or_default(),
+                }
+            } else {
+                ProcessExecution::Host
+            }
+        }
+    }
+}
+
 fn create_feature_host(
     app_data_dir: &Path,
     feature_mode: AppHostFeatureMode,
@@ -3205,10 +3233,12 @@ fn create_feature_host(
 ) -> Result<FeatureHostController, AppHostError> {
     let root = feature_host_root(app_data_dir);
     std::fs::create_dir_all(&root).map_err(|error| AppHostError::Operation(error.to_string()))?;
+    let platform = surface_platform();
     let configured_provider =
         std::env::var("MAHAYANA_INFERENCE_PROVIDER").unwrap_or_else(|_| "fabushi".into());
     let provider = effective_inference_provider(feature_mode, &configured_provider);
     let mut runtime = RuntimeConfig {
+        build_profile: runtime_build_profile_for_surface(platform),
         data_dir: Some(root.join("runtime")),
         ..RuntimeConfig::default()
     };
@@ -3247,18 +3277,7 @@ fn create_feature_host(
             _ => mahayana_model::responses::ResponsesWireApi::Responses,
         },
         inherit_installed_plugins: Some(false),
-        process_execution: if std::env::var("MAHAYANA_SANDBOX_RUNTIME").as_deref()
-            == Ok("local-docker")
-        {
-            ProcessExecution::LocalDocker {
-                docker_path: std::env::var_os("MAHAYANA_DOCKER_BIN")
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| PathBuf::from("docker")),
-                image: std::env::var("MAHAYANA_DOCKER_IMAGE").unwrap_or_default(),
-            }
-        } else {
-            ProcessExecution::Host
-        },
+        process_execution: process_execution_for_surface(platform),
         ..HostCreateConfig::default()
     };
     FeatureHostController::create_with_host_config(
@@ -3266,7 +3285,7 @@ fn create_feature_host(
             profile_id: "default".to_string(),
             mode: feature_mode.into(),
         },
-        surface_platform(),
+        platform,
         host_config,
     )
     .map_err(|error| {
@@ -4280,6 +4299,32 @@ mod fabushi_shipping_inference_tests {
         migrate_legacy_plugin_root_if_proven(&base, &account_a, &root_a).unwrap();
 
         std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn mobile_surfaces_use_embedded_runtime_and_never_spawn_local_processes() {
+        for platform in [SurfacePlatform::Ios, SurfacePlatform::Android] {
+            assert_eq!(
+                runtime_build_profile_for_surface(platform),
+                BuildProfile::MobileEmbedded
+            );
+            assert!(matches!(
+                process_execution_for_surface(platform),
+                ProcessExecution::Unavailable
+            ));
+        }
+        assert_eq!(
+            runtime_build_profile_for_surface(SurfacePlatform::Wasm),
+            BuildProfile::WebWasm
+        );
+        assert!(matches!(
+            process_execution_for_surface(SurfacePlatform::Wasm),
+            ProcessExecution::Unavailable
+        ));
+        assert_eq!(
+            runtime_build_profile_for_surface(SurfacePlatform::Electron),
+            BuildProfile::DesktopFull
+        );
     }
 
     #[test]
