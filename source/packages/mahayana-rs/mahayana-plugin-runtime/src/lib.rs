@@ -1662,7 +1662,7 @@ impl PluginInstaller {
                 requested_permissions: release.permissions.clone(),
                 installed_path: final_dir.to_string_lossy().into_owned(),
             };
-            self.activate(&plugin_root, &pointer)?;
+            self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)?;
             return Ok(pointer);
         }
 
@@ -1712,7 +1712,7 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
-        self.activate(&plugin_root, &pointer)?;
+        self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)?;
         Ok(pointer)
     }
 
@@ -1858,7 +1858,7 @@ impl PluginInstaller {
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
-        self.activate(&plugin_root, &pointer)?;
+        self.activate_with_commit_guard(&plugin_root, &pointer, &commit_guard)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
         }
@@ -1875,6 +1875,22 @@ impl PluginInstaller {
         plugin_root: &Path,
         pointer: &InstalledPluginPointer,
     ) -> Result<(), RuntimeError> {
+        let commit_guard = || true;
+        self.activate_with_commit_guard(plugin_root, pointer, &commit_guard)
+    }
+
+    fn activate_with_commit_guard<F>(
+        &self,
+        plugin_root: &Path,
+        pointer: &InstalledPluginPointer,
+        commit_guard: &F,
+    ) -> Result<(), RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         fs::create_dir_all(plugin_root).map_err(RuntimeError::Io)?;
         let active = plugin_root.join("active.json");
         if active.is_file() {
@@ -1886,7 +1902,14 @@ impl PluginInstaller {
                     .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
                 let temporary =
                     plugin_root.join(format!("previous-active.{}.json", Uuid::new_v4()));
+                if !commit_guard() {
+                    return Err(RuntimeError::StaleAccountContext);
+                }
                 fs::write(&temporary, bytes).map_err(RuntimeError::Io)?;
+                if !commit_guard() {
+                    let _ = fs::remove_file(&temporary);
+                    return Err(RuntimeError::StaleAccountContext);
+                }
                 #[cfg(windows)]
                 if previous.exists() {
                     fs::remove_file(&previous).map_err(RuntimeError::Io)?;
@@ -1897,7 +1920,14 @@ impl PluginInstaller {
         let bytes = serde_json::to_vec_pretty(pointer)
             .map_err(|error| RuntimeError::InvalidRelease(error.to_string()))?;
         let temp = plugin_root.join(format!("active.{}.json", Uuid::new_v4()));
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         fs::write(&temp, bytes).map_err(RuntimeError::Io)?;
+        if !commit_guard() {
+            let _ = fs::remove_file(&temp);
+            return Err(RuntimeError::StaleAccountContext);
+        }
         #[cfg(windows)]
         if active.exists() {
             fs::remove_file(&active).map_err(RuntimeError::Io)?;
@@ -1913,6 +1943,17 @@ impl PluginInstaller {
         &self,
         plugin_id: &str,
     ) -> Result<Option<InstalledPluginPointer>, RuntimeError> {
+        self.rollback_with_commit_guard(plugin_id, || true)
+    }
+
+    pub fn rollback_with_commit_guard<F>(
+        &self,
+        plugin_id: &str,
+        commit_guard: F,
+    ) -> Result<Option<InstalledPluginPointer>, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
         let previous_path = plugin_root.join("previous-active.json");
@@ -1928,7 +1969,10 @@ impl PluginInstaller {
                 "previous active plugin files are missing".into(),
             ));
         }
-        self.activate(&plugin_root, &previous)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
+        self.activate_with_commit_guard(&plugin_root, &previous, &commit_guard)?;
         Ok(Some(previous))
     }
 
@@ -1946,10 +1990,24 @@ impl PluginInstaller {
     }
 
     pub fn uninstall(&self, plugin_id: &str) -> Result<bool, RuntimeError> {
+        self.uninstall_with_commit_guard(plugin_id, || true)
+    }
+
+    pub fn uninstall_with_commit_guard<F>(
+        &self,
+        plugin_id: &str,
+        commit_guard: F,
+    ) -> Result<bool, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         validate_identifier(plugin_id, "pluginId")?;
         let plugin_root = self.root.join(plugin_id);
         if !plugin_root.exists() {
             return Ok(false);
+        }
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
         }
         fs::remove_dir_all(plugin_root).map_err(RuntimeError::Io)?;
         Ok(true)
@@ -3276,6 +3334,59 @@ mod tests {
             Err(RuntimeError::StaleAccountContext)
         ));
         assert!(!root.path().join("stale-account-plugin").exists());
+    }
+
+    #[test]
+    fn uninstall_commit_guard_prevents_stale_account_write() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_root = root.path().join("stale-uninstall");
+        fs::create_dir_all(plugin_root.join("versions/1.0.0/test")).unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+
+        assert!(matches!(
+            installer.uninstall_with_commit_guard("stale-uninstall", || false),
+            Err(RuntimeError::StaleAccountContext)
+        ));
+        assert!(plugin_root.exists());
+    }
+
+    #[test]
+    fn rollback_commit_guard_prevents_stale_account_pointer_switch() {
+        let root = tempfile::tempdir().unwrap();
+        let plugin_root = root.path().join("stale-rollback");
+        let current_dir = plugin_root.join("versions/2.0.0/current");
+        let previous_dir = plugin_root.join("versions/1.0.0/previous");
+        fs::create_dir_all(&current_dir).unwrap();
+        fs::create_dir_all(&previous_dir).unwrap();
+        let current = InstalledPluginPointer {
+            plugin_id: "stale-rollback".into(),
+            version: "2.0.0".into(),
+            artifact_id: "current".into(),
+            artifact_sha256: "a".repeat(64),
+            runtime: "local-web".into(),
+            entry: Some("index.html".into()),
+            requested_permissions: vec![],
+            installed_path: current_dir.to_string_lossy().into_owned(),
+        };
+        let previous = InstalledPluginPointer {
+            plugin_id: "stale-rollback".into(),
+            version: "1.0.0".into(),
+            artifact_id: "previous".into(),
+            artifact_sha256: "b".repeat(64),
+            runtime: "local-web".into(),
+            entry: Some("index.html".into()),
+            requested_permissions: vec![],
+            installed_path: previous_dir.to_string_lossy().into_owned(),
+        };
+        runtime_atomic_write_json(&plugin_root.join("active.json"), &current).unwrap();
+        runtime_atomic_write_json(&plugin_root.join("previous-active.json"), &previous).unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+
+        assert!(matches!(
+            installer.rollback_with_commit_guard("stale-rollback", || false),
+            Err(RuntimeError::StaleAccountContext)
+        ));
+        assert_eq!(installer.active("stale-rollback").unwrap(), Some(current));
     }
 
     #[test]
