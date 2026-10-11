@@ -72,16 +72,24 @@ final class GlobalDharmaMiniAppBridge {
         }
     }
 
-    func routeInput(pluginId: String, input: String) async throws -> [String: Any] {
+    func routeInput(
+        pluginId: String,
+        input: String,
+        availableTools: [String]? = nil
+    ) async throws -> [String: Any] {
         try Self.requirePluginId(pluginId)
         let cleanInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanInput.isEmpty else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App input must not be blank")
         }
+        var body: [String: Any] = ["input": cleanInput]
+        if let availableTools {
+            body["availableTools"] = availableTools
+        }
         return try await platform(
             method: "POST",
             path: "/v1/marketplace/plugins/\(pluginId)/route",
-            body: ["input": cleanInput]
+            body: body
         )
     }
 
