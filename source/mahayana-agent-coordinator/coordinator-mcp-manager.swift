@@ -905,6 +905,21 @@ final class CoordinatorMcpSurface {
         self.isClientPaused = isClientPaused
     }
 
+    func structuredLogCredentials(
+        backendURL: String,
+        accountSlot: String
+    ) async throws -> (accessToken: String, machineID: String) {
+        let accessToken = try await cursorAuth.getValidAccessToken(backendURL: backendURL)
+        let token = parseJwtPayload(accessToken)
+        guard (token?.sub ?? token?.email) == accountSlot else {
+            throw SandMcpConfigError("Structured-log account scope is stale.")
+        }
+        return (
+            accessToken: accessToken,
+            machineID: try await cursorAuth.getMachineID()
+        )
+    }
+
     static func make(
         hostSupervisor: MahayanaLocalHostSupervisor,
         settingsStore: SandSettingsStore,
