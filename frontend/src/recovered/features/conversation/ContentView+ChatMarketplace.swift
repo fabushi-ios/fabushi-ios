@@ -710,7 +710,23 @@ extension ContentView {
                                                     }
                                                 }.buttonStyle(.plain)
                                             case "audio":
-                                                HStack(spacing: 10) { Image(systemName: "music.note").font(.title2).foregroundStyle(Color.accentColor); Text(message.mediaFileName ?? "音频"); Spacer() }
+                                                Button { Task { await voicePlayback.toggle(message: message, messaging: messaging) } } label: {
+                                                    HStack(spacing: 10) {
+                                                        Image(systemName: voicePlayback.playingMessageId == message.id ? "stop.circle.fill" : "music.note")
+                                                            .font(.title2)
+                                                            .foregroundStyle(Color.accentColor)
+                                                        VStack(alignment: .leading) {
+                                                            Text(message.mediaFileName ?? "音频")
+                                                                .fontWeight(.medium)
+                                                                .foregroundStyle(.primary)
+                                                            Text(voicePlayback.playingMessageId == message.id ? "正在播放" : "点击播放")
+                                                                .font(.caption)
+                                                                .foregroundStyle(.secondary)
+                                                        }
+                                                        Spacer()
+                                                    }
+                                                }
+                                                .buttonStyle(.plain)
                                             case "photo", "video", "document":
                                                 Button { mediaViewerMessage = message } label: {
                                                     HStack(spacing: 9) {

@@ -102,7 +102,7 @@ internal func nativeMediaLoadingRange(
 }
 
 @MainActor
-private final class NativeMessagingBlobAssetLoader: NSObject, @preconcurrency AVAssetResourceLoaderDelegate {
+final class NativeMessagingBlobAssetLoader: NSObject, @preconcurrency AVAssetResourceLoaderDelegate {
     private let messaging: MessagingModel
     private let blobId: String
     private let sizeBytes: Int
