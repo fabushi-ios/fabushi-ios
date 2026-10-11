@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum FabAppPackageClass: String, Sendable {
+enum FabAppPackageClass: String, Equatable, Sendable {
     case catalog
     case localGenerated = "local-generated"
 }
