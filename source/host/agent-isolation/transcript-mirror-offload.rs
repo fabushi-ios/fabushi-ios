@@ -789,17 +789,21 @@ mod tests {
                 *count += 1;
                 if *count == 1 {
                     assert_eq!(job.state_blob_id, vec![1]);
-                    assert_eq!(
-                        executor_pool
-                            .submit(TranscriptMirrorJob {
-                                conversation_id: job.conversation_id.clone(),
-                                state_blob_id: vec![2],
-                                blob_db_paths: job.blob_db_paths.clone(),
-                                transcripts_dir: job.transcripts_dir.clone(),
-                            })
-                            .unwrap(),
-                        TranscriptMirrorSubmission::Coalesced
-                    );
+                    let coalesced = executor_pool
+                        .submit(TranscriptMirrorJob {
+                            conversation_id: job.conversation_id.clone(),
+                            state_blob_id: vec![2],
+                            blob_db_paths: job.blob_db_paths.clone(),
+                            transcripts_dir: job.transcripts_dir.clone(),
+                        })
+                        .unwrap();
+                    assert!(matches!(
+                        coalesced,
+                        TranscriptMirrorSubmission::Coalesced {
+                            queued_waiter_count: 1,
+                            ..
+                        }
+                    ));
                     Ok(false)
                 } else {
                     assert_eq!(job.state_blob_id, vec![2]);
@@ -820,7 +824,7 @@ mod tests {
         assert_eq!(*calls.lock().unwrap(), 2);
         assert_eq!(mirror.previous_root_prompt_count(), 0);
         assert_eq!(pool.active_dispatch_count().unwrap(), 0);
-        assert_eq!(pool.queued_job_count().unwrap(), 0);
+        assert_eq!(pool.queued_waiter_count("agent-worker").unwrap(), 0);
         assert_eq!(pool.active_lane_count().unwrap(), 0);
         let _ = std::fs::remove_dir_all(root);
     }
