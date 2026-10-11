@@ -43,6 +43,18 @@
     ],
     "reviewedPathEvidence": [
       {
+        "path": "source/host/src/agent_isolation/agent_store_worker.rs",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-implemented-pending-exact-head",
+        "finding": "Desktop source is a thin factory alias over ConversationBlobWorkerBackend. Shipping iOS AgentStoreWorker is the serialized repository-owned Rust lane for per-agent blob persistence, GC, legacy retirement, flush and close lifecycle, compiled into the mobile Host and covered by focused lifecycle persistence tests."
+      },
+      {
+        "path": "source/host/local-exec/local-exec-daemon-protocol.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-single-owner-replacement-implemented-pending-exact-head",
+        "finding": "Desktop source is logic-free re-export specifically to prevent a second Host local-exec owner. iOS preserves the same invariant with shared native daemon/process-identity contracts and Coordinator-owned IOSLocalExecSupervisor; no duplicate Host daemon owner is introduced."
+      },
+      {
         "path": "source/host/src/extensions/memory/extension.rs",
         "desktopCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
         "status": "current-main-reviewed-implemented-pending-exact-head",
