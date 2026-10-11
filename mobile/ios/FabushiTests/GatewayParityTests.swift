@@ -20,7 +20,6 @@ private final class GatewayAsyncGate {
 }
 
 @MainActor
-@MainActor
 private final class GatewayEventHost: MahayanaHostRequesting, @unchecked Sendable {
     var envelope: [String: Any]
     init(envelope: [String: Any]) { self.envelope = envelope }
