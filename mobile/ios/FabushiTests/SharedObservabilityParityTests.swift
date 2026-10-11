@@ -59,7 +59,8 @@ final class SharedObservabilityParityTests: XCTestCase {
         )
         await spill.append(old, timestampMs: 1)
         await spill.rotate(accountSlot: "account-a")
-        XCTAssertEqual(await spill.snapshotCount(), 0)
+        let expiredCount = await spill.snapshotCount()
+        XCTAssertEqual(expiredCount, 0)
 
         let now = Int64(Date().timeIntervalSince1970 * 1_000)
         for index in 0..<(DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES + 5) {
@@ -67,19 +68,28 @@ final class SharedObservabilityParityTests: XCTestCase {
                 .init(
                     family: .rendererLifecycle,
                     level: .info,
-                    metadata: [
-                        "index": String(index),
-                        "padding": String(repeating: "x", count: 2_048),
-                    ]
+                    metadata: ["index": String(index)]
                 ),
                 timestampMs: now
             )
         }
-        XCTAssertLessThanOrEqual(await spill.snapshotCount(), DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES)
-        XCTAssertLessThanOrEqual(await spill.persistedByteCount(), DESKTOP_STRUCTURED_LOG_SPILL_MAX_BYTES)
+        let cappedCount = await spill.snapshotCount()
+        XCTAssertLessThanOrEqual(cappedCount, DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES)
+
+        await spill.append(
+            .init(
+                family: .rendererLifecycle,
+                level: .warn,
+                metadata: ["padding": String(repeating: "x", count: DESKTOP_STRUCTURED_LOG_SPILL_MAX_BYTES + 256)]
+            ),
+            timestampMs: now
+        )
+        let persistedBytes = await spill.persistedByteCount()
+        XCTAssertLessThanOrEqual(persistedBytes, DESKTOP_STRUCTURED_LOG_SPILL_MAX_BYTES)
 
         await spill.rotate(accountSlot: "account-b")
-        XCTAssertEqual(await spill.snapshotCount(), 0)
+        let rotatedCount = await spill.snapshotCount()
+        XCTAssertEqual(rotatedCount, 0)
         XCTAssertEqual(iosLifecycleTelemetryAccountScope(nil), "logged-out")
         XCTAssertNotEqual(
             iosLifecycleTelemetryAccountScope("account-a"),
