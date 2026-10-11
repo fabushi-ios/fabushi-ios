@@ -705,7 +705,7 @@ struct MiniAppWebMcpSurface: View {
                         Divider()
                     }
 
-                    if webMcpPlugin.pluginId == GlobalDharmaCommerceModel.miniAppId,
+                    if MarketplaceModel.requiresVerifiedLocalMiniAppPackage(pluginId: webMcpPlugin.pluginId),
                        localHtmlOverride == nil,
                        localSource == nil
                     {
