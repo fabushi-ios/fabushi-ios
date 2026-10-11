@@ -210,6 +210,22 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
     }
 
 
+    func testMarketplaceInstalledProjectionMergesLocalAndCanonicalAccountTruth() {
+        let ids = MarketplaceModel.projectInstalledMiniAppIds(
+            localRows: [
+                ["pluginId": "local-only"],
+                ["pluginId": " shared "],
+                ["pluginId": ""],
+            ],
+            accountRows: [
+                ["id": "server-only"],
+                ["pluginId": "shared"],
+                ["pluginId": "   "],
+            ]
+        )
+        XCTAssertEqual(ids, Set(["local-only", "shared", "server-only"]))
+    }
+
     @MainActor
     func testMarketplaceInstalledProjectionIsAccountScopedUIState() throws {
         let appDataDirectory = FileManager.default.temporaryDirectory

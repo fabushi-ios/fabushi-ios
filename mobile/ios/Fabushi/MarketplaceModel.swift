@@ -3755,6 +3755,28 @@ final class MarketplaceModel {
         return String(data: data, encoding: .utf8)
     }
 
+    nonisolated static func projectInstalledMiniAppIds(
+        localRows: [[String: Any]],
+        accountRows: [[String: Any]]
+    ) -> Set<String> {
+        var ids = Set<String>()
+        for row in localRows {
+            if let id = (row["pluginId"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !id.isEmpty {
+                ids.insert(id)
+            }
+        }
+        for row in accountRows {
+            if let id = ((row["pluginId"] as? String) ?? (row["id"] as? String))?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !id.isEmpty {
+                ids.insert(id)
+            }
+        }
+        return ids
+    }
+
     static func marketplacePlugin(from item: [String: Any]) -> MarketplacePlugin? {
         guard let id = item["pluginId"] as? String, !id.isEmpty else { return nil }
         let source = item["source"] as? [String: Any]
@@ -5033,21 +5055,12 @@ final class MarketplaceModel {
             if loggedIn {
                 let localInstalled = try await bridge.request(method: "feature.plugin.listInstalled")
                 let localRows = (localInstalled.value as? [String: Any])?["plugins"] as? [[String: Any]] ?? []
-                var canonicalIds = Set(localRows.compactMap { row in
-                    (row["pluginId"] as? String)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .nonEmpty
-                })
                 let accountInstalled = try await bridge.request(method: "feature.marketplace.added")
                 let accountRows = (accountInstalled.value as? [String: Any])?["apps"] as? [[String: Any]] ?? []
-                for row in accountRows {
-                    let id = ((row["pluginId"] as? String) ?? (row["id"] as? String))?
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    if let id, !id.isEmpty {
-                        canonicalIds.insert(id)
-                    }
-                }
-                installedPluginIds = canonicalIds
+                installedPluginIds = Self.projectInstalledMiniAppIds(
+                    localRows: localRows,
+                    accountRows: accountRows
+                )
             } else {
                 installedPluginIds = []
             }
