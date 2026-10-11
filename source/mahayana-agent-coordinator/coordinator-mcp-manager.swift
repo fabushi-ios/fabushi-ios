@@ -1650,7 +1650,7 @@ final class CoordinatorMcpSurface {
             let result = try await manager.removeServer(serverId)
             return .handled([
                 "removed": result.removed,
-                "reason": result.reason ?? NSNull(),
+                "reason": result.reason.map { $0 as Any } ?? NSNull(),
                 "servers": result.state.servers.map(projectServer),
             ])
 
