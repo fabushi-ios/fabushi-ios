@@ -251,9 +251,10 @@ final class CoordinatorAdapterTests: XCTestCase {
             (hostSettings.value as? [String: Any])?["userTimeZone"] as? String,
             TimeZone.autoupdatingCurrent.identifier
         )
-        XCTAssertTrue(
-            await main.projectSystemUserTimeZoneForActiveAccount(reason: "focused-test")
+        let projectionSucceeded = await main.projectSystemUserTimeZoneForActiveAccount(
+            reason: "focused-test"
         )
+        XCTAssertTrue(projectionSucceeded)
 
         _ = try await main.dispatch(method: "feature.auth.logout")
         XCTAssertNil(main.coordinator.sharedSettingsSnapshot().mcpCustomInstructionsAccountScope)
