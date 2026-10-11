@@ -1442,6 +1442,122 @@ mod tests {
         );
     }
 
+    struct RejectingInteractionListener;
+
+    #[async_trait]
+    impl InteractionListener for RejectingInteractionListener {
+        async fn send_update(
+            &self,
+            _context: &InteractionListenerContext,
+            _update: InteractionUpdate,
+        ) -> Result<(), InteractionError> {
+            Ok(())
+        }
+
+        async fn query(
+            &self,
+            _context: &InteractionListenerContext,
+            query: InteractionQuery,
+        ) -> Result<interaction::InteractionResponse, InteractionError> {
+            Ok(match query.kind {
+                InteractionQueryKind::WebSearch { .. } => interaction::Responses::web_search_rejected(
+                    query.id,
+                    "focused production decision rejected",
+                ),
+                InteractionQueryKind::WebFetch { .. } => interaction::Responses::web_fetch_rejected(
+                    query.id,
+                    "focused production decision rejected",
+                ),
+                _ => return Err(InteractionError::StreamClosed {
+                    message: "unexpected focused query".into(),
+                }),
+            })
+        }
+
+        fn enqueue_post_turn_ended_work(
+            &self,
+            _work: interaction::PostTurnWork,
+        ) -> Result<(), InteractionError> {
+            Ok(())
+        }
+
+        async fn flush_post_turn_ended_work(
+            &self,
+            _context: &InteractionListenerContext,
+        ) -> Result<(), InteractionError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn shipping_interaction_gate_routes_typed_web_queries_and_fences_scope() {
+        let scope_generation = Arc::new(AtomicU64::new(7));
+        let gate = AgentInteractionDecisionGate {
+            listener: shipping_interaction_listener(PrivacyMode::NoTraining),
+            cancelled_operations: Arc::new(Mutex::new(HashSet::new())),
+            scope_generation: Arc::clone(&scope_generation),
+            expected_scope_generation: 7,
+            next_query_id: Arc::new(AtomicU64::new(41)),
+        };
+        let operation_id = KernelOperationId::from_string("interaction-focus-op");
+
+        gate.before_tool(
+            &operation_id,
+            "web_search",
+            &json!({"query":"current Fabushi state"}),
+        )
+        .await
+        .expect("shipping Noop fallback approves web search through typed listener");
+
+        gate.before_tool(
+            &operation_id,
+            "web_fetch",
+            &json!({"urls":["https://example.com"]}),
+        )
+        .await
+        .expect("shipping Noop fallback approves web fetch through typed listener");
+
+        scope_generation.store(8, Ordering::SeqCst);
+        let error = gate
+            .before_tool(&operation_id, "web_search", &json!({"query":"stale"}))
+            .await
+            .expect_err("scope change must fence stale interaction decisions");
+        assert!(error.to_string().contains("stale"));
+    }
+
+    #[tokio::test]
+    async fn production_interaction_gate_honors_listener_rejection_and_cancellation() {
+        let cancelled_operations = Arc::new(Mutex::new(HashSet::new()));
+        let gate = AgentInteractionDecisionGate {
+            listener: Arc::new(CancellationFencedListener::new(RejectingInteractionListener)),
+            cancelled_operations: Arc::clone(&cancelled_operations),
+            scope_generation: Arc::new(AtomicU64::new(3)),
+            expected_scope_generation: 3,
+            next_query_id: Arc::new(AtomicU64::new(1)),
+        };
+        let operation_id = KernelOperationId::from_string("interaction-reject-op");
+
+        let rejected = gate
+            .before_tool(&operation_id, "web_search", &json!({"query":"denied"}))
+            .await
+            .expect_err("listener rejection must fail closed before tool execution");
+        assert!(rejected.to_string().contains("focused production decision rejected"));
+
+        cancelled_operations
+            .lock()
+            .expect("cancel registry")
+            .insert(operation_id.as_str().to_owned());
+        let cancelled = gate
+            .before_tool(
+                &operation_id,
+                "web_fetch",
+                &json!({"urls":["https://example.com"]}),
+            )
+            .await
+            .expect_err("cancelled operation must fail closed before listener commit");
+        assert!(cancelled.to_string().contains("cancelled"));
+    }
+
     #[test]
     fn command_and_entitlement_metadata_are_product_owned() {
         let tools = vec![json!({
