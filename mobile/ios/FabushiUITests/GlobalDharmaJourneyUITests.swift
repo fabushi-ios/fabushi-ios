@@ -151,6 +151,9 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             XCTFail("Unable to parse initial page revision: \(revisionLabel.label)")
             return
         }
+        state["pageToolCount"] = 4
+        state["initialRevision"] = initialRevision
+        mark("pageProvidedToolsObserved", true)
 
         let draft = app.textFields["mobile-bot-draft"]
         XCTAssertTrue(
@@ -201,6 +204,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             "Retrying the Bot mutation must require Host-owned per-tool user approval"
         )
         approval.tap()
+        mark("permissionApprovedObserved", true)
 
         if stop.waitForExistence(timeout: 4) {
             let finished = XCTNSPredicateExpectation(
