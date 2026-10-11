@@ -18,7 +18,7 @@ sha2.workspace = true
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6", default-features = false, features = ["crypto-rust", "linux-native-async-persistent"] }
 
-[target.'cfg(target_os = "macos")'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 keyring = { version = "3.6", default-features = false, features = ["crypto-rust", "apple-native"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
