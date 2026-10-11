@@ -1425,12 +1425,14 @@ private struct MiniAppWebView: UIViewRepresentable {
                 generation: session.generation,
                 tools: tools
             ) { [weak self, weak webView] name, arguments in
-                guard let self, let webView else { throw CancellationError() }
+                guard let self, let webView,
+                      let effectiveTool = tools.first(where: { $0.name == name })
+                else { throw CancellationError() }
                 return try await self.invokePageTool(
                     webView: webView,
                     session: session,
                     source: source,
-                    name: name,
+                    tool: effectiveTool,
                     arguments: arguments
                 )
             }
@@ -1441,14 +1443,13 @@ private struct MiniAppWebView: UIViewRepresentable {
             webView: WKWebView,
             session: MiniAppWebMcpBridgeSession,
             source: LocalMiniAppSource,
-            name: String,
+            tool: MiniAppToolContract,
             arguments: [String: Any]
         ) async throws -> Any {
             guard activeBridgeSession == session,
                   activeLocalSource == source,
                   isTrustedWebMcpBridgeURL(webView.url, localRootURL: source.rootURL),
-                  session.grants.contains(name),
-                  let tool = toolByName[name],
+                  session.grants.contains(tool.name),
                   JSONSerialization.isValidJSONObject(arguments)
             else { throw CancellationError() }
 
@@ -1476,7 +1477,7 @@ private struct MiniAppWebView: UIViewRepresentable {
                 );
                 """,
                 arguments: [
-                    "name": name,
+                    "name": tool.name,
                     "input": arguments,
                     "pluginInstanceId": session.pluginInstanceId,
                     "nonce": session.nonce,
