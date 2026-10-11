@@ -3,7 +3,14 @@ use std::collections::hash_map::Entry;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+
+use crate::conversation_state_binary::TranscriptMirrorConversationState;
+use crate::host_diagnostics::{HostDiagnostic, report_host_diagnostic};
+use crate::legacy_transcript_mirror::LegacyFileTranscriptMirror;
+use crate::transcript_mirror_worker::execute_legacy_mirror_job;
+use crate::transcript_occurrence_deriver::TranscriptOccurrenceBlobStore;
+use serde_json::Value;
 
 pub const DEFAULT_MIRROR_WORKERS: usize = 2;
 
@@ -329,6 +336,198 @@ impl TranscriptMirrorOffloadPool {
         Ok(queued_waiters)
     }
 }
+
+
+pub type TranscriptMirrorWorkerExecutor =
+    Arc<dyn Fn(&TranscriptMirrorJob) -> Result<bool, String> + Send + Sync + 'static>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OffloadingTranscriptMirrorOptions {
+    pub blob_db_paths: Vec<PathBuf>,
+    pub transcripts_dir: PathBuf,
+}
+
+/// iOS-native production wrapper for the legacy transcript fallback.
+///
+/// Desktop owns long-lived worker threads. iOS keeps the same observable
+/// contract without introducing another daemon/runtime owner: incremental
+/// inline writes stay on the Host lane, full worker fallbacks are submitted
+/// through TranscriptMirrorOffloadPool, and the supplied executor performs the
+/// app-owned task. Cursor progress is committed only after a successful write.
+pub struct OffloadingTranscriptMirror {
+    inline: LegacyFileTranscriptMirror,
+    pool: Arc<TranscriptMirrorOffloadPool>,
+    executor: TranscriptMirrorWorkerExecutor,
+    options: OffloadingTranscriptMirrorOptions,
+    previous_root_prompt_count: Mutex<usize>,
+    write_lane: Mutex<()>,
+}
+
+impl OffloadingTranscriptMirror {
+    pub fn production(
+        options: OffloadingTranscriptMirrorOptions,
+        previous_root_prompt_count: usize,
+    ) -> Self {
+        Self::with_executor(
+            Arc::new(TranscriptMirrorOffloadPool::default()),
+            options,
+            previous_root_prompt_count,
+            Arc::new(|job| {
+                execute_legacy_mirror_job(job)
+                    .map_err(|error| error.to_string())
+            }),
+        )
+    }
+
+    pub fn with_executor(
+        pool: Arc<TranscriptMirrorOffloadPool>,
+        options: OffloadingTranscriptMirrorOptions,
+        previous_root_prompt_count: usize,
+        executor: TranscriptMirrorWorkerExecutor,
+    ) -> Self {
+        Self {
+            inline: LegacyFileTranscriptMirror::new(&options.transcripts_dir),
+            pool,
+            executor,
+            options,
+            previous_root_prompt_count: Mutex::new(previous_root_prompt_count),
+            write_lane: Mutex::new(()),
+        }
+    }
+
+    pub fn previous_root_prompt_count(&self) -> usize {
+        self.previous_root_prompt_count
+            .lock()
+            .map(|value| *value)
+            .unwrap_or_default()
+    }
+
+    pub fn write_inline<Store: TranscriptOccurrenceBlobStore>(
+        &self,
+        conversation_id: &str,
+        state: &TranscriptMirrorConversationState,
+        blob_store: &Store,
+    ) -> Result<(), String> {
+        let _lane = self
+            .write_lane
+            .lock()
+            .map_err(|_| "transcript mirror write lane is poisoned".to_string())?;
+        let previous = self.previous_root_prompt_count();
+        if let Some(count) = self
+            .inline
+            .write_incremental(conversation_id, state, blob_store, previous)
+            .map_err(|error| error.to_string())?
+        {
+            self.set_previous_root_prompt_count(count);
+            return Ok(());
+        }
+
+        let written = self
+            .inline
+            .write_full(conversation_id, state, blob_store)
+            .map_err(|error| error.to_string())?;
+        if written {
+            self.set_previous_root_prompt_count(state.root_prompt_messages_json.len());
+        } else {
+            warn_stale_mirror(conversation_id, "full-write-failed", None);
+        }
+        Ok(())
+    }
+
+    pub fn write_worker(
+        &self,
+        conversation_id: &str,
+        state: &TranscriptMirrorConversationState,
+        state_blob_id: Option<&[u8]>,
+    ) -> Result<(), String> {
+        let _lane = self
+            .write_lane
+            .lock()
+            .map_err(|_| "transcript mirror write lane is poisoned".to_string())?;
+        let Some(state_blob_id) = state_blob_id.filter(|value| !value.is_empty()) else {
+            warn_stale_mirror(conversation_id, "worker-unavailable", None);
+            return Ok(());
+        };
+
+        let submission = self
+            .pool
+            .submit(TranscriptMirrorJob {
+                conversation_id: conversation_id.to_string(),
+                state_blob_id: state_blob_id.to_vec(),
+                blob_db_paths: self.options.blob_db_paths.clone(),
+                transcripts_dir: self.options.transcripts_dir.clone(),
+            })
+            .map_err(|error| error.to_string())?;
+
+        let TranscriptMirrorSubmission::Dispatch(mut dispatch) = submission else {
+            // The wrapper serializes a conversation through write_lane. A
+            // coalesced result can only come from another owner sharing the
+            // pool, so it must not claim cursor progress for this wrapper.
+            warn_stale_mirror(conversation_id, "worker-coalesced", None);
+            return Ok(());
+        };
+
+        loop {
+            let result = (self.executor)(&dispatch.job);
+            let worker_failed = result.is_err();
+            let succeeded = matches!(result, Ok(true));
+            let error_class = worker_failed.then_some("Error");
+            if !succeeded {
+                warn_stale_mirror(conversation_id, "worker-write-failed", error_class);
+            }
+
+            let next = self
+                .pool
+                .complete_with_outcome(conversation_id, worker_failed)
+                .map_err(|error| error.to_string())?;
+            if next.is_none() {
+                if succeeded {
+                    self.set_previous_root_prompt_count(state.root_prompt_messages_json.len());
+                }
+                return Ok(());
+            }
+            // A queued successor belongs to another submitter sharing the pool.
+            // Settle it for worker-health/lane correctness, but never advance
+            // this wrapper's cursor from another caller's checkpoint.
+            dispatch = next.expect("checked above");
+        }
+    }
+
+    pub fn close(&self) -> Result<usize, String> {
+        self.pool.close().map_err(|error| error.to_string())
+    }
+
+    fn set_previous_root_prompt_count(&self, count: usize) {
+        if let Ok(mut previous) = self.previous_root_prompt_count.lock() {
+            *previous = count;
+        }
+    }
+}
+
+fn warn_stale_mirror(
+    conversation_id: &str,
+    reason: &str,
+    error_class: Option<&str>,
+) {
+    let mut diagnostic = HostDiagnostic::new();
+    diagnostic.insert(
+        "kind".into(),
+        Value::String("transcript_mirror_stale".into()),
+    );
+    diagnostic.insert(
+        "agentId".into(),
+        Value::String(conversation_id.to_string()),
+    );
+    diagnostic.insert("reason".into(), Value::String(reason.to_string()));
+    if let Some(error_class) = error_class {
+        diagnostic.insert(
+            "errorClass".into(),
+            Value::String(error_class.to_string()),
+        );
+    }
+    report_host_diagnostic(&diagnostic);
+}
+
 
 #[cfg(test)]
 mod tests {
