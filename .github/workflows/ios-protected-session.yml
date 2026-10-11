@@ -299,7 +299,9 @@ jobs:
             .botVisible == true and
             .naturalLanguageSent == true and
             .webMcpReady == true and
-            .sharedRuntimeSynced == true and
+            .permissionDeniedObserved == true and
+            .livePageMutationObserved == true and
+            .bidirectionalStateObserved == true and
             .purchaseTapped == true and
             .entitlementAllowed == true and
             .restoreTapped == true and
