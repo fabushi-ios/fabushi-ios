@@ -49,15 +49,16 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "iOS uses the embedded Mahayana FeatureHost rather than the Desktop source/host app process. Existing Runtime/FeatureHost owns canonical messaging and durable conversation state, while the Swift Coordinator launch fence now carries only the settled Host account slot as localHumanId. However, the current iOS FeatureHost has no exact humanHandoffConversationId/requestSource=human-handoff admission and append_human_agent_message-equivalent result projection found in the PR source, so this row remains an explicit production gap.",
-      "implementation_status": "mapped",
-      "production_evidence": "Existing iOS FeatureHost uses fabushi-messaging-core for canonical messaging and RuntimeKernelEventBridge for durable provider projection; Swift IOSMainRuntime/CoordinatorBootstrap now fences localHumanId. No source evidence yet closes the new Desktop human-handoff conversation/result path.",
-      "test_evidence": "Existing kernel/messaging tests cover canonical durable messaging; new focused Human-handoff conversation validation/result-projection tests are still required, followed by exact-head rust-host/build/device/protected acceptance.",
-      "notes": "IOS-MAIN-HOST-HUMAN-HANDOFF-001 is the next unclosed Host responsibility from exact Desktop eedb687e... -> ecda2393.... Do not inherit historical CHAT-013 fast-lane status as proof of this new handoff behavior. The Desktop FABUSHI_LOCAL_HUMAN_ID child-process mechanism is not copied literally; iOS must preserve the same authorized-Human identity semantics through its embedded composition.",
+      "ios_platform_delta": "iOS uses the embedded Mahayana FeatureHost rather than the Desktop source/host app process. The native protocol exposes FeatureCommand::ChatHandoffHuman instead of Desktop requestSource=human-handoff fields, but preserves the same trusted conversation admission, asynchronous Agent operation lease, terminal result projection, cancellation/failure cleanup and account-scoped Human identity semantics. Swift Coordinator launch fencing continues to carry only the settled Host account slot as localHumanId.",
+      "implementation_status": "implemented",
+      "production_evidence": "Shipping chain: FeatureCommand::ChatHandoffHuman -> execute_production -> production_human_handoff -> validate_human_handoff_conversation -> fabushi-messaging-core MessagingService::validate_trusted_assistant_target -> production_chat/runtime operation -> HumanHandoffLease assistant-event capture -> OperationCompleted -> project_human_handoff_message -> MessagingService::project_trusted_assistant_text. The target store is account-scoped _messaging state; the authenticated Human must own/participate in the conversation, Agent identity cannot impersonate a Human actor, ClientMessageId human-handoff:{operationId} is stable/idempotent, and temporary Agent membership is removed before persistence. Interrupt/failure paths remove the handoff lease and do not project a terminal success.",
+      "test_evidence": "mahayana-feature-host tests cover latest non-empty terminal capture and interrupt lease cleanup. fabushi-messaging-core focused tests now cover durable/idempotent trusted Assistant projection without persistent membership mutation, reject Human identity reuse, and reject projection to a conversation outside the authenticated Human boundary. Exact-head rust-host/build/device/protected evidence remains pending.",
+      "notes": "IOS-MAIN-HOST-HUMAN-HANDOFF-001 re-audited against Desktop ecda239337befc94722898af09e0694801e1c233. Desktop read_human_conversation_transcript admission is represented by validate_trusted_assistant_target over the canonical account-scoped messaging store; Desktop append_human_agent_message terminal persistence is represented by project_trusted_assistant_text. This is implementation closure only, not verified status, until descendant exact-head GitHub Actions and aggregate source/dependency closure succeed.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/host/build.rs",

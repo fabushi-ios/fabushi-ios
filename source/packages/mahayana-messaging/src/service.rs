@@ -3972,6 +3972,102 @@ mod remote_transport_tests {
     }
 
     #[test]
+    fn trusted_assistant_projection_is_durable_idempotent_and_does_not_mutate_membership() {
+        let (mut service, viewer, _peer, conversation_id) = remote_service_fixture();
+        let assistant_id = ActorId::new("fabushi-agent:mahayana-assistant");
+        let client_message_id = ClientMessageId("human-handoff:operation-42".into());
+        let before_participants = service
+            .engine()
+            .state()
+            .conversations
+            .get(&conversation_id)
+            .expect("direct conversation")
+            .participants
+            .clone();
+
+        let projected = service
+            .project_trusted_assistant_text(
+                &viewer,
+                conversation_id.clone(),
+                assistant_id.clone(),
+                "Fabushi",
+                client_message_id.clone(),
+                "handoff result",
+                20,
+            )
+            .expect("project trusted assistant result");
+
+        assert_eq!(projected.sender_id, assistant_id);
+        assert_eq!(
+            projected.content,
+            MessageContent::Text {
+                text: FormattedText::plain("handoff result"),
+            }
+        );
+        assert!(matches!(projected.delivery_state, DeliveryState::Sent));
+
+        let after = service
+            .engine()
+            .state()
+            .conversations
+            .get(&conversation_id)
+            .expect("direct conversation after projection");
+        assert_eq!(after.participants, before_participants);
+        assert!(
+            !after
+                .participants
+                .iter()
+                .any(|participant| participant.actor_id == assistant_id),
+            "Host-authorized Agent projection must not permanently join the Human conversation"
+        );
+
+        let replay = service
+            .project_trusted_assistant_text(
+                &viewer,
+                conversation_id,
+                assistant_id,
+                "Fabushi",
+                client_message_id,
+                "handoff result",
+                30,
+            )
+            .expect("idempotent handoff replay");
+        assert_eq!(replay.id, projected.id);
+    }
+
+    #[test]
+    fn trusted_assistant_projection_rejects_human_identity_reuse_and_unowned_target() {
+        let (mut service, viewer, peer, conversation_id) = remote_service_fixture();
+
+        let error = service
+            .project_trusted_assistant_text(
+                &viewer,
+                conversation_id.clone(),
+                peer,
+                "Impersonated peer",
+                ClientMessageId("human-handoff:impersonation".into()),
+                "must fail",
+                40,
+            )
+            .expect_err("Human identity must not be reused as an Agent");
+        assert!(matches!(
+            error,
+            MessagingServiceError::UnauthorizedCommand(ref message)
+                if message.contains("non-Agent actor identity")
+        ));
+
+        let outsider = ActorId::new("human:account:outsider");
+        let error = service
+            .validate_trusted_assistant_target(&outsider, &conversation_id)
+            .expect_err("outsider must not target another Human conversation");
+        assert!(matches!(
+            error,
+            MessagingServiceError::UnauthorizedCommand(ref message)
+                if message.contains("authenticated Human")
+        ));
+    }
+
+    #[test]
     fn remote_send_persists_pending_then_settles_without_renaming_local_id() {
         let (mut service, viewer, _peer, conversation_id) = remote_service_fixture();
         let client_message_id = ClientMessageId("ios:nonce-1".into());
