@@ -1750,13 +1750,13 @@
       "desktop_owner": "Electron Main agent-control notification feed",
       "desktop_visible_effect": "Badge and OS notification state follow the same current Agent roster; startup/restored rows establish a baseline instead of notifying old work as new.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/production/GrokMobileShell+Bots.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/ios-main/notifications/dock-badge.swift; source/shared/os-notification.swift",
+      "ios_target_path": "frontend/src/production/GrokMobileShell+Bots.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "iOS has no Electron IPC feed. The production roster refresh already has account/reconnect stale fencing; after the authoritative Host roster settles it fans the same snapshots into the native badge and notification controllers.",
       "implementation_status": "implemented",
       "production_evidence": "GrokMobileShell.refreshAccessRoster reads the canonical Host roster, rejects stale account/reconnect results, then calls MarketplaceModel.updateAgentDockBadge. That method now projects both IOSDockBadgeAgent and NotificationSnapshot from the same MobileBotSummary rows. IOSAgentNotificationController seeds the first roster without emitting historical notifications and handles later transitions.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests covers badge stale-generation rejection, notification baseline, stale generation, hidden/foreground suppression and scheduling; existing roster tests cover canonical projection. Exact-head Actions required before verified.",
-      "notes": "IOS-MAIN-NOTIFICATIONS-20261012: Electron feed transport is replaced by the native canonical roster refresh; the feed responsibility is production reachable and does not create a second Agent state owner.",
+      "notes": "IOS-MAIN-NOTIFICATIONS-20261012: Electron feed transport is replaced by the native canonical roster refresh; the feed responsibility is production reachable and does not create a second Agent state owner. Validator primary-source binding: supporting production callers/adapters remain enumerated in production_evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
@@ -1766,13 +1766,13 @@
       "desktop_owner": "Electron Main dock badge manager",
       "desktop_visible_effect": "The app badge reflects current unread visible Agents without being rolled backward by stale account/roster work.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/notifications/dock-badge.swift; mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/production/GrokMobileShell+Bots.swift",
+      "ios_target_path": "source/ios-main/notifications/dock-badge.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS uses UNUserNotificationCenter badge count instead of Electron app.dock. Roster calls are already fenced by account/reconnect generation; IOSDockBadgeController adds monotonic generation fencing around the asynchronous system badge write.",
       "implementation_status": "implemented",
       "production_evidence": "Canonical live roster refresh calls MarketplaceModel.updateAgentDockBadge, which increments the account-scoped badge generation and calls IOSDockBadgeController. The controller rejects older generations, applies UNUserNotificationCenter.setBadgeCount, and resetAgentDockBadgeForScopeChange clears the badge on account change/logout.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests.testDockBadgeControllerRejectsStaleAccountGeneration proves stale updates and reset fencing; exact-head Actions required before verified.",
-      "notes": "IOS-MAIN-NOTIFICATIONS-20261012: Desktop epoch/seq transport stamps are replaced by the existing native account/reconnect roster fence plus asynchronous badge generation fence.",
+      "notes": "IOS-MAIN-NOTIFICATIONS-20261012: Desktop epoch/seq transport stamps are replaced by the existing native account/reconnect roster fence plus asynchronous badge generation fence. Validator primary-source binding: supporting production callers/adapters remain enumerated in production_evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
@@ -1798,13 +1798,13 @@
       "desktop_owner": "Electron Main OS notification manager",
       "desktop_visible_effect": "When Fabushi is not active, enabled visible Agents can notify for new needs-input/done transitions; foreground/duplicate/hidden/stale transitions stay quiet, and tapping a notification opens the corresponding Agent.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/os-notification.swift; source/ios-main/notifications/dock-badge.swift; mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/FabushiAppDelegate.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Bots.swift",
+      "ios_target_path": "source/ios-main/notifications/dock-badge.swift",
       "ios_language": "Swift / UserNotifications / SwiftUI",
       "ios_platform_delta": "UNUserNotificationCenter replaces Electron Notification/window focus APIs. The existing shared decider retains 5-second throttling, 140-character body bound, new-message accounting and transition logic. App activity suppresses foreground scheduling; the notification delegate emits a scoped UI navigation event rather than owning Agent state.",
       "implementation_status": "implemented",
       "production_evidence": "MarketplaceModel projects canonical MobileBotSummary fields into NotificationSnapshot and calls IOSAgentNotificationController. The controller seeds baseline, runs SandOsNotificationDecider, requests native authorization only when a real eligible transition occurs, schedules done silently and needs-input with default sound, and clears Fabushi Agent notifications on account reset. FabushiAgentNotificationDelegate suppresses foreground presentation and converts tap userInfo to a scoped event; GrokMobileShell verifies accountScope and selects/refetches the existing canonical bot via selectBotForConversation.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests covers decider focus/throttle/new-message behavior plus controller baseline, stale generation, hidden/foreground suppression, scheduling and reset. Exact-head Swift/UI Actions required before verified.",
-      "notes": "IOS-MAIN-NOTIFICATIONS-20261012: production caller and tap-routing chain are now present; AppDelegate/UI only adapt platform delivery/navigation and do not become runtime owners.",
+      "notes": "IOS-MAIN-NOTIFICATIONS-20261012: production caller and tap-routing chain are now present; AppDelegate/UI only adapt platform delivery/navigation and do not become runtime owners. Validator primary-source binding: supporting production callers/adapters remain enumerated in production_evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
