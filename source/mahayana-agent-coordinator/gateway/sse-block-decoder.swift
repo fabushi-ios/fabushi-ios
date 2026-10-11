@@ -7,15 +7,19 @@ struct ServerSentEventBlock: Equatable, Sendable {
 }
 
 struct SSEBlockDecoder {
-    private var buffer = ""
+    private var buffer = Data()
 
     mutating func append(_ chunk: String) -> [ServerSentEventBlock] {
-        buffer += chunk.replacingOccurrences(of: "\r\n", with: "\n")
+        append(Data(chunk.utf8))
+    }
+
+    mutating func append(_ chunk: Data) -> [ServerSentEventBlock] {
+        buffer.append(chunk)
         var result: [ServerSentEventBlock] = []
 
-        while let range = buffer.range(of: "\n\n") {
-            let block = String(buffer[..<range.lowerBound])
-            buffer.removeSubrange(buffer.startIndex..<range.upperBound)
+        while let boundary = Self.firstBoundary(in: buffer) {
+            let block = buffer.subdata(in: 0..<boundary.start)
+            buffer.removeSubrange(0..<boundary.end)
             if let decoded = Self.decode(block) {
                 result.append(decoded)
             }
@@ -29,7 +33,27 @@ struct SSEBlockDecoder {
         return Self.decode(buffer)
     }
 
-    private static func decode(_ block: String) -> ServerSentEventBlock? {
+    private static func firstBoundary(in data: Data) -> (start: Int, end: Int)? {
+        let bytes = [UInt8](data)
+        guard bytes.count >= 2 else { return nil }
+        for index in 0..<(bytes.count - 1) {
+            if bytes[index] == 0x0A, bytes[index + 1] == 0x0A {
+                return (index, index + 2)
+            }
+            if index + 3 < bytes.count,
+               bytes[index] == 0x0D,
+               bytes[index + 1] == 0x0A,
+               bytes[index + 2] == 0x0D,
+               bytes[index + 3] == 0x0A {
+                return (index, index + 4)
+            }
+        }
+        return nil
+    }
+
+    private static func decode(_ bytes: Data) -> ServerSentEventBlock? {
+        guard let raw = String(data: bytes, encoding: .utf8) else { return nil }
+        let block = raw.replacingOccurrences(of: "\r\n", with: "\n")
         var event: String?
         var id: String?
         var dataLines: [String] = []

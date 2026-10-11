@@ -379,6 +379,45 @@ final class MahayanaCoordinator {
     private(set) var lifecycleState: LifecycleState = .starting
     private var inFlight = Set<String>()
 
+    private lazy var shippingGatewayDispatcher: GatewayRequestDispatcher = {
+        let gatewaySupervisor = CoordinatorHostSupervisor(
+            resolveConnection: { [weak self] in
+                guard let self, self.lifecycleState != .shuttingDown else {
+                    throw CoordinatorError.unavailable
+                }
+                return .init(
+                    baseURL: URL(string: "https://localhost/fabushi-ios-host")!,
+                    headers: ["x-fabushi-transport": "canonical-local-host"]
+                )
+            },
+            healthProbe: { [weak self] _ in
+                guard let self else { return false }
+                return self.lifecycleState != .shuttingDown
+            }
+        )
+        let gatewayClient = CoordinatorGatewayClient(
+            supervisor: gatewaySupervisor,
+            tracedTransport: { [weak self] _, method, args, _ in
+                guard let self else { throw CoordinatorError.unavailable }
+                guard case .object = args,
+                      let params = args.foundationValue as? [String: Any]
+                else { throw CoordinatorError.invalidParams }
+                let result = try await self.request(method: method, params: params)
+                return try CoordinatorPayload.fromFoundation(result.value)
+            }
+        )
+        return GatewayRequestDispatcher(
+            serves: { _ in true },
+            dispatchCommand: { requestId, method, args in
+                try await gatewayClient.dispatchCommand(
+                    requestId: requestId,
+                    method: method,
+                    args: args
+                )
+            }
+        )
+    }()
+
     init(
         hostSupervisor: MahayanaLocalHostSupervisor,
         passkeyProvider: (any PasskeyProviding)? = nil,
@@ -1185,6 +1224,18 @@ final class MahayanaCoordinator {
 
     /// Typed transport entry used by RendererPortServer.
     func dispatchTransport(method: String, args: CoordinatorPayload) async -> CoordinatorReplyOutcome {
+        await dispatchTransport(
+            requestId: UUID().uuidString.lowercased(),
+            method: method,
+            args: args
+        )
+    }
+
+    func dispatchTransport(
+        requestId: String,
+        method: String,
+        args: CoordinatorPayload
+    ) async -> CoordinatorReplyOutcome {
         guard lifecycleState != .shuttingDown else {
             return .failed(.init(code: "coordinator-unavailable", message: CoordinatorError.unavailable.localizedDescription))
         }
@@ -1197,16 +1248,19 @@ final class MahayanaCoordinator {
             params["awaitTurn"] = true
             params["source"] = "workflow-reference"
         }
-
-        do {
-            let result = try await request(method: method, params: params)
-            if method == "feature.receive" {
-                acceptHostEventEnvelope(result.value)
-            }
-            return .ok(try CoordinatorPayload.fromFoundation(result.value))
-        } catch {
-            return .failed(.init(code: "request-failed", message: error.localizedDescription))
+        guard let routedArgs = try? CoordinatorPayload.fromFoundation(params) else {
+            return .failed(.init(code: "invalid-params", message: CoordinatorError.invalidParams.localizedDescription))
         }
+        let outcome = await shippingGatewayDispatcher.dispatch(
+            requestId: requestId,
+            method: method,
+            args: routedArgs
+        )
+        if method == "feature.receive",
+           case .ok(let value) = outcome {
+            acceptHostEventEnvelope(value.foundationValue)
+        }
+        return outcome
     }
 
     func reapplyClientPauseAfterCoordinatorLaunch() {

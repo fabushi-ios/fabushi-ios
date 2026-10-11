@@ -841,6 +841,65 @@ final class CoordinatorContractTests: XCTestCase {
         )
     }
 
+    func testSSEDecoderOwnsIncrementalBytesAndPartialUTF8() {
+        var decoder = SSEBlockDecoder()
+        let payload = Data("event: transcript\ndata: 佛法\n\n".utf8)
+        let split = (payload.firstIndex(of: 0xE4) ?? payload.startIndex) + 1
+        XCTAssertEqual(decoder.append(payload.prefix(upTo: split)), [])
+        XCTAssertEqual(
+            decoder.append(payload.suffix(from: split)),
+            [.init(event: "transcript", id: nil, data: "佛法")]
+        )
+    }
+
+    @MainActor
+    func testGatewayClientDedupesRequestIdAndRetriesReadSafeCalls() async throws {
+        var resolveCount = 0
+        var transportCount = 0
+        let supervisor = CoordinatorHostSupervisor(
+            resolveConnection: {
+                resolveCount += 1
+                return .init(baseURL: URL(string: "https://gateway.example")!, headers: [:])
+            },
+            healthProbe: { _ in true }
+        )
+        let client = CoordinatorGatewayClient(
+            supervisor: supervisor,
+            tracedTransport: { _, method, _, trace in
+                transportCount += 1
+                if method == "getState", trace.attempt == 1 {
+                    throw GatewayCommandError(message: "transient")
+                }
+                return .object(["requestId": .string(trace.requestId)])
+            }
+        )
+        async let first = client.dispatchCommand(
+            requestId: "req-1",
+            method: "getState",
+            args: .object([:])
+        )
+        async let second = client.dispatchCommand(
+            requestId: "req-1",
+            method: "getState",
+            args: .object([:])
+        )
+        XCTAssertEqual(try await first, try await second)
+        XCTAssertEqual(transportCount, 2)
+        XCTAssertGreaterThanOrEqual(resolveCount, 1)
+    }
+
+    @MainActor
+    func testGatewayDNSDiagnosticEpisodesAreThrottledPerHost() {
+        var now = Date(timeIntervalSince1970: 100)
+        let tracker = GatewayDNSDiagnosticTracker(now: { now })
+        let url = URL(string: "https://gateway.example/path")!
+        XCTAssertEqual(tracker.recordFailure(url: url, requestId: "r1")?.episode, 1)
+        XCTAssertNil(tracker.recordFailure(url: url, requestId: "r2"))
+        now = now.addingTimeInterval(GatewayDNSDiagnosticTracker.throttleSeconds + 1)
+        XCTAssertEqual(tracker.recordFailure(url: url, requestId: "r3")?.episode, 2)
+        XCTAssertEqual(tracker.emitted.map(\.requestId), ["r1", "r3"])
+    }
+
     @MainActor
     func testClientPauseControlDropsObservedConnectionOnceAndSerializesCoordinatorState() async throws {
         var paused = true
