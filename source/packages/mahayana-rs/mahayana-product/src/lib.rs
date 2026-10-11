@@ -963,12 +963,20 @@ impl MahayanaProductClient {
         &self,
         plugin_id: &str,
         version: &str,
+        platform: Option<&str>,
     ) -> Result<Value, ProductError> {
         let plugin_id = safe_path_identifier(plugin_id, "pluginId")?;
         let version = safe_marketplace_version(version)?;
+        let platform = platform
+            .map(safe_marketplace_platform)
+            .transpose()?;
+        let mut parameters = Vec::new();
+        if let Some(platform) = platform {
+            parameters.push(("platform", platform));
+        }
         self.get_json(
             &format!("/v1/marketplace/plugins/{plugin_id}/releases/{version}"),
-            &[],
+            &parameters,
             None,
         )
     }
@@ -4648,6 +4656,54 @@ mod tests {
             .expect("public marketplace must not require account authorization");
         assert_eq!(catalog["plugins"][0]["pluginId"], "global-dharma");
         server.join().expect("join marketplace test server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn marketplace_release_preserves_native_platform_for_artifact_selection() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind release test server");
+        let address = listener.local_addr().expect("release test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept release request");
+            let mut request = [0_u8; 4096];
+            let size = stream.read(&mut request).expect("read release request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with(
+                "GET /v1/marketplace/plugins/global-dharma/releases/1.1.0?platform=ios "
+            ));
+            assert!(!request.to_ascii_lowercase().contains("authorization:"));
+            let body = r#"{"pluginId":"global-dharma","version":"1.1.0","releaseManifest":{"artifacts":[{"id":"global-dharma-ios-fabapp","platforms":["ios"]}]}}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .expect("write release response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-marketplace-release-platform-test-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let release = client
+            .marketplace_release_metadata("global-dharma", "1.1.0", Some("ios"))
+            .expect("iOS release metadata");
+        assert_eq!(
+            release["releaseManifest"]["artifacts"][0]["id"],
+            "global-dharma-ios-fabapp"
+        );
+        server.join().expect("join release test server");
         let _ = std::fs::remove_dir_all(root);
     }
 
