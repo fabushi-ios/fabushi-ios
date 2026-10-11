@@ -83,6 +83,22 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         )
     }
 
+    func testGeneratedMiniAppDocumentFailsClosedForNetworkAndEmbedding() {
+        let original = "<html><head><title>Draft</title></head><body><script>fetch('https://evil.invalid')</script></body></html>"
+        let hardened = hardenGeneratedMiniAppDocument(original)
+        XCTAssertTrue(hardened.contains("default-src 'none'"))
+        XCTAssertTrue(hardened.contains("connect-src 'none'"))
+        XCTAssertTrue(hardened.contains("frame-src 'none'"))
+        XCTAssertTrue(hardened.contains("object-src 'none'"))
+        XCTAssertTrue(hardened.contains("form-action 'none'"))
+        XCTAssertTrue(hardened.contains("base-uri 'none'"))
+        XCTAssertTrue(hardened.contains("fetch('https://evil.invalid')"))
+        XCTAssertEqual(
+            hardened.components(separatedBy: "Content-Security-Policy").count - 1,
+            1
+        )
+    }
+
     func testGeneratedMiniAppPreviewDigestChangesForEveryByteMutation() {
         let first = generatedMiniAppPreviewDigest("<html><body>draft one</body></html>")
         let same = generatedMiniAppPreviewDigest("<html><body>draft one</body></html>")
