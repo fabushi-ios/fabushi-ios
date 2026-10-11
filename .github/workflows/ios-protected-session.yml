@@ -354,7 +354,7 @@ jobs:
               raise SystemExit("no live Global Dharma WebMCP session registration trace")
           session = sessions[-1]
 
-          if not re.fullmatch(r"fnv64-[0-9a-f]{16}", session.get("account_id", "")):
+          if not re.fullmatch(r"sha256-[0-9a-f]{64}", session.get("account_id", "")):
               raise SystemExit("live WebMCP account identity is missing or not privacy-safe")
           if not re.fullmatch(r"[0-9a-f]{64}", session.get("artifact_sha256", "")):
               raise SystemExit("live WebMCP package digest is missing")
