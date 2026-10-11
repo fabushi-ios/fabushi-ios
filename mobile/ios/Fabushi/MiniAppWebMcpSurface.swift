@@ -12,6 +12,18 @@ func isTrustedWebMcpBridgeHost(_ host: String?) -> Bool {
     return host == webMcpOriginHost || host == localWebMcpOriginHost
 }
 
+func isTrustedWebMcpBridgeURL(_ url: URL?, localRootURL: URL? = nil) -> Bool {
+    guard let url else { return false }
+    if url.scheme == "https" {
+        return isTrustedWebMcpBridgeHost(url.host)
+    }
+    guard url.isFileURL, let localRootURL else { return false }
+    let root = localRootURL.standardizedFileURL
+    let candidate = url.standardizedFileURL
+    let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
+    return candidate.path.hasPrefix(rootPath) && candidate.path != root.path
+}
+
 struct MiniAppWebMcpBridgeSession: Equatable {
     let pluginInstanceId: String
     let nonce: String
@@ -546,6 +558,7 @@ struct MiniAppWebMcpSurface: View {
     @Environment(\.dismiss) private var dismiss
     @State private var status = "正在解析本地 WebMCP…"
     @State private var localHtml: String?
+    @State private var localSource: LocalMiniAppSource?
     @State private var webMcpPlugin: MarketplacePlugin?
     @State private var sourceResolved = false
 
@@ -613,6 +626,7 @@ struct MiniAppWebMcpSurface: View {
                         plugin: webMcpPlugin,
                         model: model,
                         localHtml: localHtml,
+                        localSource: localSource,
                         sourceResolved: true,
                         status: $status
                     )
@@ -633,11 +647,15 @@ struct MiniAppWebMcpSurface: View {
             webMcpPlugin = resolvedPlugin
             if let localHtmlOverride {
                 localHtml = hardenGeneratedMiniAppDocument(localHtmlOverride)
+                localSource = nil
             } else {
-                localHtml = await model.loadLocalMiniAppHtml(plugin: resolvedPlugin)
+                localHtml = nil
+                localSource = await model.loadLocalMiniAppSource(plugin: resolvedPlugin)
             }
             sourceResolved = true
-            status = localHtml == nil ? "正在加载 Hosted WebMCP…" : "正在加载本地 WebMCP…"
+            status = (localHtml == nil && localSource == nil)
+                ? "正在加载 Hosted WebMCP…"
+                : "正在加载本地 WebMCP…"
         }
     }
 }
@@ -646,6 +664,7 @@ private struct MiniAppWebView: UIViewRepresentable {
     let plugin: MarketplacePlugin
     let model: MarketplaceModel
     let localHtml: String?
+    let localSource: LocalMiniAppSource?
     let sourceResolved: Bool
     @Binding var status: String
 
@@ -670,10 +689,34 @@ private struct MiniAppWebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         guard sourceResolved else { return }
-        if let localHtml {
-            let key = "local:\(plugin.pluginId)"
+
+        if let localSource {
+            let key = "local-package:\(plugin.pluginId):\(localSource.version):\(localSource.artifactSha256)"
             guard context.coordinator.loadedSourceKey != key else { return }
             context.coordinator.loadedSourceKey = key
+            let bridgeSession = context.coordinator.prepareLocalBridgeSession()
+            context.coordinator.activeLocalRootURL = localSource.rootURL
+            webView.configuration.userContentController.removeAllUserScripts()
+            webView.configuration.userContentController.addUserScript(
+                WKUserScript(
+                    source: webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: bridgeSession),
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: true
+                )
+            )
+            webView.loadFileURL(
+                localSource.entryURL,
+                allowingReadAccessTo: localSource.rootURL
+            )
+            return
+        }
+
+        if let localHtml {
+            let key = "local-generated:\(plugin.pluginId)"
+            guard context.coordinator.loadedSourceKey != key else { return }
+            context.coordinator.loadedSourceKey = key
+            context.coordinator.activeLocalRootURL = nil
+            webView.configuration.userContentController.removeAllUserScripts()
             let bridgeSession = context.coordinator.prepareLocalBridgeSession()
             let baseURL = URL(string: "https://\(localWebMcpOriginHost)/miniapps/\(plugin.pluginId)/")
             webView.loadHTMLString(
@@ -686,6 +729,8 @@ private struct MiniAppWebView: UIViewRepresentable {
         let key = "hosted:\(plugin.pluginId)"
         guard context.coordinator.loadedSourceKey != key else { return }
         context.coordinator.loadedSourceKey = key
+        context.coordinator.activeLocalRootURL = nil
+        webView.configuration.userContentController.removeAllUserScripts()
         _ = context.coordinator.prepareLocalBridgeSession()
         var components = URLComponents()
         components.scheme = "https"
@@ -701,6 +746,8 @@ private struct MiniAppWebView: UIViewRepresentable {
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(forName: webMcpMessageHandler)
         coordinator.disposeLocalBridgeSession()
+        coordinator.activeLocalRootURL = nil
+        webView.configuration.userContentController.removeAllUserScripts()
         webView.loadHTMLString("", baseURL: nil)
         coordinator.webView = nil
     }
@@ -712,6 +759,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         @Binding private var status: String
         weak var webView: WKWebView?
         var loadedSourceKey: String?
+        var activeLocalRootURL: URL?
         private let toolByName: [String: MiniAppToolContract]
         private var activeBridgeSession: MiniAppWebMcpBridgeSession?
         private var pendingRequests: [String: Task<Void, Never>] = [:]
@@ -743,14 +791,13 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
-            let host = webView.url?.host
-            guard isTrustedWebMcpBridgeHost(host) else {
+            guard isTrustedWebMcpBridgeURL(webView.url, localRootURL: activeLocalRootURL) else {
                 disposeLocalBridgeSession()
                 status = "WebMCP 页面已打开"
                 return
             }
 
-            if host == webMcpOriginHost {
+            if webView.url?.host == webMcpOriginHost {
                 guard let session = activeBridgeSession else {
                     status = "WebMCP 页面已打开"
                     return
@@ -835,10 +882,10 @@ private struct MiniAppWebView: UIViewRepresentable {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
-            guard let url = navigationAction.request.url,
-                  url.scheme == "https",
-                  [webMcpOriginHost, localWebMcpOriginHost].contains(url.host ?? "")
-            else {
+            guard isTrustedWebMcpBridgeURL(
+                navigationAction.request.url,
+                localRootURL: activeLocalRootURL
+            ) else {
                 decisionHandler(.cancel)
                 return
             }
@@ -848,7 +895,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.name == webMcpMessageHandler,
                   let webView,
-                  isTrustedWebMcpBridgeHost(webView.url?.host),
+                  isTrustedWebMcpBridgeURL(webView.url, localRootURL: activeLocalRootURL),
                   let body = message.body as? [String: Any],
                   let pluginInstanceId = body["pluginInstanceId"] as? String,
                   let nonce = body["nonce"] as? String,

@@ -1624,6 +1624,23 @@ struct MiniAppToolContract: Equatable, Sendable {
     }
 }
 
+struct LocalMiniAppSource: Equatable, Sendable {
+    let pluginId: String
+    let version: String
+    let artifactSha256: String
+    let entry: String
+    let rootURL: URL
+    let entryURL: URL
+}
+
+struct LocalMiniAppResourceChunk: Sendable {
+    let data: Data
+    let mime: String
+    let offset: UInt64
+    let totalBytes: UInt64
+    let eof: Bool
+}
+
 struct MarketplacePlugin: Identifiable, Equatable, Sendable {
     let pluginId: String
     let displayName: String
@@ -5142,31 +5159,93 @@ final class MarketplaceModel {
         }
     }
 
-    private func localMiniAppHtml(pluginId: String) async throws -> String {
+    private func localMiniAppSource(pluginId: String) async throws -> LocalMiniAppSource {
         let result = try await bridge.request(
             method: "feature.plugin.uiDocument",
             params: ["pluginId": pluginId]
         )
-        guard let html = (result.value as? [String: Any])?["html"] as? String,
-              !html.isEmpty
+        guard let object = result.value as? [String: Any],
+              object["pluginId"] as? String == pluginId,
+              let version = object["version"] as? String, !version.isEmpty,
+              let artifactSha256 = object["artifactSha256"] as? String,
+              artifactSha256.range(of: #"^[0-9A-Fa-f]{64}$"#, options: .regularExpression) != nil,
+              let entry = object["entry"] as? String, !entry.isEmpty,
+              let installedPath = object["installedPath"] as? String, !installedPath.isEmpty
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
-        return html
+
+        let rootURL = URL(fileURLWithPath: installedPath, isDirectory: true).standardizedFileURL
+        let entryURL = rootURL.appendingPathComponent(entry, isDirectory: false).standardizedFileURL
+        let rootPath = rootURL.path.hasSuffix("/") ? rootURL.path : rootURL.path + "/"
+        guard entryURL.isFileURL,
+              entryURL.path.hasPrefix(rootPath),
+              entryURL.path != rootURL.path
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return LocalMiniAppSource(
+            pluginId: pluginId,
+            version: version,
+            artifactSha256: artifactSha256.lowercased(),
+            entry: entry,
+            rootURL: rootURL,
+            entryURL: entryURL
+        )
     }
 
-    func loadLocalMiniAppHtml(plugin: MarketplacePlugin) async -> String? {
+    func loadLocalMiniAppSource(plugin: MarketplacePlugin) async -> LocalMiniAppSource? {
         do {
-            return try await localMiniAppHtml(pluginId: plugin.pluginId)
+            return try await localMiniAppSource(pluginId: plugin.pluginId)
         } catch {
             do {
                 try await reconcileLocalMiniAppInstall(plugin)
-                return try await localMiniAppHtml(pluginId: plugin.pluginId)
+                return try await localMiniAppSource(pluginId: plugin.pluginId)
             } catch {
                 message = "本地 Mini App 包不可用，转 Hosted WebMCP：\(error.localizedDescription)"
                 return nil
             }
         }
+    }
+
+    func readLocalMiniAppResource(
+        source: LocalMiniAppSource,
+        path: String,
+        offset: UInt64 = 0,
+        length: UInt64 = 256 * 1024
+    ) async throws -> LocalMiniAppResourceChunk {
+        let result = try await bridge.request(
+            method: "feature.plugin.uiResource",
+            params: [
+                "pluginId": source.pluginId,
+                "path": path,
+                "version": source.version,
+                "artifactSha256": source.artifactSha256,
+                "offset": NSNumber(value: offset),
+                "length": NSNumber(value: min(max(length, 1), 1024 * 1024)),
+            ]
+        )
+        guard let object = result.value as? [String: Any],
+              object["pluginId"] as? String == source.pluginId,
+              object["version"] as? String == source.version,
+              let digest = object["artifactSha256"] as? String,
+              digest.caseInsensitiveCompare(source.artifactSha256) == .orderedSame,
+              let encoded = object["dataBase64"] as? String,
+              let data = Data(base64Encoded: encoded),
+              let mime = object["mime"] as? String,
+              let returnedOffset = (object["offset"] as? NSNumber)?.uint64Value,
+              let totalBytes = (object["totalBytes"] as? NSNumber)?.uint64Value,
+              let eof = object["eof"] as? Bool
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return LocalMiniAppResourceChunk(
+            data: data,
+            mime: mime,
+            offset: returnedOffset,
+            totalBytes: totalBytes,
+            eof: eof
+        )
     }
 
     func callWebMcpTool(pluginId: String, name: String, arguments: [String: Any]) async throws -> Any {

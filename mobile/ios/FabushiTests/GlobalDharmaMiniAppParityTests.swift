@@ -29,6 +29,16 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertFalse(isTrustedWebMcpBridgeHost("ombhrum.com"))
         XCTAssertFalse(isTrustedWebMcpBridgeHost("fabushi.ombhrum.com.evil.invalid"))
         XCTAssertFalse(isTrustedWebMcpBridgeHost(nil))
+
+        XCTAssertTrue(isTrustedWebMcpBridgeURL(URL(string: "https://fabushi.ombhrum.com/miniapps/test/")))
+        XCTAssertFalse(isTrustedWebMcpBridgeURL(URL(string: "http://fabushi.ombhrum.com/miniapps/test/")))
+
+        let root = URL(fileURLWithPath: "/tmp/fabushi/plugins/test/versions/1.0.0/web", isDirectory: true)
+        let entry = root.appendingPathComponent("index.html")
+        let sibling = URL(fileURLWithPath: "/tmp/fabushi/plugins/other/index.html")
+        XCTAssertTrue(isTrustedWebMcpBridgeURL(entry, localRootURL: root))
+        XCTAssertFalse(isTrustedWebMcpBridgeURL(root, localRootURL: root))
+        XCTAssertFalse(isTrustedWebMcpBridgeURL(sibling, localRootURL: root))
     }
 
     func testWebMcpToolContractPreservesCanonicalInputSchemaForNativeAndInjectedUX() throws {

@@ -1750,6 +1750,7 @@ impl AppHost {
             "entry": entry,
             "version": pointer.version,
             "artifactSha256": pointer.artifact_sha256,
+            "installedPath": pointer.installed_path,
         }))
     }
 
