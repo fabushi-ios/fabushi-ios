@@ -433,6 +433,35 @@ final class MessagingModel {
         ])
     }
 
+    func loadBlobRange(
+        blobId: String,
+        offset: Int,
+        length: Int,
+        sizeBytes: Int
+    ) async throws -> Data {
+        guard sizeBytes > 0,
+              offset >= 0,
+              offset < sizeBytes,
+              length > 0
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let requested = min(length, sizeBytes - offset)
+        let response = try await bridge.request(
+            method: "feature.messaging.blob.read",
+            params: ["blobId": blobId, "offset": offset, "length": requested]
+        )
+        guard let object = response.value as? [String: Any],
+              let encoded = object["dataBase64"] as? String,
+              let chunk = Data(base64Encoded: encoded),
+              !chunk.isEmpty,
+              chunk.count <= requested
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return chunk
+    }
+
     func loadBlob(blobId: String, sizeBytes: Int) async throws -> Data {
         guard sizeBytes > 0 else { return Data() }
         var result = Data()
@@ -440,10 +469,12 @@ final class MessagingModel {
         let chunkSize = 1024 * 1024
         while offset < sizeBytes {
             let requested = min(chunkSize, sizeBytes - offset)
-            let response = try await bridge.request(method: "feature.messaging.blob.read", params: ["blobId": blobId, "offset": offset, "length": requested])
-            guard let object = response.value as? [String: Any], let encoded = object["dataBase64"] as? String, let chunk = Data(base64Encoded: encoded), !chunk.isEmpty else {
-                throw MahayanaCoordinator.CoordinatorError.invalidResponse
-            }
+            let chunk = try await loadBlobRange(
+                blobId: blobId,
+                offset: offset,
+                length: requested,
+                sizeBytes: sizeBytes
+            )
             result.append(chunk)
             offset += chunk.count
         }

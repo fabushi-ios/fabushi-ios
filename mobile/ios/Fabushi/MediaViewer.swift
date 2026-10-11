@@ -1,7 +1,9 @@
+@preconcurrency import AVFoundation
 import AVKit
 import PDFKit
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 let nativePdfPreviewByteCap = 25 * 1024 * 1024
 
@@ -68,6 +70,175 @@ internal func clampedMediaAttachmentIndex(_ index: Int, count: Int) -> Int {
     return min(max(0, index), count - 1)
 }
 
+let nativeMediaRemoteChunkBytes = 4 * 1024 * 1024
+
+internal struct NativeMediaLoadingRange: Equatable, Sendable {
+    let offset: Int
+    let length: Int
+}
+
+internal func nativeMediaLoadingRange(
+    requestedOffset: Int64,
+    currentOffset: Int64,
+    requestedLength: Int,
+    requestsAllDataToEndOfResource: Bool,
+    sizeBytes: Int
+) -> NativeMediaLoadingRange? {
+    guard sizeBytes > 0 else { return nil }
+    let start = max(requestedOffset, currentOffset)
+    guard start >= 0, start < Int64(sizeBytes) else { return nil }
+
+    let endExclusive: Int64
+    if requestsAllDataToEndOfResource {
+        endExclusive = Int64(sizeBytes)
+    } else {
+        guard requestedLength > 0 else { return nil }
+        let requestedEnd = start.addingReportingOverflow(Int64(requestedLength))
+        guard !requestedEnd.overflow else { return nil }
+        endExclusive = min(Int64(sizeBytes), requestedEnd.partialValue)
+    }
+    guard endExclusive > start else { return nil }
+    return .init(offset: Int(start), length: Int(endExclusive - start))
+}
+
+@MainActor
+private final class NativeMessagingBlobAssetLoader: NSObject, @preconcurrency AVAssetResourceLoaderDelegate {
+    private let messaging: MessagingModel
+    private let blobId: String
+    private let sizeBytes: Int
+    private let mimeType: String?
+    private let assetURL: URL
+    private let onFailure: (String) -> Void
+    private var loadingTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
+
+    init(
+        messaging: MessagingModel,
+        blobId: String,
+        sizeBytes: Int,
+        mimeType: String?,
+        onFailure: @escaping (String) -> Void
+    ) {
+        self.messaging = messaging
+        self.blobId = blobId
+        self.sizeBytes = sizeBytes
+        self.mimeType = mimeType
+        self.onFailure = onFailure
+        let token = Data(blobId.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        self.assetURL = URL(string: "fabushi-media-blob://attachment/\(token)")!
+        super.init()
+    }
+
+    func makeAsset() -> AVURLAsset {
+        let asset = AVURLAsset(url: assetURL)
+        asset.resourceLoader.setDelegate(self, queue: .main)
+        return asset
+    }
+
+    func cancelAll() {
+        for task in loadingTasks.values {
+            task.cancel()
+        }
+        loadingTasks.removeAll()
+    }
+
+    func resourceLoader(
+        _ resourceLoader: AVAssetResourceLoader,
+        shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest
+    ) -> Bool {
+        let key = ObjectIdentifier(loadingRequest)
+        loadingTasks[key]?.cancel()
+        loadingTasks[key] = Task { @MainActor [weak self, weak loadingRequest] in
+            guard let self, let loadingRequest else { return }
+            defer { self.loadingTasks.removeValue(forKey: key) }
+            do {
+                try await self.fulfill(loadingRequest)
+            } catch is CancellationError {
+                return
+            } catch {
+                self.onFailure(error.localizedDescription)
+                loadingRequest.finishLoading(with: error)
+            }
+        }
+        return true
+    }
+
+    func resourceLoader(
+        _ resourceLoader: AVAssetResourceLoader,
+        didCancel loadingRequest: AVAssetResourceLoadingRequest
+    ) {
+        let key = ObjectIdentifier(loadingRequest)
+        loadingTasks.removeValue(forKey: key)?.cancel()
+    }
+
+    private func fulfill(_ loadingRequest: AVAssetResourceLoadingRequest) async throws {
+        if let info = loadingRequest.contentInformationRequest {
+            if let mimeType,
+               let type = UTType(mimeType: mimeType) {
+                info.contentType = type.identifier
+            } else {
+                info.contentType = UTType.movie.identifier
+            }
+            info.contentLength = Int64(sizeBytes)
+            info.isByteRangeAccessSupported = true
+        }
+
+        guard let dataRequest = loadingRequest.dataRequest else {
+            loadingRequest.finishLoading()
+            return
+        }
+        guard let range = nativeMediaLoadingRange(
+            requestedOffset: dataRequest.requestedOffset,
+            currentOffset: dataRequest.currentOffset,
+            requestedLength: dataRequest.requestedLength,
+            requestsAllDataToEndOfResource: dataRequest.requestsAllDataToEndOfResource,
+            sizeBytes: sizeBytes
+        ) else {
+            throw NSError(
+                domain: "FabushiMediaStream",
+                code: 416,
+                userInfo: [NSLocalizedDescriptionKey: "Requested media range is outside the attachment."]
+            )
+        }
+
+        var offset = range.offset
+        var remaining = range.length
+        while remaining > 0 {
+            try Task.checkCancellation()
+            let requested = min(nativeMediaRemoteChunkBytes, remaining)
+            let chunk = try await messaging.loadBlobRange(
+                blobId: blobId,
+                offset: offset,
+                length: requested,
+                sizeBytes: sizeBytes
+            )
+            guard !chunk.isEmpty, chunk.count <= requested else {
+                throw NSError(
+                    domain: "FabushiMediaStream",
+                    code: 502,
+                    userInfo: [NSLocalizedDescriptionKey: "Media source returned an invalid byte range."]
+                )
+            }
+            dataRequest.respond(with: chunk)
+            offset += chunk.count
+            remaining -= chunk.count
+            if chunk.count < requested {
+                guard offset >= sizeBytes else {
+                    throw NSError(
+                        domain: "FabushiMediaStream",
+                        code: 502,
+                        userInfo: [NSLocalizedDescriptionKey: "Media source ended before the requested byte range."]
+                    )
+                }
+                break
+            }
+        }
+        loadingRequest.finishLoading()
+    }
+}
+
 private struct NativePDFPreview: UIViewRepresentable {
     let url: URL
 
@@ -96,6 +267,8 @@ struct MediaViewer: View {
 
     @State private var data: Data?
     @State private var localURL: URL?
+    @State private var videoPlayer: AVPlayer?
+    @State private var videoAssetLoader: NativeMessagingBlobAssetLoader?
     @State private var errorMessage: String?
     @State private var loading = true
     @State private var loadGeneration = 0
@@ -230,8 +403,8 @@ struct MediaViewer: View {
                     .accessibilityLabel(selectedAttachment?.fileName ?? "Image preview")
                     .accessibilityHint("Pinch to zoom, drag to pan, double tap to fit")
             }
-        } else if selectedAttachment?.contentType == "video", let localURL {
-            VideoPlayer(player: AVPlayer(url: localURL)).ignoresSafeArea(edges: .bottom)
+        } else if selectedAttachment?.contentType == "video", let videoPlayer {
+            VideoPlayer(player: videoPlayer).ignoresSafeArea(edges: .bottom)
         } else if isNativePdfAttachment(mimeType: selectedAttachment?.mimeType, fileName: selectedAttachment?.fileName),
                   let localURL {
             NativePDFPreview(url: localURL)
@@ -289,6 +462,7 @@ struct MediaViewer: View {
         loadGeneration = loadGeneration == Int.max ? 1 : loadGeneration + 1
         let generation = loadGeneration
         resetImageTransform()
+        stopStreamingVideo()
         if let staleURL = localURL { try? FileManager.default.removeItem(at: staleURL) }
         data = nil
         localURL = nil
@@ -316,6 +490,26 @@ struct MediaViewer: View {
             errorMessage = "Spreadsheet 超过 25 MB，无法在 Fabushi 内预览；可导出后打开。"
             return
         }
+        if attachment.contentType == "video" {
+            let loader = NativeMessagingBlobAssetLoader(
+                messaging: messaging,
+                blobId: blobId,
+                sizeBytes: attachment.sizeBytes,
+                mimeType: attachment.mimeType
+            ) { message in
+                guard generation == loadGeneration else { return }
+                errorMessage = message
+            }
+            let player = AVPlayer(playerItem: AVPlayerItem(asset: loader.makeAsset()))
+            guard generation == loadGeneration, !Task.isCancelled else {
+                loader.cancelAll()
+                return
+            }
+            videoAssetLoader = loader
+            videoPlayer = player
+            return
+        }
+
         do {
             let bytes = try await messaging.loadBlob(blobId: blobId, sizeBytes: attachment.sizeBytes)
             guard generation == loadGeneration, !Task.isCancelled else { return }
@@ -339,9 +533,18 @@ struct MediaViewer: View {
     }
 
     @MainActor
+    private func stopStreamingVideo() {
+        videoPlayer?.pause()
+        videoPlayer = nil
+        videoAssetLoader?.cancelAll()
+        videoAssetLoader = nil
+    }
+
+    @MainActor
     private func invalidateLoadAndCleanUp() {
         loadGeneration = loadGeneration == Int.max ? 1 : loadGeneration + 1
         resetImageTransform()
+        stopStreamingVideo()
         if let localURL { try? FileManager.default.removeItem(at: localURL) }
         data = nil
         localURL = nil

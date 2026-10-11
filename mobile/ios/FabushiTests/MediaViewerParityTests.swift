@@ -78,4 +78,49 @@ final class MediaViewerParityTests: XCTestCase {
         XCTAssertEqual(clampedMediaAttachmentIndex(99, count: 2), 1)
     }
 
+
+    func testStreamingRangeUsesCurrentOffsetAndClampsToAttachmentBounds() {
+        XCTAssertEqual(nativeMediaRemoteChunkBytes, 4 * 1024 * 1024)
+
+        XCTAssertEqual(
+            nativeMediaLoadingRange(
+                requestedOffset: 0,
+                currentOffset: 1024,
+                requestedLength: 4096,
+                requestsAllDataToEndOfResource: false,
+                sizeBytes: 10_000
+            ),
+            NativeMediaLoadingRange(offset: 1024, length: 4096)
+        )
+        XCTAssertEqual(
+            nativeMediaLoadingRange(
+                requestedOffset: 9_000,
+                currentOffset: 9_000,
+                requestedLength: 4_096,
+                requestsAllDataToEndOfResource: false,
+                sizeBytes: 10_000
+            ),
+            NativeMediaLoadingRange(offset: 9_000, length: 1_000)
+        )
+        XCTAssertEqual(
+            nativeMediaLoadingRange(
+                requestedOffset: 4_000,
+                currentOffset: 4_000,
+                requestedLength: 1,
+                requestsAllDataToEndOfResource: true,
+                sizeBytes: 10_000
+            ),
+            NativeMediaLoadingRange(offset: 4_000, length: 6_000)
+        )
+        XCTAssertNil(
+            nativeMediaLoadingRange(
+                requestedOffset: 10_000,
+                currentOffset: 10_000,
+                requestedLength: 1,
+                requestsAllDataToEndOfResource: false,
+                sizeBytes: 10_000
+            )
+        )
+    }
+
 }
