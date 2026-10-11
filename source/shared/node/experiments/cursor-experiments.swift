@@ -257,6 +257,59 @@ final class SandExperimentService: @unchecked Sendable {
         publishSnapshot()
     }
 
+    private enum RefreshStart {
+        case disposed
+        case throttled(retryAfterMs: Int64)
+        case ready(refreshRevision: UInt64, authRevision: UInt64)
+    }
+
+    private func prepareRefresh(
+        trigger: SandExperimentRefreshTrigger,
+        nowMs: Int64
+    ) -> RefreshStart {
+        lock.lock()
+        defer { lock.unlock() }
+        if disposed { return .disposed }
+        if trigger != .authChange,
+           let until = rateLimitedUntilMs,
+           until > nowMs {
+            return .throttled(retryAfterMs: until - nowMs)
+        }
+        refreshRevision = refreshRevision == UInt64.max ? 1 : refreshRevision + 1
+        return .ready(
+            refreshRevision: refreshRevision,
+            authRevision: authRevision
+        )
+    }
+
+    private func recordRateLimit(
+        _ retryAfterMs: Int,
+        expectedRefreshRevision: UInt64,
+        expectedAuthRevision: UInt64
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !disposed,
+              refreshRevision == expectedRefreshRevision,
+              authRevision == expectedAuthRevision
+        else { return }
+        rateLimitedUntilMs = Int64(Date().timeIntervalSince1970 * 1_000)
+            + Int64(max(0, retryAfterMs))
+    }
+
+    private func clearRateLimitIfCurrent(
+        expectedRefreshRevision: UInt64,
+        expectedAuthRevision: UInt64
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !disposed,
+              refreshRevision == expectedRefreshRevision,
+              authRevision == expectedAuthRevision
+        else { return }
+        rateLimitedUntilMs = nil
+    }
+
     func refresh(
         backendUrl: String,
         getAccessToken: @escaping @Sendable (String) async throws -> String,
@@ -265,28 +318,24 @@ final class SandExperimentService: @unchecked Sendable {
         session: URLSession = .shared
     ) async {
         let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
-        lock.lock()
-        if disposed {
-            lock.unlock()
+        let expectedRefreshRevision: UInt64
+        let expectedAuthRevision: UInt64
+        switch prepareRefresh(trigger: trigger, nowMs: nowMs) {
+        case .disposed:
             return
-        }
-        if trigger != .authChange,
-           let until = rateLimitedUntilMs,
-           until > nowMs {
-            lock.unlock()
+        case .throttled(let retryAfterMs):
             reportExperimentsDiagnostic(.init(
                 kind: "bootstrap_rate_limit_wait",
                 metadata: [
                     "trigger": trigger.rawValue,
-                    "retryAfterMs": String(until - nowMs),
+                    "retryAfterMs": String(retryAfterMs),
                 ]
             ))
             return
+        case .ready(let refreshRevision, let authRevision):
+            expectedRefreshRevision = refreshRevision
+            expectedAuthRevision = authRevision
         }
-        refreshRevision = refreshRevision == UInt64.max ? 1 : refreshRevision + 1
-        let expectedRefreshRevision = refreshRevision
-        let expectedAuthRevision = authRevision
-        lock.unlock()
 
         do {
             try Task.checkCancellation()
@@ -301,14 +350,11 @@ final class SandExperimentService: @unchecked Sendable {
             try Task.checkCancellation()
 
             if let retryAfterMs = result.retryAfterMs {
-                lock.lock()
-                if !disposed,
-                   refreshRevision == expectedRefreshRevision,
-                   authRevision == expectedAuthRevision {
-                    rateLimitedUntilMs = Int64(Date().timeIntervalSince1970 * 1_000)
-                        + Int64(max(0, retryAfterMs))
-                }
-                lock.unlock()
+                recordRateLimit(
+                    retryAfterMs,
+                    expectedRefreshRevision: expectedRefreshRevision,
+                    expectedAuthRevision: expectedAuthRevision
+                )
                 reportExperimentsDiagnostic(.init(
                     kind: "bootstrap_rate_limited",
                     metadata: [
@@ -332,9 +378,10 @@ final class SandExperimentService: @unchecked Sendable {
                 ))
                 return
             }
-            lock.lock()
-            rateLimitedUntilMs = nil
-            lock.unlock()
+            clearRateLimitIfCurrent(
+                expectedRefreshRevision: expectedRefreshRevision,
+                expectedAuthRevision: expectedAuthRevision
+            )
             saveCachedBootstrap(
                 getCacheDir(),
                 cache: .init(
@@ -374,7 +421,7 @@ final class SandExperimentService: @unchecked Sendable {
         live: Bool = true,
         expectedRefreshRevision: UInt64? = nil,
         expectedAuthRevision: UInt64? = nil
-    ) -> Bool {    func hydrate(config: String, fetchedAtMs: Int64? = nil, live: Bool = true) {
+    ) -> Bool {
         guard let data = config.data(using: .utf8),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             reportExperimentsDiagnostic(.init(kind: "bootstrap_hydrate_failed"))
