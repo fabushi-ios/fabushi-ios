@@ -630,12 +630,25 @@ final class MahayanaCoordinator {
 
     func acceptHostEventEnvelope(_ value: Any) {
         guard let envelope = value as? [String: Any],
-              envelope["channel"] as? String == ClientSideToolV2Transport.family,
-              let payload = envelope["payload"],
-              let transportEvent = ClientSideToolV2TransportEvent.fromFoundation(payload),
-              let projected = clientSideToolV2Relay.accept(transportEvent)
+              let channel = envelope["channel"] as? String,
+              let payload = envelope["payload"]
         else { return }
-        rendererEventSink?(ClientSideToolV2Transport.family, projected.coordinatorPayload)
+
+        if channel == ClientSideToolV2Transport.family {
+            guard let transportEvent = ClientSideToolV2TransportEvent.fromFoundation(payload),
+                  let projected = clientSideToolV2Relay.accept(transportEvent)
+            else { return }
+            rendererEventSink?(
+                ClientSideToolV2Transport.family,
+                projected.coordinatorPayload
+            )
+            return
+        }
+
+        guard let family = CoordinatorEventFamilies.family(forChannel: channel),
+              let projected = try? CoordinatorPayload.fromFoundation(payload)
+        else { return }
+        rendererEventSink?(family, projected)
     }
 
     func updateAccountSettingsScope(_ accountScope: String?) {

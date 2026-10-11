@@ -20,6 +20,20 @@ private final class GatewayAsyncGate {
 }
 
 @MainActor
+@MainActor
+private final class GatewayEventHost: MahayanaHostRequesting, @unchecked Sendable {
+    var envelope: [String: Any]
+    init(envelope: [String: Any]) { self.envelope = envelope }
+
+    func request(
+        method: String,
+        params: [String: Any]
+    ) async throws -> MahayanaHostJSONResult {
+        guard method == "feature.receive" else { return .init(value: NSNull()) }
+        return .init(value: envelope)
+    }
+}
+
 final class GatewayParityTests: XCTestCase {
     private func waitForGate(_ gate: GatewayAsyncGate) async {
         for _ in 0..<64 {
@@ -191,5 +205,35 @@ final class GatewayParityTests: XCTestCase {
             2
         )
         XCTAssertEqual(tracker.emitted.map(\.requestId), ["r1", "r4"])
+    }
+
+    func testFeatureReceiveProjectsCanonicalGatewayEventFamilyAndDropsUnknownChannel() async throws {
+        let host = GatewayEventHost(envelope: [
+            "channel": "workflows",
+            "payload": ["workflowId": "wf-1"],
+        ])
+        let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
+        let coordinator = MahayanaCoordinator(hostSupervisor: supervisor)
+        var projected: [(String, CoordinatorPayload)] = []
+        coordinator.setRendererEventSink { family, payload in projected.append((family, payload)) }
+
+        let outcome = await coordinator.dispatchTransport(
+            requestId: "event-request-1",
+            method: "feature.receive",
+            args: .object([:])
+        )
+        guard case .ok = outcome else { return XCTFail("feature.receive must settle through shipping transport") }
+        XCTAssertEqual(projected.count, 1)
+        XCTAssertEqual(projected.first?.0, "agents-workflow")
+        XCTAssertEqual(projected.first?.1, .object(["workflowId": .string("wf-1")]))
+
+        host.envelope = ["channel": "unknown-channel", "payload": ["ignored": true]]
+        let unknown = await coordinator.dispatchTransport(
+            requestId: "event-request-2",
+            method: "feature.receive",
+            args: .object([:])
+        )
+        guard case .ok = unknown else { return XCTFail("unknown channel response should settle") }
+        XCTAssertEqual(projected.count, 1)
     }
 }

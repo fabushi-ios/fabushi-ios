@@ -140,10 +140,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/gateway/gateway-event-families.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Static Swift dictionaries replace Rust slice helpers.",
-      "implementation_status": "mapped",
-      "production_evidence": "CoordinatorEventFamilies carries the current channel/family mapping in the application source set.",
-      "test_evidence": "",
-      "notes": "IOS-MAIN-COORD-GW-005: reviewed Desktop blob ebc3a0e0fa5ddff31bf211be7284c2de0138aa93. Production SSE consumer reachability and exact mapping tests remain pending, so status is mapped only."
+      "implementation_status": "implemented",
+      "production_evidence": "The shipping RendererPortServer -> IOSMainRuntime -> MahayanaCoordinator.dispatchTransport feature.receive path passes Host event envelopes into MahayanaCoordinator.acceptHostEventEnvelope. That production ingress maps known Gateway channels through CoordinatorEventFamilies.family(forChannel:) before posting them to the live renderer event sink; client-side-tool-v2 retains its stricter typed relay, and unknown channels fail closed.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testFeatureReceiveProjectsCanonicalGatewayEventFamilyAndDropsUnknownChannel; existing ClientSideToolV2 relay tests retain typed special-case coverage.",
+      "notes": "IOS-MAIN-COORD-GW-005: the mapping is consumed by the real feature.receive -> Renderer event path. Marked implemented only; exact-head CI is required before verified.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway event-family production composition"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_reachability.rs",
