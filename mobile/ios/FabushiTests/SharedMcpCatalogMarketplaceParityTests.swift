@@ -48,6 +48,29 @@ private actor MarketplaceListingClientStub: SandMarketplaceListingClient {
 }
 
 final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
+    func testMarketplaceSkillSourcePinsMutableBlobRefToExactInstalledVersion() {
+        let version = "ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+        XCTAssertEqual(
+            pinnedMarketplaceSkillSourceUrl(
+                "https://github.com/example/connectors/blob/main/github/skills/review/SKILL.md",
+                versionRef: version
+            ),
+            "https://github.com/example/connectors/blob/abcdef0123456789abcdef0123456789abcdef01/github/skills/review/SKILL.md"
+        )
+        XCTAssertNil(
+            pinnedMarketplaceSkillSourceUrl(
+                "https://github.com/example/connectors/blob/main/github/skills/review/SKILL.md",
+                versionRef: "main"
+            )
+        )
+        XCTAssertNil(
+            pinnedMarketplaceSkillSourceUrl(
+                "https://raw.githubusercontent.com/example/connectors/main/github/skills/review/SKILL.md",
+                versionRef: version
+            )
+        )
+    }
+
     private static func plugin(
         id: String = "101",
         displayName: String = "GitHub",
