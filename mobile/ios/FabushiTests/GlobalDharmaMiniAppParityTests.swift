@@ -341,6 +341,13 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(valid, [])
     }
 
+    func testGlobalDharmaRequiresCurrentLocalPackageAndActivePageSession() {
+        XCTAssertTrue(MarketplaceModel.requiresVerifiedLocalMiniAppPackage(pluginId: "global-dharma"))
+        XCTAssertTrue(MarketplaceModel.requiresActiveLocalWebMcpSession(pluginId: "global-dharma"))
+        XCTAssertFalse(MarketplaceModel.requiresVerifiedLocalMiniAppPackage(pluginId: "other-miniapp"))
+        XCTAssertFalse(MarketplaceModel.requiresActiveLocalWebMcpSession(pluginId: "other-miniapp"))
+    }
+
     func testGlobalDharmaStatusFallbackIsReadOnlyAndNarrow() {
         let tool = MarketplaceModel.globalDharmaStatusFallbackTool
         XCTAssertEqual(tool.name, "status")
