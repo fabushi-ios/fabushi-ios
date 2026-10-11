@@ -2025,15 +2025,13 @@ final class MarketplaceModel {
     func updateAgentDockBadge(from roster: [MobileBotSummary]) async {
         guard loggedIn else { return }
         let generation = nextAgentDockBadgeGeneration()
-        let agents = roster
-            .filter { !$0.isGroup }
-            .map {
-                IOSDockBadgeAgent(
-                    hasUnread: $0.unread,
-                    isHiddenFromSidebar: $0.hidden,
-                    unreadCount: nil
-                )
-            }
+        let agents = roster.map {
+            IOSDockBadgeAgent(
+                hasUnread: $0.unread,
+                isHiddenFromSidebar: $0.hidden,
+                unreadCount: nil
+            )
+        }
         _ = await agentDockBadgeController.update(
             agents: agents,
             generation: generation

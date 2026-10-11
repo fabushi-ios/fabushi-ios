@@ -65,7 +65,8 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         let snapshot = await controller.snapshot()
         XCTAssertEqual(snapshot.generation, 3)
         XCTAssertEqual(snapshot.total, 0)
-        XCTAssertEqual(await applier.recordedCounts(), [1, 0])
+        let recordedCounts = await applier.recordedCounts()
+        XCTAssertEqual(recordedCounts, [1, 0])
     }
 
     func testLocalExecProcessIdentityRequiresExactGenerationArguments() {
