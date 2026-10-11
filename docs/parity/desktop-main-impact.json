@@ -1870,6 +1870,24 @@
         "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
         "status": "current-main-reviewed-native-passkey-deadline-implemented-pending-exact-head",
         "finding": "Audit found a real production gap: IOSPasskeyStall existed but the shipping AuthenticationServices provider did not use a 60-second stall fence. IOSAuthenticationServicesPasskeyProvider now arms the shared deadline, emits method/since lifecycle telemetry, fails the active ceremony closed, and rejects late callbacks by controller identity/generation. IOSMainRuntime wires this provider into MahayanaCoordinator; aggregate review and descendant exact-head CI remain pending."
+      },
+      {
+        "path": "source/electron-preload/preload-dev-controls.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-dev-controls-implemented-pending-exact-head",
+        "finding": "Desktop trusted dev-controls preload is replaced by DEBUG-only IOSDevControlsPreloadEntrypoint over the single IOSPreloadBridge. IOSDevControlsContract explicitly partitions canonical methods into local/remoteRunner/unavailable native replacements, and IOSNativeDevControlAdapter intercepts local network controls before production Host dispatch. Release builds fail closed."
+      },
+      {
+        "path": "source/electron-preload/runtime/dev-controls.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-entrypoint-implemented-pending-exact-head",
+        "finding": "Desktop dev-controls preload runtime entrypoint maps to FabushiRuntime DEBUG composition -> IOSDevControlsPreloadEntrypoint.installIfEnabled. Explicit capability gating prevents a second release runtime owner."
+      },
+      {
+        "path": "source/electron-preload/runtime/primary.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-primary-entrypoint-implemented-pending-exact-head",
+        "finding": "Desktop primary preload entrypoint maps to App -> FabushiSceneRoot -> FabushiRuntime -> IOSPrimaryPreloadEntrypoint -> IOSPreloadBridge, the single shipping privileged boundary shared by Marketplace/Messaging/native surfaces."
       }
     ]
   },
