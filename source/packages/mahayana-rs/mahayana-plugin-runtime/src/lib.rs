@@ -3123,6 +3123,7 @@ pub enum RuntimeError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::Signer;
     use flate2::{Compression, write::GzEncoder};
     use std::sync::{
         Arc,
@@ -3973,7 +3974,6 @@ mod tests {
                 value: String::new(),
             },
         };
-        use ed25519_dalek::Signer as _;
         manifest.signature.value = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .encode(signing.sign(&fabapp_signing_payload(&manifest).unwrap()).to_bytes());
         let package = fabapp_zip(&manifest, &[("index.html", html)]);
