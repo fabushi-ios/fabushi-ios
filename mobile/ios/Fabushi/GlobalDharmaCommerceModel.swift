@@ -57,12 +57,16 @@ final class GlobalDharmaCommerceModel {
     var accessReason = "not_loaded"
     var lifetimeOffer: GlobalDharmaLifetimeOffer?
     var busy = false
-    var message = "正在检查本地转经轮权限…"
+    var message = "免费功能可离线使用；本地转经轮在执行、购买或恢复时联网核验权限"
     var lastPaymentId: String?
 
     var canBuyLifetime: Bool {
-        guard let lifetimeOffer else { return false }
-        return !accessAllowed && lifetimeOffer.matchesCanonicalLifetime && lifetimeOffer.appleStoreAvailable && !busy
+        guard !accessAllowed, !busy else { return false }
+        // Before the user explicitly enters a protected commerce flow we do
+        // not fetch entitlement/catalog data. The purchase action performs
+        // that fetch first and still fails closed on SKU/price/rail mismatch.
+        guard let lifetimeOffer else { return true }
+        return lifetimeOffer.matchesCanonicalLifetime && lifetimeOffer.appleStoreAvailable
     }
 
     var lifetimePriceLabel: String {
