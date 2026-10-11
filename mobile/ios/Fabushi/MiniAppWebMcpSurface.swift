@@ -1292,12 +1292,20 @@ private struct MiniAppWebView: UIViewRepresentable {
                     guard self.activeBridgeSession == session else { throw CancellationError() }
 
                     let result: Any
-                    if self.plugin.pluginId == GlobalDharmaCommerceModel.miniAppId && name == "status" {
-                        let runtime = try self.model.globalDharmaSharedRuntime()
-                        result = [
-                            "content": [["type": "text", "text": "已读取全球法布施状态。"]],
-                            "structuredContent": ["runtime": runtime],
-                        ] as [String: Any]
+                    if MarketplaceModel.requiresActiveLocalWebMcpSession(
+                        pluginId: self.plugin.pluginId
+                    ) {
+                        // Page-originated calls for offline/live Mini Apps must
+                        // traverse the same Host-owned active-session boundary
+                        // as Bot-originated calls. This prevents a local page
+                        // from silently switching to the remote official MCP
+                        // runtime and keeps protected entitlement enforcement
+                        // at one trusted boundary.
+                        result = try await self.model.callActiveWebMcpTool(
+                            pluginId: self.plugin.pluginId,
+                            name: name,
+                            arguments: input
+                        )
                     } else {
                         result = try await self.model.callWebMcpTool(
                             pluginId: self.plugin.pluginId,
