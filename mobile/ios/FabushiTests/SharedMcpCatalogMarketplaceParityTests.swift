@@ -365,4 +365,135 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
         XCTAssertEqual(missing, enabledWrite)
     }
 
+
+    func testDashboardMarketplaceClientUsesCanonicalRPCsAndPreservesSkillMetadata() async throws {
+        let backend = try XCTUnwrap(URL(string: "https://api.example.test"))
+        let credentials = AccountMcpCredentials(
+            getAccessToken: { _ in "catalog-token" },
+            getMachineId: { "catalog-machine" }
+        )
+        let client = IOSCursorDashboardClient(
+            credentials: credentials,
+            backendURL: backend,
+            requestExecutor: { request in
+                XCTAssertEqual(request.httpMethod, "POST")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "authorization"), "Bearer catalog-token")
+                XCTAssertEqual(request.value(forHTTPHeaderField: "x-ghost-mode"), "true")
+                guard let url = request.url else { throw URLError(.badURL) }
+
+                let responseObject: [String: Any]
+                switch url.lastPathComponent {
+                case "ListMarketplacePlugins":
+                    let body = try XCTUnwrap(request.httpBody)
+                    let object = try XCTUnwrap(
+                        JSONSerialization.jsonObject(with: body) as? [String: Any]
+                    )
+                    XCTAssertEqual(object["marketplaceId"] as? String, "9")
+                    XCTAssertEqual(object["excludeCloudAgentPlugins"] as? Bool, true)
+                    responseObject = [
+                        "plugins": [[
+                            "id": "101",
+                            "name": "github",
+                            "displayName": "GitHub",
+                            "description": "Repository tools",
+                            "repositoryUrl": "https://github.com/example/connectors",
+                            "curatedCategoryKeys": ["DEVELOPER_TOOLS"],
+                            "mcpServers": [[
+                                "name": "github",
+                                "description": "GitHub MCP",
+                                "sourceUrl": "https://github.com/example/connectors/blob/main/github/mcp.json",
+                            ]],
+                            "skills": [[
+                                "name": "review",
+                                "description": "Review a pull request",
+                                "sourceUrl": "https://github.com/example/connectors/blob/main/github/skills/review/SKILL.md",
+                            ]],
+                            "variables": [
+                                "properties": [
+                                    "API_TOKEN": [
+                                        "title": "API Token",
+                                        "format": "password",
+                                    ],
+                                ],
+                                "required": ["API_TOKEN"],
+                            ],
+                            "marketplace": [
+                                "id": "9",
+                                "name": "team",
+                                "displayName": "Team",
+                                "teamId": "44",
+                            ],
+                            "publisher": [
+                                "name": "example",
+                                "displayName": "Example",
+                                "isUserOwned": true,
+                            ],
+                        ]],
+                    ]
+                case "ListMarketplaces":
+                    responseObject = [
+                        "marketplaces": [[
+                            "id": "9",
+                            "name": "team",
+                            "displayName": "Team",
+                            "teamId": "44",
+                        ]],
+                    ]
+                case "GetPluginMcpConfig":
+                    let body = try XCTUnwrap(request.httpBody)
+                    let object = try XCTUnwrap(
+                        JSONSerialization.jsonObject(with: body) as? [String: Any]
+                    )
+                    XCTAssertEqual(object["pluginId"] as? String, "101")
+                    responseObject = [
+                        "configJson": #"{"mcpServers":{"github":{"url":"https://mcp.example.test"}}}"#,
+                    ]
+                default:
+                    XCTFail("unexpected Dashboard Marketplace RPC: \(url.lastPathComponent)")
+                    responseObject = [:]
+                }
+
+                let data = try JSONSerialization.data(withJSONObject: responseObject)
+                let response = try XCTUnwrap(
+                    HTTPURLResponse(
+                        url: url,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["content-type": "application/json"]
+                    )
+                )
+                return (data, response)
+            }
+        )
+
+        let listing = try await client.listMarketplacePlugins(
+            marketplaceId: 9,
+            excludeCloudAgentPlugins: true,
+            timeoutMs: 12_000
+        )
+        let plugin = try XCTUnwrap(listing.plugins.first)
+        XCTAssertEqual(plugin.id, 101)
+        XCTAssertEqual(plugin.mcpServers.first?.name, "github")
+        XCTAssertEqual(plugin.skills.first?.name, "review")
+        XCTAssertEqual(
+            plugin.skills.first?.sourceUrl,
+            "https://github.com/example/connectors/blob/main/github/skills/review/SKILL.md"
+        )
+        XCTAssertEqual(plugin.marketplace?.teamId, 44)
+        XCTAssertEqual(plugin.publisher?.isUserOwned, true)
+        let token = try XCTUnwrap(plugin.variableFields.first { $0.key == "API_TOKEN" })
+        XCTAssertTrue(token.isRequired)
+        XCTAssertTrue(token.isSecret)
+
+        let marketplaces = try await client.listMarketplaces(timeoutMs: 12_000)
+        XCTAssertEqual(marketplaces.map(\.id), [9])
+        XCTAssertEqual(marketplaces.first?.teamId, 44)
+
+        let config = try await client.getPluginMcpConfig(pluginId: 101, timeoutMs: 12_000)
+        XCTAssertEqual(
+            config,
+            #"{"mcpServers":{"github":{"url":"https://mcp.example.test"}}}"#
+        )
+    }
+
 }
