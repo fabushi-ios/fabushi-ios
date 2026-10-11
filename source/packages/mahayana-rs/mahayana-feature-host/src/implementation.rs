@@ -2617,6 +2617,107 @@ impl FeatureHostController {
         }
     }
 
+    /// Read an Agent-owned HTML artifact for native local Mini App materialization.
+    ///
+    /// This intentionally shares the canonical attachment path resolver and the same
+    /// bounded text/chunk read primitives used by AttachmentReadText/AttachmentReadChunk.
+    /// Callers never receive authority to read arbitrary filesystem paths or URLs.
+    pub fn read_agent_attachment_for_local_miniapp(
+        &self,
+        agent_id: &str,
+        raw_path: &str,
+        max_bytes: u64,
+    ) -> Result<Vec<u8>, FeatureHostError> {
+        let raw_path = raw_path.trim();
+        let lowered = raw_path.to_ascii_lowercase();
+        if raw_path.is_empty()
+            || raw_path.contains("://")
+            || lowered.starts_with("file:")
+            || lowered.starts_with("http:")
+            || lowered.starts_with("https:")
+        {
+            return Err(FeatureHostError::Contract(
+                "local Mini App source must be a canonical Agent attachment path".into(),
+            ));
+        }
+        if max_bytes == 0 {
+            return Err(FeatureHostError::Contract(
+                "local Mini App artifact byte limit must be positive".into(),
+            ));
+        }
+
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| {
+                FeatureHostError::Contract("attachment storage is unavailable".into())
+            })?;
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            if !is_safe_memory_agent_id(agent_id) || !state.bots.contains_key(agent_id) {
+                return Err(FeatureHostError::Contract(format!(
+                    "unknown attachment owner: {agent_id}"
+                )));
+            }
+        }
+
+        let resolved = resolve_agent_attachment_path(&agent_root, agent_id, raw_path)?;
+        let extension = resolved
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if !matches!(extension.as_str(), "html" | "htm") {
+            return Err(FeatureHostError::Contract(
+                "local Mini App artifact must be an HTML attachment".into(),
+            ));
+        }
+        let metadata = std::fs::metadata(&resolved).map_err(|error| {
+            FeatureHostError::Contract(format!("read attachment metadata: {error}"))
+        })?;
+        if !metadata.is_file() || metadata.len() == 0 {
+            return Err(FeatureHostError::Contract(
+                "local Mini App artifact must be a non-empty file".into(),
+            ));
+        }
+        let hard_limit = max_bytes.min(ATTACHMENT_BYTE_LIMIT);
+        if metadata.len() > hard_limit {
+            return Err(FeatureHostError::Contract(format!(
+                "local Mini App artifact exceeds {hard_limit} bytes"
+            )));
+        }
+
+        let preview = read_file_prefix(&resolved, ATTACHMENT_TEXT_PREVIEW_BYTE_CAP)?;
+        if looks_like_binary(&preview) {
+            return Err(FeatureHostError::Contract(
+                "local Mini App artifact is not UTF-8 text".into(),
+            ));
+        }
+
+        let capacity = usize::try_from(metadata.len()).map_err(|_| {
+            FeatureHostError::Contract("local Mini App artifact length is unsupported".into())
+        })?;
+        let mut bytes = Vec::with_capacity(capacity);
+        let mut offset = 0_u64;
+        while offset < metadata.len() {
+            let length = (metadata.len() - offset).min(ATTACHMENT_CHUNK_MAX_BYTES as u64) as usize;
+            let chunk = read_file_range(&resolved, offset, length)?;
+            if chunk.is_empty() {
+                return Err(FeatureHostError::Contract(
+                    "local Mini App artifact ended before its declared length".into(),
+                ));
+            }
+            offset = offset.saturating_add(chunk.len() as u64);
+            bytes.extend_from_slice(&chunk);
+        }
+        if bytes.len() != capacity || std::str::from_utf8(&bytes).is_err() {
+            return Err(FeatureHostError::Contract(
+                "local Mini App artifact is not valid UTF-8 text".into(),
+            ));
+        }
+        Ok(bytes)
+    }
+
     pub fn execute(&self, command: FeatureCommand) -> Result<CommandAccepted, FeatureHostError> {
         if let FeatureCommand::MessagingExecute {
             request_id,
@@ -21894,6 +21995,52 @@ mod tests {
             }
             _ => false,
         }));
+
+        let generated_html = b"<html><head><title>Generated</title></head><body>offline</body></html>";
+        controller
+            .execute(FeatureCommand::AttachmentUpload {
+                request_id: "attachment-generated-miniapp".into(),
+                agent_id: "mahayana-assistant".into(),
+                filename: "generated.html".into(),
+                mime_type: Some("text/html".into()),
+                bytes_base64: base64::engine::general_purpose::STANDARD.encode(generated_html),
+            })
+            .expect("upload generated Mini App attachment");
+        let generated_attachment = drain(&controller)
+            .into_iter()
+            .find_map(|event| match event {
+                HostEvent::AttachmentStored { attachment, .. }
+                    if attachment.name == "generated.html" =>
+                {
+                    Some(attachment)
+                }
+                _ => None,
+            })
+            .expect("generated Mini App attachment event");
+        let materialized = controller
+            .read_agent_attachment_for_local_miniapp(
+                "mahayana-assistant",
+                &generated_attachment.path,
+                1024 * 1024,
+            )
+            .expect("read generated Mini App attachment");
+        assert_eq!(materialized, generated_html);
+        assert!(matches!(
+            controller.read_agent_attachment_for_local_miniapp(
+                "mahayana-assistant",
+                &generated_attachment.path,
+                4,
+            ),
+            Err(FeatureHostError::Contract(message)) if message.contains("exceeds")
+        ));
+        assert!(matches!(
+            controller.read_agent_attachment_for_local_miniapp(
+                "mahayana-assistant",
+                "https://evil.invalid/generated.html",
+                1024 * 1024,
+            ),
+            Err(FeatureHostError::Contract(message)) if message.contains("canonical Agent attachment path")
+        ));
 
         assert_eq!(attachment_byte_limit_for_name("clip.mp4"), VIDEO_BYTE_LIMIT);
         assert_eq!(

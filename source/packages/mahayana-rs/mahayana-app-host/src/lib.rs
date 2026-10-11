@@ -1212,7 +1212,11 @@ impl AppHost {
             // Trusted native-shell only. WebMCP and Agent tool surfaces never receive
             // these methods, signing keys, or install authority.
             "feature.plugin.localDraft.begin" => self.begin_local_fabapp_draft(),
+            "feature.plugin.localDraft.materializeArtifact" => {
+                self.materialize_local_fabapp_artifact(params)
+            }
             "feature.plugin.localDraft.prepare" => self.prepare_local_fabapp_draft(params),
+            "feature.plugin.localDraft.cancel" => self.cancel_local_fabapp_draft(params),
             "feature.plugin.localDraft.approve" => self.approve_local_fabapp_draft(params),
             "feature.plugin.localDraft.signingPayload" => {
                 self.local_fabapp_signing_payload(params)
@@ -1836,6 +1840,174 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn materialize_local_fabapp_artifact(&self, params: Value) -> Result<Value, AppHostError> {
+        const LOCAL_GENERATED_ARTIFACT_MAX_BYTES: u64 = 4 * 1024 * 1024;
+
+        let agent_id = string_param(&params, "agentId")?.trim();
+        let source_path = validate_local_generated_artifact_source_path(
+            string_param(&params, "path")?,
+        )?;
+        let display_name = string_param(&params, "displayName")?.trim();
+        if display_name.is_empty() {
+            return Err(AppHostError::InvalidRequest(
+                "displayName must not be empty".into(),
+            ));
+        }
+
+        let account = self.plugin_account_context()?;
+        let raw = self
+            .feature
+            .read_agent_attachment_for_local_miniapp(
+                agent_id,
+                source_path,
+                LOCAL_GENERATED_ARTIFACT_MAX_BYTES,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        let raw_html = String::from_utf8(raw).map_err(|_| {
+            AppHostError::InvalidRequest("Agent Mini App artifact must be UTF-8 HTML".into())
+        })?;
+        let hardened_html = harden_generated_miniapp_document(&raw_html);
+        let hardened_bytes = hardened_html.as_bytes();
+        if hardened_bytes.len() as u64 > LOCAL_GENERATED_ARTIFACT_MAX_BYTES {
+            return Err(AppHostError::InvalidRequest(format!(
+                "hardened Agent Mini App artifact exceeds {LOCAL_GENERATED_ARTIFACT_MAX_BYTES} bytes"
+            )));
+        }
+        let source_sha256 = format!("{:x}", Sha256::digest(raw_html.as_bytes()));
+        let preview_sha256 = format!("{:x}", Sha256::digest(hardened_bytes));
+
+        let begin = self.begin_local_fabapp_draft()?;
+        if begin.get("accountScope").and_then(Value::as_str) != Some(account.scope.as_str()) {
+            return Err(AppHostError::Operation(
+                "account changed while beginning Agent Mini App draft".into(),
+            ));
+        }
+        let transaction_id = begin
+            .get("transactionId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| AppHostError::Operation("local Mini App draft transaction missing".into()))?
+            .to_string();
+        let reserved_app_id = begin
+            .get("reservedAppId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| AppHostError::Operation("local Mini App reserved app id missing".into()))?
+            .to_string();
+        let publisher_id = begin
+            .get("publisherId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| AppHostError::Operation("local Mini App publisher id missing".into()))?
+            .to_string();
+
+        let prepared = match self.prepare_local_fabapp_draft(json!({
+            "transactionId": transaction_id,
+            "version": "1.0.0",
+            "displayName": display_name,
+            "entrypoint": "index.html",
+            "requestedCapabilities": [],
+            "files": {
+                "index.html": {
+                    "mime": "text/html",
+                    "dataBase64": base64::engine::general_purpose::STANDARD.encode(hardened_bytes),
+                }
+            }
+        })) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = self.cancel_local_fabapp_draft(json!({
+                    "transactionId": transaction_id,
+                }));
+                return Err(error);
+            }
+        };
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        Ok(json!({
+            "protocol": "fabushi.local-miniapp-artifact-draft.v1",
+            "accountScope": account.scope,
+            "transactionId": transaction_id,
+            "reservedAppId": reserved_app_id,
+            "publisherId": publisher_id,
+            "sourcePath": source_path,
+            "sourceSha256": source_sha256,
+            "previewSha256": preview_sha256,
+            "previewHtmlBase64": base64::engine::general_purpose::STANDARD.encode(hardened_bytes),
+            "review": prepared,
+        }))
+    }
+
+    fn cancel_local_fabapp_draft(&self, params: Value) -> Result<Value, AppHostError> {
+        let transaction_id =
+            strict_hex_identifier(string_param(&params, "transactionId")?, 32, "transactionId")?;
+        let account = self.plugin_account_context()?;
+        let transaction_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{transaction_id}.json"));
+        let mut transaction: LocalFabappDraftTransaction = serde_json::from_slice(
+            &std::fs::read(&transaction_path).map_err(|_| {
+                AppHostError::Operation("local Mini App draft transaction was not found".into())
+            })?,
+        )
+        .map_err(|error| {
+            AppHostError::Operation(format!("invalid local draft transaction: {error}"))
+        })?;
+        if transaction.schema_version != 1
+            || transaction.account_scope != account.scope
+            || transaction.account_generation != account.generation
+        {
+            return Err(AppHostError::Operation(
+                "local Mini App draft transaction is stale".into(),
+            ));
+        }
+        if transaction.state == "installed" {
+            return Err(AppHostError::Operation(
+                "installed local Mini App transaction cannot be cancelled".into(),
+            ));
+        }
+        if transaction.state == "cancelled" {
+            return Ok(json!({
+                "protocol": "fabushi.local-miniapp-draft-cancelled.v1",
+                "accountScope": account.scope,
+                "transactionId": transaction_id,
+                "cancelled": true,
+            }));
+        }
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+
+        if let Some(approval_id) = transaction.approval_id.as_deref() {
+            let approval_path = account
+                .root
+                .join(".local-authorizations")
+                .join(format!("{approval_id}.json"));
+            if let Ok(bytes) = std::fs::read(&approval_path)
+                && let Ok(mut approval) = serde_json::from_slice::<LocalFabappHostApproval>(&bytes)
+                && approval.schema_version == 1
+                && approval.account_scope == account.scope
+                && approval.account_generation == account.generation
+                && approval.transaction_id == transaction_id
+                && approval.state == "approved"
+            {
+                approval.state = "cancelled".into();
+                atomic_write_json(&approval_path, &approval)?;
+            }
+        }
+
+        transaction.state = "cancelled".into();
+        atomic_write_json(&transaction_path, &transaction)?;
+        let prepared_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{transaction_id}.prepared.json"));
+        let _ = std::fs::remove_file(prepared_path);
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        Ok(json!({
+            "protocol": "fabushi.local-miniapp-draft-cancelled.v1",
+            "accountScope": account.scope,
+            "transactionId": transaction_id,
+            "cancelled": true,
+        }))
     }
 
     fn begin_local_fabapp_draft(&self) -> Result<Value, AppHostError> {
@@ -3776,6 +3948,50 @@ pub fn dispatch_json(host: &AppHost, input: &str) -> String {
 }
 
 
+fn validate_local_generated_artifact_source_path(raw: &str) -> Result<&str, AppHostError> {
+    let path = raw.trim();
+    let lowered = path.to_ascii_lowercase();
+    if path.is_empty()
+        || path.contains("://")
+        || lowered.starts_with("file:")
+        || lowered.starts_with("http:")
+        || lowered.starts_with("https:")
+    {
+        return Err(AppHostError::InvalidRequest(
+            "Agent Mini App source must be a local canonical attachment path".into(),
+        ));
+    }
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(extension.as_str(), "html" | "htm") {
+        return Err(AppHostError::InvalidRequest(
+            "Agent Mini App source must be an HTML attachment".into(),
+        ));
+    }
+    Ok(path)
+}
+
+fn harden_generated_miniapp_document(html: &str) -> String {
+    const POLICY: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; media-src data:; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'\">";
+    let lower = html.to_ascii_lowercase();
+    if let Some(index) = lower.find("<head>") {
+        let insertion = index + "<head>".len();
+        let mut result = html.to_string();
+        result.insert_str(insertion, POLICY);
+        return result;
+    }
+    if let Some(index) = lower.find("<html>") {
+        let insertion = index + "<html>".len();
+        let mut result = html.to_string();
+        result.insert_str(insertion, &format!("<head>{POLICY}</head>"));
+        return result;
+    }
+    format!("<!doctype html><html><head>{POLICY}</head><body>{html}</body></html>")
+}
+
 #[cfg(test)]
 mod fabushi_shipping_inference_tests {
     use super::*;
@@ -3789,6 +4005,29 @@ mod fabushi_shipping_inference_tests {
         assert_ne!(a1, b);
         assert_eq!(a1.len(), 64);
         assert!(!a1.contains("account-a"));
+    }
+
+    #[test]
+    fn generated_miniapp_artifact_source_is_local_html_only() {
+        assert_eq!(
+            validate_local_generated_artifact_source_path("/tmp/agent/attachments/generated.html")
+                .expect("canonical html"),
+            "/tmp/agent/attachments/generated.html"
+        );
+        assert!(validate_local_generated_artifact_source_path("https://evil.invalid/app.html").is_err());
+        assert!(validate_local_generated_artifact_source_path("file:///tmp/app.html").is_err());
+        assert!(validate_local_generated_artifact_source_path("/tmp/agent/attachments/app.js").is_err());
+    }
+
+    #[test]
+    fn generated_miniapp_artifact_hardening_matches_preview_security_contract() {
+        let raw = "<html><head><title>Agent</title></head><body><script>fetch('https://evil.invalid')</script></body></html>";
+        let hardened = harden_generated_miniapp_document(raw);
+        assert!(hardened.contains("default-src 'none'"));
+        assert!(hardened.contains("connect-src 'none'"));
+        assert!(hardened.contains("frame-src 'none'"));
+        assert_eq!(hardened.matches("Content-Security-Policy").count(), 1);
+        assert!(hardened.contains("fetch('https://evil.invalid')"));
     }
 
     #[test]
