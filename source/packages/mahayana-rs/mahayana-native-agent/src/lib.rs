@@ -7,7 +7,12 @@
 pub mod interaction;
 
 use async_trait::async_trait;
-use interaction::{InteractionUpdate, PrivacyMode, redacted_update_for_kernel_event};
+use interaction::{
+    CancellationFencedListener, InteractionError, InteractionListener, InteractionListenerContext,
+    InteractionQuery, InteractionQueryKind, InteractionResponseKind, InteractionUpdate,
+    NoopInteractionListener, PrivacyMode, RedactedDelegateAdapter, UnredactedDelegateAdapter,
+    redacted_update_for_kernel_event,
+};
 use mahayana_agent::{
     AgentActivity, AgentActivityStatus, AgentBackend, AgentError, AgentEvent, AgentMessageRequest,
     ApprovalResolution, McpAppSession, OpenMcpAppRequest, SharedAgentEventSink, StartThreadRequest,
@@ -22,10 +27,11 @@ use mahayana_kernel::{
     OperationId as KernelOperationId, RunRequest, RuntimeProfile, SessionId, SharedKernelEventSink,
 };
 use mahayana_mcp_runtime::{NativeMcpRegistry, ResolvedMcpPlugin};
-use mahayana_native_engine::NativeEngine;
+use mahayana_native_engine::{NativeEngine, SharedToolDecisionGate, ToolDecisionGate};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -40,6 +46,7 @@ pub struct NativeAgentConfig {
 struct NativeThread {
     session_id: SessionId,
     conversation_id: ConversationId,
+    scope_generation: u64,
 }
 
 #[derive(Clone)]
@@ -138,10 +145,31 @@ pub struct NativeAgentBackend {
     mcp_sessions: Mutex<HashMap<String, NativeMcpSession>>,
     mcp_server_state: Mutex<NativeMcpServerStateStore>,
     disabled_tools: Mutex<HashMap<String, HashSet<String>>>,
+    interaction_listener: Arc<dyn InteractionListener>,
+    interaction_privacy_mode: PrivacyMode,
+    scope_generation: Arc<AtomicU64>,
+    cancelled_operations: Arc<Mutex<HashSet<String>>>,
+    next_interaction_query_id: Arc<AtomicU64>,
+    post_turn_flushes: Arc<AtomicU64>,
 }
 
 impl NativeAgentBackend {
     pub fn new(engine: Arc<NativeEngine>, config: NativeAgentConfig) -> Self {
+        let privacy_mode = PrivacyMode::Unspecified;
+        Self::new_with_interaction_listener(
+            engine,
+            config,
+            privacy_mode,
+            shipping_interaction_listener(privacy_mode),
+        )
+    }
+
+    pub fn new_with_interaction_listener(
+        engine: Arc<NativeEngine>,
+        config: NativeAgentConfig,
+        interaction_privacy_mode: PrivacyMode,
+        interaction_listener: Arc<dyn InteractionListener>,
+    ) -> Self {
         Self {
             engine,
             config,
@@ -149,6 +177,12 @@ impl NativeAgentBackend {
             mcp_sessions: Mutex::new(HashMap::new()),
             mcp_server_state: Mutex::new(NativeMcpServerStateStore::default()),
             disabled_tools: Mutex::new(HashMap::new()),
+            interaction_listener,
+            interaction_privacy_mode,
+            scope_generation: Arc::new(AtomicU64::new(1)),
+            cancelled_operations: Arc::new(Mutex::new(HashSet::new())),
+            next_interaction_query_id: Arc::new(AtomicU64::new(1)),
+            post_turn_flushes: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -174,6 +208,7 @@ impl NativeAgentBackend {
         let thread = NativeThread {
             session_id,
             conversation_id,
+            scope_generation: self.scope_generation.load(Ordering::SeqCst),
         };
         self.threads
             .lock()
@@ -189,6 +224,23 @@ impl NativeAgentBackend {
             .get(&id.to_string())
             .cloned()
             .ok_or_else(|| AgentError::ThreadNotFound(id.clone()))
+    }
+
+    fn ensure_thread_scope_current(&self, thread: &NativeThread) -> Result<(), AgentError> {
+        if thread.scope_generation != self.scope_generation.load(Ordering::SeqCst) {
+            return Err(AgentError::Unavailable(
+                "native Agent result became stale because the account/session scope changed".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn operation_cancelled(&self, operation_id: &OperationId) -> Result<bool, AgentError> {
+        Ok(self
+            .cancelled_operations
+            .lock()
+            .map_err(|_| AgentError::Backend("interaction cancellation registry poisoned".into()))?
+            .contains(operation_id.as_str()))
     }
 
     fn mcp_session(&self, id: &AgentThreadId) -> Result<NativeMcpSession, AgentError> {
@@ -256,16 +308,131 @@ impl NativeAgentBackend {
     }
 }
 
+fn shipping_interaction_listener(
+    privacy_mode: PrivacyMode,
+) -> Arc<dyn InteractionListener> {
+    let fallback = NoopInteractionListener::default();
+    let redacted = UnredactedDelegateAdapter::new(fallback, privacy_mode);
+    let unredacted = RedactedDelegateAdapter::new(redacted, privacy_mode);
+    Arc::new(CancellationFencedListener::new(unredacted))
+}
+
+struct AgentInteractionDecisionGate {
+    listener: Arc<dyn InteractionListener>,
+    cancelled_operations: Arc<Mutex<HashSet<String>>>,
+    scope_generation: Arc<AtomicU64>,
+    expected_scope_generation: u64,
+    next_query_id: Arc<AtomicU64>,
+}
+
+impl AgentInteractionDecisionGate {
+    fn is_cancelled(&self, operation_id: &KernelOperationId) -> Result<bool, KernelError> {
+        Ok(self
+            .cancelled_operations
+            .lock()
+            .map_err(|_| KernelError::Backend("interaction cancellation registry poisoned".into()))?
+            .contains(operation_id.as_str()))
+    }
+
+    fn ensure_scope_current(&self) -> Result<(), KernelError> {
+        if self.scope_generation.load(Ordering::SeqCst) != self.expected_scope_generation {
+            return Err(KernelError::PolicyDenied(
+                "Agent interaction response became stale after account/session scope change".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn next_query_id(&self) -> Result<u64, KernelError> {
+        let id = self.next_query_id.fetch_add(1, Ordering::SeqCst);
+        if id == u64::MAX {
+            return Err(KernelError::Backend(
+                "interaction query id space exhausted".into(),
+            ));
+        }
+        Ok(id)
+    }
+}
+
+#[async_trait]
+impl ToolDecisionGate for AgentInteractionDecisionGate {
+    async fn before_tool(
+        &self,
+        operation_id: &KernelOperationId,
+        tool: &str,
+        arguments: &Value,
+    ) -> Result<(), KernelError> {
+        self.ensure_scope_current()?;
+        let context = InteractionListenerContext {
+            canceled: self.is_cancelled(operation_id)?,
+        };
+        if context.canceled {
+            return Err(KernelError::PolicyDenied(
+                "Agent interaction was cancelled before tool decision".into(),
+            ));
+        }
+
+        let kind = match tool {
+            "web_search" => InteractionQueryKind::WebSearch {
+                args: arguments.clone(),
+            },
+            "web_fetch" => InteractionQueryKind::WebFetch {
+                args: arguments.clone(),
+                skip_approval: false,
+                smart_mode_approval: None,
+            },
+            _ => return Ok(()),
+        };
+        let query = InteractionQuery {
+            id: self.next_query_id()?,
+            kind,
+        };
+        let response = self
+            .listener
+            .query(&context, query.clone())
+            .await
+            .map_err(|error| KernelError::PolicyDenied(error.to_string()))?;
+        response
+            .validate_for(&query)
+            .map_err(|error| KernelError::PolicyDenied(error.to_string()))?;
+
+        self.ensure_scope_current()?;
+        if self.is_cancelled(operation_id)? {
+            return Err(KernelError::PolicyDenied(
+                "Agent interaction was cancelled before decision commit".into(),
+            ));
+        }
+
+        match response.result {
+            InteractionResponseKind::WebSearchApproved
+            | InteractionResponseKind::WebFetchApproved => Ok(()),
+            InteractionResponseKind::WebSearchRejected { reason }
+            | InteractionResponseKind::WebFetchRejected { reason } => Err(KernelError::PolicyDenied(
+                if reason.trim().is_empty() {
+                    format!("{tool} rejected by Agent interaction listener")
+                } else {
+                    reason
+                },
+            )),
+            other => Err(KernelError::PolicyDenied(format!(
+                "unexpected Agent interaction response for {tool}: {}",
+                other.name()
+            ))),
+        }
+    }
+}
+
 struct NativeEventBridge {
     operation_id: OperationId,
     conversation_id: ConversationId,
     sink: SharedAgentEventSink,
+    privacy_mode: PrivacyMode,
 }
 
 impl KernelEventSink for NativeEventBridge {
     fn emit(&self, event: KernelEvent) -> Result<(), KernelError> {
         let interaction_projection =
-            redacted_update_for_kernel_event(&event, PrivacyMode::Unspecified);
+            redacted_update_for_kernel_event(&event, self.privacy_mode);
         let mapped = match event {
             KernelEvent::MessageDelta { delta, .. } => {
                 let delta = interaction_projection
@@ -465,6 +632,7 @@ impl AgentBackend for NativeAgentBackend {
         events: SharedAgentEventSink,
     ) -> Result<(), AgentError> {
         let thread = self.thread(&request.thread_id)?;
+        self.ensure_thread_scope_current(&thread)?;
         if let Ok(mcp) = self.mcp_session(&request.thread_id)
             && mcp
                 .tools
@@ -478,6 +646,12 @@ impl AgentBackend for NativeAgentBackend {
                     json!({"message":request.text,"surface":"agent"}),
                 )
                 .await?;
+            self.ensure_thread_scope_current(&thread)?;
+            if self.operation_cancelled(&request.operation_id)? {
+                return Err(AgentError::Unavailable(
+                    "MCP chat result was cancelled before commit".into(),
+                ));
+            }
             return events.emit(AgentEvent::MessageCompleted {
                 message: Message {
                     id: MessageId::generated("mcp-chat"),
@@ -490,16 +664,39 @@ impl AgentBackend for NativeAgentBackend {
             });
         }
 
-        let sink: SharedKernelEventSink = Arc::new(NativeEventBridge {
-            operation_id: request.operation_id.clone(),
-            conversation_id: thread.conversation_id,
-            sink: events,
+        let kernel_operation_id = KernelOperationId::from_string(request.operation_id.as_str());
+        let decision_gate: SharedToolDecisionGate = Arc::new(AgentInteractionDecisionGate {
+            listener: Arc::clone(&self.interaction_listener),
+            cancelled_operations: Arc::clone(&self.cancelled_operations),
+            scope_generation: Arc::clone(&self.scope_generation),
+            expected_scope_generation: thread.scope_generation,
+            next_query_id: Arc::clone(&self.next_interaction_query_id),
         });
         self.engine
+            .install_tool_decision_gate(&kernel_operation_id, decision_gate)
+            .map_err(kernel_error)?;
+        let flush_counter = Arc::clone(&self.post_turn_flushes);
+        self.interaction_listener
+            .enqueue_post_turn_ended_work(Box::new(move || {
+                Box::pin(async move {
+                    flush_counter.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                })
+            }))
+            .map_err(interaction_error)?;
+
+        let sink: SharedKernelEventSink = Arc::new(NativeEventBridge {
+            operation_id: request.operation_id.clone(),
+            conversation_id: thread.conversation_id.clone(),
+            sink: events,
+            privacy_mode: self.interaction_privacy_mode,
+        });
+        let run_result = self
+            .engine
             .run(
                 RunRequest {
                     session_id: thread.session_id,
-                    operation_id: KernelOperationId::from_string(request.operation_id.as_str()),
+                    operation_id: kernel_operation_id.clone(),
                     input: request.text,
                     policy: policy_for_profile(self.config.profile),
                     required_capabilities: CapabilitySet::new([Capability::Model]),
@@ -507,11 +704,26 @@ impl AgentBackend for NativeAgentBackend {
                 },
                 sink,
             )
-            .await
-            .map_err(kernel_error)
+            .await;
+        let remove_result = self.engine.remove_tool_decision_gate(&kernel_operation_id);
+        let context = InteractionListenerContext {
+            canceled: self.operation_cancelled(&request.operation_id)?,
+        };
+        let flush_result = self
+            .interaction_listener
+            .flush_post_turn_ended_work(&context)
+            .await;
+        self.ensure_thread_scope_current(&thread)?;
+        remove_result.map_err(kernel_error)?;
+        flush_result.map_err(interaction_error)?;
+        run_result.map_err(kernel_error)
     }
 
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), AgentError> {
+        self.cancelled_operations
+            .lock()
+            .map_err(|_| AgentError::Backend("interaction cancellation registry poisoned".into()))?
+            .insert(operation_id.as_str().to_owned());
         self.engine
             .interrupt(&KernelOperationId::from_string(operation_id.as_str()))
             .await
@@ -533,7 +745,12 @@ impl AgentBackend for NativeAgentBackend {
     }
 
     fn reset_session(&self) -> Result<(), AgentError> {
+        self.scope_generation.fetch_add(1, Ordering::SeqCst);
         NativeEngine::reset_session(&self.engine).map_err(kernel_error)?;
+        self.cancelled_operations
+            .lock()
+            .map_err(|_| AgentError::Backend("interaction cancellation registry poisoned".into()))?
+            .clear();
         self.threads
             .lock()
             .map_err(|_| AgentError::Backend("native thread registry poisoned".into()))?
@@ -1122,6 +1339,10 @@ fn activity_status(metadata: &Value) -> AgentActivityStatus {
         Some("failed") => AgentActivityStatus::Failed,
         _ => AgentActivityStatus::Running,
     }
+}
+
+fn interaction_error(error: InteractionError) -> AgentError {
+    AgentError::Backend(error.to_string())
 }
 
 fn kernel_error(error: KernelError) -> AgentError {

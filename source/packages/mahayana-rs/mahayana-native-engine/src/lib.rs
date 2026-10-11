@@ -217,11 +217,24 @@ struct OperationControl {
     suspension_settled: Notify,
 }
 
+#[async_trait]
+pub trait ToolDecisionGate: Send + Sync {
+    async fn before_tool(
+        &self,
+        operation_id: &OperationId,
+        tool: &str,
+        arguments: &Value,
+    ) -> Result<(), KernelError>;
+}
+
+pub type SharedToolDecisionGate = Arc<dyn ToolDecisionGate>;
+
 pub struct NativeEngine {
     model: Arc<dyn ModelRuntime>,
     config: NativeEngineConfig,
     sessions: Mutex<HashMap<String, Arc<AsyncMutex<NativeSession>>>>,
     active_operations: Mutex<HashMap<String, Arc<OperationControl>>>,
+    tool_decision_gates: Mutex<HashMap<String, SharedToolDecisionGate>>,
     approvals: Mutex<HashMap<String, ApprovalWaiter>>,
     memory: Mutex<MemoryStore>,
     workflows: Mutex<HashMap<String, Workflow>>,
@@ -253,6 +266,7 @@ impl NativeEngine {
             config,
             sessions: Mutex::new(HashMap::new()),
             active_operations: Mutex::new(HashMap::new()),
+            tool_decision_gates: Mutex::new(HashMap::new()),
             approvals: Mutex::new(HashMap::new()),
             memory: Mutex::new(MemoryStore::default()),
             workflows: Mutex::new(HashMap::new()),
@@ -269,6 +283,47 @@ impl NativeEngine {
 
     pub fn metrics_snapshot(&self) -> RuntimeMetricsSnapshot {
         self.telemetry.snapshot()
+    }
+
+    pub fn install_tool_decision_gate(
+        &self,
+        operation_id: &OperationId,
+        gate: SharedToolDecisionGate,
+    ) -> Result<(), KernelError> {
+        let mut gates = self
+            .tool_decision_gates
+            .lock()
+            .map_err(|_| KernelError::Backend("tool decision gate registry poisoned".into()))?;
+        if gates.insert(operation_id.as_str().to_owned(), gate).is_some() {
+            return Err(KernelError::Backend(format!(
+                "tool decision gate already installed for {}",
+                operation_id.as_str()
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn remove_tool_decision_gate(
+        &self,
+        operation_id: &OperationId,
+    ) -> Result<(), KernelError> {
+        self.tool_decision_gates
+            .lock()
+            .map_err(|_| KernelError::Backend("tool decision gate registry poisoned".into()))?
+            .remove(operation_id.as_str());
+        Ok(())
+    }
+
+    fn tool_decision_gate(
+        &self,
+        operation_id: &OperationId,
+    ) -> Result<Option<SharedToolDecisionGate>, KernelError> {
+        Ok(self
+            .tool_decision_gates
+            .lock()
+            .map_err(|_| KernelError::Backend("tool decision gate registry poisoned".into()))?
+            .get(operation_id.as_str())
+            .cloned())
     }
 
     /// Clears all account-bound native Agent state. The active operation flags
@@ -288,6 +343,10 @@ impl NativeEngine {
         self.active_operations
             .lock()
             .map_err(|_| KernelError::Backend("native operation registry poisoned".into()))?
+            .clear();
+        self.tool_decision_gates
+            .lock()
+            .map_err(|_| KernelError::Backend("tool decision gate registry poisoned".into()))?
             .clear();
         self.approvals
             .lock()
@@ -1007,6 +1066,10 @@ impl NativeEngine {
         events: SharedKernelEventSink,
     ) -> Pin<Box<dyn Future<Output = Result<Value, KernelError>> + Send + 'a>> {
         Box::pin(async move {
+            if let Some(gate) = self.tool_decision_gate(operation_id)? {
+                gate.before_tool(operation_id, &call.name, &call.arguments)
+                    .await?;
+            }
             let risk = tool_risk(&call.name);
             self.authorize_tool(
                 session,
