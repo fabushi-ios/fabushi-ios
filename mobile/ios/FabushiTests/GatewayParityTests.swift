@@ -419,4 +419,150 @@ final class GatewayParityTests: XCTestCase {
         guard case .ok = unknown else { return XCTFail("unknown channel response should settle") }
         XCTAssertEqual(projected.count, 1)
     }
+
+    func testTransportStageRecorderCorrelatesNonceTraceAndEcho() async {
+        let recorder = TransportStageRecorder()
+        let trace = await recorder.beginSend(
+            accountSlot: "host",
+            clientNonce: "nonce-1",
+            traceparent: "trace-1",
+            nowMonotonicMilliseconds: 10
+        )
+        XCTAssertEqual(trace?.clientNonce, "nonce-1")
+        var token = trace?.beginStage(
+            "gateway-post",
+            attempt: 0,
+            startEpochMilliseconds: 100,
+            startMonotonicMilliseconds: 20
+        )
+        if let report = token?.complete(nowMonotonicMilliseconds: 35) {
+            await recorder.record(report: report)
+        }
+        let echo = await recorder.recordSendEcho(
+            accountSlot: "host",
+            clientNonce: "nonce-1",
+            nowEpochMilliseconds: 150,
+            nowMonotonicMilliseconds: 40
+        )
+        XCTAssertEqual(echo?.stage, COORDINATOR_SSE_ECHO_STAGE)
+        XCTAssertEqual(echo?.traceparent, "trace-1")
+        let reports = await recorder.reportSnapshot()
+        XCTAssertEqual(reports.map(\.stage), ["gateway-post", COORDINATOR_SSE_ECHO_STAGE])
+        XCTAssertEqual(reports.first?.durationMilliseconds, 15)
+    }
+
+    func testTransportStageRecorderBoundsAndExpiresPendingEchoes() async {
+        let recorder = TransportStageRecorder()
+        for index in 0..<(COORDINATOR_PENDING_SEND_ECHO_MAX + 1) {
+            _ = await recorder.beginSend(
+                accountSlot: "host",
+                clientNonce: "nonce-\(index)",
+                traceparent: "trace-\(index)",
+                nowMonotonicMilliseconds: UInt64(index)
+            )
+        }
+        let bounded = await recorder.pendingEchoCount()
+        XCTAssertEqual(bounded, COORDINATOR_PENDING_SEND_ECHO_MAX)
+        let evicted = await recorder.recordSendEcho(
+            accountSlot: "host",
+            clientNonce: "nonce-0",
+            nowEpochMilliseconds: 1,
+            nowMonotonicMilliseconds: 1
+        )
+        XCTAssertNil(evicted)
+
+        _ = await recorder.beginSend(
+            accountSlot: "host",
+            clientNonce: "ttl",
+            traceparent: "ttl-trace",
+            nowMonotonicMilliseconds: 10
+        )
+        let expired = await recorder.recordSendEcho(
+            accountSlot: "host",
+            clientNonce: "ttl",
+            nowEpochMilliseconds: 2,
+            nowMonotonicMilliseconds: 10 + COORDINATOR_PENDING_SEND_ECHO_TTL_MILLISECONDS + 1
+        )
+        XCTAssertNil(expired)
+    }
+
+    func testGatewayClientRecordsNativeChatSendTransportStages() async throws {
+        let recorder = TransportStageRecorder()
+        let root = "00-0123456789abcdef0123456789abcdef-2222222222222222-01"
+        let supervisor = CoordinatorHostSupervisor(
+            resolveConnection: {
+                .init(baseURL: URL(string: "https://gateway.example")!, headers: [:])
+            },
+            healthProbe: { _ in true }
+        )
+        let client = CoordinatorGatewayClient(
+            supervisor: supervisor,
+            traceRootFactory: { root },
+            transportStageRecorder: recorder,
+            tracedTransport: { _, _, _, _ in
+                .object(["accepted": .bool(true)])
+            }
+        )
+        _ = try await client.dispatchCommand(
+            requestId: "outer",
+            method: "feature.execute",
+            args: .object([
+                "command": .object([
+                    "type": .string("chat.send"),
+                    "requestId": .string("native-nonce"),
+                ]),
+            ])
+        )
+        let reports = await recorder.reportSnapshot()
+        XCTAssertEqual(reports.map(\.stage), ["gateway-connect", "gateway-post"])
+        XCTAssertTrue(reports.allSatisfy {
+            $0.clientNonce == "native-nonce"
+                && $0.traceparent == root
+                && !$0.isError
+        })
+        let pending = await recorder.pendingEchoCount()
+        XCTAssertEqual(pending, 1)
+    }
+
+    func testShippingFeatureReceiveSettlesNativeChatSendEchoCorrelation() async {
+        let recorder = TransportStageRecorder()
+        let host = GatewayEventHost(envelope: [
+            "channel": "transcript",
+            "payload": [
+                "type": "chat.message",
+                "role": "user",
+                "messageId": "native-echo-nonce",
+            ],
+        ])
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: MahayanaLocalHostSupervisor(host: host, factory: { host }),
+            transportStageRecorder: recorder
+        )
+        let send = await coordinator.dispatchTransport(
+            requestId: "send",
+            method: "feature.execute",
+            args: .object([
+                "command": .object([
+                    "type": .string("chat.send"),
+                    "requestId": .string("native-echo-nonce"),
+                ]),
+            ])
+        )
+        guard case .ok = send else { return XCTFail("chat.send failed") }
+        let before = await recorder.pendingEchoCount()
+        XCTAssertEqual(before, 1)
+
+        let receive = await coordinator.dispatchTransport(
+            requestId: "receive",
+            method: "feature.receive",
+            args: .object([:])
+        )
+        guard case .ok = receive else { return XCTFail("feature.receive failed") }
+        let after = await recorder.pendingEchoCount()
+        XCTAssertEqual(after, 0)
+        let reports = await recorder.reportSnapshot()
+        XCTAssertEqual(reports.last?.stage, COORDINATOR_SSE_ECHO_STAGE)
+        XCTAssertEqual(reports.last?.clientNonce, "native-echo-nonce")
+    }
+
 }

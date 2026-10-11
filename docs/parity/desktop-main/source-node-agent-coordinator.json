@@ -529,13 +529,14 @@
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Send/echo latency and retry stages are attributable to the right account/client nonce without unbounded pending trace state.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/telemetry/transport-stage-recorder.swift; source/ios-main/coordinator/coordinator-telemetry.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/telemetry/transport-stage-recorder.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS currently retains bounded request/stage recording but does not yet prove the Desktop nonce/echo/traceparent correlation machinery end-to-end.",
-      "implementation_status": "mapped",
-      "production_evidence": "The iOS recorder is shipping source and bounded, but it lacks explicit pending-echo TTL/traceparent correlation parity.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorTelemetryTests.swift",
-      "notes": "IOS-MAIN-COORD-TEL-002: reviewed Desktop blob 5f24b7ac889c07842ead6add615a9ac2a1a121de. Real gap retained; do not promote until nonce/echo/trace correlation is implemented and exercised."
+      "ios_platform_delta": "iOS replaces Desktop raw SSE send correlation with typed feature.execute/chat.send requestId plus feature.receive user-echo correlation. Gateway root traceparent is bound to the durable nonce, gateway-connect/gateway-post are timed per attempt, pending echoes are capped at 64 and expire after 120 seconds, and only canonical user chat.message/messageId or user-attachment card/clientNonce settles echo-coordinator-sse.",
+      "implementation_status": "implemented",
+      "production_evidence": "MahayanaCoordinator owns one TransportStageRecorder and injects it into shipping CoordinatorGatewayClient. chat.send arms host+requestId+root trace; Gateway records connect/post stages; feature.receive settles a recognized user echo before renderer projection. Telemetry is observational and cannot change Host command success/failure.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testTransportStageRecorderCorrelatesNonceTraceAndEcho; ::testTransportStageRecorderBoundsAndExpiresPendingEchoes; ::testGatewayClientRecordsNativeChatSendTransportStages; ::testShippingFeatureReceiveSettlesNativeChatSendEchoCorrelation",
+      "notes": "IOS-MAIN-COORD-TEL-002: re-read Desktop blob 5f24b7ac889c07842ead6add615a9ac2a1a121de plus shipping gateway_client/main caller context at Desktop 371b72f1. The explicit nonce/echo/traceparent gap is now implemented on the typed iOS transport; keep implemented until same-head Actions succeed.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after native transport-stage correlation implementation"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/webauthn.rs",

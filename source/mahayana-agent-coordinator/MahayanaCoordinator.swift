@@ -370,6 +370,7 @@ final class MahayanaCoordinator {
     private let devControlAdapter: (any CoordinatorDevControlAdapting)?
     private let clientSideToolV2Relay = ClientSideToolV2Relay()
     private let nativeLocalCapabilities = IOSNativeLocalCapabilityBackend()
+    private let transportStageRecorder: TransportStageRecorder
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
     private var autoReviewHostSyncNeeded = true
     private var localToolApprovalAccountScope: String?
@@ -397,6 +398,7 @@ final class MahayanaCoordinator {
         )
         let gatewayClient = CoordinatorGatewayClient(
             supervisor: gatewaySupervisor,
+            transportStageRecorder: transportStageRecorder,
             tracedTransport: { [weak self] _, method, args, _ in
                 guard let self else { throw CoordinatorError.unavailable }
                 guard case .object = args,
@@ -425,11 +427,13 @@ final class MahayanaCoordinator {
         experimentService: SandExperimentService? = nil,
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
         mcpSurface: CoordinatorMcpSurface? = nil,
+        transportStageRecorder: TransportStageRecorder = .init(),
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
+        self.transportStageRecorder = transportStageRecorder
         self.hostSettingsReconciler = settingsStore.map { store in
             IOSHostSettingsReconciler(
                 readLocal: { store.getHasSeenOnboarding() },
@@ -649,6 +653,20 @@ final class MahayanaCoordinator {
               let projected = try? CoordinatorPayload.fromFoundation(payload)
         else { return }
         rendererEventSink?(family, projected)
+    }
+
+    private func recordTransportEchoIfPresent(_ value: Any) async {
+        guard let envelope = value as? [String: Any],
+              let payload = envelope["payload"],
+              let clientNonce = coordinatorTransportEchoClientNonce(from: payload)
+        else { return }
+
+        _ = await transportStageRecorder.recordSendEcho(
+            accountSlot: "host",
+            clientNonce: clientNonce,
+            nowEpochMilliseconds: coordinatorTransportEpochMilliseconds(),
+            nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
+        )
     }
 
     func updateAccountSettingsScope(_ accountScope: String?) {
@@ -1274,6 +1292,7 @@ final class MahayanaCoordinator {
         )
         if method == "feature.receive",
            case .ok(let value) = outcome {
+            await recordTransportEchoIfPresent(value.foundationValue)
             acceptHostEventEnvelope(value.foundationValue)
         }
         return outcome
