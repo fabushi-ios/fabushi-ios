@@ -3352,6 +3352,82 @@ mod tests {
     }
 
     #[test]
+    fn identical_plugin_ids_are_fully_isolated_across_account_roots() {
+        fn release(version: &str, artifact: &ReleaseArtifact) -> ExternalReleaseManifest {
+            ExternalReleaseManifest {
+                schema_version: 1,
+                protocol: "mahayana.external-release.v1".into(),
+                plugin_id: "same-plugin".into(),
+                version: version.into(),
+                permissions: vec!["storage.local".into()],
+                artifacts: vec![artifact.clone()],
+                install: None,
+            }
+        }
+
+        let archive = tar_gz(&[("index.html", b"<h1>offline</h1>")]);
+        let artifact = ReleaseArtifact {
+            id: "ios-web".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: format!("{:x}", Sha256::digest(&archive)),
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("index.html".into()),
+        };
+
+        let temp = tempfile::tempdir().unwrap();
+        let account_a = temp.path().join("accounts/account-a");
+        let account_b = temp.path().join("accounts/account-b");
+        let installer_a = PluginInstaller::new(&account_a).unwrap();
+        let installer_b = PluginInstaller::new(&account_b).unwrap();
+
+        let a_v1 = installer_a
+            .install_verified_bytes(&release("1.0.0", &artifact), &artifact, &archive)
+            .unwrap();
+        let b_v1 = installer_b
+            .install_verified_bytes(&release("1.0.0", &artifact), &artifact, &archive)
+            .unwrap();
+        assert_ne!(a_v1.installed_path, b_v1.installed_path);
+        assert_eq!(installer_a.active("same-plugin").unwrap(), Some(a_v1.clone()));
+        assert_eq!(installer_b.active("same-plugin").unwrap(), Some(b_v1.clone()));
+
+        let mut permissions_a =
+            PermissionManager::load(account_a.join("permissions.json")).unwrap();
+        permissions_a
+            .grant("same-plugin", &["storage.local".into()], "storage.local")
+            .unwrap();
+        let permissions_b =
+            PermissionManager::load(account_b.join("permissions.json")).unwrap();
+        assert!(permissions_b.grants_for("same-plugin").is_empty());
+
+        let storage_a = account_a.join("same-plugin/storage/state.json");
+        let storage_b = account_b.join("same-plugin/storage/state.json");
+        fs::create_dir_all(storage_a.parent().unwrap()).unwrap();
+        fs::create_dir_all(storage_b.parent().unwrap()).unwrap();
+        fs::write(&storage_a, b"account-a").unwrap();
+        fs::write(&storage_b, b"account-b").unwrap();
+        assert_eq!(fs::read(&storage_a).unwrap(), b"account-a");
+        assert_eq!(fs::read(&storage_b).unwrap(), b"account-b");
+
+        let b_v2 = installer_b
+            .install_verified_bytes(&release("2.0.0", &artifact), &artifact, &archive)
+            .unwrap();
+        assert_eq!(installer_b.active("same-plugin").unwrap(), Some(b_v2));
+        let rolled_back_b = installer_b.rollback("same-plugin").unwrap().unwrap();
+        assert_eq!(rolled_back_b.version, "1.0.0");
+        assert_eq!(installer_a.active("same-plugin").unwrap(), Some(a_v1));
+
+        assert!(installer_a.uninstall("same-plugin").unwrap());
+        assert!(installer_a.active("same-plugin").unwrap().is_none());
+        assert_eq!(installer_b.active("same-plugin").unwrap(), Some(b_v1));
+        assert_eq!(fs::read(&storage_b).unwrap(), b"account-b");
+    }
+
+    #[test]
     fn permission_manager_persists_only_declared_grants() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("permissions.json");
