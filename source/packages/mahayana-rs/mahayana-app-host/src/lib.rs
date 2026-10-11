@@ -105,6 +105,36 @@ pub struct HostResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct PluginAccountContext {
+    scope: String,
+    root: PathBuf,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PluginAccountMarker {
+    schema_version: u32,
+    account_scope: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyPluginOwnerProof {
+    schema_version: u32,
+    account_scope: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyPluginMigrationJournal {
+    schema_version: u32,
+    account_scope: String,
+    state: String,
+    entries: Vec<String>,
+    completed: Vec<String>,
+}
+
 pub struct AppHost {
     app_data_dir: PathBuf,
     feature_mode: AppHostFeatureMode,
@@ -1449,16 +1479,55 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
-    fn plugin_root(&self) -> PathBuf {
-        self.app_data_dir.join("plugins")
+    fn current_plugin_account_scope(&self) -> Result<String, AppHostError> {
+        let session = self
+            .product
+            .device_agent_session()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let user_id = session
+            .get("userId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                AppHostError::Operation(
+                    "plugin storage requires an authenticated account with userId".into(),
+                )
+            })?;
+        Ok(stable_plugin_account_scope(user_id))
     }
 
-    fn permission_store(&self) -> PathBuf {
-        self.plugin_root().join("permissions.json")
+    fn ensure_plugin_account_current(&self, expected_scope: &str) -> Result<(), AppHostError> {
+        let current = self.current_plugin_account_scope()?;
+        if current != expected_scope {
+            return Err(AppHostError::Operation(
+                "account changed while plugin operation was in flight".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn plugin_account_context(&self) -> Result<PluginAccountContext, AppHostError> {
+        let scope = self.current_plugin_account_scope()?;
+        let base = self.app_data_dir.join("plugins");
+        let root = base.join("accounts").join(&scope);
+        std::fs::create_dir_all(&root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        ensure_plugin_account_marker(&root, &scope)?;
+        migrate_legacy_plugin_root_if_proven(&base, &scope, &root)?;
+        Ok(PluginAccountContext { scope, root })
+    }
+
+    fn plugin_root(&self) -> Result<PathBuf, AppHostError> {
+        Ok(self.plugin_account_context()?.root)
+    }
+
+    fn permission_store(&self) -> Result<PathBuf, AppHostError> {
+        Ok(self.plugin_root()?.join("permissions.json"))
     }
 
     fn installer(&self) -> Result<PluginInstaller, AppHostError> {
-        PluginInstaller::new(self.plugin_root())
+        PluginInstaller::new(self.plugin_root()?)
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -1483,7 +1552,7 @@ impl AppHost {
                     release.plugin_id
                 )));
             }
-            let plugin_root = self.plugin_root().join(&release.plugin_id);
+            let plugin_root = self.plugin_root()?.join(&release.plugin_id);
             let installed_dir = plugin_root
                 .join("versions")
                 .join(&release.version)
@@ -1540,7 +1609,10 @@ impl AppHost {
                 "mcp",
             ],
         };
-        let installer = self.installer()?;
+        let account = self.plugin_account_context()?;
+        let installer = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope)?;
         let pointer = installer
             .install(&release, platform, preferred)
             .or_else(|error| {
@@ -1551,6 +1623,7 @@ impl AppHost {
                 }
             })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope)?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -1563,7 +1636,7 @@ impl AppHost {
             .installer()?
             .uninstall(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        let permissions_removed = PermissionManager::load(self.permission_store())
+        let permissions_removed = PermissionManager::load(self.permission_store()?)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .remove_plugin(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -1593,7 +1666,8 @@ impl AppHost {
     }
 
     fn list_installed_plugins(&self) -> Result<Value, AppHostError> {
-        let root = self.plugin_root();
+        let account = self.plugin_account_context()?;
+        let root = account.root.clone();
         let installer = self.installer()?;
         let mut plugins = Vec::new();
         let entries = match std::fs::read_dir(&root) {
@@ -1621,6 +1695,7 @@ impl AppHost {
             }
         }
         plugins.sort_by(|left, right| left.plugin_id.cmp(&right.plugin_id));
+        self.ensure_plugin_account_current(&account.scope)?;
         Ok(json!({"plugins": plugins}))
     }
 
@@ -1633,7 +1708,7 @@ impl AppHost {
             .ok_or_else(|| {
                 AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
             })?;
-        let mut manager = PermissionManager::load(self.permission_store())
+        let mut manager = PermissionManager::load(self.permission_store()?)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         manager
             .retain_requested(plugin_id, &pointer.requested_permissions)
@@ -1660,7 +1735,7 @@ impl AppHost {
             .ok_or_else(|| {
                 AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
             })?;
-        let mut manager = PermissionManager::load(self.permission_store())
+        let mut manager = PermissionManager::load(self.permission_store()?)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         if grant {
             manager
@@ -1691,9 +1766,11 @@ impl AppHost {
     fn active_plugin_ui_root(
         &self,
         plugin_id: &str,
-    ) -> Result<(InstalledPluginPointer, PathBuf), AppHostError> {
-        let pointer = self
-            .installer()?
+    ) -> Result<(String, InstalledPluginPointer, PathBuf), AppHostError> {
+        let account = self.plugin_account_context()?;
+        let installer = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let pointer = installer
             .active(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .ok_or_else(|| {
@@ -1701,7 +1778,7 @@ impl AppHost {
             })?;
         let root = std::fs::canonicalize(&pointer.installed_path)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        Ok((pointer, root))
+        Ok((account.scope, pointer, root))
     }
 
     fn plugin_ui_entry(
@@ -1732,7 +1809,7 @@ impl AppHost {
 
     fn plugin_ui_document(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
-        let (pointer, root) = self.active_plugin_ui_root(plugin_id)?;
+        let (account_scope, pointer, root) = self.active_plugin_ui_root(plugin_id)?;
         let entry = self.plugin_ui_entry(plugin_id, &pointer, &root)?;
         let relative = safe_ui_relative_path(&entry)?;
         let document = std::fs::canonicalize(root.join(relative))
@@ -1744,6 +1821,7 @@ impl AppHost {
         }
         let html = std::fs::read_to_string(document)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account_scope)?;
         Ok(json!({
             "pluginId": plugin_id,
             "html": html,
@@ -1808,6 +1886,7 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
 
         let normalized_path = relative.to_string_lossy().replace('\\', "/");
+        self.ensure_plugin_account_current(&account_scope)?;
         Ok(json!({
             "pluginId": plugin_id,
             "path": normalized_path,
@@ -1846,7 +1925,7 @@ impl AppHost {
         if !report.portable_compatible {
             return Err(AppHostError::Operation(report.blockers().join("; ")));
         }
-        let grants = PermissionManager::load(self.permission_store())
+        let grants = PermissionManager::load(self.permission_store()?)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .grants_for(&plugin_id);
         let config = params.get("config").cloned().unwrap_or_else(|| json!({}));
@@ -1904,7 +1983,7 @@ impl AppHost {
         }
         if self.feature_mode == AppHostFeatureMode::Test {
             let installed = self
-                .plugin_root()
+                .plugin_root()?
                 .join(plugin_id)
                 .join("active.json")
                 .is_file();
@@ -2428,6 +2507,160 @@ fn clean_html_text(value: &str) -> Option<String> {
     }
 }
 
+
+fn stable_plugin_account_scope(user_id: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"fabushi.plugin-account-scope.v1\0");
+    digest.update(user_id.trim().as_bytes());
+    format!("{:x}", digest.finalize())
+}
+
+fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), AppHostError> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    }
+    let bytes = serde_json::to_vec_pretty(value)
+        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    let temp = path.with_extension(format!("tmp-{}", uuid::Uuid::new_v4()));
+    std::fs::write(&temp, bytes)
+        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    #[cfg(windows)]
+    if path.exists() {
+        std::fs::remove_file(path)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    }
+    std::fs::rename(&temp, path)
+        .map_err(|error| AppHostError::Operation(error.to_string()))
+}
+
+fn ensure_plugin_account_marker(root: &Path, scope: &str) -> Result<(), AppHostError> {
+    let marker_path = root.join("account-scope.json");
+    if marker_path.is_file() {
+        let marker: PluginAccountMarker = serde_json::from_slice(
+            &std::fs::read(&marker_path)
+                .map_err(|error| AppHostError::Operation(error.to_string()))?,
+        )
+        .map_err(|error| AppHostError::Operation(format!("invalid plugin account marker: {error}")))?;
+        if marker.schema_version != 1 || marker.account_scope != scope {
+            return Err(AppHostError::Operation(
+                "plugin account marker does not match the active account".into(),
+            ));
+        }
+        return Ok(());
+    }
+    atomic_write_json(
+        &marker_path,
+        &PluginAccountMarker {
+            schema_version: 1,
+            account_scope: scope.to_string(),
+        },
+    )
+}
+
+fn migrate_legacy_plugin_root_if_proven(
+    base: &Path,
+    scope: &str,
+    account_root: &Path,
+) -> Result<(), AppHostError> {
+    let proof_path = base.join("legacy-owner.json");
+    let proof_source = match std::fs::read(&proof_path) {
+        Ok(source) => source,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(AppHostError::Operation(error.to_string())),
+    };
+    let proof: LegacyPluginOwnerProof = serde_json::from_slice(&proof_source)
+        .map_err(|error| AppHostError::Operation(format!("invalid legacy plugin owner proof: {error}")))?;
+    if proof.schema_version != 1 || proof.account_scope != scope {
+        // Ambiguous or other-account legacy bytes remain invisible under the old root.
+        return Ok(());
+    }
+
+    let migrations_root = base.join("migrations");
+    std::fs::create_dir_all(&migrations_root)
+        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    let journal_path = migrations_root.join(format!("{scope}.json"));
+    let mut journal = if journal_path.is_file() {
+        let parsed: LegacyPluginMigrationJournal = serde_json::from_slice(
+            &std::fs::read(&journal_path)
+                .map_err(|error| AppHostError::Operation(error.to_string()))?,
+        )
+        .map_err(|error| AppHostError::Operation(format!("invalid legacy plugin migration journal: {error}")))?;
+        if parsed.schema_version != 1 || parsed.account_scope != scope {
+            return Err(AppHostError::Operation(
+                "legacy plugin migration journal scope mismatch".into(),
+            ));
+        }
+        parsed
+    } else {
+        let mut entries = Vec::new();
+        if base.is_dir() {
+            for entry in std::fs::read_dir(base)
+                .map_err(|error| AppHostError::Operation(error.to_string()))?
+            {
+                let entry = entry.map_err(|error| AppHostError::Operation(error.to_string()))?;
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if matches!(
+                    name.as_str(),
+                    "accounts" | "migrations" | "legacy-owner.json"
+                ) {
+                    continue;
+                }
+                if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\\', '\0']) {
+                    return Err(AppHostError::Operation(
+                        "legacy plugin root contains an unsafe entry name".into(),
+                    ));
+                }
+                entries.push(name);
+            }
+        }
+        entries.sort();
+        let journal = LegacyPluginMigrationJournal {
+            schema_version: 1,
+            account_scope: scope.to_string(),
+            state: "prepared".into(),
+            entries,
+            completed: Vec::new(),
+        };
+        atomic_write_json(&journal_path, &journal)?;
+        journal
+    };
+
+    if journal.state == "completed" {
+        return Ok(());
+    }
+
+    for name in journal.entries.clone() {
+        if journal.completed.iter().any(|done| done == &name) {
+            continue;
+        }
+        let source = base.join(&name);
+        let target = account_root.join(&name);
+        match (source.exists(), target.exists()) {
+            (false, true) => {}
+            (false, false) => {
+                return Err(AppHostError::Operation(format!(
+                    "legacy plugin migration lost entry {name}"
+                )));
+            }
+            (true, true) => {
+                return Err(AppHostError::Operation(format!(
+                    "legacy plugin migration conflict for {name}"
+                )));
+            }
+            (true, false) => {
+                std::fs::rename(&source, &target)
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?;
+            }
+        }
+        journal.completed.push(name);
+        journal.state = "migrating".into();
+        atomic_write_json(&journal_path, &journal)?;
+    }
+    journal.state = "completed".into();
+    atomic_write_json(&journal_path, &journal)
+}
+
 fn string_param<'a>(params: &'a Value, name: &str) -> Result<&'a str, AppHostError> {
     params
         .get(name)
@@ -2649,6 +2882,66 @@ pub fn dispatch_json(host: &AppHost, input: &str) -> String {
 #[cfg(test)]
 mod fabushi_shipping_inference_tests {
     use super::*;
+
+    #[test]
+    fn plugin_account_scope_is_stable_irreversible_and_disjoint() {
+        let a1 = stable_plugin_account_scope("account-a");
+        let a2 = stable_plugin_account_scope(" account-a ");
+        let b = stable_plugin_account_scope("account-b");
+        assert_eq!(a1, a2);
+        assert_ne!(a1, b);
+        assert_eq!(a1.len(), 64);
+        assert!(!a1.contains("account-a"));
+    }
+
+    #[test]
+    fn legacy_plugin_root_migrates_only_with_matching_owner_proof_and_journal() {
+        let base = std::env::temp_dir().join(format!(
+            "fabushi-plugin-migration-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let account_a = stable_plugin_account_scope("account-a");
+        let account_b = stable_plugin_account_scope("account-b");
+        let root_a = base.join("accounts").join(&account_a);
+        std::fs::create_dir_all(base.join("legacy-plugin")).unwrap();
+        std::fs::write(base.join("permissions.json"), b"{}").unwrap();
+        std::fs::create_dir_all(&root_a).unwrap();
+
+        migrate_legacy_plugin_root_if_proven(&base, &account_a, &root_a).unwrap();
+        assert!(base.join("legacy-plugin").is_dir());
+        assert!(!root_a.join("legacy-plugin").exists());
+
+        atomic_write_json(
+            &base.join("legacy-owner.json"),
+            &LegacyPluginOwnerProof {
+                schema_version: 1,
+                account_scope: account_b,
+            },
+        )
+        .unwrap();
+        migrate_legacy_plugin_root_if_proven(&base, &account_a, &root_a).unwrap();
+        assert!(base.join("legacy-plugin").is_dir());
+
+        atomic_write_json(
+            &base.join("legacy-owner.json"),
+            &LegacyPluginOwnerProof {
+                schema_version: 1,
+                account_scope: account_a.clone(),
+            },
+        )
+        .unwrap();
+        migrate_legacy_plugin_root_if_proven(&base, &account_a, &root_a).unwrap();
+        assert!(root_a.join("legacy-plugin").is_dir());
+        assert!(root_a.join("permissions.json").is_file());
+        let journal: LegacyPluginMigrationJournal = serde_json::from_slice(
+            &std::fs::read(base.join("migrations").join(format!("{account_a}.json"))).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(journal.state, "completed");
+        migrate_legacy_plugin_root_if_proven(&base, &account_a, &root_a).unwrap();
+
+        std::fs::remove_dir_all(base).unwrap();
+    }
 
     #[test]
     fn production_feature_host_forces_fabushi_inference_owner() {
