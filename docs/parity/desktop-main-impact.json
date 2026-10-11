@@ -1916,8 +1916,8 @@
       {
         "path": "source/electron-preload/rpc-edge-runtime.ts",
         "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-        "status": "current-main-reviewed-mapped-production-carrier-not-promoted",
-        "finding": "The same-named iOS rpc-edge helper is not a proven shipping caller. Current production uses IOSPreloadBridge -> IOSCoordinatorPortClient/RendererPortServer; the row remains mapped until protocol-equivalence and shipping ownership are fully closed."
+        "status": "current-main-reviewed-shipping-rpc-edge-implemented-pending-exact-head",
+        "finding": "IOSPreloadBridge.requestPayload now traverses IOSRPCEdgeRuntime.call in the shipping App -> SceneRoot -> FabushiRuntime -> IOSPrimaryPreloadEntrypoint chain. IOSPreloadBridge itself adapts the same generation-fenced IOSCoordinatorPortClient as IOSRPCEdgeTransport, preserving canonical sand-rpc method/event names, reply envelopes, native cancellation and existing event cleanup without introducing a second runtime owner. Focused PreloadParityTests cover channel/envelope/failure/cancellation and forbid direct requestPayload bypass; exact-head Actions remain pending."
       },
       {
         "path": "source/electron-main/coordinator/coordinator-runtime.ts",
