@@ -166,18 +166,64 @@ final class RunnerParityTests: XCTestCase {
         }
     }
 
-    func testShippingRemoteRunnerPortFailsClosedUntilAuthenticatedTransportExists() async {
-        let executor = IOSProductionLocalExecutor(
-            remoteTransport: IOSFailClosedRemoteRunnerTransport()
+    @MainActor
+    func testGenerationFencedRemoteRunnerRejectsMissingAndStaleIdentity() async throws {
+        var identity: IOSRemoteRunnerExecutionIdentity? = nil
+        var dispatchCount = 0
+        let transport = IOSGenerationFencedRemoteRunnerTransport(
+            currentIdentity: { identity },
+            dispatch: { _, _ in
+                dispatchCount += 1
+                return .object(["ok": .bool(true)])
+            }
+        )
+
+        do {
+            _ = try await transport.dispatch(method: "local-exec.shell")
+            XCTFail("remote execution must require an active account/Host generation")
+        } catch let error as IOSRemoteRunnerFenceError {
+            XCTAssertEqual(error, .unavailable)
+        }
+        XCTAssertEqual(dispatchCount, 0)
+
+        identity = .init(accountScope: "account-1", accountRevision: 7, hostGeneration: 11)
+        let stable = try await transport.dispatch(method: "local-exec.shell")
+        XCTAssertEqual(stable, .object(["ok": .bool(true)]))
+        XCTAssertEqual(dispatchCount, 1)
+
+        let staleTransport = IOSGenerationFencedRemoteRunnerTransport(
+            currentIdentity: { identity },
+            dispatch: { _, _ in
+                dispatchCount += 1
+                identity = .init(accountScope: "account-2", accountRevision: 8, hostGeneration: 12)
+                return .object(["stale": .bool(true)])
+            }
         )
         do {
-            _ = try await executor.execute(method: "shell")
-            XCTFail("shipping Remote Runner must fail closed while no authenticated endpoint is composed")
-        } catch let error as IOSRemoteRunnerUnavailableError {
-            XCTAssertEqual(error.method, "local-exec.shell")
-        } catch {
-            XCTFail("unexpected error: \(error)")
+            _ = try await staleTransport.dispatch(method: "local-exec.process.spawn")
+            XCTFail("stale account/Host results must be discarded")
+        } catch let error as IOSRemoteRunnerFenceError {
+            XCTAssertEqual(error, .stale)
         }
+        XCTAssertEqual(dispatchCount, 2)
+    }
+
+    func testShippingCoordinatorComposesRemoteRunnerIntoCanonicalHostGraph() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/mahayana-agent-coordinator/MahayanaCoordinator.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("remoteTransport: IOSGenerationFencedRemoteRunnerTransport("))
+        XCTAssertTrue(source.contains("accountRevision: localToolApprovalScopeRevision"))
+        XCTAssertTrue(source.contains("hostGeneration: hostSupervisor.generation"))
+        XCTAssertTrue(source.contains("let result = try await self.request(method: method, params: object)"))
+        XCTAssertFalse(source.contains("remoteTransport: IOSFailClosedRemoteRunnerTransport()"))
     }
 
     func testProductionRemoteRunnerScrubsDesktopOnlyEnvironmentVariables() async throws {

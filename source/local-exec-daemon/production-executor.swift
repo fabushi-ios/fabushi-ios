@@ -77,22 +77,57 @@ actor IOSProductionLocalExecutor {
 }
 
 
-struct IOSRemoteRunnerUnavailableError: LocalizedError, Equatable, Sendable {
-    let method: String
+struct IOSRemoteRunnerExecutionIdentity: Equatable, Sendable {
+    let accountScope: String
+    let accountRevision: UInt64
+    let hostGeneration: UInt64
+}
+
+enum IOSRemoteRunnerFenceError: LocalizedError, Equatable, Sendable {
+    case unavailable
+    case stale
 
     var errorDescription: String? {
-        "Remote Runner transport is unavailable for \(method)."
+        switch self {
+        case .unavailable:
+            return "Remote Runner is unavailable without an active account/Host generation."
+        case .stale:
+            return "Remote Runner result was discarded after the account or Host generation changed."
+        }
     }
 }
 
-/// Shipping fail-closed port used until an authenticated Remote Runner endpoint
-/// is actually composed by the Coordinator. This prevents an invented Host or
-/// Dashboard RPC from masquerading as production Remote Runner transport.
-struct IOSFailClosedRemoteRunnerTransport: RemoteRunnerTransport {
+/// Coordinator-owned transport for the shipping local-exec replacement.
+/// Authority stays on MahayanaCoordinator; this object only snapshots and
+/// rechecks the settled account/Host generation around one remote dispatch.
+struct IOSGenerationFencedRemoteRunnerTransport: @unchecked Sendable, RemoteRunnerTransport {
+    typealias IdentityProvider = @MainActor () -> IOSRemoteRunnerExecutionIdentity?
+    typealias Dispatch = @MainActor (String, CoordinatorPayload) async throws -> CoordinatorPayload
+
+    private let currentIdentity: IdentityProvider
+    private let dispatchImpl: Dispatch
+
+    init(
+        currentIdentity: @escaping IdentityProvider,
+        dispatch: @escaping Dispatch
+    ) {
+        self.currentIdentity = currentIdentity
+        dispatchImpl = dispatch
+    }
+
     func dispatch(
         method: String,
-        params _: CoordinatorPayload
+        params: CoordinatorPayload
     ) async throws -> CoordinatorPayload {
-        throw IOSRemoteRunnerUnavailableError(method: method)
+        guard let token = await currentIdentity() else {
+            throw IOSRemoteRunnerFenceError.unavailable
+        }
+        try Task.checkCancellation()
+        let result = try await dispatchImpl(method, params)
+        try Task.checkCancellation()
+        guard await currentIdentity() == token else {
+            throw IOSRemoteRunnerFenceError.stale
+        }
+        return result
     }
 }

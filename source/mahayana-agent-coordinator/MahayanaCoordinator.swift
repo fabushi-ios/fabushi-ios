@@ -373,7 +373,19 @@ final class MahayanaCoordinator {
     private lazy var productionLocalExecutor: IOSProductionLocalExecutor = {
         IOSProductionLocalExecutor(
             localBackend: nativeLocalCapabilities,
-            remoteTransport: IOSFailClosedRemoteRunnerTransport()
+            remoteTransport: IOSGenerationFencedRemoteRunnerTransport(
+                currentIdentity: { [weak self] in
+                    self?.currentRemoteRunnerIdentity()
+                },
+                dispatch: { [weak self] method, params in
+                    guard let self else { throw CoordinatorError.unavailable }
+                    guard case .object = params,
+                          let object = params.foundationValue as? [String: Any]
+                    else { throw CoordinatorError.invalidParams }
+                    let result = try await self.request(method: method, params: object)
+                    return try CoordinatorPayload.fromFoundation(result.value)
+                }
+            )
         )
     }()
     private let transportStageRecorder: TransportStageRecorder
@@ -507,6 +519,18 @@ final class MahayanaCoordinator {
 
     var hostGeneration: UInt64 {
         hostSupervisor.generation
+    }
+
+    private func currentRemoteRunnerIdentity() -> IOSRemoteRunnerExecutionIdentity? {
+        guard lifecycleState != .shuttingDown,
+              let accountScope = localToolApprovalAccountScope?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !accountScope.isEmpty
+        else { return nil }
+        return IOSRemoteRunnerExecutionIdentity(
+            accountScope: accountScope,
+            accountRevision: localToolApprovalScopeRevision,
+            hostGeneration: hostSupervisor.generation
+        )
     }
 
     static func make(
