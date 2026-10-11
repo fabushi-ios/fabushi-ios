@@ -15,26 +15,125 @@ final class IOSAppStoreUpdateService {
         }
     }
 
-    private let metadataProvider: @MainActor () -> IOSReleaseMetadata?
+    typealias PolicyFetcher = @MainActor (IOSReleaseMetadata) async throws -> IOSAppVersionPolicy
 
-    init(metadataProvider: @escaping @MainActor () -> IOSReleaseMetadata? = {
-        IOSReleaseMetadataReader.read()
-    }) {
+    private let metadataProvider: @MainActor () -> IOSReleaseMetadata?
+    private let policyFetcher: PolicyFetcher
+    private(set) var policyLoadState: IOSAppVersionPolicyLoadState = .idle
+
+    init(
+        metadataProvider: @escaping @MainActor () -> IOSReleaseMetadata? = {
+            IOSReleaseMetadataReader.read()
+        },
+        policyFetcher: @escaping PolicyFetcher = { metadata in
+            try await IOSAppVersionPolicyClient.fetch(metadata: metadata)
+        }
+    ) {
         self.metadataProvider = metadataProvider
+        self.policyFetcher = policyFetcher
     }
 
     func statusPayload() throws -> CoordinatorPayload {
         guard let metadata = metadataProvider() else {
             throw ServiceError.releaseMetadataUnavailable
         }
-        return .object([
-            "type": .string("managed-by-app-store"),
-            "version": .string(metadata.version),
-            "buildNumber": .string(metadata.buildNumber),
-            "bundleIdentifier": .string(metadata.bundleIdentifier),
+
+        let currentBuild = Int(metadata.buildNumber)
+        let retainedPolicy = policyLoadState.policy
+        let hasOffer: Bool
+        if let policy = retainedPolicy {
+            hasOffer = policy.updateAvailable && (
+                IOSUpdateVersion.isNewer(policy.latestVersion, than: metadata.version)
+                || (currentBuild.map { policy.latestBuildNumber > $0 } ?? false)
+                || policy.isRequired
+            )
+        } else {
+            hasOffer = false
+        }
+
+        let state: CoordinatorPayload
+        switch policyLoadState {
+        case .loading:
+            state = .object(["type": .string("checking")])
+        case .ready(let policy) where hasOffer:
+            state = .object([
+                "type": .string("available"),
+                "version": .string(policy.latestVersion),
+            ])
+        case .failed(let message, let retained):
+            if hasOffer, let retained {
+                state = .object([
+                    "type": .string("available"),
+                    "version": .string(retained.latestVersion),
+                    "lastCheck": .object([
+                        "result": .string("error"),
+                        "errorMessage": .string(message),
+                    ]),
+                ])
+            } else {
+                state = .object([
+                    "type": .string("idle"),
+                    "lastCheck": .object([
+                        "result": .string("error"),
+                        "errorMessage": .string(message),
+                    ]),
+                ])
+            }
+        case .ready, .idle:
+            state = .object([
+                "type": .string("idle"),
+                "lastCheck": .object(["result": .string("up-to-date")]),
+            ])
+        }
+
+        let isBelowMinimumVersion = retainedPolicy.map { policy in
+            policy.isRequired || (currentBuild.map { $0 < policy.minSupportedBuildNumber } ?? false)
+        } ?? false
+
+        var result: [String: CoordinatorPayload] = [
+            "state": state,
+            "currentTrack": .string("stable"),
+            "currentVersion": .string(metadata.version),
+            "trackOverride": .null,
+            "buildDefaultTrack": .string("stable"),
+            "availableTracks": .array([.string("stable")]),
+            "isTrackManagedByPolicy": .bool(true),
+            "isBelowMinimumVersion": .bool(isBelowMinimumVersion),
+            "autoUpdateWhenIdleOptIn": .bool(false),
+            "autoUpdateWhenIdleGateEnabled": .bool(false),
             "mechanism": .string(metadata.updateMechanism),
+            "bundleIdentifier": .string(metadata.bundleIdentifier),
+            "buildNumber": .string(metadata.buildNumber),
             "selfUpdateSupported": .bool(false),
-        ])
+        ]
+        if let policy = retainedPolicy {
+            result["storeURL"] = .string(policy.downloadUrl)
+            result["allowSkip"] = .bool(policy.allowSkip)
+            result["policyStrategy"] = .string(policy.strategy.rawValue)
+            result["rolloutPercentage"] = .number(Double(policy.rolloutPercentage))
+        }
+        return .object(result)
+    }
+
+    func checkForUpdates() async throws -> CoordinatorPayload {
+        guard let metadata = metadataProvider() else {
+            throw ServiceError.releaseMetadataUnavailable
+        }
+        let retained = policyLoadState.policy
+        policyLoadState = .loading
+        do {
+            let policy = try await policyFetcher(metadata)
+            policyLoadState = .ready(policy)
+        } catch is CancellationError {
+            policyLoadState = retained.map { .ready($0) } ?? .idle
+            throw CancellationError()
+        } catch {
+            policyLoadState = .failed(
+                message: error.localizedDescription,
+                retained: retained
+            )
+        }
+        return try statusPayload()
     }
 
     func unsupportedActionPayload(_ action: String) -> CoordinatorPayload {
@@ -154,15 +253,9 @@ enum IOSAppVersionPolicyClient {
               !policy.message.isEmpty,
               !policy.downloadUrl.isEmpty,
               policy.downloadURL != nil,
-              policy.forceUpdate == (policy.strategy == .force || policy.forceUpdate),
+              policy.forceUpdate == (policy.strategy == .force),
               policy.updateAvailable == (policy.strategy != .none)
         else {
-            throw ClientError.invalidPolicy
-        }
-        if policy.strategy == .force && !policy.forceUpdate {
-            throw ClientError.invalidPolicy
-        }
-        if policy.strategy == .none && policy.forceUpdate {
             throw ClientError.invalidPolicy
         }
         return policy

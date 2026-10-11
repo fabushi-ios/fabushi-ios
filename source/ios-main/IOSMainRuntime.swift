@@ -317,7 +317,7 @@ final class IOSMainRuntime {
             }
             return .ok(.object([:]))
         }
-        if let updateOutcome = updateWiring.route(method: method, args: args) {
+        if let updateOutcome = await updateWiring.route(method: method, args: args) {
             return updateOutcome
         }
         let outcome = await coordinator.dispatchTransport(
