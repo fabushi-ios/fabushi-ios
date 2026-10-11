@@ -97,7 +97,7 @@ jobs:
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci external_installer_commit_guard_prevents_stale_account_write
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci fabapp_install_commit_guard_rejects_stale_account_before_writes
       - name: Test Skills lifecycle and Agent integration contracts
-        run: cargo test --manifest-path source/packages/codex-rs/Cargo.toml -p codex-core-skills --lib
+        run: cargo test --manifest-path source/packages/codex-rs/Cargo.toml -p codex-core-skills --all-targets
 
       - name: Test native MCP, persistence telemetry, Runtime projection, and protected account contracts
         run: |
@@ -180,6 +180,7 @@ jobs:
             -only-testing:FabushiTests/SharedMcpAccountLifecycleParityTests \
             -only-testing:FabushiTests/SharedMcpManagerParityTests \
             -only-testing:FabushiTests/SharedMcpToolsDiscoveryParityTests \
+            -only-testing:FabushiTests/SharedMcpCatalogMarketplaceParityTests \
             -only-testing:FabushiTests/CoordinatorMcpSurfaceTests \
             -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests \
             -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests \
