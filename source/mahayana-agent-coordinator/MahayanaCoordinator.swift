@@ -1248,6 +1248,9 @@ final class MahayanaCoordinator {
             params["awaitTurn"] = true
             params["source"] = "workflow-reference"
         }
+        if method == "listRoutedMcpTools" || method == "executeRoutedMcpTool" {
+            params["_requestId"] = requestId
+        }
         guard let routedArgs = try? CoordinatorPayload.fromFoundation(params) else {
             return .failed(.init(code: "invalid-params", message: CoordinatorError.invalidParams.localizedDescription))
         }
