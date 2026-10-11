@@ -939,14 +939,12 @@ impl MahayanaProductClient {
         platform: Option<&str>,
     ) -> Result<Value, ProductError> {
         let query = query.map(str::trim).filter(|query| !query.is_empty());
-        // The public API uses `mobile` as the canonical platform value. Keep
-        // accepting the native-facing aliases here, but normalize them before
-        // sending the request so clients can work with older deployed Workers
-        // during a rolling deployment.
+        // Preserve native platforms for installable-package discovery.
+        // iOS/Android artifacts can have different signatures, formats, and
+        // compatibility contracts even when their hosted surfaces are both mobile.
         let platform = platform
             .map(safe_marketplace_platform)
-            .transpose()?
-            .map(canonical_marketplace_platform);
+            .transpose()?;
         let mut parameters = Vec::new();
         if let Some(query) = query {
             parameters.push(("q", query));
