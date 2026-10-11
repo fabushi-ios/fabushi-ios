@@ -15,9 +15,10 @@ final class RendererPortServer {
     }
 
     typealias RequestDispatcher = @MainActor (_ method: String, _ args: CoordinatorPayload) async -> CoordinatorReplyOutcome
+    typealias TracedRequestDispatcher = @MainActor (_ requestId: String, _ method: String, _ args: CoordinatorPayload) async -> CoordinatorReplyOutcome
 
     private let port: CoordinatorPort
-    private let dispatch: RequestDispatcher
+    private let dispatch: TracedRequestDispatcher
     private let onServing: @MainActor () -> Void
     private var inFlight: [String: Task<Void, Never>] = [:]
 
@@ -26,12 +27,26 @@ final class RendererPortServer {
 
     init(
         port: CoordinatorPort,
-        dispatch: @escaping RequestDispatcher,
+        dispatchWithRequestId: @escaping TracedRequestDispatcher,
         onServing: @escaping @MainActor () -> Void = {}
     ) {
         self.port = port
-        self.dispatch = dispatch
+        self.dispatch = dispatchWithRequestId
         self.onServing = onServing
+    }
+
+    convenience init(
+        port: CoordinatorPort,
+        dispatch: @escaping RequestDispatcher,
+        onServing: @escaping @MainActor () -> Void = {}
+    ) {
+        self.init(
+            port: port,
+            dispatchWithRequestId: { _, method, args in
+                await dispatch(method, args)
+            },
+            onServing: onServing
+        )
     }
 
     func receive(_ frame: CoordinatorFrame) {
@@ -74,7 +89,7 @@ final class RendererPortServer {
             }
             let task = Task { @MainActor [weak self] in
                 guard let self else { return }
-                let outcome = await self.dispatch(method, args)
+                let outcome = await self.dispatch(requestId, method, args)
                 guard !Task.isCancelled, self.phase == .serving else { return }
                 self.inFlight.removeValue(forKey: requestId)
                 self.port.post(.reply(requestId: requestId, outcome: outcome))
