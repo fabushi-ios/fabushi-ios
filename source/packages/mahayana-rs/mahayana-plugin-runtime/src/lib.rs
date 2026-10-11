@@ -75,6 +75,37 @@ pub struct ReleaseArtifact {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CatalogFabappTrustBinding {
+    pub publisher_id: String,
+    pub app_id: String,
+    pub artifact_id: String,
+    pub key_id: String,
+    pub raw_public_key_base64_url: String,
+}
+
+impl CatalogFabappTrustBinding {
+    fn catalog_trust(&self) -> Result<CatalogFabappTrust, RuntimeError> {
+        validate_identifier(&self.publisher_id, "fabappTrust.publisherId")?;
+        validate_identifier(&self.app_id, "fabappTrust.appId")?;
+        validate_identifier(&self.artifact_id, "fabappTrust.artifactId")?;
+        validate_identifier(&self.key_id, "fabappTrust.keyId")?;
+        let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(self.raw_public_key_base64_url.as_bytes())
+            .map_err(|_| RuntimeError::InvalidRelease("fabapp trust public key is not base64url".into()))?;
+        let public_key: [u8; 32] = decoded
+            .try_into()
+            .map_err(|_| RuntimeError::InvalidRelease("fabapp trust public key must be 32 bytes".into()))?;
+        Ok(CatalogFabappTrust {
+            publisher_id: self.publisher_id.clone(),
+            app_id: self.app_id.clone(),
+            key_id: self.key_id.clone(),
+            public_key,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExternalReleaseManifest {
     pub schema_version: u32,
@@ -84,6 +115,8 @@ pub struct ExternalReleaseManifest {
     #[serde(default)]
     pub permissions: Vec<String>,
     pub artifacts: Vec<ReleaseArtifact>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fabapp_trust: Option<CatalogFabappTrustBinding>,
     /// Present for Marketplace releases. Generic external releases may omit
     /// this field and retain the broader runtime resolver contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -154,6 +187,26 @@ impl ExternalReleaseManifest {
                 )));
             }
             validate_source(&artifact.source)?;
+        }
+        if let Some(binding) = &self.fabapp_trust {
+            if binding.app_id != self.plugin_id {
+                return Err(RuntimeError::InvalidRelease(
+                    "fabapp trust appId must match release pluginId".into(),
+                ));
+            }
+            let _ = binding.catalog_trust()?;
+            let artifact = self
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.id == binding.artifact_id)
+                .ok_or_else(|| RuntimeError::InvalidRelease(
+                    "fabapp trust artifactId was not found in release".into(),
+                ))?;
+            if artifact.format != ArtifactFormat::Zip || artifact.runtime != "local-web" {
+                return Err(RuntimeError::InvalidRelease(
+                    "catalog .fabapp artifact must use zip format and local-web runtime".into(),
+                ));
+            }
         }
         if let Some(install) = &self.install {
             validate_marketplace_install_contract(self, install)?;
@@ -1636,6 +1689,28 @@ impl PluginInstaller {
         verify_bytes(bytes, &artifact.sha256, artifact.size)?;
         if !commit_guard() {
             return Err(RuntimeError::StaleAccountContext);
+        }
+        if let Some(binding) = release
+            .fabapp_trust
+            .as_ref()
+            .filter(|binding| binding.artifact_id == artifact.id)
+        {
+            let trust = FabappTrustContext::Catalog(binding.catalog_trust()?);
+            let pointer = self.install_fabapp_bytes_with_commit_guard(
+                bytes,
+                &trust,
+                &commit_guard,
+            )?;
+            if pointer.plugin_id != release.plugin_id
+                || pointer.version != release.version
+                || !pointer.artifact_sha256.eq_ignore_ascii_case(&artifact.sha256)
+                || pointer.requested_permissions != release.permissions
+            {
+                return Err(RuntimeError::InvalidRelease(
+                    "verified .fabapp identity/version/digest/capabilities do not match release".into(),
+                ));
+            }
+            return Ok(pointer);
         }
         let plugin_root = self.root.join(&release.plugin_id);
         if let Some(active) = self.active(&release.plugin_id)?
