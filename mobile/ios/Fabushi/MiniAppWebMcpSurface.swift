@@ -248,7 +248,13 @@ func validateMiniAppSchemaValue(
                 errors.append("\(path).\(required) 是必填项")
             }
         }
-        for (key, rawChild) in schema["properties"] as? [String: Any] ?? [:] {
+        let properties = schema["properties"] as? [String: Any] ?? [:]
+        if schema["additionalProperties"] as? Bool == false {
+            for key in object.keys where properties[key] == nil {
+                errors.append("\(path).\(key) 不允许")
+            }
+        }
+        for (key, rawChild) in properties {
             guard let child = object[key],
                   let childSchema = rawChild as? [String: Any]
             else { continue }
@@ -271,7 +277,15 @@ func validateMiniAppSchemaValue(
             ))
         }
     } else if type == "string" {
-        guard let value, case .string = value else { return ["\(path) 必须是字符串"] }
+        guard let value, case .string(let text) = value else {
+            return ["\(path) 必须是字符串"]
+        }
+        if let minLength = schema["minLength"] as? Int, text.count < minLength {
+            errors.append("\(path) 长度不能小于 \(minLength)")
+        }
+        if let maxLength = schema["maxLength"] as? Int, text.count > maxLength {
+            errors.append("\(path) 长度不能超过 \(maxLength)")
+        }
     } else if type == "boolean" {
         guard let value, case .boolean = value else { return ["\(path) 必须是布尔值"] }
     } else if type == "number" {
@@ -294,6 +308,24 @@ func validateMiniAppSchemaValue(
         }
     }
     return errors
+}
+
+func miniAppEffectiveApproval(catalog: String, page: String) -> String {
+    func rank(_ value: String) -> Int {
+        switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "none":
+            return 0
+        case "destructive":
+            return 2
+        default:
+            return 1
+        }
+    }
+
+    let strongest = max(rank(catalog), rank(page))
+    if strongest >= 2 { return "destructive" }
+    if strongest >= 1 { return "required" }
+    return "none"
 }
 
 func parseMiniAppToolCommand(
@@ -1317,8 +1349,31 @@ private struct MiniAppWebView: UIViewRepresentable {
                   isTrustedWebMcpBridgeURL(webView.url, localRootURL: source.rootURL)
             else { return }
 
-            let tools = rawTools.compactMap { MarketplaceModel.webMcpToolContract(from: $0) }
-                .filter { session.grants.contains($0.name) }
+            let tools = rawTools
+                .compactMap { MarketplaceModel.webMcpToolContract(from: $0) }
+                .compactMap { pageTool -> MiniAppToolContract? in
+                    guard session.grants.contains(pageTool.name),
+                          let catalogTool = toolByName[pageTool.name]
+                    else { return nil }
+
+                    // The live page supplies the implementation schema, but it
+                    // cannot widen a reviewed catalog schema or weaken the
+                    // Host-owned approval class.
+                    if let catalogSchema = catalogTool.inputSchemaJSON,
+                       catalogSchema != pageTool.inputSchemaJSON {
+                        return nil
+                    }
+                    return MiniAppToolContract(
+                        name: pageTool.name,
+                        description: pageTool.description,
+                        approval: miniAppEffectiveApproval(
+                            catalog: catalogTool.approval,
+                            page: pageTool.approval
+                        ),
+                        title: pageTool.title,
+                        inputSchemaJSON: pageTool.inputSchemaJSON
+                    )
+                }
             guard !tools.isEmpty else { return }
 
             ActiveMiniAppWebMcpSessionRegistry.shared.register(
