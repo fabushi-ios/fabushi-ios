@@ -115,8 +115,7 @@ fn installed_plugin_skills_are_replace_all_read_only_and_runnable() {
             "description": "Review exact-head release evidence.",
             "markdown": "---\nname: Release review\ndescription: Review exact-head release evidence.\n---\nInspect the exact-head CI evidence before shipping.",
             "sourceRef": "https://github.com/example/plugin/blob/main/skills/release-review/SKILL.md",
-            "publishedByCurrentUser": false,
-            "isEnabledForAgent": true
+            "publishedByCurrentUser": false
         }]),
     )
     .expect("sync installed plugin skills");
