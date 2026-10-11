@@ -51,6 +51,7 @@ private final class GatewayEventHost: MahayanaHostRequesting, @unchecked Sendabl
     }
 }
 
+@MainActor
 final class GatewayParityTests: XCTestCase {
     private func waitForGate(_ gate: GatewayAsyncGate) async {
         for _ in 0..<64 {
@@ -101,8 +102,9 @@ final class GatewayParityTests: XCTestCase {
         }
 
         gate.open()
+        let firstValue = try await first.value
         XCTAssertEqual(
-            try await first.value,
+            firstValue,
             .object(["ok": .bool(true)])
         )
     }
@@ -192,7 +194,8 @@ final class GatewayParityTests: XCTestCase {
         supervisor.invalidateHealthCache()
         gate.open()
 
-        XCTAssertEqual(try await pending.value, replacement)
+        let pendingValue = try await pending.value
+        XCTAssertEqual(pendingValue, replacement)
         XCTAssertEqual(resolves, 2)
     }
 
@@ -633,21 +636,25 @@ final class GatewayParityTests: XCTestCase {
             }
         )
 
-        XCTAssertEqual(try await supervisor.ensureConnection(), first)
+        let initialConnection = try await supervisor.ensureConnection()
+        XCTAssertEqual(initialConnection, first)
         XCTAssertEqual(resolves, 1)
         XCTAssertEqual(probes, 0)
 
-        XCTAssertEqual(try await supervisor.ensureConnection(), first)
+        let probedConnection = try await supervisor.ensureConnection()
+        XCTAssertEqual(probedConnection, first)
         XCTAssertEqual(probes, 1)
 
         now = now.addingTimeInterval(
             Double(CoordinatorHostSupervisor.healthProbeTTLMilliseconds - 1) / 1_000
         )
-        XCTAssertEqual(try await supervisor.ensureConnection(), first)
+        let cachedConnection = try await supervisor.ensureConnection()
+        XCTAssertEqual(cachedConnection, first)
         XCTAssertEqual(probes, 1, "fresh health TTL should skip a second probe")
 
         now = now.addingTimeInterval(0.002)
-        XCTAssertEqual(try await supervisor.ensureConnection(), second)
+        let refreshedConnection = try await supervisor.ensureConnection()
+        XCTAssertEqual(refreshedConnection, second)
         XCTAssertEqual(probes, 2)
         XCTAssertEqual(resolves, 2)
     }
