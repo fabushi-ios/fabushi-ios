@@ -2375,6 +2375,8 @@ internal struct MobileBotChat: View {
                     .frame(width: 38, height: 38)
                     .background(Color.black.opacity(0.045), in: Circle())
             }
+            .accessibilityLabel("关闭 Bot 对话")
+            .accessibilityIdentifier("mobile-bot-close")
             Spacer()
             Button(action: onOpenSettings) {
                 HStack(spacing: 8) {

@@ -16,6 +16,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         "purchaseTapped": false,
         "entitlementAllowed": false,
         "restoreTapped": false,
+        "removedAtEnd": false,
     ]
 
     override func setUpWithError() throws {
@@ -208,7 +209,38 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         XCTAssertTrue(close.waitForExistence(timeout: 8))
         close.tap()
         XCTAssertTrue(waitForNonExistence(surface, timeout: 12))
-        checkpoint("090-journey-complete")
+        checkpoint("090-webmcp-closed")
+
+        let closeBot = app.buttons["mobile-bot-close"]
+        XCTAssertTrue(closeBot.waitForExistence(timeout: 8))
+        closeBot.tap()
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 12))
+
+        XCTAssertTrue(legacy.waitForExistence(timeout: 8))
+        legacy.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["app-shell"].waitForExistence(timeout: 15))
+        openMarketplace(in: app)
+
+        let cleanupSearch = app.textFields["marketplace-search"]
+        XCTAssertTrue(cleanupSearch.waitForExistence(timeout: 8))
+        cleanupSearch.tap()
+        cleanupSearch.typeText("小程序")
+        let cleanupSubmit = app.buttons["marketplace-search-submit"]
+        XCTAssertTrue(cleanupSubmit.waitForExistence(timeout: 5))
+        cleanupSubmit.tap()
+
+        let remove = app.buttons["remove-global-dharma"]
+        XCTAssertTrue(
+            scrollToElement(remove, in: app, maxSwipes: 10),
+            "Protected journey must expose real account-scoped Marketplace removal after install/update"
+        )
+        remove.tap()
+        XCTAssertTrue(
+            waitForNonExistence(remove, timeout: 30),
+            "Account-scoped removal must settle and clear the canonical installed projection"
+        )
+        mark("removedAtEnd", true)
+        checkpoint("100-removed-global-dharma")
         persistState()
     }
 

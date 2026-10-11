@@ -302,7 +302,8 @@ jobs:
             .sharedRuntimeSynced == true and
             .purchaseTapped == true and
             .entitlementAllowed == true and
-            .restoreTapped == true
+            .restoreTapped == true and
+            .removedAtEnd == true
           ' "$EVIDENCE_DIR/state.json" >/dev/null
 
       - name: Collect evidence and remove protected session
