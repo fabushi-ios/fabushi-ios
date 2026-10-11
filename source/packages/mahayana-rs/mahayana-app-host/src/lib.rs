@@ -2413,8 +2413,17 @@ impl AppHost {
             .ok_or_else(|| {
                 AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
             })?;
+        let account_root = std::fs::canonicalize(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let plugin_root = account_root.join(plugin_id);
         let root = std::fs::canonicalize(&pointer.installed_path)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        if !root.starts_with(&plugin_root) || !root.is_dir() {
+            return Err(AppHostError::Operation(
+                "installed plugin root escaped the active account scope".into(),
+            ));
+        }
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         Ok((account.scope, account.generation, pointer, root))
     }
 
@@ -2473,7 +2482,8 @@ impl AppHost {
     fn plugin_ui_resource(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
         let path = string_param(&params, "path")?;
-        let (pointer, root) = self.active_plugin_ui_root(plugin_id)?;
+        let (account_scope, account_generation, pointer, root) =
+            self.active_plugin_ui_root(plugin_id)?;
 
         if let Some(expected_version) = params.get("version").and_then(Value::as_str)
             && expected_version != pointer.version
