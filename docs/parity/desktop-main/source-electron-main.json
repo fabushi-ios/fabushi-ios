@@ -1391,17 +1391,17 @@
     {
       "desktop_path": "source/electron-main/feedback/feedback-report.ts",
       "desktop_blob_sha": "ff6e526d037eebff6d68f94b5adba3c36fbe330e",
-      "desktop_responsibility": "pending-review",
-      "desktop_owner": "platform-main",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_responsibility": "Validate and submit authenticated product feedback to /sand/feedback with account identity fencing, bounded diagnostics, machine checksum, a 15-second deadline and stable error codes.",
+      "desktop_owner": "electron-main feedback report adapter using canonical Cursor auth/machine identity",
+      "desktop_visible_effect": "Account feedback submits against the signed-in identity, preserves optional conversation context, includes bounded diagnostics, and returns stable recoverable error states.",
+      "ios_disposition": "ios-adapted",
+      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "ios_language": "Swift",
+      "ios_platform_delta": "Native Coordinator MCP routing runs before Host dispatch and reuses the single IOSCursorAuthService/machine-id owner. The older Rust /api/feedback menu-report path remains separate and is not counted as this Desktop responsibility.",
+      "implementation_status": "implemented",
+      "production_evidence": "MarketplaceModel.submitAccountFeedback -> IOSPreloadBridge -> MahayanaCoordinator -> CoordinatorMcpSurface.route(submitFeedback) -> IOSFeedbackReportClient -> /sand/feedback. Client validates message/account/submission/conversation bounds, token sub/email == accountSlot, Bearer + x-cursor-checksum + client metadata, bounded Sentry IDs, 15s timeout, and Desktop HTTP error mapping.",
+      "test_evidence": "FeedbackOverlayParityTests covers stable codes/state plus exact /sand/feedback request path/headers/body/bounded Sentry IDs, token identity mismatch and 429 mapping. Descendant exact-head Actions required before verified.",
+      "notes": "Reviewed against Desktop 371b72f1 source/electron-main/feedback/feedback-report.ts. Current-main feedback intentionally bypasses the legacy Rust /api/feedback menu-report format."
     },
     {
       "desktop_path": "source/electron-main/foundations.test.ts",

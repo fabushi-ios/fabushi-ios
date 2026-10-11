@@ -642,12 +642,156 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
     }
 }
 
+struct IOSFeedbackSubmitArgs: Equatable, Sendable {
+    let accountSlot: String
+    let message: String
+    let submissionId: String
+    let conversationId: String?
+}
+
+private let IOS_FEEDBACK_UUID_PATTERN =
+    #"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"#
+
+func iosFeedbackSubmitArgs(_ value: [String: Any]) -> IOSFeedbackSubmitArgs? {
+    guard let rawMessage = value["message"] as? String else { return nil }
+    let message = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !message.isEmpty,
+          message.count <= SAND_FEEDBACK_MESSAGE_MAX_CHARS,
+          let rawSlot = value["accountSlot"] as? String
+    else { return nil }
+    let accountSlot = rawSlot.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !accountSlot.isEmpty,
+          accountSlot.count <= SAND_FEEDBACK_ACCOUNT_SLOT_MAX_CHARS,
+          let submissionId = value["submissionId"] as? String,
+          submissionId.range(of: IOS_FEEDBACK_UUID_PATTERN, options: .regularExpression) != nil
+    else { return nil }
+    var conversationId: String?
+    if let rawConversation = value["conversationId"] {
+        guard let rawConversation = rawConversation as? String else { return nil }
+        let normalized = rawConversation.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalized.isEmpty {
+            guard normalized.count <= SAND_FEEDBACK_CONVERSATION_ID_MAX_CHARS else { return nil }
+            conversationId = normalized
+        }
+    }
+    return .init(
+        accountSlot: accountSlot,
+        message: message,
+        submissionId: submissionId,
+        conversationId: conversationId
+    )
+}
+
+@MainActor
+final class IOSFeedbackReportClient {
+    typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+
+    private let getAccessToken: @MainActor @Sendable (String) async throws -> String
+    private let getMachineID: @MainActor @Sendable () async throws -> String
+    private let getBackendURL: @MainActor @Sendable () -> String
+    private let recentSentryEventIDs: @MainActor @Sendable () -> [String]
+    private let appVersion: @MainActor @Sendable () -> String
+    private let osVersion: @MainActor @Sendable () -> String
+    private let requestExecutor: RequestExecutor
+
+    init(
+        getAccessToken: @escaping @MainActor @Sendable (String) async throws -> String,
+        getMachineID: @escaping @MainActor @Sendable () async throws -> String,
+        getBackendURL: @escaping @MainActor @Sendable () -> String,
+        recentSentryEventIDs: @escaping @MainActor @Sendable () -> [String] = { [] },
+        appVersion: @escaping @MainActor @Sendable () -> String = {
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+                ?? "unknown"
+        },
+        osVersion: @escaping @MainActor @Sendable () -> String = {
+            ProcessInfo.processInfo.operatingSystemVersionString
+        },
+        requestExecutor: @escaping RequestExecutor = { request in
+            try await URLSession.shared.data(for: request)
+        }
+    ) {
+        self.getAccessToken = getAccessToken
+        self.getMachineID = getMachineID
+        self.getBackendURL = getBackendURL
+        self.recentSentryEventIDs = recentSentryEventIDs
+        self.appVersion = appVersion
+        self.osVersion = osVersion
+        self.requestExecutor = requestExecutor
+    }
+
+    func submit(_ value: [String: Any]) async -> [String: Any] {
+        guard let feedback = iosFeedbackSubmitArgs(value) else {
+            return ["ok": false, "code": "invalid-feedback"]
+        }
+        let backendURL = getBackendURL()
+        let accessToken: String
+        do {
+            accessToken = try await getAccessToken(backendURL)
+        } catch {
+            return ["ok": false, "code": "not-signed-in"]
+        }
+        let token = parseJwtPayload(accessToken)
+        guard (token?.sub ?? token?.email) == feedback.accountSlot else {
+            return ["ok": false, "code": "not-signed-in"]
+        }
+
+        do {
+            guard let baseURL = URL(string: backendURL) else {
+                return ["ok": false, "code": "unavailable"]
+            }
+            var request = URLRequest(url: baseURL.appendingPathComponent("sand/feedback"))
+            request.httpMethod = "POST"
+            request.timeoutInterval = 15
+            var headers = getSandBackendClientHeaders(ProcessInfo.processInfo.environment)
+            headers["content-type"] = "application/json"
+            headers["authorization"] = "Bearer \(accessToken)"
+            headers["x-cursor-checksum"] = createCursorChecksum(
+                machineId: try await getMachineID()
+            )
+            for (name, value) in headers {
+                request.setValue(value, forHTTPHeaderField: name)
+            }
+            var body: [String: Any] = [
+                "message": feedback.message,
+                "submissionId": feedback.submissionId,
+                "appVersion": appVersion(),
+                "platform": "ios",
+                "osVersion": osVersion(),
+                "sentryEventIds": recentSentryEventIDs()
+                    .filter(isValidFeedbackSentryEventID)
+                    .prefix(SAND_FEEDBACK_SENTRY_EVENT_ID_MAX_COUNT)
+                    .map { $0 },
+            ]
+            if let conversationId = feedback.conversationId {
+                body["conversationId"] = conversationId
+            }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (_, response) = try await requestExecutor(request)
+            guard let http = response as? HTTPURLResponse else {
+                return ["ok": false, "code": "unavailable"]
+            }
+            switch http.statusCode {
+            case 200..<300: return ["ok": true]
+            case 400: return ["ok": false, "code": "invalid-feedback"]
+            case 402: return ["ok": false, "code": "subscription-required"]
+            case 403: return ["ok": false, "code": "access-denied"]
+            case 429: return ["ok": false, "code": "rate-limited"]
+            default: return ["ok": false, "code": "unavailable"]
+            }
+        } catch {
+            return ["ok": false, "code": "unavailable"]
+        }
+    }
+}
+
 @MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
     private let cursorAuth: IOSCursorAuthService
     private let dashboard: IOSCursorDashboardClient
+    private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
     private let isClientPaused: @MainActor () -> Bool
@@ -700,6 +844,7 @@ final class CoordinatorMcpSurface {
         port: CoordinatorMcpHostPort,
         cursorAuth: IOSCursorAuthService,
         dashboard: IOSCursorDashboardClient,
+        feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
         localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer,
         isClientPaused: @escaping @MainActor () -> Bool
@@ -708,6 +853,7 @@ final class CoordinatorMcpSurface {
         self.port = port
         self.cursorAuth = cursorAuth
         self.dashboard = dashboard
+        self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
         self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
         self.isClientPaused = isClientPaused
@@ -736,6 +882,13 @@ final class CoordinatorMcpSurface {
             }
         )
         let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        let feedbackClient = IOSFeedbackReportClient(
+            getAccessToken: { backendURL in
+                try await cursorAuth.getValidAccessToken(backendURL: backendURL)
+            },
+            getMachineID: { try await cursorAuth.getMachineID() },
+            getBackendURL: { getConfiguredBackendUrl() }
+        )
         let localToolPermissionCeilingSynchronizer = IOSCursorLocalToolPermissionCeilingSynchronizer(
             settingsStore: settingsStore,
             fetchCeiling: { try await dashboard.getLocalToolPermissionCeiling() },
@@ -820,6 +973,7 @@ final class CoordinatorMcpSurface {
             port: port,
             cursorAuth: cursorAuth,
             dashboard: dashboard,
+            feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
             localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
             isClientPaused: isClientPaused
@@ -1073,6 +1227,9 @@ final class CoordinatorMcpSurface {
         params: [String: Any]
     ) async throws -> CoordinatorDevControlRouting {
         switch method {
+        case "submitFeedback":
+            return .handled(await feedbackClient.submit(params))
+
         case "getBoxMigrationStatus":
             try refuseComputerConnectionWhileClientPaused()
             try await requireCursorComputerLifecycle()
