@@ -246,6 +246,21 @@ Acceptance evidence must record repository, exact SHA, workflow/run/job IDs, com
 - `mobile/ios/Fabushi/GlobalDharmaCommerceModel.swift`
 - `.github/workflows/ios-protected-global-dharma.yml`
 
+
+### 2026-10-12 execution evidence refresh
+
+This execution round is intentionally fail-closed. It does **not** convert pending, cancelled, skipped, neutral, or externally blocked evidence into Passed.
+
+- Live refs were re-read directly through Git refs: iOS main `f098639ab178a839690b9dece60fa0d11c5d2e25`; Desktop main `371b72f1cd20de03dc4dff9a15ed761054968093` / tree `3116c54a1e36da95189c740bdc789ad543ce2d20`; Backend main `9c56a77cbe02dfceebf574236a703b53cd257cb9`; Platform Core main `c301820b93274bda586fbb82be982afc3c2ee4d4`; canonical Fabushi server main `c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52`; Marketplace main `1971f2a93197cfb79d1e8f0856345f36776f3ca3`.
+- Historical iOS evidence head `ba067cd838496c847715acda9b22c8d39c908a6f` and runs `38154970619` / `38154970497` are observation-only because PR #3 advanced.
+- New Actions-only offline acceptance is owned by `.github/workflows/ios-protected-session.yml` job `global-dharma-offline`. It performs canonical online Marketplace preparation, proves a real public HTTPS probe works before isolation, disables enabled macOS runner network services, requires the same real public probe to fail, then cold-starts the installed app and invokes `/offline.state.read` plus approved `/offline.practice.record` through the native Host panel against the active page. It terminates/relaunches Fabushi again while isolated and requires the same persisted revision, restores network, then requires the real public probe to recover. No invalid URL or synthetic network mock is accepted as isolation evidence.
+- Cold app initialization no longer preflights Marketplace catalog or remote MCP discovery. Catalog/MCP refresh remains surface-driven; protected `local.prayer-wheel.start` retains its fresh Host-side entitlement boundary.
+- Active WebMCP pending-result fencing now includes package version and artifact digest in addition to account/instance/generation. Focused tests cover package identity replacement and immediate removal of a disabled page tool, complementing existing wrong-account, wrong instance/nonce/generation/tool, schema additionalProperties/maxLength, approval-denial, origin trust, and timeout/page-teardown contracts.
+- Backend production signer preflight run `38156689037`, job `114521016801`, exact Backend `9c56a77cbe02dfceebf574236a703b53cd257cb9`, failed closed with exit code 1 because all five managed Worker secrets remain absent: `FABUSHI_MARKETPLACE_SIGNING_PRIVATE_KEY`, `FABUSHI_MARKETPLACE_SIGNING_PUBLIC_KEY_RAW`, `FABUSHI_MARKETPLACE_SIGNING_KEY_ID`, `FABUSHI_MARKETPLACE_TRUST_EPOCH`, and `FABUSHI_MARKETPLACE_REVIEW_TOKEN`. No production package/signature is fabricated.
+- Signer support thread `1a12b70942632c11` and Apple/provider thread `1a12bc3ea0b5880b` were re-read; neither contains a provider/configuration-complete reply. Duplicate reminder mail was not sent. Consequently production `.fabapp` finalization and GD-PAY-02 remain externally blocked.
+- Protected UI acceptance now separates the core real Marketplace/WebMCP journey from the externally gated Apple purchase journey. Synthetic commerce remains disabled. Apple purchase/restore becomes a hard gate only when `FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE=1`; otherwise the evidence records `commerceExternalBlock=true` and cannot be cited as GD-PAY-02 Passed.
+- Exact-head Actions in this round have repeatedly been invalidated by unrelated/concurrent PR #3 commits. Only a terminal run whose `head_sha` equals the final PR head is release evidence. Architecture-only success followed by cancelled/skipped rust-host/build/archive jobs is not Passed.
+
 ## 16. Spec compliance record
 
 | Requirement / AC | Status | Evidence / reason |
