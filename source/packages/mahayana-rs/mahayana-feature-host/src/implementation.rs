@@ -346,6 +346,41 @@ fn default_true() -> bool {
     true
 }
 
+fn normalized_installed_plugin_version(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.len() != 40 || !trimmed.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let normalized = trimmed.to_ascii_lowercase();
+    (trimmed == normalized).then_some(normalized)
+}
+
+fn installed_plugin_skill_source_matches_version(
+    source_ref: Option<&str>,
+    version: &str,
+) -> bool {
+    let Some(source) = source_ref.map(str::trim).filter(|value| !value.is_empty()) else {
+        return false;
+    };
+    if source.contains('?') || source.contains('#') {
+        return false;
+    }
+    let Some(rest) = source.strip_prefix("https://github.com/") else {
+        return false;
+    };
+    let mut parts = rest.split('/');
+    let (Some(owner), Some(repo), Some(blob), Some(source_version)) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    !owner.is_empty()
+        && !repo.is_empty()
+        && blob == "blob"
+        && source_version == version
+        && parts.next().is_some_and(|part| !part.is_empty())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PublishedWorkflowCacheMetadata {
@@ -1825,6 +1860,20 @@ impl FeatureHostController {
         let mut workflow_ids = BTreeSet::new();
         let mut total_bytes = 0usize;
         for skill in &skills {
+            let Some(plugin_version) = normalized_installed_plugin_version(&skill.plugin_version)
+            else {
+                return Err(FeatureHostError::Contract(
+                    "installed plugin skill must use an immutable normalized plugin version".into(),
+                ));
+            };
+            if !installed_plugin_skill_source_matches_version(
+                skill.source_ref.as_deref(),
+                &plugin_version,
+            ) {
+                return Err(FeatureHostError::Contract(
+                    "installed plugin skill source must match the immutable plugin version".into(),
+                ));
+            }
             if skill.plugin_id.trim().is_empty()
                 || skill.plugin_version.trim().is_empty()
                 || skill.name.trim().is_empty()

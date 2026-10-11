@@ -114,7 +114,7 @@ fn installed_plugin_skills_are_replace_all_read_only_and_runnable() {
             "name": "Release review",
             "description": "Review exact-head release evidence.",
             "markdown": "---\nname: Release review\ndescription: Review exact-head release evidence.\n---\nInspect the exact-head CI evidence before shipping.",
-            "sourceRef": "https://github.com/example/plugin/blob/main/skills/release-review/SKILL.md",
+            "sourceRef": "https://github.com/example/plugin/blob/0123456789abcdef0123456789abcdef01234567/skills/release-review/SKILL.md",
             "publishedByCurrentUser": false
         }]),
     )
@@ -146,4 +146,49 @@ fn installed_plugin_skills_are_replace_all_read_only_and_runnable() {
         id: "plugin-42-release-review".into(),
     }).expect_err("removed installed plugin skill must no longer be runnable");
     assert!(removed.to_string().contains("unknown workflow"));
+}
+
+#[test]
+fn installed_plugin_skills_reject_mutable_or_mismatched_source_identity() {
+    let host = controller();
+    let agent_id = "mahayana-assistant";
+    let version = "0123456789abcdef0123456789abcdef01234567";
+    let bad_cases = [
+        (
+            "main",
+            Some("https://github.com/example/plugin/blob/main/skills/release-review/SKILL.md"),
+        ),
+        (
+            version,
+            Some("https://github.com/example/plugin/blob/main/skills/release-review/SKILL.md"),
+        ),
+        (
+            version,
+            Some("https://github.com/example/plugin/blob/ffffffffffffffffffffffffffffffffffffffff/skills/release-review/SKILL.md"),
+        ),
+        (version, None),
+    ];
+
+    for (plugin_version, source_ref) in bad_cases {
+        let error = host
+            .sync_installed_plugin_skills(
+                agent_id,
+                json!([{
+                    "pluginId": "42",
+                    "pluginVersion": plugin_version,
+                    "workflowId": "plugin-42-release-review",
+                    "skillId": "release-review",
+                    "name": "Release review",
+                    "description": "Review exact-head release evidence.",
+                    "markdown": "---\nname: Release review\ndescription: Review exact-head release evidence.\n---\nInspect the exact-head CI evidence before shipping.",
+                    "sourceRef": source_ref,
+                    "publishedByCurrentUser": false
+                }]),
+            )
+            .expect_err("mutable or mismatched Marketplace Skill identity must fail closed");
+        assert!(
+            error.to_string().contains("immutable"),
+            "unexpected validation error: {error}"
+        );
+    }
 }
