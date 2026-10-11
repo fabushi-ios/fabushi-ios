@@ -2388,15 +2388,11 @@ impl AppHost {
 
     fn plugin_compatibility(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
-        let pointer = self
-            .installer()?
-            .active(plugin_id)
-            .map_err(|error| AppHostError::Operation(error.to_string()))?
-            .ok_or_else(|| {
-                AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
-            })?;
-        let report = scan_package_compatibility(Path::new(&pointer.installed_path))
+        let (account_scope, account_generation, _pointer, root) =
+            self.active_plugin_ui_root(plugin_id)?;
+        let report = scan_package_compatibility(&root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account_scope, &account_generation)?;
         serde_json::to_value(report).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -2550,13 +2546,8 @@ impl AppHost {
 
     fn start_runtime(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?.to_string();
-        let pointer = self
-            .installer()?
-            .active(&plugin_id)
-            .map_err(|error| AppHostError::Operation(error.to_string()))?
-            .ok_or_else(|| {
-                AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
-            })?;
+        let (account_scope, account_generation, pointer, root) =
+            self.active_plugin_ui_root(&plugin_id)?;
         if !matches!(
             pointer.runtime.as_str(),
             "deepseek-js" | "javascript" | "cordis-js"
@@ -2566,16 +2557,22 @@ impl AppHost {
                 pointer.runtime
             )));
         }
-        let root = PathBuf::from(&pointer.installed_path);
         let entry = discover_js_entry(&pointer.entry, &root)?;
         let report = scan_package_compatibility(&root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         if !report.portable_compatible {
             return Err(AppHostError::Operation(report.blockers().join("; ")));
         }
-        let grants = PermissionManager::load(self.permission_store()?)
-            .map_err(|error| AppHostError::Operation(error.to_string()))?
-            .grants_for(&plugin_id);
+        let grants = PermissionManager::load(
+            self.app_data_dir
+                .join("plugins")
+                .join("accounts")
+                .join(&account_scope)
+                .join("permissions.json"),
+        )
+        .map_err(|error| AppHostError::Operation(error.to_string()))?
+        .grants_for(&plugin_id);
+        self.ensure_plugin_account_current(&account_scope, &account_generation)?;
         let config = params.get("config").cloned().unwrap_or_else(|| json!({}));
         let mut host = self
             .js
@@ -2584,6 +2581,15 @@ impl AppHost {
         let state = host
             .register_plugin_with_grants(&plugin_id, &root, &entry, &config, &grants)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        if self
+            .ensure_plugin_account_current(&account_scope, &account_generation)
+            .is_err()
+        {
+            let _ = host.disable_plugin(&plugin_id);
+            return Err(AppHostError::Operation(
+                "account generation changed while plugin runtime was starting".into(),
+            ));
+        }
         serde_json::to_value(state).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
