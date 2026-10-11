@@ -702,7 +702,7 @@ struct IOSCursorDashboardJSON: @unchecked Sendable {
     let value: [String: Any]
 }
 
-final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient {
+final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient, SandMarketplaceListingClient {
     static func decodePrReviewUserDestinationForTests(_ data: Data) throws -> SandPrReviewDestination? {
         try IOSCursorDashboardProto.decodePrReviewUserDestination(data)
     }
@@ -1570,6 +1570,109 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             configJson: response["configJson"] as? String ?? #"{"mcpServers":{}}"#,
             serverMetadataByName: metadata
         )
+    }
+
+    private func marketplaceWireMarketplace(_ row: [String: Any]) -> MarketplaceWireMarketplace? {
+        guard let id = uint64(row["id"]), id != 0,
+              let name = row["name"] as? String, !name.isEmpty
+        else { return nil }
+        return .init(
+            id: id,
+            name: name,
+            displayName: row["displayName"] as? String ?? "",
+            teamId: uint64(row["teamId"]),
+            userId: uint64(row["userId"])
+        )
+    }
+
+    private func marketplaceWirePlugin(_ row: [String: Any]) -> MarketplaceWirePlugin? {
+        guard let id = uint64(row["id"]), id != 0,
+              let name = row["name"] as? String, !name.isEmpty
+        else { return nil }
+
+        let connectors = (row["mcpServers"] as? [[String: Any]] ?? []).compactMap { item -> MarketplaceWireConnector? in
+            guard let name = item["name"] as? String, !name.isEmpty else { return nil }
+            return .init(
+                name: name,
+                description: item["description"] as? String ?? "",
+                sourceUrl: item["sourceUrl"] as? String
+            )
+        }
+        let skills = (row["skills"] as? [[String: Any]] ?? []).compactMap { item -> MarketplaceWireSkill? in
+            guard let name = item["name"] as? String, !name.isEmpty else { return nil }
+            return .init(
+                name: name,
+                description: item["description"] as? String ?? "",
+                sourceUrl: item["sourceUrl"] as? String
+            )
+        }
+        let marketplace = (row["marketplace"] as? [String: Any]).flatMap(marketplaceWireMarketplace)
+        let publisher: MarketplaceWirePublisher?
+        if let item = row["publisher"] as? [String: Any],
+           let publisherName = item["name"] as? String, !publisherName.isEmpty {
+            publisher = .init(
+                name: publisherName,
+                displayName: item["displayName"] as? String ?? "",
+                logoUrl: item["logoUrl"] as? String,
+                websiteUrl: item["websiteUrl"] as? String,
+                isUserOwned: item["isUserOwned"] as? Bool ?? false
+            )
+        } else {
+            publisher = nil
+        }
+        let variableFields = pluginVariablesSchemaToFields(
+            row["variables"] as? [String: Any] ?? [:]
+        )
+        return .init(
+            id: id,
+            name: name,
+            displayName: row["displayName"] as? String ?? "",
+            description: row["description"] as? String ?? "",
+            logoUrl: row["logoUrl"] as? String,
+            repositoryUrl: row["repositoryUrl"] as? String,
+            curatedCategoryKeys: stringArray(row["curatedCategoryKeys"]),
+            mcpServers: connectors,
+            skills: skills,
+            variableFields: variableFields,
+            marketplace: marketplace,
+            publisher: publisher
+        )
+    }
+
+    func listMarketplacePlugins(
+        marketplaceId: UInt64?,
+        excludeCloudAgentPlugins: Bool,
+        timeoutMs: Int
+    ) async throws -> MarketplacePluginListing {
+        var body: [String: Any] = [
+            "excludeCloudAgentPlugins": excludeCloudAgentPlugins,
+        ]
+        if let marketplaceId {
+            body["marketplaceId"] = String(marketplaceId)
+        }
+        let response = try await rpc(
+            "ListMarketplacePlugins",
+            body: body,
+            timeoutMs: timeoutMs
+        )
+        let plugins = (response["plugins"] as? [[String: Any]] ?? [])
+            .compactMap(marketplaceWirePlugin)
+        return .init(plugins: plugins)
+    }
+
+    func listMarketplaces(timeoutMs: Int) async throws -> [MarketplaceWireMarketplace] {
+        let response = try await rpc("ListMarketplaces", body: [:], timeoutMs: timeoutMs)
+        return (response["marketplaces"] as? [[String: Any]] ?? [])
+            .compactMap(marketplaceWireMarketplace)
+    }
+
+    func getPluginMcpConfig(pluginId: UInt64, timeoutMs: Int) async throws -> String? {
+        let response = try await rpc(
+            "GetPluginMcpConfig",
+            body: ["pluginId": String(pluginId)],
+            timeoutMs: timeoutMs
+        )
+        return response["configJson"] as? String
     }
 
     func getEffectiveUserPlugins(excludeConfiguredVariables: Bool) async throws -> [EffectivePluginWire] {
