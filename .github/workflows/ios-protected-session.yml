@@ -397,7 +397,7 @@ jobs:
         run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
 
   global-dharma-offline:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 90
     env:
@@ -410,14 +410,14 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event.pull_request.head.sha || inputs.source_sha }}
           fetch-depth: 1
 
       - name: Verify exact source and Desktop authority
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || inputs.source_sha }}"
           python3 scripts/check-desktop-main-ios-architecture.py --authority-only
           echo "EVIDENCE_DIR=$GITHUB_WORKSPACE/ios-global-dharma-offline-evidence" >> "$GITHUB_ENV"
           mkdir -p ios-global-dharma-offline-evidence
@@ -530,7 +530,7 @@ jobs:
           )"
           export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
           export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
-          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ inputs.source_sha }}"
+          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ github.event.pull_request.head.sha || inputs.source_sha }}"
           rm -rf "$EVIDENCE_DIR/Prepare.xcresult"
           xcodebuild test-without-building             -xctestrun "$OFFLINE_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$EVIDENCE_DIR/Prepare.xcresult"             -only-testing:FabushiUITests/GlobalDharmaJourneyUITests/testPrepareGlobalDharmaOfflineAcceptance             2>&1 | tee "$EVIDENCE_DIR/prepare.log"
           curl --fail --silent --show-error --connect-timeout 5 --max-time 10 https://example.com/ >/dev/null
@@ -578,7 +578,7 @@ jobs:
           )"
           export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
           export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
-          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ inputs.source_sha }}"
+          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ github.event.pull_request.head.sha || inputs.source_sha }}"
           export TEST_RUNNER_FABUSHI_E2E_NETWORK_ISOLATED=1
 
           rm -rf "$EVIDENCE_DIR/Offline.xcresult"
@@ -641,7 +641,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: fabushi-ios-global-dharma-offline-${{ inputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: fabushi-ios-global-dharma-offline-${{ github.event.pull_request.head.sha || inputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ios-global-dharma-offline-evidence/
           if-no-files-found: error
           retention-days: 30
