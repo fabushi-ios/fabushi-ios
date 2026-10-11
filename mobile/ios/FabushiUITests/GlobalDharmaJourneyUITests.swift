@@ -263,8 +263,17 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         checkpoint("061-bidirectional-live-state")
 
         let allowed = app.descendants(matching: .any)["global-dharma-entitlement-allowed"]
+        let buyMonthly = app.buttons["global-dharma-buy-monthly"]
         let buy = app.buttons["global-dharma-buy-lifetime"]
         if !allowed.waitForExistence(timeout: 6) {
+            XCTAssertTrue(
+                buyMonthly.waitForExistence(timeout: 12),
+                "Expected either existing entitlement or the canonical ¥30/month purchase action"
+            )
+            XCTAssertTrue(
+                buyMonthly.label.contains("30"),
+                "Monthly local prayer-wheel purchase must visibly preserve the server CNY 30 / 30-day contract"
+            )
             XCTAssertTrue(buy.waitForExistence(timeout: 12), "Expected either existing entitlement or the ¥1080 lifetime purchase action")
             XCTAssertTrue(
                 buy.label.contains("1080"),
