@@ -569,6 +569,9 @@ struct MiniAppWebMcpSurface: View {
     @State private var localSource: LocalMiniAppSource?
     @State private var webMcpPlugin: MarketplacePlugin?
     @State private var sourceResolved = false
+    @State private var generatedDraftReview: LocalMiniAppDraftReview?
+    @State private var generatedInstallBusy = false
+    @State private var generatedInstallMessage: String?
 
     private var previewDigest: String? {
         localHtmlOverride.map(generatedMiniAppPreviewDigest)
@@ -643,6 +646,13 @@ struct MiniAppWebMcpSurface: View {
                         Divider()
                     }
 
+                    if localHtmlOverride != nil {
+                        generatedMiniAppReviewPanel
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 10)
+                        Divider()
+                    }
+
                     MiniAppWebView(
                         plugin: webMcpPlugin,
                         model: model,
@@ -675,8 +685,27 @@ struct MiniAppWebMcpSurface: View {
             let resolvedPlugin = await model.webMcpPlugin(for: plugin)
             webMcpPlugin = resolvedPlugin
             if let localHtmlOverride {
-                localHtml = hardenGeneratedMiniAppDocument(localHtmlOverride)
+                let hardened = hardenGeneratedMiniAppDocument(localHtmlOverride)
+                localHtml = hardened
                 localSource = nil
+                generatedDraftReview = nil
+                generatedInstallMessage = nil
+                do {
+                    let transaction = try await model.beginGeneratedMiniAppDraft()
+                    generatedDraftReview = try await model.prepareGeneratedMiniAppDraft(
+                        transaction,
+                        displayName: plugin.displayName,
+                        requestedCapabilities: [],
+                        files: [
+                            "index.html": LocalMiniAppDraftFile(
+                                mime: "text/html",
+                                data: Data(hardened.utf8)
+                            )
+                        ]
+                    )
+                } catch {
+                    generatedInstallMessage = "草稿准备失败：\(error.localizedDescription)"
+                }
             } else {
                 localHtml = nil
                 localSource = await model.loadLocalMiniAppSource(plugin: resolvedPlugin)
@@ -685,6 +714,116 @@ struct MiniAppWebMcpSurface: View {
             status = (localHtml == nil && localSource == nil)
                 ? "正在加载 Hosted WebMCP…"
                 : "正在加载本地 WebMCP…"
+        }
+    }
+
+    @ViewBuilder
+    private var generatedMiniAppReviewPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("一次性安全预览", systemImage: "eye")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if let review = generatedDraftReview {
+                    Text(ByteCountFormatter.string(
+                        fromByteCount: Int64(review.totalBytes),
+                        countStyle: .file
+                    ))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            if let review = generatedDraftReview {
+                Text("安装前请核对源文件、权限和大小。预览不会继承已安装 App 的 Cookie、存储或 Native/MCP 权限。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                DisclosureGroup("查看将安装的源文件") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(review.files, id: \.path) { file in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(file.path)
+                                    .font(.caption.monospaced())
+                                Text("\(file.mime) • \(file.bytes) bytes • \(file.sha256.prefix(16))…")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if let source = localHtml {
+                            Divider()
+                            ScrollView {
+                                Text(source)
+                                    .font(.caption2.monospaced())
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(maxHeight: 180)
+                            .accessibilityIdentifier("miniapp-generated-source-review")
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("权限")
+                        .font(.caption.weight(.semibold))
+                    if review.requestedCapabilities.isEmpty {
+                        Text("无额外 Host / Shell / MCP / Network 权限")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(review.requestedCapabilities, id: \.self) { capability in
+                            Text("• \(capability)")
+                                .font(.caption.monospaced())
+                        }
+                    }
+                }
+
+                Button {
+                    Task { await installGeneratedDraft(review) }
+                } label: {
+                    if generatedInstallBusy {
+                        ProgressView()
+                    } else {
+                        Label("明确安装此版本", systemImage: "square.and.arrow.down")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(generatedInstallBusy)
+                .accessibilityIdentifier("miniapp-generated-explicit-install")
+            } else if generatedInstallMessage == nil {
+                ProgressView("正在生成不可变草稿摘要…")
+                    .font(.caption)
+            }
+
+            if let generatedInstallMessage {
+                Text(generatedInstallMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("miniapp-generated-install-status")
+            }
+        }
+        .padding(10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("miniapp-generated-review")
+    }
+
+    @MainActor
+    private func installGeneratedDraft(_ review: LocalMiniAppDraftReview) async {
+        guard !generatedInstallBusy else { return }
+        generatedInstallBusy = true
+        defer { generatedInstallBusy = false }
+        do {
+            let approval = try await model.approveGeneratedMiniAppDraft(review)
+            let signature = try await model.signApprovedGeneratedMiniApp(approval)
+            let installed = try await model.installApprovedGeneratedMiniApp(
+                signatureBase64URL: signature,
+                approval: approval
+            )
+            generatedInstallMessage = "已安装 \(installed.pluginId) \(installed.version)。"
+        } catch {
+            generatedInstallMessage = "安装失败：\(error.localizedDescription)"
         }
     }
 }
