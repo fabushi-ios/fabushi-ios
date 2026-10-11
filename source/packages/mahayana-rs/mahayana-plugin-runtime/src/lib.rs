@@ -2909,21 +2909,52 @@ impl PermissionManager {
         requested: &[String],
         permission: &str,
     ) -> Result<(), RuntimeError> {
+        self.grant_with_commit_guard(plugin_id, requested, permission, || true)
+    }
+
+    pub fn grant_with_commit_guard<F>(
+        &mut self,
+        plugin_id: &str,
+        requested: &[String],
+        permission: &str,
+        commit_guard: F,
+    ) -> Result<(), RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         if !requested.iter().any(|candidate| candidate == permission) {
             return Err(RuntimeError::PermissionNotRequested {
                 plugin_id: plugin_id.to_string(),
                 permission: permission.to_string(),
             });
         }
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         self.store
             .grants
             .entry(plugin_id.to_string())
             .or_default()
             .insert(permission.to_string());
-        self.persist()
+        self.persist_with_commit_guard(commit_guard)
     }
 
     pub fn revoke(&mut self, plugin_id: &str, permission: &str) -> Result<(), RuntimeError> {
+        self.revoke_with_commit_guard(plugin_id, permission, || true)
+    }
+
+    pub fn revoke_with_commit_guard<F>(
+        &mut self,
+        plugin_id: &str,
+        permission: &str,
+        commit_guard: F,
+    ) -> Result<(), RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let remove_plugin = if let Some(grants) = self.store.grants.get_mut(plugin_id) {
             grants.remove(permission);
             grants.is_empty()
@@ -2933,12 +2964,26 @@ impl PermissionManager {
         if remove_plugin {
             self.store.grants.remove(plugin_id);
         }
-        self.persist()
+        self.persist_with_commit_guard(commit_guard)
     }
 
     pub fn remove_plugin(&mut self, plugin_id: &str) -> Result<bool, RuntimeError> {
+        self.remove_plugin_with_commit_guard(plugin_id, || true)
+    }
+
+    pub fn remove_plugin_with_commit_guard<F>(
+        &mut self,
+        plugin_id: &str,
+        commit_guard: F,
+    ) -> Result<bool, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let removed = self.store.grants.remove(plugin_id).is_some();
-        self.persist()?;
+        self.persist_with_commit_guard(commit_guard)?;
         Ok(removed)
     }
 
@@ -2947,6 +2992,21 @@ impl PermissionManager {
         plugin_id: &str,
         requested: &[String],
     ) -> Result<(), RuntimeError> {
+        self.retain_requested_with_commit_guard(plugin_id, requested, || true)
+    }
+
+    pub fn retain_requested_with_commit_guard<F>(
+        &mut self,
+        plugin_id: &str,
+        requested: &[String],
+        commit_guard: F,
+    ) -> Result<(), RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let requested = requested.iter().cloned().collect::<BTreeSet<_>>();
         let remove_plugin = if let Some(grants) = self.store.grants.get_mut(plugin_id) {
             grants.retain(|permission| requested.contains(permission));
@@ -2957,17 +3017,34 @@ impl PermissionManager {
         if remove_plugin {
             self.store.grants.remove(plugin_id);
         }
-        self.persist()
+        self.persist_with_commit_guard(commit_guard)
     }
 
     fn persist(&self) -> Result<(), RuntimeError> {
+        self.persist_with_commit_guard(|| true)
+    }
+
+    fn persist_with_commit_guard<F>(&self, commit_guard: F) -> Result<(), RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)?;
         }
         let bytes = serde_json::to_vec_pretty(&self.store)
             .map_err(|error| RuntimeError::Io(io::Error::new(io::ErrorKind::InvalidData, error)))?;
         let temporary = self.path.with_extension(format!("tmp-{}", Uuid::new_v4()));
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         fs::write(&temporary, bytes)?;
+        if !commit_guard() {
+            let _ = fs::remove_file(&temporary);
+            return Err(RuntimeError::StaleAccountContext);
+        }
         if self.path.exists() {
             fs::remove_file(&self.path)?;
         }
@@ -3817,6 +3894,26 @@ mod tests {
         assert!(installer_a.active("same-plugin").unwrap().is_none());
         assert_eq!(installer_b.active("same-plugin").unwrap(), Some(b_v1));
         assert_eq!(fs::read(&storage_b).unwrap(), b"account-b");
+    }
+
+    #[test]
+    fn permission_commit_guard_rejects_stale_account_before_file_write() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("permissions.json");
+        let requested = vec!["storage.local".to_string()];
+        let mut manager = PermissionManager::load(&path).unwrap();
+
+        assert!(matches!(
+            manager.grant_with_commit_guard(
+                "sample-plugin",
+                &requested,
+                "storage.local",
+                || false
+            ),
+            Err(RuntimeError::StaleAccountContext)
+        ));
+        assert!(!path.exists());
+        assert!(!manager.is_granted("sample-plugin", "storage.local"));
     }
 
     #[test]
