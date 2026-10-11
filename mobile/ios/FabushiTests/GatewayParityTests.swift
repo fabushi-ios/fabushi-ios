@@ -565,4 +565,91 @@ final class GatewayParityTests: XCTestCase {
         XCTAssertEqual(reports.last?.clientNonce, "native-echo-nonce")
     }
 
+
+    func testGatewayClientDoesNotRetrySideEffectingFeatureExecuteTransportFailure() async {
+        var attempts = 0
+        let supervisor = CoordinatorHostSupervisor(
+            resolveConnection: {
+                .init(baseURL: URL(string: "https://gateway.example")!, headers: [:])
+            },
+            healthProbe: { _ in false }
+        )
+        let client = CoordinatorGatewayClient(
+            supervisor: supervisor,
+            tracedTransport: { _, method, _, _ in
+                attempts += 1
+                XCTAssertEqual(method, "feature.execute")
+                throw GatewayUnreachableError(
+                    transportKind: "network",
+                    message: "ambiguous transport drop"
+                )
+            }
+        )
+
+        do {
+            _ = try await client.dispatchCommand(
+                requestId: "side-effect-no-retry",
+                method: "feature.execute",
+                args: .object([
+                    "command": .object([
+                        "type": .string("chat.send"),
+                        "requestId": .string("side-effect-nonce"),
+                    ]),
+                ])
+            )
+            XCTFail("side-effecting feature.execute must fail closed without transport retry")
+        } catch let error as GatewayUnreachableError {
+            XCTAssertEqual(error.transportKind, "network")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        XCTAssertEqual(attempts, 1)
+    }
+
+    func testHostSupervisorUsesHealthyTTLThenReprobesAndResolvesAfterFailure() async throws {
+        var now = Date(timeIntervalSince1970: 1_000)
+        var resolves = 0
+        var probes = 0
+        let first = CoordinatorGatewayClient.Connection(
+            baseURL: URL(string: "https://first.example")!,
+            headers: ["authorization": "Bearer scoped"]
+        )
+        let second = CoordinatorGatewayClient.Connection(
+            baseURL: URL(string: "https://second.example")!,
+            headers: ["authorization": "Bearer replacement"]
+        )
+        var probeResults = [true, false]
+
+        let supervisor = CoordinatorHostSupervisor(
+            now: { now },
+            resolveConnection: {
+                resolves += 1
+                return resolves == 1 ? first : second
+            },
+            healthProbe: { connection in
+                probes += 1
+                XCTAssertTrue(connection == first || connection == second)
+                return probeResults.removeFirst()
+            }
+        )
+
+        XCTAssertEqual(try await supervisor.ensureConnection(), first)
+        XCTAssertEqual(resolves, 1)
+        XCTAssertEqual(probes, 0)
+
+        XCTAssertEqual(try await supervisor.ensureConnection(), first)
+        XCTAssertEqual(probes, 1)
+
+        now = now.addingTimeInterval(
+            Double(CoordinatorHostSupervisor.healthProbeTTLMilliseconds - 1) / 1_000
+        )
+        XCTAssertEqual(try await supervisor.ensureConnection(), first)
+        XCTAssertEqual(probes, 1, "fresh health TTL should skip a second probe")
+
+        now = now.addingTimeInterval(0.002)
+        XCTAssertEqual(try await supervisor.ensureConnection(), second)
+        XCTAssertEqual(probes, 2)
+        XCTAssertEqual(resolves, 2)
+    }
+
 }
