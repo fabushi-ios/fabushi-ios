@@ -1574,9 +1574,27 @@ impl PluginInstaller {
         bytes: &[u8],
         trust: &FabappTrustContext,
     ) -> Result<InstalledPluginPointer, RuntimeError> {
+        self.install_fabapp_bytes_with_commit_guard(bytes, trust, || true)
+    }
+
+    pub fn install_fabapp_bytes_with_commit_guard<F>(
+        &self,
+        bytes: &[u8],
+        trust: &FabappTrustContext,
+        commit_guard: F,
+    ) -> Result<InstalledPluginPointer, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         let verified = verify_fabapp_bytes(bytes, trust)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let plugin_root = self.root.join(&verified.manifest.app_id);
         fs::create_dir_all(&plugin_root)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         recover_fabapp_install_journal(&plugin_root)?;
 
         if let Some(active) = self.active(&verified.manifest.app_id)?
@@ -1588,6 +1606,9 @@ impl PluginInstaller {
             });
         }
 
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let approval_path = match trust {
             FabappTrustContext::LocalGenerated(local) => {
                 Some(reserve_local_generated_approval(&plugin_root, &verified, local)?)
@@ -1613,8 +1634,14 @@ impl PluginInstaller {
             state: "verified".into(),
             staging_relative: Some(staging_relative.clone()),
         };
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         runtime_atomic_write_json(&journal_path, &journal)?;
 
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         fs::create_dir_all(&staging)?;
         for (path, data) in &verified.files {
             let relative = safe_relative_path(path)?;
@@ -1625,6 +1652,10 @@ impl PluginInstaller {
             fs::write(target, data)?;
         }
         verify_installed_fabapp_dir(&staging, &verified)?;
+        if !commit_guard() {
+            let _ = fs::remove_dir_all(&staging);
+            return Err(RuntimeError::StaleAccountContext);
+        }
         journal.state = "staged".into();
         runtime_atomic_write_json(&journal_path, &journal)?;
 
@@ -1632,19 +1663,34 @@ impl PluginInstaller {
             .join("versions")
             .join(&verified.manifest.version)
             .join(&verified.package_sha256);
+        let mut moved_new_content = false;
         if final_dir.is_dir() {
             verify_installed_fabapp_dir(&final_dir, &verified)?;
             fs::remove_dir_all(&staging)?;
         } else {
+            if !commit_guard() {
+                let _ = fs::remove_dir_all(&staging);
+                return Err(RuntimeError::StaleAccountContext);
+            }
             if let Some(parent) = final_dir.parent() {
                 fs::create_dir_all(parent)?;
             }
             fs::rename(&staging, &final_dir)?;
+            moved_new_content = true;
+        }
+        if !commit_guard() {
+            if moved_new_content {
+                let _ = fs::remove_dir_all(&final_dir);
+            }
+            return Err(RuntimeError::StaleAccountContext);
         }
         journal.state = "content-moved".into();
         journal.staging_relative = None;
         runtime_atomic_write_json(&journal_path, &journal)?;
 
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let metadata_root = plugin_root.join(".fabapp-manifests");
         fs::create_dir_all(&metadata_root)?;
         runtime_atomic_write_json(
@@ -1662,7 +1708,13 @@ impl PluginInstaller {
             requested_permissions: verified.manifest.requested_capabilities.clone(),
             installed_path: final_dir.to_string_lossy().into_owned(),
         };
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         self.activate(&plugin_root, &pointer)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         journal.state = "completed".into();
         runtime_atomic_write_json(&journal_path, &journal)?;
         if let Some(path) = approval_path {
@@ -3349,6 +3401,36 @@ mod tests {
         assert!(installer.uninstall("cleanup-plugin").unwrap());
         assert!(!temp.path().join("cleanup-plugin").exists());
         assert!(!installer.uninstall("cleanup-plugin").unwrap());
+    }
+
+    #[test]
+    fn fabapp_install_commit_guard_rejects_stale_account_before_writes() {
+        let signing = SigningKey::from_bytes(&[29_u8; 32]);
+        let html = b"<html><body>guard</body></html>";
+        let mut manifest = fabapp_manifest(
+            "com.example.guard",
+            "com.example",
+            "catalog",
+            html,
+        );
+        sign_fabapp_manifest(&mut manifest, &signing);
+        let package = fabapp_zip(&manifest, &[("index.html", html)]);
+        let trust = FabappTrustContext::Catalog(CatalogFabappTrust {
+            publisher_id: "com.example".into(),
+            app_id: "com.example.guard".into(),
+            key_id: "catalog-key".into(),
+            public_key: signing.verifying_key().to_bytes(),
+        });
+        let temp = tempfile::tempdir().unwrap();
+        let installer = PluginInstaller::new(temp.path()).unwrap();
+
+        let result = installer.install_fabapp_bytes_with_commit_guard(
+            &package,
+            &trust,
+            || false,
+        );
+        assert!(matches!(result, Err(RuntimeError::StaleAccountContext)));
+        assert!(!temp.path().join("com.example.guard").exists());
     }
 
     #[test]
