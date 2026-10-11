@@ -4,6 +4,17 @@ struct MiniAppWebMcpApprovalDenied: LocalizedError {
     var errorDescription: String? { "用户取消了 WebMCP Tool 调用" }
 }
 
+struct MiniAppWebMcpSchemaViolation: LocalizedError {
+    let details: [String]
+
+    var errorDescription: String? {
+        let normalized = details.filter { !$0.isEmpty }
+        return normalized.isEmpty
+            ? "WebMCP Tool 参数不符合当前页面 Schema"
+            : "WebMCP Tool 参数不符合当前页面 Schema：\(normalized.joined(separator: "；"))"
+    }
+}
+
 @MainActor
 final class ActiveMiniAppWebMcpSessionRegistry {
     static let shared = ActiveMiniAppWebMcpSessionRegistry()
@@ -147,6 +158,29 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         let expectedInstanceId = entry.snapshot.pluginInstanceId
         let expectedGeneration = entry.snapshot.generation
         let permissionRequired = tool.approval != "none"
+
+        let argumentValue = JSONSerialization.isValidJSONObject(arguments)
+            ? MiniAppCommandValue.fromJSON(arguments, schema: tool.inputSchemaObject)
+            : nil
+        let schemaErrors = validateMiniAppSchemaValue(
+            tool.inputSchemaObject,
+            value: argumentValue
+        )
+        guard argumentValue != nil, schemaErrors.isEmpty else {
+            appendTrace(
+                entry: entry,
+                callId: callId,
+                toolName: name,
+                permissionDecision: permissionRequired ? "not-reached" : "not-required",
+                stateRevision: nil,
+                outcome: "schema-rejected"
+            )
+            throw MiniAppWebMcpSchemaViolation(
+                details: argumentValue == nil
+                    ? ["$ 包含不支持的 JSON 参数"]
+                    : schemaErrors
+            )
+        }
 
         do {
             let value = try await entry.invoke(name, arguments)
