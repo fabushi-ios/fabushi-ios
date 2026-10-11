@@ -3,7 +3,7 @@
 Status: active
 Spec ID: IOS-DESKTOP-MAIN-001
 Revision: 1
-Updated: 2026-10-08
+Updated: 2026-10-11
 Target: fabushi-ios/fabushi-ios PR #3 and successors
 Canonical policy: this file, AGENTS.md, manifests/desktop-main-authority.json
 Historical baseline: docs/history/ios-desktop-pr20-spec-2026-10-08.md
@@ -13,7 +13,7 @@ Historical baseline: docs/history/ios-desktop-pr20-spec-2026-10-08.md
 Build and release a standalone, native iOS edition of the **complete applicable product currently defined by bhrumom/fabushi-desktop@main**, while preserving the Fabushi Bot product, existing iOS capabilities, security, and owner boundaries. No capability survey, README, ledger, scaffolding, limited vertical slice, UI demo, or green partial CI can satisfy this goal.
 
 - **Live source**: bhrumom/fabushi-desktop branch main; never Desktop PR #20, a release tag, Grok Bot, a draft PR, or Telegram Desktop directly.
-- **Observed snapshot at this revision**: Desktop commit 3bc92400826cc4ca7ac665b467708e22261edc61, tree 3d2a0ad250ca82d0cf3b7bd917d8eca7400e5c31. This is historical provenance once main advances.
+- **Observed snapshot at this revision**: Desktop commit d575b4f77b6895eea4ecaced96e5c512964bf3ed, tree d4c8fe5c91635064f11673ebeefc94c1f83b5ab8. Selected frontend/** + source/** identities remain 7,951 blobs; the 92fcc2b0→d575b4f7 delta adds FPM-001/OMA-001 and updates the parity spec outside selected roots. Those requirements are active but their production implementation and acceptance remain pending. This snapshot becomes historical provenance once main advances.
 - **Machine authority**: manifests/desktop-main-authority.json; read it and query the remote main ref, not a Markdown SHA or PR description.
 - **Target**: fabushi-ios/fabushi-ios, current target branch exact HEAD at validation.
 - **Never use a floating checkout as acceptance evidence.** Fetch current main, record its exact commit/tree, pin the source for inventory and oracle collection, and recheck main at the end of the acceptance cycle. A HEAD change invalidates final parity until the delta is revalidated.
