@@ -341,15 +341,16 @@
       "desktop_owner": "Production ForwardMessageDialog",
       "desktop_visible_effect": "Users can search eligible conversations, forward one settled message to multiple destinations, hide sender/caption metadata, see partial failures, and retry only failed destinations safely.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MessagingModel.swift",
+      "ios_target_path": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS uses a native SwiftUI sheet. Desktop sends one batch clientNonce; iOS native messaging sends one command per destination, so it preserves one stable clientMessageId per selected destination across retries and excludes successful settlements from pendingRecipients. This gives the same idempotent retry effect without inventing a second batch owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "ForwardMessageSheet calls MessagingModel.searchForwardRecipients/listForwardRecipients for eligible results, tracks multi-selection, enforces dropCaptions=>dropSenderNames, calls forwardMessageBatch over stable per-destination IDs, records every settlement, disables already-sent rows and retries only pending/failed destinations. It is presented from the shipping Human conversation message action path.",
-      "test_evidence": "ForwardMessageParityTests covers bounded recipient navigation, settled canonical-message eligibility, Ctrl/Cmd submit shortcuts, failed-only retry target projection and stable per-destination clientMessageId reuse. Same-final-HEAD Swift/UI/protected evidence is still required before verified promotion.",
-      "notes": "IOS-MAIN-FORWARD-001: current Desktop ForwardMessageDialog.tsx fully read at locked main. Shipping SwiftUI ForwardMessageSheet uses canonical server eligibility search, multi-selection, privacy options, stable per-destination idempotency, per-destination settlement, success locking and failed-only retry. Pure retry/idempotency projections are now shared by production and focused tests. Global current-main re-review fence remains active. Exact-head promotion is intentionally fail-closed: production/test evidence exists, but current final-head ordinary/protected CI has not yet completed successfully, so this row remains mapped until that evidence is attached.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "authority_review_state": "requires-current-main-review"
+      "implementation_status": "implemented",
+      "production_evidence": "Shipping Human conversation message actions present ForwardMessageSheet. The sheet calls MessagingModel.searchForwardRecipients, which executes canonical listForwardRecipients against the settled source message, tracks multi-recipient selection, enforces dropCaptions=>dropSenderNames, allocates one stable clientMessageId per destination, calls MessagingModel.forwardMessageBatch/forwardMessage, records per-destination settlement, disables sent destinations, and computes failed/pending-only retry targets. MessagingModel.swift is the canonical messaging collaborator; no second forwarding owner is introduced.",
+      "test_evidence": "mobile/ios/FabushiTests/ForwardMessageParityTests.swift covers eligible/settled source eligibility, bounded recipient navigation, submit shortcuts, failed-only retry projection, and stable per-destination clientMessageId reuse. Current-main source review was repeated against Desktop 371b72f1cd20de03dc4dff9a15ed761054968093. Exact-head ordinary/protected CI is still required before verified.",
+      "notes": "IOS-MAIN-FORWARD-001: re-reviewed against current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093; no responsibility drift found. Shipping native SwiftUI + MessagingModel path provides eligible discovery, multi-selection, privacy, stable idempotent per-destination intents, partial settlement and failed-only retry. Marked implemented only; verified remains blocked on same-final-HEAD CI/acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending exact-head GitHub Actions after current-main forwarding re-review"
     },
     {
       "desktop_path": "frontend/src/production/ProductionRenderer.tsx",
