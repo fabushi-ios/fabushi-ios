@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
   "group": "source-box-exec-daemon",
   "rowCount": 5,
   "rows": [
@@ -75,9 +75,9 @@
       "ios_language": "Swift / Rust",
       "ios_platform_delta": "The Desktop loopback daemon process itself remains not applicable inside the iOS sandbox. Its applicable client-visible local-exec vocabulary is preserved by the existing Coordinator-owned RemoteRunner bridge plus the iOS-owned Rust Host canonical agent.v1 schema; no second runtime or on-device unrestricted shell daemon is introduced.",
       "implementation_status": "not-applicable",
-      "production_evidence": "source/box-exec-daemon/server.swift is included in the shipping Fabushi app target and routes typed read/redacted-read/write/shell/shell-stream/background-shell/stdin requests through IOSBoxExecServerAdapter -> RemoteRunner -> Coordinator transport. source/host/box/generated-production.rs includes build-generated canonical agent.v1 bindings.",
-      "test_evidence": "mobile/ios/FabushiTests/RunnerParityTests.swift covers RemoteRunner ownership and typed write/redacted-read/shell-stream timeout-background/stdin payload projection. Rust generated-production focused tests cover canonical oneof/timeout/abort/read-blob schema. Descendant exact-head Actions pending.",
-      "notes": "Re-reviewed against Desktop main 92fcc2b0f64b6b8f8f8829305b30874b558d6b35; Desktop blob af9a831539b10579066d9e2caf084ef9f1331074 is unchanged from the recorded blob. not-applicable applies only to spawning the daemon process on iOS, not to the protocol/user capability, which has an explicit RemoteRunner replacement."
+      "production_evidence": "source/box-exec-daemon/server.swift preserves the typed box execution vocabulary and delegates to RemoteRunner when a transport is supplied. The current shipping Coordinator does not yet compose an authenticated RemoteRunner endpoint for this adapter, so source presence is not claimed as production reachability.",
+      "test_evidence": "RunnerParityTests covers typed write/redacted-read/shell-stream/stdin projection and RemoteRunner behavior. Exact-head Actions plus a real production caller/endpoint are still required for replacement closure.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: corrected prior overclaim that adapter -> RemoteRunner implied shipping reachability. The daemon process itself remains platform-inapplicable; the remote execution replacement remains pending."
     }
   ]
 }

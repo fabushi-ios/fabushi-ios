@@ -136,6 +136,50 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(remoteMethods, ["local-exec.shell"])
     }
 
+    func testProductionLocalExecutorAcceptsOnlyExactRemoteNamespaces() async throws {
+        let transport = TestRemoteRunnerTransport()
+        let executor = IOSProductionLocalExecutor(remoteTransport: transport)
+
+        for method in ["shell", "shell.exec", "process", "process.spawn", "box", "box.read"] {
+            _ = try await executor.execute(method: method)
+        }
+        XCTAssertEqual(
+            await transport.recordedMethods(),
+            [
+                "local-exec.shell",
+                "local-exec.shell.exec",
+                "local-exec.process",
+                "local-exec.process.spawn",
+                "local-exec.box",
+                "local-exec.box.read",
+            ]
+        )
+
+        for method in ["shellish", "processManager", "boxes", "unknown"] {
+            do {
+                _ = try await executor.execute(method: method)
+                XCTFail("\(method) must fail closed")
+            } catch is LocalCapabilityRunner.RunnerError {
+            } catch {
+                XCTFail("unexpected error for \(method): \(error)")
+            }
+        }
+    }
+
+    func testShippingRemoteRunnerPortFailsClosedUntilAuthenticatedTransportExists() async {
+        let executor = IOSProductionLocalExecutor(
+            remoteTransport: IOSFailClosedRemoteRunnerTransport()
+        )
+        do {
+            _ = try await executor.execute(method: "shell")
+            XCTFail("shipping Remote Runner must fail closed while no authenticated endpoint is composed")
+        } catch let error as IOSRemoteRunnerUnavailableError {
+            XCTAssertEqual(error.method, "local-exec.shell")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
     func testProductionRemoteRunnerScrubsDesktopOnlyEnvironmentVariables() async throws {
         let transport = TestRemoteRunnerTransport()
         let executor = IOSProductionLocalExecutor(remoteTransport: transport)

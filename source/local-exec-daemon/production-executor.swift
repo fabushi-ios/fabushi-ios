@@ -55,9 +55,13 @@ actor IOSProductionLocalExecutor {
     }
 
     private static func requiresRemoteRunner(_ method: String) -> Bool {
-        method.hasPrefix("shell.")
-            || method.hasPrefix("process.")
-            || method.hasPrefix("box.")
+        remoteNamespace(method, root: "shell")
+            || remoteNamespace(method, root: "process")
+            || remoteNamespace(method, root: "box")
+    }
+
+    private static func remoteNamespace(_ method: String, root: String) -> Bool {
+        method == root || method.hasPrefix("\(root).")
     }
 
     private static func localCapability(for method: String) -> LocalCapabilityRunner.Capability? {
@@ -69,5 +73,26 @@ actor IOSProductionLocalExecutor {
         case "clipboardWrite": .clipboardWrite
         default: nil
         }
+    }
+}
+
+
+struct IOSRemoteRunnerUnavailableError: LocalizedError, Equatable, Sendable {
+    let method: String
+
+    var errorDescription: String? {
+        "Remote Runner transport is unavailable for \(method)."
+    }
+}
+
+/// Shipping fail-closed port used until an authenticated Remote Runner endpoint
+/// is actually composed by the Coordinator. This prevents an invented Host or
+/// Dashboard RPC from masquerading as production Remote Runner transport.
+struct IOSFailClosedRemoteRunnerTransport: RemoteRunnerTransport {
+    func dispatch(
+        method: String,
+        params _: CoordinatorPayload
+    ) async throws -> CoordinatorPayload {
+        throw IOSRemoteRunnerUnavailableError(method: method)
     }
 }

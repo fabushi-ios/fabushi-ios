@@ -370,6 +370,12 @@ final class MahayanaCoordinator {
     private let devControlAdapter: (any CoordinatorDevControlAdapting)?
     private let clientSideToolV2Relay = ClientSideToolV2Relay()
     private let nativeLocalCapabilities = IOSNativeLocalCapabilityBackend()
+    private lazy var productionLocalExecutor: IOSProductionLocalExecutor = {
+        IOSProductionLocalExecutor(
+            localBackend: nativeLocalCapabilities,
+            remoteTransport: IOSFailClosedRemoteRunnerTransport()
+        )
+    }()
     private let transportStageRecorder: TransportStageRecorder
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
     private var autoReviewHostSyncNeeded = true
@@ -1280,8 +1286,8 @@ final class MahayanaCoordinator {
         if method == "openExternal" {
             do {
                 let payload = try CoordinatorPayload.fromFoundation(params)
-                let result = try await nativeLocalCapabilities.execute(
-                    capability: .openExternalURL,
+                let result = try await productionLocalExecutor.execute(
+                    method: "openExternalURL",
                     params: payload
                 )
                 return JSONResult(value: result.foundationValue)

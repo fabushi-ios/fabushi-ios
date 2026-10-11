@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "ea6da4779f508679549599d15121c74fe384ad96",
+  "sourceCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
   "group": "source-local-exec-daemon",
   "rowCount": 3,
   "rows": [
@@ -29,10 +29,10 @@
       "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/local-exec-daemon/production-executor.swift; source/shared/local-exec-process-identity.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS does not spawn a standalone Node daemon. Coordinator actor lifetime replaces process lifetime, process identity remains a shared contract for remote/local-runner evidence, and execution uses the native/RemoteRunner split.",
-      "implementation_status": "not-applicable",
-      "production_evidence": "IOSLocalExecSupervisor is actor-owned; IOSProductionLocalExecutor is the shipping route owner; source/shared/local-exec-process-identity.swift retains generation identity semantics where process-backed runners are involved.",
-      "test_evidence": "CoordinatorAdapterTests local-exec supervisor routing plus SharedPermissionsAndNotificationsParityTests process identity and production routing tests; descendant exact-HEAD Actions required.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: standalone Node process lifecycle is platform-inapplicable with explicit actor/RemoteRunner replacement; no user capability is waived."
+      "implementation_status": "mapped",
+      "production_evidence": "Standalone Node process lifetime is platform-inapplicable on iOS. MahayanaCoordinator now composes IOSProductionLocalExecutor and the shipping openExternal Main RPC reaches its native allowlist path. Shell/process/box remain fail-closed because no authenticated production RemoteRunner endpoint/caller is yet composed; this row is therefore mapped, not implemented.",
+      "test_evidence": "RunnerParityTests covers exact remote namespaces and the shipping fail-closed RemoteRunner port; exact-head GitHub Actions are required. A real remote shell/process/box caller plus authenticated endpoint remains required before implementation closure.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: corrected prior overclaim. Process spawning is not applicable, but the replacement product capability is not complete until RemoteRunner composition is proven."
     },
     {
       "desktop_path": "source/local-exec-daemon/production-executor.ts",
@@ -44,10 +44,10 @@
       "ios_target_path": "source/local-exec-daemon/production-executor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS replaces arbitrary on-device shell/file execution with an allowlisted native capability runner plus RemoteRunner for shell/process/box semantics. Unknown methods are rejected rather than treated as remote-capable.",
-      "implementation_status": "implemented",
-      "production_evidence": "29e8ec92009b00cf59a80a1e194a7bd90fa7cbf1 adds a strict requiresRemoteRunner gate in IOSProductionLocalExecutor, preserving the local/remote boundary and preventing arbitrary method escalation.",
-      "test_evidence": "0f572d6d17bc3858ce200ab9db4a2bddabcde04a adds testProductionLocalExecRejectsUnknownMethodsBeforeRemoteDispatch and proves shell.exec remains the one expected remote route; descendant exact-HEAD Actions required.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261011: exact Desktop production executor reviewed against iOS platform replacement; real routing defect fixed, status implemented pending CI."
+      "implementation_status": "mapped",
+      "production_evidence": "IOSProductionLocalExecutor is now composed by shipping MahayanaCoordinator and openExternal reaches its native allowlist. It strictly accepts only shell/process/box namespaces for RemoteRunner and rejects lookalikes/unknown methods. The shipping remote port intentionally fails closed until a real authenticated RemoteRunner endpoint and production caller are composed.",
+      "test_evidence": "RunnerParityTests covers local allowlist, exact shell/process/box namespace routing, environment scrubbing, unknown-method rejection, and fail-closed shipping remote port. Exact-head Actions pending; remote production caller evidence is still missing.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: downgraded from implemented to mapped because source existence/tests did not prove App -> Coordinator/Host -> RemoteRunner shipping reachability. No denominator change."
     }
   ]
 }
