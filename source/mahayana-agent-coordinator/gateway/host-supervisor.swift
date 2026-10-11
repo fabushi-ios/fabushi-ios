@@ -16,6 +16,7 @@ final class CoordinatorHostSupervisor {
     private var connection: Connection?
     private var lastHealthyAt: Date?
     private var pendingConnection: Task<Connection, Error>?
+    private var pendingConnectionToken: String?
     private var healthEpoch: UInt64 = 0
 
     init(
@@ -33,6 +34,7 @@ final class CoordinatorHostSupervisor {
         lastHealthyAt = nil
         pendingConnection?.cancel()
         pendingConnection = nil
+        pendingConnectionToken = nil
     }
 
     func ensureConnection() async throws -> Connection {
@@ -62,22 +64,31 @@ final class CoordinatorHostSupervisor {
             return resolved
         }
 
+        let token = UUID().uuidString.lowercased()
         let task = Task { @MainActor [resolveConnection] in
             try await resolveConnection()
         }
         pendingConnection = task
-        defer {
-            if pendingConnection != nil {
-                pendingConnection = nil
-            }
-        }
+        pendingConnectionToken = token
 
-        let resolved = try await task.value
-        guard epoch == healthEpoch else {
-            return try await ensureConnection()
+        do {
+            let resolved = try await task.value
+            if pendingConnectionToken == token {
+                pendingConnection = nil
+                pendingConnectionToken = nil
+            }
+            guard epoch == healthEpoch else {
+                return try await ensureConnection()
+            }
+            connection = resolved
+            lastHealthyAt = nil
+            return resolved
+        } catch {
+            if pendingConnectionToken == token {
+                pendingConnection = nil
+                pendingConnectionToken = nil
+            }
+            throw error
         }
-        connection = resolved
-        lastHealthyAt = nil
-        return resolved
     }
 }

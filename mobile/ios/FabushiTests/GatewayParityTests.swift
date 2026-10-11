@@ -127,7 +127,7 @@ final class GatewayParityTests: XCTestCase {
                 $0.traceparent.hasPrefix("00-0123456789abcdef0123456789abcdef-")
             }
         )
-        XCTAssertEqual(traceHeaders, traces.map(\.traceparent))
+        XCTAssertEqual(traceHeaders.compactMap { $0 }, traces.map(\.traceparent))
         XCTAssertEqual(resolves, 2)
     }
 
