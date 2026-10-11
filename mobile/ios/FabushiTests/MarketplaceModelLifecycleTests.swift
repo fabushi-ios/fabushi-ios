@@ -246,6 +246,67 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
         XCTAssertTrue(model.installedPluginIds.isEmpty)
     }
 
+    func testMarketplaceYoursShippingSurfaceRefreshesAuthoritativePluginSkillsBeforeHostWorkflowList() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+
+        let marketplaceModelSource = try String(
+            contentsOf: repositoryRoot
+                .appendingPathComponent("mobile/ios/Fabushi/MarketplaceModel.swift"),
+            encoding: .utf8
+        )
+        let marketplaceSurfaceSource = try String(
+            contentsOf: repositoryRoot
+                .appendingPathComponent("frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"),
+            encoding: .utf8
+        )
+        let coordinatorSource = try String(
+            contentsOf: repositoryRoot
+                .appendingPathComponent("source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(
+            marketplaceSurfaceSource.contains("Task { await model.refreshPrivateSkills() }"),
+            "The shipping Yours refresh control must keep calling the authoritative skill refresh."
+        )
+        XCTAssertTrue(
+            marketplaceSurfaceSource.contains("await model.refreshPrivateSkills()"),
+            "The shipping Yours task/tab lifecycle must keep refreshing installed Marketplace skills."
+        )
+
+        let refreshStart = try XCTUnwrap(
+            marketplaceModelSource.range(of: "func refreshPrivateSkills() async")
+        )
+        let refreshTail = marketplaceModelSource[refreshStart.lowerBound...]
+        let syncRange = try XCTUnwrap(
+            refreshTail.range(of: #"method: "coordinator.skill.pluginFactsSync""#)
+        )
+        let listRange = try XCTUnwrap(
+            refreshTail.range(of: #"type: "workflow.list""#)
+        )
+        XCTAssertLessThan(
+            refreshTail.distance(from: refreshTail.startIndex, to: syncRange.lowerBound),
+            refreshTail.distance(from: refreshTail.startIndex, to: listRange.lowerBound),
+            "Installed Marketplace plugin facts must be synchronized before the Host workflow list is read."
+        )
+
+        XCTAssertTrue(
+            coordinatorSource.contains(#"case "coordinator.skill.pluginFactsSync":"#)
+        )
+        XCTAssertTrue(
+            coordinatorSource.contains("refreshAuthoritativePluginFacts(agentId: agentId)")
+        )
+        XCTAssertTrue(
+            coordinatorSource.contains(#"method: "feature.workflow.pluginSkillsSync""#),
+            "The shipping Coordinator route must continue handing installed plugin skills to the single Rust Host owner."
+        )
+    }
+
     @MainActor
     func testPrivateSkillScopeFailsClosedAndCanBeExplicitlyBoundToAgent() throws {
         let appDataDirectory = FileManager.default.temporaryDirectory
