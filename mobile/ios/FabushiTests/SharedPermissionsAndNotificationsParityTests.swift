@@ -22,7 +22,52 @@ private actor RecordingRemoteRunnerTransport: RemoteRunnerTransport {
     }
 }
 
+private actor RecordingBadgeApplier: IOSAppBadgeApplying {
+    private(set) var counts: [Int] = []
+
+    func setBadgeCount(_ count: Int) async {
+        counts.append(count)
+    }
+
+    func recordedCounts() -> [Int] {
+        counts
+    }
+}
+
 final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
+    func testDockBadgeControllerRejectsStaleAccountGeneration() async {
+        let applier = RecordingBadgeApplier()
+        let controller = IOSDockBadgeController(applier: applier)
+
+        let first = await controller.update(
+            agents: [
+                .init(hasUnread: true, isHiddenFromSidebar: false),
+                .init(hasUnread: true, isHiddenFromSidebar: true),
+                .init(hasUnread: false, isHiddenFromSidebar: false),
+            ],
+            generation: 2
+        )
+        XCTAssertEqual(first, 1)
+
+        let stale = await controller.update(
+            agents: [.init(hasUnread: true, isHiddenFromSidebar: false, unreadCount: 9)],
+            generation: 1
+        )
+        XCTAssertNil(stale)
+
+        await controller.reset(generation: 3)
+        let staleAfterReset = await controller.update(
+            agents: [.init(hasUnread: true, isHiddenFromSidebar: false, unreadCount: 4)],
+            generation: 2
+        )
+        XCTAssertNil(staleAfterReset)
+
+        let snapshot = await controller.snapshot()
+        XCTAssertEqual(snapshot.generation, 3)
+        XCTAssertEqual(snapshot.total, 0)
+        XCTAssertEqual(await applier.recordedCounts(), [1, 0])
+    }
+
     func testLocalExecProcessIdentityRequiresExactGenerationArguments() {
         let command = "/opt/fabushi/local-exec --sand-local-exec-generation=g-1 --serve"
         XCTAssertTrue(commandCarriesLocalExecGeneration(

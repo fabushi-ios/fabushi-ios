@@ -51,15 +51,35 @@ struct IOSUserNotificationBadgeApplier: IOSAppBadgeApplying {
 
 actor IOSDockBadgeController {
     private let applier: any IOSAppBadgeApplying
+    private var latestGeneration: UInt64 = 0
+    private var latestTotal = 0
 
     init(applier: any IOSAppBadgeApplying = IOSUserNotificationBadgeApplier()) {
         self.applier = applier
     }
 
     @discardableResult
-    func update(agents: [IOSDockBadgeAgent]) async -> Int {
+    func update(
+        agents: [IOSDockBadgeAgent],
+        generation: UInt64
+    ) async -> Int? {
+        guard generation >= latestGeneration else { return nil }
+        latestGeneration = generation
         let total = computeDockBadgeTotal(agents)
+        latestTotal = total
         await applier.setBadgeCount(total)
+        guard generation == latestGeneration else { return nil }
         return total
+    }
+
+    func reset(generation: UInt64) async {
+        guard generation >= latestGeneration else { return }
+        latestGeneration = generation
+        latestTotal = 0
+        await applier.setBadgeCount(0)
+    }
+
+    func snapshot() -> (generation: UInt64, total: Int) {
+        (latestGeneration, latestTotal)
     }
 }

@@ -113,6 +113,7 @@ extension GrokMobileShell {
             hiddenChatsController.ingestAgents(live)
             let projected = hiddenChatsController.projectAgents(live)
             bots = projected
+            await model.updateAgentDockBadge(from: projected)
             AccessRosterPersistence.save(projected, accountScopeKey: expectedScope)
             accessRosterSnapshot = AccessRosterSnapshotProjection.complete(
                 projected,

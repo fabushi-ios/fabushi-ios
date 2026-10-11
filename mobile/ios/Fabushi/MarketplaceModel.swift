@@ -1988,6 +1988,8 @@ final class MarketplaceModel {
     @ObservationIgnored private var privateSkillScopeGeneration = 0
     @ObservationIgnored private let toolResultStore = MobileToolResultStore()
     @ObservationIgnored private let localMiniAppSigningAuthority = LocalMiniAppSigningAuthority()
+    @ObservationIgnored private let agentDockBadgeController = IOSDockBadgeController()
+    @ObservationIgnored private var agentDockBadgeGeneration: UInt64 = 0
     @ObservationIgnored private var toolResultRendererObserver: UUID?
 
     init(bridge: IOSPreloadBridge) {
@@ -2011,6 +2013,39 @@ final class MarketplaceModel {
     private func resetToolResultCards() {
         toolResultStore.resetAll()
         toolResultCardsByAgent = [:]
+    }
+
+    private func nextAgentDockBadgeGeneration() -> UInt64 {
+        agentDockBadgeGeneration = agentDockBadgeGeneration == UInt64.max
+            ? 1
+            : agentDockBadgeGeneration + 1
+        return agentDockBadgeGeneration
+    }
+
+    func updateAgentDockBadge(from roster: [MobileBotSummary]) async {
+        guard loggedIn else { return }
+        let generation = nextAgentDockBadgeGeneration()
+        let agents = roster
+            .filter { !$0.isGroup }
+            .map {
+                IOSDockBadgeAgent(
+                    hasUnread: $0.unread,
+                    isHiddenFromSidebar: $0.hidden,
+                    unreadCount: nil
+                )
+            }
+        _ = await agentDockBadgeController.update(
+            agents: agents,
+            generation: generation
+        )
+    }
+
+    private func resetAgentDockBadgeForScopeChange() {
+        let generation = nextAgentDockBadgeGeneration()
+        let controller = agentDockBadgeController
+        Task {
+            await controller.reset(generation: generation)
+        }
     }
 
     var settingsNoticeAccountKey: String {
@@ -2393,6 +2428,7 @@ final class MarketplaceModel {
         if previousMcpScope != globalDharmaAccountScope || !loggedIn {
             resetMcpState()
             resetToolResultCards()
+            resetAgentDockBadgeForScopeChange()
             installedPluginIds = []
         }
 
