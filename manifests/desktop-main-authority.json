@@ -3,20 +3,20 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
-  "rootTreeSha": "ed56d351521842550b541f37de3d567f027eeda9",
+  "commit": "d575b4f77b6895eea4ecaced96e5c512964bf3ed",
+  "rootTreeSha": "d4c8fe5c91635064f11673ebeefc94c1f83b5ab8",
   "observedAt": "2026-10-11",
-  "previousSourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "previousSourceCommit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
       "source/**"
     ],
     "selectedFileCount": 7951,
-    "fullTrackedCount": 8174,
+    "fullTrackedCount": 8176,
     "gitlinkCount": 0,
-    "nonselectedCount": 223,
-    "fullTreeSha256": "45dfa17041424a90ce6fe9c31ff7113c73d332d2fb1a60a627bd1ac9af6562c5",
+    "nonselectedCount": 225,
+    "fullTreeSha256": "30075e07b97a223e09828cfc553ab0156b37656386d2ebb62720130c1fd28341",
     "selectedTreeSha256": "85adf0b64c517cfdc72a1d52078977683748714a5ec893a8d30b992d7052febc",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
@@ -27,5 +27,5 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Incremental live-main rebaseline to 92fcc2b0 after Remote Computer mobile-session reconciliation landed. Git identities are current; the RCS server responsibility was audited against the native iOS shipping call graph, while affected aggregate owners/dependencies and full source/release acceptance remain open."
+  "notes": "Incremental live-main rebaseline from 92fcc2b0 to d575b4f7. Selected frontend/** + source/** remains exactly 7,951 blobs. Two active Marketplace/offline-mini-app specs were added and the parity/recovery spec changed outside selected roots; FPM-001/OMA-001 are requirement-only and remain pending iOS production implementation and acceptance."
 }
