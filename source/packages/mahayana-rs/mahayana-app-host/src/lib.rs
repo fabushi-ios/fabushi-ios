@@ -1553,8 +1553,12 @@ impl AppHost {
                 "install": install
             }));
         }
+        let requested_platform = params
+            .get("platform")
+            .and_then(Value::as_str)
+            .unwrap_or(host_platform());
         self.product
-            .marketplace_release_metadata(plugin_id, version)
+            .marketplace_release_metadata(plugin_id, version, Some(requested_platform))
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
