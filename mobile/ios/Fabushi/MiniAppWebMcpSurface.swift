@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SwiftUI
 import UIKit
@@ -5,7 +6,14 @@ import WebKit
 
 private let webMcpOriginHost = "fabushi.ombhrum.com"
 private let localWebMcpOriginHost = "miniapp.local.fabushi.invalid"
+private let generatedMiniAppPreviewOriginHost = "preview.miniapp.local.fabushi.invalid"
 private let webMcpMessageHandler = "fabushiWebMcp"
+
+func generatedMiniAppPreviewDigest(_ html: String) -> String {
+    SHA256.hash(data: Data(html.utf8))
+        .map { String(format: "%02x", $0) }
+        .joined()
+}
 
 func isTrustedWebMcpBridgeHost(_ host: String?) -> Bool {
     guard let host else { return false }
@@ -562,6 +570,17 @@ struct MiniAppWebMcpSurface: View {
     @State private var webMcpPlugin: MarketplacePlugin?
     @State private var sourceResolved = false
 
+    private var previewDigest: String? {
+        localHtmlOverride.map(generatedMiniAppPreviewDigest)
+    }
+
+    private var sourceGenerationKey: String {
+        if let previewDigest {
+            return "preview:\(plugin.pluginId):\(previewDigest)"
+        }
+        return "installed:\(plugin.pluginId)"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
@@ -616,25 +635,28 @@ struct MiniAppWebMcpSurface: View {
 
             if sourceResolved, let webMcpPlugin {
                 VStack(spacing: 0) {
-                    MiniAppToolCommandPanel(plugin: webMcpPlugin, model: model)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                    if localHtmlOverride == nil {
+                        MiniAppToolCommandPanel(plugin: webMcpPlugin, model: model)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 10)
 
-                    Divider()
+                        Divider()
+                    }
 
                     MiniAppWebView(
                         plugin: webMcpPlugin,
                         model: model,
                         localHtml: localHtml,
                         localSource: localSource,
-                        dataStoreIdentifier: model.miniAppWebsiteDataStoreIdentifier(
-                            pluginId: webMcpPlugin.pluginId
-                        ),
+                        dataStoreIdentifier: localHtmlOverride == nil
+                            ? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)
+                            : nil,
                         sourceResolved: true,
                         status: $status
                     )
                     .id(
-                        model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)?.uuidString
+                        previewDigest.map { "miniapp-preview-\($0)" }
+                            ?? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)?.uuidString
                             ?? "miniapp-ephemeral-logged-out"
                     )
                 }
@@ -646,7 +668,7 @@ struct MiniAppWebMcpSurface: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniapp-webmcp-surface")
-        .task(id: plugin.pluginId) {
+        .task(id: sourceGenerationKey) {
             if plugin.pluginId == GlobalDharmaCommerceModel.miniAppId {
                 await model.globalDharmaCommerce.refresh()
             }
@@ -724,19 +746,22 @@ private struct MiniAppWebView: UIViewRepresentable {
         }
 
         if let localHtml {
-            let key = "local-generated:\(plugin.pluginId)"
+            let digest = generatedMiniAppPreviewDigest(localHtml)
+            let key = "local-preview:\(plugin.pluginId):\(digest)"
             guard context.coordinator.loadedSourceKey != key else { return }
             context.coordinator.loadedSourceKey = key
             context.coordinator.activeLocalRootURL = nil
+            context.coordinator.previewMode = true
+            context.coordinator.disposeLocalBridgeSession()
             webView.configuration.userContentController.removeAllUserScripts()
-            let bridgeSession = context.coordinator.prepareLocalBridgeSession()
-            let baseURL = URL(string: "https://\(localWebMcpOriginHost)/miniapps/\(plugin.pluginId)/")
-            webView.loadHTMLString(
-                injectLocalWebMcp(localHtml, plugin: plugin, bridgeSession: bridgeSession),
-                baseURL: baseURL
+            let baseURL = URL(
+                string: "https://\(generatedMiniAppPreviewOriginHost)/drafts/\(digest)/"
             )
+            webView.loadHTMLString(localHtml, baseURL: baseURL)
             return
         }
+
+        context.coordinator.previewMode = false
 
         let key = "hosted:\(plugin.pluginId)"
         guard context.coordinator.loadedSourceKey != key else { return }
@@ -770,6 +795,7 @@ private struct MiniAppWebView: UIViewRepresentable {
         let model: MarketplaceModel
         @Binding private var status: String
         weak var webView: WKWebView?
+        var previewMode = false
         var loadedSourceKey: String?
         var activeLocalRootURL: URL?
         private let toolByName: [String: MiniAppToolContract]
@@ -894,6 +920,13 @@ private struct MiniAppWebView: UIViewRepresentable {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
         ) {
+            if previewMode {
+                let url = navigationAction.request.url
+                let allowed = url?.scheme == "https"
+                    && url?.host == generatedMiniAppPreviewOriginHost
+                decisionHandler(allowed ? .allow : .cancel)
+                return
+            }
             guard isTrustedWebMcpBridgeURL(
                 navigationAction.request.url,
                 localRootURL: activeLocalRootURL
