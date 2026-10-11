@@ -20,12 +20,12 @@ Therefore existing strings such as “WebMCP 已连接” or “Bot / Web UI 同
 
 Live authorities re-read for this task:
 - iOS main: `f098639ab178a839690b9dece60fa0d11c5d2e25`
-- iOS PR #3 discovery HEAD: `1f1deb151cb2c137ba5f7f1470a14be263661b28`
+- iOS PR #3 current implementation HEAD at this record: `13e6964a0fbea0e68513f2f7ace41a84992c1a33`
 - Desktop main: `371b72f1cd20de03dc4dff9a15ed761054968093`
-- Backend main: `94263e5543741924e23197edbc4712652f76a340`
+- Backend main: `9c56a77cbe02dfceebf574236a703b53cd257cb9`
 - Platform Core main: `c301820b93274bda586fbb82be982afc3c2ee4d4`
 
-Any later implementation/evidence must bind to its new exact HEAD. Historical runs are diagnostic only.
+The original discovery HEAD was `1f1deb151cb2c137ba5f7f1470a14be263661b28`; it and all earlier workflow runs are historical diagnostics only. Final acceptance must bind to the latest exact PR HEAD.
 
 ## 2. Goal
 
@@ -100,7 +100,7 @@ Make Global Dharma the first production reference implementation of the existing
 | --- | --- | --- | --- | --- |
 | Marketplace package install/source | MarketplaceModel + Host `feature.plugin.*` | platform | install/update network may be needed | no |
 | Local package render/storage | MiniAppWebMcpSurface + WKWebView | free platform | yes after install | no |
-| Current Global Dharma `home/status/logs/validate_config/start/stop/loop/chat/send/deploy_latest` | remote `/api/mcp/apps/global-dharma` via GlobalDharmaMiniAppBridge | remote service until replaced by real local owner | no | only when returned protected Host request requires it |
+| Global Dharma `home/status/logs/validate_config/start/stop/loop/chat/send/deploy_latest` | remote `/api/mcp/apps/global-dharma` via GlobalDharmaMiniAppBridge | remote service | no | only when returned protected Host request requires it; iOS preserves this route only when no active local-page tool fence exists |
 | Local WebMCP session identity/permission | MiniAppWebMcpSurface | free platform | yes | no |
 | Local prayer wheel start | Global Dharma + trusted Host boundary | protected | no by default because fresh online entitlement required | yes |
 | Purchase/restore | GlobalDharmaCommerceModel + StoreKit + service | paid service | no | yes |
@@ -252,7 +252,7 @@ Acceptance evidence must record repository, exact SHA, workflow/run/job IDs, com
 | GD-ARCH-001 | implemented; exact-head CI pending | Shipping entry uses generic `MiniAppWebMcpSurface`; the legacy `GlobalDharmaMiniAppView` parallel `loadHTMLString` runtime has been removed from PR #3. |
 | GD-PKG-001..004 | implementation closed; production signer rollout blocked | Global Dharma 1.1.0 source is owned by `bhrumom/fabushi-marketplace` and uses the strict catalog `.fabapp` manifest/finalizer contract. The iOS production install path now preserves `platform=ios`, selects the iOS ZIP-container `.fabapp`, requires release `fabappTrust`, verifies the outer digest/size and Ed25519 package manifest through `mahayana-plugin-runtime::verify_fabapp_bytes`, reconciles app/version/digest/requested-capabilities, and only then journals/activates the install. Backend PR #28 keeps this release fail-closed until immutable artifact URL/source SHA/digest/size plus managed signer key ID/public key are all present. Marketplace source-contract CI is already green; production finalization still requires the managed signing Worker configuration. |
 | GD-OFF-01..03 | implementation present; journey evidence pending | The 1.1.0 package uses only local `index.html/style.css/app.js`, CSP `connect-src 'none'`, localStorage-backed revision state, and no startup entitlement request. Cold-start/restart/network-off UI evidence must still complete on the current exact iOS HEAD. |
-| GD-WEBMCP-01..07 | implementation present; exact-head UI/security evidence pending | Active page tools register through `registerLocalTool`; native Host invokes the current page via `invokeLocalFromHost` fenced by account/app instance/nonce/generation; Bot routes Global Dharma through `callActiveWebMcpTool`. Hosted Global Dharma WebMCP fallback is explicitly rejected. The active-session registry now records bounded ordered invocation traces with call ID, account/app/package/version/instance, privacy-safe nonce identifier, generation, tool, permission decision, state revision and outcome; the protected journey exercises denial-before-approval and same-page bidirectional revision changes. |
+| GD-WEBMCP-01..07 | implementation present; latest exact-head UI/security evidence pending | Active page tools register through `registerLocalTool`; native Host invokes the current page via `invokeLocalFromHost` fenced by account/app/version/digest/instance/nonce/generation. Page tool schemas must match reviewed catalog schemas, Host validates arguments before execution, and page annotations cannot weaken Host approval class. Host-originated page calls are bounded to 15 seconds with abort-on-pagehide; WebKit process/navigation failure tears down the active session. With an active Global Dharma page, remote MCP fallback is explicitly rejected; without an active page, the pre-existing governed remote-service route remains available and is never cited as local WebMCP evidence. The registry records bounded ordered invocation traces with call ID, account/app/package/version/instance, privacy-safe nonce identifier, generation, tool, permission decision, state revision and outcome; the protected journey covers denial-before-approval and same-page bidirectional revision changes. |
 | GD-PAY-01 | implementation present; protected journey pending | `local.prayer-wheel.start` is the only current protected local capability; `callActiveWebMcpTool` performs fresh Host-side entitlement refresh only for that protected tool. Free tools bypass entitlement preflight. |
 | GD-PAY-02 | current contract re-read required for final acceptance | iOS constants remain `global-dharma` / `local.prayer-wheel.start` / `local-prayer-wheel.lifetime` / CNY 1080; final acceptance must bind them to current Backend/Core authority and real purchase evidence. |
 | GD-PAY-03 / GD-PAY-02 acceptance | blocked | Real StoreKit/device/payment acceptance depends on external Apple/product/account configuration; CI test rail is not production evidence. |
