@@ -658,4 +658,163 @@ mod tests {
             TranscriptMirrorOffloadError::Closed
         );
     }
+
+    #[derive(Default)]
+    struct InlineStore(std::collections::HashMap<Vec<u8>, Vec<u8>>);
+
+    impl TranscriptOccurrenceBlobStore for InlineStore {
+        fn get_blob(&self, id: &[u8]) -> Option<Vec<u8>> {
+            self.0.get(id).cloned()
+        }
+    }
+
+    fn temp_root(label: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "fabushi-ios-transcript-offload-{label}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn wrapper_prefers_incremental_and_falls_back_to_full_inline() {
+        let root = temp_root("inline");
+        let mut store = InlineStore::default();
+        store.0.insert(
+            vec![1],
+            br#"{"role":"user","content":"one"}"#.to_vec(),
+        );
+        store.0.insert(
+            vec![2],
+            br#"{"role":"assistant","content":"two"}"#.to_vec(),
+        );
+        let mirror = OffloadingTranscriptMirror::with_executor(
+            Arc::new(TranscriptMirrorOffloadPool::default()),
+            OffloadingTranscriptMirrorOptions {
+                blob_db_paths: vec![],
+                transcripts_dir: root.clone(),
+            },
+            0,
+            Arc::new(|_| panic!("inline fallback must not offload")),
+        );
+
+        let first = TranscriptMirrorConversationState {
+            root_prompt_messages_json: vec![vec![1]],
+            turns: vec![],
+            summary_archives: vec![],
+        };
+        mirror.write_inline("agent-inline", &first, &store).unwrap();
+        assert_eq!(mirror.previous_root_prompt_count(), 1);
+
+        let second = TranscriptMirrorConversationState {
+            root_prompt_messages_json: vec![vec![1], vec![2]],
+            turns: vec![],
+            summary_archives: vec![],
+        };
+        mirror.write_inline("agent-inline", &second, &store).unwrap();
+        assert_eq!(mirror.previous_root_prompt_count(), 2);
+        let body = std::fs::read_to_string(
+            root.join("agent-inline").join("agent-inline.jsonl"),
+        )
+        .unwrap();
+        assert!(body.contains("one"));
+        assert!(body.contains("two"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn worker_success_advances_cursor_only_after_executor_settles() {
+        let root = temp_root("worker-success");
+        let calls = Arc::new(Mutex::new(Vec::<TranscriptMirrorJob>::new()));
+        let captured = calls.clone();
+        let mirror = OffloadingTranscriptMirror::with_executor(
+            Arc::new(TranscriptMirrorOffloadPool::new(1)),
+            OffloadingTranscriptMirrorOptions {
+                blob_db_paths: vec![root.join("conversation.sqlite")],
+                transcripts_dir: root.join("transcripts"),
+            },
+            0,
+            Arc::new(move |job| {
+                captured.lock().unwrap().push(job.clone());
+                Ok(true)
+            }),
+        );
+        let state = TranscriptMirrorConversationState {
+            root_prompt_messages_json: vec![vec![7], vec![8]],
+            turns: vec![],
+            summary_archives: vec![],
+        };
+
+        mirror
+            .write_worker("agent-worker", &state, Some(&[9, 9]))
+            .unwrap();
+        assert_eq!(mirror.previous_root_prompt_count(), 2);
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].conversation_id, "agent-worker");
+        assert_eq!(calls[0].state_blob_id, vec![9, 9]);
+        drop(calls);
+        assert_eq!(mirror.pool.active_dispatch_count().unwrap(), 0);
+        assert_eq!(mirror.pool.active_lane_count().unwrap(), 0);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn worker_missing_false_and_error_results_never_claim_progress() {
+        let state = TranscriptMirrorConversationState {
+            root_prompt_messages_json: vec![vec![1]],
+            turns: vec![],
+            summary_archives: vec![],
+        };
+
+        for (label, executor) in [
+            (
+                "false",
+                Arc::new(|_: &TranscriptMirrorJob| Ok(false))
+                    as TranscriptMirrorWorkerExecutor,
+            ),
+            (
+                "error",
+                Arc::new(|_: &TranscriptMirrorJob| Err("worker failed".into()))
+                    as TranscriptMirrorWorkerExecutor,
+            ),
+        ] {
+            let root = temp_root(label);
+            let mirror = OffloadingTranscriptMirror::with_executor(
+                Arc::new(TranscriptMirrorOffloadPool::new(1)),
+                OffloadingTranscriptMirrorOptions {
+                    blob_db_paths: vec![root.join("conversation.sqlite")],
+                    transcripts_dir: root.join("transcripts"),
+                },
+                0,
+                executor,
+            );
+            mirror
+                .write_worker("agent-worker", &state, Some(&[4]))
+                .unwrap();
+            assert_eq!(mirror.previous_root_prompt_count(), 0);
+            assert_eq!(mirror.pool.active_dispatch_count().unwrap(), 0);
+            let _ = std::fs::remove_dir_all(root);
+        }
+
+        let root = temp_root("missing");
+        let mirror = OffloadingTranscriptMirror::with_executor(
+            Arc::new(TranscriptMirrorOffloadPool::new(1)),
+            OffloadingTranscriptMirrorOptions {
+                blob_db_paths: vec![root.join("conversation.sqlite")],
+                transcripts_dir: root.join("transcripts"),
+            },
+            0,
+            Arc::new(|_| panic!("missing state id must not execute worker")),
+        );
+        mirror.write_worker("agent-worker", &state, None).unwrap();
+        assert_eq!(mirror.previous_root_prompt_count(), 0);
+        assert_eq!(mirror.pool.active_dispatch_count().unwrap(), 0);
+        let _ = std::fs::remove_dir_all(root);
+    }
 }
