@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import SwiftUI
 @preconcurrency import LiveKitWebRTC
