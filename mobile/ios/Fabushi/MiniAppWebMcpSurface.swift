@@ -627,8 +627,15 @@ struct MiniAppWebMcpSurface: View {
                         model: model,
                         localHtml: localHtml,
                         localSource: localSource,
+                        dataStoreIdentifier: model.miniAppWebsiteDataStoreIdentifier(
+                            pluginId: webMcpPlugin.pluginId
+                        ),
                         sourceResolved: true,
                         status: $status
+                    )
+                    .id(
+                        model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)?.uuidString
+                            ?? "miniapp-ephemeral-logged-out"
                     )
                 }
             } else {
@@ -665,6 +672,7 @@ private struct MiniAppWebView: UIViewRepresentable {
     let model: MarketplaceModel
     let localHtml: String?
     let localSource: LocalMiniAppSource?
+    let dataStoreIdentifier: UUID?
     let sourceResolved: Bool
     @Binding var status: String
 
@@ -674,7 +682,11 @@ private struct MiniAppWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
+        if let dataStoreIdentifier {
+            configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: dataStoreIdentifier)
+        } else {
+            configuration.websiteDataStore = .nonPersistent()
+        }
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration.userContentController.add(context.coordinator, name: webMcpMessageHandler)
 

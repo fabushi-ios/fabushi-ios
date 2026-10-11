@@ -1,4 +1,5 @@
 import AuthenticationServices
+import CryptoKit
 import Foundation
 import Observation
 import UIKit
@@ -1954,6 +1955,36 @@ final class MarketplaceModel {
         }
         let email = accountEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return email.isEmpty ? "account" : email
+    }
+
+    static func miniAppWebsiteDataStoreIdentifier(
+        accountScope: String,
+        pluginId: String
+    ) -> UUID? {
+        let accountScope = accountScope.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pluginId = pluginId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accountScope.isEmpty, !pluginId.isEmpty else { return nil }
+        let digest = SHA256.hash(
+            data: Data("fabushi.miniapp.web-profile.v1\u{0}\(accountScope)\u{0}\(pluginId)".utf8)
+        )
+        let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+        guard hex.count == 32 else { return nil }
+        let uuid = [
+            String(hex.prefix(8)),
+            String(hex.dropFirst(8).prefix(4)),
+            String(hex.dropFirst(12).prefix(4)),
+            String(hex.dropFirst(16).prefix(4)),
+            String(hex.dropFirst(20).prefix(12)),
+        ].joined(separator: "-")
+        return UUID(uuidString: uuid)
+    }
+
+    func miniAppWebsiteDataStoreIdentifier(pluginId: String) -> UUID? {
+        guard loggedIn, let accountScope = globalDharmaAccountScope else { return nil }
+        return Self.miniAppWebsiteDataStoreIdentifier(
+            accountScope: accountScope,
+            pluginId: pluginId
+        )
     }
 
     private func publishPluginsNotice(

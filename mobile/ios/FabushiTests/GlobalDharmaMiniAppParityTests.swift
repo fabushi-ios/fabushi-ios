@@ -23,6 +23,42 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(bot.menuButtonText, "打开应用")
     }
 
+    func testMiniAppWebProfilesAreStablePerAccountAndDisjointAcrossAccountsAndPlugins() throws {
+        let a1 = try XCTUnwrap(
+            MarketplaceModel.miniAppWebsiteDataStoreIdentifier(
+                accountScope: "account-a",
+                pluginId: "global-dharma"
+            )
+        )
+        let a2 = try XCTUnwrap(
+            MarketplaceModel.miniAppWebsiteDataStoreIdentifier(
+                accountScope: "account-a",
+                pluginId: "global-dharma"
+            )
+        )
+        let otherAccount = try XCTUnwrap(
+            MarketplaceModel.miniAppWebsiteDataStoreIdentifier(
+                accountScope: "account-b",
+                pluginId: "global-dharma"
+            )
+        )
+        let otherPlugin = try XCTUnwrap(
+            MarketplaceModel.miniAppWebsiteDataStoreIdentifier(
+                accountScope: "account-a",
+                pluginId: "faliu-flashcards"
+            )
+        )
+        XCTAssertEqual(a1, a2)
+        XCTAssertNotEqual(a1, otherAccount)
+        XCTAssertNotEqual(a1, otherPlugin)
+        XCTAssertNil(
+            MarketplaceModel.miniAppWebsiteDataStoreIdentifier(
+                accountScope: "",
+                pluginId: "global-dharma"
+            )
+        )
+    }
+
     func testWebMcpBridgeTrustIsBoundedToCanonicalLocalAndHostedOrigins() {
         XCTAssertTrue(isTrustedWebMcpBridgeHost("miniapp.local.fabushi.invalid"))
         XCTAssertTrue(isTrustedWebMcpBridgeHost("fabushi.ombhrum.com"))
