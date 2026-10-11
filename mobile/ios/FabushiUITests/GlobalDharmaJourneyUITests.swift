@@ -18,6 +18,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         "purchaseTapped": false,
         "entitlementAllowed": false,
         "restoreTapped": false,
+        "commerceExternalBlock": false,
         "removedAtEnd": false,
     ]
 
@@ -262,48 +263,56 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         mark("bidirectionalStateObserved", true)
         checkpoint("061-bidirectional-live-state")
 
-        let allowed = app.descendants(matching: .any)["global-dharma-entitlement-allowed"]
-        let buyMonthly = app.buttons["global-dharma-buy-monthly"]
-        let buy = app.buttons["global-dharma-buy-lifetime"]
-        if !allowed.waitForExistence(timeout: 6) {
+        if environment["FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE"] == "1" {
+            let allowed = app.descendants(matching: .any)["global-dharma-entitlement-allowed"]
+            let buyMonthly = app.buttons["global-dharma-buy-monthly"]
+            let buy = app.buttons["global-dharma-buy-lifetime"]
+            if !allowed.waitForExistence(timeout: 6) {
+                XCTAssertTrue(
+                    buyMonthly.waitForExistence(timeout: 12),
+                    "Expected either existing entitlement or the canonical ¥30/month purchase action"
+                )
+                XCTAssertTrue(
+                    buyMonthly.label.contains("30"),
+                    "Monthly local prayer-wheel purchase must visibly preserve the server CNY 30 / 30-day contract"
+                )
+                XCTAssertTrue(buy.waitForExistence(timeout: 12), "Expected either existing entitlement or the ¥1080 lifetime purchase action")
+                XCTAssertTrue(
+                    buy.label.contains("1080"),
+                    "Lifetime local prayer-wheel purchase must visibly preserve the CNY 1080 contract"
+                )
+                buy.tap()
+                mark("purchaseTapped", true)
+                XCTAssertTrue(
+                    buy.isEnabled,
+                    "Protected acceptance requires a real purchase/authorization path. If StoreKit/provider checkout is unavailable in this CI environment, commerce remains blocked rather than using synthetic entitlement state."
+                )
+                XCTAssertTrue(
+                    allowed.waitForExistence(timeout: 60),
+                    "Real purchase/authorization did not project an allowed service entitlement"
+                )
+                checkpoint("070-purchase-entitlement")
+            } else {
+                checkpoint("070-preexisting-entitlement")
+            }
+    
+            mark("entitlementAllowed", true)
+            let restore = app.buttons["global-dharma-restore-purchase"]
+            XCTAssertTrue(restore.waitForExistence(timeout: 10))
+            restore.tap()
+            mark("restoreTapped", true)
             XCTAssertTrue(
-                buyMonthly.waitForExistence(timeout: 12),
-                "Expected either existing entitlement or the canonical ¥30/month purchase action"
+                allowed.waitForExistence(timeout: 30),
+                "Restore must leave the server-authoritative lifetime entitlement allowed"
             )
-            XCTAssertTrue(
-                buyMonthly.label.contains("30"),
-                "Monthly local prayer-wheel purchase must visibly preserve the server CNY 30 / 30-day contract"
-            )
-            XCTAssertTrue(buy.waitForExistence(timeout: 12), "Expected either existing entitlement or the ¥1080 lifetime purchase action")
-            XCTAssertTrue(
-                buy.label.contains("1080"),
-                "Lifetime local prayer-wheel purchase must visibly preserve the CNY 1080 contract"
-            )
-            buy.tap()
-            mark("purchaseTapped", true)
-            XCTAssertTrue(
-                buy.isEnabled,
-                "Protected acceptance requires a real purchase/authorization path. If StoreKit/provider checkout is unavailable in this CI environment, commerce remains blocked rather than using synthetic entitlement state."
-            )
-            XCTAssertTrue(
-                allowed.waitForExistence(timeout: 60),
-                "Real purchase/authorization did not project an allowed service entitlement"
-            )
-            checkpoint("070-purchase-entitlement")
+            checkpoint("080-restore-entitlement")
         } else {
-            checkpoint("070-preexisting-entitlement")
+            // Apple product/provider eligibility is an external release prerequisite.
+            // Keep the live Marketplace/WebMCP journey hard-gated while recording
+            // commerce as blocked instead of substituting synthetic entitlement.
+            mark("commerceExternalBlock", true)
+            checkpoint("070-commerce-external-block")
         }
-
-        mark("entitlementAllowed", true)
-        let restore = app.buttons["global-dharma-restore-purchase"]
-        XCTAssertTrue(restore.waitForExistence(timeout: 10))
-        restore.tap()
-        mark("restoreTapped", true)
-        XCTAssertTrue(
-            allowed.waitForExistence(timeout: 30),
-            "Restore must leave the server-authoritative lifetime entitlement allowed"
-        )
-        checkpoint("080-restore-entitlement")
 
         let close = app.buttons["miniapp-webmcp-close"]
         XCTAssertTrue(close.waitForExistence(timeout: 8))
@@ -342,6 +351,243 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         mark("removedAtEnd", true)
         checkpoint("100-removed-global-dharma")
         persistState()
+    }
+
+
+    @MainActor
+    func testPrepareGlobalDharmaOfflineAcceptance() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let protectedSession = environment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"],
+              !protectedSession.isEmpty
+        else {
+            throw XCTSkip("Requires the bounded Fabushi CI account session")
+        }
+
+        let app = XCUIApplication()
+        configureRealCIEnvironment(for: app)
+        app.launch()
+
+        let skip = app.buttons["mobile-onboarding-skip"]
+        if skip.waitForExistence(timeout: 4) { skip.tap() }
+
+        let grokHome = app.descendants(matching: .any)["grok-mobile-home"]
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 25))
+        let legacy = app.buttons["grok-mobile-legacy"]
+        XCTAssertTrue(legacy.waitForExistence(timeout: 8))
+        legacy.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["app-shell"].waitForExistence(timeout: 15))
+
+        openMarketplace(in: app)
+        let search = app.textFields["marketplace-search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 8))
+        replaceText(in: search, with: "小程序")
+        let submit = app.buttons["marketplace-search-submit"]
+        XCTAssertTrue(submit.waitForExistence(timeout: 5))
+        submit.tap()
+
+        let plugin = app.descendants(matching: .any)["plugin-global-dharma"]
+        let install = app.buttons["install-global-dharma"]
+        let open = app.buttons["open-global-dharma"]
+        XCTAssertTrue(
+            scrollUntilAnyExists([plugin, install, open], in: app, maxSwipes: 10),
+            "Canonical Marketplace must surface global-dharma before offline preparation"
+        )
+        if install.exists && install.isHittable {
+            install.tap()
+            let approve = app.buttons["permission-approve"]
+            if approve.waitForExistence(timeout: 5), approve.isHittable { approve.tap() }
+        }
+        XCTAssertTrue(waitForAny([open, plugin], timeout: 30))
+
+        XCTAssertTrue(scrollToElement(open, in: app, maxSwipes: 8))
+        open.tap()
+        let surface = app.descendants(matching: .any)["miniapp-webmcp-surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 20))
+        let connected = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "本地 WebMCP 已连接 · 页面注册 ")
+        ).firstMatch
+        XCTAssertTrue(connected.waitForExistence(timeout: 30))
+        XCTAssertTrue(connected.label.contains("4 个实时 Tool"))
+
+        let revisionPrefix = "rev "
+        let revisionLabel = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", revisionPrefix))
+            .firstMatch
+        XCTAssertTrue(revisionLabel.waitForExistence(timeout: 20))
+        guard let baseline = parseRevision(revisionLabel.label, prefix: revisionPrefix) else {
+            XCTFail("Unable to parse online preparation revision")
+            return
+        }
+        let free = app.buttons["执行免费本地操作"]
+        XCTAssertTrue(free.waitForExistence(timeout: 12))
+        free.tap()
+        guard let preparedRevision = waitForRevisionGreaterThan(
+            baseline,
+            element: revisionLabel,
+            prefix: revisionPrefix,
+            timeout: 15
+        ) else {
+            XCTFail("Online preparation must persist one local mutation before network isolation")
+            return
+        }
+
+        state["offlinePrepared"] = true
+        state["preparedRevision"] = preparedRevision
+        checkpoint("110-offline-prepared-local-package")
+
+        let close = app.buttons["miniapp-webmcp-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 8))
+        close.tap()
+        XCTAssertTrue(waitForNonExistence(surface, timeout: 12))
+        leaveMarketplaceForBotHome(in: app)
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 15))
+        let botEntry = app.buttons["grok-mobile-miniapp-bot-global-dharma"]
+        XCTAssertTrue(
+            scrollToElement(botEntry, in: app, maxSwipes: 8),
+            "Online preparation must persist the canonical Mini App Bot before network isolation"
+        )
+        state["offlineBotPrepared"] = true
+        persistState()
+        app.terminate()
+    }
+
+    @MainActor
+    func testGlobalDharmaOfflineColdStartHostWebMcpAndPersistence() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["FABUSHI_E2E_NETWORK_ISOLATED"] == "1" else {
+            XCTFail("GD-OFF/GD-WEBMCP-05 requires runner-level network isolation")
+            return
+        }
+        guard let protectedSession = environment["FABUSHI_CI_ACCOUNT_SESSION_BASE64"],
+              !protectedSession.isEmpty
+        else {
+            throw XCTSkip("Requires the bounded Fabushi CI account session")
+        }
+
+        let app = XCUIApplication()
+        configureRealCIEnvironment(for: app)
+        app.launch()
+
+        let skip = app.buttons["mobile-onboarding-skip"]
+        if skip.waitForExistence(timeout: 4) { skip.tap() }
+        let grokHome = app.descendants(matching: .any)["grok-mobile-home"]
+        XCTAssertTrue(
+            grokHome.waitForExistence(timeout: 25),
+            "Installed Global Dharma must cold-start while the runner has no public network"
+        )
+
+        let botEntry = app.buttons["grok-mobile-miniapp-bot-global-dharma"]
+        XCTAssertTrue(
+            scrollToElement(botEntry, in: app, maxSwipes: 8),
+            "Persisted canonical Mini App Bot must be available offline"
+        )
+        botEntry.tap()
+        let botChat = app.descendants(matching: .any)["mobile-bot-chat"]
+        XCTAssertTrue(botChat.waitForExistence(timeout: 15))
+        let openApp = app.buttons["mobile-bot-open-miniapp"]
+        XCTAssertTrue(openApp.waitForExistence(timeout: 8))
+        openApp.tap()
+
+        let surface = app.descendants(matching: .any)["miniapp-webmcp-surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 20))
+        let connected = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "本地 WebMCP 已连接 · 页面注册 ")
+        ).firstMatch
+        XCTAssertTrue(connected.waitForExistence(timeout: 30))
+        XCTAssertTrue(connected.label.contains("4 个实时 Tool"))
+
+        let revisionPrefix = "rev "
+        let revisionLabel = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", revisionPrefix))
+            .firstMatch
+        XCTAssertTrue(revisionLabel.waitForExistence(timeout: 20))
+        guard let coldStartRevision = parseRevision(revisionLabel.label, prefix: revisionPrefix) else {
+            XCTFail("Unable to parse offline cold-start revision")
+            return
+        }
+        XCTAssertGreaterThan(
+            coldStartRevision,
+            0,
+            "Online preparation state must survive full Fabushi termination and offline cold start"
+        )
+
+        let command = app.textFields["miniapp-tool-command-input"]
+        let run = app.buttons["miniapp-tool-command-run"]
+        XCTAssertTrue(command.waitForExistence(timeout: 10))
+        XCTAssertTrue(run.waitForExistence(timeout: 5))
+
+        replaceText(in: command, with: "/offline.state.read")
+        run.tap()
+        let commandStatus = app.staticTexts["miniapp-tool-command-status"]
+        XCTAssertTrue(commandStatus.waitForExistence(timeout: 15))
+        XCTAssertTrue(commandStatus.label.contains("已执行 /offline.state.read"))
+        XCTAssertEqual(
+            parseRevision(revisionLabel.label, prefix: revisionPrefix),
+            coldStartRevision,
+            "Free read-only Host WebMCP call must read the current page state without mutation"
+        )
+
+        replaceText(in: command, with: "/offline.practice.record offline-ci")
+        run.tap()
+        let approval = app.alerts.buttons["允许"]
+        XCTAssertTrue(
+            approval.waitForExistence(timeout: 10),
+            "Free local mutation must still use the Host-owned approval boundary while offline"
+        )
+        approval.tap()
+        guard let mutatedRevision = waitForRevisionGreaterThan(
+            coldStartRevision,
+            element: revisionLabel,
+            prefix: revisionPrefix,
+            timeout: 20
+        ) else {
+            XCTFail("Native Host WebMCP mutation did not update the active WKWebView revision offline")
+            return
+        }
+        XCTAssertTrue(commandStatus.waitForExistence(timeout: 10))
+        XCTAssertTrue(commandStatus.label.contains("已执行 /offline.practice.record"))
+
+        state["offlineColdStart"] = true
+        state["offlineHostRead"] = true
+        state["offlineHostMutation"] = true
+        state["offlineMutationRevision"] = mutatedRevision
+        checkpoint("120-offline-host-webmcp-mutated")
+
+        app.terminate()
+        app.launch()
+        if skip.waitForExistence(timeout: 4) { skip.tap() }
+        XCTAssertTrue(grokHome.waitForExistence(timeout: 25))
+        let restoredBot = app.buttons["grok-mobile-miniapp-bot-global-dharma"]
+        XCTAssertTrue(scrollToElement(restoredBot, in: app, maxSwipes: 8))
+        restoredBot.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["mobile-bot-chat"].waitForExistence(timeout: 15))
+        let restoredOpen = app.buttons["mobile-bot-open-miniapp"]
+        XCTAssertTrue(restoredOpen.waitForExistence(timeout: 8))
+        restoredOpen.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["miniapp-webmcp-surface"].waitForExistence(timeout: 20))
+        let restoredRevisionLabel = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", revisionPrefix))
+            .firstMatch
+        XCTAssertTrue(restoredRevisionLabel.waitForExistence(timeout: 20))
+        XCTAssertEqual(
+            parseRevision(restoredRevisionLabel.label, prefix: revisionPrefix),
+            mutatedRevision,
+            "localStorage/page-owned revision must survive a second full offline cold restart"
+        )
+
+        state["offlinePersistenceRecovered"] = true
+        checkpoint("130-offline-second-cold-start-restored")
+        persistState()
+        app.terminate()
+    }
+
+    @MainActor
+    private func replaceText(in element: XCUIElement, with text: String) {
+        element.tap()
+        if let current = element.value as? String, !current.isEmpty {
+            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        }
+        element.typeText(text)
     }
 
     @MainActor

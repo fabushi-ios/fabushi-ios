@@ -2353,9 +2353,10 @@ final class MarketplaceModel {
             if loggedIn {
                 await resolveSignedInOnboardingRoute()
                 await refreshAccountUsage()
-                await refresh()
-                await refreshMcpBackendStatus()
-                await refreshMcpServers()
+                // Marketplace catalog and MCP connector discovery are intentionally
+                // lazy. An already-installed offline Mini App must be able to cold
+                // start without catalog or remote-MCP preflight. The Marketplace
+                // and Yours/Connectors surfaces refresh these owners on entry.
             }
         } catch {
             authResolved = true

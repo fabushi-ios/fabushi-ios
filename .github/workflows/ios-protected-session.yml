@@ -26,6 +26,7 @@ jobs:
       FABUSHI_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
       MAHAYANA_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
       FABUSHI_FEATURE_HOST_TEST: '0'
+      FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE: ${{ vars.FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE || '0' }}
     steps:
       - name: Checkout exact source
         uses: actions/checkout@v5
@@ -240,6 +241,7 @@ jobs:
           export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$api_base"
           export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="$FABUSHI_E2E_SOURCE_SHA"
           export TEST_RUNNER_FABUSHI_DEVICE_NAME="$FABUSHI_DEVICE_NAME"
+          export TEST_RUNNER_FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE="${FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE:-0}"
           for key in \
             GITHUB_ACTIONS GITHUB_REPOSITORY GITHUB_WORKFLOW GITHUB_JOB \
             GITHUB_RUN_ID GITHUB_RUN_ATTEMPT RUNNER_NAME RUNNER_OS RUNNER_ARCH
@@ -302,11 +304,23 @@ jobs:
             .permissionDeniedObserved == true and
             .livePageMutationObserved == true and
             .bidirectionalStateObserved == true and
-            .purchaseTapped == true and
-            .entitlementAllowed == true and
-            .restoreTapped == true and
             .removedAtEnd == true
           ' "$EVIDENCE_DIR/state.json" >/dev/null
+          if [ "${FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE:-0}" = "1" ]; then
+            jq -e '
+              .purchaseTapped == true and
+              .entitlementAllowed == true and
+              .restoreTapped == true and
+              .commerceExternalBlock == false
+            ' "$EVIDENCE_DIR/state.json" >/dev/null
+          else
+            jq -e '
+              .purchaseTapped == false and
+              .entitlementAllowed == false and
+              .restoreTapped == false and
+              .commerceExternalBlock == true
+            ' "$EVIDENCE_DIR/state.json" >/dev/null
+          fi
 
       - name: Collect evidence and remove protected session
         if: always()
