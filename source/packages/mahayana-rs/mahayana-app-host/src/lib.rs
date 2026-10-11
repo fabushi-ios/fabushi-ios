@@ -108,6 +108,7 @@ pub struct HostResponse {
 #[derive(Debug, Clone)]
 struct PluginAccountContext {
     scope: String,
+    generation: String,
     root: PathBuf,
 }
 
@@ -1479,7 +1480,7 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
-    fn current_plugin_account_scope(&self) -> Result<String, AppHostError> {
+    fn current_plugin_account_identity(&self) -> Result<(String, String), AppHostError> {
         let session = self
             .product
             .device_agent_session()
@@ -1494,28 +1495,53 @@ impl AppHost {
                     "plugin storage requires an authenticated account with userId".into(),
                 )
             })?;
-        Ok(stable_plugin_account_scope(user_id))
+        let session_id = session
+            .get("sessionId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                AppHostError::Operation(
+                    "plugin storage requires an authenticated account generation".into(),
+                )
+            })?;
+        Ok((
+            stable_plugin_account_scope(user_id),
+            stable_plugin_account_generation(user_id, session_id),
+        ))
     }
 
-    fn ensure_plugin_account_current(&self, expected_scope: &str) -> Result<(), AppHostError> {
-        let current = self.current_plugin_account_scope()?;
-        if current != expected_scope {
+    fn current_plugin_account_scope(&self) -> Result<String, AppHostError> {
+        self.current_plugin_account_identity().map(|(scope, _)| scope)
+    }
+
+    fn ensure_plugin_account_current(
+        &self,
+        expected_scope: &str,
+        expected_generation: &str,
+    ) -> Result<(), AppHostError> {
+        let (scope, generation) = self.current_plugin_account_identity()?;
+        if scope != expected_scope || generation != expected_generation {
             return Err(AppHostError::Operation(
-                "account changed while plugin operation was in flight".into(),
+                "account generation changed while plugin operation was in flight".into(),
             ));
         }
         Ok(())
     }
 
     fn plugin_account_context(&self) -> Result<PluginAccountContext, AppHostError> {
-        let scope = self.current_plugin_account_scope()?;
+        let (scope, generation) = self.current_plugin_account_identity()?;
         let base = self.app_data_dir.join("plugins");
         let root = base.join("accounts").join(&scope);
         std::fs::create_dir_all(&root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         ensure_plugin_account_marker(&root, &scope)?;
         migrate_legacy_plugin_root_if_proven(&base, &scope, &root)?;
-        Ok(PluginAccountContext { scope, root })
+        Ok(PluginAccountContext {
+            scope,
+            generation,
+            root,
+        })
     }
 
     fn plugin_root(&self) -> Result<PathBuf, AppHostError> {
@@ -1612,11 +1638,12 @@ impl AppHost {
         let account = self.plugin_account_context()?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        self.ensure_plugin_account_current(&account.scope)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let pointer = installer
             .install_with_commit_guard(&release, platform, preferred, || {
-                self.current_plugin_account_scope()
-                    .is_ok_and(|scope| scope == account.scope)
+                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                    scope == account.scope && generation == account.generation
+                })
             })
             .or_else(|error| {
                 if matches!(platform, "ios" | "android") {
@@ -1629,7 +1656,7 @@ impl AppHost {
                 }
             })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        self.ensure_plugin_account_current(&account.scope)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -1701,7 +1728,7 @@ impl AppHost {
             }
         }
         plugins.sort_by(|left, right| left.plugin_id.cmp(&right.plugin_id));
-        self.ensure_plugin_account_current(&account.scope)?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         Ok(json!({"plugins": plugins}))
     }
 
@@ -1772,7 +1799,7 @@ impl AppHost {
     fn active_plugin_ui_root(
         &self,
         plugin_id: &str,
-    ) -> Result<(String, InstalledPluginPointer, PathBuf), AppHostError> {
+    ) -> Result<(String, String, InstalledPluginPointer, PathBuf), AppHostError> {
         let account = self.plugin_account_context()?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -1784,7 +1811,7 @@ impl AppHost {
             })?;
         let root = std::fs::canonicalize(&pointer.installed_path)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        Ok((account.scope, pointer, root))
+        Ok((account.scope, account.generation, pointer, root))
     }
 
     fn plugin_ui_entry(
@@ -1815,7 +1842,8 @@ impl AppHost {
 
     fn plugin_ui_document(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
-        let (account_scope, pointer, root) = self.active_plugin_ui_root(plugin_id)?;
+        let (account_scope, account_generation, pointer, root) =
+            self.active_plugin_ui_root(plugin_id)?;
         let entry = self.plugin_ui_entry(plugin_id, &pointer, &root)?;
         let relative = safe_ui_relative_path(&entry)?;
         let document = std::fs::canonicalize(root.join(relative))
@@ -1827,7 +1855,7 @@ impl AppHost {
         }
         let html = std::fs::read_to_string(document)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        self.ensure_plugin_account_current(&account_scope)?;
+        self.ensure_plugin_account_current(&account_scope, &account_generation)?;
         Ok(json!({
             "pluginId": plugin_id,
             "html": html,
@@ -1892,7 +1920,7 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
 
         let normalized_path = relative.to_string_lossy().replace('\\', "/");
-        self.ensure_plugin_account_current(&account_scope)?;
+        self.ensure_plugin_account_current(&account_scope, &account_generation)?;
         Ok(json!({
             "pluginId": plugin_id,
             "path": normalized_path,
@@ -2521,6 +2549,15 @@ fn stable_plugin_account_scope(user_id: &str) -> String {
     format!("{:x}", digest.finalize())
 }
 
+fn stable_plugin_account_generation(user_id: &str, session_id: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"fabushi.plugin-account-generation.v1\0");
+    digest.update(user_id.trim().as_bytes());
+    digest.update([0]);
+    digest.update(session_id.trim().as_bytes());
+    format!("{:x}", digest.finalize())
+}
+
 fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), AppHostError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -2898,6 +2935,19 @@ mod fabushi_shipping_inference_tests {
         assert_ne!(a1, b);
         assert_eq!(a1.len(), 64);
         assert!(!a1.contains("account-a"));
+    }
+
+    #[test]
+    fn plugin_account_generation_fences_same_account_reauthentication() {
+        let scope_a = stable_plugin_account_scope("account-a");
+        assert_eq!(scope_a, stable_plugin_account_scope("account-a"));
+        let generation_1 = stable_plugin_account_generation("account-a", "session-1");
+        let generation_2 = stable_plugin_account_generation("account-a", "session-2");
+        let other_account = stable_plugin_account_generation("account-b", "session-1");
+        assert_ne!(generation_1, generation_2);
+        assert_ne!(generation_1, other_account);
+        assert_eq!(generation_1.len(), 64);
+        assert!(!generation_1.contains("session-1"));
     }
 
     #[test]
