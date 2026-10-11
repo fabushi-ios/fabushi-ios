@@ -2,6 +2,23 @@ import XCTest
 @testable import Fabushi
 
 final class GlobalDharmaCommerceTests: XCTestCase {
+    @MainActor
+    func testCommerceStartsOfflineWithoutEntitlementPreflightState() {
+        let bridge = IOSPreloadBridge()
+        let model = GlobalDharmaCommerceModel(
+            bridge: bridge,
+            platformBaseURL: URL(string: "https://example.invalid")!,
+            paymentBaseURL: URL(string: "https://pay.example.invalid")!
+        )
+
+        XCTAssertFalse(model.accessAllowed)
+        XCTAssertEqual(model.accessReason, "not_loaded")
+        XCTAssertNil(model.lifetimeOffer)
+        XCTAssertTrue(model.canBuyLifetime)
+        XCTAssertTrue(model.message.contains("免费功能可离线使用"))
+    }
+
+
     func testCanonicalLifetimeOfferAcceptsOnlyServerCNY1080DurableContract() throws {
         let offer = try XCTUnwrap(GlobalDharmaCommerceModel.parseLifetimeOffer([
             "productId": "prod.global-dharma.local-prayer-wheel.lifetime",
