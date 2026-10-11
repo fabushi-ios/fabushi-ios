@@ -2095,6 +2095,12 @@ internal struct MobileBotChat: View {
                 findBar
                 Divider().opacity(0.25)
             }
+            if openedMiniApp {
+                miniAppCover
+                    .frame(height: 320)
+                    .accessibilityIdentifier("mobile-bot-live-miniapp-panel")
+                Divider().opacity(0.35)
+            }
             transcriptList
             replyBanner
             voiceStatusBanner
@@ -2213,9 +2219,6 @@ internal struct MobileBotChat: View {
             forwardMessage = nil
             closeFind()
             invalidateEditorSuggestions()
-        }
-        .fullScreenCover(isPresented: $openedMiniApp) {
-            miniAppCover
         }
         .fullScreenCover(item: $generatedMiniAppArtifactDraft) { artifact in
             let transaction = artifact.review.transaction
@@ -3432,7 +3435,11 @@ internal struct MobileBotChat: View {
     private var miniAppCover: some View {
         if let miniAppId = bot.miniAppId,
            let plugin = model.plugins.first(where: { $0.pluginId == miniAppId }) {
-            MiniAppWebMcpSurface(plugin: plugin, model: model)
+            MiniAppWebMcpSurface(
+                plugin: plugin,
+                model: model,
+                onClose: { openedMiniApp = false }
+            )
         } else {
             VStack(spacing: 12) {
                 ProgressView()
