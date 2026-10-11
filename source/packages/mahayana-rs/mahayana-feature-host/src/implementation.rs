@@ -342,6 +342,10 @@ struct InstalledPluginSkillSnapshot {
     is_enabled_for_agent: bool,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PublishedWorkflowCacheMetadata {
