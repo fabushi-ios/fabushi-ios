@@ -395,3 +395,262 @@ jobs:
       - name: Verify Desktop main remained unchanged through protected acceptance
         if: always()
         run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
+  global-dharma-offline:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      FABUSHI_CI_TEST_USERNAME: ${{ secrets.FABUSHI_CI_TEST_USERNAME }}
+      FABUSHI_CI_TEST_PASSWORD: ${{ secrets.FABUSHI_CI_TEST_PASSWORD }}
+      FABUSHI_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
+      MAHAYANA_API_BASE_URL: ${{ vars.FABUSHI_API_BASE_URL || 'https://api.ombhrum.com' }}
+      FABUSHI_FEATURE_HOST_TEST: '0'
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source and Desktop authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+          echo "EVIDENCE_DIR=$GITHUB_WORKSPACE/ios-global-dharma-offline-evidence" >> "$GITHUB_ENV"
+          mkdir -p ios-global-dharma-offline-evidence
+          {
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "source_sha=$(git rev-parse HEAD)"
+            echo "source_tree=$(git rev-parse HEAD^{tree})"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "network_isolation=runner-network-services-disabled"
+            echo "public_probe=https://example.com/"
+          } > ios-global-dharma-offline-evidence/provenance.env
+
+      - name: Require bounded protected account
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${FABUSHI_CI_TEST_USERNAME:-}"
+          test -n "${FABUSHI_CI_TEST_PASSWORD:-}"
+          test "${FABUSHI_FEATURE_HOST_TEST:-}" = "0"
+
+      - name: Verify offline source boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          model = Path("mobile/ios/Fabushi/MarketplaceModel.swift").read_text()
+          commerce = Path("mobile/ios/Fabushi/GlobalDharmaCommerceModel.swift").read_text()
+          surface = Path("mobile/ios/Fabushi/MiniAppWebMcpSurface.swift").read_text()
+          init = model[model.index("func initializeApp() async"):model.index("private func applyAuth", model.index("func initializeApp() async"))]
+          forbidden = ("await refresh()", "await refreshMcpBackendStatus()", "await refreshMcpServers()")
+          if any(item in init for item in forbidden):
+              raise SystemExit("cold app initialization still preflights Marketplace/MCP")
+          if "await globalDharmaCommerce.refresh()" not in model:
+              raise SystemExit("protected entitlement boundary missing")
+          if "protectedMiniAppCapability" not in model:
+              raise SystemExit("protected capability classifier missing")
+          if "requiresActiveLocalWebMcpSession" not in surface:
+              raise SystemExit("active-page local WebMCP fence missing")
+          PY
+
+      - name: Install simulator build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+          rustup target add aarch64-apple-ios-sim
+
+      - name: Boot clean simulator
+        id: sim
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for xs in d.values() for x in xs if x["name"].startswith("iPhone")))')"
+          xcrun simctl shutdown "$UDID" 2>/dev/null || true
+          xcrun simctl erase "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build app and UI tests once while online
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          ../../scripts/build-mahayana-ios.sh iphonesimulator arm64
+          xcodegen generate
+          xcodebuild build-for-testing             -project Fabushi.xcodeproj             -scheme Fabushi             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -derivedDataPath "$RUNNER_TEMP/FabushiOfflineDerivedData"
+          xctestrun="$(find "$RUNNER_TEMP/FabushiOfflineDerivedData/Build/Products" -name '*.xctestrun' -type f -print -quit)"
+          test -n "$xctestrun"
+          echo "OFFLINE_XCTESTRUN=$xctestrun" >> "$GITHUB_ENV"
+
+      - name: Prepare bounded refresh-token-free session
+        shell: bash
+        env:
+          DEVICE_ID: gha-${{ github.run_id }}-${{ github.run_attempt }}-ios-offline
+          FABUSHI_CI_ACCOUNT_SESSION_FILE: ${{ runner.temp }}/fabushi-ci-offline/account-session.json
+        run: |
+          set -euo pipefail
+          node .github/scripts/prepare-ios-ci-session.mjs
+          test -s "$FABUSHI_CI_ACCOUNT_SESSION_FILE"
+          test "$(stat -f '%Lp' "$FABUSHI_CI_ACCOUNT_SESSION_FILE")" = "600"
+          echo "HOST_CI_SESSION=$FABUSHI_CI_ACCOUNT_SESSION_FILE" >> "$GITHUB_ENV"
+
+      - name: Install built products
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_bundle="$(find "$RUNNER_TEMP/FabushiOfflineDerivedData/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name 'Fabushi.app' -type d -print -quit)"
+          test_runner="$(find "$RUNNER_TEMP/FabushiOfflineDerivedData/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name 'FabushiUITests-Runner.app' -type d -print -quit)"
+          test -d "$app_bundle"
+          test -d "$test_runner"
+          xcrun simctl install "${{ steps.sim.outputs.udid }}" "$app_bundle"
+          xcrun simctl install "${{ steps.sim.outputs.udid }}" "$test_runner"
+
+      - name: Prepare canonical Marketplace install while online
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$HOST_CI_SESSION"
+          session_b64="$(python3 - "$HOST_CI_SESSION" <<'PY'
+          import base64, pathlib, sys
+          payload = pathlib.Path(sys.argv[1]).read_bytes()
+          if not payload or len(payload) > 64 * 1024:
+              raise SystemExit("invalid bounded session")
+          print(base64.b64encode(payload).decode("ascii"), end="")
+          PY
+          )"
+          export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
+          export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
+          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ inputs.source_sha }}"
+          rm -rf "$EVIDENCE_DIR/Prepare.xcresult"
+          xcodebuild test-without-building             -xctestrun "$OFFLINE_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$EVIDENCE_DIR/Prepare.xcresult"             -only-testing:FabushiUITests/GlobalDharmaJourneyUITests/testPrepareGlobalDharmaOfflineAcceptance             2>&1 | tee "$EVIDENCE_DIR/prepare.log"
+          curl --fail --silent --show-error --connect-timeout 5 --max-time 10 https://example.com/ >/dev/null
+          echo "online_public_probe=success" >> "$EVIDENCE_DIR/network-audit.env"
+
+      - name: Prove public network isolation and run cold-start local WebMCP
+        working-directory: mobile/ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          enabled_file="$RUNNER_TEMP/fabushi-enabled-network-services.txt"
+          : > "$enabled_file"
+          restore_network() {
+            while IFS= read -r service; do
+              [ -z "$service" ] && continue
+              sudo networksetup -setnetworkserviceenabled "$service" on >/dev/null 2>&1 || true
+            done < "$enabled_file"
+          }
+          trap restore_network EXIT
+
+          networksetup -listallnetworkservices | tail -n +2 | sed 's/^\*//' | while IFS= read -r service; do
+            [ -z "$service" ] && continue
+            if networksetup -getnetworkserviceenabled "$service" 2>/dev/null | grep -q "Enabled"; then
+              printf '%s\n' "$service" >> "$enabled_file"
+              sudo networksetup -setnetworkserviceenabled "$service" off
+            fi
+          done
+          test -s "$enabled_file"
+
+          probe_rc=0
+          curl --fail --silent --show-error --connect-timeout 3 --max-time 8 https://example.com/ >/dev/null 2>"$EVIDENCE_DIR/offline-public-probe.stderr" || probe_rc=$?
+          if [ "$probe_rc" -eq 0 ]; then
+            echo "Public probe unexpectedly remained reachable after runner network isolation" >&2
+            exit 3
+          fi
+          {
+            echo "offline_public_probe=unreachable"
+            echo "offline_public_probe_exit=$probe_rc"
+          } >> "$EVIDENCE_DIR/network-audit.env"
+
+          session_b64="$(python3 - "$HOST_CI_SESSION" <<'PY'
+          import base64, pathlib, sys
+          print(base64.b64encode(pathlib.Path(sys.argv[1]).read_bytes()).decode("ascii"), end="")
+          PY
+          )"
+          export TEST_RUNNER_FABUSHI_CI_ACCOUNT_SESSION_BASE64="$session_b64"
+          export TEST_RUNNER_FABUSHI_CI_API_BASE_URL="$FABUSHI_API_BASE_URL"
+          export TEST_RUNNER_FABUSHI_E2E_SOURCE_SHA="${{ inputs.source_sha }}"
+          export TEST_RUNNER_FABUSHI_E2E_NETWORK_ISOLATED=1
+
+          rm -rf "$EVIDENCE_DIR/Offline.xcresult"
+          set +e
+          xcodebuild test-without-building             -xctestrun "$OFFLINE_XCTESTRUN"             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"             -resultBundlePath "$EVIDENCE_DIR/Offline.xcresult"             -only-testing:FabushiUITests/GlobalDharmaJourneyUITests/testGlobalDharmaOfflineColdStartHostWebMcpAndPersistence             2>&1 | tee "$EVIDENCE_DIR/offline.log"
+          test_rc=${PIPESTATUS[0]}
+          set -e
+
+          restore_network
+          trap - EXIT
+          curl --fail --silent --show-error --connect-timeout 5 --max-time 15 https://example.com/ >/dev/null
+          echo "restored_public_probe=success" >> "$EVIDENCE_DIR/network-audit.env"
+          exit "$test_rc"
+
+      - name: Extract and require offline evidence state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$EVIDENCE_DIR/offline.log" "$EVIDENCE_DIR/state.json" <<'PY'
+          import base64, pathlib, re, sys
+          log = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+          matches = re.findall(r"FABUSHI_E2E_STATE_BASE64=([A-Za-z0-9+/=]+)", log)
+          if not matches:
+              raise SystemExit("offline UI test produced no state marker")
+          pathlib.Path(sys.argv[2]).write_bytes(base64.b64decode(matches[-1], validate=True))
+          PY
+          jq -e '
+            .offlineColdStart == true and
+            .offlineHostRead == true and
+            .offlineHostMutation == true and
+            .offlinePersistenceRecovered == true and
+            (.offlineMutationRevision | type == "number" and . > 0)
+          ' "$EVIDENCE_DIR/state.json" >/dev/null
+          grep -q '^online_public_probe=success$' "$EVIDENCE_DIR/network-audit.env"
+          grep -q '^offline_public_probe=unreachable$' "$EVIDENCE_DIR/network-audit.env"
+          grep -q '^restored_public_probe=success$' "$EVIDENCE_DIR/network-audit.env"
+
+      - name: Verify Desktop authority remained unchanged
+        if: always()
+        run: python3 scripts/check-desktop-main-ios-architecture.py --authority-only
+
+      - name: Package evidence provenance
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "$EVIDENCE_DIR"
+          python3 - "$EVIDENCE_DIR" <<'PY'
+          import hashlib, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          output = root / "SHA256SUMS.txt"
+          files = sorted(p for p in root.rglob("*") if p.is_file() and p != output)
+          with output.open("w", encoding="utf-8") as handle:
+              for path in files:
+                  handle.write(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(root).as_posix()}\n")
+          PY
+          (cd "$EVIDENCE_DIR" && shasum -a 256 -c SHA256SUMS.txt)
+
+      - name: Upload offline acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fabushi-ios-global-dharma-offline-${{ inputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ios-global-dharma-offline-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup simulator and bounded session
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          rm -f "${HOST_CI_SESSION:-}"
+          xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" || true
+          xcrun simctl erase "${{ steps.sim.outputs.udid }}" || true
