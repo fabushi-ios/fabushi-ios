@@ -249,13 +249,13 @@ Acceptance evidence must record repository, exact SHA, workflow/run/job IDs, com
 
 | Requirement / AC | Status | Evidence / reason |
 | --- | --- | --- |
-| GD-ARCH-001 | pending | Current shipping entry uses generic surface from ContentView, but special legacy GlobalDharmaMiniAppView still exists and current generic call path is remote for Global Dharma. |
-| GD-PKG-001..004 | pending | Generic verifier/loader exists; Global Dharma package/update/recovery evidence pending. |
-| GD-OFF-01..03 | pending | Current inline legacy page performs startup network work; no accepted offline cold-start evidence. |
-| GD-WEBMCP-01..07 | pending | Existing bridge has page->Host nonce/grant fencing but lacks accepted Host/Bot->current-page invocation. |
-| GD-PAY-01 | pending | Host entitlement guard exists for remote result hostRequest, but live-page protected boundary requires revalidation. |
-| GD-PAY-02 | pending | Constants match current iOS contract; current Backend/Core live authority must be used for final acceptance. |
+| GD-ARCH-001 | implemented; exact-head CI pending | Shipping entry uses generic `MiniAppWebMcpSurface`; the legacy `GlobalDharmaMiniAppView` parallel `loadHTMLString` runtime has been removed from PR #3. |
+| GD-PKG-001..004 | implemented; production signing blocked | Global Dharma 1.1.0 source is owned by `bhrumom/fabushi-marketplace` and uses the strict catalog `.fabapp` manifest/finalizer contract. Marketplace main `1971f2a...` source-contract CI passed; production finalization still requires the managed signing Worker secrets/trust root. |
+| GD-OFF-01..03 | implementation present; journey evidence pending | The 1.1.0 package uses only local `index.html/style.css/app.js`, CSP `connect-src 'none'`, localStorage-backed revision state, and no startup entitlement request. Cold-start/restart/network-off UI evidence must still complete on the current exact iOS HEAD. |
+| GD-WEBMCP-01..07 | implementation present; exact-head UI/security evidence pending | Active page tools register through `registerLocalTool`; native Host invokes the current page via `invokeLocalFromHost` fenced by account/app instance/nonce/generation; Bot routes Global Dharma through `callActiveWebMcpTool`. Hosted Global Dharma WebMCP fallback is now explicitly rejected. |
+| GD-PAY-01 | implementation present; protected journey pending | `local.prayer-wheel.start` is the only current protected local capability; `callActiveWebMcpTool` performs fresh Host-side entitlement refresh only for that protected tool. Free tools bypass entitlement preflight. |
+| GD-PAY-02 | current contract re-read required for final acceptance | iOS constants remain `global-dharma` / `local.prayer-wheel.start` / `local-prayer-wheel.lifetime` / CNY 1080; final acceptance must bind them to current Backend/Core authority and real purchase evidence. |
 | GD-PAY-03 / GD-PAY-02 acceptance | blocked | Real StoreKit/device/payment acceptance depends on external Apple/product/account configuration; CI test rail is not production evidence. |
-| GD-MKT-01 | pending | Generic install path exists; Global Dharma exact package evidence pending. |
-| FPM-IOS-01..04 | pending | Existing production code exists; exact-head regression and missing parts require verification. |
+| GD-MKT-01 | implementation present; production artifact rollout blocked | Global Dharma is required to use the verified local package and normal Host install/source APIs with no hosted fallback. Production-signed 1.1.0 artifact/catalog rollout remains blocked by managed signer configuration. |
+| FPM-IOS-01..04 | pending exact-head regression | Existing Marketplace/Connectors/Skills/private Mini App production owners remain in place; current-head regression and any remaining product gaps still require Actions evidence. |
 | GD-REL-01 | blocked | Real signed-device/TestFlight/App Review acceptance requires configured Apple distribution infrastructure and policy evidence. |
