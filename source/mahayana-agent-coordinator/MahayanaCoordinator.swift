@@ -533,6 +533,17 @@ final class MahayanaCoordinator {
         )
     }
 
+    func structuredLogCredentials(
+        backendURL: String,
+        accountSlot: String
+    ) async throws -> (accessToken: String, machineID: String) {
+        guard let mcpSurface else { throw CoordinatorError.unavailable }
+        return try await mcpSurface.structuredLogCredentials(
+            backendURL: backendURL,
+            accountSlot: accountSlot
+        )
+    }
+
     static func make(
         appDataDirectory: URL,
         featureHostTest: Bool = false,
