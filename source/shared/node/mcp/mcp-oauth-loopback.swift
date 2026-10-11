@@ -8,7 +8,10 @@ import Foundation
 let MCP_OAUTH_IOS_CALLBACK_URL = "fabushi://auth/callback"
 let MCP_OAUTH_LOOPBACK_CALLBACK_URL = MCP_OAUTH_IOS_CALLBACK_URL
 let BACKEND_MCP_OAUTH_PENDING_STATE_TTL_MS = 15 * 60 * 1_000
-let MCP_OAUTH_PENDING_TTL_MS = BACKEND_MCP_OAUTH_PENDING_STATE_TTL_MS + 60_000
+// Desktop coordinator callback ownership expires after 11 minutes. Keep the
+// app callback lease shorter than the backend token window so a stale callback
+// cannot outlive the canonical coordinator owner.
+let MCP_OAUTH_PENDING_TTL_MS = 11 * 60 * 1_000
 let MCP_OAUTH_COMPLETION_RETRY_DELAY_MS = 500
 
 struct ParsedMcpOAuthAuthorization: Equatable, Sendable {
@@ -239,6 +242,16 @@ actor SandMcpOAuthCallbackLifecycle {
     func expirePending() {
         let now = nowMs()
         pending = pending.filter { $0.value.expiresAtMs > now }
+    }
+
+    func removePending(forServerName serverName: String) {
+        let states = pending.compactMap { state, value in
+            value.serverName == serverName ? state : nil
+        }
+        for state in states {
+            pending[state]?.completing?.cancel()
+            pending.removeValue(forKey: state)
+        }
     }
 
     func dispose() {

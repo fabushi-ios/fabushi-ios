@@ -184,38 +184,33 @@ final class SharedMcpOAuthLifecycleParityTests: XCTestCase {
         XCTAssertEqual(unsupportedResult, .unsupportedURL)
     }
 
-    func testCoordinatorRegistryUsesSameTTLAndSingleUseCallbackIdentity() async throws {
-        let registry = MCPOAuthCallbackRegistry()
-        let listener = MCPOAuthCallbackListener(registry: registry)
-        await registry.register(
-            state: "coordinator-state",
-            providerIdentifier: "server-7"
-        )
-        let callback = try XCTUnwrap(URL(string:
-            "fabushi://auth/callback?state=coordinator-state&code=abc"
-        ))
-        let accepted = try await listener.accept(callback)
-        XCTAssertEqual(accepted.providerIdentifier, "server-7")
+    func testShippingLifecycleMatchesDesktopTTLAndServerRemovalFence() async throws {
+        XCTAssertEqual(MCP_OAUTH_PENDING_TTL_MS, 11 * 60 * 1_000)
 
-        do {
-            _ = try await listener.accept(callback)
-            XCTFail("callback state must be single-use")
-        } catch let error as MCPOAuthCallbackListener.CallbackError {
-            XCTAssertEqual(error, .stateMismatch)
+        let lifecycle = SandMcpOAuthCallbackLifecycle(
+            completeOAuth: { _, _ in XCTFail("completion must not run") }
+        )
+
+        func authorization(state: String) throws -> String {
+            var components = try XCTUnwrap(URLComponents(string: "https://provider.example/authorize"))
+            components.queryItems = [
+                .init(name: "redirect_uri", value: MCP_OAUTH_IOS_CALLBACK_URL),
+                .init(name: "state", value: state),
+            ]
+            return try XCTUnwrap(components.url?.absoluteString)
         }
 
-        let created = Date(timeIntervalSince1970: 100)
-        await registry.register(
-            state: "expired-state",
-            providerIdentifier: "server-8",
-            now: created
-        )
-        let expired = await registry.consume(
-            state: "expired-state",
-            now: created.addingTimeInterval(
-                TimeInterval(MCP_OAUTH_PENDING_TTL_MS) / 1_000 + 1
-            )
-        )
-        XCTAssertNil(expired)
+        XCTAssertTrue(await lifecycle.registerPendingAuthFromUrl(
+            authorizationUrl: try authorization(state: "removed-server-state"),
+            serverName: "Removed Server"
+        ))
+        XCTAssertTrue(await lifecycle.registerPendingAuthFromUrl(
+            authorizationUrl: try authorization(state: "surviving-server-state"),
+            serverName: "Surviving Server"
+        ))
+
+        await lifecycle.removePending(forServerName: "Removed Server")
+        XCTAssertFalse(await lifecycle.hasPendingState("removed-server-state"))
+        XCTAssertTrue(await lifecycle.hasPendingState("surviving-server-state"))
     }
 }

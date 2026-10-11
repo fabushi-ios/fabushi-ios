@@ -652,6 +652,7 @@ actor SandMcpManager {
         if let authWatches {
             _ = await authWatches.clearPendingAuthWatchesForServer(id)
         }
+        await oauthCallbacks.removePending(forServerName: row.name)
         let sameNameCount = lastDisplay?.servers.filter {
             $0.name == row.name
         }.count ?? 1
@@ -827,6 +828,7 @@ actor SandMcpManager {
             if let authWatches {
                 _ = await authWatches.clearPendingAuthWatchesForServer(row.id)
             }
+            await oauthCallbacks.removePending(forServerName: row.name)
             var disabled = deps.settingsStore.getMcpDisabledToolsByServerId()
             disabled.removeValue(forKey: row.id)
             deps.settingsStore.setMcpDisabledToolsByServerId(disabled)

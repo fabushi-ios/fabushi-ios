@@ -85,6 +85,16 @@ jobs:
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-feature-host --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host-mobile --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-messaging/Cargo.toml
+      - name: Test generated Mini App install fences and offline recovery
+        run: |
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host --lib --profile ci local_fabapp_commit_records_fail_closed_after_cancel_or_stale_generation
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci fabapp_local_generated_verifier_binds_account_draft_and_approval
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci fabapp_local_generated_rejects_post_approval_mutation_and_privileged_egress
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci fabapp_install_survives_cold_installer_recreation
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci fabapp_install_recovers_interrupted_staging_before_next_install
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci fabapp_local_generated_upgrade_keeps_previous_and_rolls_back
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci external_installer_commit_guard_prevents_stale_account_write
+          cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-plugin-runtime --lib --profile ci fabapp_install_commit_guard_rejects_stale_account_before_writes
       - name: Test native MCP, persistence telemetry, Runtime projection, and protected account contracts
         run: |
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-kernel --lib --profile ci
