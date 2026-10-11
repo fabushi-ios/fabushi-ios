@@ -1,10 +1,22 @@
+import Foundation
 import XCTest
 @testable import Fabushi
 
 final class GlobalDharmaCommerceTests: XCTestCase {
     @MainActor
-    func testCommerceStartsOfflineWithoutEntitlementPreflightState() {
-        let bridge = IOSPreloadBridge()
+    func testCommerceStartsOfflineWithoutEntitlementPreflightState() throws {
+        let appDataDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-global-dharma-commerce-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: appDataDirectory,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: appDataDirectory) }
+        let main = try IOSMainRuntime(
+            appDataDirectory: appDataDirectory,
+            featureHostTest: true
+        )
+        let bridge = IOSPreloadBridge(main: main)
         let model = GlobalDharmaCommerceModel(
             bridge: bridge,
             platformBaseURL: URL(string: "https://example.invalid")!,
