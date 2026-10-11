@@ -313,6 +313,136 @@ jobs:
             echo "instance_nonce_grant_fence_test=passed"
           } > "$EVIDENCE_DIR/webmcp-security.env"
 
+      - name: Require live WebMCP session identity trace
+        shell: bash
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          test -s "$EVIDENCE_DIR/state.json"
+          xcrun simctl spawn "$UDID" log show \
+            --style compact \
+            --last 30m \
+            --predicate 'process == "Fabushi" AND (eventMessage CONTAINS "FABUSHI_WEBMCP_SESSION_REGISTER" OR eventMessage CONTAINS "FABUSHI_WEBMCP_TRACE")' \
+            > "$EVIDENCE_DIR/webmcp-live-trace.log"
+          python3 - "$EVIDENCE_DIR/webmcp-live-trace.log" "$EVIDENCE_DIR/state.json" "$EVIDENCE_DIR/webmcp-live-trace.json" <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          log_path, state_path, output_path = map(pathlib.Path, sys.argv[1:])
+          lines = log_path.read_text(errors="replace").splitlines()
+          state = json.loads(state_path.read_text())
+
+          token = re.compile(r"([a-z_]+)=([^ ]+)")
+          def records(marker):
+              out = []
+              for line in lines:
+                  if marker not in line:
+                      continue
+                  fields = dict(token.findall(line.split(marker, 1)[1]))
+                  fields["_raw"] = line
+                  out.append(fields)
+              return out
+
+          sessions = [
+              row for row in records("FABUSHI_WEBMCP_SESSION_REGISTER")
+              if row.get("plugin_id") == "global-dharma"
+          ]
+          if not sessions:
+              raise SystemExit("no live Global Dharma WebMCP session registration trace")
+          session = sessions[-1]
+
+          if not re.fullmatch(r"fnv64-[0-9a-f]{16}", session.get("account_id", "")):
+              raise SystemExit("live WebMCP account identity is missing or not privacy-safe")
+          if not re.fullmatch(r"[0-9a-f]{64}", session.get("artifact_sha256", "")):
+              raise SystemExit("live WebMCP package digest is missing")
+          if not re.fullmatch(r"fnv64-[0-9a-f]{16}", session.get("nonce_id", "")):
+              raise SystemExit("live WebMCP nonce identity is missing or raw")
+          if not session.get("instance_id", "").startswith("global-dharma:"):
+              raise SystemExit("live WebMCP instance identity is invalid")
+          if not session.get("version"):
+              raise SystemExit("live WebMCP package version is missing")
+          if int(session.get("generation", "0")) <= 0:
+              raise SystemExit("live WebMCP generation is invalid")
+          if int(session.get("tool_count", "0")) != 4:
+              raise SystemExit("live page did not register exactly four reviewed tools")
+
+          identity_keys = (
+              "account_id",
+              "plugin_id",
+              "version",
+              "artifact_sha256",
+              "instance_id",
+              "nonce_id",
+              "generation",
+          )
+          def same_identity(row):
+              return all(row.get(key) == session.get(key) for key in identity_keys)
+
+          traces = [
+              row for row in records("FABUSHI_WEBMCP_TRACE")
+              if row.get("plugin_id") == "global-dharma" and same_identity(row)
+          ]
+          if not traces:
+              raise SystemExit("no tool-call trace matched the accepted live page identity")
+
+          def revision(row):
+              value = row.get("state_revision")
+              return None if value in (None, "none") else int(value)
+
+          initial = int(state["initialRevision"])
+          bot_revision = int(state["botMutationRevision"])
+          manual_revision = int(state["manualMutationRevision"])
+
+          denied = [
+              row for row in traces
+              if row.get("permission") == "denied"
+              and row.get("outcome") == "denied"
+              and revision(row) is None
+          ]
+          approved = [
+              row for row in traces
+              if row.get("permission") == "approved"
+              and row.get("outcome") == "success"
+              and revision(row) == bot_revision
+              and bot_revision > initial
+          ]
+          read_back = [
+              row for row in traces
+              if row.get("permission") == "not-required"
+              and row.get("outcome") == "success"
+              and revision(row) == manual_revision
+              and manual_revision > bot_revision
+          ]
+          if not denied:
+              raise SystemExit("real journey did not emit a denied mutation trace")
+          if not approved:
+              raise SystemExit("real journey did not emit an approved mutation trace at the Bot revision")
+          if not read_back:
+              raise SystemExit("real journey did not emit a read-only trace at the manual revision")
+
+          sequences = [int(row["sequence"]) for row in traces if row.get("sequence", "").isdigit()]
+          if sequences != sorted(sequences) or len(sequences) != len(set(sequences)):
+              raise SystemExit("live WebMCP trace sequence is not strictly ordered")
+
+          evidence = {
+              "schema": "fabushi.ios.live-webmcp-trace.v1",
+              "session": {key: session[key] for key in identity_keys},
+              "toolCount": int(session["tool_count"]),
+              "traceCount": len(traces),
+              "deniedCallId": denied[-1].get("call_id"),
+              "approvedCallId": approved[-1].get("call_id"),
+              "readBackCallId": read_back[-1].get("call_id"),
+              "initialRevision": initial,
+              "botMutationRevision": bot_revision,
+              "manualMutationRevision": manual_revision,
+          }
+          output_path.write_text(json.dumps(evidence, sort_keys=True, indent=2) + "\n")
+          PY
+          test -s "$EVIDENCE_DIR/webmcp-live-trace.json"
+
       - name: Require complete protected journey state
         shell: bash
         run: |
