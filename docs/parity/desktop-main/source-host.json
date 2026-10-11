@@ -85,19 +85,19 @@
       "desktop_owner": "host",
       "desktop_visible_effect": "Host imports the same connection/discovery protocol as Coordinator without duplicating runtime state or wire semantics.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/local-exec-daemon.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS has no Electron-main re-export layer; the shared native contracts plus the Coordinator-owned supervisor are the single equivalent owner.",
       "implementation_status": "implemented",
-      "production_evidence": "Desktop file is intentionally logic-free and only re-exports the Electron-main protocol because Coordinator owns process supervision. iOS preserves that single-owner invariant without an Electron re-export layer: source/shared/local-exec-daemon.swift and local-exec-process-identity.swift define native shared identity/discovery constants and exact generation fencing, while IOSLocalExecSupervisor is the sole native routing/supervision owner. No Host-local duplicate daemon protocol state machine exists.",
+      "production_evidence": "Desktop file is intentionally logic-free and only re-exports the Electron-main protocol because Coordinator owns process supervision. iOS preserves that single-owner invariant with source/mahayana-agent-coordinator/local-exec/supervisor.swift as the primary production owner; source/shared/local-exec-daemon.swift and source/shared/local-exec-process-identity.swift remain supporting shared identity/discovery and exact-generation contract evidence. No Host-local duplicate daemon protocol state machine exists.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests.testLocalExecProcessIdentityRequiresExactGenerationArguments and CoordinatorAdapterTests.testLocalExecSupervisorRoutesDesktopProcessSemanticsRemote cover the shared identity and Coordinator-owned routing boundary; descendant exact-head Actions remain required.",
       "notes": "IOS-MAIN-LOCAL-EXEC-20261011: current Desktop main blob 5ed4c7c8 is a compatibility re-export only. iOS closes the same responsibility by keeping contracts shared and supervision Coordinator-owned, rather than recreating a Host alias layer.",
       "authority_review_state": "current-main-reviewed",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "exact_head_evidence": "pending descendant exact-head GitHub Actions",
       "ios_related_paths": [
-        "source/shared/local-exec-process-identity.swift",
-        "source/mahayana-agent-coordinator/local-exec/supervisor.swift"
+        "source/shared/local-exec-daemon.swift",
+        "source/shared/local-exec-process-identity.swift"
       ]
     },
     {
@@ -206,7 +206,7 @@
       "ios_language": "Rust",
       "ios_platform_delta": "iOS uses a Rust serialized lane inside the embedded mobile Host rather than Desktop's production worker-backend alias. The shipping mobile Host path-includes this module directly.",
       "implementation_status": "implemented",
-      "production_evidence": "Desktop current-main file is a thin production factory alias to ConversationBlobWorkerBackend. iOS uses the repository-owned AgentStoreWorker serialized Rust lane compiled into mahayana-app-host-mobile: it owns the agent id and blob DB path, opens ConversationBlobStoreDb with busy timeout/legacy adoption, fences closed lanes, updates activity, serializes get/set/root/checkpoint/GC/legacy-retirement/flush operations, and closes the store exactly once. This is the platform-adapted production backend owner rather than a competing writer.",
+      "production_evidence": "Desktop current-main file is a thin production factory alias to ConversationBlobWorkerBackend. iOS uses source/host/agent-isolation/agent-store-worker.rs as the repository-owned AgentStoreWorker serialized Rust lane: it owns the agent id and blob DB path, opens ConversationBlobStoreDb with busy timeout/legacy adoption, fences closed lanes, updates activity, serializes get/set/root/checkpoint/GC/legacy-retirement/flush operations, and closes the store exactly once. source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs path-includes that owner into the shipping mobile Host composition; it is supporting composition evidence rather than a second persistence owner.",
       "test_evidence": "source/host/agent-isolation/agent-store-worker.rs::serial_lane_persists_agent_scoped_blob_operations proves agent-scoped persistence, flush/close lifecycle and fail-closed post-close access. Exact-head rust-host composition evidence remains pending.",
       "notes": "Current-main re-audit against Desktop blob f0e00680 confirms the Desktop source itself adds no behavior beyond selecting ConversationBlobWorkerBackend. iOS's richer serialized lane is the shipping adaptation and is implemented; verification waits for descendant exact-head Actions and aggregate persistence closure.",
       "exact_head_evidence": "pending descendant exact-head GitHub Actions",
