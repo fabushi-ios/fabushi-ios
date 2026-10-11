@@ -204,7 +204,8 @@ final class SharedExperimentServiceParityTests: XCTestCase {
         )
         await first.value
 
-        XCTAssertEqual(await script.calls(), 2)
+        let bootstrapCalls = await script.calls()
+        XCTAssertEqual(bootstrapCalls, 2)
         XCTAssertTrue(service.checkFeatureGate("sand_client_pause"))
         XCTAssertTrue(service.hasAuthenticatedStatsigBootstrap())
     }
