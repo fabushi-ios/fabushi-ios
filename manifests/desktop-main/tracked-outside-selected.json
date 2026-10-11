@@ -3,8 +3,8 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
-    "tree": "a7d8b9182bc9a586d5b9f40f5613237389f74737"
+    "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+    "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20"
   },
   "count": 226,
   "gitlinkCount": 0,
@@ -694,11 +694,11 @@
       "path": "docs/specs/fabushi-plugins-marketplace-owner-inventory.md",
       "mode": "100644",
       "type": "blob",
-      "sha": "2d32b9c9c8975babb5ddd1508d75a5c283e7d59d",
-      "size": 12542,
+      "sha": "f583e70924bad617b1db5bd5ecaf7d2a293c255c",
+      "size": 15917,
       "classification": "active-marketplace-owner-inventory",
       "coverage_status": "reviewed-owner-map-production-and-acceptance-pending",
-      "reason": "Current FPM-001 source-to-owner inventory. It confirms iOS Marketplace/Mini App Web runtime are partial and AI private Mini App creation has missing/partial prerequisites; used as owner/requirement context only, not as shipping implementation evidence."
+      "reason": "Current FPM-001 owner/source inventory. Desktop 371b72f1 adds the Skills owner audit: existing Host plugin-skills cache/lifecycle, publish/resync/unpublish and ownership fences remain canonical owners and must be adapted rather than duplicated. This is documentation/owner authority, not iOS shipping implementation evidence."
     },
     {
       "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",

@@ -3,10 +3,10 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
-  "rootTreeSha": "a7d8b9182bc9a586d5b9f40f5613237389f74737",
+  "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+  "rootTreeSha": "3116c54a1e36da95189c740bdc789ad543ce2d20",
   "observedAt": "2026-10-11",
-  "previousSourceCommit": "d575b4f77b6895eea4ecaced96e5c512964bf3ed",
+  "previousSourceCommit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
@@ -16,7 +16,7 @@
     "fullTrackedCount": 8177,
     "gitlinkCount": 0,
     "nonselectedCount": 226,
-    "fullTreeSha256": "c7c489bf971ae85eb80301713afd7eb07d530b14674d0d296d96ecbcbdd224ac",
+    "fullTreeSha256": "eff329d1cc0d74d67917fc39137e3d5161e8adc782e6868cbe4c07614e9a0531",
     "selectedTreeSha256": "85adf0b64c517cfdc72a1d52078977683748714a5ec893a8d30b992d7052febc",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
@@ -27,5 +27,5 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Incremental live-main rebaseline from d575b4f7 to 62d0c99f. Desktop changed only FPM-001 metadata plus the new Marketplace owner inventory outside frontend/** + source/**; the selected production source set remains exactly 7,951 blobs with unchanged selected digest. The new owner inventory explicitly keeps iOS OMA package/runtime work partial and AI private Mini App creation missing/partial prerequisites, so baselineReady/dependenciesReviewed/completenessAccepted/acceptanceAccepted remain false."
+  "notes": "Incremental live-main rebaseline from 62d0c99f to 371b72f1. Desktop changed only docs/specs/fabushi-plugins-marketplace-owner-inventory.md outside frontend/** + source/**; selected production source remains exactly 7,951 blobs with unchanged selected digest. The owner audit now binds Skills lifecycle/migration to existing Host owners and does not add selected shipping source. iOS OMA/AI private Mini App production and device acceptance remain incomplete, so all acceptance booleans remain false."
 }

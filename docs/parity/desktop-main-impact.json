@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "d575b4f77b6895eea4ecaced96e5c512964bf3ed",
-  "currentCommit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
-  "fullTree": "a7d8b9182bc9a586d5b9f40f5613237389f74737",
+  "previousCommit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
+  "currentCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+  "fullTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
   "directCount": 0,
   "metadataCorrections": 0,
   "fullReviewAccepted": false,
   "directChanges": [],
   "dependencyReview": {
     "status": "pending",
-    "reason": "Desktop d575b4f7→62d0c99f changed only FPM-001 documentation and added the Marketplace owner inventory outside selected production roots. The selected 7,951 source identities are unchanged. The owner inventory was reviewed and explicitly leaves iOS OMA runtime partial plus AI private Mini App creation missing/partial; aggregate dependency/source/release closure remains pending.",
+    "reason": "Desktop 62d0c99f→371b72f1 changes only the nonselected Marketplace owner inventory. The new Skills audit confirms existing Host owners and migration fences; selected source identities are unchanged. iOS production/completeness/release closure remains pending.",
     "sameDirectoryReviewPaths": [
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0014_remote_computer_client_tokens.sql",
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0016_remote_computer_session_provider.sql",
@@ -26,11 +26,12 @@
       "source/host/MahayanaHostRuntime.swift"
     ],
     "sharedContractReview": "pending",
-    "mainActiveSpecsReview": "FPM-001-owner-inventory-reviewed-selected-source-unchanged-ios-production-and-acceptance-pending",
+    "mainActiveSpecsReview": "FPM-001-skills-owner-audit-reviewed-selected-source-unchanged-ios-production-and-acceptance-pending",
     "newAndChangedResponsibilitiesReviewed": false,
     "mainActiveSpecsReviewEvidence": [
       "docs/specs/remote-computer-mobile-session-reconciliation.md read at Desktop 92fcc2b0; iOS applicability determined from shipping call graph, not from Android compatibility wording.",
-      "Desktop 62d0c99f added docs/specs/fabushi-plugins-marketplace-owner-inventory.md and refreshed FPM-001 metadata only; inventory FPM-OWN-012/013/016 keeps iOS Marketplace/Mini App/AI private creation partial or missing, so no implementation/verification promotion was made."
+      "Desktop 62d0c99f added docs/specs/fabushi-plugins-marketplace-owner-inventory.md and refreshed FPM-001 metadata only; inventory FPM-OWN-012/013/016 keeps iOS Marketplace/Mini App/AI private creation partial or missing, so no implementation/verification promotion was made.",
+      "Desktop 371b72f1 extends FPM owner inventory with Skills lifecycle/ownership migration facts only; selected 7,951 source identities are unchanged and no iOS verification status is promoted."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending."
