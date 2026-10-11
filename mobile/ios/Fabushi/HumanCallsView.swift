@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 @preconcurrency import LiveKitWebRTC
 
@@ -150,6 +151,7 @@ internal struct HumanCallsView: View {
     @State private var errorText: String?
     @State private var refreshGeneration = 0
     @Environment(\.humanCallMediaPort) private var mediaPort
+    @Environment(\.scenePhase) private var scenePhase
     @State private var peerConnection: HumanCallPeerConnection?
     @State private var activeMediaCallId: String?
     @State private var activeMediaGeneration: Int?
@@ -169,6 +171,7 @@ internal struct HumanCallsView: View {
     @State private var selectedMicrophoneId: String?
     @State private var selectedCameraId: String?
     @State private var recovering = false
+    @State private var wasMediaBackgrounded = false
 
     var body: some View {
         NavigationStack {
@@ -273,7 +276,27 @@ internal struct HumanCallsView: View {
                 }
             }
         }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background, .inactive:
+                wasMediaBackgrounded = activeMediaCallId != nil
+            case .active where wasMediaBackgrounded:
+                wasMediaBackgrounded = false
+                Task { await recoverActiveMedia(reason: "foreground-resume") }
+            default:
+                break
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: AVAudioSession.interruptionNotification
+        )) { notification in
+            guard HumanCallMediaPort.shouldRecoverAfterAudioInterruption(
+                userInfo: notification.userInfo
+            ) else { return }
+            Task { await recoverActiveMedia(reason: "audio-interruption-ended") }
+        }
         .onDisappear {
+            wasMediaBackgrounded = false
             let callId = activeMediaCallId
             let generation = activeMediaGeneration
             closeActiveMedia()
@@ -835,6 +858,16 @@ internal struct HumanCallsView: View {
             await sendSignal(call: call, lease: lease, kind: "offer", payload: offer)
         }
         await consumeSignals(for: call)
+    }
+
+    private func recoverActiveMedia(reason: String) async {
+        guard
+            let activeMediaSession,
+            activeMediaCallId == activeMediaSession.id,
+            !recovering
+        else { return }
+        mediaState = reason == "foreground-resume" ? "恢复通话中" : "恢复音频中"
+        await recoverMedia(from: activeMediaSession)
     }
 
     private func recoverMedia(from call: HumanCallSessionRecord) async {

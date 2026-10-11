@@ -18,6 +18,27 @@ final class HumanCallMediaPortTests: XCTestCase {
         XCTAssertEqual(HumanCallMediaPermission.prompt.rawValue, "prompt")
         XCTAssertEqual(HumanCallMediaPermission.notRequested.rawValue, "not-requested")
     }
+    func testAudioInterruptionRecoveryRequiresEndedShouldResume() {
+        XCTAssertFalse(HumanCallMediaPort.shouldRecoverAfterAudioInterruption(
+            userInfo: [
+                AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue,
+                AVAudioSessionInterruptionOptionKey: AVAudioSession.InterruptionOptions.shouldResume.rawValue,
+            ]
+        ))
+        XCTAssertFalse(HumanCallMediaPort.shouldRecoverAfterAudioInterruption(
+            userInfo: [
+                AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.ended.rawValue,
+                AVAudioSessionInterruptionOptionKey: 0,
+            ]
+        ))
+        XCTAssertTrue(HumanCallMediaPort.shouldRecoverAfterAudioInterruption(
+            userInfo: [
+                AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.ended.rawValue,
+                AVAudioSessionInterruptionOptionKey: AVAudioSession.InterruptionOptions.shouldResume.rawValue,
+            ]
+        ))
+    }
+
     @MainActor
     func testStoredMediaPreferenceKeepsSystemDefaultDistinctFromRuntimeFallback() {
         let suiteName = "HumanCallMediaPortTests.media-preferences"

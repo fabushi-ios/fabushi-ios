@@ -121,6 +121,17 @@ internal final class HumanCallMediaPort {
         }
     }
 
+    static func shouldRecoverAfterAudioInterruption(
+        userInfo: [AnyHashable: Any]?
+    ) -> Bool {
+        guard
+            let typeRaw = userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+            AVAudioSession.InterruptionType(rawValue: typeRaw) == .ended
+        else { return false }
+        let optionRaw = (userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt) ?? 0
+        return AVAudioSession.InterruptionOptions(rawValue: optionRaw).contains(.shouldResume)
+    }
+
     static func resolvedDeviceId(
         preferredId: String?,
         kind: HumanCallMediaDevice.Kind,
