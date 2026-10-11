@@ -6675,7 +6675,22 @@ internal struct MobileBotChat: View {
         ))
         do {
             let bridge = GlobalDharmaMiniAppBridge(bridge: bridge)
-            let routed = try await bridge.routeInput(pluginId: pluginId, input: text)
+            let activeToolNames: [String]?
+            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
+                guard let activeTools = model.activeWebMcpTools(pluginId: pluginId), !activeTools.isEmpty else {
+                    throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                        "全球法布施需要先打开当前本地 Mini App 页面，再通过 Bot 操作"
+                    )
+                }
+                activeToolNames = activeTools.map(\.name)
+            } else {
+                activeToolNames = nil
+            }
+            let routed = try await bridge.routeInput(
+                pluginId: pluginId,
+                input: text,
+                availableTools: activeToolNames
+            )
             guard let execution = routed["execution"] as? [String: Any] else {
                 removeThinking(operationId)
                 let reply = (routed["message"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -6689,7 +6704,9 @@ internal struct MobileBotChat: View {
             }
             let command = routed["command"] as? [String: Any]
             let slash = command?["slash"] as? String ?? ""
-            if routed["requiresApproval"] as? Bool == true {
+            if routed["requiresApproval"] as? Bool == true,
+               pluginId != GlobalDharmaMiniAppBridge.globalDharmaId
+            {
                 removeThinking(operationId)
                 entries.append(MobileChatMessage(
                     id: "assistant:\(operationId)",
@@ -6699,11 +6716,20 @@ internal struct MobileBotChat: View {
                 ))
                 return true
             }
-            guard (execution["kind"] as? String) == "mcp-http",
-                  let tool = execution["tool"] as? String,
-                  !tool.isEmpty
-            else {
-                throw MahayanaCoordinator.CoordinatorError.requestFailed("iOS Mini App Bot only accepts governed mcp-http execution")
+            let executionKind = execution["kind"] as? String
+            guard let tool = execution["tool"] as? String, !tool.isEmpty else {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App route did not return an executable tool")
+            }
+            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
+                guard executionKind == "web" else {
+                    throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                        "Global Dharma Bot requires local WebMCP execution"
+                    )
+                }
+            } else if executionKind != "mcp-http" {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "iOS Mini App Bot only accepts governed mcp-http execution"
+                )
             }
             let arguments = routed["arguments"] as? [String: Any] ?? [:]
             let result: [String: Any]
