@@ -1481,12 +1481,8 @@ impl AppHost {
             .get("platform")
             .and_then(Value::as_str)
             .unwrap_or(host_platform());
-        let marketplace_platform = match requested_platform {
-            "ios" | "android" => "mobile",
-            other => other,
-        };
         self.product
-            .marketplace_browse(query, Some(marketplace_platform))
+            .marketplace_browse(query, Some(requested_platform))
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
