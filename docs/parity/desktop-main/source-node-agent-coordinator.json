@@ -203,13 +203,14 @@
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Gateway control traffic uses authenticated TLS/HTTP with bounded I/O and well-formed response parsing.",
       "ios_disposition": "not-applicable-with-replacement",
-      "ios_target_path": "mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Raw TcpStream/rustls transport is intentionally replaced by Apple URLSession/URLSessionWebSocketTask and ATS; duplicating a socket/TLS stack would violate the native iOS transport boundary.",
-      "implementation_status": "mapped",
-      "production_evidence": "FabushiRemoteDeviceGateway configures URLSession without cache reuse and uses the official WSS endpoint; App Info.plist keeps NSAllowsArbitraryLoads=false.",
-      "test_evidence": "mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift; mobile/ios/FabushiTests/SharedEgressTunnelParityTests.swift",
-      "notes": "IOS-MAIN-COORD-GW-009: reviewed Desktop blob 512ac2ad1105ae74fa7d04df635dd466e99d9756. Platform mechanism is N/A with native replacement; higher-level Gateway command semantics remain tracked separately."
+      "ios_platform_delta": "Desktop must open and parse a real localhost/remote HTTP(S) socket, resolve DNS addresses, configure rustls roots, enforce read/write timeouts and parse bounded Content-Length responses. The iOS canonical Coordinator and Host share the same app runtime, so the shipping Gateway transport is an in-process typed call: CoordinatorHostSupervisor provides a synthetic endpoint identity only for connection generation/endpoint fencing, while CoordinatorGatewayClient injects trace context and calls MahayanaCoordinator.request directly. No TCP, DNS, TLS certificate file, HTTP response parser or Content-Length framing exists on this boundary, so recreating the Desktop socket stack would add a second and incorrect transport owner.",
+      "implementation_status": "implemented",
+      "production_evidence": "MahayanaCoordinator.shippingGatewayDispatcher constructs CoordinatorHostSupervisor and CoordinatorGatewayClient; its tracedTransport closure validates object params and invokes self.request(method:params:) directly. CoordinatorGatewayClient still preserves requestId collision fencing, child traceparent injection, endpoint pinning across retries, cancellation, health invalidation, read-safe bounded retry and typed Gateway error classification. The canonical Host request path remains the sole execution owner; the synthetic https://localhost/fabushi-ios-host URL is never passed to URLSession or a socket transport.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testGatewayClientPropagatesTraceAndRetriesReadSafeFailure; ::testGatewayClientRejectsEndpointDriftBeforeSecondTransportAttempt; ::testGatewayClientDoesNotRetryCommandErrorOnReadSafeMethod; ::testGatewayShippingDispatchPreservesAccessDeniedAndDoesNotRetry; ::testShippingGatewayEventFamilyRoutesThroughFeatureReceive; mobile/ios/FabushiTests/CoordinatorContractTests.swift",
+      "notes": "IOS-MAIN-COORD-GW-009: re-read Desktop blob 512ac2ad1105ae74fa7d04df635dd466e99d9756 at Desktop 371b72f1. Previous ledger evidence incorrectly pointed at FabushiRemoteDeviceGateway/URLSession, which is a different external-service transport. The actual Coordinator Gateway replacement is the canonical in-process typed Host call. Marked implemented, not verified, pending exact-head Actions.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after corrected in-process HTTP transport replacement mapping"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/mod.rs",
