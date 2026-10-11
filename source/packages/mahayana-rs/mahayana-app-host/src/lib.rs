@@ -114,6 +114,12 @@ struct PluginAccountContext {
     root: PathBuf,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PluginRuntimeAccountBinding {
+    account_scope: String,
+    account_generation: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PluginAccountMarker {
@@ -195,6 +201,7 @@ pub struct AppHost {
     feature_mode: AppHostFeatureMode,
     product: MahayanaProductClient,
     js: Mutex<DeepSeekJsHost>,
+    runtime_accounts: Mutex<BTreeMap<String, PluginRuntimeAccountBinding>>,
     feature: FeatureHostController,
 }
 
@@ -249,6 +256,7 @@ impl AppHost {
                 DeepSeekJsHost::new()
                     .map_err(|error| AppHostError::Operation(error.to_string()))?,
             ),
+            runtime_accounts: Mutex::new(BTreeMap::new()),
             feature,
         })
     }
@@ -661,7 +669,16 @@ impl AppHost {
 
     pub fn dispatch(&self, request: HostRequest) -> HostResponse {
         let id = request.id.clone();
-        match self.handle(&request.method, request.params) {
+        let mut outcome = self
+            .reconcile_plugin_runtime_accounts()
+            .and_then(|_| self.handle(&request.method, request.params));
+        let post_reconcile = self.reconcile_plugin_runtime_accounts();
+        if outcome.is_ok() {
+            if let Err(error) = post_reconcile {
+                outcome = Err(error);
+            }
+        }
+        match outcome {
             Ok(result) => HostResponse {
                 id,
                 ok: true,
@@ -1189,6 +1206,7 @@ impl AppHost {
             "feature.marketplace.browse" => self.marketplace_browse(params),
             "feature.marketplace.release" => self.marketplace_release(params),
             "feature.marketplace.add" => self.marketplace_add(params),
+            "feature.marketplace.remove" => self.marketplace_remove(params),
             "feature.plugin.install" => self.install_plugin(params),
             // Trusted native-shell only. WebMCP and Agent tool surfaces never receive
             // these methods, signing keys, or install authority.
@@ -1543,6 +1561,28 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
+    fn marketplace_remove(&self, params: Value) -> Result<Value, AppHostError> {
+        let plugin_id = string_param(&params, "pluginId")?;
+        if self.feature_mode == AppHostFeatureMode::Test {
+            if !TEST_MARKETPLACE_PLUGINS
+                .iter()
+                .any(|(candidate, _, _)| *candidate == plugin_id)
+            {
+                return Err(AppHostError::Operation(format!(
+                    "test marketplace plugin {plugin_id} was not found"
+                )));
+            }
+            return Ok(json!({
+                "removed": true,
+                "miniAppId": plugin_id,
+                "accountSynchronized": true,
+            }));
+        }
+        self.product
+            .marketplace_remove(plugin_id)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
     fn current_plugin_account_identity(&self) -> Result<(String, String), AppHostError> {
         let session = self
             .product
@@ -1590,6 +1630,54 @@ impl AppHost {
             ));
         }
         Ok(())
+    }
+
+    fn reconcile_plugin_runtime_accounts(&self) -> Result<(), AppHostError> {
+        let mut bindings = self
+            .runtime_accounts
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin runtime account lock poisoned".into()))?;
+        if bindings.is_empty() {
+            return Ok(());
+        }
+        let current = self.current_plugin_account_identity().ok();
+        let stale = stale_plugin_runtime_ids(&bindings, current.as_ref());
+        if stale.is_empty() {
+            return Ok(());
+        }
+        let mut host = self
+            .js
+            .lock()
+            .map_err(|_| AppHostError::Operation("JavaScript host lock poisoned".into()))?;
+        for plugin_id in &stale {
+            let _ = host.disable_plugin(plugin_id);
+        }
+        for plugin_id in stale {
+            bindings.remove(&plugin_id);
+        }
+        Ok(())
+    }
+
+    fn disable_plugin_runtime(
+        &self,
+        plugin_id: &str,
+        require_active: bool,
+    ) -> Result<(), AppHostError> {
+        let mut bindings = self
+            .runtime_accounts
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin runtime account lock poisoned".into()))?;
+        let mut host = self
+            .js
+            .lock()
+            .map_err(|_| AppHostError::Operation("JavaScript host lock poisoned".into()))?;
+        let disabled = host.disable_plugin(plugin_id);
+        bindings.remove(plugin_id);
+        match disabled {
+            Ok(_) => Ok(()),
+            Err(_) if !require_active => Ok(()),
+            Err(error) => Err(AppHostError::Operation(error.to_string())),
+        }
     }
 
     fn plugin_account_context(&self) -> Result<PluginAccountContext, AppHostError> {
@@ -2209,9 +2297,7 @@ impl AppHost {
         let account = self.plugin_account_context()?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        if let Ok(mut host) = self.js.lock() {
-            let _ = host.disable_plugin(plugin_id);
-        }
+        self.disable_plugin_runtime(plugin_id, false)?;
         let removed = installer
             .uninstall_with_commit_guard(plugin_id, || {
                 self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
@@ -2574,6 +2660,10 @@ impl AppHost {
         .grants_for(&plugin_id);
         self.ensure_plugin_account_current(&account_scope, &account_generation)?;
         let config = params.get("config").cloned().unwrap_or_else(|| json!({}));
+        let mut bindings = self
+            .runtime_accounts
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin runtime account lock poisoned".into()))?;
         let mut host = self
             .js
             .lock()
@@ -2586,20 +2676,24 @@ impl AppHost {
             .is_err()
         {
             let _ = host.disable_plugin(&plugin_id);
+            bindings.remove(&plugin_id);
             return Err(AppHostError::Operation(
                 "account generation changed while plugin runtime was starting".into(),
             ));
         }
+        bindings.insert(
+            plugin_id,
+            PluginRuntimeAccountBinding {
+                account_scope,
+                account_generation,
+            },
+        );
         serde_json::to_value(state).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
     fn stop_runtime(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
-        self.js
-            .lock()
-            .map_err(|_| AppHostError::Operation("JavaScript host lock poisoned".into()))?
-            .disable_plugin(plugin_id)
-            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.disable_plugin_runtime(plugin_id, true)?;
         Ok(Value::Null)
     }
 
@@ -2649,6 +2743,46 @@ impl AppHost {
                 return deterministic_test_runtime_call(plugin_id, name, &arguments);
             }
         }
+
+        self.reconcile_plugin_runtime_accounts()?;
+        let current = self.current_plugin_account_identity()?;
+        let needs_restore = {
+            let bindings = self.runtime_accounts.lock().map_err(|_| {
+                AppHostError::Operation("plugin runtime account lock poisoned".into())
+            })?;
+            let binding_current = bindings
+                .get(plugin_id)
+                .is_some_and(|binding| {
+                    plugin_runtime_binding_matches_identity(binding, Some(&current))
+                });
+            let host = self
+                .js
+                .lock()
+                .map_err(|_| AppHostError::Operation("JavaScript host lock poisoned".into()))?;
+            !binding_current || host.plugin_state(plugin_id) != Some(PluginState::Active)
+        };
+        if needs_restore {
+            self.start_runtime(json!({
+                "pluginId": plugin_id,
+                "config": {},
+            }))?;
+        }
+
+        let current = self.current_plugin_account_identity()?;
+        let bindings = self
+            .runtime_accounts
+            .lock()
+            .map_err(|_| AppHostError::Operation("plugin runtime account lock poisoned".into()))?;
+        let binding = bindings.get(plugin_id).ok_or_else(|| {
+            AppHostError::Operation(format!(
+                "plugin {plugin_id} runtime has no current account binding"
+            ))
+        })?;
+        if !plugin_runtime_binding_matches_identity(binding, Some(&current)) {
+            return Err(AppHostError::Operation(
+                "plugin runtime belongs to a stale account generation".into(),
+            ));
+        }
         let host = self
             .js
             .lock()
@@ -2666,8 +2800,13 @@ impl AppHost {
                 "tool {name} is not registered in the active runtime"
             )));
         }
-        host.call_tool_json(name, &arguments)
-            .map_err(|error| AppHostError::Operation(error.to_string()))
+        let result = host
+            .call_tool_json(name, &arguments)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        drop(host);
+        drop(bindings);
+        self.ensure_plugin_account_current(&current.0, &current.1)?;
+        Ok(result)
     }
 }
 
@@ -3211,6 +3350,29 @@ fn stable_plugin_account_generation(user_id: &str, session_id: &str) -> String {
     format!("{:x}", digest.finalize())
 }
 
+fn plugin_runtime_binding_matches_identity(
+    binding: &PluginRuntimeAccountBinding,
+    identity: Option<&(String, String)>,
+) -> bool {
+    identity.is_some_and(|(scope, generation)| {
+        binding.account_scope.as_str() == scope.as_str()
+            && binding.account_generation.as_str() == generation.as_str()
+    })
+}
+
+fn stale_plugin_runtime_ids(
+    bindings: &BTreeMap<String, PluginRuntimeAccountBinding>,
+    current: Option<&(String, String)>,
+) -> Vec<String> {
+    bindings
+        .iter()
+        .filter_map(|(plugin_id, binding)| {
+            (!plugin_runtime_binding_matches_identity(binding, current))
+                .then_some(plugin_id.clone())
+        })
+        .collect()
+}
+
 fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), AppHostError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -3611,6 +3773,44 @@ mod fabushi_shipping_inference_tests {
         assert_ne!(generation_1, other_account);
         assert_eq!(generation_1.len(), 64);
         assert!(!generation_1.contains("session-1"));
+    }
+
+    #[test]
+    fn plugin_runtime_binding_prunes_account_and_generation_changes() {
+        let scope_a = stable_plugin_account_scope("account-a");
+        let scope_b = stable_plugin_account_scope("account-b");
+        let generation_1 = stable_plugin_account_generation("account-a", "session-1");
+        let generation_2 = stable_plugin_account_generation("account-a", "session-2");
+        let mut bindings = BTreeMap::new();
+        bindings.insert(
+            "plugin-a".into(),
+            PluginRuntimeAccountBinding {
+                account_scope: scope_a.clone(),
+                account_generation: generation_1.clone(),
+            },
+        );
+        assert!(stale_plugin_runtime_ids(
+            &bindings,
+            Some(&(scope_a.clone(), generation_1.clone()))
+        ).is_empty());
+        assert_eq!(
+            stale_plugin_runtime_ids(
+                &bindings,
+                Some(&(scope_a.clone(), generation_2))
+            ),
+            vec!["plugin-a".to_string()]
+        );
+        assert_eq!(
+            stale_plugin_runtime_ids(
+                &bindings,
+                Some(&(scope_b, generation_1))
+            ),
+            vec!["plugin-a".to_string()]
+        );
+        assert_eq!(
+            stale_plugin_runtime_ids(&bindings, None),
+            vec!["plugin-a".to_string()]
+        );
     }
 
     #[test]

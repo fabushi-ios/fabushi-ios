@@ -984,6 +984,15 @@ impl MahayanaProductClient {
         )
     }
 
+    pub fn marketplace_remove(&self, plugin_id: &str) -> Result<Value, ProductError> {
+        let plugin_id = safe_path_identifier(plugin_id, "pluginId")?;
+        let token = self.authorization_token(&Value::Null)?;
+        self.delete_json(
+            &format!("/v1/marketplace/plugins/{plugin_id}/add"),
+            Some(&token),
+        )
+    }
+
     pub fn download_marketplace_plugin(
         &self,
         plugin_id: &str,
@@ -2952,6 +2961,22 @@ impl MahayanaProductClient {
                 .post(&url)
                 .header("Accept", "application/json")
                 .json(&body);
+            if let Some(token) = token {
+                request = request.bearer_auth(token);
+            }
+            request.send()
+        })?;
+        decode_response(Ok(response))
+    }
+
+    fn delete_json(
+        &self,
+        path: &str,
+        token: Option<&str>,
+    ) -> Result<Value, ProductError> {
+        let url = format!("{}{}", self.api_base_url, path);
+        let response = send_with_ipv4_fallback(|client| {
+            let mut request = client.delete(&url).header("Accept", "application/json");
             if let Some(token) = token {
                 request = request.bearer_auth(token);
             }
