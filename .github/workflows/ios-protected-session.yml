@@ -398,43 +398,72 @@ jobs:
 
           denied = [
               row for row in traces
-              if row.get("permission") == "denied"
+              if row.get("tool_name") == "offline.practice.record"
+              and row.get("permission") == "denied"
               and row.get("outcome") == "denied"
               and revision(row) is None
           ]
           approved = [
               row for row in traces
-              if row.get("permission") == "approved"
+              if row.get("tool_name") == "offline.practice.record"
+              and row.get("permission") == "approved"
               and row.get("outcome") == "success"
               and revision(row) == bot_revision
               and bot_revision > initial
           ]
           read_back = [
               row for row in traces
-              if row.get("permission") == "not-required"
+              if row.get("tool_name") == "offline.state.read"
+              and row.get("permission") == "not-required"
               and row.get("outcome") == "success"
               and revision(row) == manual_revision
               and manual_revision > bot_revision
           ]
           if not denied:
-              raise SystemExit("real journey did not emit a denied mutation trace")
+              raise SystemExit("real journey did not emit a denied offline.practice.record trace")
           if not approved:
-              raise SystemExit("real journey did not emit an approved mutation trace at the Bot revision")
+              raise SystemExit("real journey did not emit an approved offline.practice.record trace at the Bot revision")
           if not read_back:
-              raise SystemExit("real journey did not emit a read-only trace at the manual revision")
+              raise SystemExit("real journey did not emit an offline.state.read trace at the manual revision")
 
-          sequences = [int(row["sequence"]) for row in traces if row.get("sequence", "").isdigit()]
+          if any(not row.get("sequence", "").isdigit() for row in traces):
+              raise SystemExit("live WebMCP trace contains a missing or non-numeric sequence")
+          sequences = [int(row["sequence"]) for row in traces]
           if sequences != sorted(sequences) or len(sequences) != len(set(sequences)):
               raise SystemExit("live WebMCP trace sequence is not strictly ordered")
+
+          ordered = [
+              (d, a, r)
+              for d in denied
+              for a in approved
+              for r in read_back
+              if int(d["sequence"]) < int(a["sequence"]) < int(r["sequence"])
+          ]
+          if not ordered:
+              raise SystemExit("live WebMCP evidence does not prove denied mutation -> approved mutation -> state read-back ordering")
+          denied_event, approved_event, read_back_event = ordered[-1]
+          call_ids = {
+              denied_event.get("call_id"),
+              approved_event.get("call_id"),
+              read_back_event.get("call_id"),
+          }
+          if None in call_ids or len(call_ids) != 3:
+              raise SystemExit("live WebMCP evidence does not contain three distinct call IDs")
 
           evidence = {
               "schema": "fabushi.ios.live-webmcp-trace.v1",
               "session": {key: session[key] for key in identity_keys},
               "toolCount": int(session["tool_count"]),
               "traceCount": len(traces),
-              "deniedCallId": denied[-1].get("call_id"),
-              "approvedCallId": approved[-1].get("call_id"),
-              "readBackCallId": read_back[-1].get("call_id"),
+              "deniedCallId": denied_event["call_id"],
+              "deniedTool": denied_event["tool_name"],
+              "deniedSequence": int(denied_event["sequence"]),
+              "approvedCallId": approved_event["call_id"],
+              "approvedTool": approved_event["tool_name"],
+              "approvedSequence": int(approved_event["sequence"]),
+              "readBackCallId": read_back_event["call_id"],
+              "readBackTool": read_back_event["tool_name"],
+              "readBackSequence": int(read_back_event["sequence"]),
               "initialRevision": initial,
               "botMutationRevision": bot_revision,
               "manualMutationRevision": manual_revision,
