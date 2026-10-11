@@ -28,15 +28,16 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "Desktop process carrier is replaced by an in-process iOS carrier boundary while preserving Coordinator ownership and protocol semantics.",
-      "implementation_status": "mapped",
-      "production_evidence": "iOS collapses the separate Node process into the canonical in-process Mobile Host composition. Host creation/account-boundary logic owns the authenticated Human identity, typed FeatureHost/Runtime commands replace string carrier channels, and runtime/session replacement clears old-account state before new work.",
-      "test_evidence": "Existing mobile Host/FeatureHost tests cover canonical local Human identity/account transition and typed Host command boundaries. Exact carrier queue/close mechanics are process-specific and are not duplicated.",
-      "notes": "IOS-MAIN-COORDINATOR-CARRIER-001: exact Desktop main carrier.rs read at 3bc92400826cc4ca7ac665b467708e22261edc61. Process IPC is adapted to typed in-process modules; keep mapped pending aggregate exact-head evidence.",
+      "ios_platform_delta": "Desktop launches a separate Coordinator process with JSON bootstrap plus three named IPC carrier channels. iOS replaces the OS-process carrier with two typed in-process boundaries: the repository-owned MobileHostBridge serializes Host Dispatch/HumanCall/Shutdown commands over one bounded sync channel, while CoordinatorProtocol/RendererPortServer/ControlPortClient type request/reply/event/cancel/shutdown direction and lifecycle. Canonical Human identity is read from the Host transport identity (userId/deviceId), not invented by the carrier.",
+      "implementation_status": "implemented",
+      "production_evidence": "mahayana-app-host-mobile::MobileHostBridge::spawn creates a sync_channel(64), processes MobileHostCommand serially on the canonical Host thread, catches Host faults, and settles explicit Shutdown. MobileAppHost::call_transport_identity requires non-empty canonical userId/deviceId from host.human_call_transport_identity and Human call session authorization fences participants against that identity. RendererPortServer requires hello/version before requests, rejects wrong-direction/reused in-flight requestId frames, cancels tasks on cancel/shutdown/port close and emits typed events; CoordinatorControlPortClient fails pending calls when settled and rejects calls after settlement.",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/GatewayParityTests.swift; Rust Host Runner composition and iOS-owned Rust Host module jobs exercise the shipping Mobile Host bridge",
+      "notes": "IOS-MAIN-COORDINATOR-CARRIER-002: re-read exact Desktop main carrier.rs blob 2977d5e1a43e89265090cea2f820cf85b2ad03a0 at 371b72f1. Process bootstrap/channel names are platform mechanics; iOS preserves canonical Human identity, bounded FIFO command ownership, typed channel direction, cancellation and fail-closed settlement without a second process carrier.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed-implemented",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "exact_head_evidence": "pending exact-head GitHub Actions after current-main carrier review"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/client_side_tool_v2_relay.rs",
