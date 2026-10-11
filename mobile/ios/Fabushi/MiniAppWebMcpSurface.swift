@@ -705,22 +705,41 @@ struct MiniAppWebMcpSurface: View {
                         Divider()
                     }
 
-                    MiniAppWebView(
-                        plugin: webMcpPlugin,
-                        model: model,
-                        localHtml: localHtml,
-                        localSource: localSource,
-                        dataStoreIdentifier: localHtmlOverride == nil
-                            ? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)
-                            : nil,
-                        sourceResolved: true,
-                        status: $status
-                    )
-                    .id(
-                        previewDigest.map { "miniapp-preview-\($0)" }
-                            ?? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)?.uuidString
-                            ?? "miniapp-ephemeral-logged-out"
-                    )
+                    if webMcpPlugin.pluginId == GlobalDharmaCommerceModel.miniAppId,
+                       localHtmlOverride == nil,
+                       localSource == nil
+                    {
+                        VStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.shield")
+                                .font(.title2)
+                            Text("全球法布施本地安装包不可用")
+                                .font(.headline)
+                            Text("已停止 Hosted WebMCP 回退。请重新安装或修复已验证的 .fabapp 包；免费离线功能不会切换到远程运行时。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(24)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityIdentifier("global-dharma-local-package-required")
+                    } else {
+                        MiniAppWebView(
+                            plugin: webMcpPlugin,
+                            model: model,
+                            localHtml: localHtml,
+                            localSource: localSource,
+                            dataStoreIdentifier: localHtmlOverride == nil
+                                ? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)
+                                : nil,
+                            sourceResolved: true,
+                            status: $status
+                        )
+                        .id(
+                            previewDigest.map { "miniapp-preview-\($0)" }
+                                ?? model.miniAppWebsiteDataStoreIdentifier(pluginId: webMcpPlugin.pluginId)?.uuidString
+                                ?? "miniapp-ephemeral-logged-out"
+                        )
+                    }
                 }
             } else {
                 ProgressView()
@@ -731,9 +750,9 @@ struct MiniAppWebMcpSurface: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("miniapp-webmcp-surface")
         .task(id: sourceGenerationKey) {
-            if plugin.pluginId == GlobalDharmaCommerceModel.miniAppId {
-                await model.globalDharmaCommerce.refresh()
-            }
+            // Opening a free/offline Mini App must never preflight paid
+            // entitlement. Protected capability execution, purchase and
+            // restore own their network checks.
             let resolvedPlugin = await model.webMcpPlugin(for: plugin)
             webMcpPlugin = resolvedPlugin
             if let localHtmlOverride {
