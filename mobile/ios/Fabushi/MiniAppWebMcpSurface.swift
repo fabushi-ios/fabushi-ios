@@ -600,17 +600,20 @@ struct MiniAppWebMcpSurface: View {
     let model: MarketplaceModel
     let localHtmlOverride: String?
     let generatedDraftReviewOverride: LocalMiniAppDraftReview?
+    let onClose: (() -> Void)?
 
     init(
         plugin: MarketplacePlugin,
         model: MarketplaceModel,
         localHtmlOverride: String? = nil,
-        generatedDraftReviewOverride: LocalMiniAppDraftReview? = nil
+        generatedDraftReviewOverride: LocalMiniAppDraftReview? = nil,
+        onClose: (() -> Void)? = nil
     ) {
         self.plugin = plugin
         self.model = model
         self.localHtmlOverride = localHtmlOverride
         self.generatedDraftReviewOverride = generatedDraftReviewOverride
+        self.onClose = onClose
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -639,8 +642,14 @@ struct MiniAppWebMcpSurface: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Button("返回") { dismiss() }
-                    .accessibilityIdentifier("miniapp-webmcp-close")
+                Button("返回") {
+                    if let onClose {
+                        onClose()
+                    } else {
+                        dismiss()
+                    }
+                }
+                .accessibilityIdentifier("miniapp-webmcp-close")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(plugin.displayName).font(.headline)
