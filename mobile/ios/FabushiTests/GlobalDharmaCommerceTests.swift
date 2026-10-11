@@ -13,11 +13,55 @@ final class GlobalDharmaCommerceTests: XCTestCase {
 
         XCTAssertFalse(model.accessAllowed)
         XCTAssertEqual(model.accessReason, "not_loaded")
+        XCTAssertNil(model.monthlyOffer)
         XCTAssertNil(model.lifetimeOffer)
+        XCTAssertTrue(model.canBuyMonthly)
         XCTAssertTrue(model.canBuyLifetime)
         XCTAssertTrue(model.message.contains("免费功能可离线使用"))
     }
 
+
+    func testCanonicalMonthlyOfferAcceptsOnlyServerCNY30SubscriptionContract() throws {
+        let offer = try XCTUnwrap(GlobalDharmaCommerceModel.parseLifetimeOffer([
+            "productId": "prod.global-dharma.local-prayer-wheel.monthly",
+            "sku": "local-prayer-wheel.monthly",
+            "productKind": "subscription",
+            "currency": "CNY",
+            "amount": 3_000,
+            "activeRails": ["apple_in_app_purchase", "web_provider"],
+        ]))
+
+        XCTAssertTrue(offer.matchesCanonicalMonthly)
+        XCTAssertFalse(offer.matchesCanonicalLifetime)
+        XCTAssertTrue(offer.appleStoreAvailable)
+        XCTAssertEqual(
+            GlobalDharmaCommerceModel.monthlyProductId,
+            "prod.global-dharma.local-prayer-wheel.monthly"
+        )
+        XCTAssertEqual(GlobalDharmaCommerceModel.monthlySku, "local-prayer-wheel.monthly")
+    }
+
+    func testMonthlyOfferFailsClosedOnClientTamperedPriceOrKind() throws {
+        let wrongAmount = try XCTUnwrap(GlobalDharmaCommerceModel.parseLifetimeOffer([
+            "productId": "prod.global-dharma.local-prayer-wheel.monthly",
+            "sku": "local-prayer-wheel.monthly",
+            "productKind": "subscription",
+            "currency": "CNY",
+            "amount": 3_001,
+            "activeRails": ["apple_in_app_purchase"],
+        ]))
+        let wrongKind = try XCTUnwrap(GlobalDharmaCommerceModel.parseLifetimeOffer([
+            "productId": "prod.global-dharma.local-prayer-wheel.monthly",
+            "sku": "local-prayer-wheel.monthly",
+            "productKind": "digital_durable",
+            "currency": "CNY",
+            "amount": 3_000,
+            "activeRails": ["apple_in_app_purchase"],
+        ]))
+
+        XCTAssertFalse(wrongAmount.matchesCanonicalMonthly)
+        XCTAssertFalse(wrongKind.matchesCanonicalMonthly)
+    }
 
     func testCanonicalLifetimeOfferAcceptsOnlyServerCNY1080DurableContract() throws {
         let offer = try XCTUnwrap(GlobalDharmaCommerceModel.parseLifetimeOffer([
