@@ -200,17 +200,21 @@ final class SharedMcpOAuthLifecycleParityTests: XCTestCase {
             return try XCTUnwrap(components.url?.absoluteString)
         }
 
-        XCTAssertTrue(await lifecycle.registerPendingAuthFromUrl(
+        let removedRegistered = await lifecycle.registerPendingAuthFromUrl(
             authorizationUrl: try authorization(state: "removed-server-state"),
             serverName: "Removed Server"
-        ))
-        XCTAssertTrue(await lifecycle.registerPendingAuthFromUrl(
+        )
+        XCTAssertTrue(removedRegistered)
+        let survivingRegistered = await lifecycle.registerPendingAuthFromUrl(
             authorizationUrl: try authorization(state: "surviving-server-state"),
             serverName: "Surviving Server"
-        ))
+        )
+        XCTAssertTrue(survivingRegistered)
 
         await lifecycle.removePending(forServerName: "Removed Server")
-        XCTAssertFalse(await lifecycle.hasPendingState("removed-server-state"))
-        XCTAssertTrue(await lifecycle.hasPendingState("surviving-server-state"))
+        let removedPending = await lifecycle.hasPendingState("removed-server-state")
+        let survivingPending = await lifecycle.hasPendingState("surviving-server-state")
+        XCTAssertFalse(removedPending)
+        XCTAssertTrue(survivingPending)
     }
 }
