@@ -16,6 +16,13 @@ final class IOSCoordinatorPortClient {
     struct PortError: LocalizedError, Equatable, Sendable {
         let code: String
         let message: String
+        let transportKind: String?
+
+        init(code: String, message: String, transportKind: String? = nil) {
+            self.code = code
+            self.message = message
+            self.transportKind = transportKind
+        }
 
         var errorDescription: String? { "\(code): \(message)" }
     }
@@ -107,7 +114,11 @@ final class IOSCoordinatorPortClient {
             case .ok(let value):
                 continuation.resume(returning: value)
             case .failed(let failure):
-                continuation.resume(throwing: PortError(code: failure.code, message: failure.message))
+                continuation.resume(throwing: PortError(
+                    code: failure.code,
+                    message: failure.message,
+                    transportKind: failure.transportKind
+                ))
             }
 
         case .event(let family, let payload):

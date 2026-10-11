@@ -216,6 +216,130 @@ final class PreloadParityTests: XCTestCase {
 
 
 
+    func testSSEDecoderPreservesPartialFrameAndSplitUTF8() {
+        var decoder = SSEBlockDecoder()
+        let payload = Data("法🙏".utf8)
+        let split = payload.count - 1
+
+        var first = Data("event: message\ndata: ".utf8)
+        first.append(payload.subdata(in: 0..<split))
+        XCTAssertTrue(decoder.append(first).isEmpty)
+
+        var second = payload.subdata(in: split..<payload.count)
+        second.append(Data("\n\n".utf8))
+        XCTAssertEqual(
+            decoder.append(second),
+            [ServerSentEventBlock(event: "message", id: nil, data: "法🙏")]
+        )
+        XCTAssertNil(decoder.finish())
+    }
+
+    @MainActor
+    func testFeatureEventBrokerSurvivesEmptyStallAndRetryableDisconnect() async throws {
+        var count = 0
+        var delays: [Int] = []
+        let broker = IOSFeatureEventBroker(
+            receiveTimeoutMilliseconds: 5,
+            sleeper: { delays.append($0) }
+        ) { _ in
+            count += 1
+            if count == 1 { return nil }
+            if count == 2 {
+                throw IOSCoordinatorPortClient.PortError(
+                    code: "gateway-unreachable",
+                    message: "transient",
+                    transportKind: "network"
+                )
+            }
+            return .object(["type": .string("recovered")])
+        }
+
+        let payload = try await broker.next(deadlineMilliseconds: 5_000) {
+            $0["type"] as? String == "recovered"
+        }
+        XCTAssertEqual(
+            (payload.foundationValue as? [String: Any])?["type"] as? String,
+            "recovered"
+        )
+        XCTAssertEqual(count, 3)
+        XCTAssertEqual(delays, [1_000])
+        broker.dispose()
+    }
+
+    @MainActor
+    func testFeatureEventBrokerPermanentFailureRestartsForNextWaiter() async throws {
+        var count = 0
+        let broker = IOSFeatureEventBroker { _ in
+            count += 1
+            if count == 1 {
+                throw IOSCoordinatorPortClient.PortError(
+                    code: "gateway-command-failed",
+                    message: "permanent"
+                )
+            }
+            return .object(["type": .string("fresh")])
+        }
+
+        do {
+            _ = try await broker.next(deadlineMilliseconds: 1_000) { _ in true }
+            XCTFail("expected permanent failure")
+        } catch let error as IOSCoordinatorPortClient.PortError {
+            XCTAssertEqual(error.code, "gateway-command-failed")
+        }
+
+        let payload = try await broker.next(deadlineMilliseconds: 1_000) {
+            $0["type"] as? String == "fresh"
+        }
+        XCTAssertEqual(
+            (payload.foundationValue as? [String: Any])?["type"] as? String,
+            "fresh"
+        )
+        broker.dispose()
+    }
+
+    @MainActor
+    func testFeatureEventBrokerCancellationFencesLateReceive() async throws {
+        var block = true
+        var receiveStarted = false
+        let broker = IOSFeatureEventBroker { _ in
+            receiveStarted = true
+            if block {
+                try await Task<Never, Never>.sleep(
+                    nanoseconds: 5_000_000_000
+                )
+            }
+            return .object(["type": .string("fresh")])
+        }
+
+        let pending = Task { @MainActor in
+            try await broker.next(deadlineMilliseconds: 10_000) { _ in true }
+        }
+        for _ in 0..<64 {
+            if receiveStarted { break }
+            await Task.yield()
+        }
+        XCTAssertTrue(receiveStarted)
+
+        pending.cancel()
+        do {
+            _ = try await pending.value
+            XCTFail("expected cancellation")
+        } catch is CancellationError {
+        }
+
+        block = false
+        receiveStarted = false
+        let payload = try await broker.next(deadlineMilliseconds: 1_000) {
+            $0["type"] as? String == "fresh"
+        }
+        XCTAssertTrue(receiveStarted)
+        XCTAssertEqual(
+            (payload.foundationValue as? [String: Any])?["type"] as? String,
+            "fresh"
+        )
+        broker.dispose()
+    }
+
     func testAppSurfacesDoNotBypassCanonicalFeatureEventBroker() throws {
         let file = URL(fileURLWithPath: #filePath)
         let repositoryRoot = file

@@ -17,9 +17,37 @@ enum IOSFeatureEventBrokerError: LocalizedError, Equatable {
     }
 }
 
+private enum IOSFeatureEventBrokerRecovery {
+    static let minDelayMilliseconds = 1_000
+    static let maxDelayMilliseconds = 10_000
+
+    static func isRetryable(_ error: Error) -> Bool {
+        guard let error = error as? IOSCoordinatorPortClient.PortError else {
+            return false
+        }
+        if error.code == "gateway-transport-failed" {
+            return true
+        }
+        guard error.code == "gateway-unreachable" else {
+            return false
+        }
+        return ["refused", "dns", "timeout", "network", "http_5xx", "connect"]
+            .contains(error.transportKind ?? "")
+    }
+
+    static func delayMilliseconds(attempt: Int) -> Int {
+        let shift = max(0, min(attempt - 1, 10))
+        return min(
+            minDelayMilliseconds * (1 << shift),
+            maxDelayMilliseconds
+        )
+    }
+}
+
 @MainActor
 final class IOSFeatureEventBroker {
     typealias Receiver = @MainActor (_ timeoutMilliseconds: Int) async throws -> CoordinatorPayload?
+    typealias Sleeper = @MainActor (_ milliseconds: Int) async throws -> Void
     typealias Predicate = ([String: Any]) -> Bool
 
     private struct Waiter {
@@ -30,6 +58,7 @@ final class IOSFeatureEventBroker {
     }
 
     private let receive: Receiver
+    private let sleeper: Sleeper
     private let receiveTimeoutMilliseconds: Int
     private let bufferLimit: Int
     private var waiters: [UUID: Waiter] = [:]
@@ -41,10 +70,17 @@ final class IOSFeatureEventBroker {
     init(
         receiveTimeoutMilliseconds: Int = 80,
         bufferLimit: Int = 256,
+        sleeper: @escaping Sleeper = { milliseconds in
+            guard milliseconds > 0 else { return }
+            try await Task<Never, Never>.sleep(
+                nanoseconds: UInt64(milliseconds) * 1_000_000
+            )
+        },
         receive: @escaping Receiver
     ) {
         self.receiveTimeoutMilliseconds = max(1, receiveTimeoutMilliseconds)
         self.bufferLimit = max(1, bufferLimit)
+        self.sleeper = sleeper
         self.receive = receive
     }
 
@@ -110,6 +146,7 @@ final class IOSFeatureEventBroker {
             }
         }
 
+        var reconnectAttempt = 0
         while !disposed, !waiters.isEmpty, !Task.isCancelled {
             expireWaiters()
             guard !waiters.isEmpty else { break }
@@ -117,13 +154,40 @@ final class IOSFeatureEventBroker {
                 if let event = try await receive(receiveTimeoutMilliseconds) {
                     route(event)
                 }
+                reconnectAttempt = 0
             } catch is CancellationError {
                 if Task.isCancelled || disposed { break }
             } catch {
-                failAll(with: error)
-                break
+                guard IOSFeatureEventBrokerRecovery.isRetryable(error) else {
+                    failAll(with: error)
+                    break
+                }
+                reconnectAttempt += 1
+                let delay = boundedReconnectDelayMilliseconds(
+                    attempt: reconnectAttempt
+                )
+                guard delay > 0 else { continue }
+                do {
+                    try await sleeper(delay)
+                } catch is CancellationError {
+                    break
+                } catch {
+                    failAll(with: error)
+                    break
+                }
             }
         }
+    }
+
+    private func boundedReconnectDelayMilliseconds(attempt: Int) -> Int {
+        let policyDelay = IOSFeatureEventBrokerRecovery
+            .delayMilliseconds(attempt: attempt)
+        let now = Date()
+        let remaining = waiterOrder.compactMap { id -> Int? in
+            guard let waiter = waiters[id] else { return nil }
+            return max(0, Int(waiter.expiresAt.timeIntervalSince(now) * 1_000))
+        }.min()
+        return min(policyDelay, remaining ?? 0)
     }
 
     private func route(_ event: CoordinatorPayload) {
@@ -167,6 +231,9 @@ final class IOSFeatureEventBroker {
         guard let waiter = waiters[id] else { return }
         removeWaiter(id)
         waiter.continuation.resume(throwing: CancellationError())
+        if waiters.isEmpty {
+            pumpTask?.cancel()
+        }
     }
 
     private func removeWaiter(_ id: UUID) {
