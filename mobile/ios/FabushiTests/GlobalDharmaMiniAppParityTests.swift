@@ -1,8 +1,32 @@
+import CryptoKit
 import XCTest
 @testable import Fabushi
 
 @MainActor
 final class GlobalDharmaMiniAppParityTests: XCTestCase {
+    func testLocalMiniAppSigningAuthorityKeepsPrivateKeyBehindKeychainAdapter() async throws {
+        let scope = String(repeating: "a", count: 64)
+        let authority = LocalMiniAppSigningAuthority(
+            service: "com.ombhrum.fabushi.tests.local-author.\(UUID().uuidString)"
+        )
+        let descriptor = try await authority.descriptor(accountScope: scope)
+        let payload = Data("fabushi.fabapp.manifest.v1\u{0}test".utf8)
+        let signature = try await authority.sign(payload, accountScope: scope)
+
+        var encoded = descriptor.publicKeyBase64URL
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while encoded.count % 4 != 0 { encoded.append("=") }
+        let publicBytes = try XCTUnwrap(Data(base64Encoded: encoded))
+        let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: publicBytes)
+
+        XCTAssertTrue(publicKey.isValidSignature(signature, for: payload))
+        XCTAssertTrue(descriptor.keyId.hasPrefix("local-ed25519-"))
+        XCTAssertFalse(descriptor.publicKeyBase64URL.isEmpty)
+
+        try await authority.deleteKeyForTesting(accountScope: scope)
+    }
+
     func testGovernedLifetimeEntitlementConstantsMatchCrossPlatformContract() {
         XCTAssertEqual(GlobalDharmaMiniAppBridge.globalDharmaId, "global-dharma")
         XCTAssertEqual(GlobalDharmaMiniAppBridge.prayerWheelCapability, "local.prayer-wheel.start")
