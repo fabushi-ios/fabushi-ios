@@ -301,19 +301,27 @@ private final class CoordinatorMcpHostPort {
     func executeTool(
         serverIdentifier: String,
         toolName: String,
-        args: McpJSONValue
+        args: McpJSONValue,
+        toolCallId: String,
+        agentId: String?
     ) async throws -> McpJSONValue {
         guard let scope = accountScope else {
             throw SandMcpConfigError("MCP tools require an authenticated account.")
         }
         let generation = scopeGeneration
+        var params: [String: Any] = [
+            "server": serverIdentifier,
+            "tool": toolName,
+            "arguments": foundationValue(args),
+            "toolCallId": toolCallId,
+        ]
+        if let agentId,
+           !agentId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            params["agentId"] = agentId
+        }
         let response = try await hostSupervisor.request(
             method: "feature.mcp.toolCall",
-            params: [
-                "server": serverIdentifier,
-                "tool": toolName,
-                "arguments": foundationValue(args),
-            ]
+            params: params
         )
         guard generation == scopeGeneration, scope == accountScope else {
             throw SandMcpConfigError(
@@ -551,7 +559,9 @@ private final class CoordinatorMcpBackendClient: DashboardMcpExecClient, @unchec
             value: try await port.executeTool(
                 serverIdentifier: serverIdentifier,
                 toolName: toolName,
-                args: args
+                args: args,
+                toolCallId: toolCallId,
+                agentId: agentId.isEmpty ? nil : agentId
             )
         )
     }
@@ -648,6 +658,41 @@ final class CoordinatorMcpSurface {
     private var computerMigrationOwedOperationId: String?
     private var computerMigrationGeneration: UInt64 = 0
     private var accountScope: String?
+    private var routedScopeGeneration: UInt64 = 0
+
+    private lazy var routedMcpBridge: RoutedMCPBridge = {
+        let manager = self.manager
+        return RoutedMCPBridge(
+            listTools: {
+                let tools = try await manager.getTools()
+                return tools.map { tool in
+                    RoutedMCPTool(
+                        name: tool.name,
+                        providerIdentifier: tool.providerIdentifier,
+                        toolName: tool.toolName,
+                        description: tool.description,
+                        inputSchema: tool.inputSchema.map(routedCoordinatorPayload)
+                    )
+                }
+            },
+            currentScope: { [weak self] in
+                await self?.routedScopeToken()
+            },
+            callTool: { tool, arguments, toolCallId, agentId in
+                routedCoordinatorPayload(
+                    await manager.executeTool(
+                        .init(
+                            providerIdentifier: tool.providerIdentifier,
+                            name: tool.toolName,
+                            args: McpJSONValue.from(arguments.foundationValue),
+                            toolCallId: toolCallId
+                        ),
+                        auditIdentity: .init(agentId: agentId)
+                    )
+                )
+            }
+        )
+    }()
 
     private init(
         manager: SandMcpManager,
@@ -788,6 +833,9 @@ final class CoordinatorMcpSurface {
         let next = normalized?.isEmpty == false ? normalized : nil
         if next != accountScope {
             accountScope = next
+            routedScopeGeneration = routedScopeGeneration == UInt64.max
+                ? 1
+                : routedScopeGeneration + 1
             stopComputerMigrationWatch(clearState: true)
         }
         port.updateAccountScope(next)
@@ -795,6 +843,14 @@ final class CoordinatorMcpSurface {
             guard let self else { return }
             self.localToolPermissionCeilingSynchronizer.consume(await self.cursorAuth.status())
         }
+    }
+
+    private func routedScopeToken() -> RoutedMCPScopeToken? {
+        guard let accountScope else { return nil }
+        return .init(
+            accountScope: accountScope,
+            generation: routedScopeGeneration
+        )
     }
 
     func dropObservedComputerConnectionForClientPause() {
@@ -1244,6 +1300,40 @@ final class CoordinatorMcpSurface {
                 "tools": tools.map(projectTool),
             ])
 
+        case "listRoutedMcpTools":
+            guard let scope = routedScopeToken() else {
+                throw SandMcpConfigError("Routed MCP tools require an authenticated account.")
+            }
+            let tools = try await routedMcpBridge.listTools(scope: scope)
+            return .handled([
+                "tools": tools.map(projectRoutedTool),
+            ])
+
+        case "executeRoutedMcpTool":
+            guard let scope = routedScopeToken() else {
+                throw SandMcpConfigError("Routed MCP tools require an authenticated account.")
+            }
+            guard let requestId = nonEmptyString(params["_requestId"]),
+                  let name = nonEmptyString(params["name"]),
+                  let toolCallId = nonEmptyString(params["toolCallId"])
+            else {
+                throw SandMcpConfigError(
+                    "Routed MCP execution requires requestId, name and toolCallId."
+                )
+            }
+            let arguments = try CoordinatorPayload.fromFoundation(
+                params["arguments"] ?? params["args"] ?? [String: Any]()
+            )
+            let result = try await routedMcpBridge.callTool(
+                name: name,
+                arguments: arguments,
+                requestId: requestId,
+                toolCallId: toolCallId,
+                agentId: nonEmptyString(params["agentId"]),
+                scope: scope
+            )
+            return .handled(result.foundationValue)
+
         case "coordinator.mcp.cursorAuth.status":
             return .handled(projectCursorAuthStatus(await cursorAuth.status()))
 
@@ -1510,9 +1600,92 @@ final class CoordinatorMcpSurface {
         ]
     }
 
+    private func projectRoutedTool(_ tool: RoutedMCPTool) -> [String: Any] {
+        [
+            "name": tool.name,
+            "providerIdentifier": tool.providerIdentifier,
+            "toolName": tool.toolName,
+            "description": tool.description ?? NSNull(),
+            "inputSchema": tool.inputSchema?.foundationValue ?? NSNull(),
+        ]
+    }
+
     private func nonEmptyString(_ value: Any?) -> String? {
         guard let value = value as? String else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+
+private func routedCoordinatorPayload(_ value: McpJSONValue) -> CoordinatorPayload {
+    switch value {
+    case .null: return .null
+    case .bool(let value): return .bool(value)
+    case .number(let value): return .number(value)
+    case .string(let value): return .string(value)
+    case .array(let values): return .array(values.map(routedCoordinatorPayload))
+    case .object(let object): return .object(object.mapValues(routedCoordinatorPayload))
+    }
+}
+
+private func routedCoordinatorPayload(_ result: SandMcpResult) -> CoordinatorPayload {
+    switch result.result {
+    case .error(let message):
+        return .object([
+            "isError": .bool(true),
+            "content": .array([
+                .object([
+                    "type": .string("text"),
+                    "text": .string(message),
+                ]),
+            ]),
+        ])
+    case .success(let success):
+        let content = success.content.map { item -> CoordinatorPayload in
+            switch item.content {
+            case .text(let text):
+                return .object([
+                    "type": .string("text"),
+                    "text": .string(text.text),
+                ])
+            case .image(let image):
+                return .object([
+                    "type": .string("image"),
+                    "data": .string(image.data),
+                    "mimeType": .string(image.mimeType),
+                ])
+            case .other(let caseName, let value):
+                var object: [String: CoordinatorPayload] = [
+                    "type": .string(caseName),
+                ]
+                if let value {
+                    object["value"] = routedCoordinatorPayload(value)
+                }
+                return .object(object)
+            }
+        }
+        var object: [String: CoordinatorPayload] = [
+            "isError": .bool(success.isError),
+            "content": .array(content),
+        ]
+        if let structured = success.structuredContent {
+            object["structuredContent"] = routedCoordinatorPayload(structured)
+        }
+        return .object(object)
+    case .other(let caseName, let value):
+        var object: [String: CoordinatorPayload] = [
+            "isError": .bool(true),
+            "content": .array([
+                .object([
+                    "type": .string("text"),
+                    "text": .string("Unsupported routed MCP result: \(caseName)"),
+                ]),
+            ]),
+        ]
+        if let value {
+            object["structuredContent"] = routedCoordinatorPayload(value)
+        }
+        return .object(object)
     }
 }
