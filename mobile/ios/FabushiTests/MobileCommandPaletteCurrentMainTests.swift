@@ -117,8 +117,8 @@ final class MobileCommandPaletteCurrentMainTests: XCTestCase {
             name: "Shared",
             description: "",
             isGroup: true,
-            isSharedRoom: true,
-            memberIds: ["agent"]
+            memberIds: ["agent"],
+            isSharedRoom: true
         )
         XCTAssertEqual(
             MobileCommandPaletteRootProjection.actions(
