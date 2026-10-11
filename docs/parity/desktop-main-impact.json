@@ -1888,6 +1888,36 @@
         "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
         "status": "current-main-reviewed-native-primary-entrypoint-implemented-pending-exact-head",
         "finding": "Desktop primary preload entrypoint maps to App -> FabushiSceneRoot -> FabushiRuntime -> IOSPrimaryPreloadEntrypoint -> IOSPreloadBridge, the single shipping privileged boundary shared by Marketplace/Messaging/native surfaces."
+      },
+      {
+        "path": "source/electron-preload/preload-boundaries.test.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-test-runner-replacement-pending-exact-head",
+        "finding": "Desktop Node preload-boundary test file is not a shipping iOS responsibility; its RPC/VNC/browser boundary assertions map to focused XCTest coverage of the actual native owners. Product responsibilities remain in their shipping rows and are not waived."
+      },
+      {
+        "path": "source/electron-preload/preload-browser-base.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-browser-lifecycle-implemented-pending-exact-head",
+        "finding": "Shipping Marketplace browser login now routes through IOSBrowserAuthSessionFence/IOSWebViewPreloadEntrypoint before ASWebAuthenticationSession. System browser semantics replace Electron dialog/local-network shims; fabushi://auth/complete origin return is fenced by generation, attempt and account scope so cancelled/superseded/account-switched callbacks cannot commit."
+      },
+      {
+        "path": "source/electron-preload/preload-webview.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-browser-entrypoint-implemented-pending-exact-head",
+        "finding": "The native trusted browser composition is now a production dependency of MarketplaceModel rather than a test-only policy file; unsupported browser schemes fail before ASWebAuthenticationSession presentation."
+      },
+      {
+        "path": "source/electron-preload/runtime/webview.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-shipping-runtime-implemented-pending-exact-head",
+        "finding": "MarketplaceModel owns IOSBrowserAuthSessionFence from runtime/webview.swift, proving a real shipping caller for the native browser preload entrypoint and its cancel/reload/account-switch fences."
+      },
+      {
+        "path": "source/electron-preload/rpc-edge-runtime.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-mapped-production-carrier-not-promoted",
+        "finding": "The same-named iOS rpc-edge helper is not a proven shipping caller. Current production uses IOSPreloadBridge -> IOSCoordinatorPortClient/RendererPortServer; the row remains mapped until protocol-equivalence and shipping ownership are fully closed."
       }
     ]
   },

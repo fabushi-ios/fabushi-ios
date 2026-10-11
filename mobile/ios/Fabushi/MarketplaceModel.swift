@@ -1965,7 +1965,9 @@ final class MarketplaceModel {
     @ObservationIgnored private var globalDharmaExecution: [String: Any]?
     private static let globalDharmaExecutionKeyPrefix = "fabushi.ios.miniapp-execution.v1:"
     @ObservationIgnored private let browserAuthPresentationContext = BrowserAuthPresentationContext()
+    @ObservationIgnored private let browserAuthSessionFence = IOSBrowserAuthSessionFence()
     @ObservationIgnored private var webAuthenticationSession: ASWebAuthenticationSession?
+    @ObservationIgnored private var browserLoginAccountScope: String?
     @ObservationIgnored private var mcpOAuthSession: ASWebAuthenticationSession?
     @ObservationIgnored private var mcpBackendLoginAttemptId: String?
     @ObservationIgnored private var linkMetadataCache: [String: MobileLinkMetadata] = [:]
@@ -2815,6 +2817,7 @@ final class MarketplaceModel {
                 ) }
             browserLoginAttemptId = attemptId
             browserLoginURL = loginURL
+            browserLoginAccountScope = settingsNoticeAccountKey
             loginBusy = false
             if loginURLString.hasPrefix("about:blank#fabushi-test-browser-login") {
                 await completeBrowserLogin(attemptId: attemptId)
@@ -2824,6 +2827,8 @@ final class MarketplaceModel {
         } catch {
             browserLoginAttemptId = nil
             browserLoginURL = nil
+            browserLoginAccountScope = nil
+            browserAuthSessionFence.cancel()
             loginBusy = false
             loginError = error.localizedDescription
         }
@@ -2831,6 +2836,10 @@ final class MarketplaceModel {
 
     func reopenBrowserLogin() async {
         guard let attemptId = browserLoginAttemptId else { return }
+        guard browserLoginAccountScope == settingsNoticeAccountKey else {
+            await cancelBrowserLoginAttempt()
+            return
+        }
         loginError = nil
         do {
             let result = try await bridge.request(method: "feature.auth.browserReopen", params: ["attemptId": attemptId])
@@ -2848,37 +2857,74 @@ final class MarketplaceModel {
     }
 
     func cancelBrowserLogin() async {
+        browserAuthSessionFence.cancel()
         webAuthenticationSession?.cancel()
         webAuthenticationSession = nil
         await cancelBrowserLoginAttempt()
     }
 
     private func cancelBrowserLoginAttempt() async {
-        guard let attemptId = browserLoginAttemptId else { return }
+        browserAuthSessionFence.cancel()
+        guard let attemptId = browserLoginAttemptId else {
+            browserLoginAccountScope = nil
+            return
+        }
         loginError = nil
         do {
             _ = try await bridge.request(method: "feature.auth.browserCancel", params: ["attemptId": attemptId])
         } catch { loginError = error.localizedDescription }
         browserLoginAttemptId = nil
         browserLoginURL = nil
+        browserLoginAccountScope = nil
         loginBusy = false
         message = "登录授权已取消"
     }
 
     private func presentBrowserLogin(_ loginURL: URL) {
+        guard let attemptId = browserLoginAttemptId,
+              let accountScope = browserLoginAccountScope,
+              let token = browserAuthSessionFence.begin(
+                attemptID: attemptId,
+                accountScope: accountScope,
+                url: loginURL
+              )
+        else {
+            loginError = "登录页面地址无效"
+            message = "登录页面未能打开，请重试"
+            return
+        }
+
         webAuthenticationSession?.cancel()
         let session = ASWebAuthenticationSession(
             url: loginURL,
             callbackURLScheme: "fabushi"
         ) { [weak self] callbackURL, error in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self,
+                      self.webAuthenticationSession != nil,
+                      self.browserAuthSessionFence.accepts(
+                        token,
+                        currentAttemptID: self.browserLoginAttemptId,
+                        currentAccountScope: self.settingsNoticeAccountKey,
+                        callbackURL: callbackURL
+                      )
+                else { return }
+
                 self.webAuthenticationSession = nil
                 if let callbackURL {
+                    guard self.browserAuthSessionFence.settleCallback(
+                        token,
+                        currentAttemptID: self.browserLoginAttemptId,
+                        currentAccountScope: self.settingsNoticeAccountKey,
+                        callbackURL: callbackURL
+                    ) else { return }
                     self.handleDeepLink(callbackURL)
                     return
                 }
-                if let authError = error as? ASWebAuthenticationSessionError, authError.code == .canceledLogin {
+
+                self.browserAuthSessionFence.cancel()
+                if let authError = error as? ASWebAuthenticationSessionError,
+                   authError.code == .canceledLogin {
                     await self.cancelBrowserLoginAttempt()
                     return
                 }
@@ -2892,6 +2938,7 @@ final class MarketplaceModel {
         session.prefersEphemeralWebBrowserSession = false
         webAuthenticationSession = session
         if !session.start() {
+            browserAuthSessionFence.cancel()
             webAuthenticationSession = nil
             loginError = "无法打开应用内登录页面"
             message = "登录页面未能打开，请重试"
@@ -3308,7 +3355,9 @@ final class MarketplaceModel {
         let attemptId = params["attemptId"] ?? ""
         let status = (params["status"] ?? "completed").lowercased()
         guard attemptId.range(of: "^[A-Za-z0-9_-]{8,96}$", options: .regularExpression) != nil,
-              ["completed", "cancelled", "failed"].contains(status)
+              ["completed", "cancelled", "failed"].contains(status),
+              attemptId == browserLoginAttemptId,
+              browserLoginAccountScope == settingsNoticeAccountKey
         else { return }
         message = status == "completed" ? "登录授权已完成，正在同步账号状态" : "登录授权状态：\(status)"
         if status == "completed" { Task { await completeBrowserLogin(attemptId: attemptId) } }
@@ -3335,6 +3384,8 @@ final class MarketplaceModel {
                 }
                 browserLoginAttemptId = nil
                 browserLoginURL = nil
+                browserLoginAccountScope = nil
+                browserAuthSessionFence.cancel()
                 webAuthenticationSession = nil
                 loginError = nil
                 await resolveSignedInOnboardingRoute()

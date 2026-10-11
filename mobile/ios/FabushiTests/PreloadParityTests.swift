@@ -187,6 +187,100 @@ final class PreloadParityTests: XCTestCase {
 
 
     @MainActor
+    func testNativeBrowserAuthPlanPreservesIdPCompatibilityAndSystemLifecycle() throws {
+        let idp = try XCTUnwrap(URL(string: "https://tenant.okta.com/login"))
+        let plan = try XCTUnwrap(IOSWebViewPreloadEntrypoint.browserAuthPlan(for: idp))
+        XCTAssertEqual(plan.originalOrigin, "https://tenant.okta.com")
+        XCTAssertEqual(plan.localNetworkCompatibility, .systemBrowserOwnedIdentityProvider)
+        XCTAssertTrue(plan.usesSystemAuthenticationSession)
+        XCTAssertTrue(plan.usesSystemDialogLifecycle)
+        XCTAssertTrue(plan.usesSystemPasskeyPresentation)
+        XCTAssertTrue(plan.callbackReturnsToApp)
+
+        let ordinary = try XCTUnwrap(URL(string: "https://cursor.com/login"))
+        XCTAssertEqual(
+            IOSWebViewPreloadEntrypoint.browserAuthPlan(for: ordinary)?.localNetworkCompatibility,
+            .notRequired
+        )
+        XCTAssertNil(
+            IOSWebViewPreloadEntrypoint.browserAuthPlan(
+                for: try XCTUnwrap(URL(string: "javascript:alert(1)"))
+            )
+        )
+    }
+
+    @MainActor
+    func testNativeBrowserAuthFenceHappyCancelReloadAndAccountSwitch() throws {
+        let fence = IOSBrowserAuthSessionFence()
+        let loginURL = try XCTUnwrap(URL(string: "https://tenant.okta.com/login"))
+        let callback = try XCTUnwrap(URL(string: "fabushi://auth/complete?attemptId=attempt-1"))
+        let hostileCallback = try XCTUnwrap(URL(string: "https://example.com/callback"))
+        let wrongAppCallback = try XCTUnwrap(URL(string: "fabushi://other/complete"))
+
+        let first = try XCTUnwrap(fence.begin(
+            attemptID: "attempt-1",
+            accountScope: "logged-out",
+            url: loginURL
+        ))
+        XCTAssertTrue(fence.accepts(
+            first,
+            currentAttemptID: "attempt-1",
+            currentAccountScope: "logged-out"
+        ))
+        XCTAssertFalse(fence.accepts(
+            first,
+            currentAttemptID: "attempt-1",
+            currentAccountScope: "account-b"
+        ), "account switch must fence the old browser callback")
+        XCTAssertFalse(fence.accepts(
+            first,
+            currentAttemptID: "attempt-1",
+            currentAccountScope: "logged-out",
+            callbackURL: hostileCallback
+        ))
+        XCTAssertFalse(fence.accepts(
+            first,
+            currentAttemptID: "attempt-1",
+            currentAccountScope: "logged-out",
+            callbackURL: wrongAppCallback
+        ), "only the browser-auth app callback is an origin return")
+
+        let reloaded = try XCTUnwrap(fence.begin(
+            attemptID: "attempt-1",
+            accountScope: "logged-out",
+            url: loginURL
+        ))
+        XCTAssertFalse(fence.accepts(
+            first,
+            currentAttemptID: "attempt-1",
+            currentAccountScope: "logged-out"
+        ), "reopening the system browser must stale the previous generation")
+        XCTAssertTrue(fence.settleCallback(
+            reloaded,
+            currentAttemptID: "attempt-1",
+            currentAccountScope: "logged-out",
+            callbackURL: callback
+        ))
+        XCTAssertFalse(fence.accepts(
+            reloaded,
+            currentAttemptID: "attempt-1",
+            currentAccountScope: "logged-out"
+        ), "settled callbacks must not commit twice")
+
+        let cancelled = try XCTUnwrap(fence.begin(
+            attemptID: "attempt-2",
+            accountScope: "logged-out",
+            url: loginURL
+        ))
+        fence.cancel()
+        XCTAssertFalse(fence.accepts(
+            cancelled,
+            currentAttemptID: "attempt-2",
+            currentAccountScope: "logged-out"
+        ))
+    }
+
+    @MainActor
     func testFeatureEventBrokerBuffersUnmatchedEventsWithoutDroppingThem() async throws {
         var receiveCount = 0
         var events: [CoordinatorPayload] = [
