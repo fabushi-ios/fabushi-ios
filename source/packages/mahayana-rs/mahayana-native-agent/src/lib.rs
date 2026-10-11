@@ -4,7 +4,10 @@
 //! the default Codex implementation with the sovereign native engine and MCP
 //! transport. Codex can remain behind an explicit compatibility feature.
 
+pub mod interaction;
+
 use async_trait::async_trait;
+use interaction::{InteractionUpdate, PrivacyMode, redacted_update_for_kernel_event};
 use mahayana_agent::{
     AgentActivity, AgentActivityStatus, AgentBackend, AgentError, AgentEvent, AgentMessageRequest,
     ApprovalResolution, McpAppSession, OpenMcpAppRequest, SharedAgentEventSink, StartThreadRequest,
@@ -261,8 +264,19 @@ struct NativeEventBridge {
 
 impl KernelEventSink for NativeEventBridge {
     fn emit(&self, event: KernelEvent) -> Result<(), KernelError> {
+        let interaction_projection =
+            redacted_update_for_kernel_event(&event, PrivacyMode::Unspecified);
         let mapped = match event {
-            KernelEvent::MessageDelta { delta, .. } => AgentEvent::MessageDelta { delta },
+            KernelEvent::MessageDelta { delta, .. } => {
+                let delta = interaction_projection
+                    .as_ref()
+                    .and_then(|update| match &update.update {
+                        InteractionUpdate::TextDelta { text } => Some(text.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or(delta);
+                AgentEvent::MessageDelta { delta }
+            },
             KernelEvent::MessageCompleted { text, .. } => AgentEvent::MessageCompleted {
                 message: Message {
                     id: MessageId::generated("mahayana-native-message"),
@@ -284,7 +298,15 @@ impl KernelEventSink for NativeEventBridge {
                 usage: ModelTokenUsageSnapshot {
                     total: None,
                     last: ModelTokenUsage {
-                        total_tokens: to_i64(total_tokens),
+                        total_tokens: to_i64(
+                            interaction_projection
+                                .as_ref()
+                                .and_then(|update| match &update.update {
+                                    InteractionUpdate::TokenDelta { tokens } => Some(*tokens),
+                                    _ => None,
+                                })
+                                .unwrap_or(total_tokens),
+                        ),
                         input_tokens: to_i64(input_tokens),
                         cached_input_tokens: to_i64(cached_input_tokens),
                         output_tokens: to_i64(output_tokens),
@@ -340,7 +362,13 @@ impl KernelEventSink for NativeEventBridge {
                         title,
                         detail,
                         status: AgentActivityStatus::Running,
-                        metadata: Some(json!({"tool":tool,"arguments":arguments})),
+                        metadata: Some(json!({
+                            "tool":tool,
+                            "arguments":arguments,
+                            "interaction":interaction_projection
+                                .as_ref()
+                                .map(|update| update.audit_metadata()),
+                        })),
                     },
                 }
             }
@@ -378,7 +406,14 @@ impl KernelEventSink for NativeEventBridge {
                         } else {
                             AgentActivityStatus::Failed
                         },
-                        metadata: Some(json!({"tool":tool,"output":output,"success":success})),
+                        metadata: Some(json!({
+                            "tool":tool,
+                            "output":output,
+                            "success":success,
+                            "interaction":interaction_projection
+                                .as_ref()
+                                .map(|update| update.audit_metadata()),
+                        })),
                     },
                 }
             }
