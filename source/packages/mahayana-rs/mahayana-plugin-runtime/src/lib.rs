@@ -3888,7 +3888,7 @@ mod tests {
 
     #[test]
     fn local_generated_builder_binds_exact_resources_and_signing_payload() {
-        let signing = SigningKey::from_bytes(&[31_u8; 32]);
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[31_u8; 32]);
         let mut resources = BTreeMap::from([
             ("index.html".to_string(), ("text/html".to_string(), b"<html>safe</html>".to_vec())),
             ("app.js".to_string(), ("text/javascript".to_string(), b"window.ok=true".to_vec())),
@@ -3940,15 +3940,42 @@ mod tests {
 
     #[test]
     fn fabapp_install_commit_guard_rejects_stale_account_before_writes() {
-        let signing = SigningKey::from_bytes(&[29_u8; 32]);
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[29_u8; 32]);
         let html = b"<html><body>guard</body></html>";
-        let mut manifest = fabapp_manifest(
-            "com.example.guard",
-            "com.example",
-            "catalog",
-            html,
-        );
-        sign_fabapp_manifest(&mut manifest, &signing);
+        let mut manifest = FabappManifest {
+            manifest_version: 1,
+            package_class: Some(FabappPackageClass::Catalog),
+            app_id: "com.example.guard".into(),
+            publisher_id: "com.example".into(),
+            version: "1.0.0".into(),
+            display_name: "Guard".into(),
+            entrypoint: "index.html".into(),
+            runtime: "web".into(),
+            min_host_api: FABAPP_HOST_API_V1,
+            offline_core: true,
+            requested_capabilities: Vec::new(),
+            network_policy: FabappNetworkPolicy {
+                mode: "deny".into(),
+                allowed_origins: Vec::new(),
+            },
+            files: BTreeMap::from([(
+                "index.html".into(),
+                FabappFileRecord {
+                    sha256: format!("{:x}", Sha256::digest(html)),
+                    bytes: html.len() as u64,
+                    mime: "text/html".into(),
+                },
+            )]),
+            local_author: None,
+            signature: FabappSignature {
+                algorithm: "Ed25519".into(),
+                key_id: "catalog-key".into(),
+                value: String::new(),
+            },
+        };
+        use ed25519_dalek::Signer as _;
+        manifest.signature.value = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(signing.sign(&fabapp_signing_payload(&manifest).unwrap()).to_bytes());
         let package = fabapp_zip(&manifest, &[("index.html", html)]);
         let trust = FabappTrustContext::Catalog(CatalogFabappTrust {
             publisher_id: "com.example".into(),
