@@ -1159,45 +1159,6 @@ private struct MiniAppWebView: UIViewRepresentable {
                     return
                 }
                 self.status = local ? "本地 WebMCP 已连接" : "WebMCP 已连接"
-                if self.plugin.pluginId == GlobalDharmaCommerceModel.miniAppId {
-                    let sharedRuntimeProbe = """
-                    (() => {
-                      const tools=window.__fabushiWebMcp?.list?.()||[];
-                      function marker(label,text,revision){
-                        let node=document.getElementById('fabushi-shared-runtime-sync');
-                        if(!node){
-                          node=document.createElement('div');
-                          node.id='fabushi-shared-runtime-sync';
-                          node.setAttribute('role','status');
-                          node.style.cssText='margin:12px;padding:10px 12px;border:1px solid rgba(0,0,0,.12);border-radius:12px;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;';
-                          document.body.prepend(node);
-                        }
-                        node.setAttribute('aria-label',label);
-                        node.dataset.revision=revision===undefined?'':String(revision);
-                        node.textContent=text;
-                        return node;
-                      }
-                      if(!tools.some((tool)=>tool&&tool.name==='status')){
-                        marker('共享状态恢复失败','共享状态恢复失败 · WebMCP status 未暴露');
-                        return;
-                      }
-                      window.__fabushiWebMcp.call('status',{}).then((result)=>{
-                        const canonicalRuntime=result?.structuredContent?.runtime;
-                        const revision=Number(canonicalRuntime?.revision??-1);
-                        if(canonicalRuntime?.protocol!=='fabushi.miniapp.runtime.v1'||canonicalRuntime?.miniAppId!=='global-dharma'||!Number.isInteger(revision)||revision<0){
-                          marker('共享状态恢复失败','共享状态恢复失败 · canonical runtime 无效');
-                          return;
-                        }
-                        const label=`Bot / Web UI 同一共享状态 · revision ${revision}`;
-                        marker(label,label,revision);
-                        window.dispatchEvent(new CustomEvent('fabushi:shared-runtime-restored',{detail:canonicalRuntime}));
-                      }).catch((error)=>{
-                        marker('共享状态恢复失败',`共享状态恢复失败 · ${String(error?.message||error)}`);
-                      });
-                    })()
-                    """
-                    webView?.evaluateJavaScript(sharedRuntimeProbe)
-                }
             }
         }
 
