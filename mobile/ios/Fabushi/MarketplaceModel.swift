@@ -1662,6 +1662,17 @@ struct LocalMiniAppDraftReview: Equatable, Sendable {
     let files: [LocalMiniAppDraftReviewFile]
 }
 
+struct GeneratedMiniAppArtifactDraft: Identifiable, Equatable, Sendable {
+    let review: LocalMiniAppDraftReview
+    let html: String
+    let sourcePath: String
+    let sourceSha256: String
+    let previewSha256: String
+    let displayName: String
+
+    var id: String { review.transaction.transactionId }
+}
+
 struct LocalMiniAppInstallApproval: Equatable, Sendable {
     let accountScope: String
     let transactionId: String
@@ -5315,6 +5326,128 @@ final class MarketplaceModel {
         }
     }
 
+    static func canonicalGeneratedMiniAppArtifactPath(_ raw: String) -> String? {
+        let path = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowered = path.lowercased()
+        guard !path.isEmpty,
+              path.hasPrefix("/"),
+              !path.contains("://"),
+              !lowered.hasPrefix("file:"),
+              !lowered.hasPrefix("http:"),
+              !lowered.hasPrefix("https:"),
+              !NSString(string: path).pathComponents.contains("..")
+        else { return nil }
+        let pathExtension = NSString(string: path).pathExtension.lowercased()
+        guard pathExtension == "html" || pathExtension == "htm" else { return nil }
+        return path
+    }
+
+    func materializeGeneratedMiniAppArtifact(
+        agentId: String,
+        path rawPath: String,
+        displayName rawDisplayName: String
+    ) async throws -> GeneratedMiniAppArtifactDraft {
+        guard loggedIn,
+              !agentId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let path = Self.canonicalGeneratedMiniAppArtifactPath(rawPath)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let displayName = rawDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !displayName.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+
+        let response = try await bridge.request(
+            method: "feature.plugin.localDraft.materializeArtifact",
+            params: [
+                "agentId": agentId,
+                "path": path,
+                "displayName": displayName,
+            ]
+        )
+        guard let object = response.value as? [String: Any],
+              object["protocol"] as? String == "fabushi.local-miniapp-artifact-draft.v1",
+              let accountScope = object["accountScope"] as? String,
+              accountScope.count == 64,
+              let transactionId = object["transactionId"] as? String,
+              let reservedAppId = object["reservedAppId"] as? String,
+              let publisherId = object["publisherId"] as? String,
+              object["sourcePath"] as? String == path,
+              let sourceSha256 = object["sourceSha256"] as? String,
+              sourceSha256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+              let previewSha256 = object["previewSha256"] as? String,
+              previewSha256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+              let previewBase64 = object["previewHtmlBase64"] as? String,
+              let previewData = Data(base64Encoded: previewBase64),
+              let html = String(data: previewData, encoding: .utf8),
+              generatedMiniAppPreviewDigest(html) == previewSha256,
+              let reviewObject = object["review"] as? [String: Any]
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+
+        let transaction = LocalMiniAppDraftTransaction(
+            accountScope: accountScope,
+            transactionId: transactionId,
+            reservedAppId: reservedAppId,
+            publisherId: publisherId
+        )
+        guard reviewObject["protocol"] as? String == "fabushi.local-miniapp-draft-prepared.v1",
+              reviewObject["accountScope"] as? String == accountScope,
+              reviewObject["transactionId"] as? String == transactionId,
+              reviewObject["reservedAppId"] as? String == reservedAppId,
+              reviewObject["publisherId"] as? String == publisherId,
+              let draftDigest = reviewObject["draftDigest"] as? String,
+              draftDigest.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+              let totalBytes = (reviewObject["totalBytes"] as? NSNumber)?.uint64Value,
+              let capabilities = reviewObject["requestedCapabilities"] as? [String],
+              let rawFiles = reviewObject["files"] as? [String: Any]
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let reviewFiles = try rawFiles.map { path, raw -> LocalMiniAppDraftReviewFile in
+            guard let record = raw as? [String: Any],
+                  let sha256 = record["sha256"] as? String,
+                  sha256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+                  let bytes = (record["bytes"] as? NSNumber)?.uint64Value,
+                  let mime = record["mime"] as? String
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            return LocalMiniAppDraftReviewFile(
+                path: path,
+                sha256: sha256,
+                bytes: bytes,
+                mime: mime
+            )
+        }.sorted { $0.path < $1.path }
+        guard reviewFiles.reduce(UInt64(0), { $0 &+ $1.bytes }) == totalBytes,
+              reviewFiles.count == 1,
+              reviewFiles[0].path == "index.html",
+              reviewFiles[0].mime == "text/html",
+              reviewFiles[0].sha256 == previewSha256,
+              reviewFiles[0].bytes == UInt64(previewData.count)
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let review = LocalMiniAppDraftReview(
+            transaction: transaction,
+            draftDigest: draftDigest,
+            totalBytes: totalBytes,
+            requestedCapabilities: capabilities,
+            files: reviewFiles
+        )
+        return GeneratedMiniAppArtifactDraft(
+            review: review,
+            html: html,
+            sourcePath: path,
+            sourceSha256: sourceSha256,
+            previewSha256: previewSha256,
+            displayName: displayName
+        )
+    }
+
     func beginGeneratedMiniAppDraft() async throws -> LocalMiniAppDraftTransaction {
         guard loggedIn else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed(
@@ -5410,6 +5543,27 @@ final class MarketplaceModel {
             requestedCapabilities: capabilities,
             files: reviewFiles
         )
+    }
+
+    func cancelGeneratedMiniAppDraft(
+        _ review: LocalMiniAppDraftReview
+    ) async throws {
+        guard loggedIn else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let transaction = review.transaction
+        let response = try await bridge.request(
+            method: "feature.plugin.localDraft.cancel",
+            params: ["transactionId": transaction.transactionId]
+        )
+        guard let object = response.value as? [String: Any],
+              object["protocol"] as? String == "fabushi.local-miniapp-draft-cancelled.v1",
+              object["accountScope"] as? String == transaction.accountScope,
+              object["transactionId"] as? String == transaction.transactionId,
+              object["cancelled"] as? Bool == true
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
     }
 
     func approveGeneratedMiniAppDraft(

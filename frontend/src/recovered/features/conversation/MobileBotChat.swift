@@ -838,6 +838,21 @@ internal func isMobileBotVisibleAssistantCompletion(
     return !text.isEmpty || attachment != nil
 }
 
+func mobileGeneratedMiniAppArtifactPath(_ raw: String) -> String? {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+
+    let path: String
+    if trimmed.hasPrefix("/") {
+        path = trimmed
+    } else if let url = URL(string: trimmed), url.isFileURL {
+        path = url.path
+    } else {
+        return nil
+    }
+    return MarketplaceModel.canonicalGeneratedMiniAppArtifactPath(path)
+}
+
 private let mobileAcknowledgementResendPrefix = "sand-resend-v1:"
 
 internal func mobileAcknowledgementLogicalNonce(_ nonce: String) -> String {
@@ -1999,6 +2014,9 @@ internal struct MobileBotChat: View {
     @State private var activeOperationId: String?
     @State private var errorText: String?
     @State private var openedMiniApp = false
+    @State private var generatedMiniAppArtifactDraft: GeneratedMiniAppArtifactDraft?
+    @State private var generatedMiniAppArtifactBusy = false
+    @State private var generatedMiniAppArtifactGeneration = 0
     @State private var asyncTasksPresented = false
     @State private var conversationOutlinePresented = false
     @State private var replyTargetId: String?
@@ -2095,6 +2113,9 @@ internal struct MobileBotChat: View {
             guard connected else { return }
             Task { await flushDurableComposerQueue() }
         }
+        .onChange(of: reconnectGeneration) { _, _ in
+            invalidateGeneratedMiniAppArtifactFlow()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 linkMetadataFocusRevision = linkMetadataFocusRevision == Int.max
@@ -2127,6 +2148,7 @@ internal struct MobileBotChat: View {
             invalidateEditorSuggestions()
         }
         .onChange(of: bot.id) { _, _ in
+            invalidateGeneratedMiniAppArtifactFlow()
             resetAcknowledgementScope()
             cancelVoiceInput()
             invalidateComposerAttachmentStaging()
@@ -2157,6 +2179,7 @@ internal struct MobileBotChat: View {
             invalidateEditorSuggestions()
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
+            invalidateGeneratedMiniAppArtifactFlow()
             resetAcknowledgementScope()
             transcriptPaginationGeneration &+= 1
             transcriptOlderLoading = false
@@ -2173,6 +2196,7 @@ internal struct MobileBotChat: View {
             invalidateEditorSuggestions()
         }
         .onDisappear {
+            invalidateGeneratedMiniAppArtifactFlow()
             resetAcknowledgementScope()
             cancelVoiceInput()
             invalidateComposerAttachmentStaging()
@@ -2192,6 +2216,23 @@ internal struct MobileBotChat: View {
         }
         .fullScreenCover(isPresented: $openedMiniApp) {
             miniAppCover
+        }
+        .fullScreenCover(item: $generatedMiniAppArtifactDraft) { artifact in
+            let transaction = artifact.review.transaction
+            let plugin = MarketplacePlugin(
+                pluginId: transaction.reservedAppId,
+                displayName: artifact.displayName,
+                description: "Agent 生成的本地 Mini App 安全草稿",
+                latestVersion: "1.0.0",
+                sourceRef: nil,
+                tools: []
+            )
+            MiniAppWebMcpSurface(
+                plugin: plugin,
+                model: model,
+                localHtmlOverride: artifact.html,
+                generatedDraftReviewOverride: artifact.review
+            )
         }
         .sheet(isPresented: $conversationOutlinePresented) {
             MobileConversationOutlinePanel(
@@ -5573,6 +5614,26 @@ internal struct MobileBotChat: View {
                         .font(.caption.weight(.medium))
                         .accessibilityIdentifier(Self.semanticId("mobile-bot-attachment-\(attachment.id)"))
                 }
+                if let artifactPath = mobileGeneratedMiniAppArtifactPath(attachment.url) {
+                    Button {
+                        Task {
+                            await materializeGeneratedMiniAppArtifact(
+                                path: artifactPath,
+                                displayName: label
+                            )
+                        }
+                    } label: {
+                        Label(
+                            generatedMiniAppArtifactBusy ? "正在准备安全预览…" : "作为 Mini App 安全预览",
+                            systemImage: "app.badge.checkmark"
+                        )
+                        .font(.caption.weight(.semibold))
+                    }
+                    .disabled(generatedMiniAppArtifactBusy)
+                    .accessibilityIdentifier(
+                        Self.semanticId("mobile-bot-generated-miniapp-preview-\(attachment.id)")
+                    )
+                }
             }
         } else if let rawURL = entry.attachmentURL,
                   let destination = attachmentDestinationURL(rawURL)
@@ -5584,6 +5645,60 @@ internal struct MobileBotChat: View {
                 )
                 .font(.caption.weight(.medium))
             }
+        }
+    }
+
+    @MainActor
+    private func materializeGeneratedMiniAppArtifact(
+        path: String,
+        displayName: String
+    ) async {
+        generatedMiniAppArtifactGeneration &+= 1
+        let generation = generatedMiniAppArtifactGeneration
+        let accountKey = model.settingsNoticeAccountKey
+        let agentId = bot.id
+        generatedMiniAppArtifactBusy = true
+        defer {
+            if generation == generatedMiniAppArtifactGeneration {
+                generatedMiniAppArtifactBusy = false
+            }
+        }
+
+        do {
+            let artifact = try await model.materializeGeneratedMiniAppArtifact(
+                agentId: agentId,
+                path: path,
+                displayName: displayName
+            )
+            guard !Task.isCancelled,
+                  generation == generatedMiniAppArtifactGeneration,
+                  accountKey == model.settingsNoticeAccountKey,
+                  agentId == bot.id
+            else {
+                try? await model.cancelGeneratedMiniAppDraft(artifact.review)
+                return
+            }
+            generatedMiniAppArtifactDraft = artifact
+            errorText = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard generation == generatedMiniAppArtifactGeneration,
+                  accountKey == model.settingsNoticeAccountKey,
+                  agentId == bot.id
+            else { return }
+            errorText = "Mini App 安全预览准备失败：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func invalidateGeneratedMiniAppArtifactFlow() {
+        generatedMiniAppArtifactGeneration &+= 1
+        generatedMiniAppArtifactBusy = false
+        guard let artifact = generatedMiniAppArtifactDraft else { return }
+        generatedMiniAppArtifactDraft = nil
+        Task {
+            try? await model.cancelGeneratedMiniAppDraft(artifact.review)
         }
     }
 

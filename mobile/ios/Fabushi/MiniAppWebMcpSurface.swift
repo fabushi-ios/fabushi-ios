@@ -15,6 +15,20 @@ func generatedMiniAppPreviewDigest(_ html: String) -> String {
         .joined()
 }
 
+func generatedMiniAppReviewMatchesPreview(
+    _ review: LocalMiniAppDraftReview,
+    html: String
+) -> Bool {
+    guard review.files.count == 1,
+          let file = review.files.first,
+          file.path == "index.html",
+          file.mime == "text/html"
+    else { return false }
+    let bytes = Data(html.utf8)
+    return file.bytes == UInt64(bytes.count)
+        && file.sha256 == generatedMiniAppPreviewDigest(html)
+}
+
 func isTrustedWebMcpBridgeHost(_ host: String?) -> Bool {
     guard let host else { return false }
     return host == webMcpOriginHost || host == localWebMcpOriginHost
@@ -556,11 +570,18 @@ struct MiniAppWebMcpSurface: View {
     let plugin: MarketplacePlugin
     let model: MarketplaceModel
     let localHtmlOverride: String?
+    let generatedDraftReviewOverride: LocalMiniAppDraftReview?
 
-    init(plugin: MarketplacePlugin, model: MarketplaceModel, localHtmlOverride: String? = nil) {
+    init(
+        plugin: MarketplacePlugin,
+        model: MarketplaceModel,
+        localHtmlOverride: String? = nil,
+        generatedDraftReviewOverride: LocalMiniAppDraftReview? = nil
+    ) {
         self.plugin = plugin
         self.model = model
         self.localHtmlOverride = localHtmlOverride
+        self.generatedDraftReviewOverride = generatedDraftReviewOverride
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -572,6 +593,8 @@ struct MiniAppWebMcpSurface: View {
     @State private var generatedDraftReview: LocalMiniAppDraftReview?
     @State private var generatedInstallBusy = false
     @State private var generatedInstallMessage: String?
+    @State private var generatedInstallTask: Task<Void, Never>?
+    @State private var generatedInstallCompleted = false
 
     private var previewDigest: String? {
         localHtmlOverride.map(generatedMiniAppPreviewDigest)
@@ -685,26 +708,39 @@ struct MiniAppWebMcpSurface: View {
             let resolvedPlugin = await model.webMcpPlugin(for: plugin)
             webMcpPlugin = resolvedPlugin
             if let localHtmlOverride {
-                let hardened = hardenGeneratedMiniAppDocument(localHtmlOverride)
-                localHtml = hardened
                 localSource = nil
                 generatedDraftReview = nil
                 generatedInstallMessage = nil
-                do {
-                    let transaction = try await model.beginGeneratedMiniAppDraft()
-                    generatedDraftReview = try await model.prepareGeneratedMiniAppDraft(
-                        transaction,
-                        displayName: plugin.displayName,
-                        requestedCapabilities: [],
-                        files: [
-                            "index.html": LocalMiniAppDraftFile(
-                                mime: "text/html",
-                                data: Data(hardened.utf8)
-                            )
-                        ]
-                    )
-                } catch {
-                    generatedInstallMessage = "草稿准备失败：\(error.localizedDescription)"
+                generatedInstallCompleted = false
+                if let controlledReview = generatedDraftReviewOverride {
+                    if controlledReview.transaction.reservedAppId == plugin.pluginId,
+                       generatedMiniAppReviewMatchesPreview(controlledReview, html: localHtmlOverride)
+                    {
+                        localHtml = localHtmlOverride
+                        generatedDraftReview = controlledReview
+                    } else {
+                        localHtml = nil
+                        generatedInstallMessage = "受控 Agent 草稿摘要与预览字节不一致，已拒绝预览和安装。"
+                    }
+                } else {
+                    let hardened = hardenGeneratedMiniAppDocument(localHtmlOverride)
+                    localHtml = hardened
+                    do {
+                        let transaction = try await model.beginGeneratedMiniAppDraft()
+                        generatedDraftReview = try await model.prepareGeneratedMiniAppDraft(
+                            transaction,
+                            displayName: plugin.displayName,
+                            requestedCapabilities: [],
+                            files: [
+                                "index.html": LocalMiniAppDraftFile(
+                                    mime: "text/html",
+                                    data: Data(hardened.utf8)
+                                )
+                            ]
+                        )
+                    } catch {
+                        generatedInstallMessage = "草稿准备失败：\(error.localizedDescription)"
+                    }
                 }
             } else {
                 localHtml = nil
@@ -714,6 +750,14 @@ struct MiniAppWebMcpSurface: View {
             status = (localHtml == nil && localSource == nil)
                 ? "正在加载 Hosted WebMCP…"
                 : "正在加载本地 WebMCP…"
+        }
+        .onDisappear {
+            generatedInstallTask?.cancel()
+            generatedInstallTask = nil
+            guard !generatedInstallCompleted, let review = generatedDraftReview else { return }
+            Task {
+                try? await model.cancelGeneratedMiniAppDraft(review)
+            }
         }
     }
 
@@ -780,7 +824,8 @@ struct MiniAppWebMcpSurface: View {
                 }
 
                 Button {
-                    Task { await installGeneratedDraft(review) }
+                    generatedInstallTask?.cancel()
+                    generatedInstallTask = Task { await installGeneratedDraft(review) }
                 } label: {
                     if generatedInstallBusy {
                         ProgressView()
@@ -811,17 +856,45 @@ struct MiniAppWebMcpSurface: View {
 
     @MainActor
     private func installGeneratedDraft(_ review: LocalMiniAppDraftReview) async {
-        guard !generatedInstallBusy else { return }
+        guard !generatedInstallBusy,
+              let preview = localHtml,
+              generatedMiniAppReviewMatchesPreview(review, html: preview)
+        else {
+            generatedInstallMessage = "草稿摘要已变化，必须重新生成并再次明确批准。"
+            return
+        }
+        let accountKey = model.settingsNoticeAccountKey
         generatedInstallBusy = true
         defer { generatedInstallBusy = false }
         do {
+            try Task.checkCancellation()
             let approval = try await model.approveGeneratedMiniAppDraft(review)
+            try Task.checkCancellation()
+            guard accountKey == model.settingsNoticeAccountKey,
+                  generatedDraftReview?.transaction.transactionId == review.transaction.transactionId,
+                  generatedDraftReview?.draftDigest == review.draftDigest,
+                  let currentPreview = localHtml,
+                  generatedMiniAppReviewMatchesPreview(review, html: currentPreview)
+            else {
+                throw CancellationError()
+            }
             let signature = try await model.signApprovedGeneratedMiniApp(approval)
+            try Task.checkCancellation()
+            guard accountKey == model.settingsNoticeAccountKey,
+                  generatedDraftReview?.draftDigest == review.draftDigest
+            else {
+                throw CancellationError()
+            }
             let installed = try await model.installApprovedGeneratedMiniApp(
                 signatureBase64URL: signature,
                 approval: approval
             )
+            try Task.checkCancellation()
+            generatedInstallCompleted = true
             generatedInstallMessage = "已安装 \(installed.pluginId) \(installed.version)。"
+        } catch is CancellationError {
+            try? await model.cancelGeneratedMiniAppDraft(review)
+            generatedInstallMessage = "已取消，未安装此草稿。"
         } catch {
             generatedInstallMessage = "安装失败：\(error.localizedDescription)"
         }

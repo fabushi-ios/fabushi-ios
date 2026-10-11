@@ -109,6 +109,71 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertTrue(first.allSatisfy { $0.isHexDigit })
     }
 
+    func testAgentGeneratedMiniAppSourceRejectsExternalURLTraversalAndNonHTML() {
+        XCTAssertEqual(
+            MarketplaceModel.canonicalGeneratedMiniAppArtifactPath(
+                "/tmp/account/agent/attachments/generated.html"
+            ),
+            "/tmp/account/agent/attachments/generated.html"
+        )
+        XCTAssertNil(
+            MarketplaceModel.canonicalGeneratedMiniAppArtifactPath(
+                "/tmp/account/agent/attachments/../escape.html"
+            )
+        )
+        XCTAssertNil(
+            MarketplaceModel.canonicalGeneratedMiniAppArtifactPath(
+                "https://evil.invalid/generated.html"
+            )
+        )
+        XCTAssertNil(
+            mobileGeneratedMiniAppArtifactPath("https://evil.invalid/generated.html")
+        )
+        XCTAssertEqual(
+            mobileGeneratedMiniAppArtifactPath(
+                "file:///tmp/account/agent/attachments/generated.html"
+            ),
+            "/tmp/account/agent/attachments/generated.html"
+        )
+        XCTAssertNil(
+            mobileGeneratedMiniAppArtifactPath(
+                "file:///tmp/account/agent/attachments/generated.js"
+            )
+        )
+    }
+
+    func testControlledAgentDraftPreviewMustMatchExactReviewedBytes() {
+        let html = "<html><head></head><body>offline</body></html>"
+        let sha = generatedMiniAppPreviewDigest(html)
+        let transaction = LocalMiniAppDraftTransaction(
+            accountScope: String(repeating: "a", count: 64),
+            transactionId: String(repeating: "b", count: 32),
+            reservedAppId: "local.fabushi.test",
+            publisherId: "local.fabushi"
+        )
+        let review = LocalMiniAppDraftReview(
+            transaction: transaction,
+            draftDigest: String(repeating: "c", count: 64),
+            totalBytes: UInt64(Data(html.utf8).count),
+            requestedCapabilities: [],
+            files: [
+                LocalMiniAppDraftReviewFile(
+                    path: "index.html",
+                    sha256: sha,
+                    bytes: UInt64(Data(html.utf8).count),
+                    mime: "text/html"
+                )
+            ]
+        )
+        XCTAssertTrue(generatedMiniAppReviewMatchesPreview(review, html: html))
+        XCTAssertFalse(
+            generatedMiniAppReviewMatchesPreview(
+                review,
+                html: html.replacingOccurrences(of: "offline", with: "changed")
+            )
+        )
+    }
+
     func testGeneratedPreviewOriginNeverReceivesInstalledWebMcpBridgeTrust() {
         XCTAssertFalse(
             isTrustedWebMcpBridgeURL(
