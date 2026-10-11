@@ -467,10 +467,16 @@ impl OffloadingTranscriptMirror {
             return Ok(());
         };
 
+        let mut is_primary_dispatch = true;
+        let mut primary_succeeded = false;
         loop {
             let result = (self.executor)(&dispatch.job);
             let worker_failed = result.is_err();
             let succeeded = matches!(result, Ok(true));
+            if is_primary_dispatch {
+                primary_succeeded = succeeded;
+                is_primary_dispatch = false;
+            }
             let error_class = worker_failed.then_some("Error");
             if !succeeded {
                 warn_stale_mirror(conversation_id, "worker-write-failed", error_class);
@@ -481,7 +487,7 @@ impl OffloadingTranscriptMirror {
                 .complete_with_outcome(conversation_id, worker_failed)
                 .map_err(|error| error.to_string())?;
             if next.is_none() {
-                if succeeded {
+                if primary_succeeded {
                     self.set_previous_root_prompt_count(state.root_prompt_messages_json.len());
                 }
                 return Ok(());
@@ -761,6 +767,61 @@ mod tests {
         drop(calls);
         assert_eq!(mirror.pool.active_dispatch_count().unwrap(), 0);
         assert_eq!(mirror.pool.active_lane_count().unwrap(), 0);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn queued_successor_cannot_promote_a_failed_primary_cursor() {
+        let root = temp_root("queued-successor");
+        let pool = Arc::new(TranscriptMirrorOffloadPool::new(1));
+        let executor_pool = pool.clone();
+        let calls = Arc::new(Mutex::new(0usize));
+        let executor_calls = calls.clone();
+        let mirror = OffloadingTranscriptMirror::with_executor(
+            pool.clone(),
+            OffloadingTranscriptMirrorOptions {
+                blob_db_paths: vec![root.join("conversation.sqlite")],
+                transcripts_dir: root.join("transcripts"),
+            },
+            0,
+            Arc::new(move |job| {
+                let mut count = executor_calls.lock().unwrap();
+                *count += 1;
+                if *count == 1 {
+                    assert_eq!(job.state_blob_id, vec![1]);
+                    assert_eq!(
+                        executor_pool
+                            .submit(TranscriptMirrorJob {
+                                conversation_id: job.conversation_id.clone(),
+                                state_blob_id: vec![2],
+                                blob_db_paths: job.blob_db_paths.clone(),
+                                transcripts_dir: job.transcripts_dir.clone(),
+                            })
+                            .unwrap(),
+                        TranscriptMirrorSubmission::Coalesced
+                    );
+                    Ok(false)
+                } else {
+                    assert_eq!(job.state_blob_id, vec![2]);
+                    Ok(true)
+                }
+            }),
+        );
+        let state = TranscriptMirrorConversationState {
+            root_prompt_messages_json: vec![vec![7], vec![8], vec![9]],
+            turns: vec![],
+            summary_archives: vec![],
+        };
+
+        mirror
+            .write_worker("agent-worker", &state, Some(&[1]))
+            .unwrap();
+
+        assert_eq!(*calls.lock().unwrap(), 2);
+        assert_eq!(mirror.previous_root_prompt_count(), 0);
+        assert_eq!(pool.active_dispatch_count().unwrap(), 0);
+        assert_eq!(pool.queued_job_count().unwrap(), 0);
+        assert_eq!(pool.active_lane_count().unwrap(), 0);
         let _ = std::fs::remove_dir_all(root);
     }
 
