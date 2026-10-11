@@ -30,9 +30,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "iOS does not spawn a standalone Node daemon. Coordinator actor lifetime replaces process lifetime, process identity remains a shared contract for remote/local-runner evidence, and execution uses the native/RemoteRunner split.",
       "implementation_status": "mapped",
-      "production_evidence": "Standalone Node process lifetime is platform-inapplicable on iOS. MahayanaCoordinator now composes IOSProductionLocalExecutor and the shipping openExternal Main RPC reaches its native allowlist path. Shell/process/box remain fail-closed because no authenticated production RemoteRunner endpoint/caller is yet composed; this row is therefore mapped, not implemented.",
-      "test_evidence": "RunnerParityTests covers exact remote namespaces and the shipping fail-closed RemoteRunner port; exact-head GitHub Actions are required. A real remote shell/process/box caller plus authenticated endpoint remains required before implementation closure.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: corrected prior overclaim. Process spawning is not applicable, but the replacement product capability is not complete until RemoteRunner composition is proven."
+      "production_evidence": "Standalone Node process lifetime is platform-inapplicable on iOS. b36884be composes IOSProductionLocalExecutor with IOSGenerationFencedRemoteRunnerTransport in shipping MahayanaCoordinator; remote requests reuse MahayanaCoordinator.request -> MahayanaLocalHostSupervisor and are fenced by settled account scope revision + Host generation.",
+      "test_evidence": "RunnerParityTests covers exact remote namespaces, missing/stale account-generation fencing and shipping source composition. Exact-head Actions and a real Host/Agent remote shell/process/box caller remain required.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport/composition gap closed; standalone process spawning remains platform-inapplicable. Keep mapped until production caller evidence closes."
     },
     {
       "desktop_path": "source/local-exec-daemon/production-executor.ts",
@@ -45,9 +45,9 @@
       "ios_language": "Swift",
       "ios_platform_delta": "iOS replaces arbitrary on-device shell/file execution with an allowlisted native capability runner plus RemoteRunner for shell/process/box semantics. Unknown methods are rejected rather than treated as remote-capable.",
       "implementation_status": "mapped",
-      "production_evidence": "IOSProductionLocalExecutor is now composed by shipping MahayanaCoordinator and openExternal reaches its native allowlist. It strictly accepts only shell/process/box namespaces for RemoteRunner and rejects lookalikes/unknown methods. The shipping remote port intentionally fails closed until a real authenticated RemoteRunner endpoint and production caller are composed.",
-      "test_evidence": "RunnerParityTests covers local allowlist, exact shell/process/box namespace routing, environment scrubbing, unknown-method rejection, and fail-closed shipping remote port. Exact-head Actions pending; remote production caller evidence is still missing.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: downgraded from implemented to mapped because source existence/tests did not prove App -> Coordinator/Host -> RemoteRunner shipping reachability. No denominator change."
+      "production_evidence": "b36884be composes IOSProductionLocalExecutor by shipping MahayanaCoordinator. Local capabilities are allowlisted; shell/process/box route through RemoteRunner -> IOSGenerationFencedRemoteRunnerTransport -> MahayanaCoordinator.request -> canonical Host supervisor. Unknown methods fail closed and results are discarded across account revision or Host generation changes.",
+      "test_evidence": "RunnerParityTests covers local allowlist, exact shell/process/box routing, env scrubbing, unknown rejection, missing-account refusal, stale-result discard and source composition. Exact-head Actions and a real Host/Agent remote caller remain required.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport/composition gap closed without a second runtime owner; keep mapped until production caller/e2e evidence proves reachability."
     }
   ]
 }

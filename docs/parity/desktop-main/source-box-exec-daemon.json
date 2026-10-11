@@ -75,9 +75,9 @@
       "ios_language": "Swift / Rust",
       "ios_platform_delta": "The Desktop loopback daemon process itself remains not applicable inside the iOS sandbox. Its applicable client-visible local-exec vocabulary is preserved by the existing Coordinator-owned RemoteRunner bridge plus the iOS-owned Rust Host canonical agent.v1 schema; no second runtime or on-device unrestricted shell daemon is introduced.",
       "implementation_status": "not-applicable",
-      "production_evidence": "source/box-exec-daemon/server.swift preserves the typed box execution vocabulary and delegates to RemoteRunner when a transport is supplied. The current shipping Coordinator does not yet compose an authenticated RemoteRunner endpoint for this adapter, so source presence is not claimed as production reachability.",
-      "test_evidence": "RunnerParityTests covers typed write/redacted-read/shell-stream/stdin projection and RemoteRunner behavior. Exact-head Actions plus a real production caller/endpoint are still required for replacement closure.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: corrected prior overclaim that adapter -> RemoteRunner implied shipping reachability. The daemon process itself remains platform-inapplicable; the remote execution replacement remains pending."
+      "production_evidence": "source/box-exec-daemon/server.swift preserves typed box execution vocabulary. b36884be supplies shipping RemoteRunner with IOSGenerationFencedRemoteRunnerTransport through the canonical MahayanaCoordinator/Host request graph. A concrete Host/Agent caller into the box/local-exec replacement is still pending.",
+      "test_evidence": "RunnerParityTests covers typed write/redacted-read/shell-stream/stdin projection, RemoteRunner behavior, account/Host generation fencing and shipping composition. Exact-head Actions plus a real production caller remain required.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport composition is present; daemon process remains platform-inapplicable and caller-level replacement closure remains pending."
     }
   ]
 }
