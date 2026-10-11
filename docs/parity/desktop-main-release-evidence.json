@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "desktopSourceCommit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
-  "desktopRootTree": "ed56d351521842550b541f37de3d567f027eeda9",
+  "desktopSourceCommit": "d575b4f77b6895eea4ecaced96e5c512964bf3ed",
+  "desktopRootTree": "d4c8fe5c91635064f11673ebeefc94c1f83b5ab8",
   "status": "in-progress",
   "finalAcceptance": false,
   "finalIosCommit": null,
@@ -325,5 +325,5 @@
       "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
     }
   },
-  "note": "This matrix is intentionally pending. It is not evidence that product migration or App Store release is complete."
+  "note": "Bound to Desktop d575b4f7. Selected source is unchanged from 92fcc2b0, while FPM-001/OMA-001 add active requirement-only product work. All release criteria remain pending until exact-head implementation and independent evidence close them."
 }
