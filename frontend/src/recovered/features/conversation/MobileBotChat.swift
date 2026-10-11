@@ -6699,9 +6699,27 @@ internal struct MobileBotChat: View {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("iOS Mini App Bot only accepts governed mcp-http execution")
             }
             let arguments = routed["arguments"] as? [String: Any] ?? [:]
-            let result = try await bridge.callOfficialMcpTool(pluginId: pluginId, name: tool, arguments: arguments)
+            let result: [String: Any]
             if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
-                model.recordGlobalDharmaExecution(tool: tool, result: result, source: "bot")
+                // Global Dharma is the offline/live Mini App reference path:
+                // natural-language routing may be online, but execution must
+                // target the currently loaded, account-scoped WKWebView
+                // session. Never substitute the remote official MCP runtime.
+                let localResult = try await model.callActiveWebMcpTool(
+                    pluginId: pluginId,
+                    name: tool,
+                    arguments: arguments
+                )
+                guard let localResult = localResult as? [String: Any] else {
+                    throw MahayanaCoordinator.CoordinatorError.invalidResponse
+                }
+                result = localResult
+            } else {
+                result = try await bridge.callOfficialMcpTool(
+                    pluginId: pluginId,
+                    name: tool,
+                    arguments: arguments
+                )
             }
             removeThinking(operationId)
             entries.append(MobileChatMessage(
