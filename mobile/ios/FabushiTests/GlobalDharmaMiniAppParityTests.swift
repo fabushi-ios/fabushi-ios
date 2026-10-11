@@ -228,6 +228,37 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertFalse(isTrustedWebMcpBridgeURL(sibling, localRootURL: root))
     }
 
+    func testWebMcpBootstrapBoundsHostCallsAndCancelsThemOnPageTeardown() {
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read state",
+            approval: "none",
+            inputSchemaJSON: #"{"additionalProperties":false,"properties":{},"type":"object"}"#
+        )
+        let plugin = MarketplacePlugin(
+            pluginId: "global-dharma",
+            displayName: "全球法布施",
+            description: "test",
+            latestVersion: "1.1.0",
+            tools: [tool]
+        )
+        let session = MiniAppWebMcpBridgeSession(
+            pluginInstanceId: "global-dharma:instance-timeout",
+            nonce: "0123456789abcdef0123456789abcdef",
+            grants: ["offline.state.read"],
+            generation: 7
+        )
+        let bootstrap = webMcpBootstrapJavaScript(plugin: plugin, bridgeSession: session)
+
+        XCTAssertEqual(miniAppWebMcpHostCallTimeoutMilliseconds, 15_000)
+        XCTAssertTrue(bootstrap.contains("const hostCallTimeoutMs=15000"))
+        XCTAssertTrue(bootstrap.contains("const activePageCalls=new Set()"))
+        XCTAssertTrue(bootstrap.contains("setTimeout(()=>controller.abort(),hostCallTimeoutMs)"))
+        XCTAssertTrue(bootstrap.contains("WebMCP Tool timed out or cancelled"))
+        XCTAssertTrue(bootstrap.contains("for(const controller of activePageCalls)controller.abort()"))
+        XCTAssertTrue(bootstrap.contains("activePageCalls.clear()"))
+    }
+
     func testWebMcpToolContractPreservesCanonicalInputSchemaForNativeAndInjectedUX() throws {
         let tool = try XCTUnwrap(MarketplaceModel.webMcpToolContract(from: [
             "name": "configure",
