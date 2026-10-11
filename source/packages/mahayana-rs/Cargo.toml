@@ -69,6 +69,7 @@ license = "Apache-2.0"
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"
+ed25519-dalek = "2"
 codex-app-server-client = { path = "../codex-rs/app-server-client" }
 codex-app-server-protocol = { path = "../codex-rs/app-server-protocol" }
 codex-arg0 = { path = "../codex-rs/arg0" }

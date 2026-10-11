@@ -7,6 +7,7 @@
 //! truth.
 
 use base64::Engine as _;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use semver::{Version, VersionReq};
@@ -15,8 +16,8 @@ use sha1::Sha1;
 use sha2::{Digest, Sha256, Sha512};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fs::{self, File};
-use std::io::{self, Cursor, Read};
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 use tar::Archive;
@@ -527,6 +528,869 @@ struct NpmFullDistMetadata {
     shasum: Option<String>,
 }
 
+
+const FABAPP_MAX_COMPRESSED_BYTES: usize = 100 * 1024 * 1024;
+const FABAPP_MAX_EXPANDED_BYTES: u64 = 250 * 1024 * 1024;
+const FABAPP_MAX_FILES: usize = 10_000;
+const FABAPP_MAX_INFLATION_RATIO: u64 = 100;
+const FABAPP_HOST_API_V1: u32 = 1;
+const FABAPP_SIGNATURE_DOMAIN: &[u8] = b"fabushi.fabapp.manifest.v1\0";
+const FABAPP_DRAFT_DOMAIN: &[u8] = b"fabushi.fabapp.draft.v1\0";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FabappPackageClass {
+    Catalog,
+    LocalGenerated,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FabappNetworkPolicy {
+    pub mode: String,
+    #[serde(default)]
+    pub allowed_origins: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FabappFileRecord {
+    pub sha256: String,
+    pub bytes: u64,
+    pub mime: String,
+}
+
+fn deserialize_fabapp_files<'de, D>(
+    deserializer: D,
+) -> Result<BTreeMap<String, FabappFileRecord>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct FileMapVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for FileMapVisitor {
+        type Value = BTreeMap<String, FabappFileRecord>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("a unique mini-app file table")
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            let mut files = BTreeMap::new();
+            while let Some((path, record)) =
+                map.next_entry::<String, FabappFileRecord>()?
+            {
+                if files.insert(path.clone(), record).is_some() {
+                    return Err(serde::de::Error::custom(format!(
+                        "duplicate manifest file path {path}"
+                    )));
+                }
+            }
+            Ok(files)
+        }
+    }
+
+    deserializer.deserialize_map(FileMapVisitor)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FabappSignature {
+    pub algorithm: String,
+    pub key_id: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FabappLocalAuthorBinding {
+    pub account_scope: String,
+    pub draft_digest: String,
+    pub user_approval_id: String,
+    pub creation_transaction_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FabappManifest {
+    pub manifest_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_class: Option<FabappPackageClass>,
+    pub app_id: String,
+    pub publisher_id: String,
+    pub version: String,
+    pub display_name: String,
+    pub entrypoint: String,
+    pub runtime: String,
+    pub min_host_api: u32,
+    pub offline_core: bool,
+    #[serde(default)]
+    pub requested_capabilities: Vec<String>,
+    pub network_policy: FabappNetworkPolicy,
+    #[serde(deserialize_with = "deserialize_fabapp_files")]
+    pub files: BTreeMap<String, FabappFileRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_author: Option<FabappLocalAuthorBinding>,
+    pub signature: FabappSignature,
+}
+
+impl FabappManifest {
+    pub fn package_class(&self) -> FabappPackageClass {
+        self.package_class.unwrap_or(FabappPackageClass::Catalog)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogFabappTrust {
+    pub publisher_id: String,
+    pub app_id: String,
+    pub key_id: String,
+    pub public_key: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalGeneratedFabappTrust {
+    pub account_scope: String,
+    pub publisher_id: String,
+    pub reserved_app_id: String,
+    pub approved_draft_digest: String,
+    pub user_approval_id: String,
+    pub creation_transaction_id: String,
+    pub key_id: String,
+    pub public_key: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FabappTrustContext {
+    Catalog(CatalogFabappTrust),
+    LocalGenerated(LocalGeneratedFabappTrust),
+}
+
+#[derive(Debug, Clone)]
+pub struct VerifiedFabappPackage {
+    pub manifest: FabappManifest,
+    pub package_sha256: String,
+    pub draft_digest: String,
+    files: BTreeMap<String, Vec<u8>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FabappInstallJournal {
+    schema_version: u32,
+    transaction_id: String,
+    package_sha256: String,
+    state: String,
+    #[serde(default)]
+    staging_relative: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalApprovalRecord {
+    schema_version: u32,
+    account_scope: String,
+    app_id: String,
+    draft_digest: String,
+    user_approval_id: String,
+    creation_transaction_id: String,
+    package_sha256: String,
+    state: String,
+}
+
+pub fn compute_fabapp_draft_digest(manifest: &FabappManifest) -> Result<String, RuntimeError> {
+    let binding = serde_json::json!({
+        "manifestVersion": manifest.manifest_version,
+        "packageClass": manifest.package_class,
+        "appId": manifest.app_id,
+        "publisherId": manifest.publisher_id,
+        "version": manifest.version,
+        "displayName": manifest.display_name,
+        "entrypoint": manifest.entrypoint,
+        "runtime": manifest.runtime,
+        "minHostApi": manifest.min_host_api,
+        "offlineCore": manifest.offline_core,
+        "requestedCapabilities": manifest.requested_capabilities,
+        "networkPolicy": manifest.network_policy,
+        "files": manifest.files,
+    });
+    let canonical = jcs_canonicalize(&binding)?;
+    let mut digest = Sha256::new();
+    digest.update(FABAPP_DRAFT_DOMAIN);
+    digest.update(canonical.as_bytes());
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+pub fn verify_fabapp_bytes(
+    bytes: &[u8],
+    trust: &FabappTrustContext,
+) -> Result<VerifiedFabappPackage, RuntimeError> {
+    if bytes.is_empty() || bytes.len() > FABAPP_MAX_COMPRESSED_BYTES {
+        return Err(RuntimeError::FabappPolicy(
+            "package compressed size exceeds limit".into(),
+        ));
+    }
+    let package_sha256 = format!("{:x}", Sha256::digest(bytes));
+    let mut archive = ZipArchive::new(Cursor::new(bytes))
+        .map_err(|error| RuntimeError::FabappArchive(error.to_string()))?;
+    if archive.len() == 0 || archive.len() > FABAPP_MAX_FILES.saturating_add(1) {
+        return Err(RuntimeError::FabappPolicy(
+            "package file count exceeds limit".into(),
+        ));
+    }
+
+    let mut expanded_total = 0_u64;
+    let mut archive_files = BTreeMap::<String, Vec<u8>>::new();
+    let mut normalized_names = BTreeSet::new();
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|error| RuntimeError::FabappArchive(error.to_string()))?;
+        let name = std::str::from_utf8(entry.name_raw())
+            .map_err(|_| RuntimeError::FabappPolicy("package paths must be UTF-8".into()))?
+            .to_string();
+        validate_fabapp_path(&name)?;
+        if entry.is_dir() {
+            return Err(RuntimeError::FabappPolicy(
+                "explicit directory entries are not allowed".into(),
+            ));
+        }
+        if let Some(mode) = entry.unix_mode() {
+            let kind = mode & 0o170000;
+            if kind != 0 && kind != 0o100000 {
+                return Err(RuntimeError::FabappPolicy(
+                    "links and special files are not allowed".into(),
+                ));
+            }
+            if mode & 0o111 != 0 {
+                return Err(RuntimeError::FabappPolicy(
+                    "executable permission bits are not allowed".into(),
+                ));
+            }
+        }
+        let normalized = name.to_ascii_lowercase();
+        if !normalized_names.insert(normalized) {
+            return Err(RuntimeError::FabappPolicy(
+                "duplicate or case-colliding package path".into(),
+            ));
+        }
+        expanded_total = expanded_total
+            .checked_add(entry.size())
+            .ok_or_else(|| RuntimeError::FabappPolicy("expanded size overflow".into()))?;
+        if expanded_total > FABAPP_MAX_EXPANDED_BYTES {
+            return Err(RuntimeError::FabappPolicy(
+                "expanded package size exceeds limit".into(),
+            ));
+        }
+        let compressed = entry.compressed_size();
+        if entry.size() > 0
+            && (compressed == 0
+                || entry.size()
+                    > compressed.saturating_mul(FABAPP_MAX_INFLATION_RATIO))
+        {
+            return Err(RuntimeError::FabappPolicy(
+                "package entry inflation ratio exceeds limit".into(),
+            ));
+        }
+        let capacity = usize::try_from(entry.size())
+            .map_err(|_| RuntimeError::FabappPolicy("entry size overflow".into()))?;
+        let mut data = Vec::with_capacity(capacity.min(4 * 1024 * 1024));
+        entry
+            .take(entry.size().saturating_add(1))
+            .read_to_end(&mut data)
+            .map_err(RuntimeError::Io)?;
+        if data.len() as u64 != entry.size() {
+            return Err(RuntimeError::FabappPolicy(
+                "package entry size changed while reading".into(),
+            ));
+        }
+        archive_files.insert(name, data);
+    }
+
+    let manifest_bytes = archive_files
+        .remove("manifest.json")
+        .ok_or_else(|| RuntimeError::FabappManifest("root manifest.json is required".into()))?;
+    let manifest: FabappManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|error| RuntimeError::FabappManifest(error.to_string()))?;
+    validate_fabapp_manifest(&manifest)?;
+
+    if archive_files.len() != manifest.files.len()
+        || archive_files.keys().any(|path| !manifest.files.contains_key(path))
+        || manifest.files.keys().any(|path| !archive_files.contains_key(path))
+    {
+        return Err(RuntimeError::FabappPolicy(
+            "archive files must exactly match manifest file table".into(),
+        ));
+    }
+
+    for (path, record) in &manifest.files {
+        let data = archive_files
+            .get(path)
+            .ok_or_else(|| RuntimeError::FabappPolicy(format!("missing manifest file {path}")))?;
+        if data.len() as u64 != record.bytes {
+            return Err(RuntimeError::FabappPolicy(format!(
+                "size mismatch for {path}"
+            )));
+        }
+        let actual = format!("{:x}", Sha256::digest(data));
+        if actual != record.sha256 {
+            return Err(RuntimeError::FabappPolicy(format!(
+                "digest mismatch for {path}"
+            )));
+        }
+        let expected_mime = fabapp_expected_mime(path).ok_or_else(|| {
+            RuntimeError::FabappPolicy(format!("unsupported packaged resource type {path}"))
+        })?;
+        if record.mime != expected_mime {
+            return Err(RuntimeError::FabappPolicy(format!(
+                "MIME mismatch for {path}: expected {expected_mime}"
+            )));
+        }
+    }
+
+    let draft_digest = compute_fabapp_draft_digest(&manifest)?;
+    verify_fabapp_trust(&manifest, trust, &draft_digest)?;
+    verify_fabapp_signature(&manifest, trust)?;
+
+    Ok(VerifiedFabappPackage {
+        manifest,
+        package_sha256,
+        draft_digest,
+        files: archive_files,
+    })
+}
+
+fn validate_fabapp_manifest(manifest: &FabappManifest) -> Result<(), RuntimeError> {
+    if manifest.manifest_version != 1 {
+        return Err(RuntimeError::FabappManifest(
+            "unsupported manifestVersion".into(),
+        ));
+    }
+    validate_fabapp_reverse_id(&manifest.app_id, "appId")?;
+    validate_fabapp_reverse_id(&manifest.publisher_id, "publisherId")?;
+    Version::parse(manifest.version.trim()).map_err(|_| {
+        RuntimeError::FabappManifest("version must be strict semantic version".into())
+    })?;
+    if manifest.display_name.trim().is_empty() || manifest.display_name.chars().count() > 128 {
+        return Err(RuntimeError::FabappManifest(
+            "displayName is missing or too long".into(),
+        ));
+    }
+    if manifest.runtime != "web" {
+        return Err(RuntimeError::FabappManifest(
+            "runtime must be web".into(),
+        ));
+    }
+    if manifest.min_host_api == 0 || manifest.min_host_api > FABAPP_HOST_API_V1 {
+        return Err(RuntimeError::FabappManifest(
+            "minHostApi is unsupported".into(),
+        ));
+    }
+    validate_fabapp_path(&manifest.entrypoint)?;
+    if manifest.entrypoint == "manifest.json" || !manifest.files.contains_key(&manifest.entrypoint) {
+        return Err(RuntimeError::FabappManifest(
+            "entrypoint must name a listed package resource".into(),
+        ));
+    }
+    if fabapp_expected_mime(&manifest.entrypoint) != Some("text/html") {
+        return Err(RuntimeError::FabappManifest(
+            "entrypoint must be an HTML resource".into(),
+        ));
+    }
+    if manifest.files.is_empty() || manifest.files.len() > FABAPP_MAX_FILES {
+        return Err(RuntimeError::FabappManifest(
+            "files table is empty or too large".into(),
+        ));
+    }
+
+    let mut normalized_paths = BTreeSet::new();
+    for (path, record) in &manifest.files {
+        validate_fabapp_path(path)?;
+        if path == "manifest.json" {
+            return Err(RuntimeError::FabappManifest(
+                "manifest.json may not appear in files table".into(),
+            ));
+        }
+        if !normalized_paths.insert(path.to_ascii_lowercase()) {
+            return Err(RuntimeError::FabappManifest(
+                "files table contains case-colliding paths".into(),
+            ));
+        }
+        if record.sha256.len() != 64
+            || !record.sha256.bytes().all(|byte| {
+                byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()
+            })
+        {
+            return Err(RuntimeError::FabappManifest(format!(
+                "invalid lowercase sha256 for {path}"
+            )));
+        }
+        if record.bytes > FABAPP_MAX_EXPANDED_BYTES {
+            return Err(RuntimeError::FabappManifest(format!(
+                "declared file size too large for {path}"
+            )));
+        }
+    }
+
+    let mut capabilities = BTreeSet::new();
+    for capability in &manifest.requested_capabilities {
+        if capability.is_empty()
+            || capability.len() > 128
+            || !capability.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
+            })
+            || !capabilities.insert(capability)
+        {
+            return Err(RuntimeError::FabappManifest(
+                "requestedCapabilities contains an invalid or duplicate value".into(),
+            ));
+        }
+    }
+
+    match manifest.network_policy.mode.as_str() {
+        "deny" => {
+            if !manifest.network_policy.allowed_origins.is_empty() {
+                return Err(RuntimeError::FabappManifest(
+                    "deny networkPolicy may not carry allowedOrigins".into(),
+                ));
+            }
+        }
+        "allowlist" => {
+            let mut origins = BTreeSet::new();
+            for origin in &manifest.network_policy.allowed_origins {
+                let url = Url::parse(origin)
+                    .map_err(|_| RuntimeError::FabappManifest("invalid allowedOrigin".into()))?;
+                if url.scheme() != "https"
+                    || url.host_str().is_none()
+                    || !url.username().is_empty()
+                    || url.password().is_some()
+                    || url.query().is_some()
+                    || url.fragment().is_some()
+                    || url.path() != "/"
+                    || !origins.insert(origin)
+                {
+                    return Err(RuntimeError::FabappManifest(
+                        "allowedOrigins must be unique HTTPS origins".into(),
+                    ));
+                }
+            }
+        }
+        _ => {
+            return Err(RuntimeError::FabappManifest(
+                "networkPolicy.mode must be deny or allowlist".into(),
+            ));
+        }
+    }
+
+    if manifest.signature.algorithm != "Ed25519"
+        || manifest.signature.key_id.trim().is_empty()
+        || manifest.signature.value.trim().is_empty()
+    {
+        return Err(RuntimeError::FabappManifest(
+            "signature must use Ed25519 with keyId/value".into(),
+        ));
+    }
+
+    match manifest.package_class() {
+        FabappPackageClass::Catalog => {
+            if manifest.local_author.is_some() {
+                return Err(RuntimeError::FabappManifest(
+                    "catalog package may not carry localAuthor".into(),
+                ));
+            }
+        }
+        FabappPackageClass::LocalGenerated => {
+            let binding = manifest.local_author.as_ref().ok_or_else(|| {
+                RuntimeError::FabappManifest(
+                    "local-generated package requires localAuthor binding".into(),
+                )
+            })?;
+            validate_hex_digest(&binding.account_scope, "local author accountScope")?;
+            validate_hex_digest(&binding.draft_digest, "local author draftDigest")?;
+            validate_identifier(&binding.user_approval_id, "userApprovalId")?;
+            validate_identifier(
+                &binding.creation_transaction_id,
+                "creationTransactionId",
+            )?;
+            for capability in &manifest.requested_capabilities {
+                let lowered = capability.to_ascii_lowercase();
+                if lowered.contains("shell")
+                    || lowered.contains("host")
+                    || lowered.contains("computer")
+                    || lowered.contains("mcp")
+                    || lowered.contains("native")
+                    || lowered.contains("payment")
+                    || lowered.contains("wallet")
+                    || lowered.contains("network")
+                {
+                    return Err(RuntimeError::FabappPolicy(format!(
+                        "local-generated package may not request privileged capability {capability}"
+                    )));
+                }
+            }
+            if manifest.network_policy.mode != "deny"
+                || !manifest.network_policy.allowed_origins.is_empty()
+            {
+                return Err(RuntimeError::FabappPolicy(
+                    "local-generated package network egress is denied in v1".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn verify_fabapp_trust(
+    manifest: &FabappManifest,
+    trust: &FabappTrustContext,
+    computed_draft_digest: &str,
+) -> Result<(), RuntimeError> {
+    match (manifest.package_class(), trust) {
+        (FabappPackageClass::Catalog, FabappTrustContext::Catalog(trust)) => {
+            if manifest.publisher_id != trust.publisher_id
+                || manifest.app_id != trust.app_id
+                || manifest.signature.key_id != trust.key_id
+            {
+                return Err(RuntimeError::FabappTrust(
+                    "catalog publisher/app/key binding mismatch".into(),
+                ));
+            }
+        }
+        (
+            FabappPackageClass::LocalGenerated,
+            FabappTrustContext::LocalGenerated(trust),
+        ) => {
+            let binding = manifest.local_author.as_ref().ok_or_else(|| {
+                RuntimeError::FabappTrust("local author binding missing".into())
+            })?;
+            if manifest.publisher_id != trust.publisher_id
+                || manifest.app_id != trust.reserved_app_id
+                || manifest.signature.key_id != trust.key_id
+                || binding.account_scope != trust.account_scope
+                || binding.draft_digest != trust.approved_draft_digest
+                || binding.draft_digest != computed_draft_digest
+                || binding.user_approval_id != trust.user_approval_id
+                || binding.creation_transaction_id != trust.creation_transaction_id
+            {
+                return Err(RuntimeError::FabappTrust(
+                    "local author account/draft/approval/transaction binding mismatch".into(),
+                ));
+            }
+        }
+        (FabappPackageClass::Catalog, FabappTrustContext::LocalGenerated(_))
+        | (FabappPackageClass::LocalGenerated, FabappTrustContext::Catalog(_)) => {
+            return Err(RuntimeError::FabappTrust(
+                "package class and trust root are disjoint".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn verify_fabapp_signature(
+    manifest: &FabappManifest,
+    trust: &FabappTrustContext,
+) -> Result<(), RuntimeError> {
+    let key_bytes = match trust {
+        FabappTrustContext::Catalog(trust) => trust.public_key,
+        FabappTrustContext::LocalGenerated(trust) => trust.public_key,
+    };
+    let key = VerifyingKey::from_bytes(&key_bytes)
+        .map_err(|_| RuntimeError::FabappTrust("invalid Ed25519 public key".into()))?;
+    let signature_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(manifest.signature.value.as_bytes())
+        .map_err(|_| RuntimeError::FabappSignature)?;
+    let signature = Signature::from_slice(&signature_bytes)
+        .map_err(|_| RuntimeError::FabappSignature)?;
+    let mut unsigned = serde_json::to_value(manifest)
+        .map_err(|error| RuntimeError::FabappManifest(error.to_string()))?;
+    let object = unsigned
+        .as_object_mut()
+        .ok_or_else(|| RuntimeError::FabappManifest("manifest must be object".into()))?;
+    object.remove("signature");
+    let canonical = jcs_canonicalize(&unsigned)?;
+    let mut message = Vec::with_capacity(FABAPP_SIGNATURE_DOMAIN.len() + canonical.len());
+    message.extend_from_slice(FABAPP_SIGNATURE_DOMAIN);
+    message.extend_from_slice(canonical.as_bytes());
+    key.verify(&message, &signature)
+        .map_err(|_| RuntimeError::FabappSignature)
+}
+
+fn jcs_canonicalize(value: &serde_json::Value) -> Result<String, RuntimeError> {
+    fn write_value(
+        value: &serde_json::Value,
+        output: &mut String,
+    ) -> Result<(), RuntimeError> {
+        match value {
+            serde_json::Value::Null => output.push_str("null"),
+            serde_json::Value::Bool(value) => {
+                output.push_str(if *value { "true" } else { "false" })
+            }
+            serde_json::Value::Number(value) => {
+                if value.as_i64().is_none() && value.as_u64().is_none() {
+                    return Err(RuntimeError::FabappManifest(
+                        "floating-point manifest numbers are not allowed".into(),
+                    ));
+                }
+                output.push_str(&value.to_string());
+            }
+            serde_json::Value::String(value) => output.push_str(
+                &serde_json::to_string(value)
+                    .map_err(|error| RuntimeError::FabappManifest(error.to_string()))?,
+            ),
+            serde_json::Value::Array(values) => {
+                output.push('[');
+                for (index, value) in values.iter().enumerate() {
+                    if index != 0 {
+                        output.push(',');
+                    }
+                    write_value(value, output)?;
+                }
+                output.push(']');
+            }
+            serde_json::Value::Object(values) => {
+                output.push('{');
+                let mut keys = values.keys().collect::<Vec<_>>();
+                keys.sort();
+                for (index, key) in keys.into_iter().enumerate() {
+                    if index != 0 {
+                        output.push(',');
+                    }
+                    output.push_str(
+                        &serde_json::to_string(key)
+                            .map_err(|error| RuntimeError::FabappManifest(error.to_string()))?,
+                    );
+                    output.push(':');
+                    write_value(&values[key], output)?;
+                }
+                output.push('}');
+            }
+        }
+        Ok(())
+    }
+
+    let mut output = String::new();
+    write_value(value, &mut output)?;
+    Ok(output)
+}
+
+fn validate_fabapp_reverse_id(
+    value: &str,
+    kind: &'static str,
+) -> Result<(), RuntimeError> {
+    if value.is_empty()
+        || value.len() > 128
+        || value.starts_with('.')
+        || value.ends_with('.')
+        || value.split('.').count() < 2
+        || value.split('.').any(|segment| {
+            segment.is_empty()
+                || !segment.bytes().all(|byte| {
+                    byte.is_ascii_lowercase()
+                        || byte.is_ascii_digit()
+                        || byte == b'-'
+                })
+                || segment.starts_with('-')
+                || segment.ends_with('-')
+        })
+    {
+        return Err(RuntimeError::InvalidIdentifier {
+            kind,
+            value: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_hex_digest(value: &str, label: &str) -> Result<(), RuntimeError> {
+    if value.len() != 64
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()
+        })
+    {
+        return Err(RuntimeError::FabappManifest(format!(
+            "{label} must be lowercase SHA-256"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_fabapp_path(path: &str) -> Result<(), RuntimeError> {
+    if path.is_empty()
+        || path.len() > 1024
+        || !path.is_ascii()
+        || path.bytes().any(|byte| byte < 0x20 || byte == b'\\' || byte == b':')
+        || path.starts_with('/')
+        || path.ends_with('/')
+        || path.contains("//")
+        || path.split('/').any(|segment| {
+            segment.is_empty() || segment == "." || segment == ".."
+        })
+    {
+        return Err(RuntimeError::FabappPolicy(format!(
+            "unsafe or ambiguous package path {path:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn fabapp_expected_mime(path: &str) -> Option<&'static str> {
+    let extension = Path::new(path)
+        .extension()?
+        .to_str()?
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "html" | "htm" => Some("text/html"),
+        "css" => Some("text/css"),
+        "js" | "mjs" => Some("text/javascript"),
+        "json" => Some("application/json"),
+        "wasm" => Some("application/wasm"),
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "svg" => Some("image/svg+xml"),
+        "txt" => Some("text/plain"),
+        "woff" => Some("font/woff"),
+        "woff2" => Some("font/woff2"),
+        "ico" => Some("image/x-icon"),
+        _ => None,
+    }
+}
+
+fn runtime_atomic_write_json<T: Serialize>(
+    path: &Path,
+    value: &T,
+) -> Result<(), RuntimeError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let bytes = serde_json::to_vec_pretty(value)
+        .map_err(|error| RuntimeError::FabappInstall(error.to_string()))?;
+    let temp = path.with_extension(format!("tmp-{}", Uuid::new_v4()));
+    fs::write(&temp, bytes)?;
+    #[cfg(windows)]
+    if path.exists() {
+        fs::remove_file(path)?;
+    }
+    fs::rename(temp, path)?;
+    Ok(())
+}
+
+fn recover_fabapp_install_journal(plugin_root: &Path) -> Result<(), RuntimeError> {
+    let path = plugin_root.join("install-journal.json");
+    if !path.is_file() {
+        return Ok(());
+    }
+    let mut journal: FabappInstallJournal = serde_json::from_slice(&fs::read(&path)?)
+        .map_err(|error| RuntimeError::FabappInstall(error.to_string()))?;
+    if journal.schema_version != 1 || journal.state == "completed" {
+        return Ok(());
+    }
+    if let Some(relative) = journal.staging_relative.as_deref() {
+        let relative = safe_relative_path(relative)?;
+        let staging = plugin_root.join(relative);
+        if staging.starts_with(plugin_root) && staging.is_dir() {
+            fs::remove_dir_all(staging)?;
+        }
+    }
+    journal.state = "recovered-aborted".into();
+    journal.staging_relative = None;
+    runtime_atomic_write_json(&path, &journal)
+}
+
+fn reserve_local_generated_approval(
+    plugin_root: &Path,
+    verified: &VerifiedFabappPackage,
+    trust: &LocalGeneratedFabappTrust,
+) -> Result<PathBuf, RuntimeError> {
+    let approvals = plugin_root.join("approvals");
+    fs::create_dir_all(&approvals)?;
+    validate_identifier(&trust.user_approval_id, "userApprovalId")?;
+    let path = approvals.join(format!("{}.json", trust.user_approval_id));
+    let expected = LocalApprovalRecord {
+        schema_version: 1,
+        account_scope: trust.account_scope.clone(),
+        app_id: trust.reserved_app_id.clone(),
+        draft_digest: trust.approved_draft_digest.clone(),
+        user_approval_id: trust.user_approval_id.clone(),
+        creation_transaction_id: trust.creation_transaction_id.clone(),
+        package_sha256: verified.package_sha256.clone(),
+        state: "reserved".into(),
+    };
+    if path.is_file() {
+        let existing: LocalApprovalRecord = serde_json::from_slice(&fs::read(&path)?)
+            .map_err(|error| RuntimeError::FabappInstall(error.to_string()))?;
+        let same_transaction = existing.schema_version == 1
+            && existing.account_scope == expected.account_scope
+            && existing.app_id == expected.app_id
+            && existing.draft_digest == expected.draft_digest
+            && existing.user_approval_id == expected.user_approval_id
+            && existing.creation_transaction_id == expected.creation_transaction_id
+            && existing.package_sha256 == expected.package_sha256;
+        if same_transaction && existing.state == "reserved" {
+            return Ok(path);
+        }
+        return Err(RuntimeError::FabappApprovalReplay);
+    }
+    let bytes = serde_json::to_vec_pretty(&expected)
+        .map_err(|error| RuntimeError::FabappInstall(error.to_string()))?;
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&path)
+        .map_err(|error| {
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                RuntimeError::FabappApprovalReplay
+            } else {
+                RuntimeError::Io(error)
+            }
+        })?;
+    file.write_all(&bytes)?;
+    file.sync_all()?;
+    Ok(path)
+}
+
+fn complete_local_generated_approval(
+    path: &Path,
+) -> Result<(), RuntimeError> {
+    let mut record: LocalApprovalRecord = serde_json::from_slice(&fs::read(path)?)
+        .map_err(|error| RuntimeError::FabappInstall(error.to_string()))?;
+    if record.state != "reserved" {
+        return Err(RuntimeError::FabappApprovalReplay);
+    }
+    record.state = "completed".into();
+    runtime_atomic_write_json(path, &record)
+}
+
+fn verify_installed_fabapp_dir(
+    root: &Path,
+    verified: &VerifiedFabappPackage,
+) -> Result<(), RuntimeError> {
+    for (path, record) in &verified.manifest.files {
+        let relative = safe_relative_path(path)?;
+        let file = root.join(relative);
+        if !file.is_file() {
+            return Err(RuntimeError::FabappInstall(format!(
+                "immutable package file missing: {path}"
+            )));
+        }
+        let bytes = fs::read(file)?;
+        if bytes.len() as u64 != record.bytes
+            || format!("{:x}", Sha256::digest(&bytes)) != record.sha256
+        {
+            return Err(RuntimeError::FabappInstall(format!(
+                "immutable package file changed: {path}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledPluginPointer {
@@ -568,10 +1432,28 @@ impl PluginInstaller {
         platform: &str,
         preferred_runtimes: &[&str],
     ) -> Result<InstalledPluginPointer, RuntimeError> {
+        self.install_with_commit_guard(release, platform, preferred_runtimes, || true)
+    }
+
+    pub fn install_with_commit_guard<F>(
+        &self,
+        release: &ExternalReleaseManifest,
+        platform: &str,
+        preferred_runtimes: &[&str],
+        commit_guard: F,
+    ) -> Result<InstalledPluginPointer, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         release.validate()?;
         let artifact = release.select_artifact(platform, preferred_runtimes)?;
         let bytes = self.resolver.download_verified(artifact)?;
-        self.install_verified_bytes(release, artifact, &bytes)
+        self.install_verified_bytes_with_commit_guard(
+            release,
+            artifact,
+            &bytes,
+            commit_guard,
+        )
     }
 
     pub fn install_verified_bytes(
@@ -580,6 +1462,19 @@ impl PluginInstaller {
         artifact: &ReleaseArtifact,
         bytes: &[u8],
     ) -> Result<InstalledPluginPointer, RuntimeError> {
+        self.install_verified_bytes_with_commit_guard(release, artifact, bytes, || true)
+    }
+
+    fn install_verified_bytes_with_commit_guard<F>(
+        &self,
+        release: &ExternalReleaseManifest,
+        artifact: &ReleaseArtifact,
+        bytes: &[u8],
+        commit_guard: F,
+    ) -> Result<InstalledPluginPointer, RuntimeError>
+    where
+        F: Fn() -> bool,
+    {
         release.validate()?;
         if !release
             .artifacts
@@ -591,6 +1486,9 @@ impl PluginInstaller {
             ));
         }
         verify_bytes(bytes, &artifact.sha256, artifact.size)?;
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         let plugin_root = self.root.join(&release.plugin_id);
         if let Some(active) = self.active(&release.plugin_id)?
             && compare_install_versions(&release.version, &active.version) == Ordering::Less
@@ -604,6 +1502,9 @@ impl PluginInstaller {
         fs::create_dir_all(&versions_root).map_err(RuntimeError::Io)?;
         let final_dir = versions_root.join(&release.version).join(&artifact.id);
         if final_dir.exists() {
+            if !commit_guard() {
+                return Err(RuntimeError::StaleAccountContext);
+            }
             let pointer = InstalledPluginPointer {
                 plugin_id: release.plugin_id.clone(),
                 version: release.version.clone(),
@@ -643,6 +1544,10 @@ impl PluginInstaller {
                 return Err(RuntimeError::MissingEntry(artifact.entry.clone().unwrap()));
             }
         }
+        if !commit_guard() {
+            let _ = fs::remove_dir_all(&staging);
+            return Err(RuntimeError::StaleAccountContext);
+        }
         if let Some(parent) = final_dir.parent() {
             fs::create_dir_all(parent).map_err(RuntimeError::Io)?;
         }
@@ -657,7 +1562,112 @@ impl PluginInstaller {
             requested_permissions: release.permissions.clone(),
             installed_path: final_dir.to_string_lossy().into_owned(),
         };
+        if !commit_guard() {
+            return Err(RuntimeError::StaleAccountContext);
+        }
         self.activate(&plugin_root, &pointer)?;
+        Ok(pointer)
+    }
+
+    pub fn install_fabapp_bytes(
+        &self,
+        bytes: &[u8],
+        trust: &FabappTrustContext,
+    ) -> Result<InstalledPluginPointer, RuntimeError> {
+        let verified = verify_fabapp_bytes(bytes, trust)?;
+        let plugin_root = self.root.join(&verified.manifest.app_id);
+        fs::create_dir_all(&plugin_root)?;
+        recover_fabapp_install_journal(&plugin_root)?;
+
+        if let Some(active) = self.active(&verified.manifest.app_id)?
+            && compare_install_versions(&verified.manifest.version, &active.version) == Ordering::Less
+        {
+            return Err(RuntimeError::DowngradeBlocked {
+                current: active.version,
+                candidate: verified.manifest.version.clone(),
+            });
+        }
+
+        let approval_path = match trust {
+            FabappTrustContext::LocalGenerated(local) => {
+                Some(reserve_local_generated_approval(&plugin_root, &verified, local)?)
+            }
+            FabappTrustContext::Catalog(_) => None,
+        };
+
+        let transaction_id = match trust {
+            FabappTrustContext::LocalGenerated(local) => {
+                local.creation_transaction_id.clone()
+            }
+            FabappTrustContext::Catalog(_) => {
+                format!("catalog-{}", verified.package_sha256)
+            }
+        };
+        let staging_relative = format!(".fabapp-staging/{}", Uuid::new_v4());
+        let staging = plugin_root.join(&staging_relative);
+        let journal_path = plugin_root.join("install-journal.json");
+        let mut journal = FabappInstallJournal {
+            schema_version: 1,
+            transaction_id,
+            package_sha256: verified.package_sha256.clone(),
+            state: "verified".into(),
+            staging_relative: Some(staging_relative.clone()),
+        };
+        runtime_atomic_write_json(&journal_path, &journal)?;
+
+        fs::create_dir_all(&staging)?;
+        for (path, data) in &verified.files {
+            let relative = safe_relative_path(path)?;
+            let target = staging.join(relative);
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(target, data)?;
+        }
+        verify_installed_fabapp_dir(&staging, &verified)?;
+        journal.state = "staged".into();
+        runtime_atomic_write_json(&journal_path, &journal)?;
+
+        let final_dir = plugin_root
+            .join("versions")
+            .join(&verified.manifest.version)
+            .join(&verified.package_sha256);
+        if final_dir.is_dir() {
+            verify_installed_fabapp_dir(&final_dir, &verified)?;
+            fs::remove_dir_all(&staging)?;
+        } else {
+            if let Some(parent) = final_dir.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::rename(&staging, &final_dir)?;
+        }
+        journal.state = "content-moved".into();
+        journal.staging_relative = None;
+        runtime_atomic_write_json(&journal_path, &journal)?;
+
+        let metadata_root = plugin_root.join(".fabapp-manifests");
+        fs::create_dir_all(&metadata_root)?;
+        runtime_atomic_write_json(
+            &metadata_root.join(format!("{}.json", verified.package_sha256)),
+            &verified.manifest,
+        )?;
+
+        let pointer = InstalledPluginPointer {
+            plugin_id: verified.manifest.app_id.clone(),
+            version: verified.manifest.version.clone(),
+            artifact_id: format!("fabapp-{}", verified.package_sha256),
+            artifact_sha256: verified.package_sha256.clone(),
+            runtime: "local-web".into(),
+            entry: Some(verified.manifest.entrypoint.clone()),
+            requested_permissions: verified.manifest.requested_capabilities.clone(),
+            installed_path: final_dir.to_string_lossy().into_owned(),
+        };
+        self.activate(&plugin_root, &pointer)?;
+        journal.state = "completed".into();
+        runtime_atomic_write_json(&journal_path, &journal)?;
+        if let Some(path) = approval_path {
+            complete_local_generated_approval(&path)?;
+        }
         Ok(pointer)
     }
 
@@ -1727,6 +2737,22 @@ pub enum RuntimeError {
     SizeMismatch,
     #[error("artifact SHA-256 mismatch")]
     DigestMismatch,
+    #[error("plugin operation belongs to a stale account context")]
+    StaleAccountContext,
+    #[error("invalid .fabapp manifest: {0}")]
+    FabappManifest(String),
+    #[error(".fabapp archive rejected: {0}")]
+    FabappArchive(String),
+    #[error(".fabapp policy rejected package: {0}")]
+    FabappPolicy(String),
+    #[error(".fabapp trust binding rejected package: {0}")]
+    FabappTrust(String),
+    #[error(".fabapp Ed25519 signature verification failed")]
+    FabappSignature,
+    #[error(".fabapp installation journal failed: {0}")]
+    FabappInstall(String),
+    #[error("local-generated approval was replayed or already consumed")]
+    FabappApprovalReplay,
     #[error("refusing to downgrade plugin from {current} to {candidate}")]
     DowngradeBlocked { current: String, candidate: String },
     #[error("npm package integrity mismatch")]
@@ -1780,6 +2806,277 @@ mod tests {
         }
         let encoder = builder.into_inner().unwrap();
         encoder.finish().unwrap()
+    }
+
+
+    fn local_fabapp_manifest(
+        signing: &ed25519_dalek::SigningKey,
+        account_scope: &str,
+        app_id: &str,
+        approval_id: &str,
+        transaction_id: &str,
+        files: &[(&str, &[u8], &str)],
+    ) -> FabappManifest {
+        let mut file_table = BTreeMap::new();
+        for (path, bytes, mime) in files {
+            file_table.insert(
+                (*path).to_string(),
+                FabappFileRecord {
+                    sha256: format!("{:x}", Sha256::digest(bytes)),
+                    bytes: bytes.len() as u64,
+                    mime: (*mime).to_string(),
+                },
+            );
+        }
+        let mut manifest = FabappManifest {
+            manifest_version: 1,
+            package_class: Some(FabappPackageClass::LocalGenerated),
+            app_id: app_id.to_string(),
+            publisher_id: "local.fabushi".into(),
+            version: "1.0.0".into(),
+            display_name: "Private App".into(),
+            entrypoint: "index.html".into(),
+            runtime: "web".into(),
+            min_host_api: 1,
+            offline_core: true,
+            requested_capabilities: Vec::new(),
+            network_policy: FabappNetworkPolicy {
+                mode: "deny".into(),
+                allowed_origins: Vec::new(),
+            },
+            files: file_table,
+            local_author: Some(FabappLocalAuthorBinding {
+                account_scope: account_scope.into(),
+                draft_digest: "0".repeat(64),
+                user_approval_id: approval_id.into(),
+                creation_transaction_id: transaction_id.into(),
+            }),
+            signature: FabappSignature {
+                algorithm: "Ed25519".into(),
+                key_id: "device-local-key-1".into(),
+                value: String::new(),
+            },
+        };
+        let draft = compute_fabapp_draft_digest(&manifest).unwrap();
+        manifest.local_author.as_mut().unwrap().draft_digest = draft;
+        let mut unsigned = serde_json::to_value(&manifest).unwrap();
+        unsigned.as_object_mut().unwrap().remove("signature");
+        let canonical = jcs_canonicalize(&unsigned).unwrap();
+        let mut message = FABAPP_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(canonical.as_bytes());
+        use ed25519_dalek::Signer as _;
+        let signature = signing.sign(&message);
+        manifest.signature.value =
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature.to_bytes());
+        manifest
+    }
+
+    fn fabapp_zip(manifest: &FabappManifest, files: &[(&str, &[u8])]) -> Vec<u8> {
+        use zip::write::SimpleFileOptions;
+        let cursor = Cursor::new(Vec::<u8>::new());
+        let mut writer = zip::ZipWriter::new(cursor);
+        let options = SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated)
+            .unix_permissions(0o644);
+        writer.start_file("manifest.json", options).unwrap();
+        writer
+            .write_all(&serde_json::to_vec(manifest).unwrap())
+            .unwrap();
+        for (path, bytes) in files {
+            writer.start_file(*path, options).unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    fn local_trust(
+        signing: &ed25519_dalek::SigningKey,
+        manifest: &FabappManifest,
+    ) -> LocalGeneratedFabappTrust {
+        let binding = manifest.local_author.as_ref().unwrap();
+        LocalGeneratedFabappTrust {
+            account_scope: binding.account_scope.clone(),
+            publisher_id: manifest.publisher_id.clone(),
+            reserved_app_id: manifest.app_id.clone(),
+            approved_draft_digest: binding.draft_digest.clone(),
+            user_approval_id: binding.user_approval_id.clone(),
+            creation_transaction_id: binding.creation_transaction_id.clone(),
+            key_id: manifest.signature.key_id.clone(),
+            public_key: signing.verifying_key().to_bytes(),
+        }
+    }
+
+    #[test]
+    fn fabapp_local_generated_verifier_binds_account_draft_and_approval() {
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[7_u8; 32]);
+        let scope = format!("{:x}", Sha256::digest(b"account-a"));
+        let html = b"<!doctype html><title>Offline</title>";
+        let manifest = local_fabapp_manifest(
+            &signing,
+            &scope,
+            "private.fabushi.app-1",
+            "approval-1",
+            "transaction-1",
+            &[("index.html", html, "text/html")],
+        );
+        let package = fabapp_zip(&manifest, &[("index.html", html)]);
+        let trust = local_trust(&signing, &manifest);
+        let verified =
+            verify_fabapp_bytes(&package, &FabappTrustContext::LocalGenerated(trust.clone()))
+                .unwrap();
+        assert_eq!(verified.manifest.app_id, "private.fabushi.app-1");
+
+        let mut wrong_account = trust.clone();
+        wrong_account.account_scope = format!("{:x}", Sha256::digest(b"account-b"));
+        assert!(matches!(
+            verify_fabapp_bytes(
+                &package,
+                &FabappTrustContext::LocalGenerated(wrong_account)
+            ),
+            Err(RuntimeError::FabappTrust(_))
+        ));
+
+        let mut wrong_approval = trust.clone();
+        wrong_approval.user_approval_id = "approval-2".into();
+        assert!(matches!(
+            verify_fabapp_bytes(
+                &package,
+                &FabappTrustContext::LocalGenerated(wrong_approval)
+            ),
+            Err(RuntimeError::FabappTrust(_))
+        ));
+
+        let catalog = CatalogFabappTrust {
+            publisher_id: manifest.publisher_id.clone(),
+            app_id: manifest.app_id.clone(),
+            key_id: manifest.signature.key_id.clone(),
+            public_key: signing.verifying_key().to_bytes(),
+        };
+        assert!(matches!(
+            verify_fabapp_bytes(&package, &FabappTrustContext::Catalog(catalog)),
+            Err(RuntimeError::FabappTrust(_))
+        ));
+    }
+
+    #[test]
+    fn fabapp_local_generated_rejects_post_approval_mutation_and_privileged_egress() {
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[9_u8; 32]);
+        let scope = format!("{:x}", Sha256::digest(b"account-a"));
+        let html = b"<h1>approved</h1>";
+        let manifest = local_fabapp_manifest(
+            &signing,
+            &scope,
+            "private.fabushi.app-2",
+            "approval-2",
+            "transaction-2",
+            &[("index.html", html, "text/html")],
+        );
+        let trust = local_trust(&signing, &manifest);
+        let mutated = fabapp_zip(&manifest, &[("index.html", b"<h1>mutated</h1>")]);
+        assert!(matches!(
+            verify_fabapp_bytes(
+                &mutated,
+                &FabappTrustContext::LocalGenerated(trust.clone())
+            ),
+            Err(RuntimeError::FabappPolicy(_))
+        ));
+
+        let mut privileged = manifest.clone();
+        privileged.requested_capabilities = vec!["host.shell".into()];
+        let draft = compute_fabapp_draft_digest(&privileged).unwrap();
+        privileged.local_author.as_mut().unwrap().draft_digest = draft.clone();
+        let mut privileged_trust = trust.clone();
+        privileged_trust.approved_draft_digest = draft;
+        let mut unsigned = serde_json::to_value(&privileged).unwrap();
+        unsigned.as_object_mut().unwrap().remove("signature");
+        let canonical = jcs_canonicalize(&unsigned).unwrap();
+        let mut message = FABAPP_SIGNATURE_DOMAIN.to_vec();
+        message.extend_from_slice(canonical.as_bytes());
+        use ed25519_dalek::Signer as _;
+        privileged.signature.value =
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .encode(signing.sign(&message).to_bytes());
+        let privileged_package = fabapp_zip(&privileged, &[("index.html", html)]);
+        assert!(matches!(
+            verify_fabapp_bytes(
+                &privileged_package,
+                &FabappTrustContext::LocalGenerated(privileged_trust)
+            ),
+            Err(RuntimeError::FabappPolicy(_))
+        ));
+    }
+
+    #[test]
+    fn fabapp_install_is_content_addressed_atomic_and_consumes_approval_once() {
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[11_u8; 32]);
+        let scope = format!("{:x}", Sha256::digest(b"account-a"));
+        let html = b"<h1>offline</h1>";
+        let manifest = local_fabapp_manifest(
+            &signing,
+            &scope,
+            "private.fabushi.app-3",
+            "approval-3",
+            "transaction-3",
+            &[("index.html", html, "text/html")],
+        );
+        let trust = local_trust(&signing, &manifest);
+        let package = fabapp_zip(&manifest, &[("index.html", html)]);
+        let root = tempfile::tempdir().unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let pointer = installer
+            .install_fabapp_bytes(
+                &package,
+                &FabappTrustContext::LocalGenerated(trust.clone()),
+            )
+            .unwrap();
+        assert!(Path::new(&pointer.installed_path).join("index.html").is_file());
+        assert_eq!(installer.active(&manifest.app_id).unwrap(), Some(pointer));
+        assert!(matches!(
+            installer.install_fabapp_bytes(
+                &package,
+                &FabappTrustContext::LocalGenerated(trust)
+            ),
+            Err(RuntimeError::FabappApprovalReplay)
+        ));
+    }
+
+    #[test]
+    fn external_installer_commit_guard_prevents_stale_account_write() {
+        let archive = tar_gz(&[("plugin.json", br#"{"ok":true}"#)]);
+        let digest = format!("{:x}", Sha256::digest(&archive));
+        let artifact = ReleaseArtifact {
+            id: "universal".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into()],
+            source: ArtifactSource::Https {
+                url: "https://example.com/plugin.tar.gz".into(),
+            },
+            sha256: digest,
+            size: archive.len() as u64,
+            format: ArtifactFormat::TarGz,
+            entry: Some("plugin.json".into()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: "stale-account-plugin".into(),
+            version: "1.0.0".into(),
+            permissions: Vec::new(),
+            artifacts: vec![artifact.clone()],
+            install: None,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        assert!(matches!(
+            installer.install_verified_bytes_with_commit_guard(
+                &release,
+                &artifact,
+                &archive,
+                || false
+            ),
+            Err(RuntimeError::StaleAccountContext)
+        ));
+        assert!(!root.path().join("stale-account-plugin").exists());
     }
 
     #[test]

@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 base64.workspace = true
+ed25519-dalek.workspace = true
 flate2.workspace = true
 mahayana-platform-core.workspace = true
 reqwest.workspace = true

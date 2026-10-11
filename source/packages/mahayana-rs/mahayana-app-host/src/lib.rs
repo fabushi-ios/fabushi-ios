@@ -1614,10 +1614,16 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope)?;
         let pointer = installer
-            .install(&release, platform, preferred)
+            .install_with_commit_guard(&release, platform, preferred, || {
+                self.current_plugin_account_scope()
+                    .is_ok_and(|scope| scope == account.scope)
+            })
             .or_else(|error| {
                 if matches!(platform, "ios" | "android") {
-                    installer.install(&release, "mobile", preferred)
+                    installer.install_with_commit_guard(&release, "mobile", preferred, || {
+                        self.current_plugin_account_scope()
+                            .is_ok_and(|scope| scope == account.scope)
+                    })
                 } else {
                     Err(error)
                 }
