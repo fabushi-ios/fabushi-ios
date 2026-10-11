@@ -8,6 +8,7 @@ private let webMcpOriginHost = "fabushi.ombhrum.com"
 private let localWebMcpOriginHost = "miniapp.local.fabushi.invalid"
 private let generatedMiniAppPreviewOriginHost = "preview.miniapp.local.fabushi.invalid"
 private let webMcpMessageHandler = "fabushiWebMcp"
+let miniAppWebMcpHostCallTimeoutMilliseconds = 15_000
 
 func generatedMiniAppPreviewDigest(_ html: String) -> String {
     SHA256.hash(data: Data(html.utf8))
@@ -1146,6 +1147,35 @@ private struct MiniAppWebView: UIViewRepresentable {
             status = "正在加载 WebMCP…"
         }
 
+        private func failActiveBridge(_ message: String) {
+            disposeLocalBridgeSession()
+            loadedSourceKey = nil
+            status = message
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            guard self.webView === webView else { return }
+            failActiveBridge("WebMCP 页面进程已终止，当前 Tool 会话已失效")
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation?,
+            withError error: Error
+        ) {
+            guard self.webView === webView else { return }
+            failActiveBridge("WebMCP 页面加载失败，当前 Tool 会话已失效：\(error.localizedDescription)")
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation?,
+            withError error: Error
+        ) {
+            guard self.webView === webView else { return }
+            failActiveBridge("WebMCP 页面加载失败，当前 Tool 会话已失效：\(error.localizedDescription)")
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
             guard isTrustedWebMcpBridgeURL(webView.url, localRootURL: activeLocalRootURL) else {
                 disposeLocalBridgeSession()
@@ -1537,7 +1567,7 @@ func webMcpToolDefinitions(plugin: MarketplacePlugin) -> [[String: Any]] {
     }
 }
 
-private func webMcpBootstrapJavaScript(
+func webMcpBootstrapJavaScript(
     plugin: MarketplacePlugin,
     bridgeSession: MiniAppWebMcpBridgeSession
 ) -> String {
@@ -1551,7 +1581,8 @@ private func webMcpBootstrapJavaScript(
       const nonce=\(jsonString(bridgeSession.nonce));
       const grants=new Set(\(jsonStringArray(Array(bridgeSession.grants).sorted())));
       const generation=\(bridgeSession.generation);
-      const hostTools=new Map();const pageTools=new Map();const controllers=[];const pending=new Map();let sequence=0;let disposed=false;
+      const hostCallTimeoutMs=\(miniAppWebMcpHostCallTimeoutMilliseconds);
+      const hostTools=new Map();const pageTools=new Map();const controllers=[];const activePageCalls=new Set();const pending=new Map();let sequence=0;let disposed=false;
       function rejectPending(reason){for(const task of pending.values())task.reject(new Error(reason));pending.clear();}
       window.__fabushiNativeResolve=(requestId,responseInstanceId,responseNonce,payload)=>{if(disposed||responseInstanceId!==pluginInstanceId||responseNonce!==nonce)return;const task=pending.get(requestId);if(!task)return;pending.delete(requestId);if(payload&&payload.ok)task.resolve(payload.result);else task.reject(new Error(payload?.error||'WebMCP runtime call failed'));};
       function post(message){window.webkit.messageHandlers.\(webMcpMessageHandler).postMessage({...message,pluginInstanceId,nonce,generation});}
@@ -1560,11 +1591,11 @@ private func webMcpBootstrapJavaScript(
       function registerHost(item){if(!grants.has(item.name))return;const tool={name:item.name,title:item.title||item.name,description:item.description||item.name,inputSchema:item.inputSchema||{type:'object',properties:{}},annotations:{readOnlyHint:item.readOnlyHint===true},execute:(input)=>callNative(item.name,input)};hostTools.set(tool.name,tool);if(document.modelContext&&typeof document.modelContext.registerTool==='function'){const controller=new AbortController();controllers.push(controller);Promise.resolve(document.modelContext.registerTool(tool,{signal:controller.signal})).catch(()=>{});}}
       function publishPageTools(){post({kind:'pageTools',tools:Array.from(pageTools.values()).map(publicTool)});}
       function registerLocalTool(definition,execute){if(disposed)throw new Error('MCP App bridge disposed');if(!definition||typeof definition.name!=='string'||!/^[A-Za-z0-9_.-]{1,128}$/.test(definition.name))throw new Error('Invalid local WebMCP tool name');if(typeof execute!=='function')throw new Error('Local WebMCP tool requires an execute function');if(!grants.has(definition.name))throw new Error('MCP App bridge capability not granted: '+definition.name);const tool={name:definition.name,title:definition.title||definition.name,description:definition.description||definition.name,inputSchema:definition.inputSchema||{type:'object',properties:{}},annotations:definition.annotations||{readOnlyHint:false},execute};pageTools.set(tool.name,tool);publishPageTools();return ()=>{pageTools.delete(tool.name);publishPageTools();};}
-      async function invokeLocalFromHost(name,input,expectedInstanceId,expectedNonce,expectedGeneration){if(disposed||expectedInstanceId!==pluginInstanceId||expectedNonce!==nonce||Number(expectedGeneration)!==generation)throw new Error('Stale Mini App WebMCP session');const tool=pageTools.get(name);if(!tool)throw new Error('Active page did not register local WebMCP tool: '+name);return await tool.execute(input||{});}
+      async function invokeLocalFromHost(name,input,expectedInstanceId,expectedNonce,expectedGeneration){if(disposed||expectedInstanceId!==pluginInstanceId||expectedNonce!==nonce||Number(expectedGeneration)!==generation)throw new Error('Stale Mini App WebMCP session');const tool=pageTools.get(name);if(!tool)throw new Error('Active page did not register local WebMCP tool: '+name);const controller=new AbortController();activePageCalls.add(controller);const timer=setTimeout(()=>controller.abort(),hostCallTimeoutMs);try{return await Promise.race([Promise.resolve(tool.execute(input||{},{signal:controller.signal})),new Promise((_,reject)=>controller.signal.addEventListener('abort',()=>reject(new Error(disposed?'MCP App bridge disposed':'WebMCP Tool timed out or cancelled')),{once:true}))]);}finally{clearTimeout(timer);activePageCalls.delete(controller);}}
       for(const item of definitions)registerHost(item);
       Object.defineProperty(window,'__fabushiWebMcp',{configurable:true,value:{version:2,list:()=>Array.from(hostTools.values()).map(publicTool),call:async(name,input={})=>{const tool=hostTools.get(name);if(!tool)throw new Error('Unknown WebMCP tool: '+name);return tool.execute(input);},registerLocalTool,listLocal:()=>Array.from(pageTools.values()).map(publicTool),invokeLocalFromHost}});
       post({kind:'ready'});
-      window.addEventListener('pagehide',()=>{if(disposed)return;disposed=true;for(const controller of controllers)controller.abort();post({kind:'dispose'});rejectPending('MCP App bridge disposed');pageTools.clear();},{once:true});
+      window.addEventListener('pagehide',()=>{if(disposed)return;disposed=true;for(const controller of controllers)controller.abort();for(const controller of activePageCalls)controller.abort();activePageCalls.clear();post({kind:'dispose'});rejectPending('MCP App bridge disposed');pageTools.clear();},{once:true});
       window.dispatchEvent(new CustomEvent('fabushi:webmcp-ready',{detail:{pluginId:\(jsonString(plugin.pluginId)),pluginInstanceId,generation,grants:Array.from(grants),tools:Array.from(hostTools.keys())}}));
     })();
     """
