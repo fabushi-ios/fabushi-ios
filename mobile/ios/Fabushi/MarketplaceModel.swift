@@ -5777,6 +5777,10 @@ final class MarketplaceModel {
         pluginId == GlobalDharmaMiniAppBridge.globalDharmaId
     }
 
+    nonisolated static func requiresVerifiedLocalMiniAppPackage(pluginId: String) -> Bool {
+        pluginId == GlobalDharmaMiniAppBridge.globalDharmaId
+    }
+
     func callActiveWebMcpTool(
         pluginId: String,
         name: String,
