@@ -155,6 +155,8 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         else { return nil }
 
         let callId = UUID().uuidString.lowercased()
+        let expectedVersion = entry.snapshot.version
+        let expectedArtifactSha256 = entry.snapshot.artifactSha256
         let expectedInstanceId = entry.snapshot.pluginInstanceId
         let expectedGeneration = entry.snapshot.generation
         let permissionRequired = tool.approval != "none"
@@ -187,6 +189,8 @@ final class ActiveMiniAppWebMcpSessionRegistry {
             let revision = Self.stateRevision(from: value)
             guard let current = entriesByPluginId[pluginId],
                   current.snapshot.accountKey == accountKey,
+                  current.snapshot.version == expectedVersion,
+                  current.snapshot.artifactSha256 == expectedArtifactSha256,
                   current.snapshot.pluginInstanceId == expectedInstanceId,
                   current.snapshot.generation == expectedGeneration
             else {

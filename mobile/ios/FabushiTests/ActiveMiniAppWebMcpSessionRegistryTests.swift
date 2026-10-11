@@ -284,4 +284,113 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
             toolName: "status"
         ))
     }
+
+    func testPendingResultIsRejectedWhenPackageVersionOrDigestChanges() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.1.0",
+            artifactSha256: String(repeating: "a", count: 64),
+            pluginInstanceId: "stable-instance",
+            nonce: "stable-nonce",
+            generation: 9,
+            tools: [tool]
+        ) { _, _ in
+            registry.register(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                version: "1.1.1",
+                artifactSha256: String(repeating: "b", count: 64),
+                pluginInstanceId: "stable-instance",
+                nonce: "stable-nonce",
+                generation: 9,
+                tools: [tool]
+            ) { _, _ in ["revision": 8] }
+            return ["revision": 7]
+        }
+
+        do {
+            _ = try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.state.read",
+                arguments: [:]
+            )
+            XCTFail("A pending result from an older package version/digest must be stale")
+        } catch is CancellationError {
+            // Expected: package identity changed before the result committed.
+        }
+
+        let trace = try XCTUnwrap(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last
+        )
+        XCTAssertEqual(trace.version, "1.1.0")
+        XCTAssertEqual(trace.artifactSha256, String(repeating: "a", count: 64))
+        XCTAssertEqual(trace.stateRevision, 7)
+        XCTAssertEqual(trace.outcome, "stale-session")
+
+        let current = try XCTUnwrap(
+            registry.snapshot(accountKey: "account-a", pluginId: "global-dharma")
+        )
+        XCTAssertEqual(current.version, "1.1.1")
+        XCTAssertEqual(current.artifactSha256, String(repeating: "b", count: 64))
+    }
+
+    func testReRegistrationImmediatelyDisablesRemovedTool() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let status = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+        let mutation = MiniAppToolContract(
+            name: "offline.practice.record",
+            description: "mutate local state",
+            approval: "required"
+        )
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.1.0",
+            artifactSha256: String(repeating: "c", count: 64),
+            pluginInstanceId: "instance-1",
+            nonce: "nonce-1",
+            generation: 4,
+            tools: [status, mutation]
+        ) { name, _ in ["tool": name, "revision": 1] }
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.1.0",
+            artifactSha256: String(repeating: "c", count: 64),
+            pluginInstanceId: "instance-1",
+            nonce: "nonce-1",
+            generation: 4,
+            tools: [status]
+        ) { name, _ in ["tool": name, "revision": 2] }
+
+        XCTAssertNil(try await registry.callIfActive(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            name: "offline.practice.record",
+            arguments: [:]
+        ))
+        let read = try await registry.callIfActive(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            name: "offline.state.read",
+            arguments: [:]
+        )
+        XCTAssertEqual((read?.value as? [String: Any])?["revision"] as? Int, 2)
+    }
+
 }
