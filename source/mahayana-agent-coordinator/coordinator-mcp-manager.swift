@@ -73,6 +73,35 @@ func normalizedSkillPublishVersion(_ raw: String?) -> String? {
     return value
 }
 
+struct InstalledMarketplaceSkillSource: Equatable, Sendable {
+    let version: String
+    let sourceUrl: String
+}
+
+func requireInstalledMarketplaceSkillSource(
+    pluginId: String,
+    skillName: String,
+    versionRef: String?,
+    sourceUrl: String?
+) throws -> InstalledMarketplaceSkillSource {
+    guard let version = normalizedSkillPublishVersion(versionRef) else {
+        throw SandMcpConfigError(
+            "Installed plugin \(pluginId) skill \(skillName) is not pinned to an immutable commit."
+        )
+    }
+    guard let sourceUrl,
+          let pinnedSourceUrl = pinnedMarketplaceSkillSourceUrl(
+              sourceUrl,
+              versionRef: version
+          )
+    else {
+        throw SandMcpConfigError(
+            "Installed plugin \(pluginId) skill \(skillName) does not expose a supported immutable source."
+        )
+    }
+    return .init(version: version, sourceUrl: pinnedSourceUrl)
+}
+
 func projectAuthoritativePublishedPlugins(
     _ plugins: [EffectiveUserPlugin],
     currentUserId: UInt64
@@ -1245,17 +1274,24 @@ final class CoordinatorMcpSurface {
                   let effectivePlugin = enabledByPluginId[plugin.id] else { continue }
             var usedSkillIds = Set<String>()
             for (index, skill) in plugin.skills.enumerated() {
-                guard installedSkills.count < 64,
-                      let version = normalizedSkillPublishVersion(effectivePlugin.versionRef),
-                      let sourceUrl = skill.sourceUrl,
-                      let pinnedSourceUrl = pinnedMarketplaceSkillSourceUrl(
-                          sourceUrl,
-                          versionRef: version
-                      ),
-                      let markdown = await fetchMarketplaceSkillMarkdown(
-                          sourceUrl: pinnedSourceUrl
-                      )
-                else { continue }
+                guard installedSkills.count < 64 else {
+                    throw SandMcpConfigError(
+                        "Installed plugin skills exceed the supported limit of 64; the previous Host snapshot was preserved."
+                    )
+                }
+                let source = try requireInstalledMarketplaceSkillSource(
+                    pluginId: plugin.id,
+                    skillName: skill.name,
+                    versionRef: effectivePlugin.versionRef,
+                    sourceUrl: skill.sourceUrl
+                )
+                guard let markdown = await fetchMarketplaceSkillMarkdown(
+                    sourceUrl: source.sourceUrl
+                ) else {
+                    throw SandMcpConfigError(
+                        "Installed plugin \(plugin.id) skill \(skill.name) could not be materialized from its immutable source; the previous Host snapshot was preserved."
+                    )
+                }
                 var skillId = marketplaceInstalledSkillId(skill.name)
                 if skillId.isEmpty || usedSkillIds.contains(skillId) {
                     skillId = "skill-\(index + 1)"
@@ -1263,13 +1299,13 @@ final class CoordinatorMcpSurface {
                 usedSkillIds.insert(skillId)
                 installedSkills.append([
                     "pluginId": plugin.id,
-                    "pluginVersion": version,
+                    "pluginVersion": source.version,
                     "workflowId": "plugin-\(plugin.id)-\(skillId)",
                     "skillId": skillId,
                     "name": skill.name,
                     "description": skill.description,
                     "markdown": markdown,
-                    "sourceRef": pinnedSourceUrl,
+                    "sourceRef": source.sourceUrl,
                     "publishedByCurrentUser": effectivePlugin.publisherUserId == currentUserId,
                     "isEnabledForAgent": true,
                 ])

@@ -248,4 +248,43 @@ final class CoordinatorSkillPublishAuthoritativeProjectionTests: XCTestCase {
             "abcdef0123456789abcdef0123456789abcdef01"
         )
     }
+
+    func testInstalledMarketplaceSkillSourceFailsClosedUnlessVersionAndSourceAreImmutable() throws {
+        let source = try requireInstalledMarketplaceSkillSource(
+            pluginId: "41",
+            skillName: "release-review",
+            versionRef: "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+            sourceUrl: "https://github.com/example/connectors/blob/main/skills/release-review/SKILL.md"
+        )
+        XCTAssertEqual(source.version, "abcdef0123456789abcdef0123456789abcdef01")
+        XCTAssertEqual(
+            source.sourceUrl,
+            "https://github.com/example/connectors/blob/abcdef0123456789abcdef0123456789abcdef01/skills/release-review/SKILL.md"
+        )
+
+        XCTAssertThrowsError(
+            try requireInstalledMarketplaceSkillSource(
+                pluginId: "41",
+                skillName: "release-review",
+                versionRef: "main",
+                sourceUrl: "https://github.com/example/connectors/blob/main/skills/release-review/SKILL.md"
+            )
+        )
+        XCTAssertThrowsError(
+            try requireInstalledMarketplaceSkillSource(
+                pluginId: "41",
+                skillName: "release-review",
+                versionRef: "abcdef0123456789abcdef0123456789abcdef01",
+                sourceUrl: "https://raw.githubusercontent.com/example/connectors/main/skills/release-review/SKILL.md"
+            )
+        )
+        XCTAssertThrowsError(
+            try requireInstalledMarketplaceSkillSource(
+                pluginId: "41",
+                skillName: "release-review",
+                versionRef: "abcdef0123456789abcdef0123456789abcdef01",
+                sourceUrl: nil
+            )
+        )
+    }
 }
