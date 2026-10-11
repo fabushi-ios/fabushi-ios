@@ -8099,10 +8099,10 @@
       "ios_target_path": "source/packages/mcp-core/config/mcp-focus-retry-cooldown.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "Constant is preserved verbatim as a Rust duration in milliseconds.",
-      "implementation_status": "mapped",
-      "production_evidence": "Rust mirror exists but no shipping crate/caller is proven.",
-      "test_evidence": "Counterpart asserts 300000 ms.",
-      "notes": "Desktop blob 072cb28bdfb5c57c8a5eca14870ed7caf16c4e27 reviewed; mapped only."
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mcp-core/config/mcp-focus-retry-cooldown.rs is included by source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs via #[path]; .github/workflows/ios-desktop-main-architecture.yml runs cargo test -p mahayana-app-host-mobile --lib --profile ci in the required rust-host job.",
+      "test_evidence": "Counterpart asserts 300000 ms. Exact-head rust-host success is required before verified.",
+      "notes": "Desktop blob 072cb28bdfb5c57c8a5eca14870ed7caf16c4e27 reviewed; mapped only. Shipping crate composition and required CI inclusion confirmed against iOS 504d58612a709c97bea9d3de3f83f69e3ca9995a; kept below verified pending exact-head rust-host success."
     },
     {
       "desktop_path": "source/packages/mcp-core/config/mcp-fsm-timing-config.ts",
@@ -8114,10 +8114,10 @@
       "ios_target_path": "source/packages/mcp-core/config/mcp-fsm-timing-config.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "Constant is preserved verbatim in Rust.",
-      "implementation_status": "mapped",
-      "production_evidence": "Rust mirror exists but no shipping crate/caller is proven.",
-      "test_evidence": "Counterpart asserts 300000 ms.",
-      "notes": "Desktop blob 6ad778f958b4fa29bd89253b44da20ec1b76da14 reviewed; mapped only."
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mcp-core/config/mcp-fsm-timing-config.rs is included by source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs via #[path]; .github/workflows/ios-desktop-main-architecture.yml runs cargo test -p mahayana-app-host-mobile --lib --profile ci in the required rust-host job.",
+      "test_evidence": "Counterpart asserts 300000 ms. Exact-head rust-host success is required before verified.",
+      "notes": "Desktop blob 6ad778f958b4fa29bd89253b44da20ec1b76da14 reviewed; mapped only. Shipping crate composition and required CI inclusion confirmed against iOS 504d58612a709c97bea9d3de3f83f69e3ca9995a; kept below verified pending exact-head rust-host success."
     },
     {
       "desktop_path": "source/packages/mcp-core/config/mcp-inline-reconnect-cooldown.ts",
@@ -8129,10 +8129,10 @@
       "ios_target_path": "source/packages/mcp-core/config/mcp-inline-reconnect-cooldown.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "Constant is preserved verbatim in Rust.",
-      "implementation_status": "mapped",
-      "production_evidence": "Rust mirror exists but no shipping crate/caller is proven.",
-      "test_evidence": "Counterpart asserts 300000 ms.",
-      "notes": "Desktop blob a8275613f5fa48ebf4a18cb9b710fd0239ad81f3 reviewed; mapped only."
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mcp-core/config/mcp-inline-reconnect-cooldown.rs is included by source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs via #[path]; .github/workflows/ios-desktop-main-architecture.yml runs cargo test -p mahayana-app-host-mobile --lib --profile ci in the required rust-host job.",
+      "test_evidence": "Counterpart asserts 300000 ms. Exact-head rust-host success is required before verified.",
+      "notes": "Desktop blob a8275613f5fa48ebf4a18cb9b710fd0239ad81f3 reviewed; mapped only. Shipping crate composition and required CI inclusion confirmed against iOS 504d58612a709c97bea9d3de3f83f69e3ca9995a; kept below verified pending exact-head rust-host success."
     },
     {
       "desktop_path": "source/packages/mcp-core/config/mcp-tool-call-timeout.ts",
@@ -8144,10 +8144,10 @@
       "ios_target_path": "source/packages/mcp-core/config/mcp-tool-call-timeout.rs",
       "ios_language": "Rust",
       "ios_platform_delta": "Both timeout constants are preserved verbatim in Rust.",
-      "implementation_status": "mapped",
-      "production_evidence": "Rust mirror exists but no shipping crate/caller is proven.",
-      "test_evidence": "Counterpart asserts both values equal 3600000 ms.",
-      "notes": "Desktop blob cb3104f7b258a68bf99f113d8dc8363ebae092f2 reviewed; mapped only."
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mcp-core/config/mcp-tool-call-timeout.rs is included by source/packages/mahayana-rs/mahayana-app-host-mobile/src/lib.rs via #[path]; .github/workflows/ios-desktop-main-architecture.yml runs cargo test -p mahayana-app-host-mobile --lib --profile ci in the required rust-host job.",
+      "test_evidence": "Counterpart asserts both values equal 3600000 ms. Exact-head rust-host success is required before verified.",
+      "notes": "Desktop blob cb3104f7b258a68bf99f113d8dc8363ebae092f2 reviewed; mapped only. Shipping crate composition and required CI inclusion confirmed against iOS 504d58612a709c97bea9d3de3f83f69e3ca9995a; kept below verified pending exact-head rust-host success."
     },
     {
       "desktop_path": "source/packages/metrics/index.ts",
