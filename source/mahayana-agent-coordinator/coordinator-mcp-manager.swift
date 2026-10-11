@@ -937,6 +937,35 @@ final class CoordinatorMcpSurface {
                 )
             }
         ))
+        let accountWriter = createAccountMcpWriter(accountDependencies)
+        let catalog = SandMcpCatalogFlow(core: .init(
+            isAuthenticated: {
+                await cursorAuth.status().loggedIn
+            },
+            fetchMarketplace: {
+                try await fetchMarketplaceMcpPlugins(deps: .init(
+                    bestEffortToken: {
+                        await bestEffortToken {
+                            try await cursorAuth.getValidAccessToken(
+                                backendURL: getConfiguredBackendUrl()
+                            )
+                        }
+                    },
+                    createClient: { dashboard },
+                    rememberPluginLogoUrl: rememberPluginLogoUrl
+                ))
+            },
+            listEffectivePlugins: {
+                try await fetchEffectiveUserPlugins(accountDependencies)
+            },
+            requireAccountWriter: {
+                accountWriter
+            },
+            // SandMcpManager performs the authoritative reload immediately after
+            // catalog install/update. Keep this callback side-effect free so the
+            // catalog never creates a second manager lifecycle.
+            reloadServers: {}
+        ))
         var dependencies = SandMcpManagerDependencies(
             settingsStore: settingsStore,
             backendMcpExec: backend,
@@ -955,7 +984,8 @@ final class CoordinatorMcpSurface {
                 await port.updateDashboardServerIdentifiers([])
                 return try await port.loadAccountDisplay(forceFresh: requireFreshRead)
             },
-            accountMcpWriter: createAccountMcpWriter(accountDependencies),
+            accountMcpWriter: accountWriter,
+            catalog: catalog,
             autoPollEnabled: true
         )
         dependencies.setToolDisabled = { identifier, tool, disabled in
