@@ -20,10 +20,11 @@ Therefore existing strings such as “WebMCP 已连接” or “Bot / Web UI 同
 
 Live authorities re-read for this task:
 - iOS main: `f098639ab178a839690b9dece60fa0d11c5d2e25`
-- iOS PR #3 current implementation HEAD at this record: `13e6964a0fbea0e68513f2f7ace41a84992c1a33`
+- iOS PR #3 pre-document implementation HEAD: `5feaa90ae769a114d0194c9114601aeabe3a8d5b` (final evidence must use the resulting newer exact HEAD)
 - Desktop main: `371b72f1cd20de03dc4dff9a15ed761054968093`
 - Backend main: `9c56a77cbe02dfceebf574236a703b53cd257cb9`
 - Platform Core main: `c301820b93274bda586fbb82be982afc3c2ee4d4`
+- Canonical Fabushi server/payment main: `c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52`
 
 The original discovery HEAD was `1f1deb151cb2c137ba5f7f1470a14be263661b28`; it and all earlier workflow runs are historical diagnostics only. Final acceptance must bind to the latest exact PR HEAD.
 
@@ -76,12 +77,12 @@ Make Global Dharma the first production reference implementation of the existing
 ### Permissions and entitlement
 
 - **GD-PAY-01** `local.prayer-wheel.start` remains protected. The trusted Host checks current canonical server entitlement immediately before executing that capability. Network/service failure fails only that protected operation.
-- **GD-PAY-02** Current governed identifiers remain until server authority proves otherwise:
+- **GD-PAY-02** Current server-authoritative commerce contract, re-read from `bhrumom/fabushi@c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52`:
   - mini app `global-dharma`
-  - capability `local.prayer-wheel.start`
-  - SKU `local-prayer-wheel.lifetime`
-  - product `prod.global-dharma.local-prayer-wheel.lifetime`
-  - current client guard CNY 108000 minor units.
+  - protected capability `local.prayer-wheel.start`
+  - monthly SKU `local-prayer-wheel.monthly`, product `prod.global-dharma.local-prayer-wheel.monthly`, CNY 3000 minor units, 30-day subscription
+  - lifetime SKU `local-prayer-wheel.lifetime`, product `prod.global-dharma.local-prayer-wheel.lifetime`, CNY 108000 minor units, durable entitlement
+  - Apple/Google purchase rails are exposed only when their server provider bindings are actually active; unknown subscription expiry, cancellation, revocation and expiration fail closed.
 - **GD-PAY-03** Purchase/restore must use real authorized StoreKit/canonical service flows in production. CI synthetic commerce stays explicitly test-only and cannot be cited as production payment acceptance.
 - **GD-PERM-01** Read-only tools may use no-prompt grants only when explicitly declared. Mutations require the existing approval owner unless an equivalent durable per-tool user grant exists.
 - **GD-PERM-02** Web content never receives account bearer tokens, OAuth secrets, Keychain, arbitrary MCP servers, shell, Computer, filesystem or entitlement-signing authority.
@@ -254,7 +255,7 @@ Acceptance evidence must record repository, exact SHA, workflow/run/job IDs, com
 | GD-OFF-01..03 | implementation present; journey evidence pending | The 1.1.0 package uses only local `index.html/style.css/app.js`, CSP `connect-src 'none'`, localStorage-backed revision state, and no startup entitlement request. Cold-start/restart/network-off UI evidence must still complete on the current exact iOS HEAD. |
 | GD-WEBMCP-01..07 | implementation present; latest exact-head UI/security evidence pending | Active page tools register through `registerLocalTool`; native Host invokes the current page via `invokeLocalFromHost` fenced by account/app/version/digest/instance/nonce/generation. Page tool schemas must match reviewed catalog schemas, Host validates arguments before execution, and page annotations cannot weaken Host approval class. Host-originated page calls are bounded to 15 seconds with abort-on-pagehide; WebKit process/navigation failure tears down the active session. With an active Global Dharma page, remote MCP fallback is explicitly rejected; without an active page, the pre-existing governed remote-service route remains available and is never cited as local WebMCP evidence. The registry records bounded ordered invocation traces with call ID, account/app/package/version/instance, privacy-safe nonce identifier, generation, tool, permission decision, state revision and outcome; the protected journey covers denial-before-approval and same-page bidirectional revision changes. |
 | GD-PAY-01 | implementation present; protected journey pending | `local.prayer-wheel.start` is the only current protected local capability; `callActiveWebMcpTool` performs fresh Host-side entitlement refresh only for that protected tool. Free tools bypass entitlement preflight. |
-| GD-PAY-02 | current contract re-read required for final acceptance | iOS constants remain `global-dharma` / `local.prayer-wheel.start` / `local-prayer-wheel.lifetime` / CNY 1080; final acceptance must bind them to current Backend/Core authority and real purchase evidence. |
+| GD-PAY-02 | implementation aligned; production purchase evidence blocked | Canonical server main defines both CNY 30 / 30-day monthly (`local-prayer-wheel.monthly`) and CNY 1080 lifetime (`local-prayer-wheel.lifetime`) offers for `local.prayer-wheel.start`. iOS now parses and validates both server offers, exposes both choices, refuses client-side price/kind/SKU drift, requires the server `activeRails` projection before StoreKit, and restores either SKU before re-reading canonical entitlement. Real Apple purchase/restore still requires provider/App Store configuration. |
 | GD-PAY-03 / GD-PAY-02 acceptance | blocked | Real StoreKit/device/payment acceptance depends on external Apple/product/account configuration; CI test rail is not production evidence. |
 | GD-MKT-01 | implementation closed; production artifact rollout blocked | Global Dharma discovery and release selection preserve native iOS instead of collapsing to generic `mobile`; the catalog emits the 1.1.0 package only when immutable release metadata and signer trust are complete, otherwise iOS release is unavailable rather than falling back to legacy 1.0.0/Hosted MCP. The normal Host `feature.plugin.install` path consumes the exact `releaseManifest` and its `fabappTrust`. Production-signed 1.1.0 artifact/catalog rollout remains blocked by managed signer configuration. |
 | FPM-IOS-01..04 | pending exact-head regression | Existing Marketplace/Connectors/Skills/private Mini App production owners remain in place; current-head regression and any remaining product gaps still require Actions evidence. |
