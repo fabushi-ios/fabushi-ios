@@ -18,6 +18,7 @@ final class HumanCallMediaPortTests: XCTestCase {
         XCTAssertEqual(HumanCallMediaPermission.prompt.rawValue, "prompt")
         XCTAssertEqual(HumanCallMediaPermission.notRequested.rawValue, "not-requested")
     }
+    @MainActor
     func testAudioInterruptionRecoveryRequiresEndedShouldResume() {
         XCTAssertFalse(HumanCallMediaPort.shouldRecoverAfterAudioInterruption(
             userInfo: [
