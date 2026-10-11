@@ -12,6 +12,7 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         "botVisible": false,
         "naturalLanguageSent": false,
         "webMcpReady": false,
+        "permissionDeniedObserved": false,
         "livePageMutationObserved": false,
         "bidirectionalStateObserved": false,
         "purchaseTapped": false,
@@ -162,14 +163,44 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         send.tap()
         mark("naturalLanguageSent", true)
 
+        let denial = app.alerts.buttons["取消"]
+        XCTAssertTrue(
+            denial.waitForExistence(timeout: 30),
+            "Bot mutation must expose a real Host-owned denial path"
+        )
+        denial.tap()
+
+        let stop = app.buttons["mobile-bot-stop"]
+        if stop.waitForExistence(timeout: 4) {
+            let deniedFinished = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"),
+                object: stop
+            )
+            XCTAssertEqual(
+                XCTWaiter.wait(for: [deniedFinished], timeout: 60),
+                .completed,
+                "Denied Global Dharma WebMCP operation did not reach a terminal state"
+            )
+        }
+        XCTAssertEqual(
+            parseRevision(revisionLabel.label, prefix: revisionPrefix),
+            initialRevision,
+            "Denying the Bot mutation must leave the current page-owned state unchanged"
+        )
+        mark("permissionDeniedObserved", true)
+        checkpoint("055-bot-mutation-denied")
+
+        draft.tap()
+        draft.typeText("在全球法布施里面执行一项免费的本地操作，并让我看到结果。")
+        send.tap()
+
         let approval = app.alerts.buttons["允许"]
         XCTAssertTrue(
             approval.waitForExistence(timeout: 30),
-            "Bot mutation must require Host-owned per-tool user approval"
+            "Retrying the Bot mutation must require Host-owned per-tool user approval"
         )
         approval.tap()
 
-        let stop = app.buttons["mobile-bot-stop"]
         if stop.waitForExistence(timeout: 4) {
             let finished = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "exists == false"),
