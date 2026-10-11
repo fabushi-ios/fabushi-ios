@@ -5268,22 +5268,13 @@ final class MarketplaceModel {
     }
 
     func webMcpPlugin(for plugin: MarketplacePlugin) async -> MarketplacePlugin {
-        guard plugin.pluginId == GlobalDharmaMiniAppBridge.globalDharmaId else {
-            return plugin
-        }
-        do {
-            let advertised = try await globalDharmaBridge.listOfficialMcpTools(pluginId: plugin.pluginId)
-            let tools = advertised.compactMap(Self.webMcpToolContract(from:))
-            guard !tools.isEmpty else {
-                throw MahayanaCoordinator.CoordinatorError.requestFailed(
-                    "Global Dharma canonical MCP tools/list returned no usable tools"
-                )
-            }
-            return plugin.replacingTools(tools)
-        } catch {
-            message = "Global Dharma WebMCP 工具合同不可用，仅保留只读 status 恢复：\(error.localizedDescription)"
-            return plugin.replacingTools([Self.globalDharmaStatusFallbackTool])
-        }
+        // Installed Mini Apps must derive their executable WebMCP surface from the
+        // active page session. Fetching a second, remote Global Dharma MCP tool
+        // list here makes the UI and Bot appear connected while they can target
+        // different runtimes. Keep the signed Marketplace manifest as the
+        // pre-load grant envelope; the active WKWebView narrows it further by
+        // registering the page tools that actually exist for this load.
+        return plugin
     }
 
     private func reconcileLocalMiniAppInstall(_ plugin: MarketplacePlugin) async throws {
@@ -5782,6 +5773,10 @@ final class MarketplaceModel {
         )
     }
 
+    nonisolated static func requiresActiveLocalWebMcpSession(pluginId: String) -> Bool {
+        pluginId == GlobalDharmaMiniAppBridge.globalDharmaId
+    }
+
     func callActiveWebMcpTool(
         pluginId: String,
         name: String,
@@ -5794,6 +5789,11 @@ final class MarketplaceModel {
             arguments: arguments
         ) {
             return invocation.value
+        }
+        if Self.requiresActiveLocalWebMcpSession(pluginId: pluginId) {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Global Dharma requires an active local Mini App WebMCP session"
+            )
         }
         return try await callWebMcpTool(
             pluginId: pluginId,
