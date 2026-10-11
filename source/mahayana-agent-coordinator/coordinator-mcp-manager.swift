@@ -209,6 +209,23 @@ private final class CoordinatorMcpHostPort {
         return value
     }
 
+    func syncInstalledPluginSkills(
+        agentId: String,
+        skills: [[String: Any]]
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.workflow.pluginSkillsSync",
+            params: [
+                "agentId": agentId,
+                "skills": skills,
+            ]
+        )
+        guard let value = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Installed plugin skill projection response is invalid.")
+        }
+        return value
+    }
+
     func confirmWorkflowPublish(
         agentId: String,
         workflowId: String,
@@ -1203,8 +1220,11 @@ final class CoordinatorMcpSurface {
         guard (await cursorAuth.status()).loggedIn else {
             let empty: [[String: Any]] = []
             _ = try await port.syncWorkflowPluginFacts(agentId: agentId, plugins: empty)
+            _ = try await port.syncInstalledPluginSkills(agentId: agentId, skills: empty)
             return empty
         }
+        let scope = accountScope
+        let generation = routedScopeGeneration
         let currentUserId = try await dashboard.getCurrentUserId()
         let effective = try await manager.listEffectivePlugins()
         let projected = projectAuthoritativePublishedPlugins(
@@ -1212,7 +1232,65 @@ final class CoordinatorMcpSurface {
             currentUserId: currentUserId
         )
         _ = try await port.syncWorkflowPluginFacts(agentId: agentId, plugins: projected)
+
+        let enabledByPluginId = Dictionary(
+            uniqueKeysWithValues: effective
+                .filter(\.isEnabled)
+                .map { ($0.pluginId, $0) }
+        )
+        let catalog = try await manager.getCatalog(forceRefresh: false)
+        var installedSkills: [[String: Any]] = []
+        for plugin in catalog {
+            guard installedSkills.count < 64,
+                  let effectivePlugin = enabledByPluginId[plugin.id] else { continue }
+            var usedSkillIds = Set<String>()
+            for (index, skill) in plugin.skills.enumerated() {
+                guard installedSkills.count < 64,
+                      let sourceUrl = skill.sourceUrl,
+                      let markdown = await fetchMarketplaceSkillMarkdown(sourceUrl: sourceUrl)
+                else { continue }
+                var skillId = marketplaceInstalledSkillId(skill.name)
+                if skillId.isEmpty || usedSkillIds.contains(skillId) {
+                    skillId = "skill-\(index + 1)"
+                }
+                usedSkillIds.insert(skillId)
+                installedSkills.append([
+                    "pluginId": plugin.id,
+                    "pluginVersion": effectivePlugin.versionRef,
+                    "workflowId": "plugin-\(plugin.id)-\(skillId)",
+                    "skillId": skillId,
+                    "name": skill.name,
+                    "description": skill.description,
+                    "markdown": markdown,
+                    "sourceRef": sourceUrl,
+                    "publishedByCurrentUser": effectivePlugin.publisherUserId == currentUserId,
+                    "isEnabledForAgent": true,
+                ])
+            }
+        }
+        guard scope == accountScope, generation == routedScopeGeneration else {
+            throw SandMcpConfigError(
+                "Installed plugin skill refresh became stale because the account changed."
+            )
+        }
+        _ = try await port.syncInstalledPluginSkills(agentId: agentId, skills: installedSkills)
         return projected
+    }
+
+    private func marketplaceInstalledSkillId(_ raw: String) -> String {
+        var output = ""
+        var pendingDash = false
+        for scalar in raw.lowercased().unicodeScalars {
+            if CharacterSet.alphanumerics.contains(scalar), scalar.isASCII {
+                if pendingDash, !output.isEmpty { output.append("-") }
+                pendingDash = false
+                if output.count < 40 { output.unicodeScalars.append(scalar) }
+            } else {
+                pendingDash = true
+            }
+            if output.count >= 40 { break }
+        }
+        return output.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
     }
 
     private func publishTeamId(_ value: Any?) throws -> Int32 {

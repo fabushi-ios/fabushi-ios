@@ -323,6 +323,25 @@ struct PublishedPluginSnapshot {
     is_enabled_for_agent: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstalledPluginSkillSnapshot {
+    plugin_id: String,
+    plugin_version: String,
+    workflow_id: String,
+    skill_id: String,
+    name: String,
+    #[serde(default)]
+    description: String,
+    markdown: String,
+    #[serde(default)]
+    source_ref: Option<String>,
+    #[serde(default)]
+    published_by_current_user: bool,
+    #[serde(default = "default_true")]
+    is_enabled_for_agent: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PublishedWorkflowCacheMetadata {
@@ -810,6 +829,7 @@ struct FeatureState {
     auth_user: Option<Value>,
     automations: BTreeMap<String, AutomationSummary>,
     published_plugins_by_agent: BTreeMap<String, Vec<PublishedPluginSnapshot>>,
+    installed_plugin_skills_by_agent: BTreeMap<String, Vec<InstalledPluginSkillSnapshot>>,
     connectors: BTreeMap<String, ConnectorSummary>,
     skills: BTreeMap<String, SkillSummary>,
     bots: BTreeMap<String, BotSummary>,
@@ -879,6 +899,7 @@ impl Default for FeatureState {
             auth_user: None,
             automations: BTreeMap::new(),
             published_plugins_by_agent: BTreeMap::new(),
+            installed_plugin_skills_by_agent: BTreeMap::new(),
             connectors: default_connectors(),
             skills: default_skills(),
             bots: default_bots(),
@@ -1772,6 +1793,138 @@ impl FeatureHostController {
         self.state()?
             .published_plugins_by_agent
             .insert(agent_id.to_string(), plugins);
+        Ok(json!({"agentId": agent_id, "count": count}))
+    }
+
+    pub fn sync_installed_plugin_skills(
+        &self,
+        agent_id: &str,
+        skills: Value,
+    ) -> Result<Value, FeatureHostError> {
+        if !is_safe_memory_agent_id(agent_id) {
+            return Err(FeatureHostError::Contract(
+                "unsafe installed plugin skill agent id".into(),
+            ));
+        }
+        if !self.state()?.bots.contains_key(agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unknown workflow owner: {agent_id}"
+            )));
+        }
+        let skills: Vec<InstalledPluginSkillSnapshot> = serde_json::from_value(skills)
+            .map_err(|error| FeatureHostError::Contract(format!(
+                "invalid installed plugin skill projection: {error}"
+            )))?;
+        if skills.len() > INSTALLED_PLUGIN_SKILLS_MAX_COUNT {
+            return Err(FeatureHostError::Contract("too many installed plugin skills".into()));
+        }
+        let mut workflow_ids = BTreeSet::new();
+        let mut total_bytes = 0usize;
+        for skill in &skills {
+            if skill.plugin_id.trim().is_empty()
+                || skill.plugin_version.trim().is_empty()
+                || skill.name.trim().is_empty()
+                || !is_safe_memory_agent_id(&skill.plugin_id)
+                || !is_safe_memory_agent_id(&skill.skill_id)
+                || !is_safe_memory_agent_id(&skill.workflow_id)
+                || !workflow_ids.insert(skill.workflow_id.clone())
+            {
+                return Err(FeatureHostError::Contract(
+                    "installed plugin skill projection has an invalid identity".into(),
+                ));
+            }
+            let byte_count = skill.markdown.len();
+            if byte_count == 0 || byte_count > INSTALLED_PLUGIN_SKILL_MAX_BYTES {
+                return Err(FeatureHostError::Contract(
+                    "installed plugin skill markdown is outside the allowed size".into(),
+                ));
+            }
+            total_bytes = total_bytes.saturating_add(byte_count);
+            if total_bytes > INSTALLED_PLUGIN_SKILLS_MAX_BYTES {
+                return Err(FeatureHostError::Contract(
+                    "installed plugin skill projection is too large".into(),
+                ));
+            }
+            if parse_workflow_file(&skill.markdown).is_none() {
+                return Err(FeatureHostError::Contract(
+                    "installed plugin skill markdown is invalid".into(),
+                ));
+            }
+        }
+        let workflow_root = self
+            .workflow_root_path
+            .as_deref()
+            .ok_or_else(|| FeatureHostError::Contract("workflow storage is unavailable".into()))?;
+        let cache_parent = workflow_root
+            .join(INSTALLED_PLUGIN_SKILLS_CACHE_DIR)
+            .join(agent_id);
+        let root_parent = cache_parent.parent().ok_or_else(|| {
+            FeatureHostError::Contract("installed plugin skill cache path is invalid".into())
+        })?;
+        std::fs::create_dir_all(root_parent).map_err(|error| {
+            FeatureHostError::Contract(format!(
+                "create installed plugin skill cache parent: {error}"
+            ))
+        })?;
+        let temp_root = root_parent.join(format!(".{agent_id}.tmp-{}", Uuid::new_v4()));
+        let write_result = (|| {
+            std::fs::create_dir_all(&temp_root).map_err(|error| {
+                FeatureHostError::Contract(format!(
+                    "create installed plugin skill staging root: {error}"
+                ))
+            })?;
+            for skill in &skills {
+                let path = temp_root
+                    .join(&skill.plugin_id)
+                    .join(&skill.skill_id)
+                    .join(WORKFLOW_FILENAME);
+                let parent = path.parent().ok_or_else(|| {
+                    FeatureHostError::Contract(
+                        "installed plugin skill staging path is invalid".into(),
+                    )
+                })?;
+                std::fs::create_dir_all(parent).map_err(|error| {
+                    FeatureHostError::Contract(format!(
+                        "create installed plugin skill directory: {error}"
+                    ))
+                })?;
+                std::fs::write(&path, skill.markdown.as_bytes()).map_err(|error| {
+                    FeatureHostError::Contract(format!(
+                        "write installed plugin skill: {error}"
+                    ))
+                })?;
+            }
+            Ok::<(), FeatureHostError>(())
+        })();
+        if let Err(error) = write_result {
+            let _ = std::fs::remove_dir_all(&temp_root);
+            return Err(error);
+        }
+        let backup_root = root_parent.join(format!(".{agent_id}.backup-{}", Uuid::new_v4()));
+        if cache_parent.exists() {
+            std::fs::rename(&cache_parent, &backup_root).map_err(|error| {
+                let _ = std::fs::remove_dir_all(&temp_root);
+                FeatureHostError::Contract(format!(
+                    "stage installed plugin skill cache replacement: {error}"
+                ))
+            })?;
+        }
+        if let Err(error) = std::fs::rename(&temp_root, &cache_parent) {
+            let _ = std::fs::remove_dir_all(&temp_root);
+            if backup_root.exists() {
+                let _ = std::fs::rename(&backup_root, &cache_parent);
+            }
+            return Err(FeatureHostError::Contract(format!(
+                "commit installed plugin skill cache: {error}"
+            )));
+        }
+        if backup_root.exists() {
+            let _ = std::fs::remove_dir_all(&backup_root);
+        }
+        let count = skills.len();
+        self.state()?
+            .installed_plugin_skills_by_agent
+            .insert(agent_id.to_string(), skills);
         Ok(json!({"agentId": agent_id, "count": count}))
     }
 
@@ -6448,7 +6601,7 @@ impl FeatureHostController {
         match command {
             FeatureCommand::WorkflowList { .. } => {
                 let mut workflows = list_workflow_summaries(workflow_root, agent_root, &agent_id);
-                let (automations, published_plugins) = {
+                let (automations, published_plugins, installed_plugin_skills) = {
                     let state = self.state()?;
                     let automations = state
                         .automations
@@ -6466,7 +6619,12 @@ impl FeatureHostController {
                         .get(&agent_id)
                         .cloned()
                         .unwrap_or_default();
-                    (automations, published_plugins)
+                    let installed_plugin_skills = state
+                        .installed_plugin_skills_by_agent
+                        .get(&agent_id)
+                        .cloned()
+                        .unwrap_or_default();
+                    (automations, published_plugins, installed_plugin_skills)
                 };
                 workflows.extend(automations);
                 workflows.extend(published_workflow_summaries(
@@ -6474,6 +6632,11 @@ impl FeatureHostController {
                     agent_root,
                     &agent_id,
                     &published_plugins,
+                ));
+                workflows.extend(installed_plugin_workflow_summaries(
+                    workflow_root,
+                    &agent_id,
+                    &installed_plugin_skills,
                 ));
                 workflows.truncate(WORKFLOW_UI_LIMIT);
                 self.state()?.events.push_back(HostEvent::WorkflowListed {
@@ -6591,6 +6754,16 @@ impl FeatureHostController {
                 }
             }
             FeatureCommand::WorkflowSetEnabled { id, enabled, .. } => {
+                if self
+                    .state()?
+                    .installed_plugin_skills_by_agent
+                    .get(&agent_id)
+                    .is_some_and(|skills| skills.iter().any(|skill| skill.workflow_id == id))
+                {
+                    return Err(FeatureHostError::Contract(
+                        "installed plugin skills are read-only; enable or disable the plugin instead".into(),
+                    ));
+                }
                 let automation = {
                     let mut state = self.state()?;
                     if let Some(automation) = state.automations.get_mut(&id) {
@@ -6627,6 +6800,16 @@ impl FeatureHostController {
                 });
             }
             FeatureCommand::WorkflowDelete { id, .. } => {
+                if self
+                    .state()?
+                    .installed_plugin_skills_by_agent
+                    .get(&agent_id)
+                    .is_some_and(|skills| skills.iter().any(|skill| skill.workflow_id == id))
+                {
+                    return Err(FeatureHostError::Contract(
+                        "installed plugin skills are read-only; uninstall the plugin instead".into(),
+                    ));
+                }
                 let removed_automation = {
                     let mut state = self.state()?;
                     if let Some(existing) = state.automations.get(&id) {
@@ -6663,7 +6846,19 @@ impl FeatureHostController {
                         agent_id: Some(agent_id),
                     });
                 }
+                let installed_plugin_skills = self
+                    .state()?
+                    .installed_plugin_skills_by_agent
+                    .get(&agent_id)
+                    .cloned()
+                    .unwrap_or_default();
                 let workflow = load_workflow_summary(workflow_root, agent_root, &agent_id, &id)
+                    .or_else(|| installed_plugin_workflow_summary_by_id(
+                        workflow_root,
+                        &agent_id,
+                        &installed_plugin_skills,
+                        &id,
+                    ))
                     .ok_or_else(|| FeatureHostError::Contract(format!("unknown workflow: {id}")))?;
                 if !workflow.is_enabled_for_agent {
                     return Err(FeatureHostError::Contract(format!(
@@ -9746,6 +9941,7 @@ impl FeatureHostController {
             state.subagents.clear();
             state.automations = automations;
             state.published_plugins_by_agent.clear();
+            state.installed_plugin_skills_by_agent.clear();
             state.bots = bots;
             state.peer_messages = peer_messages;
             state.groups.clear();
@@ -16683,6 +16879,10 @@ const SEARCH_SNIPPET_LEAD: usize = 30;
 const SEARCH_SNIPPET_TRAIL: usize = 60;
 const WORKFLOW_MAX_PER_AGENT: usize = 100;
 const WORKFLOW_ENABLEMENT_FILENAME: &str = "enabled-workflows.json";
+const INSTALLED_PLUGIN_SKILLS_CACHE_DIR: &str = ".installed-plugin-skills";
+const INSTALLED_PLUGIN_SKILLS_MAX_COUNT: usize = 100;
+const INSTALLED_PLUGIN_SKILL_MAX_BYTES: usize = 256 * 1024;
+const INSTALLED_PLUGIN_SKILLS_MAX_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Clone)]
 struct ParsedWorkflowFile {
@@ -16816,6 +17016,95 @@ fn parse_workflow_file(raw: &str) -> Option<ParsedWorkflowFile> {
         source_ref: read_workflow_source_ref(&data),
         data,
     })
+}
+
+fn installed_plugin_skill_cache_path(
+    workflow_root: &Path,
+    agent_id: &str,
+    snapshot: &InstalledPluginSkillSnapshot,
+) -> Result<PathBuf, FeatureHostError> {
+    if !is_safe_memory_agent_id(agent_id)
+        || !is_safe_memory_agent_id(&snapshot.plugin_id)
+        || !is_safe_memory_agent_id(&snapshot.skill_id)
+        || !is_safe_memory_agent_id(&snapshot.workflow_id)
+    {
+        return Err(FeatureHostError::Contract(
+            "installed plugin skill has an unsafe storage identity".into(),
+        ));
+    }
+    Ok(workflow_root
+        .join(INSTALLED_PLUGIN_SKILLS_CACHE_DIR)
+        .join(agent_id)
+        .join(&snapshot.plugin_id)
+        .join(&snapshot.skill_id)
+        .join(WORKFLOW_FILENAME))
+}
+
+fn installed_plugin_skill_summary(
+    workflow_root: &Path,
+    agent_id: &str,
+    snapshot: &InstalledPluginSkillSnapshot,
+) -> Option<WorkflowSummary> {
+    let path = installed_plugin_skill_cache_path(workflow_root, agent_id, snapshot).ok()?;
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let parsed = parse_workflow_file(&raw)?;
+    let name = if parsed.name.is_empty() {
+        clamp_workflow_name(&snapshot.name)
+    } else {
+        parsed.name
+    };
+    let description = if parsed.description.is_empty() {
+        clamp_workflow_description(&snapshot.description)
+    } else {
+        parsed.description
+    };
+    Some(WorkflowSummary {
+        id: snapshot.workflow_id.clone(),
+        name,
+        description,
+        body: parsed.body,
+        trigger: None,
+        source_ref: snapshot.source_ref.clone().or(parsed.source_ref),
+        source: WorkflowSource::Plugin,
+        plugin_id: Some(snapshot.plugin_id.clone()),
+        published_by_current_user: snapshot.published_by_current_user,
+        is_enabled_for_agent: snapshot.is_enabled_for_agent,
+        disable_model_invocation: parsed
+            .data
+            .get(yaml_key("disable-model-invocation"))
+            .and_then(serde_yaml::Value::as_bool),
+        schedule_description: None,
+        created_at: workflow_created_at(&path),
+        last_run_at: None,
+        next_run_at: None,
+        helper_scripts: Vec::new(),
+        file_path: path.to_string_lossy().into_owned(),
+    })
+}
+
+fn installed_plugin_workflow_summaries(
+    workflow_root: &Path,
+    agent_id: &str,
+    snapshots: &[InstalledPluginSkillSnapshot],
+) -> Vec<WorkflowSummary> {
+    let mut out = snapshots
+        .iter()
+        .filter_map(|snapshot| installed_plugin_skill_summary(workflow_root, agent_id, snapshot))
+        .collect::<Vec<_>>();
+    out.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));
+    out
+}
+
+fn installed_plugin_workflow_summary_by_id(
+    workflow_root: &Path,
+    agent_id: &str,
+    snapshots: &[InstalledPluginSkillSnapshot],
+    workflow_id: &str,
+) -> Option<WorkflowSummary> {
+    snapshots
+        .iter()
+        .find(|snapshot| snapshot.workflow_id == workflow_id)
+        .and_then(|snapshot| installed_plugin_skill_summary(workflow_root, agent_id, snapshot))
 }
 
 fn serialize_workflow_file(

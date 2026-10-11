@@ -88,6 +88,32 @@ func toRawGithubUrl(_ blobUrl: String) -> String? {
     return "https://raw.githubusercontent.com/\(owner)/\(repo)/\(ref)/\(rest)"
 }
 
+private let MARKETPLACE_SKILL_MARKDOWN_MAX_BYTES = 256 * 1024
+
+func fetchMarketplaceSkillMarkdown(
+    sourceUrl: String,
+    session: URLSession = .shared
+) async -> String? {
+    guard let raw = toRawGithubUrl(sourceUrl),
+          let url = URL(string: raw) else { return nil }
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    request.timeoutInterval = 15
+    do {
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              !data.isEmpty,
+              data.count <= MARKETPLACE_SKILL_MARKDOWN_MAX_BYTES,
+              let markdown = String(data: data, encoding: .utf8),
+              !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return markdown
+    } catch {
+        return nil
+    }
+}
+
 func normalizeMarketplaceServer(_ value: [String: Any]) -> [String: Any] {
     var rest = value
     let transport = rest.removeValue(forKey: "transport") as? String

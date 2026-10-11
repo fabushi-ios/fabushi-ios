@@ -1,5 +1,6 @@
 use mahayana_feature_host::FeatureHostController;
 use mahayana_host_protocol::{FeatureCommand, HostConfig, HostMode, SurfacePlatform};
+use serde_json::json;
 use uuid::Uuid;
 
 fn controller() -> FeatureHostController {
@@ -96,4 +97,54 @@ fn workflow_skill_crud_and_agent_enablement_round_trip_through_production_comman
         deleted.to_string().contains("unknown workflow"),
         "unexpected deleted workflow error: {deleted}"
     );
+}
+
+
+#[test]
+fn installed_plugin_skills_are_replace_all_read_only_and_runnable() {
+    let host = controller();
+    let agent_id = "mahayana-assistant";
+    host.sync_installed_plugin_skills(
+        agent_id,
+        json!([{
+            "pluginId": "42",
+            "pluginVersion": "0123456789abcdef0123456789abcdef01234567",
+            "workflowId": "plugin-42-release-review",
+            "skillId": "release-review",
+            "name": "Release review",
+            "description": "Review exact-head release evidence.",
+            "markdown": "---\nname: Release review\ndescription: Review exact-head release evidence.\n---\nInspect the exact-head CI evidence before shipping.",
+            "sourceRef": "https://github.com/example/plugin/blob/main/skills/release-review/SKILL.md",
+            "publishedByCurrentUser": false,
+            "isEnabledForAgent": true
+        }]),
+    )
+    .expect("sync installed plugin skills");
+    host.execute(FeatureCommand::WorkflowRun {
+        request_id: "plugin-skill-run".into(),
+        agent_id: agent_id.into(),
+        id: "plugin-42-release-review".into(),
+    })
+    .expect("installed plugin skill reaches canonical workflow runner");
+    let disable = host.execute(FeatureCommand::WorkflowSetEnabled {
+        request_id: "plugin-skill-disable".into(),
+        agent_id: agent_id.into(),
+        id: "plugin-42-release-review".into(),
+        enabled: false,
+    }).expect_err("plugin-managed skill enablement must be read-only");
+    assert!(disable.to_string().contains("read-only"));
+    let delete = host.execute(FeatureCommand::WorkflowDelete {
+        request_id: "plugin-skill-delete".into(),
+        agent_id: agent_id.into(),
+        id: "plugin-42-release-review".into(),
+    }).expect_err("plugin-managed skill deletion must be read-only");
+    assert!(delete.to_string().contains("read-only"));
+    host.sync_installed_plugin_skills(agent_id, json!([]))
+        .expect("replace installed plugin skills with empty authoritative snapshot");
+    let removed = host.execute(FeatureCommand::WorkflowRun {
+        request_id: "plugin-skill-run-after-remove".into(),
+        agent_id: agent_id.into(),
+        id: "plugin-42-release-review".into(),
+    }).expect_err("removed installed plugin skill must no longer be runnable");
+    assert!(removed.to_string().contains("unknown workflow"));
 }

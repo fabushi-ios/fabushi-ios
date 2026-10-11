@@ -1179,6 +1179,13 @@ impl AppHost {
                     params.get("plugins").cloned().unwrap_or_else(|| json!([])),
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "feature.workflow.pluginSkillsSync" => self
+                .feature
+                .sync_installed_plugin_skills(
+                    string_param(&params, "agentId")?,
+                    params.get("skills").cloned().unwrap_or_else(|| json!([])),
+                )
+                .map_err(|error| AppHostError::Operation(error.to_string())),
             "feature.workflow.publishConfirm" => self
                 .feature
                 .confirm_workflow_publish(
