@@ -243,11 +243,15 @@ final class IOSMainRuntime {
     func makeRendererPortServer(port: CoordinatorPort) -> RendererPortServer {
         let server = RendererPortServer(
             port: port,
-            dispatch: { [weak self] method, args in
+            dispatchWithRequestId: { [weak self] requestId, method, args in
                 guard let self else {
                     return .failed(.init(code: "coordinator-unavailable", message: "iOS main runtime was released"))
                 }
-                return await self.dispatchTransport(method: method, args: args)
+                return await self.dispatchTransport(
+                    requestId: requestId,
+                    method: method,
+                    args: args
+                )
             },
             onServing: { [weak self] in
                 self?.coordinator.replayClientSideToolEvents()
@@ -263,6 +267,18 @@ final class IOSMainRuntime {
         method: String,
         args: CoordinatorPayload
     ) async -> CoordinatorReplyOutcome {
+        await dispatchTransport(
+            requestId: UUID().uuidString.lowercased(),
+            method: method,
+            args: args
+        )
+    }
+
+    private func dispatchTransport(
+        requestId: String,
+        method: String,
+        args: CoordinatorPayload
+    ) async -> CoordinatorReplyOutcome {
         if method == "reportBoxVisibility" {
             if let report = args.foundationValue as? [String: Any] {
                 boxVisibilityTracker.handle(report, documentKey: "ios-main")
@@ -272,7 +288,11 @@ final class IOSMainRuntime {
         if let updateOutcome = updateWiring.route(method: method, args: args) {
             return updateOutcome
         }
-        let outcome = await coordinator.dispatchTransport(method: method, args: args)
+        let outcome = await coordinator.dispatchTransport(
+            requestId: requestId,
+            method: method,
+            args: args
+        )
         if let accountAuthorization = await accountRuntime.observeAuthReply(method: method, outcome: outcome) {
             switch accountAuthorization {
             case .ready(let slot):
