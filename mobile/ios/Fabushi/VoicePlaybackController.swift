@@ -7,7 +7,7 @@ import Observation
 final class VoicePlaybackController {
     private var player: AVPlayer?
     private var assetLoader: NativeMessagingBlobAssetLoader?
-    private var endObserver: NSObjectProtocol?
+    @ObservationIgnored nonisolated(unsafe) private var endObserver: NSObjectProtocol?
     private(set) var playingMessageId: String?
     var errorMessage: String?
 
