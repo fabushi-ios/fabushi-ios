@@ -2222,7 +2222,11 @@ impl AppHost {
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let permissions_removed = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?
-            .remove_plugin(plugin_id)
+            .remove_plugin_with_commit_guard(plugin_id, || {
+                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                    scope == account.scope && generation == account.generation
+                })
+            })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         Ok(json!({
@@ -2308,7 +2312,15 @@ impl AppHost {
         let mut manager = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         manager
-            .retain_requested(plugin_id, &pointer.requested_permissions)
+            .retain_requested_with_commit_guard(
+                plugin_id,
+                &pointer.requested_permissions,
+                || {
+                    self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                        scope == account.scope && generation == account.generation
+                    })
+                },
+            )
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let granted = manager.grants_for(plugin_id);
@@ -2339,11 +2351,24 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         if grant {
             manager
-                .grant(plugin_id, &pointer.requested_permissions, permission)
+                .grant_with_commit_guard(
+                    plugin_id,
+                    &pointer.requested_permissions,
+                    permission,
+                    || {
+                        self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                            scope == account.scope && generation == account.generation
+                        })
+                    },
+                )
                 .map_err(|error| AppHostError::Operation(error.to_string()))?;
         } else {
             manager
-                .revoke(plugin_id, permission)
+                .revoke_with_commit_guard(plugin_id, permission, || {
+                    self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                        scope == account.scope && generation == account.generation
+                    })
+                })
                 .map_err(|error| AppHostError::Operation(error.to_string()))?;
         }
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
