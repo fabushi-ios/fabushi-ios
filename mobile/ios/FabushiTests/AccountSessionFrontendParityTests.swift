@@ -27,8 +27,14 @@ final class AccountSessionFrontendParityTests: XCTestCase {
             autoReview: DEFAULT_SAND_AUTO_REVIEW_INSTRUCTIONS,
             inferenceProvider: .fabushi,
             privacyModeEnabled: false,
-            timeZone: nil,
-            localToolPermission: nil
+            timeZone: .init(
+                detectedTimeZone: nil,
+                overrideTimeZone: nil
+            ),
+            localToolPermission: .init(
+                permission: SAND_DEFAULT_LOCAL_TOOL_PERMISSION,
+                ceiling: nil
+            )
         )
         XCTAssertFalse(snapshot.privacyModeEnabled)
     }
