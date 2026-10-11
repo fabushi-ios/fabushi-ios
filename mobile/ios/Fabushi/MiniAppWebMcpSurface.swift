@@ -1547,7 +1547,7 @@ private struct MiniAppWebView: UIViewRepresentable {
     }
 }
 
-private func hardenGeneratedMiniAppDocument(_ html: String) -> String {
+func hardenGeneratedMiniAppDocument(_ html: String) -> String {
     let policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; media-src data:; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'\">"
     if let range = html.range(of: "<head>", options: .caseInsensitive) {
         var result = html
