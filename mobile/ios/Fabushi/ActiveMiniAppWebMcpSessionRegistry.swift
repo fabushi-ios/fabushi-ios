@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 struct MiniAppWebMcpApprovalDenied: LocalizedError {
     var errorDescription: String? { "用户取消了 WebMCP Tool 调用" }
@@ -18,6 +19,10 @@ struct MiniAppWebMcpSchemaViolation: LocalizedError {
 @MainActor
 final class ActiveMiniAppWebMcpSessionRegistry {
     static let shared = ActiveMiniAppWebMcpSessionRegistry()
+    private static let logger = Logger(
+        subsystem: "com.ombhrum.fabushi",
+        category: "miniapp-webmcp"
+    )
 
     struct Invocation {
         let callId: String
@@ -109,6 +114,18 @@ final class ActiveMiniAppWebMcpSessionRegistry {
             tools: uniqueTools,
             invoke: invoke
         )
+        let sessionEvidence = [
+            "FABUSHI_WEBMCP_SESSION_REGISTER",
+            "account_id=\(Self.nonceIdentifier(normalizedAccount))",
+            "plugin_id=\(normalizedPluginId)",
+            "version=\(version)",
+            "artifact_sha256=\(artifactSha256.lowercased())",
+            "instance_id=\(pluginInstanceId)",
+            "nonce_id=\(Self.nonceIdentifier(nonce))",
+            "generation=\(generation)",
+            "tool_count=\(uniqueTools.count)",
+        ].joined(separator: " ")
+        Self.logger.notice("\(sessionEvidence, privacy: .public)")
     }
 
     func unregister(
@@ -264,7 +281,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
     ) {
         traceSequence = traceSequence == UInt64.max ? 1 : traceSequence + 1
         let snapshot = entry.snapshot
-        invocationTraces.append(InvocationTrace(
+        let trace = InvocationTrace(
             sequence: traceSequence,
             callId: callId,
             accountKey: snapshot.accountKey,
@@ -278,7 +295,25 @@ final class ActiveMiniAppWebMcpSessionRegistry {
             permissionDecision: permissionDecision,
             stateRevision: stateRevision,
             outcome: outcome
-        ))
+        )
+        invocationTraces.append(trace)
+        let traceEvidence = [
+            "FABUSHI_WEBMCP_TRACE",
+            "sequence=\(trace.sequence)",
+            "call_id=\(trace.callId)",
+            "account_id=\(Self.nonceIdentifier(trace.accountKey))",
+            "plugin_id=\(trace.pluginId)",
+            "version=\(trace.version)",
+            "artifact_sha256=\(trace.artifactSha256)",
+            "instance_id=\(trace.pluginInstanceId)",
+            "nonce_id=\(trace.nonceIdentifier)",
+            "generation=\(trace.generation)",
+            "tool_name=\(trace.toolName)",
+            "permission=\(trace.permissionDecision)",
+            "state_revision=\(trace.stateRevision.map(String.init) ?? "none")",
+            "outcome=\(trace.outcome)",
+        ].joined(separator: " ")
+        Self.logger.notice("\(traceEvidence, privacy: .public)")
         if invocationTraces.count > 256 {
             invocationTraces.removeFirst(invocationTraces.count - 256)
         }
