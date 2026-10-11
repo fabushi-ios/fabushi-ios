@@ -483,6 +483,29 @@ final class CoordinatorContractTests: XCTestCase {
     }
 
     @MainActor
+    func testRendererPortForwardsWireRequestIdToShippingDispatcher() async {
+        let port = TestCoordinatorPort()
+        let forwarded = expectation(description: "wire request id forwarded")
+        var observed: String?
+        let server = RendererPortServer(
+            port: port,
+            dispatchWithRequestId: { requestId, _, _ in
+                observed = requestId
+                forwarded.fulfill()
+                return .ok(.null)
+            }
+        )
+        server.receive(.hello(protocolVersion: CoordinatorProtocol.version))
+        server.receive(.request(
+            requestId: "wire-request-42",
+            method: "sendPrompt",
+            args: .object([:])
+        ))
+        await fulfillment(of: [forwarded], timeout: 1)
+        XCTAssertEqual(observed, "wire-request-42")
+    }
+
+    @MainActor
     func testRendererPortHandshakeAndCancellationSettleDeterministically() async {
         let port = TestCoordinatorPort()
         let server = RendererPortServer(port: port) { _, _ in
@@ -898,6 +921,92 @@ final class CoordinatorContractTests: XCTestCase {
         now = now.addingTimeInterval(GatewayDNSDiagnosticTracker.throttleSeconds + 1)
         XCTAssertEqual(tracker.recordFailure(url: url, requestId: "r3")?.episode, 2)
         XCTAssertEqual(tracker.emitted.map(\.requestId), ["r1", "r3"])
+    }
+
+    func testRoutedMCPBridgeRejectsStaleScopeBeforeCommit() async throws {
+        actor ScopeBox {
+            var value: RoutedMCPScopeToken?
+            init(_ value: RoutedMCPScopeToken?) { self.value = value }
+            func get() -> RoutedMCPScopeToken? { value }
+            func set(_ next: RoutedMCPScopeToken?) { value = next }
+        }
+        let original = RoutedMCPScopeToken(accountScope: "account-a", generation: 1)
+        let box = ScopeBox(original)
+        let bridge = RoutedMCPBridge(
+            listTools: {
+                [
+                    .init(
+                        name: "search",
+                        providerIdentifier: "github",
+                        toolName: "search",
+                        description: nil,
+                        inputSchema: nil
+                    ),
+                ]
+            },
+            currentScope: { await box.get() },
+            callTool: { _, _, _, _ in .object(["ok": .bool(true)]) }
+        )
+        _ = try await bridge.listTools(scope: original)
+        await box.set(.init(accountScope: "account-b", generation: 2))
+        do {
+            _ = try await bridge.callTool(
+                name: "search",
+                arguments: .object([:]),
+                requestId: "request-1",
+                toolCallId: "call-1",
+                agentId: "agent-1",
+                scope: original
+            )
+            XCTFail("stale account scope must fail closed")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("stale"))
+        }
+    }
+
+    func testRoutedMCPBridgeCancellationFencesLateResult() async throws {
+        actor ScopeBox {
+            let value = RoutedMCPScopeToken(accountScope: "account-a", generation: 1)
+            func get() -> RoutedMCPScopeToken? { value }
+        }
+        let box = ScopeBox()
+        let bridge = RoutedMCPBridge(
+            listTools: {
+                [
+                    .init(
+                        name: "search",
+                        providerIdentifier: "github",
+                        toolName: "search",
+                        description: nil,
+                        inputSchema: nil
+                    ),
+                ]
+            },
+            currentScope: { await box.get() },
+            callTool: { _, _, _, _ in
+                try await Task.sleep(for: .seconds(2))
+                return .object(["ok": .bool(true)])
+            }
+        )
+        let scope = await box.get()!
+        _ = try await bridge.listTools(scope: scope)
+        let call = Task {
+            try await bridge.callTool(
+                name: "search",
+                arguments: .object([:]),
+                requestId: "request-cancel",
+                toolCallId: "call-cancel",
+                agentId: nil,
+                scope: scope
+            )
+        }
+        call.cancel()
+        do {
+            _ = try await call.value
+            XCTFail("cancelled routed MCP call must not commit a late result")
+        } catch is CancellationError {
+            // expected
+        }
     }
 
     @MainActor
