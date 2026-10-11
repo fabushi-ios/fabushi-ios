@@ -1246,8 +1246,15 @@ final class CoordinatorMcpSurface {
             var usedSkillIds = Set<String>()
             for (index, skill) in plugin.skills.enumerated() {
                 guard installedSkills.count < 64,
+                      let version = normalizedSkillPublishVersion(effectivePlugin.versionRef),
                       let sourceUrl = skill.sourceUrl,
-                      let markdown = await fetchMarketplaceSkillMarkdown(sourceUrl: sourceUrl)
+                      let pinnedSourceUrl = pinnedMarketplaceSkillSourceUrl(
+                          sourceUrl,
+                          versionRef: version
+                      ),
+                      let markdown = await fetchMarketplaceSkillMarkdown(
+                          sourceUrl: pinnedSourceUrl
+                      )
                 else { continue }
                 var skillId = marketplaceInstalledSkillId(skill.name)
                 if skillId.isEmpty || usedSkillIds.contains(skillId) {
@@ -1256,13 +1263,13 @@ final class CoordinatorMcpSurface {
                 usedSkillIds.insert(skillId)
                 installedSkills.append([
                     "pluginId": plugin.id,
-                    "pluginVersion": effectivePlugin.versionRef,
+                    "pluginVersion": version,
                     "workflowId": "plugin-\(plugin.id)-\(skillId)",
                     "skillId": skillId,
                     "name": skill.name,
                     "description": skill.description,
                     "markdown": markdown,
-                    "sourceRef": sourceUrl,
+                    "sourceRef": pinnedSourceUrl,
                     "publishedByCurrentUser": effectivePlugin.publisherUserId == currentUserId,
                     "isEnabledForAgent": true,
                 ])
