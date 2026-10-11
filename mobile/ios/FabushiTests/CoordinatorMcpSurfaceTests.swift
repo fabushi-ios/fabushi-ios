@@ -4,6 +4,7 @@ import XCTest
 @MainActor
 private final class CoordinatorMcpFakeHost: MahayanaHostRequesting, @unchecked Sendable {
     private var disabled = Set(["search"])
+    private(set) var toolCalls: [[String: Any]] = []
 
     func request(
         method: String,
@@ -45,7 +46,13 @@ private final class CoordinatorMcpFakeHost: MahayanaHostRequesting, @unchecked S
             ])
 
         case "feature.mcp.toolCall":
-            return .init(value: ["ok": true])
+            toolCalls.append(params)
+            return .init(value: [
+                "content": [
+                    ["type": "text", "text": "ok"],
+                ],
+                "structuredContent": ["ok": true],
+            ])
 
         default:
             return .init(value: NSNull())
@@ -112,6 +119,40 @@ final class CoordinatorMcpSurfaceTests: XCTestCase {
         XCTAssertFalse(
             settings.getMcpDisabledToolsByServerId()[serverId]?.contains("search") == true
         )
+
+        let routedList = await coordinator.dispatchTransport(
+            requestId: "runner-list-1",
+            method: "listRoutedMcpTools",
+            args: .object([:])
+        )
+        guard case .ok(let routedListPayload) = routedList,
+              let routedObject = routedListPayload.foundationValue as? [String: Any],
+              let routedTools = routedObject["tools"] as? [[String: Any]],
+              let routedName = routedTools.first?["name"] as? String
+        else {
+            return XCTFail("routed MCP list did not travel through the shipping coordinator path")
+        }
+        XCTAssertEqual(routedTools.first?["providerIdentifier"] as? String, "github")
+
+        let routedCall = await coordinator.dispatchTransport(
+            requestId: "runner-call-1",
+            method: "executeRoutedMcpTool",
+            args: .object([
+                "name": .string(routedName),
+                "toolCallId": .string("tool-call-1"),
+                "agentId": .string("agent-1"),
+                "arguments": .object(["query": .string("fabushi")]),
+            ])
+        )
+        guard case .ok(let routedCallPayload) = routedCall else {
+            return XCTFail("routed MCP execution did not travel through the shipping coordinator path")
+        }
+        XCTAssertEqual(
+            (routedCallPayload.foundationValue as? [String: Any])?["isError"] as? Bool,
+            false
+        )
+        XCTAssertEqual(host.toolCalls.last?["toolCallId"] as? String, "tool-call-1")
+        XCTAssertEqual(host.toolCalls.last?["agentId"] as? String, "agent-1")
 
         settings.setMcpCustomInstructionsByServerId([serverId: "private"])
         coordinator.updateAccountSettingsScope(nil)
