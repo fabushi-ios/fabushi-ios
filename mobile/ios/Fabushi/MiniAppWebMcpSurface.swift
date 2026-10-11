@@ -1238,7 +1238,11 @@ private struct MiniAppWebView: UIViewRepresentable {
                 do {
                     try Task.checkCancellation()
                     guard self.activeBridgeSession == session else { throw CancellationError() }
-                    if tool.approval != "none" {
+                    if tool.approval != "none",
+                       !MarketplaceModel.requiresActiveLocalWebMcpSession(
+                           pluginId: self.plugin.pluginId
+                       )
+                    {
                         guard await self.requestApproval(tool) else {
                             self.resolve(
                                 webView: webView,
@@ -1350,8 +1354,20 @@ private struct MiniAppWebView: UIViewRepresentable {
                   activeLocalSource == source,
                   isTrustedWebMcpBridgeURL(webView.url, localRootURL: source.rootURL),
                   session.grants.contains(name),
+                  let tool = toolByName[name],
                   JSONSerialization.isValidJSONObject(arguments)
             else { throw CancellationError() }
+
+            if tool.approval != "none" {
+                guard await requestApproval(tool) else {
+                    throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                        "用户取消了 WebMCP Tool 调用"
+                    )
+                }
+                guard activeBridgeSession == session,
+                      activeLocalSource == source
+                else { throw CancellationError() }
+            }
 
             let result = try await webView.callAsyncJavaScript(
                 """
