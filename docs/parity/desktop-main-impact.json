@@ -31,7 +31,8 @@
     "mainActiveSpecsReviewEvidence": [
       "docs/specs/remote-computer-mobile-session-reconciliation.md read at Desktop 92fcc2b0; iOS applicability determined from shipping call graph, not from Android compatibility wording.",
       "Desktop 62d0c99f added docs/specs/fabushi-plugins-marketplace-owner-inventory.md and refreshed FPM-001 metadata only; inventory FPM-OWN-012/013/016 keeps iOS Marketplace/Mini App/AI private creation partial or missing, so no implementation/verification promotion was made.",
-      "Desktop 371b72f1 extends FPM owner inventory with Skills lifecycle/ownership migration facts only; selected 7,951 source identities are unchanged and no iOS verification status is promoted."
+      "Desktop 371b72f1 extends FPM owner inventory with Skills lifecycle/ownership migration facts only; selected 7,951 source identities are unchanged and no iOS verification status is promoted.",
+      "iOS PR #3 FPM-OWN-012 source closure: exact source f8695509f37f36f4c97e7373c522d11eb2b87700 adds canonical account-installed projection via feature.marketplace.added, authenticated feature.marketplace.remove -> DELETE /v1/marketplace/plugins/:pluginId/add, shipping SwiftUI Remove, local Host uninstall, JS runtime account scope/session-generation bindings with stale teardown and current-account lazy restore, and a protected journey that requires removal settlement. This is implementation evidence only until descendant exact-head Actions finish. FPM-OWN-016 remains fail-closed because local-generated draft/preview/approval/sign/install APIs are not yet reachable from the existing Agent artifact flow; no verified promotion or acceptance boolean change is made."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending."
