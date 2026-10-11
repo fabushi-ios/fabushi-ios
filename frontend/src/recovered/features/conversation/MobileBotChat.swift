@@ -6676,12 +6676,13 @@ internal struct MobileBotChat: View {
         do {
             let bridge = GlobalDharmaMiniAppBridge(bridge: bridge)
             let activeToolNames: [String]?
-            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
-                guard let activeTools = model.activeWebMcpTools(pluginId: pluginId), !activeTools.isEmpty else {
-                    throw MahayanaCoordinator.CoordinatorError.requestFailed(
-                        "全球法布施需要先打开当前本地 Mini App 页面，再通过 Bot 操作"
-                    )
-                }
+            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+               let activeTools = model.activeWebMcpTools(pluginId: pluginId),
+               !activeTools.isEmpty
+            {
+                // An active page creates a hard local execution fence. When no
+                // page is active, omit the fence so the canonical router may
+                // still expose Global Dharma's legacy remote-service tools.
                 activeToolNames = activeTools.map(\.name)
             } else {
                 activeToolNames = nil
@@ -6720,24 +6721,31 @@ internal struct MobileBotChat: View {
             guard let tool = execution["tool"] as? String, !tool.isEmpty else {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App route did not return an executable tool")
             }
-            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
-                guard executionKind == "web" else {
+            let hasActiveLocalSession = activeToolNames != nil
+            guard GlobalDharmaMiniAppBridge.acceptsExecutionKind(
+                pluginId: pluginId,
+                executionKind: executionKind,
+                hasActiveLocalSession: hasActiveLocalSession
+            ) else {
+                if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+                   hasActiveLocalSession
+                {
                     throw MahayanaCoordinator.CoordinatorError.requestFailed(
-                        "Global Dharma Bot requires local WebMCP execution"
+                        "Global Dharma active page forbids remote MCP fallback"
                     )
                 }
-            } else if executionKind != "mcp-http" {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed(
-                    "iOS Mini App Bot only accepts governed mcp-http execution"
+                    "Mini App route returned an execution kind that is not allowed in the current session"
                 )
             }
             let arguments = routed["arguments"] as? [String: Any] ?? [:]
             let result: [String: Any]
-            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
-                // Global Dharma is the offline/live Mini App reference path:
-                // natural-language routing may be online, but execution must
-                // target the currently loaded, account-scoped WKWebView
-                // session. Never substitute the remote official MCP runtime.
+            if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+               executionKind == "web"
+            {
+                // With an active page, Global Dharma is the offline/live Mini
+                // App reference path. Never substitute the remote official MCP
+                // runtime for a local-page tool.
                 let localResult = try await model.callActiveWebMcpTool(
                     pluginId: pluginId,
                     name: tool,
@@ -6748,6 +6756,9 @@ internal struct MobileBotChat: View {
                 }
                 result = localResult
             } else {
+                // Global Dharma's pre-existing remote service remains available
+                // only when there is no active local-page fence. Other Mini App
+                // bots continue to use the governed MCP HTTP path.
                 result = try await bridge.callOfficialMcpTool(
                     pluginId: pluginId,
                     name: tool,
