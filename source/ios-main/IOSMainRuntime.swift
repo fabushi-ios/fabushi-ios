@@ -39,6 +39,7 @@ final class IOSUserTimeZoneProjectionFence {
 final class IOSMainRuntime {
     let coordinator: MahayanaCoordinator
     let lifecycleReporter: IOSLifecycleReporter
+    private let lifecycleTelemetrySink: IOSLifecycleTelemetryDurableSink
     private let coordinatorAppVersion: String
     private let coordinatorDataDirectory: String
     private let coordinatorLocalHumanIdentity: CoordinatorLocalHumanIdentityState
@@ -69,6 +70,13 @@ final class IOSMainRuntime {
 
         let reporter = IOSLifecycleReporter()
         lifecycleReporter = reporter
+        let lifecycleTelemetrySink = IOSLifecycleTelemetryDurableSink(
+            url: appDataDirectory.appendingPathComponent(IOS_LIFECYCLE_TELEMETRY_SPILL_FILE_NAME)
+        )
+        self.lifecycleTelemetrySink = lifecycleTelemetrySink
+        reporter.attach { record in
+            lifecycleTelemetrySink.submit(record)
+        }
         let boxVisibilityTracker = IOSBoxVisibilityTracker(reporter: reporter)
         self.boxVisibilityTracker = boxVisibilityTracker
 
@@ -128,6 +136,7 @@ final class IOSMainRuntime {
                 clearAccountScope: {
                     coordinatorLocalHumanIdentity.replace(with: nil)
                     boxVisibilityTracker.noteAccountSlot(nil)
+                    lifecycleTelemetrySink.rotate(accountSlot: nil)
                     coordinator.updateAccountSettingsScope(nil)
                 },
                 didClearAccountScope: { _, nextSlot in
@@ -144,6 +153,7 @@ final class IOSMainRuntime {
         let accountAuthorizer = IOSAccountAuthorizer(
             applyAccountScope: { slot in
                 boxVisibilityTracker.noteAccountSlot(slot)
+                lifecycleTelemetrySink.rotate(accountSlot: slot)
                 coordinator.updateAccountSettingsScope(slot)
             },
             applyLocalHumanIdentity: { slot in
@@ -348,6 +358,7 @@ final class IOSMainRuntime {
         case .background:
             lifecycleRecovery.transition(to: .background)
             lifecycleReporter.report(.rendererLifecycle, metadata: ["phase": "background"])
+            lifecycleTelemetrySink.settleLoggedOutIfNeeded()
             coordinator.sceneEnteredBackground()
             reportSessionActivity(active: false)
         case .inactive:
@@ -454,6 +465,7 @@ final class IOSMainRuntime {
             .rendererLifecycle,
             metadata: ["phase": "shutting-down"]
         )
+        lifecycleTelemetrySink.settleLoggedOutIfNeeded()
         accountRuntime.reset()
         boxVisibilityTracker.abandonAll()
         coordinatorLocalHumanIdentity.replace(with: nil)

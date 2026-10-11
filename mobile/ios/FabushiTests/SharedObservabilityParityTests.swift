@@ -45,6 +45,48 @@ private actor StructuredLogRecorder {
 }
 
 final class SharedObservabilityParityTests: XCTestCase {
+    func testLifecycleTelemetrySpillIsAccountScopedBoundedAndAgeLimited() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("telemetry-spill-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent(IOS_LIFECYCLE_TELEMETRY_SPILL_FILE_NAME)
+        let spill = IOSLifecycleTelemetrySpill(url: url)
+
+        let old = IOSLifecycleTelemetryRecord(
+            family: .startup,
+            level: .info,
+            metadata: ["phase": "old"]
+        )
+        await spill.append(old, timestampMs: 1)
+        await spill.rotate(accountSlot: "account-a")
+        XCTAssertEqual(await spill.snapshotCount(), 0)
+
+        let now = Int64(Date().timeIntervalSince1970 * 1_000)
+        for index in 0..<(DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES + 5) {
+            await spill.append(
+                .init(
+                    family: .rendererLifecycle,
+                    level: .info,
+                    metadata: [
+                        "index": String(index),
+                        "padding": String(repeating: "x", count: 2_048),
+                    ]
+                ),
+                timestampMs: now
+            )
+        }
+        XCTAssertLessThanOrEqual(await spill.snapshotCount(), DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES)
+        XCTAssertLessThanOrEqual(await spill.persistedByteCount(), DESKTOP_STRUCTURED_LOG_SPILL_MAX_BYTES)
+
+        await spill.rotate(accountSlot: "account-b")
+        XCTAssertEqual(await spill.snapshotCount(), 0)
+        XCTAssertEqual(iosLifecycleTelemetryAccountScope(nil), "logged-out")
+        XCTAssertNotEqual(
+            iosLifecycleTelemetryAccountScope("account-a"),
+            iosLifecycleTelemetryAccountScope("account-b")
+        )
+    }
+
     func testHeapMetricsRejectInvalidCoreValuesAndKeepsValidCounts() {
         XCTAssertNil(parseHeapMetricsReport(["usedBytes": -1, "limitBytes": 100]))
         XCTAssertNil(parseHeapMetricsReport(["usedBytes": 1, "limitBytes": 0]))
