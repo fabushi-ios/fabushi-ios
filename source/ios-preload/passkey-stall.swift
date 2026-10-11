@@ -36,3 +36,70 @@ enum IOSPasskeyStall {
         }
     }
 }
+
+
+/// Shipping deadline owner for native passkey ceremonies.
+///
+/// Desktop fences navigator.credentials at the trusted preload boundary. iOS
+/// performs the same ceremony through AuthenticationServices, so the deadline
+/// lives beside the native provider instead of a WebView shim. Re-arming
+/// advances a generation and cancels the prior timer; stale timers therefore
+/// cannot settle a replacement ceremony.
+@MainActor
+final class IOSPasskeyCeremonyDeadline {
+    typealias StallReporter = @MainActor (_ method: String, _ sinceMilliseconds: Int64) -> Void
+    typealias TimeoutHandler = @MainActor (_ generation: UInt64) -> Void
+
+    private let timeoutNanoseconds: UInt64
+    private let reportStall: StallReporter
+    private var timeoutTask: Task<Void, Never>?
+    private(set) var generation: UInt64 = 0
+
+    init(
+        timeoutNanoseconds: UInt64 = IOSPasskeyStall.stallNanoseconds,
+        reportStall: @escaping StallReporter = { _, _ in }
+    ) {
+        self.timeoutNanoseconds = timeoutNanoseconds
+        self.reportStall = reportStall
+    }
+
+    @discardableResult
+    func arm(
+        method: String,
+        sinceMilliseconds: Int64,
+        onTimeout: @escaping TimeoutHandler
+    ) -> UInt64 {
+        timeoutTask?.cancel()
+        generation &+= 1
+        if generation == 0 { generation = 1 }
+        let currentGeneration = generation
+        let delay = timeoutNanoseconds
+
+        timeoutTask = Task { @MainActor [weak self] in
+            do {
+                try await Task<Never, Never>.sleep(nanoseconds: delay)
+            } catch {
+                return
+            }
+            guard let self,
+                  !Task.isCancelled,
+                  self.generation == currentGeneration
+            else { return }
+
+            self.timeoutTask = nil
+            self.reportStall(method, sinceMilliseconds)
+            onTimeout(currentGeneration)
+        }
+        return currentGeneration
+    }
+
+    func disarm(generation expectedGeneration: UInt64) {
+        guard expectedGeneration == generation else { return }
+        timeoutTask?.cancel()
+        timeoutTask = nil
+    }
+
+    func isCurrent(_ expectedGeneration: UInt64) -> Bool {
+        expectedGeneration == generation
+    }
+}

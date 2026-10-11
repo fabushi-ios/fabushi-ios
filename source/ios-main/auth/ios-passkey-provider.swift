@@ -26,13 +26,30 @@ final class IOSAuthenticationServicesPasskeyProvider:
         }
     }
 
+    typealias NowMilliseconds = @MainActor () -> Int64
+
     private let allowedRelyingPartyIDs: Set<String>
+    private let ceremonyDeadline: IOSPasskeyCeremonyDeadline
+    private let nowMilliseconds: NowMilliseconds
     private var continuation: CheckedContinuation<PasskeyAssertion, Error>?
     private var authorizationController: ASAuthorizationController?
+    private var activeCeremonyGeneration: UInt64?
 
-    init(allowedRelyingPartyIDs: Set<String> = ["fabushi.app"]) {
+    init(
+        allowedRelyingPartyIDs: Set<String> = ["fabushi.app"],
+        stallNanoseconds: UInt64 = IOSPasskeyStall.stallNanoseconds,
+        nowMilliseconds: @escaping NowMilliseconds = {
+            Int64(Date().timeIntervalSince1970 * 1_000)
+        },
+        reportStall: @escaping IOSPasskeyCeremonyDeadline.StallReporter = { _, _ in }
+    ) {
         self.allowedRelyingPartyIDs = Set(
             allowedRelyingPartyIDs.map { $0.lowercased() }
+        )
+        self.nowMilliseconds = nowMilliseconds
+        ceremonyDeadline = IOSPasskeyCeremonyDeadline(
+            timeoutNanoseconds: stallNanoseconds,
+            reportStall: reportStall
         )
         super.init()
     }
@@ -75,6 +92,7 @@ final class IOSAuthenticationServicesPasskeyProvider:
             ? .required
             : .preferred
 
+        let sinceMilliseconds = nowMilliseconds()
         return try await withCheckedThrowingContinuation {
             (continuation: CheckedContinuation<PasskeyAssertion, Error>) in
             self.continuation = continuation
@@ -84,6 +102,19 @@ final class IOSAuthenticationServicesPasskeyProvider:
             authorizationController = controller
             controller.delegate = self
             controller.presentationContextProvider = self
+
+            let generation = ceremonyDeadline.arm(
+                method: "credentials.get",
+                sinceMilliseconds: sinceMilliseconds
+            ) { [weak self, weak controller] generation in
+                guard let self, let controller else { return }
+                self.settle(
+                    .failure(IOSPasskeyStallError.stalled(method: "credentials.get")),
+                    controller: controller,
+                    generation: generation
+                )
+            }
+            activeCeremonyGeneration = generation
             controller.performRequests()
         }
     }
@@ -95,24 +126,30 @@ final class IOSAuthenticationServicesPasskeyProvider:
         guard let credential = authorization.credential
             as? ASAuthorizationPlatformPublicKeyCredentialAssertion
         else {
-            settle(.failure(ProviderError.unexpectedCredential))
+            settle(
+                .failure(ProviderError.unexpectedCredential),
+                controller: controller
+            )
             return
         }
 
-        settle(.success(PasskeyAssertion(
-            credentialID: credential.credentialID,
-            authenticatorData: credential.rawAuthenticatorData,
-            clientDataJSON: credential.rawClientDataJSON,
-            signature: credential.signature,
-            userID: credential.userID
-        )))
+        settle(
+            .success(PasskeyAssertion(
+                credentialID: credential.credentialID,
+                authenticatorData: credential.rawAuthenticatorData,
+                clientDataJSON: credential.rawClientDataJSON,
+                signature: credential.signature,
+                userID: credential.userID
+            )),
+            controller: controller
+        )
     }
 
     func authorizationController(
         controller: ASAuthorizationController,
         didCompleteWithError error: Error
     ) {
-        settle(.failure(error))
+        settle(.failure(error), controller: controller)
     }
 
     func presentationAnchor(
@@ -129,10 +166,22 @@ final class IOSAuthenticationServicesPasskeyProvider:
         return ASPresentationAnchor()
     }
 
-    private func settle(_ result: Result<PasskeyAssertion, Error>) {
+    private func settle(
+        _ result: Result<PasskeyAssertion, Error>,
+        controller: ASAuthorizationController? = nil,
+        generation: UInt64? = nil
+    ) {
+        if let controller, controller !== authorizationController { return }
+        if let generation, generation != activeCeremonyGeneration { return }
         guard let continuation else { return }
+
+        if let activeCeremonyGeneration {
+            ceremonyDeadline.disarm(generation: activeCeremonyGeneration)
+        }
+        self.activeCeremonyGeneration = nil
         self.continuation = nil
         authorizationController = nil
+
         switch result {
         case .success(let assertion):
             continuation.resume(returning: assertion)

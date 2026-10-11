@@ -72,7 +72,19 @@ final class IOSMainRuntime {
         let boxVisibilityTracker = IOSBoxVisibilityTracker(reporter: reporter)
         self.boxVisibilityTracker = boxVisibilityTracker
 
-        let passkeyProvider = IOSAuthenticationServicesPasskeyProvider()
+        let passkeyProvider = IOSAuthenticationServicesPasskeyProvider(
+            reportStall: { method, sinceMilliseconds in
+                reporter.report(
+                    .rendererLifecycle,
+                    level: .warn,
+                    metadata: [
+                        "phase": "passkey_stalled",
+                        "method": method,
+                        "since_ms": String(sinceMilliseconds),
+                    ]
+                )
+            }
+        )
         self.passkeyProvider = passkeyProvider
 
         let coordinator = try MahayanaCoordinator.make(

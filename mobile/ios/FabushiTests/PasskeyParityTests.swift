@@ -66,4 +66,38 @@ final class PasskeyParityTests: XCTestCase {
             .string(assertion.userID!.base64EncodedString())
         )
     }
+    @MainActor
+    func testPasskeyCeremonyDeadlineCancelsSupersededGeneration() async throws {
+        var reports: [String] = []
+        var timedOut: [UInt64] = []
+        let deadline = IOSPasskeyCeremonyDeadline(
+            timeoutNanoseconds: 1_000_000,
+            reportStall: { method, sinceMilliseconds in
+                reports.append("\(method):\(sinceMilliseconds)")
+            }
+        )
+
+        let first = deadline.arm(
+            method: "credentials.get",
+            sinceMilliseconds: 11
+        ) { generation in
+            timedOut.append(generation)
+        }
+        let second = deadline.arm(
+            method: "credentials.get",
+            sinceMilliseconds: 22
+        ) { generation in
+            timedOut.append(generation)
+        }
+
+        XCTAssertFalse(deadline.isCurrent(first))
+        XCTAssertTrue(deadline.isCurrent(second))
+
+        try await Task<Never, Never>.sleep(nanoseconds: 20_000_000)
+
+        XCTAssertEqual(reports, ["credentials.get:22"])
+        XCTAssertEqual(timedOut, [second])
+    }
+
+
 }
