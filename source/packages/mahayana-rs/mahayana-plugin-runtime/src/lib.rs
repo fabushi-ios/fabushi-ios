@@ -902,7 +902,7 @@ pub fn verify_fabapp_bytes(
     let mut archive_files = BTreeMap::<String, Vec<u8>>::new();
     let mut normalized_names = BTreeSet::new();
     for index in 0..archive.len() {
-        let mut entry = archive
+        let entry = archive
             .by_index(index)
             .map_err(|error| RuntimeError::FabappArchive(error.to_string()))?;
         let name = std::str::from_utf8(entry.name_raw())
@@ -951,14 +951,15 @@ pub fn verify_fabapp_bytes(
                 "package entry inflation ratio exceeds limit".into(),
             ));
         }
-        let capacity = usize::try_from(entry.size())
+        let entry_size = entry.size();
+        let capacity = usize::try_from(entry_size)
             .map_err(|_| RuntimeError::FabappPolicy("entry size overflow".into()))?;
         let mut data = Vec::with_capacity(capacity.min(4 * 1024 * 1024));
         entry
-            .take(entry.size().saturating_add(1))
+            .take(entry_size.saturating_add(1))
             .read_to_end(&mut data)
             .map_err(RuntimeError::Io)?;
-        if data.len() as u64 != entry.size() {
+        if data.len() as u64 != entry_size {
             return Err(RuntimeError::FabappPolicy(
                 "package entry size changed while reading".into(),
             ));
