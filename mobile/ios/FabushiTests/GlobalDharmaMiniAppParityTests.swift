@@ -35,6 +35,34 @@ final class GlobalDharmaMiniAppParityTests: XCTestCase {
         XCTAssertEqual(GlobalDharmaMiniAppBridge.prayerWheelLifetimeCNYMinor, 108_000)
     }
 
+    func testGlobalDharmaExecutionKindKeepsLivePageLocalAndPreservesRemoteServiceWithoutPage() {
+        XCTAssertTrue(GlobalDharmaMiniAppBridge.acceptsExecutionKind(
+            pluginId: "global-dharma",
+            executionKind: "web",
+            hasActiveLocalSession: true
+        ))
+        XCTAssertFalse(GlobalDharmaMiniAppBridge.acceptsExecutionKind(
+            pluginId: "global-dharma",
+            executionKind: "mcp-http",
+            hasActiveLocalSession: true
+        ))
+        XCTAssertTrue(GlobalDharmaMiniAppBridge.acceptsExecutionKind(
+            pluginId: "global-dharma",
+            executionKind: "mcp-http",
+            hasActiveLocalSession: false
+        ))
+        XCTAssertFalse(GlobalDharmaMiniAppBridge.acceptsExecutionKind(
+            pluginId: "global-dharma",
+            executionKind: "web",
+            hasActiveLocalSession: false
+        ))
+        XCTAssertTrue(GlobalDharmaMiniAppBridge.acceptsExecutionKind(
+            pluginId: "other-miniapp",
+            executionKind: "mcp-http",
+            hasActiveLocalSession: false
+        ))
+    }
+
     func testProjectedMiniAppBotCarriesComposerLaunchMetadata() {
         let bot = MobileBotSummary(
             id: "global-dharma-bot",
