@@ -14,6 +14,14 @@ struct GlobalDharmaLifetimeOffer: Equatable, Sendable {
         activeRails.contains("apple_in_app_purchase")
     }
 
+    var matchesCanonicalMonthly: Bool {
+        productId == GlobalDharmaCommerceModel.monthlyProductId &&
+            sku == GlobalDharmaCommerceModel.monthlySku &&
+            productKind == "subscription" &&
+            currency == "CNY" &&
+            amount == 3_000
+    }
+
     var matchesCanonicalLifetime: Bool {
         productId == GlobalDharmaCommerceModel.lifetimeProductId &&
             sku == GlobalDharmaCommerceModel.lifetimeSku &&
@@ -26,6 +34,8 @@ struct GlobalDharmaLifetimeOffer: Equatable, Sendable {
 enum GlobalDharmaCommerceError: LocalizedError {
     case invalidResponse
     case unauthenticated
+    case monthlyOfferMissing
+    case monthlyOfferMismatch
     case lifetimeOfferMissing
     case lifetimeOfferMismatch
     case appleStoreNotConfigured
@@ -36,6 +46,8 @@ enum GlobalDharmaCommerceError: LocalizedError {
         switch self {
         case .invalidResponse: return "支付服务返回了无效响应"
         case .unauthenticated: return "Fabushi 登录态不可用"
+        case .monthlyOfferMissing: return "服务端未返回本地转经轮月付商品"
+        case .monthlyOfferMismatch: return "服务端月付商品价格或权限契约与客户端安全基线不一致"
         case .lifetimeOfferMissing: return "服务端未返回本地转经轮买断商品"
         case .lifetimeOfferMismatch: return "服务端买断商品价格或权限契约与客户端安全基线不一致"
         case .appleStoreNotConfigured: return "App Store 买断商品尚未激活，已按安全策略停止购买"
@@ -50,15 +62,29 @@ enum GlobalDharmaCommerceError: LocalizedError {
 final class GlobalDharmaCommerceModel {
     nonisolated static let miniAppId = "global-dharma"
     nonisolated static let capability = "local.prayer-wheel.start"
+    nonisolated static let monthlyProductId = "prod.global-dharma.local-prayer-wheel.monthly"
+    nonisolated static let monthlySku = "local-prayer-wheel.monthly"
     nonisolated static let lifetimeProductId = "prod.global-dharma.local-prayer-wheel.lifetime"
     nonisolated static let lifetimeSku = "local-prayer-wheel.lifetime"
 
     var accessAllowed = false
     var accessReason = "not_loaded"
+    var monthlyOffer: GlobalDharmaLifetimeOffer?
     var lifetimeOffer: GlobalDharmaLifetimeOffer?
     var busy = false
     var message = "免费功能可离线使用；本地转经轮在执行、购买或恢复时联网核验权限"
     var lastPaymentId: String?
+
+    var canBuyMonthly: Bool {
+        guard !accessAllowed, !busy else { return false }
+        guard let monthlyOffer else { return true }
+        return monthlyOffer.matchesCanonicalMonthly && monthlyOffer.appleStoreAvailable
+    }
+
+    var monthlyPriceLabel: String {
+        guard let monthlyOffer, monthlyOffer.matchesCanonicalMonthly else { return "¥30/月" }
+        return "¥\(monthlyOffer.amount / 100)/月"
+    }
 
     var canBuyLifetime: Bool {
         guard !accessAllowed, !busy else { return false }
@@ -95,13 +121,15 @@ final class GlobalDharmaCommerceModel {
         do {
             try applyEntitlement(try await fetchEntitlement())
             if accessAllowed {
-                message = "本地转经轮已买断 · 权限有效"
-            } else if let lifetimeOffer, lifetimeOffer.matchesCanonicalLifetime {
-                message = lifetimeOffer.appleStoreAvailable
-                    ? "本地转经轮买断 \(lifetimePriceLabel)"
-                    : "\(lifetimePriceLabel) 买断 · App Store 商品尚未激活"
+                message = "本地转经轮权限有效"
             } else {
-                message = "本地转经轮权限未开通"
+                let monthlyStatus = monthlyOffer?.matchesCanonicalMonthly == true
+                    ? (monthlyOffer?.appleStoreAvailable == true ? monthlyPriceLabel : "\(monthlyPriceLabel) · App Store 未激活")
+                    : "月付不可用"
+                let lifetimeStatus = lifetimeOffer?.matchesCanonicalLifetime == true
+                    ? (lifetimeOffer?.appleStoreAvailable == true ? "\(lifetimePriceLabel) 买断" : "\(lifetimePriceLabel) 买断 · App Store 未激活")
+                    : "买断不可用"
+                message = "本地转经轮权限未开通 · \(monthlyStatus) / \(lifetimeStatus)"
             }
         } catch {
             accessAllowed = false
@@ -111,35 +139,67 @@ final class GlobalDharmaCommerceModel {
         }
     }
 
+    func purchaseMonthly() async {
+        await purchase(
+            sku: Self.monthlySku,
+            expectedAmount: 3_000,
+            offerName: "月付",
+            successMessage: "购买完成 · 本地转经轮月度权限已生效"
+        )
+    }
+
     func purchaseLifetime() async {
+        await purchase(
+            sku: Self.lifetimeSku,
+            expectedAmount: 108_000,
+            offerName: "买断",
+            successMessage: "购买完成 · 本地转经轮永久权限已生效"
+        )
+    }
+
+    private func purchase(
+        sku: String,
+        expectedAmount: Int64,
+        offerName: String,
+        successMessage: String
+    ) async {
         guard !busy else { return }
         busy = true
         defer { busy = false }
         do {
             try applyEntitlement(try await fetchEntitlement())
             if accessAllowed {
-                message = "本地转经轮已买断 · 无需重复购买"
+                message = "本地转经轮权限已生效 · 无需重复购买"
                 return
             }
-            guard let offer = lifetimeOffer else { throw GlobalDharmaCommerceError.lifetimeOfferMissing }
-            guard offer.matchesCanonicalLifetime else { throw GlobalDharmaCommerceError.lifetimeOfferMismatch }
+
+            let offer: GlobalDharmaLifetimeOffer
+            if sku == Self.monthlySku {
+                guard let candidate = monthlyOffer else { throw GlobalDharmaCommerceError.monthlyOfferMissing }
+                guard candidate.matchesCanonicalMonthly else { throw GlobalDharmaCommerceError.monthlyOfferMismatch }
+                offer = candidate
+            } else {
+                guard let candidate = lifetimeOffer else { throw GlobalDharmaCommerceError.lifetimeOfferMissing }
+                guard candidate.matchesCanonicalLifetime else { throw GlobalDharmaCommerceError.lifetimeOfferMismatch }
+                offer = candidate
+            }
             guard offer.appleStoreAvailable else { throw GlobalDharmaCommerceError.appleStoreNotConfigured }
 
-            message = "正在创建 Fabushi Pay 订单…"
+            message = "正在创建 Fabushi Pay \(offerName)订单…"
             let intent = try await requestJSON(
                 baseURL: paymentBaseURL,
                 path: "/v1/miniapps/\(Self.miniAppId)/pay/intents",
                 method: "POST",
                 body: [
-                    "sku": Self.lifetimeSku,
+                    "sku": sku,
                     "rail": "appleInAppPurchase",
-                    "idempotencyKey": "ios-global-dharma-lifetime-\(UUID().uuidString.lowercased())",
+                    "idempotencyKey": "ios-global-dharma-\(sku == Self.monthlySku ? "monthly" : "lifetime")-\(UUID().uuidString.lowercased())",
                 ]
             )
             guard let paymentId = intent["paymentId"] as? String,
                   UUID(uuidString: paymentId) != nil,
-                  intent["sku"] as? String == Self.lifetimeSku,
-                  (intent["amount"] as? NSNumber)?.int64Value == 108_000,
+                  intent["sku"] as? String == sku,
+                  (intent["amount"] as? NSNumber)?.int64Value == expectedAmount,
                   intent["currency"] as? String == "CNY"
             else { throw GlobalDharmaCommerceError.invalidResponse }
             lastPaymentId = paymentId
@@ -178,7 +238,7 @@ final class GlobalDharmaCommerceModel {
                   UUID(uuidString: requestReferenceId) != nil
             else { throw GlobalDharmaCommerceError.invalidResponse }
 
-            message = "正在打开 App Store Advanced Commerce 购买流程…"
+            message = "正在打开 App Store Advanced Commerce \(offerName)流程…"
             let storeKit = FabushiPayStoreKit(
                 serviceBaseURL: paymentBaseURL,
                 session: session,
@@ -193,21 +253,25 @@ final class GlobalDharmaCommerceModel {
                 verifyPath: verifyPath
             )
             guard receipt.paymentId == paymentId,
-                  receipt.sku == Self.lifetimeSku,
-                  receipt.amount == 108_000,
+                  receipt.sku == sku,
+                  receipt.amount == expectedAmount,
                   receipt.currency == "CNY",
                   receipt.status == "succeeded"
             else { throw GlobalDharmaCommerceError.invalidResponse }
 
             try applyEntitlement(try await fetchEntitlement())
             guard accessAllowed else { throw GlobalDharmaCommerceError.entitlementNotGranted }
-            message = "购买完成 · 本地转经轮永久权限已生效"
+            message = successMessage
         } catch {
             message = "购买未完成：\(error.localizedDescription)"
         }
     }
 
     func restoreLifetime() async {
+        await restorePurchases()
+    }
+
+    func restorePurchases() async {
         guard !busy else { return }
         busy = true
         defer { busy = false }
@@ -226,11 +290,13 @@ final class GlobalDharmaCommerceModel {
                     try await Self.currentAccessToken(from: bridge)
                 }
             )
-            let receipt = try await storeKit.restore(expectedSku: Self.lifetimeSku)
+            let receipt = try await storeKit.restore(expectedSkus: [Self.monthlySku, Self.lifetimeSku])
             lastPaymentId = receipt.paymentId
             try applyEntitlement(try await fetchEntitlement())
             guard accessAllowed else { throw GlobalDharmaCommerceError.entitlementNotGranted }
-            message = "恢复完成 · 本地转经轮永久权限已生效"
+            message = receipt.sku == Self.monthlySku
+                ? "恢复完成 · 本地转经轮月度权限已生效"
+                : "恢复完成 · 本地转经轮永久权限已生效"
         } catch {
             message = "恢复未完成：\(error.localizedDescription)"
         }
@@ -252,7 +318,11 @@ final class GlobalDharmaCommerceModel {
         accessReason = access["reason"] as? String ?? "unknown"
 
         let options = object["purchaseOptions"] as? [[String: Any]] ?? []
-        lifetimeOffer = options.compactMap(Self.parseLifetimeOffer).first {
+        let parsed = options.compactMap(Self.parseLifetimeOffer)
+        monthlyOffer = parsed.first {
+            $0.productId == Self.monthlyProductId || $0.sku == Self.monthlySku
+        }
+        lifetimeOffer = parsed.first {
             $0.productId == Self.lifetimeProductId || $0.sku == Self.lifetimeSku
         }
     }
