@@ -11,6 +11,27 @@ private final class CoordinatorLocalHumanIdentityState {
     }
 }
 
+
+/// Fences native system-time-zone projection across account replacement and
+/// logout. ProductHostSettings remains the single durable time-zone authority.
+@MainActor
+final class IOSUserTimeZoneProjectionFence {
+    private(set) var generation: UInt64 = 0
+    private(set) var accountSlot: String?
+
+    @discardableResult
+    func advance(to accountSlot: String?) -> UInt64 {
+        generation &+= 1
+        if generation == 0 { generation = 1 }
+        self.accountSlot = accountSlot
+        return generation
+    }
+
+    func accepts(generation: UInt64, accountSlot: String?) -> Bool {
+        self.generation == generation && self.accountSlot == accountSlot
+    }
+}
+
 /// iOS platform-main counterpart of Grok's Electron main process.
 ///
 /// Owns lifecycle forwarding and the coordinator. It does not expose Host.
@@ -25,6 +46,7 @@ final class IOSMainRuntime {
     private let boxVisibilityTracker: IOSBoxVisibilityTracker
     private let passkeyProvider: IOSAuthenticationServicesPasskeyProvider
     private let accountRuntime: CoordinatorAccountRuntime
+    private let userTimeZoneProjectionFence = IOSUserTimeZoneProjectionFence()
     private let updateWiring: IOSUpdateServiceWiring
     let devCapability: IOSDevCapability
     private let devControlAdapter: IOSNativeDevControlAdapter
@@ -251,16 +273,21 @@ final class IOSMainRuntime {
             return updateOutcome
         }
         let outcome = await coordinator.dispatchTransport(method: method, args: args)
-        if let accountAuthorization = await accountRuntime.observeAuthReply(method: method, outcome: outcome),
-           case .refused(_, let reason) = accountAuthorization {
-            lifecycleReporter.report(
-                .coordinatorHandoff,
-                level: .warn,
-                metadata: [
-                    "account_scope": "refused",
-                    "reason": reason,
-                ]
-            )
+        if let accountAuthorization = await accountRuntime.observeAuthReply(method: method, outcome: outcome) {
+            switch accountAuthorization {
+            case .ready(let slot):
+                _ = await projectSystemUserTimeZone(accountSlot: slot, reason: "auth-settled")
+            case .refused(_, let reason):
+                _ = userTimeZoneProjectionFence.advance(to: nil)
+                lifecycleReporter.report(
+                    .coordinatorHandoff,
+                    level: .warn,
+                    metadata: [
+                        "account_scope": "refused",
+                        "reason": reason,
+                    ]
+                )
+            }
         }
         return outcome
     }
@@ -272,6 +299,10 @@ final class IOSMainRuntime {
             lifecycleReporter.report(.rendererLifecycle, metadata: ["phase": "active"])
             coordinator.sceneBecameActive()
             reportSessionActivity(active: true)
+            Task { [weak self] in
+                guard let self else { return }
+                _ = await self.projectSystemUserTimeZoneForActiveAccount(reason: "scene-active")
+            }
         case .background:
             lifecycleRecovery.transition(to: .background)
             lifecycleReporter.report(.rendererLifecycle, metadata: ["phase": "background"])
@@ -315,7 +346,67 @@ final class IOSMainRuntime {
         }
     }
 
+    @discardableResult
+    func projectSystemUserTimeZoneForActiveAccount(reason: String) async -> Bool {
+        await projectSystemUserTimeZone(accountSlot: accountRuntime.activeSlot, reason: reason)
+    }
+
+    @discardableResult
+    private func projectSystemUserTimeZone(accountSlot: String?, reason: String) async -> Bool {
+        let generation = userTimeZoneProjectionFence.advance(to: accountSlot)
+        guard let accountSlot else { return true }
+
+        let identifier = TimeZone.autoupdatingCurrent.identifier
+        guard TimeZone(identifier: identifier) != nil else {
+            lifecycleReporter.report(
+                .coordinatorHandoff,
+                level: .warn,
+                metadata: ["user_timezone_projection": "invalid-system-zone", "reason": reason]
+            )
+            return false
+        }
+        guard userTimeZoneProjectionFence.accepts(generation: generation, accountSlot: accountSlot),
+              accountRuntime.activeSlot == accountSlot
+        else { return false }
+
+        do {
+            let reply = try await coordinator.request(
+                method: "setHostSettings",
+                params: ["settings": ["userTimeZone": identifier]]
+            ).value
+            guard userTimeZoneProjectionFence.accepts(generation: generation, accountSlot: accountSlot),
+                  accountRuntime.activeSlot == accountSlot
+            else { return false }
+            guard let settings = reply as? [String: Any],
+                  settings["userTimeZone"] as? String == identifier
+            else {
+                lifecycleReporter.report(
+                    .coordinatorHandoff,
+                    level: .warn,
+                    metadata: ["user_timezone_projection": "host-mismatch", "reason": reason]
+                )
+                return false
+            }
+            return true
+        } catch {
+            if userTimeZoneProjectionFence.accepts(generation: generation, accountSlot: accountSlot),
+               accountRuntime.activeSlot == accountSlot {
+                lifecycleReporter.report(
+                    .coordinatorHandoff,
+                    level: .warn,
+                    metadata: [
+                        "user_timezone_projection": "host-unavailable",
+                        "reason": reason,
+                        "error": String(error.localizedDescription.prefix(512)),
+                    ]
+                )
+            }
+            return false
+        }
+    }
+
     func shutdown() {
+        _ = userTimeZoneProjectionFence.advance(to: nil)
         lifecycleRecovery.transition(to: .shuttingDown)
         lifecycleReporter.report(
             .rendererLifecycle,
