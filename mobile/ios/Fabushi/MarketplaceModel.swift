@@ -5720,7 +5720,9 @@ final class MarketplaceModel {
                 try await reconcileLocalMiniAppInstall(plugin)
                 return try await localMiniAppSource(pluginId: plugin.pluginId)
             } catch {
-                message = "本地 Mini App 包不可用，转 Hosted WebMCP：\(error.localizedDescription)"
+                message = Self.requiresVerifiedLocalMiniAppPackage(pluginId: plugin.pluginId)
+                    ? "本地 Mini App 包不可用；该应用禁止 Hosted WebMCP 回退：\(error.localizedDescription)"
+                    : "本地 Mini App 包不可用，转 Hosted WebMCP：\(error.localizedDescription)"
                 return nil
             }
         }
