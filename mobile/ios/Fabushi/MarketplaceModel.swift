@@ -5775,6 +5775,33 @@ final class MarketplaceModel {
         )
     }
 
+    func activeWebMcpTools(pluginId: String) -> [MiniAppToolContract]? {
+        ActiveMiniAppWebMcpSessionRegistry.shared.tools(
+            accountKey: settingsNoticeAccountKey,
+            pluginId: pluginId
+        )
+    }
+
+    func callActiveWebMcpTool(
+        pluginId: String,
+        name: String,
+        arguments: [String: Any]
+    ) async throws -> Any {
+        if let invocation = try await ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive(
+            accountKey: settingsNoticeAccountKey,
+            pluginId: pluginId,
+            name: name,
+            arguments: arguments
+        ) {
+            return invocation.value
+        }
+        return try await callWebMcpTool(
+            pluginId: pluginId,
+            name: name,
+            arguments: arguments
+        )
+    }
+
     func callWebMcpTool(pluginId: String, name: String, arguments: [String: Any]) async throws -> Any {
         guard name.range(of: #"^[A-Za-z0-9_.-]{1,128}$"#, options: .regularExpression) != nil else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("Invalid WebMCP tool name")
