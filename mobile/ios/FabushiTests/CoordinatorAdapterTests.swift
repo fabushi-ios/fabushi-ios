@@ -80,6 +80,22 @@ final class CoordinatorAdapterTests: XCTestCase {
     }
 
     @MainActor
+    func testUserTimeZoneProjectionFenceRejectsStaleAccountGeneration() {
+        let fence = IOSUserTimeZoneProjectionFence()
+
+        let first = fence.advance(to: "account-1")
+        XCTAssertTrue(fence.accepts(generation: first, accountSlot: "account-1"))
+
+        let replacement = fence.advance(to: "account-2")
+        XCTAssertFalse(fence.accepts(generation: first, accountSlot: "account-1"))
+        XCTAssertTrue(fence.accepts(generation: replacement, accountSlot: "account-2"))
+
+        let logout = fence.advance(to: nil)
+        XCTAssertFalse(fence.accepts(generation: replacement, accountSlot: "account-2"))
+        XCTAssertTrue(fence.accepts(generation: logout, accountSlot: nil))
+    }
+
+    @MainActor
     func testCoordinatorAccountRuntimeFollowsSettledRustAuthReplies() async {
         var clearCount = 0
         var transitions: [(String, String?)] = []
@@ -229,6 +245,14 @@ final class CoordinatorAdapterTests: XCTestCase {
         XCTAssertEqual(
             main.coordinator.sharedSettingsSnapshot().mcpCustomInstructionsAccountScope,
             "fast-e2e-browser-user"
+        )
+        let hostSettings = try await main.dispatch(method: "getHostSettings")
+        XCTAssertEqual(
+            (hostSettings.value as? [String: Any])?["userTimeZone"] as? String,
+            TimeZone.autoupdatingCurrent.identifier
+        )
+        XCTAssertTrue(
+            await main.projectSystemUserTimeZoneForActiveAccount(reason: "focused-test")
         )
 
         _ = try await main.dispatch(method: "feature.auth.logout")
