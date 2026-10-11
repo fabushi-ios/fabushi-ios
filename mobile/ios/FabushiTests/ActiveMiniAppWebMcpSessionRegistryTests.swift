@@ -171,6 +171,92 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         )
     }
 
+    func testActiveSessionRejectsArgumentsAgainstPageSchemaBeforeExecution() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.practice.record",
+            description: "mutate local state",
+            approval: "required",
+            inputSchemaJSON: #"{"additionalProperties":false,"properties":{"label":{"maxLength":5,"type":"string"}},"type":"object"}"#
+        )
+        var invocationCount = 0
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.1.0",
+            artifactSha256: String(repeating: "d", count: 64),
+            pluginInstanceId: "global-dharma:instance-schema",
+            nonce: "nonce-schema",
+            generation: 12,
+            tools: [tool]
+        ) { _, arguments in
+            invocationCount += 1
+            return ["revision": 1, "label": arguments["label"] as? String ?? ""]
+        }
+
+        do {
+            _ = try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.practice.record",
+                arguments: ["label": "too-long"]
+            )
+            XCTFail("Oversized label must be rejected before page execution")
+        } catch let error as MiniAppWebMcpSchemaViolation {
+            XCTAssertTrue(error.localizedDescription.contains("长度不能超过 5"))
+        }
+
+        do {
+            _ = try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.practice.record",
+                arguments: ["extra": true]
+            )
+            XCTFail("additionalProperties=false must reject unreviewed arguments")
+        } catch let error as MiniAppWebMcpSchemaViolation {
+            XCTAssertTrue(error.localizedDescription.contains("$.extra 不允许"))
+        }
+
+        XCTAssertEqual(invocationCount, 0)
+        let rejected = registry.traces(accountKey: "account-a", pluginId: "global-dharma")
+        XCTAssertEqual(rejected.map(\.outcome), ["schema-rejected", "schema-rejected"])
+        XCTAssertEqual(rejected.map(\.permissionDecision), ["not-reached", "not-reached"])
+
+        let accepted = try await registry.callIfActive(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            name: "offline.practice.record",
+            arguments: ["label": "valid"]
+        )
+        XCTAssertEqual(invocationCount, 1)
+        XCTAssertEqual((accepted?.value as? [String: Any])?["label"] as? String, "valid")
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
+            "success"
+        )
+    }
+
+    func testLivePageCannotWeakenCatalogApproval() {
+        XCTAssertEqual(
+            miniAppEffectiveApproval(catalog: "required", page: "none"),
+            "required"
+        )
+        XCTAssertEqual(
+            miniAppEffectiveApproval(catalog: "destructive", page: "none"),
+            "destructive"
+        )
+        XCTAssertEqual(
+            miniAppEffectiveApproval(catalog: "none", page: "required"),
+            "required"
+        )
+        XCTAssertEqual(
+            miniAppEffectiveApproval(catalog: "none", page: "none"),
+            "none"
+        )
+    }
+
     func testStaleUnregisterCannotTearDownNewerSession() async throws {
         let registry = ActiveMiniAppWebMcpSessionRegistry.shared
         let tool = MiniAppToolContract(
