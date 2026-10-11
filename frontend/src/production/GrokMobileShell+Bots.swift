@@ -77,6 +77,23 @@ extension GrokMobileShell {
     }
 
     @MainActor
+    func openAgentFromSystemNotification(
+        agentId: String,
+        accountScope: String
+    ) async {
+        guard accountScope == mobileAccountScopeKey else { return }
+        if let current = bots.first(where: { $0.id == agentId && !$0.isGroup }) {
+            selectBotForConversation(current)
+            return
+        }
+        await refreshAccessRoster()
+        guard accountScope == mobileAccountScopeKey,
+              let refreshed = bots.first(where: { $0.id == agentId && !$0.isGroup })
+        else { return }
+        selectBotForConversation(refreshed)
+    }
+
+    @MainActor
     func refreshAccessRoster() async {
         await refreshAgentNetworkGate()
         accessRosterGeneration = accessRosterGeneration == Int.max ? 1 : accessRosterGeneration + 1

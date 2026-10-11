@@ -117,6 +117,17 @@ internal struct GrokMobileShell: View {
         .onChange(of: model.accountRosterRevision) { _, _ in
             Task { await refreshAccessRoster() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .fabushiOpenAgentFromNotification)) { note in
+            guard let agentId = note.userInfo?[IOSAgentNotificationController.agentIdUserInfoKey] as? String,
+                  let accountScope = note.userInfo?[IOSAgentNotificationController.accountScopeUserInfoKey] as? String
+            else { return }
+            Task { @MainActor in
+                await openAgentFromSystemNotification(
+                    agentId: agentId,
+                    accountScope: accountScope
+                )
+            }
+        }
         .onChange(of: mobileAccountScopeKey) { _, _ in
             resetCommandPaletteComputerScope()
         }

@@ -1989,6 +1989,7 @@ final class MarketplaceModel {
     @ObservationIgnored private let toolResultStore = MobileToolResultStore()
     @ObservationIgnored private let localMiniAppSigningAuthority = LocalMiniAppSigningAuthority()
     @ObservationIgnored private let agentDockBadgeController = IOSDockBadgeController()
+    @ObservationIgnored private let agentNotificationController = IOSAgentNotificationController()
     @ObservationIgnored private var agentDockBadgeGeneration: UInt64 = 0
     @ObservationIgnored private var toolResultRendererObserver: UUID?
 
@@ -2025,7 +2026,7 @@ final class MarketplaceModel {
     func updateAgentDockBadge(from roster: [MobileBotSummary]) async {
         guard loggedIn else { return }
         let generation = nextAgentDockBadgeGeneration()
-        let agents = roster.map {
+        let badgeAgents = roster.map {
             IOSDockBadgeAgent(
                 hasUnread: $0.unread,
                 isHiddenFromSidebar: $0.hidden,
@@ -2033,16 +2034,39 @@ final class MarketplaceModel {
             )
         }
         _ = await agentDockBadgeController.update(
-            agents: agents,
+            agents: badgeAgents,
+            generation: generation
+        )
+
+        let notificationAgents = roster
+            .filter { !$0.isGroup && $0.miniAppId == nil }
+            .map {
+                NotificationSnapshot(
+                    id: $0.id,
+                    name: $0.name,
+                    isRunning: $0.isRunning,
+                    awaitingReason: $0.waitingReason,
+                    notifyEnabled: $0.notifyOnUpdatesEnabled,
+                    isHiddenFromSidebar: $0.hidden,
+                    lastMessageId: $0.lastMessageId,
+                    lastMessagePreview: $0.lastMessagePreview
+                )
+            }
+        await agentNotificationController.update(
+            agents: notificationAgents,
+            accountScope: settingsNoticeAccountKey,
+            isAppActive: UIApplication.shared.applicationState == .active,
             generation: generation
         )
     }
 
     private func resetAgentDockBadgeForScopeChange() {
         let generation = nextAgentDockBadgeGeneration()
-        let controller = agentDockBadgeController
+        let badgeController = agentDockBadgeController
+        let notificationController = agentNotificationController
         Task {
-            await controller.reset(generation: generation)
+            await badgeController.reset(generation: generation)
+            await notificationController.reset(generation: generation)
         }
     }
 
