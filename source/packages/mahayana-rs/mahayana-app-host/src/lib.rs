@@ -2206,17 +2206,25 @@ impl AppHost {
 
     fn uninstall_plugin(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
+        let account = self.plugin_account_context()?;
+        let installer = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
         if let Ok(mut host) = self.js.lock() {
             let _ = host.disable_plugin(plugin_id);
         }
-        let removed = self
-            .installer()?
-            .uninstall(plugin_id)
+        let removed = installer
+            .uninstall_with_commit_guard(plugin_id, || {
+                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                    scope == account.scope && generation == account.generation
+                })
+            })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        let permissions_removed = PermissionManager::load(self.permission_store()?)
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        let permissions_removed = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .remove_plugin(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         Ok(json!({
             "pluginId": plugin_id,
             "removed": removed,
@@ -2226,26 +2234,36 @@ impl AppHost {
 
     fn active_plugin(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
-        let pointer = self
-            .installer()?
+        let account = self.plugin_account_context()?;
+        let pointer = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
     fn rollback_plugin(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
-        let pointer = self
-            .installer()?
-            .rollback(plugin_id)
+        let account = self.plugin_account_context()?;
+        let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let pointer = installer
+            .rollback_with_commit_guard(plugin_id, || {
+                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                    scope == account.scope && generation == account.generation
+                })
+            })
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
     fn list_installed_plugins(&self) -> Result<Value, AppHostError> {
         let account = self.plugin_account_context()?;
         let root = account.root.clone();
-        let installer = self.installer()?;
+        let installer = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let mut plugins = Vec::new();
         let entries = match std::fs::read_dir(&root) {
             Ok(entries) => entries,
@@ -2278,18 +2296,21 @@ impl AppHost {
 
     fn plugin_permissions(&self, params: Value) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
-        let pointer = self
-            .installer()?
+        let account = self.plugin_account_context()?;
+        let pointer = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .ok_or_else(|| {
                 AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
             })?;
-        let mut manager = PermissionManager::load(self.permission_store()?)
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        let mut manager = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         manager
             .retain_requested(plugin_id, &pointer.requested_permissions)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         let granted = manager.grants_for(plugin_id);
         let missing = pointer
             .requested_permissions
@@ -2305,14 +2326,16 @@ impl AppHost {
     fn set_permission(&self, params: Value, grant: bool) -> Result<Value, AppHostError> {
         let plugin_id = string_param(&params, "pluginId")?;
         let permission = string_param(&params, "permission")?;
-        let pointer = self
-            .installer()?
+        let account = self.plugin_account_context()?;
+        let pointer = PluginInstaller::new(&account.root)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .ok_or_else(|| {
                 AppHostError::Operation(format!("plugin {plugin_id} is not installed"))
             })?;
-        let mut manager = PermissionManager::load(self.permission_store()?)
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        let mut manager = PermissionManager::load(account.root.join("permissions.json"))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         if grant {
             manager
@@ -2323,7 +2346,19 @@ impl AppHost {
                 .revoke(plugin_id, permission)
                 .map_err(|error| AppHostError::Operation(error.to_string()))?;
         }
-        self.plugin_permissions(json!({"pluginId": plugin_id}))
+        self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        let granted = manager.grants_for(plugin_id);
+        let missing = pointer
+            .requested_permissions
+            .iter()
+            .filter(|candidate| !granted.contains(candidate))
+            .cloned()
+            .collect::<Vec<_>>();
+        Ok(json!({
+            "requested": pointer.requested_permissions,
+            "granted": granted,
+            "missing": missing
+        }))
     }
 
     fn plugin_compatibility(&self, params: Value) -> Result<Value, AppHostError> {
