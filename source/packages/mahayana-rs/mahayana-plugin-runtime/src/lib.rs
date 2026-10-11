@@ -1696,21 +1696,25 @@ impl PluginInstaller {
             .filter(|binding| binding.artifact_id == artifact.id)
         {
             let trust = FabappTrustContext::Catalog(binding.catalog_trust()?);
-            let pointer = self.install_fabapp_bytes_with_commit_guard(
-                bytes,
-                &trust,
-                &commit_guard,
-            )?;
-            if pointer.plugin_id != release.plugin_id
-                || pointer.version != release.version
-                || !pointer.artifact_sha256.eq_ignore_ascii_case(&artifact.sha256)
-                || pointer.requested_permissions != release.permissions
+            // Verify and reconcile every release/package identity field before
+            // the content-addressed installer is allowed to create or activate
+            // anything. install_fabapp_bytes_with_commit_guard deliberately
+            // verifies again immediately before writing.
+            let verified = verify_fabapp_bytes(bytes, &trust)?;
+            if verified.manifest.app_id != release.plugin_id
+                || verified.manifest.version != release.version
+                || !verified.package_sha256.eq_ignore_ascii_case(&artifact.sha256)
+                || verified.manifest.requested_capabilities != release.permissions
             {
                 return Err(RuntimeError::InvalidRelease(
                     "verified .fabapp identity/version/digest/capabilities do not match release".into(),
                 ));
             }
-            return Ok(pointer);
+            return self.install_fabapp_bytes_with_commit_guard(
+                bytes,
+                &trust,
+                &commit_guard,
+            );
         }
         let plugin_root = self.root.join(&release.plugin_id);
         if let Some(active) = self.active(&release.plugin_id)?
