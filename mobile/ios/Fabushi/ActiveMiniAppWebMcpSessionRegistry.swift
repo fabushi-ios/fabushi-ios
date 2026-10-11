@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import OSLog
 
@@ -116,7 +117,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         )
         let sessionEvidence = [
             "FABUSHI_WEBMCP_SESSION_REGISTER",
-            "account_id=\(Self.nonceIdentifier(normalizedAccount))",
+            "account_id=\(Self.accountIdentifier(normalizedAccount))",
             "plugin_id=\(normalizedPluginId)",
             "version=\(version)",
             "artifact_sha256=\(artifactSha256.lowercased())",
@@ -301,7 +302,7 @@ final class ActiveMiniAppWebMcpSessionRegistry {
             "FABUSHI_WEBMCP_TRACE",
             "sequence=\(trace.sequence)",
             "call_id=\(trace.callId)",
-            "account_id=\(Self.nonceIdentifier(trace.accountKey))",
+            "account_id=\(Self.accountIdentifier(trace.accountKey))",
             "plugin_id=\(trace.pluginId)",
             "version=\(trace.version)",
             "artifact_sha256=\(trace.artifactSha256)",
@@ -317,6 +318,11 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         if invocationTraces.count > 256 {
             invocationTraces.removeFirst(invocationTraces.count - 256)
         }
+    }
+
+    private nonisolated static func accountIdentifier(_ accountKey: String) -> String {
+        let digest = SHA256.hash(data: Data(accountKey.utf8))
+        return "sha256-" + digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private nonisolated static func nonceIdentifier(_ nonce: String) -> String {
