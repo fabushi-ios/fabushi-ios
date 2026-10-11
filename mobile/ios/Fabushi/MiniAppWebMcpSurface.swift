@@ -704,22 +704,31 @@ struct MiniAppWebMcpSurface: View {
                     }
                     .accessibilityIdentifier("global-dharma-entitlement-status")
 
-                    HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         if model.globalDharmaCommerce.accessAllowed {
-                            Label("本地转经轮已买断", systemImage: "infinity")
+                            Label("本地转经轮权限有效", systemImage: "checkmark.seal")
                                 .font(.subheadline.weight(.semibold))
                                 .accessibilityIdentifier("global-dharma-entitlement-allowed")
                         } else {
-                            Button("\(model.globalDharmaCommerce.lifetimePriceLabel) 买断本地转经轮") {
-                                Task { await model.globalDharmaCommerce.purchaseLifetime() }
+                            HStack(spacing: 10) {
+                                Button("\(model.globalDharmaCommerce.monthlyPriceLabel) 开通") {
+                                    Task { await model.globalDharmaCommerce.purchaseMonthly() }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(!model.globalDharmaCommerce.canBuyMonthly)
+                                .accessibilityIdentifier("global-dharma-buy-monthly")
+
+                                Button("\(model.globalDharmaCommerce.lifetimePriceLabel) 买断") {
+                                    Task { await model.globalDharmaCommerce.purchaseLifetime() }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(!model.globalDharmaCommerce.canBuyLifetime)
+                                .accessibilityIdentifier("global-dharma-buy-lifetime")
                             }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(!model.globalDharmaCommerce.canBuyLifetime)
-                            .accessibilityIdentifier("global-dharma-buy-lifetime")
                         }
 
                         Button("恢复购买") {
-                            Task { await model.globalDharmaCommerce.restoreLifetime() }
+                            Task { await model.globalDharmaCommerce.restorePurchases() }
                         }
                         .buttonStyle(.bordered)
                         .disabled(model.globalDharmaCommerce.busy)
