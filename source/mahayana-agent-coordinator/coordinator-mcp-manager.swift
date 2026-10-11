@@ -1473,6 +1473,40 @@ final class CoordinatorMcpSurface {
             let state = try await manager.listServers()
             return .handled(["servers": state.servers.map(projectServer)])
 
+        case "coordinator.mcp.reloadServers":
+            let state = try await manager.reloadServers()
+            return .handled(["servers": state.servers.map(projectServer)])
+
+        case "coordinator.mcp.removeServer":
+            guard let serverId = nonEmptyString(params["serverId"]) else {
+                throw SandMcpConfigError("MCP server id is required.")
+            }
+            let result = try await manager.removeServer(serverId)
+            return .handled([
+                "removed": result.removed,
+                "reason": result.reason ?? NSNull(),
+                "servers": result.state.servers.map(projectServer),
+            ])
+
+        case "coordinator.mcp.uninstallPlugin":
+            guard let pluginId = nonEmptyString(params["pluginId"]) else {
+                throw SandMcpConfigError("MCP plugin id is required.")
+            }
+            let state = try await manager.uninstallPlugin(pluginId)
+            return .handled(["servers": state.servers.map(projectServer)])
+
+        case "coordinator.mcp.setInstructions":
+            guard let serverId = nonEmptyString(params["serverId"]),
+                  let instructions = params["instructions"] as? String
+            else {
+                throw SandMcpConfigError("MCP server id and instructions are required.")
+            }
+            let state = try await manager.setServerCustomInstructions(
+                serverId: serverId,
+                instructions: instructions
+            )
+            return .handled(["servers": state.servers.map(projectServer)])
+
         case "coordinator.mcp.servers":
             let state = try await manager.listServers()
             return .handled(["servers": state.servers.map(projectServer)])

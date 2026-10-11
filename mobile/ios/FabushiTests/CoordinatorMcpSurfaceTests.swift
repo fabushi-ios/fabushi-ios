@@ -120,6 +120,24 @@ final class CoordinatorMcpSurfaceTests: XCTestCase {
             settings.getMcpDisabledToolsByServerId()[serverId]?.contains("search") == true
         )
 
+        let instructions = try await coordinator.request(
+            method: "coordinator.mcp.setInstructions",
+            params: [
+                "serverId": serverId,
+                "instructions": "Use read-only repository tools.",
+            ]
+        )
+        XCTAssertNotNil((instructions.value as? [String: Any])?["servers"])
+        XCTAssertEqual(
+            settings.getMcpCustomInstructionsByServerId()[serverId],
+            "Use read-only repository tools."
+        )
+
+        let reloaded = try await coordinator.request(
+            method: "coordinator.mcp.reloadServers"
+        )
+        XCTAssertNotNil((reloaded.value as? [String: Any])?["servers"])
+
         let routedList = await coordinator.dispatchTransport(
             requestId: "runner-list-1",
             method: "listRoutedMcpTools",

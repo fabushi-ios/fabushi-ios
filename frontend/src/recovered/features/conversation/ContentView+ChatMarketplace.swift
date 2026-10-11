@@ -1679,6 +1679,11 @@ extension ContentView {
                             }
                             .disabled(model.mcpLoading)
                             .accessibilityIdentifier("mcp-refresh")
+                            Button("重新加载") {
+                                Task { await model.reloadMcpServers() }
+                            }
+                            .disabled(model.mcpLoading)
+                            .accessibilityIdentifier("mcp-reload")
                         }
 
                         if let error = model.mcpError {
@@ -1835,6 +1840,41 @@ extension ContentView {
                                         }
                                     }
                                 }
+
+                                HStack(spacing: 8) {
+                                    TextField(
+                                        "自定义说明",
+                                        text: Binding(
+                                            get: {
+                                                model.mcpInstructionsDraftByServerId[server.serverId]
+                                                    ?? ""
+                                            },
+                                            set: {
+                                                model.mcpInstructionsDraftByServerId[server.serverId] = $0
+                                            }
+                                        )
+                                    )
+                                    Button("保存说明") {
+                                        Task {
+                                            await model.saveMcpInstructions(
+                                                serverId: server.serverId
+                                            )
+                                        }
+                                    }
+                                    .disabled(model.mcpMutatingServerId != nil)
+
+                                    if !server.isRequired
+                                        && !server.isTeamServer
+                                        && !server.managedByTeamPluginPolicy {
+                                        Button("移除服务器", role: .destructive) {
+                                            Task { await model.removeMcpServer(server) }
+                                        }
+                                        .disabled(model.mcpMutatingServerId != nil)
+                                    }
+                                }
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .accessibilityIdentifier("mcp-server-management-\(server.id)")
 
                                 if let tools = model.mcpToolsByServerId[server.serverId] {
                                     if tools.isEmpty {

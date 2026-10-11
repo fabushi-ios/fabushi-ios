@@ -1934,6 +1934,8 @@ final class MarketplaceModel {
     var mcpBackendBusy = false
     var mcpNewAccountDraftByServerId: [String: String] = [:]
     var mcpRenameDraftByIdentity: [String: String] = [:]
+    var mcpInstructionsDraftByServerId: [String: String] = [:]
+    var mcpMutatingServerId: String?
     var featureHostSmokeStatus: String?
     var authResolved = false
     var loggedIn = false
@@ -2344,6 +2346,8 @@ final class MarketplaceModel {
         mcpError = nil
         mcpNewAccountDraftByServerId = [:]
         mcpRenameDraftByIdentity = [:]
+        mcpInstructionsDraftByServerId = [:]
+        mcpMutatingServerId = nil
     }
 
     func initializeApp() async {
@@ -4608,6 +4612,88 @@ final class MarketplaceModel {
         }
         connectorCatalog = nextCatalog
         return (mcpServers, nextCatalog)
+    }
+
+    func reloadMcpServers() async {
+        guard loggedIn else { return }
+        let epoch = mcpAccountEpoch
+        mcpLoading = true
+        mcpError = nil
+        defer {
+            if epoch == mcpAccountEpoch {
+                mcpLoading = false
+            }
+        }
+        do {
+            let response = try await bridge.request(method: "coordinator.mcp.reloadServers")
+            guard epoch == mcpAccountEpoch,
+                  let object = response.value as? [String: Any],
+                  let rows = object["servers"] as? [[String: Any]]
+            else { return }
+            mcpServers = rows.compactMap(Self.mcpServer(from:))
+            let validIds = Set(mcpServers.map(\.serverId))
+            mcpToolsByServerId = mcpToolsByServerId.filter { validIds.contains($0.key) }
+        } catch {
+            guard epoch == mcpAccountEpoch else { return }
+            mcpError = error.localizedDescription
+        }
+    }
+
+    func saveMcpInstructions(serverId: String) async {
+        guard loggedIn else { return }
+        let instructions = mcpInstructionsDraftByServerId[serverId] ?? ""
+        await mutateMcpServer(
+            serverId: serverId,
+            method: "coordinator.mcp.setInstructions",
+            params: [
+                "serverId": serverId,
+                "instructions": instructions,
+            ]
+        )
+    }
+
+    func removeMcpServer(_ server: MarketplaceMcpServer) async {
+        guard !server.isRequired,
+              !server.isTeamServer,
+              !server.managedByTeamPluginPolicy
+        else { return }
+        if let pluginId = server.pluginId, !pluginId.isEmpty {
+            await mutateMcpServer(
+                serverId: server.serverId,
+                method: "coordinator.mcp.uninstallPlugin",
+                params: ["pluginId": pluginId]
+            )
+        } else {
+            await mutateMcpServer(
+                serverId: server.serverId,
+                method: "coordinator.mcp.removeServer",
+                params: ["serverId": server.serverId]
+            )
+        }
+    }
+
+    private func mutateMcpServer(
+        serverId: String,
+        method: String,
+        params: [String: Any]
+    ) async {
+        guard loggedIn, mcpMutatingServerId == nil else { return }
+        let epoch = mcpAccountEpoch
+        mcpMutatingServerId = serverId
+        mcpError = nil
+        defer {
+            if epoch == mcpAccountEpoch, mcpMutatingServerId == serverId {
+                mcpMutatingServerId = nil
+            }
+        }
+        do {
+            _ = try await bridge.request(method: method, params: params)
+            guard epoch == mcpAccountEpoch else { return }
+            _ = await refreshMcpServers()
+        } catch {
+            guard epoch == mcpAccountEpoch else { return }
+            mcpError = error.localizedDescription
+        }
     }
 
     func loadMcpTools(serverId: String) async {
