@@ -1,6 +1,18 @@
 import XCTest
 @testable import Fabushi
 
+private actor FeedbackRequestRecorder {
+    private var request: URLRequest?
+
+    func record(_ request: URLRequest) {
+        self.request = request
+    }
+
+    func snapshot() -> URLRequest? {
+        request
+    }
+}
+
 final class FeedbackOverlayParityTests: XCTestCase {
     func testFeedbackCodesNormalizeDesktopContractAndUnknownFailsClosed() {
         XCTAssertEqual(AccountFeedbackCode.normalize("access-denied"), .accessDenied)
@@ -38,7 +50,7 @@ final class FeedbackOverlayParityTests: XCTestCase {
     @MainActor
     func testFeedbackClientUsesCurrentMainSandEndpointHeadersAndPayload() async throws {
         let token = try feedbackTestToken(["sub": "user-1"])
-        var capturedRequest: URLRequest?
+        let requestRecorder = FeedbackRequestRecorder()
         let client = IOSFeedbackReportClient(
             getAccessToken: { _ in token },
             getMachineID: { "machine-123" },
@@ -49,7 +61,7 @@ final class FeedbackOverlayParityTests: XCTestCase {
             appVersion: { "9.9.9" },
             osVersion: { "iOS-test" },
             requestExecutor: { request in
-                capturedRequest = request
+                await requestRecorder.record(request)
                 return (
                     Data("{}".utf8),
                     HTTPURLResponse(
@@ -68,6 +80,7 @@ final class FeedbackOverlayParityTests: XCTestCase {
             "conversationId": " conversation-7 ",
         ])
         XCTAssertEqual(result["ok"] as? Bool, true)
+        let capturedRequest = await requestRecorder.snapshot()
         let request = try XCTUnwrap(capturedRequest)
         XCTAssertEqual(request.url?.path, "/sand/feedback")
         XCTAssertEqual(request.httpMethod, "POST")
