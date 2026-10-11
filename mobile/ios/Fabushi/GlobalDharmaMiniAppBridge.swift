@@ -72,6 +72,19 @@ final class GlobalDharmaMiniAppBridge {
         }
     }
 
+    nonisolated static func acceptsExecutionKind(
+        pluginId: String,
+        executionKind: String?,
+        hasActiveLocalSession: Bool
+    ) -> Bool {
+        if pluginId == globalDharmaId {
+            return hasActiveLocalSession
+                ? executionKind == "web"
+                : executionKind == "mcp-http"
+        }
+        return executionKind == "mcp-http"
+    }
+
     func routeInput(
         pluginId: String,
         input: String,
