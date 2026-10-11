@@ -461,10 +461,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/routed-mcp-bridge.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/shared/node/mcp/mcp-tools-discovery.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS avoids opening an extra localhost HTTP MCP server inside the app. Tool discovery/call is kept in-process through typed Coordinator/manager ports; RoutedMCPBridge retains cache/unknown-tool/unique-call-id semantics as a helper.",
-      "implementation_status": "mapped",
-      "production_evidence": "CoordinatorMcpBackendClient and CoordinatorMcpHostPort provide shipping list/call paths with account-generation fencing, but the standalone RoutedMCPBridge helper has not been proven as a shipping caller.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedMcpToolsDiscoveryParityTests.swift; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
-      "notes": "IOS-MAIN-COORD-MCP-003: reviewed Desktop blob 69fac54dc1e377a08d162ff1de923925befdb29e. Keep mapped until the exact routed-MCP product effect is proven through the active Agent/tool invocation path; do not infer completeness from the helper file."
+      "implementation_status": "implemented",
+      "production_evidence": "Shipping RendererPortServer forwards the wire requestId through IOSMainRuntime and MahayanaCoordinator into CoordinatorMcpSurface.listRoutedMcpTools/executeRoutedMcpTool. CoordinatorMcpSurface owns a live RoutedMCPBridge composed over canonical SandMcpManager.getTools/executeTool. The bridge caches tools per account-generation scope, fails closed for unknown tools, validates bounded requestId/toolCallId, dedupes same callId per request, propagates explicit toolCallId/agentId through CoordinatorMcpBackendClient and CoordinatorMcpHostPort, and fences cancellation/stale account scope before result commit. iOS intentionally replaces the Desktop secret loopback HTTP listener with an in-process typed bridge.",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift proves shipping Coordinator routed list/call and Host toolCallId/agentId propagation; mobile/ios/FabushiTests/CoordinatorContractTests.swift covers Renderer wire requestId forwarding plus RoutedMCPBridge stale-scope and cancellation fences.",
+      "notes": "IOS-MAIN-COORD-MCP-003: production composition now exists through the canonical SandMcpManager; kept at implemented until exact-head architecture/rust-host/Swift tests succeed.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/runner_tool_relay.rs",
@@ -476,10 +477,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/shared/rpc/coordinator.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "The iOS embedded Runner/Coordinator path uses typed direct MCP manager calls rather than a generic process event relay. The allowed routed methods remain in the Coordinator method registry.",
-      "implementation_status": "mapped",
-      "production_evidence": "CoordinatorMethodRegistry contains listRoutedMcpTools/executeRoutedMcpTool and the shipping MCP manager owns tool list/execute, but the exact Desktop runner relay envelope has no separate iOS process boundary.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
-      "notes": "IOS-MAIN-COORD-RUNNER-001: reviewed Desktop blob 54593a04ce88b9bc0b7e91d068b99024732eeab8. Keep mapped until active Agent/Runner routed-tool call evidence is attached."
+      "implementation_status": "implemented",
+      "production_evidence": "The iOS replacement keeps the frozen listRoutedMcpTools/executeRoutedMcpTool capability surface in CoordinatorMethodRegistry and now has real shipping handlers in CoordinatorMcpSurface. Renderer wire requestId is forwarded rather than regenerated; execute requires bounded requestId/name/toolCallId, propagates agentId and callId into canonical MCP execution, and account scope/cancellation fences late results. No generic Runner-to-Coordinator method relay is introduced.",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift exercises both routed methods through MahayanaCoordinator.dispatchTransport with explicit requestId and verifies Host call correlation; CoordinatorContractTests.swift verifies wire requestId and stale/cancel fences.",
+      "notes": "IOS-MAIN-COORD-RUNNER-001: iOS-adapted direct typed relay is production-reachable; exact-head CI still required before verified.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/supervisor.rs",
@@ -758,10 +760,11 @@
       "ios_target_path": "source/shared/rpc/coordinator.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "In-process typed routing replaces the Desktop event relay.",
-      "implementation_status": "mapped",
-      "production_evidence": "CoordinatorMethodRegistry exposes only the routed tool methods for this responsibility and the MCP manager owns execution; exact Runner call path still needs evidence.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
-      "notes": "IOS-MAIN-COORD-RUNNER-T001: reviewed Desktop test blob 121e270bef70992ccea320ccaf360f8b50da41a0."
+      "implementation_status": "implemented",
+      "production_evidence": "The Desktop test responsibility is replaced by iOS focused tests over the actual in-process typed relay. Only listRoutedMcpTools/executeRoutedMcpTool are registered for the Runner replacement, requestId/toolCallId are validated and preserved, and cancellation/stale account generation fail closed.",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; mobile/ios/FabushiTests/CoordinatorContractTests.swift",
+      "notes": "IOS-MAIN-COORD-RUNNER-T001: replacement contract is implemented; verification waits for exact-head CI.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after routed-MCP production composition"
     },
     {
       "desktop_path": "source/node-agent-coordinator/tests/webauthn_gateway_transport.rs",
