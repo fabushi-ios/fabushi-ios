@@ -695,7 +695,7 @@ impl AgentBackend for NativeAgentBackend {
             .engine
             .run(
                 RunRequest {
-                    session_id: thread.session_id,
+                    session_id: thread.session_id.clone(),
                     operation_id: kernel_operation_id.clone(),
                     input: request.text,
                     policy: policy_for_profile(self.config.profile),
