@@ -86,6 +86,42 @@ actor IOSLifecycleTelemetrySpill {
         (try? Data(contentsOf: url).count) ?? 0
     }
 
+    func structuredLogCheckpoint() -> StructuredLogCheckpoint {
+        let buffered = records.map { record in
+            var metadata = record.metadata
+            metadata["lifecycle_family"] = record.family
+            return BufferedStructuredLog(
+                level: StructuredLogLevel(rawValue: record.level) ?? .info,
+                message: "sand.desktop.lifecycle",
+                metadata: metadata,
+                timestampMs: record.timestampMs
+            )
+        }
+        return .init(
+            counterID: createDropCounterID(),
+            counters: emptyDropCounters(),
+            records: buffered
+        )
+    }
+
+    func replaceWithStructuredLogPending(_ pending: [BufferedStructuredLog]) {
+        guard accountScope != nil else { return }
+        records = pending.compactMap { record in
+            guard record.message == "sand.desktop.lifecycle",
+                  let family = record.metadata["lifecycle_family"]
+            else { return nil }
+            var metadata = record.metadata
+            metadata.removeValue(forKey: "lifecycle_family")
+            return IOSLifecycleTelemetryDiskRecord(
+                family: family,
+                level: record.level.rawValue,
+                metadata: metadata,
+                timestampMs: record.timestampMs
+            )
+        }
+        persist(nowMs: Int64(Date().timeIntervalSince1970 * 1_000))
+    }
+
     private func load(scope: String) -> [IOSLifecycleTelemetryDiskRecord] {
         guard let data = try? Data(contentsOf: url),
               data.count <= DESKTOP_STRUCTURED_LOG_SPILL_MAX_BYTES,
@@ -140,41 +176,134 @@ actor IOSLifecycleTelemetrySpill {
 
 @MainActor
 final class IOSLifecycleTelemetryDurableSink {
+    typealias SubmitterFactory = @MainActor (_ accountSlot: String) -> StructuredLogSubmitter
+
     private let spill: IOSLifecycleTelemetrySpill
     private var tail: Task<Void, Never>?
+    private var scheduledFlush: Task<Void, Never>?
+    private var makeSubmitter: SubmitterFactory?
+    private var transport: StructuredLogTransport?
+    private var accountSlot: String?
 
     init(url: URL) {
         spill = IOSLifecycleTelemetrySpill(url: url)
     }
 
+    func configureRemoteShipping(makeSubmitter: @escaping SubmitterFactory) {
+        self.makeSubmitter = makeSubmitter
+        if let accountSlot {
+            rotate(accountSlot: accountSlot)
+        }
+    }
+
     func submit(_ record: IOSLifecycleTelemetryRecord) {
         let previous = tail
         let spill = spill
-        tail = Task {
+        tail = Task { @MainActor [weak self] in
             _ = await previous?.value
             await spill.append(record)
+            guard let self, let transport = self.transport else { return }
+            await transport.enqueue(
+                StructuredLogLevel(rawValue: record.level.rawValue) ?? .info,
+                message: "sand.desktop.lifecycle",
+                metadata: record.metadata.merging(
+                    ["lifecycle_family": record.family.rawValue]
+                ) { current, _ in current }
+            )
+            self.scheduleRemoteFlush()
         }
     }
 
     func rotate(accountSlot: String?) {
+        self.accountSlot = accountSlot
+        scheduledFlush?.cancel()
+        scheduledFlush = nil
         let previous = tail
         let spill = spill
-        tail = Task {
+        let makeSubmitter = makeSubmitter
+        tail = Task { @MainActor [weak self] in
             _ = await previous?.value
+            guard let self else { return }
+            if let old = self.transport {
+                await old.dispose(retainUndelivered: false)
+            }
+            self.transport = nil
             await spill.rotate(accountSlot: accountSlot)
+
+            guard let accountSlot,
+                  !accountSlot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let makeSubmitter
+            else { return }
+
+            let checkpoint = await spill.structuredLogCheckpoint()
+            let next = StructuredLogTransport(
+                key: IOS_SAND_LOG_KEY,
+                platformTags: [
+                    "client": "sand",
+                    "client.type": "sand",
+                    "platform": "ios",
+                ],
+                initialCheckpoint: checkpoint,
+                holdForIdentity: false,
+                submit: makeSubmitter(accountSlot)
+            )
+            await next.setIdentityTags([
+                "account_scope": iosLifecycleTelemetryAccountScope(accountSlot),
+            ])
+            self.transport = next
+            self.scheduleRemoteFlush(eager: !checkpoint.records.isEmpty)
         }
     }
 
     func settleLoggedOutIfNeeded() {
+        guard accountSlot == nil else { return }
+        rotate(accountSlot: nil)
+    }
+
+    func flushRemoteNow() {
+        scheduledFlush?.cancel()
+        scheduledFlush = nil
         let previous = tail
         let spill = spill
-        tail = Task {
+        tail = Task { @MainActor [weak self] in
             _ = await previous?.value
-            await spill.settleLoggedOutIfNeeded()
+            guard let self, let transport = self.transport else { return }
+            await self.flushAndPersist(transport: transport, spill: spill)
         }
     }
 
     func waitForPending() async {
         await tail?.value
+    }
+
+    private func scheduleRemoteFlush(eager: Bool = false) {
+        guard transport != nil, scheduledFlush == nil else { return }
+        scheduledFlush = Task { @MainActor [weak self] in
+            if !eager {
+                try? await Task.sleep(
+                    nanoseconds: UInt64(LOG_SHIP_INTERVAL_MS) * 1_000_000
+                )
+            }
+            guard !Task.isCancelled, let self else { return }
+            self.scheduledFlush = nil
+            self.flushRemoteNow()
+        }
+    }
+
+    private func flushAndPersist(
+        transport: StructuredLogTransport,
+        spill: IOSLifecycleTelemetrySpill
+    ) async {
+        while true {
+            let before = await transport.capturePending()
+            guard !before.isEmpty else {
+                await spill.replaceWithStructuredLogPending([])
+                return
+            }
+            let shipped = await transport.flushNow()
+            let pending = await transport.capturePending()
+            await spill.replaceWithStructuredLogPending(pending)
+            guard shipped, pending.count < before.count else { return }
+        }
     }
 }
