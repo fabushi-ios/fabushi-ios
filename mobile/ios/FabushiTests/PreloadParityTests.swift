@@ -402,6 +402,22 @@ final class PreloadParityTests: XCTestCase {
         XCTAssertTrue(IOSMainRPCRuntime.isMethod("listAllAutomations"))
         XCTAssertEqual(IOSMainRPCRuntime.methodTable["listAllAutomations"], IOSRPCArgumentShape.none)
         XCTAssertFalse(IOSMainRPCRuntime.isMethod("totallyUnknownMethod"))
+        XCTAssertEqual(IOSMainRPCRuntime.desktopAuthorityMethodTable.count, 127)
+        XCTAssertTrue(IOSMainRPCRuntime.isDesktopAuthorityMethod("getUiPreferences"))
+        XCTAssertEqual(IOSMainRPCRuntime.desktopAuthorityMethodTable["getUiPreferences"], .none)
+        XCTAssertTrue(IOSMainRPCRuntime.isDesktopAuthorityMethod("setUiPreferences"))
+        XCTAssertEqual(IOSMainRPCRuntime.desktopAuthorityMethodTable["setUiPreferences"], .object)
+        XCTAssertTrue(IOSMainRPCRuntime.isDesktopAuthorityMethod("getCallMediaPreferences"))
+        XCTAssertEqual(IOSMainRPCRuntime.desktopAuthorityMethodTable["getCallMediaPreferences"], .none)
+        XCTAssertTrue(IOSMainRPCRuntime.isDesktopAuthorityMethod("setCallMediaPreferences"))
+        XCTAssertEqual(IOSMainRPCRuntime.desktopAuthorityMethodTable["setCallMediaPreferences"], .object)
+        XCTAssertTrue(IOSMainRPCRuntime.isDesktopAuthorityMethod("requestCallMediaPermissions"))
+        XCTAssertEqual(IOSMainRPCRuntime.desktopAuthorityMethodTable["requestCallMediaPermissions"], .object)
+        XCTAssertTrue(IOSMainRPCRuntime.isDesktopAuthorityMethod("listCallDisplaySources"))
+        XCTAssertEqual(IOSMainRPCRuntime.desktopAuthorityMethodTable["listCallDisplaySources"], .none)
+        XCTAssertFalse(IOSMainRPCRuntime.isDesktopAuthorityMethod("listAllAutomations"))
+        XCTAssertTrue(IOSMainRPCRuntime.isMethod("listAllAutomations"))
+        XCTAssertEqual(IOSMainRPCRuntime.iosExtensionMethodTable["listAllAutomations"], .none)
 
         XCTAssertEqual(IOSMainRPCRuntime.eventNames, [
             "box-migration",

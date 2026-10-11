@@ -69,7 +69,10 @@ enum IOSMainRPCRuntime {
         "webauthn-proxy-changed": .init(delivery: .nativeStateOwner, ownerPath: "source/shared/webauthn-proxy-availability.swift", ownerSymbol: "sandWebauthnProxyMirroredEnablement", productEffect: "Projects native iOS and iPadOS WebAuthn availability into the passkey and security owner."),
         "zoom-factor-changed": .init(delivery: .platformMechanismReplacement, ownerPath: "frontend/src/production/MobileUiPreferences.swift", ownerSymbol: "MobileUiPreferencesStore", productEffect: "Native Dynamic Type, text scale, and view gestures replace Electron renderer zoom-factor events."),
     ]
-    static let methodTable: [String: IOSRPCArgumentShape] = [
+    /// Exact method-name/argument-shape mirror of bhrumom/fabushi-desktop@371b72f1cd20de03dc4dff9a15ed761054968093
+    /// source/shared/rpc/main.ts. Keep iOS-only compatibility methods out of this
+    /// table so Desktop authority drift remains independently testable.
+    static let desktopAuthorityMethodTable: [String: IOSRPCArgumentShape] = [
         "openExternal": .object,
         "submitFeedback": .object,
         "getDesktopEnvironment": .none,
@@ -97,6 +100,10 @@ enum IOSMainRPCRuntime {
         "setOnboardingSeen": .object,
         "getTimeZone": .none,
         "setTimeZoneOverride": .object,
+        "getUiPreferences": .none,
+        "setUiPreferences": .object,
+        "getCallMediaPreferences": .none,
+        "setCallMediaPreferences": .object,
         "getAutoReviewInstructions": .none,
         "setAutoReviewInstructions": .object,
         "getLocalToolPermission": .none,
@@ -137,6 +144,8 @@ enum IOSMainRPCRuntime {
         "getBoxRuntime": .none,
         "setBoxRuntime": .object,
         "transcribeAudio": .object,
+        "requestCallMediaPermissions": .object,
+        "listCallDisplaySources": .none,
         "getCursorAuthStatus": .none,
         "loginCursor": .none,
         "cancelCursorLogin": .none,
@@ -172,7 +181,6 @@ enum IOSMainRPCRuntime {
         "reportClientFailure": .object,
         "openCloudAgent": .object,
         "getLinkMetadata": .object,
-        "listAllAutomations": .none,
         "listSecrets": .none,
         "revealSecret": .object,
         "upsertSecrets": .object,
@@ -193,6 +201,18 @@ enum IOSMainRPCRuntime {
         "listMcpServerTools": .object,
         "toggleMcpToolDisabled": .object,
     ]
+
+    /// iOS-owned compatibility surface retained in addition to Desktop authority.
+    static let iosExtensionMethodTable: [String: IOSRPCArgumentShape] = [
+        "listAllAutomations": .none,
+    ]
+
+    static let methodTable: [String: IOSRPCArgumentShape] =
+        desktopAuthorityMethodTable.merging(iosExtensionMethodTable) { desktop, _ in desktop }
+
+    static func isDesktopAuthorityMethod(_ name: String) -> Bool {
+        desktopAuthorityMethodTable[name] != nil
+    }
 
     static func isMethod(_ name: String) -> Bool {
         methodTable[name] != nil

@@ -43,6 +43,12 @@
     ],
     "reviewedPathEvidence": [
       {
+        "path": "source/electron-preload/main-rpc-runtime.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-replacement-implemented-pending-exact-head",
+        "finding": "Desktop main-rpc-runtime is a shipping preload alias for source/shared/rpc/main.ts. iOS has no Electron IPC split, so the replacement is the single IOSPreloadBridge typed Coordinator port plus an exact 127-method Desktop authority audit table. This audit found and fixed six missing Desktop method entries while retaining listAllAutomations as an explicitly separate iOS-only extension; aggregate dependency/shared-contract review remains pending."
+      },
+      {
         "path": "source/electron-preload/box-vnc-clipboard-paste.ts",
         "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
         "status": "current-main-reviewed-direct-port-implemented-pending-exact-head",
