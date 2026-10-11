@@ -28,7 +28,7 @@ struct IOSLifecycleTelemetryRecord: Equatable, Sendable {
 
 @MainActor
 final class IOSLifecycleReporter {
-    static let preAttachBufferLimit = 100
+    nonisolated static let preAttachBufferLimit = 100
     private var uploader: (@MainActor (IOSLifecycleTelemetryRecord) -> Void)?
     private var buffered: [IOSLifecycleTelemetryRecord] = []
 
