@@ -202,6 +202,16 @@ func projectMobileReactionPills(
     }
 }
 
+private extension Data {
+    init?(base64URLEncoded value: String) {
+        var encoded = value
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while encoded.count % 4 != 0 { encoded.append("=") }
+        self.init(base64Encoded: encoded)
+    }
+}
+
 func normalizeMobileReactionInput(_ value: String) -> String? {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, trimmed.utf16.count <= 16 else { return nil }
@@ -1630,6 +1640,26 @@ struct LocalMiniAppDraftTransaction: Equatable, Sendable {
     let transactionId: String
     let reservedAppId: String
     let publisherId: String
+}
+
+struct LocalMiniAppDraftFile: Equatable, Sendable {
+    let mime: String
+    let data: Data
+}
+
+struct LocalMiniAppDraftReviewFile: Equatable, Sendable {
+    let path: String
+    let sha256: String
+    let bytes: UInt64
+    let mime: String
+}
+
+struct LocalMiniAppDraftReview: Equatable, Sendable {
+    let transaction: LocalMiniAppDraftTransaction
+    let draftDigest: String
+    let totalBytes: UInt64
+    let requestedCapabilities: [String]
+    let files: [LocalMiniAppDraftReviewFile]
 }
 
 struct LocalMiniAppInstallApproval: Equatable, Sendable {
@@ -5236,15 +5266,88 @@ final class MarketplaceModel {
         )
     }
 
-    func approveGeneratedMiniAppDraft(
+    func prepareGeneratedMiniAppDraft(
         _ transaction: LocalMiniAppDraftTransaction,
-        draftDigest: String
+        version: String = "1.0.0",
+        displayName: String,
+        entrypoint: String = "index.html",
+        requestedCapabilities: [String] = [],
+        files: [String: LocalMiniAppDraftFile]
+    ) async throws -> LocalMiniAppDraftReview {
+        guard loggedIn, !files.isEmpty else {
+            throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let encodedFiles: [String: Any] = files.mapValues { file in
+            [
+                "mime": file.mime,
+                "dataBase64": file.data.base64EncodedString(),
+            ]
+        }
+        let response = try await bridge.request(
+            method: "feature.plugin.localDraft.prepare",
+            params: [
+                "transactionId": transaction.transactionId,
+                "version": version,
+                "displayName": displayName,
+                "entrypoint": entrypoint,
+                "requestedCapabilities": requestedCapabilities,
+                "files": encodedFiles,
+            ]
+        )
+        guard let object = response.value as? [String: Any],
+              object["protocol"] as? String == "fabushi.local-miniapp-draft-prepared.v1",
+              object["accountScope"] as? String == transaction.accountScope,
+              object["transactionId"] as? String == transaction.transactionId,
+              object["reservedAppId"] as? String == transaction.reservedAppId,
+              object["publisherId"] as? String == transaction.publisherId,
+              let draftDigest = object["draftDigest"] as? String,
+              draftDigest.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+              let totalBytes = (object["totalBytes"] as? NSNumber)?.uint64Value,
+              let capabilities = object["requestedCapabilities"] as? [String],
+              let rawFiles = object["files"] as? [String: Any]
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        let reviewFiles = try rawFiles.map { path, raw -> LocalMiniAppDraftReviewFile in
+            guard let record = raw as? [String: Any],
+                  let sha256 = record["sha256"] as? String,
+                  sha256.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+                  let bytes = (record["bytes"] as? NSNumber)?.uint64Value,
+                  let mime = record["mime"] as? String
+            else {
+                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            }
+            return LocalMiniAppDraftReviewFile(
+                path: path,
+                sha256: sha256,
+                bytes: bytes,
+                mime: mime
+            )
+        }.sorted { $0.path < $1.path }
+        guard reviewFiles.reduce(UInt64(0), { $0 &+ $1.bytes }) == totalBytes else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return LocalMiniAppDraftReview(
+            transaction: transaction,
+            draftDigest: draftDigest,
+            totalBytes: totalBytes,
+            requestedCapabilities: capabilities,
+            files: reviewFiles
+        )
+    }
+
+    func approveGeneratedMiniAppDraft(
+        _ review: LocalMiniAppDraftReview
     ) async throws -> LocalMiniAppInstallApproval {
         guard loggedIn,
-              draftDigest.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil
+              review.draftDigest.range(
+                of: #"^[0-9a-f]{64}$"#,
+                options: .regularExpression
+              ) != nil
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidParams
         }
+        let transaction = review.transaction
         let descriptor = try await localMiniAppSigningAuthority.descriptor(
             accountScope: transaction.accountScope
         )
@@ -5252,7 +5355,7 @@ final class MarketplaceModel {
             method: "feature.plugin.localDraft.approve",
             params: [
                 "transactionId": transaction.transactionId,
-                "draftDigest": draftDigest,
+                "draftDigest": review.draftDigest,
                 "keyId": descriptor.keyId,
                 "publicKeyBase64": descriptor.publicKeyBase64URL,
             ]
@@ -5263,7 +5366,7 @@ final class MarketplaceModel {
               object["transactionId"] as? String == transaction.transactionId,
               object["reservedAppId"] as? String == transaction.reservedAppId,
               object["publisherId"] as? String == transaction.publisherId,
-              object["draftDigest"] as? String == draftDigest,
+              object["draftDigest"] as? String == review.draftDigest,
               object["keyId"] as? String == descriptor.keyId,
               let userApprovalId = object["userApprovalId"] as? String
         else {
@@ -5274,19 +5377,34 @@ final class MarketplaceModel {
             transactionId: transaction.transactionId,
             reservedAppId: transaction.reservedAppId,
             publisherId: transaction.publisherId,
-            draftDigest: draftDigest,
+            draftDigest: review.draftDigest,
             userApprovalId: userApprovalId,
             keyId: descriptor.keyId,
             publicKeyBase64URL: descriptor.publicKeyBase64URL
         )
     }
 
-    func signGeneratedMiniAppManifestPayload(
-        _ payload: Data,
-        approval: LocalMiniAppInstallApproval
+    func signApprovedGeneratedMiniApp(
+        _ approval: LocalMiniAppInstallApproval
     ) async throws -> String {
-        guard loggedIn, !payload.isEmpty else {
+        guard loggedIn else {
             throw MahayanaCoordinator.CoordinatorError.invalidParams
+        }
+        let response = try await bridge.request(
+            method: "feature.plugin.localDraft.signingPayload",
+            params: ["userApprovalId": approval.userApprovalId]
+        )
+        guard let object = response.value as? [String: Any],
+              object["protocol"] as? String == "fabushi.local-miniapp-signing-payload.v1",
+              object["accountScope"] as? String == approval.accountScope,
+              object["transactionId"] as? String == approval.transactionId,
+              object["userApprovalId"] as? String == approval.userApprovalId,
+              object["draftDigest"] as? String == approval.draftDigest,
+              let encodedPayload = object["signingPayloadBase64"] as? String,
+              let payload = Data(base64Encoded: encodedPayload),
+              !payload.isEmpty
+        else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         let signature = try await localMiniAppSigningAuthority.sign(
             payload,
@@ -5299,17 +5417,20 @@ final class MarketplaceModel {
     }
 
     @discardableResult
-    func installGeneratedMiniAppPackage(
-        _ package: Data,
+    func installApprovedGeneratedMiniApp(
+        signatureBase64URL: String,
         approval: LocalMiniAppInstallApproval
     ) async throws -> LocalMiniAppSource {
-        guard loggedIn, !package.isEmpty else {
+        guard loggedIn,
+              !signatureBase64URL.isEmpty,
+              Data(base64URLEncoded: signatureBase64URL)?.count == 64
+        else {
             throw MahayanaCoordinator.CoordinatorError.invalidParams
         }
         let response = try await bridge.request(
             method: "feature.plugin.installLocalFabapp",
             params: [
-                "packageBase64": package.base64EncodedString(),
+                "signatureBase64URL": signatureBase64URL,
                 "userApprovalId": approval.userApprovalId,
                 "keyId": approval.keyId,
                 "publicKeyBase64": approval.publicKeyBase64URL,
