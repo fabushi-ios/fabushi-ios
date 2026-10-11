@@ -3,6 +3,36 @@ import Foundation
 struct GatewayTraceContext: Equatable, Sendable {
     let requestId: String
     let attempt: Int
+    let rootTraceparent: String
+    let traceparent: String
+}
+
+enum GatewayTraceParent {
+    static func makeRoot() -> String {
+        let traceId = randomHex(count: 32)
+        let spanId = randomHex(count: 16)
+        return "00-\(traceId)-\(spanId)-01"
+    }
+
+    static func makeChild(root: String) -> String {
+        let parts = root.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 4,
+              parts[0].count == 2,
+              parts[1].count == 32,
+              parts[2].count == 16,
+              parts[3].count == 2
+        else {
+            return root
+        }
+        return "\(parts[0])-\(parts[1])-\(randomHex(count: 16))-\(parts[3])"
+    }
+
+    private static func randomHex(count: Int) -> String {
+        let value = UUID().uuidString
+            .replacingOccurrences(of: "-", with: "")
+            .lowercased()
+        return String(value.prefix(count))
+    }
 }
 
 enum GatewayRetryPolicy {
@@ -17,6 +47,11 @@ enum GatewayRetryPolicy {
     }
 }
 
+private struct GatewayRequestFingerprint: Equatable {
+    let method: String
+    let args: CoordinatorPayload
+}
+
 @MainActor
 final class CoordinatorGatewayClient {
     struct Connection: Equatable, Sendable {
@@ -26,19 +61,29 @@ final class CoordinatorGatewayClient {
 
     typealias CommandTransport = @MainActor (_ connection: Connection, _ method: String, _ args: CoordinatorPayload) async throws -> CoordinatorPayload
     typealias TracedCommandTransport = @MainActor (_ connection: Connection, _ method: String, _ args: CoordinatorPayload, _ trace: GatewayTraceContext) async throws -> CoordinatorPayload
+    typealias TraceRootFactory = @MainActor () -> String
+
+    private struct InFlightRequest {
+        let token: String
+        let fingerprint: GatewayRequestFingerprint
+        let task: Task<CoordinatorPayload, Error>
+    }
 
     private let supervisor: CoordinatorHostSupervisor
     private let transport: TracedCommandTransport
     private let dnsDiagnostics: GatewayDNSDiagnosticTracker
-    private var inFlight: [String: Task<CoordinatorPayload, Error>] = [:]
+    private let traceRootFactory: TraceRootFactory
+    private var inFlight: [String: InFlightRequest] = [:]
 
     init(
         supervisor: CoordinatorHostSupervisor,
         dnsDiagnostics: GatewayDNSDiagnosticTracker = .init(),
+        traceRootFactory: @escaping TraceRootFactory = { GatewayTraceParent.makeRoot() },
         transport: @escaping CommandTransport
     ) {
         self.supervisor = supervisor
         self.dnsDiagnostics = dnsDiagnostics
+        self.traceRootFactory = traceRootFactory
         self.transport = { connection, method, args, _ in
             try await transport(connection, method, args)
         }
@@ -47,10 +92,12 @@ final class CoordinatorGatewayClient {
     init(
         supervisor: CoordinatorHostSupervisor,
         dnsDiagnostics: GatewayDNSDiagnosticTracker = .init(),
+        traceRootFactory: @escaping TraceRootFactory = { GatewayTraceParent.makeRoot() },
         tracedTransport: @escaping TracedCommandTransport
     ) {
         self.supervisor = supervisor
         self.dnsDiagnostics = dnsDiagnostics
+        self.traceRootFactory = traceRootFactory
         self.transport = tracedTransport
     }
 
@@ -68,13 +115,20 @@ final class CoordinatorGatewayClient {
         args: CoordinatorPayload
     ) async throws -> CoordinatorPayload {
         let normalizedRequestId = requestId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedRequestId.isEmpty else {
-            throw GatewayCommandError(message: "gateway requestId must not be empty")
+        guard !normalizedRequestId.isEmpty, normalizedRequestId.utf8.count <= 256 else {
+            throw GatewayCommandError(message: "gateway requestId must be 1...256 bytes")
         }
+        let fingerprint = GatewayRequestFingerprint(method: method, args: args)
         if let existing = inFlight[normalizedRequestId] {
-            return try await existing.value
+            guard existing.fingerprint == fingerprint else {
+                throw GatewayCommandError(
+                    message: "gateway requestId was reused for a different command"
+                )
+            }
+            return try await existing.task.value
         }
 
+        let token = UUID().uuidString.lowercased()
         let task = Task { @MainActor [weak self] () throws -> CoordinatorPayload in
             guard let self else {
                 throw GatewayUnreachableError(
@@ -82,19 +136,46 @@ final class CoordinatorGatewayClient {
                     message: "gateway client released before request completed"
                 )
             }
-            defer { self.inFlight.removeValue(forKey: normalizedRequestId) }
+
+            let rootTraceparent = self.traceRootFactory()
+            var pinnedBaseURL: URL?
             var lastError: Error?
+
             for attempt in 1...GatewayRetryPolicy.maxAttempts {
                 try Task.checkCancellation()
                 let connection = try await self.supervisor.ensureConnection()
+                if let pinnedBaseURL, pinnedBaseURL != connection.baseURL {
+                    throw GatewayUnreachableError(
+                        transportKind: "coordinator",
+                        message: "gateway endpoint changed while retrying request \(normalizedRequestId)"
+                    )
+                }
+                if pinnedBaseURL == nil {
+                    pinnedBaseURL = connection.baseURL
+                }
+
+                let trace = GatewayTraceContext(
+                    requestId: normalizedRequestId,
+                    attempt: attempt,
+                    rootTraceparent: rootTraceparent,
+                    traceparent: GatewayTraceParent.makeChild(root: rootTraceparent)
+                )
+                var headers = connection.headers
+                headers["traceparent"] = trace.traceparent
+                let tracedConnection = Connection(
+                    baseURL: connection.baseURL,
+                    headers: headers
+                )
+
                 do {
                     let value = try await self.transport(
-                        connection,
+                        tracedConnection,
                         method,
                         args,
-                        .init(requestId: normalizedRequestId, attempt: attempt)
+                        trace
                     )
                     try Task.checkCancellation()
+                    self.dnsDiagnostics.recordSuccess(url: connection.baseURL)
                     return value
                 } catch is CancellationError {
                     throw CancellationError()
@@ -111,16 +192,36 @@ final class CoordinatorGatewayClient {
                     }
                 }
             }
+
             throw lastError ?? GatewayUnreachableError(
                 transportKind: "coordinator",
                 message: "gateway command failed without an error"
             )
         }
-        inFlight[normalizedRequestId] = task
-        return try await task.value
+
+        inFlight[normalizedRequestId] = .init(
+            token: token,
+            fingerprint: fingerprint,
+            task: task
+        )
+
+        do {
+            let value = try await task.value
+            settleInFlight(requestId: normalizedRequestId, token: token)
+            return value
+        } catch {
+            settleInFlight(requestId: normalizedRequestId, token: token)
+            throw error
+        }
     }
 
     func cancel(requestId: String) {
-        inFlight.removeValue(forKey: requestId)?.cancel()
+        let normalized = requestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        inFlight.removeValue(forKey: normalized)?.task.cancel()
+    }
+
+    private func settleInFlight(requestId: String, token: String) {
+        guard inFlight[requestId]?.token == token else { return }
+        inFlight.removeValue(forKey: requestId)
     }
 }

@@ -93,10 +93,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/gateway/gateway-client.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/shared/gateway-wire.swift; source/ios-main/dev/dev-gateway-offline.swift; source/ios-main/coordinator/desktop-connectivity.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Desktop process/SSE transport is adapted to in-process Coordinator actors and Apple networking. Shared wire constants already preserve slim-avatar, mint-dedupe and traceparent header identities.",
-      "implementation_status": "mapped",
-      "production_evidence": "MahayanaCoordinator enforces client-pause blocking for Gateway/Computer operations; IOSDevGatewayOfflineControl owns induced-offline state; IOSConnectivity owns online/resume projection.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift; mobile/ios/FabushiTests/DevControlsParityTests.swift",
-      "notes": "IOS-MAIN-COORD-GW-002: current iOS CoordinatorGatewayClient is not yet proven as a shipping caller and does not itself carry the full Desktop retry/dedupe/trace/SSE policy. Keep mapped; do not promote until production reachability and focused policy evidence are added."
+      "implementation_status": "implemented",
+      "production_evidence": "MahayanaCoordinator.dispatchTransport is the shipping Renderer transport entry and routes every command through shippingGatewayDispatcher -> CoordinatorGatewayClient -> the canonical MahayanaCoordinator.request owner. The client now validates bounded requestId, coalesces only identical request fingerprints, fails closed on requestId reuse, pins the endpoint across bounded read-safe retries, injects a W3C traceparent child span into the terminal transport connection, invalidates failed health, records DNS failure/success episodes, and never auto-retries side-effecting methods.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift covers requestId collision fencing, bounded retry, endpoint reuse, traceparent propagation, stale Host resolve fencing and DNS episodes; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift proves the shipping dispatchTransport -> routed MCP caller.",
+      "notes": "IOS-MAIN-COORD-GW-002: the iOS embedded Coordinator uses an in-process canonical Host endpoint rather than Desktop HTTP ambiguity. Read-safe retries are bounded; writes fail closed instead of uncertain automatic retry. Marked implemented only; SSE/event-family stream responsibilities remain separate mapped rows and exact-head CI is still required before verified.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_dns_diagnostics.rs",
@@ -108,10 +109,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/gateway/gateway-dns-diagnostics.swift; source/mahayana-agent-coordinator/gateway/coordinator-gateway-reachability.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS uses URL/Network-stack classifications instead of raw getaddrinfo probe ownership.",
-      "implementation_status": "mapped",
-      "production_evidence": "GatewayDNSDiagnostics classifies loopback/control hosts and secure transport; GatewayReachability classifies native URL/network failures.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testGatewayDNSDiagnosticsClassifyLoopbackWithoutResolvingIt",
-      "notes": "IOS-MAIN-COORD-GW-003: reviewed Desktop blob 83164b092c759ed8c428bbea509b06a976eece6f. Probe throttling/dual-resolver episode telemetry is not yet equivalently proven, so status remains mapped."
+      "implementation_status": "implemented",
+      "production_evidence": "Shipping CoordinatorGatewayClient records GatewayDNSDiagnosticTracker failure episodes on transport errors and clears the active episode on successful terminal transport. The iOS-native tracker classifies URL host kind, throttles probes/telemetry to 60 seconds per host, suppresses duplicate reports within an active failure episode, and increments episode identity only after recovery followed by a later failure.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testDNSDiagnosticsEmitOneEpisodeUntilSuccessAndThrottleNewEpisode; mobile/ios/FabushiTests/CoordinatorContractTests.swift::testGatewayDNSDiagnosticEpisodesAreThrottledPerHost",
+      "notes": "IOS-MAIN-COORD-GW-003: iOS intentionally relies on the native URL/network stack instead of Desktop raw system-vs-independent resolver probes, but preserves fail-closed host classification, throttling and failure-episode telemetry in the shipping Gateway caller. Exact-head CI remains pending.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_errors.rs",
@@ -168,10 +170,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/gateway/gateway-request-dispatcher.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Async Swift dispatch closures and CoordinatorReplyOutcome replace Rust handler registry/raw HTTP parsing.",
-      "implementation_status": "mapped",
-      "production_evidence": "MahayanaCoordinator is the shipping request owner; CoordinatorGatewayRequestDispatcher exists in the same source graph but its direct shipping composition still requires proof.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift",
-      "notes": "IOS-MAIN-COORD-GW-007: reviewed Desktop blob 38ca19db76493f9c2bca8862b484d61b7e74f47c. Direct production composition of the dispatcher and exact failure/header parity remain open."
+      "implementation_status": "implemented",
+      "production_evidence": "RendererPortServer preserves wire requestId into IOSMainRuntime/MahayanaCoordinator.dispatchTransport. dispatchTransport always calls the shipping GatewayRequestDispatcher, which validates the served method surface, forwards requestId/method/typed args into CoordinatorGatewayClient and maps cancellation/command/unreachable/transport errors to stable CoordinatorReplyOutcome failures before returning to Renderer.",
+      "test_evidence": "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift exercises real dispatchTransport list/call traffic through the shipping dispatcher; mobile/ios/FabushiTests/GatewayParityTests.swift exercises request correlation/retry failure semantics.",
+      "notes": "IOS-MAIN-COORD-GW-007: direct production composition now exists. iOS has no separate raw Gateway HTTP JSON parser on this embedded path; typed CoordinatorPayload is the platform replacement. Marked implemented pending exact-head CI.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/host_supervisor.rs",
@@ -183,10 +186,11 @@
       "ios_target_path": "source/mahayana-agent-coordinator/gateway/host-supervisor.swift; source/mahayana-agent-coordinator/local-host-supervisor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "MainActor task coalescing and generation/health cache replace child-process discovery files and socket probes.",
-      "implementation_status": "mapped",
-      "production_evidence": "MahayanaLocalHostSupervisor is the canonical shipping Host owner; CoordinatorHostSupervisor implements bounded connection reuse/invalidation semantics in the app source graph.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift::testHostSupervisorReusesHealthyConnectionWithinTTL; mobile/ios/FabushiTests/LocalHostRecoveryTests.swift",
-      "notes": "IOS-MAIN-COORD-GW-008: reviewed Desktop blob ea7d370c0a79948e7e6a0a179405d3aacd9e3a56. Gateway-specific supervisor shipping composition and stale-resolve tests remain pending."
+      "implementation_status": "implemented",
+      "production_evidence": "MahayanaCoordinator.shippingGatewayDispatcher constructs CoordinatorHostSupervisor as the only Gateway connection owner used by CoordinatorGatewayClient. It reuses fresh healthy connections, coalesces resolves, invalidates health on transport failure and now fences both health probes and all waiters on healthEpoch so a stale resolve cannot commit after invalidation.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testHostSupervisorRejectsResolveSettledAfterInvalidation; mobile/ios/FabushiTests/CoordinatorContractTests.swift::testGatewayClientDedupesRequestIdAndRetriesReadSafeCalls; mobile/ios/FabushiTests/LocalHostRecoveryTests.swift",
+      "notes": "IOS-MAIN-COORD-GW-008: Gateway-specific supervisor is now directly composed by the shipping Coordinator. The embedded iOS Host endpoint replaces Desktop discovery-file/process probing while retaining TTL/invalidation/stale-attempt semantics. Marked implemented pending exact-head CI.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway shipping policy implementation"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/http_transport.rs",

@@ -22,11 +22,12 @@ struct GatewayDNSFailureEpisode: Equatable, Sendable {
 
 @MainActor
 final class GatewayDNSDiagnosticTracker {
-    static let throttleSeconds: TimeInterval = 30
+    static let throttleSeconds: TimeInterval = 60
 
     private let now: () -> Date
     private var lastProbeAtByHost: [String: Date] = [:]
     private var episodeByHost: [String: UInt64] = [:]
+    private var activeEpisodeHosts = Set<String>()
     private(set) var emitted: [GatewayDNSFailureEpisode] = []
 
     init(now: @escaping () -> Date = Date.init) {
@@ -37,14 +38,20 @@ final class GatewayDNSDiagnosticTracker {
     func recordFailure(url: URL, requestId: String) -> GatewayDNSFailureEpisode? {
         let diagnostic = GatewayDNSDiagnostics.inspect(url)
         guard let host = diagnostic.host, !host.isEmpty else { return nil }
+        let key = host.lowercased()
+        guard !activeEpisodeHosts.contains(key) else { return nil }
+
         let timestamp = now()
-        if let last = lastProbeAtByHost[host],
+        if let last = lastProbeAtByHost[key],
            timestamp.timeIntervalSince(last) < Self.throttleSeconds {
             return nil
         }
-        lastProbeAtByHost[host] = timestamp
-        let next = (episodeByHost[host] ?? 0) &+ 1
-        episodeByHost[host] = next
+
+        lastProbeAtByHost[key] = timestamp
+        activeEpisodeHosts.insert(key)
+        let next = (episodeByHost[key] ?? 0) &+ 1
+        episodeByHost[key] = next
+
         let event = GatewayDNSFailureEpisode(
             host: host,
             requestId: requestId,
@@ -53,6 +60,15 @@ final class GatewayDNSDiagnosticTracker {
         )
         emitted.append(event)
         return event
+    }
+
+    func recordSuccess(url: URL) {
+        guard let host = GatewayDNSDiagnostics.inspect(url).host else { return }
+        activeEpisodeHosts.remove(host.lowercased())
+    }
+
+    func episodeActive(host: String) -> Bool {
+        activeEpisodeHosts.contains(host.lowercased())
     }
 }
 

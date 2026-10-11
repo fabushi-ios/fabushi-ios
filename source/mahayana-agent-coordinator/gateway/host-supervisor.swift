@@ -41,21 +41,36 @@ final class CoordinatorHostSupervisor {
             return connection
         }
 
-        if let connection, await healthProbe(connection) {
-            lastHealthyAt = now()
-            return connection
+        if let connection {
+            let probeEpoch = healthEpoch
+            let healthy = await healthProbe(connection)
+            guard probeEpoch == healthEpoch else {
+                return try await ensureConnection()
+            }
+            if healthy {
+                lastHealthyAt = now()
+                return connection
+            }
         }
 
         let epoch = healthEpoch
         if let pendingConnection {
-            return try await pendingConnection.value
+            let resolved = try await pendingConnection.value
+            guard epoch == healthEpoch else {
+                return try await ensureConnection()
+            }
+            return resolved
         }
 
         let task = Task { @MainActor [resolveConnection] in
             try await resolveConnection()
         }
         pendingConnection = task
-        defer { pendingConnection = nil }
+        defer {
+            if pendingConnection != nil {
+                pendingConnection = nil
+            }
+        }
 
         let resolved = try await task.value
         guard epoch == healthEpoch else {
