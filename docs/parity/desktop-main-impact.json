@@ -43,6 +43,12 @@
     ],
     "reviewedPathEvidence": [
       {
+        "path": "source/electron-preload/box-vnc-clipboard-paste.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-direct-port-implemented-pending-exact-head",
+        "finding": "Desktop trusted noVNC clipboard paste helper has a shipping Swift direct port in source/ios-preload, compiled through mobile/ios/project.yml and covered by PreloadParityTests for JSON escaping, clipboardPasteFrom invocation and fail-closed sync acknowledgement."
+      },
+      {
         "path": "source/packages/agent-analytics/commit-scoring/git-repo-utils.ts",
         "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
         "status": "current-main-reviewed-direct-port-implemented-pending-exact-head",
