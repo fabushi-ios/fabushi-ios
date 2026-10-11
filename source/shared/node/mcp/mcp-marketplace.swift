@@ -88,6 +88,28 @@ func toRawGithubUrl(_ blobUrl: String) -> String? {
     return "https://raw.githubusercontent.com/\(owner)/\(repo)/\(ref)/\(rest)"
 }
 
+func pinnedMarketplaceSkillSourceUrl(
+    _ sourceUrl: String,
+    versionRef: String
+) -> String? {
+    let commit = versionRef.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard commit.count == 40,
+          commit.utf8.allSatisfy({
+              ($0 >= 48 && $0 <= 57) || ($0 >= 97 && $0 <= 102)
+          }),
+          let parsed = URL(string: sourceUrl),
+          parsed.scheme == "https",
+          parsed.host?.lowercased() == "github.com"
+    else { return nil }
+    let parts = parsed.path.split(separator: "/").map(String.init)
+    guard parts.count >= 5, parts[2] == "blob" else { return nil }
+    let owner = parts[0]
+    let repo = parts[1]
+    let rest = parts.dropFirst(4).joined(separator: "/")
+    guard !owner.isEmpty, !repo.isEmpty, !rest.isEmpty else { return nil }
+    return "https://github.com/\(owner)/\(repo)/blob/\(commit)/\(rest)"
+}
+
 private let MARKETPLACE_SKILL_MARKDOWN_MAX_BYTES = 256 * 1024
 
 func fetchMarketplaceSkillMarkdown(
