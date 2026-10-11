@@ -3,20 +3,20 @@
   "authorityMode": "live-main",
   "repository": "bhrumom/fabushi-desktop",
   "branch": "main",
-  "commit": "d575b4f77b6895eea4ecaced96e5c512964bf3ed",
-  "rootTreeSha": "d4c8fe5c91635064f11673ebeefc94c1f83b5ab8",
+  "commit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
+  "rootTreeSha": "a7d8b9182bc9a586d5b9f40f5613237389f74737",
   "observedAt": "2026-10-11",
-  "previousSourceCommit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
+  "previousSourceCommit": "d575b4f77b6895eea4ecaced96e5c512964bf3ed",
   "inventory": {
     "selectedRoots": [
       "frontend/**",
       "source/**"
     ],
     "selectedFileCount": 7951,
-    "fullTrackedCount": 8176,
+    "fullTrackedCount": 8177,
     "gitlinkCount": 0,
-    "nonselectedCount": 225,
-    "fullTreeSha256": "30075e07b97a223e09828cfc553ab0156b37656386d2ebb62720130c1fd28341",
+    "nonselectedCount": 226,
+    "fullTreeSha256": "c7c489bf971ae85eb80301713afd7eb07d530b14674d0d296d96ecbcbdd224ac",
     "selectedTreeSha256": "85adf0b64c517cfdc72a1d52078977683748714a5ec893a8d30b992d7052febc",
     "manifestIndex": "manifests/desktop-main-reference-index.json",
     "ledgerIndex": "docs/parity/desktop-main-index.json",
@@ -27,5 +27,5 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Incremental live-main rebaseline from 92fcc2b0 to d575b4f7. Selected frontend/** + source/** remains exactly 7,951 blobs. Two active Marketplace/offline-mini-app specs were added and the parity/recovery spec changed outside selected roots; FPM-001/OMA-001 are requirement-only and remain pending iOS production implementation and acceptance."
+  "notes": "Incremental live-main rebaseline from d575b4f7 to 62d0c99f. Desktop changed only FPM-001 metadata plus the new Marketplace owner inventory outside frontend/** + source/**; the selected production source set remains exactly 7,951 blobs with unchanged selected digest. The new owner inventory explicitly keeps iOS OMA package/runtime work partial and AI private Mini App creation missing/partial prerequisites, so baselineReady/dependenciesReviewed/completenessAccepted/acceptanceAccepted remain false."
 }
