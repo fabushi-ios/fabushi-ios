@@ -723,12 +723,13 @@
       "ios_target_path": "mobile/ios/Fabushi/HumanCallMediaPort.swift; mobile/ios/Fabushi/HumanCallsView.swift",
       "ios_language": "Swift / AVFoundation / AVAudioSession / ReplayKit",
       "ios_platform_delta": "AVCaptureDevice/AVAudioSession replace Electron systemPreferences and Desktop capture enumeration. HumanCallMediaPort preserves granted/denied/prompt/not-requested wire states, selected-device persistence and ReplayKit availability; HumanCallsView is the shipping consumer. Cross-application screen sharing remains owned by the separately tracked Broadcast Upload Extension lifecycle rather than being faked by this port.",
-      "implementation_status": "mapped",
-      "production_evidence": "HumanCallMediaPort.requestPermissions uses AVCaptureDevice authorization/requestAccess, enumerates microphone/camera devices with deterministic preference fallback, applies preferred microphone input and exposes RPScreenRecorder availability. HumanCallsView owns one HumanCallMediaPort and uses it in real call start/answer, camera/microphone selection, screen-share enablement and updateCallMedia projection.",
-      "test_evidence": "mobile/ios/FabushiTests/HumanCallMediaPortTests.swift proves permission mapping/wire values and device preference resolution; HumanCallBroadcastIPCTests cover the separately owned broadcast IPC path; current-head build/UI evidence remains required.",
-      "notes": "Re-read current Desktop blob 451d53d5e08b12b63b867e0e481c93780a091f9b. Native owner and shipping entrypoint are now explicitly identified, but current-main aggregate review plus permission/cancel/restart/ordering acceptance are still required before implementation/verification promotion.",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "implemented",
+      "production_evidence": "FabushiRuntime constructs the single HumanCallMediaPort from Coordinator-owned durable call-media preferences and injects it into the shipping SwiftUI environment. HumanCallsView uses it for real call start/answer permission requests, microphone/camera choice, preferred-input application and ReplayKit availability. The live call surface fences device/lease/signal generations, recovers peer disconnect/failure with reconnect+resume+ICE restart, and routes background-to-foreground plus resumable AVAudioSession interruptions through the same recoverMedia path.",
+      "test_evidence": "HumanCallMediaPortTests proves Desktop-compatible permission wire values, durable preference/fallback semantics and audio-interruption recovery policy; HumanCallBroadcastIPCTests covers the separate Broadcast path. Current exact-head Swift/unit/UI Actions are still required before verified.",
+      "notes": "Current-main audit against Desktop blob 451d53d5e08b12b63b867e0e481c93780a091f9b. Native permissions, persistent device intent, shipping UI caller, ReplayKit capability, foreground/interruption recovery and stale media-generation fencing are present. Status is implemented, not verified, pending current exact-head Actions.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "exact_head_evidence": "pending current exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/electron-main/coordinator/account-revoke.ts",
@@ -964,14 +965,16 @@
       "desktop_owner": "Electron main Coordinator process runtime",
       "desktop_visible_effect": "Coordinator crashes recover with bounded backoff while intentional restart/replacement waits for old generation retirement and stale transport events cannot overwrite newer state.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/coordinator/coordinator-runtime.swift",
+      "ios_target_path": "source/ios-preload/preload.swift; source/ios-preload/coordinator-port-bridge.swift; source/ios-main/coordinator/coordinator-runtime.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS has no utility child-process exit promise. IOSCoordinatorRuntime owns one in-process launch handle and generation fence, while native lifecycle/recovery owns app suspension/relaunch. Exact crash-relaunch/backoff equivalence is not yet proven in this owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "IOSCoordinatorRuntime has stopped/running/restarting/disposed states, one launch handle, monotonic generation acceptance, explicit restart and disposal.",
-      "test_evidence": "IOSCoordinatorArchitectureTests covers bounded relaunch delay and generation-related infrastructure, but does not yet prove automatic crash relaunch and old-handle retirement equivalent to Desktop.",
-      "notes": "Reviewed Desktop blob 52af61f060b59b7f1f6675a6c9b2b7c93a7f4e13. Kept mapped until iOS crash/relaunch composition is proven, rather than inferring parity from similarly named runtime code.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "ios_platform_delta": "iOS has no utility child process. The shipping IOSPreloadBridge owns one in-process Coordinator transport generation: unexpected port close/protocol breach retires that generation, records lifecycle telemetry, schedules bounded 250ms-to-10s backoff, rebuilds the typed port pair, and fences stale callbacks by client identity plus generation. Explicit user retry performs an immediate generation replacement; shutdown cancels recovery and cannot relaunch.",
+      "implementation_status": "implemented",
+      "production_evidence": "FabushiApp -> FabushiSceneRoot -> FabushiRuntime -> IOSPrimaryPreloadEntrypoint -> IOSPreloadBridge is the shipping owner. IOSPreloadBridge uses IOSCoordinatorTransportRecoveryController for failure attempts/generations and lifecycle telemetry, rebuilds RendererPortServer/IOSCoordinatorPortClient after unexpected settlement, and FabushiRuntime.retryConnection invokes restartTransport for explicit replacement. IOSCoordinatorPortClient pins settlement before peer notification so synchronous close cannot rewrite cause.",
+      "test_evidence": "IOSCoordinatorArchitectureTests::testShippingCoordinatorRecoveryBackoffGenerationAndDisposal covers fast-failure backoff, healthy-window reset, protocol-breach classification, intentional replacement, generation fencing and disposal. Existing CoordinatorContractTests cover typed request/reply/cancel/shutdown/protocol handling. Current exact-head Actions pending.",
+      "notes": "Current-main audit against Desktop blob 52af61f060b59b7f1f6675a6c9b2b7c93a7f4e13. The similarly named IOSCoordinatorRuntime alone is not used as completion evidence; promotion is based on the actual shipping preload transport owner and its native recovery lifecycle.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending current exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/electron-main/coordinator/coordinator-telemetry.ts",
@@ -984,10 +987,12 @@
       "ios_language": "Swift",
       "ios_platform_delta": "iOS implements native lifecycle/auth telemetry projections and the same 30s healthy window / 250ms-to-10s bounded relaunch policy, but the complete Desktop multi-sink telemetry fanout is split across IOSLifecycleReporter and native service owners.",
       "implementation_status": "mapped",
-      "production_evidence": "CoordinatorTelemetry provides exit classification and bounded relaunch delay; IOSAuthTelemetryRelay buffers bounded pre-attach events and IOSMainRuntime wires auth projections into lifecycle reporter streams.",
-      "test_evidence": "IOSCoordinatorArchitectureTests asserts relaunch backoff. Complete reachability/rebuild/reconciliation/agents-unreachable sink parity remains under aggregate telemetry review.",
-      "notes": "Reviewed Desktop blob 2b434b870aacc2ccf8683bec26bd1fc34f37a30d. Kept mapped because one Swift file does not yet prove the full Desktop telemetry sink graph.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "CoordinatorTelemetry retains the Desktop 30s healthy window and 250ms-to-10s bounded relaunch policy. The shipping IOSPreloadBridge now emits coordinatorHandoff exited/relaunched telemetry with exit class, uptime, relaunch sequence, delay and transport generation. Other reachability/rebuild/reconciliation/agents-unreachable telemetry remains split across IOSLifecycleReporter/native owners and is still under aggregate review.",
+      "test_evidence": "IOSCoordinatorArchitectureTests covers backoff and the shipping recovery controller lifecycle. Full Desktop multi-sink telemetry parity remains open; therefore this row remains mapped.",
+      "notes": "Current-main re-review against Desktop blob 2b434b870aacc2ccf8683bec26bd1fc34f37a30d. Runtime crash/relaunch telemetry is now wired, but this broader telemetry-sink row is intentionally not promoted until remaining sink families are closed.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending aggregate telemetry review and current exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/electron-main/coordinator/desktop-connectivity.ts",
