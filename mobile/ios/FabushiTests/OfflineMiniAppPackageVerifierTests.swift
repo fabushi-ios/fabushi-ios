@@ -124,13 +124,13 @@ final class OfflineMiniAppPackageVerifierTests: XCTestCase {
                 hostApi: 1
             )
         ) { error in
-            guard case FabAppVerificationError.fileSizeMismatch("index.html") = error
-                    ?? FabAppVerificationError.invalidJSON else {
-                if case FabAppVerificationError.fileDigestMismatch("index.html") = error {
-                    return
-                }
-                return XCTFail("unexpected error: \(error)")
+            if case FabAppVerificationError.fileSizeMismatch("index.html") = error {
+                return
             }
+            if case FabAppVerificationError.fileDigestMismatch("index.html") = error {
+                return
+            }
+            XCTFail("unexpected error: \(error)")
         }
     }
 
