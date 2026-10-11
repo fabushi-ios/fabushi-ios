@@ -3412,13 +3412,6 @@ fn safe_marketplace_platform(value: &str) -> Result<&str, ProductError> {
     }
 }
 
-fn canonical_marketplace_platform(value: &str) -> &str {
-    match value {
-        "ios" | "android" => "mobile",
-        value => value,
-    }
-}
-
 fn safe_marketplace_platforms(platforms: &[String]) -> Result<Vec<&str>, ProductError> {
     let mut normalized = Vec::new();
     for platform in platforms {
@@ -4654,6 +4647,48 @@ mod tests {
             .expect("public marketplace must not require account authorization");
         assert_eq!(catalog["plugins"][0]["pluginId"], "global-dharma");
         server.join().expect("join marketplace test server");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn marketplace_browse_preserves_ios_for_package_discovery() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind iOS marketplace test server");
+        let address = listener.local_addr().expect("iOS marketplace test address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept iOS marketplace request");
+            let mut request = [0_u8; 4096];
+            let size = stream.read(&mut request).expect("read iOS marketplace request");
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with("GET /v1/marketplace/plugins?q=global&platform=ios "));
+            let body = r#"{"plugins":[{"pluginId":"global-dharma","latestVersion":"1.1.0"}]}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .expect("write iOS marketplace response");
+        });
+
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-ios-marketplace-browse-test-{}-{}",
+            std::process::id(),
+            surface_now_millis()
+        ));
+        let client = MahayanaProductClient::new_with_surface_state_path(
+            format!("http://{address}"),
+            root.join("session.json"),
+            root.join("product-surface.json"),
+        );
+        let catalog = client
+            .marketplace_browse(Some("global"), Some("ios"))
+            .expect("iOS marketplace browse");
+        assert_eq!(catalog["plugins"][0]["pluginId"], "global-dharma");
+        server.join().expect("join iOS marketplace test server");
         let _ = std::fs::remove_dir_all(root);
     }
 
