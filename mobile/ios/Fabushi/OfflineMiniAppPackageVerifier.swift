@@ -405,7 +405,9 @@ private indirect enum StrictJSON: Equatable {
         case .array(let values):
             return "[" + (try values.map { try $0.canonicalString() }.joined(separator: ",")) + "]"
         case .object(let object):
-            let keys = object.keys.sorted()
+            let keys = object.keys.sorted { left, right in
+                Array(left.utf16).lexicographicallyPrecedes(Array(right.utf16))
+            }
             return "{" + (try keys.map { key in
                 Self.quote(key) + ":" + (try object[key]!.canonicalString())
             }.joined(separator: ",")) + "}"
