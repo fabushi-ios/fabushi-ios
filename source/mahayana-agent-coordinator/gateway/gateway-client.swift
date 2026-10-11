@@ -45,6 +45,17 @@ enum GatewayRetryPolicy {
             || method == "coordinator.mcp.servers"
             || method == "coordinator.mcp.tools"
     }
+
+    static func shouldRetry(method: String, error: Error) -> Bool {
+        guard isRetrySafe(method) else { return false }
+        if error is GatewayCommandError { return false }
+        if let error = error as? GatewayUnreachableError {
+            return GatewayReachability.isRetryableTransportKind(
+                error.transportKind
+            )
+        }
+        return GatewayReachability.classifyOutcome(error)?.retryable == true
+    }
 }
 
 private struct GatewayRequestFingerprint: Equatable {
@@ -187,7 +198,10 @@ final class CoordinatorGatewayClient {
                         requestId: normalizedRequestId
                     )
                     if attempt >= GatewayRetryPolicy.maxAttempts
-                        || !GatewayRetryPolicy.isRetrySafe(method) {
+                        || !GatewayRetryPolicy.shouldRetry(
+                            method: method,
+                            error: error
+                        ) {
                         throw error
                     }
                 }

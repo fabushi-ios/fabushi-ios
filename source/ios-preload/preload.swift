@@ -31,8 +31,9 @@ private enum IOSFeatureEventBrokerRecovery {
         guard error.code == "gateway-unreachable" else {
             return false
         }
-        return ["refused", "dns", "timeout", "network", "http_5xx", "connect"]
-            .contains(error.transportKind ?? "")
+        return GatewayReachability.isRetryableTransportKind(
+            error.transportKind ?? ""
+        )
     }
 
     static func delayMilliseconds(attempt: Int) -> Int {

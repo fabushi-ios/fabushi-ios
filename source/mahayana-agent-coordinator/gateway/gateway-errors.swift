@@ -29,6 +29,16 @@ enum GatewayFailureMapper {
                 transportKind: value.transportKind
             )
         }
-        return .init(code: GatewayFailureCode.transportFailed.rawValue, message: error.localizedDescription)
+        if let outcome = GatewayReachability.classifyOutcome(error) {
+            return .init(
+                code: GatewayFailureCode.unreachable.rawValue,
+                message: error.localizedDescription,
+                transportKind: outcome.transportKind
+            )
+        }
+        return .init(
+            code: GatewayFailureCode.transportFailed.rawValue,
+            message: error.localizedDescription
+        )
     }
 }

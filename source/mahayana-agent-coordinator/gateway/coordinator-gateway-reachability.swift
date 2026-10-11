@@ -14,6 +14,44 @@ struct GatewayReachabilityReport: Equatable, Sendable {
     let causeSummary: String?
 }
 
+enum GatewayReachabilityOutcome: Equatable, Sendable {
+    case reachable
+    case noStorage
+    case boxBlocked
+    case accessDenied
+    case refused
+    case dns
+    case timeout
+    case network
+    case http(Int)
+
+    var retryable: Bool {
+        switch self {
+        case .refused, .dns, .timeout, .network:
+            return true
+        case .http(let status):
+            return (500...599).contains(status)
+        default:
+            return false
+        }
+    }
+
+    var transportKind: String {
+        switch self {
+        case .reachable: return "reachable"
+        case .noStorage: return "no_storage"
+        case .boxBlocked: return "box_blocked"
+        case .accessDenied: return "access_denied"
+        case .refused: return "refused"
+        case .dns: return "dns"
+        case .timeout: return "timeout"
+        case .network: return "network"
+        case .http(let status):
+            return (500...599).contains(status) ? "http_5xx" : "network"
+        }
+    }
+}
+
 enum GatewayReachability {
     static func classifyBaseURL(_ url: URL) -> GatewayReachabilityKind {
         guard let host = url.host?.lowercased() else { return .unknown }
@@ -21,20 +59,36 @@ enum GatewayReachability {
         return .remote
     }
 
+    static func outcome(forHTTPStatus status: Int) -> GatewayReachabilityOutcome? {
+        if status >= 500 { return .http(status) }
+        if status == 401 || status == 403 { return .accessDenied }
+        return nil
+    }
+
+    static func classifyOutcome(_ error: Error) -> GatewayReachabilityOutcome? {
+        guard let error = error as? URLError else { return nil }
+        switch error.code {
+        case .notConnectedToInternet, .networkConnectionLost:
+            return .network
+        case .timedOut:
+            return .timeout
+        case .cannotFindHost, .dnsLookupFailed:
+            return .dns
+        case .cannotConnectToHost:
+            return .refused
+        default:
+            return .network
+        }
+    }
+
+    static func isRetryableTransportKind(_ transportKind: String) -> Bool {
+        ["refused", "dns", "timeout", "network", "http_5xx"]
+            .contains(transportKind)
+    }
+
     static func classify(_ error: Error) -> (outcome: String, cause: String) {
-        if let error = error as? URLError {
-            switch error.code {
-            case .notConnectedToInternet, .networkConnectionLost:
-                return ("network", error.localizedDescription)
-            case .timedOut:
-                return ("timeout", error.localizedDescription)
-            case .cannotFindHost, .dnsLookupFailed:
-                return ("dns", error.localizedDescription)
-            case .cannotConnectToHost:
-                return ("connect", error.localizedDescription)
-            default:
-                return ("transport", error.localizedDescription)
-            }
+        if let outcome = classifyOutcome(error) {
+            return (outcome.transportKind, error.localizedDescription)
         }
         return ("transport", error.localizedDescription)
     }

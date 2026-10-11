@@ -206,6 +206,139 @@ final class GatewayParityTests: XCTestCase {
         XCTAssertEqual(tracker.emitted.map(\.requestId), ["r1", "r4"])
     }
 
+    func testGatewayReachabilityMatchesDesktopRetryClasses() {
+        XCTAssertEqual(
+            GatewayReachability.classifyBaseURL(
+                URL(string: "https://localhost/fabushi")!
+            ),
+            .loopback
+        )
+        XCTAssertEqual(
+            GatewayReachability.classifyBaseURL(
+                URL(string: "https://gateway.example")!
+            ),
+            .remote
+        )
+        XCTAssertEqual(
+            GatewayReachability.outcome(forHTTPStatus: 503),
+            .http(503)
+        )
+        XCTAssertTrue(
+            GatewayReachability.outcome(forHTTPStatus: 503)?.retryable == true
+        )
+        XCTAssertEqual(
+            GatewayReachability.outcome(forHTTPStatus: 403),
+            .accessDenied
+        )
+        XCTAssertFalse(
+            GatewayReachability.outcome(forHTTPStatus: 403)?.retryable == true
+        )
+
+        let timeout = GatewayReachability.classifyOutcome(
+            URLError(.timedOut)
+        )
+        XCTAssertEqual(timeout, .timeout)
+        XCTAssertTrue(timeout?.retryable == true)
+
+        let refused = GatewayReachability.classifyOutcome(
+            URLError(.cannotConnectToHost)
+        )
+        XCTAssertEqual(refused, .refused)
+        XCTAssertTrue(refused?.retryable == true)
+    }
+
+    func testGatewayFailureMapperPreservesReachabilityTransportKind() {
+        let timeout = GatewayFailureMapper.failure(
+            for: URLError(.timedOut)
+        )
+        XCTAssertEqual(timeout.code, GatewayFailureCode.unreachable.rawValue)
+        XCTAssertEqual(timeout.transportKind, "timeout")
+
+        let denied = GatewayFailureMapper.failure(
+            for: GatewayUnreachableError(
+                transportKind: "access_denied",
+                message: "denied"
+            )
+        )
+        XCTAssertEqual(denied.code, GatewayFailureCode.unreachable.rawValue)
+        XCTAssertEqual(denied.transportKind, "access_denied")
+    }
+
+    func testGatewayClientDoesNotRetryCommandErrorOnReadSafeMethod() async {
+        var attempts = 0
+        let supervisor = CoordinatorHostSupervisor(
+            resolveConnection: {
+                .init(
+                    baseURL: URL(string: "https://gateway.example")!,
+                    headers: [:]
+                )
+            },
+            healthProbe: { _ in true }
+        )
+        let client = CoordinatorGatewayClient(
+            supervisor: supervisor,
+            tracedTransport: { _, _, _, _ in
+                attempts += 1
+                throw GatewayCommandError(message: "invalid command")
+            }
+        )
+
+        do {
+            _ = try await client.dispatchCommand(
+                requestId: "command-error",
+                method: "getState",
+                args: .object([:])
+            )
+            XCTFail("command errors must not be retried")
+        } catch is GatewayCommandError {
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        XCTAssertEqual(attempts, 1)
+    }
+
+    func testGatewayClientRejectsEndpointDriftBeforeSecondTransportAttempt() async {
+        var resolves = 0
+        var transports = 0
+        let supervisor = CoordinatorHostSupervisor(
+            resolveConnection: {
+                resolves += 1
+                let host = resolves == 1 ? "old.example" : "new.example"
+                return .init(
+                    baseURL: URL(string: "https://\(host)")!,
+                    headers: [:]
+                )
+            },
+            healthProbe: { _ in false }
+        )
+        let client = CoordinatorGatewayClient(
+            supervisor: supervisor,
+            tracedTransport: { _, _, _, _ in
+                transports += 1
+                throw GatewayUnreachableError(
+                    transportKind: "network",
+                    message: "drop"
+                )
+            }
+        )
+
+        do {
+            _ = try await client.dispatchCommand(
+                requestId: "endpoint-drift",
+                method: "getState",
+                args: .object([:])
+            )
+            XCTFail("retry must reject a changed Gateway endpoint")
+        } catch let error as GatewayUnreachableError {
+            XCTAssertEqual(error.transportKind, "coordinator")
+            XCTAssertTrue(error.localizedDescription.contains("endpoint changed"))
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        XCTAssertEqual(resolves, 2)
+        XCTAssertEqual(transports, 1)
+    }
+
     func testFeatureReceiveProjectsCanonicalGatewayEventFamilyAndDropsUnknownChannel() async throws {
         let host = GatewayEventHost(envelope: [
             "channel": "workflows",
