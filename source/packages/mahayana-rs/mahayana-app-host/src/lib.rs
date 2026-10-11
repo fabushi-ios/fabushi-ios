@@ -2456,12 +2456,41 @@ impl AppHost {
             key_id: approval.key_id.clone(),
             public_key,
         });
+        let transaction_path = account
+            .root
+            .join(".local-drafts")
+            .join(format!("{}.json", approval.transaction_id));
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
             .install_fabapp_bytes_with_commit_guard(&package, &trust, || {
-                self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
+                if !self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
                     scope == account.scope && generation == account.generation
+                }) {
+                    return false;
+                }
+                let latest_approval = std::fs::read(&approval_path)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<LocalFabappHostApproval>(&bytes).ok());
+                let latest_transaction = std::fs::read(&transaction_path)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<LocalFabappDraftTransaction>(&bytes).ok());
+                latest_approval.is_some_and(|current| {
+                    current.schema_version == 1
+                        && current.state == "approved"
+                        && current.account_scope == account.scope
+                        && current.account_generation == account.generation
+                        && current.user_approval_id == approval.user_approval_id
+                        && current.transaction_id == approval.transaction_id
+                        && current.draft_digest == approval.draft_digest
+                }) && latest_transaction.is_some_and(|current| {
+                    current.schema_version == 1
+                        && current.state == "approved"
+                        && current.account_scope == account.scope
+                        && current.account_generation == account.generation
+                        && current.transaction_id == approval.transaction_id
+                        && current.approval_id.as_deref() == Some(approval.user_approval_id.as_str())
+                        && current.draft_digest.as_deref() == Some(approval.draft_digest.as_str())
                 })
             })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -2469,10 +2498,6 @@ impl AppHost {
 
         approval.state = "consumed".into();
         atomic_write_json(&approval_path, &approval)?;
-        let transaction_path = account
-            .root
-            .join(".local-drafts")
-            .join(format!("{}.json", approval.transaction_id));
         if let Ok(bytes) = std::fs::read(&transaction_path) {
             if let Ok(mut transaction) =
                 serde_json::from_slice::<LocalFabappDraftTransaction>(&bytes)
