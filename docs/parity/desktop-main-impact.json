@@ -1930,6 +1930,18 @@
         "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
         "status": "current-main-reviewed-runtime-lifecycle-wired-aggregate-telemetry-still-mapped",
         "finding": "Shipping transport emits exited/relaunched telemetry with exit class, uptime, relaunch sequence, delay and generation using the Desktop healthy-window/backoff policy. Broader reachability/rebuild/reconciliation/agents-unreachable sink parity is still open, so the row remains mapped."
+      },
+      {
+        "path": "source/electron-main/experiments/experiments-ipc.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-experiments-ipc-implemented-pending-exact-head",
+        "finding": "Desktop experiment IPC registration/change broadcast is replaced by the existing typed iOS Coordinator request/event boundary. Shipping MahayanaCoordinator exposes snapshot sync, override command and refresh routes and emits experiments-changed from the canonical SandExperimentService subscription. Focused service/Host transport tests exist; descendant exact-head CI remains required."
+      },
+      {
+        "path": "source/electron-main/experiments/experiments-runtime.ts",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-shipping-experiments-runtime-implemented-pending-exact-head",
+        "finding": "Audit found and repaired real shipping gaps: native cache-only composition now starts authenticated Statsig polling, auth-revision stale-result fencing, exact Anysphere membership refresh, account-transition dev-override wipe, account-scoped Host override projection, snapshot changed emission and shipping diagnostics. IOSCursorAuthService remains the only auth owner; Rust FeatureHost stores only the bounded per-account override projection. Exact-head architecture/rust-host/Swift/protected evidence remains pending."
       }
     ]
   },
