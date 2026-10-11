@@ -5783,11 +5783,40 @@ final class MarketplaceModel {
         pluginId == GlobalDharmaMiniAppBridge.globalDharmaId
     }
 
+    nonisolated static func protectedMiniAppCapability(
+        pluginId: String,
+        toolName: String
+    ) -> String? {
+        guard pluginId == GlobalDharmaMiniAppBridge.globalDharmaId,
+              toolName == GlobalDharmaCommerceModel.capability
+        else { return nil }
+        return GlobalDharmaCommerceModel.capability
+    }
+
     func callActiveWebMcpTool(
         pluginId: String,
         name: String,
         arguments: [String: Any]
     ) async throws -> Any {
+        if Self.requiresActiveLocalWebMcpSession(pluginId: pluginId) {
+            guard activeWebMcpTools(pluginId: pluginId)?.contains(where: { $0.name == name }) == true else {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Global Dharma requires the requested tool to be registered by the active local page"
+                )
+            }
+            if Self.protectedMiniAppCapability(pluginId: pluginId, toolName: name) != nil {
+                // The protected boundary is Host-owned and fresh. Free tools
+                // never enter this path and therefore never preflight network
+                // entitlement.
+                await globalDharmaCommerce.refresh()
+                guard globalDharmaCommerce.accessAllowed else {
+                    throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                        globalDharmaCommerce.message
+                    )
+                }
+            }
+        }
+
         if let invocation = try await ActiveMiniAppWebMcpSessionRegistry.shared.callIfActive(
             accountKey: settingsNoticeAccountKey,
             pluginId: pluginId,
