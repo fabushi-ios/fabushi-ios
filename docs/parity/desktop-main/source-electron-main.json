@@ -1611,13 +1611,13 @@
       "desktop_owner": "Electron Main Marketplace SDK edge; Mahayana Host remains plugin-skills lifecycle owner.",
       "desktop_visible_effect": "Enabled installed plugin skills become runnable Host workflows without moving lifecycle ownership into Electron; private Git access failures remain explicit instead of silently dropping a skill.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "ios_language": "Swift / Rust",
       "ios_platform_delta": "iOS does not clone Marketplace repositories into a Desktop plugins cache. It uses the canonical Marketplace catalog/effective-plugin clients, requires an immutable GitHub blob source that matches the normalized 40-hex version, fetches bounded Markdown, then synchronizes the snapshot into the single Rust Host owner.",
       "implementation_status": "implemented",
       "production_evidence": "Production Marketplace Yours is a shipping caller: ContentView+ChatMarketplace invokes MarketplaceModel.refreshPrivateSkills() from its task/tab lifecycle and explicit refresh control. refreshPrivateSkills() first requests coordinator.skill.pluginFactsSync, whose Coordinator handler refreshes effective plugins/catalog state and calls feature.workflow.pluginSkillsSync into the single Rust Host owner, then reads workflow.list. The Coordinator still preserves immutable plugin/version identity, publisher/team facts, account-generation fencing and bounded Skill materialization.",
       "test_evidence": "MarketplaceModelLifecycleTests.testMarketplaceYoursShippingSurfaceRefreshesAuthoritativePluginSkillsBeforeHostWorkflowList source-contracts the shipping UI -> MarketplaceModel -> Coordinator -> Rust Host refresh path and ordering. Existing Swift/Rust focused tests cover immutable source/version validation, stale account fencing, Host snapshot/cache limits, read-only mutation refusal and installed plugin workflow execution. Fresh exact-head GitHub Actions are required before verified promotion.",
-      "notes": "IOS-MAIN-MCP-SKILLS-20261012: full current-main source responsibility and ordinary shipping caller reachability are closed. Keep implemented until the final exact-head focused/full Actions gates pass; do not promote to verified from predecessor runs.",
+      "notes": "IOS-MAIN-MCP-SKILLS-20261012: full current-main source responsibility and ordinary shipping caller reachability are closed. Keep implemented until the final exact-head focused/full Actions gates pass; do not promote to verified from predecessor runs. Validator ownership note: ios_target_path names the primary concrete shipping source; secondary canonical owners remain documented in production_evidence/ios_platform_delta.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
@@ -1703,13 +1703,13 @@
       "desktop_owner": "Electron Main avatar/media edge",
       "desktop_visible_effect": "Users can select or generate a valid bounded avatar, crop/reposition it, save it through the canonical Bot/Group owner, and reject invalid/oversized image sources.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "ios_target_path": "frontend/src/production/MobileAvatarEditor.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "PhotosPicker/UIKit replace Electron dialogs/nativeImage/Chromium decode. iOS normalizes directly to the 1024 crop-source bound; native presentation replaces Electron image context menus.",
       "implementation_status": "implemented",
       "production_evidence": "MobileAvatarEditorSheet is a production bot/group editor surface and calls GrokMobileBotService.updateAgentAvatar on canonical Host-owned state. AvatarImagePolicy enforces 25 MiB input, 1024 source bound, 1x-5x crop/pan and 256x256 PNG export. Generated avatars use generateAgentAvatarImage then the same normalization. Account/agent/reconnect and operation generation fence stale results.",
       "test_evidence": "AvatarEditorParityTests pins source limits, crop, shape/color catalogs, canonical bot/group update commands, avatar projection and scope fencing. Exact-head GitHub Actions required before verified.",
-      "notes": "IOS-MAIN-MEDIA-20261012: exact Desktop current-main responsibility reviewed; Electron-specific clipboard/context-menu mechanics use native iOS replacements.",
+      "notes": "IOS-MAIN-MEDIA-20261012: exact Desktop current-main responsibility reviewed; Electron-specific clipboard/context-menu mechanics use native iOS replacements. Validator ownership note: ios_target_path names the primary concrete shipping source; secondary canonical owners remain documented in production_evidence/ios_platform_delta.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
@@ -1719,13 +1719,13 @@
       "desktop_owner": "Electron Main media protocol edge",
       "desktop_visible_effect": "Large remote video/audio attachments seek and play without downloading the whole blob, ranges clamp to resource bounds, and invalid/out-of-range requests fail safely.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/MediaViewer.swift; mobile/ios/Fabushi/VoicePlaybackController.swift; mobile/ios/Fabushi/MessagingModel.swift",
+      "ios_target_path": "mobile/ios/Fabushi/MediaViewer.swift",
       "ios_language": "Swift / AVFoundation",
       "ios_platform_delta": "AVAssetResourceLoader replaces the Electron sand-media protocol. iOS maps AVFoundation offsets to the same bounded 4 MiB canonical messaging blob reads.",
       "implementation_status": "implemented",
       "production_evidence": "Production MediaViewer creates NativeMessagingBlobAssetLoader + AVPlayer for video; VoicePlaybackController uses the same loader for voice/audio. It calls canonical blob.read with offset/length, clamps bounds, supports read-to-end, and cancels outstanding requests on teardown. Viewer/player generation fences stale results.",
       "test_evidence": "MediaViewerParityTests pins the 4 MiB chunk, currentOffset, end clamping, read-to-end and out-of-range behavior. Exact-head Swift/UI Actions required before verified.",
-      "notes": "IOS-MAIN-MEDIA-20261012: promoted only after confirming actual MediaViewer and VoicePlaybackController production callers.",
+      "notes": "IOS-MAIN-MEDIA-20261012: promoted only after confirming actual MediaViewer and VoicePlaybackController production callers. Validator ownership note: ios_target_path names the primary concrete shipping source; secondary canonical owners remain documented in production_evidence/ios_platform_delta.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
