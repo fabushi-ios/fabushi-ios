@@ -331,26 +331,9 @@ final class FabushiRuntime {
         appVersionPolicyState = retained == nil ? .loading : .ready(retained!)
         appVersionPolicyTask = Task { [weak self] in
             guard let self else { return }
-            guard let metadata = IOSReleaseMetadataReader.read() else {
-                self.appVersionPolicyState = .failed(
-                    message: IOSAppStoreUpdateService.ServiceError.releaseMetadataUnavailable.localizedDescription,
-                    retained: retained
-                )
-                return
-            }
-            do {
-                let policy = try await IOSAppVersionPolicyClient.fetch(metadata: metadata)
-                guard !Task.isCancelled else { return }
-                self.appVersionPolicyState = .ready(policy)
-            } catch is CancellationError {
-                return
-            } catch {
-                guard !Task.isCancelled else { return }
-                self.appVersionPolicyState = .failed(
-                    message: error.localizedDescription,
-                    retained: retained
-                )
-            }
+            let next = await self.main.refreshAppVersionPolicy()
+            guard !Task.isCancelled else { return }
+            self.appVersionPolicyState = next
         }
     }
 

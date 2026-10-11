@@ -8,6 +8,24 @@ final class IOSUpdateServiceWiring {
         self.service = service
     }
 
+    var policyLoadState: IOSAppVersionPolicyLoadState {
+        service.policyLoadState
+    }
+
+    func refreshPolicy() async -> IOSAppVersionPolicyLoadState {
+        do {
+            _ = try await service.checkForUpdates()
+            return service.policyLoadState
+        } catch is CancellationError {
+            return service.policyLoadState
+        } catch {
+            return .failed(
+                message: error.localizedDescription,
+                retained: service.policyLoadState.policy
+            )
+        }
+    }
+
     func route(
         method: String,
         args: CoordinatorPayload

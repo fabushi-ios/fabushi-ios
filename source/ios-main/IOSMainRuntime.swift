@@ -306,6 +306,10 @@ final class IOSMainRuntime {
         )
     }
 
+    func refreshAppVersionPolicy() async -> IOSAppVersionPolicyLoadState {
+        await updateWiring.refreshPolicy()
+    }
+
     private func dispatchTransport(
         requestId: String,
         method: String,

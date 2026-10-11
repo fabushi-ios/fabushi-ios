@@ -20,6 +20,7 @@ final class IOSAppStoreUpdateService {
     private let metadataProvider: @MainActor () -> IOSReleaseMetadata?
     private let policyFetcher: PolicyFetcher
     private(set) var policyLoadState: IOSAppVersionPolicyLoadState = .idle
+    private var refreshGeneration: UInt64 = 0
 
     init(
         metadataProvider: @escaping @MainActor () -> IOSReleaseMetadata? = {
@@ -119,19 +120,27 @@ final class IOSAppStoreUpdateService {
         guard let metadata = metadataProvider() else {
             throw ServiceError.releaseMetadataUnavailable
         }
+        refreshGeneration = refreshGeneration == UInt64.max ? 1 : refreshGeneration + 1
+        let generation = refreshGeneration
         let retained = policyLoadState.policy
         policyLoadState = .loading
         do {
             let policy = try await policyFetcher(metadata)
-            policyLoadState = .ready(policy)
+            if generation == refreshGeneration {
+                policyLoadState = .ready(policy)
+            }
         } catch is CancellationError {
-            policyLoadState = retained.map { .ready($0) } ?? .idle
+            if generation == refreshGeneration {
+                policyLoadState = retained.map { .ready($0) } ?? .idle
+            }
             throw CancellationError()
         } catch {
-            policyLoadState = .failed(
-                message: error.localizedDescription,
-                retained: retained
-            )
+            if generation == refreshGeneration {
+                policyLoadState = .failed(
+                    message: error.localizedDescription,
+                    retained: retained
+                )
+            }
         }
         return try statusPayload()
     }

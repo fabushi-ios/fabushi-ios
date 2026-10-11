@@ -111,6 +111,37 @@ final class UpdateParityTests: XCTestCase {
         XCTAssertEqual(lastCheck["errorMessage"] as? String, "offline")
     }
 
+    func testOverlappingChecksFenceStalePolicyResults() async throws {
+        let expectedMetadata = metadata()
+        let olderPolicy = policy(latestVersion: "1.2.66", latestBuildNumber: 35)
+        let newerPolicy = policy(latestVersion: "1.2.67", latestBuildNumber: 36)
+        var continuations: [CheckedContinuation<IOSAppVersionPolicy, Error>] = []
+        let service = IOSAppStoreUpdateService(
+            metadataProvider: { expectedMetadata },
+            policyFetcher: { _ in
+                try await withCheckedThrowingContinuation { continuation in
+                    continuations.append(continuation)
+                }
+            }
+        )
+
+        let first = Task { try await service.checkForUpdates() }
+        while continuations.count < 1 { await Task.yield() }
+        let second = Task { try await service.checkForUpdates() }
+        while continuations.count < 2 { await Task.yield() }
+
+        continuations[1].resume(returning: newerPolicy)
+        _ = try await second.value
+        continuations[0].resume(returning: olderPolicy)
+        _ = try await first.value
+
+        guard case .ready(let authoritative) = service.policyLoadState else {
+            return XCTFail("newest refresh must remain authoritative")
+        }
+        XCTAssertEqual(authoritative.latestVersion, "1.2.67")
+        XCTAssertEqual(authoritative.latestBuildNumber, 36)
+    }
+
     func testPolicyDecoderRejectsOptionalForceMismatch() throws {
         let payload: [String: Any] = [
             "enabled": true,
