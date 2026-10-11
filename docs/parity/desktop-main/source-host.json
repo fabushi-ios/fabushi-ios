@@ -14,14 +14,15 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/Cargo.toml",
       "ios_language": "Rust / Cargo",
       "ios_platform_delta": "iOS owns a different native Mahayana Host graph: mahayana-feature-host already depends directly on fabushi-messaging-core, and the Mahayana workspace reqwest dependency already enables multipart. No Desktop source/host crate copy is required.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/Cargo.toml declares fabushi-messaging-core.workspace=true; source/packages/mahayana-rs/Cargo.toml declares fabushi-messaging-core and reqwest 0.12 with blocking/json/multipart/rustls-tls.",
-      "test_evidence": "iOS rust-host GitHub Actions exercise the mobile-embedded Mahayana graph; exact-head evidence pending.",
-      "notes": "IOS-MAIN-HOST-DEPS-001: re-audited against Desktop 3bc92400 exact delta ef90c6e7... -> 1f9c61e6.... Dependency capability is present in the iOS-owned graph; keep mapped/current-main-fenced until aggregate review and same-head Actions close.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/Cargo.toml directly declares fabushi-messaging-core.workspace=true in the shipping FeatureHost graph. source/packages/mahayana-rs/Cargo.toml maps fabushi-messaging-core to the repository-owned mahayana-messaging crate and declares reqwest 0.12 with blocking/json/multipart/rustls-tls, so both canonical durable messaging and multipart-capable transport are present in the iOS-owned Host composition.",
+      "test_evidence": "The mobile-embedded FeatureHost and messaging crates are exercised by the required rust-host GitHub Actions; focused Human-handoff messaging contracts now exercise fabushi-messaging-core from the same graph. Verification remains pending descendant exact-head Actions.",
+      "notes": "IOS-MAIN-HOST-DEPS-001 re-audited against Desktop current main 371b72f1 / blob 1f9c61e6. This is a platform-adapted dependency composition, not a byte-for-byte Cargo copy: iOS preserves the product capabilities in its repository-owned embedded graph. Marked implemented only; exact-head verification and aggregate dependency closure remain pending.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/host/app/Cargo.toml",
