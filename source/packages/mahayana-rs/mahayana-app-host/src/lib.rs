@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::io::Read as _;
+use std::io::{Read as _, Seek as _, SeekFrom};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -1110,6 +1110,7 @@ impl AppHost {
             "feature.plugin.active" => self.active_plugin(params),
             "feature.plugin.listInstalled" => self.list_installed_plugins(),
             "feature.plugin.uiDocument" => self.plugin_ui_document(params),
+            "feature.plugin.uiResource" => self.plugin_ui_resource(params),
             "feature.messaging.execute" => self.feature_messaging_execute(params),
             "feature.messaging.blob.read" => self.feature_messaging_blob_read(params),
             "feature.messaging.access.issue" => self.feature_messaging_access_issue(params),
@@ -1687,8 +1688,10 @@ impl AppHost {
         serde_json::to_value(report).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
-    fn plugin_ui_document(&self, params: Value) -> Result<Value, AppHostError> {
-        let plugin_id = string_param(&params, "pluginId")?;
+    fn active_plugin_ui_root(
+        &self,
+        plugin_id: &str,
+    ) -> Result<(InstalledPluginPointer, PathBuf), AppHostError> {
         let pointer = self
             .installer()?
             .active(plugin_id)
@@ -1698,11 +1701,20 @@ impl AppHost {
             })?;
         let root = std::fs::canonicalize(&pointer.installed_path)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        Ok((pointer, root))
+    }
+
+    fn plugin_ui_entry(
+        &self,
+        plugin_id: &str,
+        pointer: &InstalledPluginPointer,
+        root: &Path,
+    ) -> Result<String, AppHostError> {
         let requested_entry = pointer
             .entry
             .as_deref()
             .map(|value| value.trim_start_matches("./"));
-        let entry = requested_entry
+        requested_entry
             .filter(|value| value.to_ascii_lowercase().ends_with(".html"))
             .map(str::to_string)
             .or_else(|| {
@@ -1715,30 +1727,97 @@ impl AppHost {
                 AppHostError::Operation(format!(
                     "installed plugin {plugin_id} does not expose an HTML Mini App entry"
                 ))
-            })?;
-        let relative = PathBuf::from(&entry);
-        if relative.components().any(|component| {
-            matches!(
-                component,
-                std::path::Component::ParentDir
-                    | std::path::Component::RootDir
-                    | std::path::Component::Prefix(_)
-            )
-        }) {
-            return Err(AppHostError::InvalidRequest(
-                "plugin UI entry escaped installed root".into(),
-            ));
-        }
+            })
+    }
+
+    fn plugin_ui_document(&self, params: Value) -> Result<Value, AppHostError> {
+        let plugin_id = string_param(&params, "pluginId")?;
+        let (pointer, root) = self.active_plugin_ui_root(plugin_id)?;
+        let entry = self.plugin_ui_entry(plugin_id, &pointer, &root)?;
+        let relative = safe_ui_relative_path(&entry)?;
         let document = std::fs::canonicalize(root.join(relative))
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        if !document.starts_with(&root) {
+        if !document.starts_with(&root) || !document.is_file() {
             return Err(AppHostError::InvalidRequest(
                 "plugin UI entry escaped installed root".into(),
             ));
         }
         let html = std::fs::read_to_string(document)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
-        Ok(json!({"pluginId": plugin_id, "html": html}))
+        Ok(json!({
+            "pluginId": plugin_id,
+            "html": html,
+            "entry": entry,
+            "version": pointer.version,
+            "artifactSha256": pointer.artifact_sha256,
+        }))
+    }
+
+    fn plugin_ui_resource(&self, params: Value) -> Result<Value, AppHostError> {
+        let plugin_id = string_param(&params, "pluginId")?;
+        let path = string_param(&params, "path")?;
+        let (pointer, root) = self.active_plugin_ui_root(plugin_id)?;
+
+        if let Some(expected_version) = params.get("version").and_then(Value::as_str)
+            && expected_version != pointer.version
+        {
+            return Err(AppHostError::Operation(
+                "active Mini App version changed before resource read".into(),
+            ));
+        }
+        if let Some(expected_digest) = params.get("artifactSha256").and_then(Value::as_str)
+            && !expected_digest.eq_ignore_ascii_case(&pointer.artifact_sha256)
+        {
+            return Err(AppHostError::Operation(
+                "active Mini App artifact changed before resource read".into(),
+            ));
+        }
+
+        let relative = safe_ui_relative_path(path)?;
+        let resource = std::fs::canonicalize(root.join(&relative))
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        if !resource.starts_with(&root) || !resource.is_file() {
+            return Err(AppHostError::InvalidRequest(
+                "plugin UI resource escaped installed root".into(),
+            ));
+        }
+
+        let metadata = std::fs::metadata(&resource)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let total_bytes = metadata.len();
+        let offset = params.get("offset").and_then(Value::as_u64).unwrap_or(0);
+        if offset > total_bytes {
+            return Err(AppHostError::InvalidRequest(
+                "plugin UI resource offset exceeds file length".into(),
+            ));
+        }
+        let requested_length = params
+            .get("length")
+            .and_then(Value::as_u64)
+            .unwrap_or(256 * 1024)
+            .clamp(1, 1024 * 1024);
+        let read_length = requested_length.min(total_bytes.saturating_sub(offset)) as usize;
+
+        let mut file = std::fs::File::open(&resource)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        file.seek(SeekFrom::Start(offset))
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let mut bytes = vec![0_u8; read_length];
+        file.read_exact(&mut bytes)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+
+        let normalized_path = relative.to_string_lossy().replace('\\', "/");
+        Ok(json!({
+            "pluginId": plugin_id,
+            "path": normalized_path,
+            "version": pointer.version,
+            "artifactSha256": pointer.artifact_sha256,
+            "offset": offset,
+            "totalBytes": total_bytes,
+            "eof": offset.saturating_add(read_length as u64) >= total_bytes,
+            "mime": miniapp_resource_mime(&relative),
+            "dataBase64": base64::engine::general_purpose::STANDARD.encode(bytes),
+        }))
     }
 
     fn start_runtime(&self, params: Value) -> Result<Value, AppHostError> {
@@ -2045,6 +2124,52 @@ fn create_feature_host(
     .map_err(|error| {
         AppHostError::Operation(format!("feature host initialization failed: {error}"))
     })
+}
+
+fn safe_ui_relative_path(value: &str) -> Result<PathBuf, AppHostError> {
+    let value = value.trim();
+    if value.is_empty()
+        || value.starts_with('/')
+        || value.contains('\\')
+        || value.contains('\0')
+    {
+        return Err(AppHostError::InvalidRequest(
+            "plugin UI resource path is invalid".into(),
+        ));
+    }
+    let relative = PathBuf::from(value);
+    if relative.components().any(|component| {
+        !matches!(component, std::path::Component::Normal(_))
+    }) {
+        return Err(AppHostError::InvalidRequest(
+            "plugin UI resource path is invalid".into(),
+        ));
+    }
+    Ok(relative)
+}
+
+fn miniapp_resource_mime(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "html" | "htm" => "text/html",
+        "js" | "mjs" => "text/javascript",
+        "css" => "text/css",
+        "json" => "application/json",
+        "wasm" => "application/wasm",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "woff" => "font/woff",
+        "woff2" => "font/woff2",
+        "txt" => "text/plain",
+        _ => "application/octet-stream",
+    }
 }
 
 fn discover_js_entry(entry: &Option<String>, root: &Path) -> Result<PathBuf, AppHostError> {
@@ -2725,6 +2850,25 @@ mod fabushi_shipping_inference_tests {
         let html = r#"<html><head><title> Example &amp; Docs </title><meta name="description" content="A useful page"></head></html>"#;
         assert_eq!(html_tag_text(html, "title").as_deref(), Some("Example & Docs"));
         assert_eq!(html_meta_content(html, "description").as_deref(), Some("A useful page"));
+    }
+
+    #[test]
+    fn miniapp_ui_resource_paths_and_mime_fail_closed() {
+        assert_eq!(
+            safe_ui_relative_path("assets/app.js").unwrap(),
+            PathBuf::from("assets/app.js")
+        );
+        for invalid in ["", "/index.html", "../index.html", "./index.html", "a/../b", r"a\\b"] {
+            assert!(safe_ui_relative_path(invalid).is_err(), "{invalid:?}");
+        }
+        assert_eq!(
+            miniapp_resource_mime(Path::new("assets/app.wasm")),
+            "application/wasm"
+        );
+        assert_eq!(
+            miniapp_resource_mime(Path::new("assets/data.bin")),
+            "application/octet-stream"
+        );
     }
 
     #[test]
