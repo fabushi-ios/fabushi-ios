@@ -50,7 +50,7 @@ enum GlobalDharmaCommerceError: LocalizedError {
         case .monthlyOfferMismatch: return "服务端月付商品价格或权限契约与客户端安全基线不一致"
         case .lifetimeOfferMissing: return "服务端未返回本地转经轮买断商品"
         case .lifetimeOfferMismatch: return "服务端买断商品价格或权限契约与客户端安全基线不一致"
-        case .appleStoreNotConfigured: return "App Store 买断商品尚未激活，已按安全策略停止购买"
+        case .appleStoreNotConfigured: return "App Store 商品尚未激活，已按安全策略停止购买"
         case .entitlementNotGranted: return "支付已处理，但服务端尚未授予本地转经轮权限"
         case .serverRejected(let status, let message): return "服务端拒绝请求（\(status)）：\(message)"
         }
@@ -134,6 +134,7 @@ final class GlobalDharmaCommerceModel {
         } catch {
             accessAllowed = false
             accessReason = "lookup_failed"
+            monthlyOffer = nil
             lifetimeOffer = nil
             message = "权限检查失败：\(error.localizedDescription)"
         }
@@ -278,7 +279,7 @@ final class GlobalDharmaCommerceModel {
         do {
             try applyEntitlement(try await fetchEntitlement())
             if accessAllowed {
-                message = "永久权限已在当前 Fabushi 账号生效"
+                message = "本地转经轮权限已在当前 Fabushi 账号生效"
                 return
             }
 
