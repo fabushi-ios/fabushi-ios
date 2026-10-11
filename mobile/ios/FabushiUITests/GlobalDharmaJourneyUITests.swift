@@ -12,7 +12,8 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         "botVisible": false,
         "naturalLanguageSent": false,
         "webMcpReady": false,
-        "sharedRuntimeSynced": false,
+        "livePageMutationObserved": false,
+        "bidirectionalStateObserved": false,
         "purchaseTapped": false,
         "entitlementAllowed": false,
         "restoreTapped": false,
@@ -113,14 +114,60 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
         mark("botVisible", true)
         checkpoint("040-global-dharma-bot")
 
+        openApp.tap()
+        let panel = app.descendants(matching: .any)["mobile-bot-live-miniapp-panel"]
+        XCTAssertTrue(
+            panel.waitForExistence(timeout: 15),
+            "打开应用必须在同一 Bot 会话内保持 live Mini App panel，而不是卸载当前 WKWebView"
+        )
+        let surface = app.descendants(matching: .any)["miniapp-webmcp-surface"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 15), "打开应用 must present the Mini App Web UI")
+
+        let connected = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "本地 WebMCP 已连接 · 页面注册 ")
+        ).firstMatch
+        XCTAssertTrue(
+            connected.waitForExistence(timeout: 30),
+            "Host must report tools registered by the current page session"
+        )
+        XCTAssertTrue(
+            connected.label.contains("4 个实时 Tool"),
+            "Global Dharma 1.1.0 must register the four reviewed local WebMCP tools"
+        )
+        mark("webMcpReady", true)
+        checkpoint("050-live-miniapp-webmcp-ready")
+
+        let revisionPrefix = "rev "
+        let revisionLabel = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", revisionPrefix))
+            .firstMatch
+        XCTAssertTrue(
+            revisionLabel.waitForExistence(timeout: 20),
+            "The visible page must expose its real persisted revision"
+        )
+        guard let initialRevision = parseRevision(revisionLabel.label, prefix: revisionPrefix) else {
+            XCTFail("Unable to parse initial page revision: \(revisionLabel.label)")
+            return
+        }
+
         let draft = app.textFields["mobile-bot-draft"]
-        XCTAssertTrue(draft.waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            draft.waitForExistence(timeout: 8),
+            "Bot composer must remain usable while the exact same Mini App WebView stays mounted"
+        )
         draft.tap()
-        draft.typeText("请通过 WebMCP 查看当前运行状态，并把当前操作状态同步到小程序界面。")
+        draft.typeText("在全球法布施里面执行一项免费的本地操作，并让我看到结果。")
         let send = app.buttons["mobile-bot-send"]
         XCTAssertTrue(send.waitForExistence(timeout: 8))
         send.tap()
         mark("naturalLanguageSent", true)
+
+        let approval = app.alerts.buttons["允许"]
+        XCTAssertTrue(
+            approval.waitForExistence(timeout: 30),
+            "Bot mutation must require Host-owned per-tool user approval"
+        )
+        approval.tap()
 
         let stop = app.buttons["mobile-bot-stop"]
         if stop.waitForExistence(timeout: 4) {
@@ -131,45 +178,58 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             XCTAssertEqual(
                 XCTWaiter.wait(for: [finished], timeout: 90),
                 .completed,
-                "Global Dharma Bot WebMCP operation did not reach a terminal state"
+                "Global Dharma Bot local WebMCP operation did not reach a terminal state"
             )
         }
-        checkpoint("050-bot-webmcp-natural-language")
 
-        openApp.tap()
-        let surface = app.descendants(matching: .any)["miniapp-webmcp-surface"]
-        XCTAssertTrue(surface.waitForExistence(timeout: 15), "打开应用 must present the Mini App Web UI")
-
-        let connected = app.staticTexts["WebMCP 已连接"]
-        let localConnected = app.staticTexts["本地 WebMCP 已连接"]
-        let opened = app.staticTexts["WebMCP 页面已打开"]
-        XCTAssertTrue(
-            waitForAny([connected, localConnected, opened], timeout: 20),
-            "Mini App Web UI must expose a ready WebMCP bridge"
+        let botMutatedRevision = waitForRevisionGreaterThan(
+            initialRevision,
+            element: revisionLabel,
+            prefix: revisionPrefix,
+            timeout: 30
         )
-        mark("webMcpReady", true)
-        checkpoint("060-miniapp-webmcp-open")
-
-        let sharedRuntimePrefix = "Bot / Web UI 同一共享状态 · revision "
-        let sharedRuntime = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH %@", sharedRuntimePrefix))
-            .firstMatch
-        XCTAssertTrue(
-            sharedRuntime.waitForExistence(timeout: 30),
-            "Opening the Global Dharma Web UI must restore the canonical account-scoped runtime and complete the read-only WebMCP status bridge"
+        XCTAssertNotNil(
+            botMutatedRevision,
+            "Bot -> Host -> active WKWebView must mutate the visible page revision without reload"
         )
-        let revisionSuffix = sharedRuntime.label.dropFirst(sharedRuntimePrefix.count)
-        let revisionDigits = revisionSuffix.prefix(while: { $0.isNumber })
-        guard !revisionDigits.isEmpty,
-              let revision = Int(revisionDigits),
-              revision > 0
+        state["botMutationRevision"] = botMutatedRevision
+        mark("livePageMutationObserved", true)
+        checkpoint("060-bot-mutated-live-page")
+
+        let manualFreeAction = app.buttons["执行免费本地操作"]
+        XCTAssertTrue(
+            manualFreeAction.waitForExistence(timeout: 15),
+            "The current offline page must expose its real free local action"
+        )
+        manualFreeAction.tap()
+        guard let afterBot = botMutatedRevision,
+              let manualRevision = waitForRevisionGreaterThan(
+                  afterBot,
+                  element: revisionLabel,
+                  prefix: revisionPrefix,
+                  timeout: 15
+              )
         else {
-            XCTFail("Bot/Web UI synchronization must expose a positive canonical runtime revision, got: \(sharedRuntime.label)")
+            XCTFail("Manual page mutation must advance the same persisted revision")
             return
         }
-        state["sharedRuntimeRevision"] = revision
-        mark("sharedRuntimeSynced", true)
-        checkpoint("061-bot-webui-shared-runtime")
+        state["manualMutationRevision"] = manualRevision
+
+        draft.tap()
+        draft.typeText("读取刚才操作后的状态")
+        send.tap()
+        let stateReadReply = app.staticTexts["已读取全球法布施本地状态。"]
+        XCTAssertTrue(
+            stateReadReply.waitForExistence(timeout: 60),
+            "Bot must read the latest state from the active page-owned WebMCP tool after manual mutation"
+        )
+        XCTAssertEqual(
+            parseRevision(revisionLabel.label, prefix: revisionPrefix),
+            manualRevision,
+            "Read-only Bot access must not replace or regress the page-owned revision"
+        )
+        mark("bidirectionalStateObserved", true)
+        checkpoint("061-bidirectional-live-state")
 
         let allowed = app.descendants(matching: .any)["global-dharma-entitlement-allowed"]
         let buy = app.buttons["global-dharma-buy-lifetime"]
@@ -347,6 +407,34 @@ final class GlobalDharmaJourneyUITests: XCTestCase {
             object: element
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func waitForRevisionGreaterThan(
+        _ baseline: Int,
+        element: XCUIElement,
+        prefix: String,
+        timeout: TimeInterval
+    ) -> Int? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists,
+               let revision = parseRevision(element.label, prefix: prefix),
+               revision > baseline
+            {
+                return revision
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        return nil
+    }
+
+    private func parseRevision(_ label: String, prefix: String) -> Int? {
+        guard label.hasPrefix(prefix) else { return nil }
+        let suffix = label.dropFirst(prefix.count)
+        let digits = suffix.prefix(while: { $0.isNumber })
+        guard !digits.isEmpty else { return nil }
+        return Int(digits)
     }
 
     private func mark(_ key: String, _ value: Bool) {
