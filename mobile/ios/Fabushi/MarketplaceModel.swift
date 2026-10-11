@@ -5841,15 +5841,10 @@ final class MarketplaceModel {
         guard name.range(of: #"^[A-Za-z0-9_.-]{1,128}$"#, options: .regularExpression) != nil else {
             throw MahayanaCoordinator.CoordinatorError.requestFailed("Invalid WebMCP tool name")
         }
-        if pluginId == GlobalDharmaMiniAppBridge.globalDharmaId {
-            let result = try await globalDharmaBridge.callOfficialMcpTool(
-                pluginId: pluginId,
-                name: name,
-                arguments: arguments
+        if Self.requiresActiveLocalWebMcpSession(pluginId: pluginId) {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Global Dharma execution is local-session-only; hosted WebMCP fallback is disabled"
             )
-            guard name == "status" else { return result }
-            let runtime = try globalDharmaSharedRuntime()
-            return Self.bridgeGlobalDharmaStatusResult(result, runtime: runtime)
         }
         return try await callRuntimeTool(pluginId: pluginId, name: name, arguments: arguments)
     }
