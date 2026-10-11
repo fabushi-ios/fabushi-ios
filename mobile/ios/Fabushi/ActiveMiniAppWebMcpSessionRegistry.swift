@@ -1,10 +1,15 @@
 import Foundation
 
+struct MiniAppWebMcpApprovalDenied: LocalizedError {
+    var errorDescription: String? { "用户取消了 WebMCP Tool 调用" }
+}
+
 @MainActor
 final class ActiveMiniAppWebMcpSessionRegistry {
     static let shared = ActiveMiniAppWebMcpSessionRegistry()
 
     struct Invocation {
+        let callId: String
         let value: Any
     }
 
@@ -19,6 +24,22 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         let toolNames: [String]
     }
 
+    struct InvocationTrace: Equatable {
+        let sequence: UInt64
+        let callId: String
+        let accountKey: String
+        let pluginId: String
+        let version: String
+        let artifactSha256: String
+        let pluginInstanceId: String
+        let nonceIdentifier: String
+        let generation: UInt64
+        let toolName: String
+        let permissionDecision: String
+        let stateRevision: Int?
+        let outcome: String
+    }
+
     private struct Entry {
         let snapshot: Snapshot
         let tools: [String: MiniAppToolContract]
@@ -26,6 +47,8 @@ final class ActiveMiniAppWebMcpSessionRegistry {
     }
 
     private var entriesByPluginId: [String: Entry] = [:]
+    private var traceSequence: UInt64 = 0
+    private(set) var invocationTraces: [InvocationTrace] = []
 
     private init() {}
 
@@ -117,24 +140,139 @@ final class ActiveMiniAppWebMcpSessionRegistry {
     ) async throws -> Invocation? {
         guard let entry = entriesByPluginId[pluginId],
               entry.snapshot.accountKey == accountKey,
-              entry.tools[name] != nil
+              let tool = entry.tools[name]
         else { return nil }
 
+        let callId = UUID().uuidString.lowercased()
         let expectedInstanceId = entry.snapshot.pluginInstanceId
         let expectedGeneration = entry.snapshot.generation
-        let value = try await entry.invoke(name, arguments)
+        let permissionRequired = tool.approval != "none"
 
-        guard let current = entriesByPluginId[pluginId],
-              current.snapshot.accountKey == accountKey,
-              current.snapshot.pluginInstanceId == expectedInstanceId,
-              current.snapshot.generation == expectedGeneration
-        else {
+        do {
+            let value = try await entry.invoke(name, arguments)
+            let revision = Self.stateRevision(from: value)
+            guard let current = entriesByPluginId[pluginId],
+                  current.snapshot.accountKey == accountKey,
+                  current.snapshot.pluginInstanceId == expectedInstanceId,
+                  current.snapshot.generation == expectedGeneration
+            else {
+                appendTrace(
+                    entry: entry,
+                    callId: callId,
+                    toolName: name,
+                    permissionDecision: permissionRequired ? "approved" : "not-required",
+                    stateRevision: revision,
+                    outcome: "stale-session"
+                )
+                throw CancellationError()
+            }
+            appendTrace(
+                entry: entry,
+                callId: callId,
+                toolName: name,
+                permissionDecision: permissionRequired ? "approved" : "not-required",
+                stateRevision: revision,
+                outcome: "success"
+            )
+            return Invocation(callId: callId, value: value)
+        } catch is MiniAppWebMcpApprovalDenied {
+            appendTrace(
+                entry: entry,
+                callId: callId,
+                toolName: name,
+                permissionDecision: "denied",
+                stateRevision: nil,
+                outcome: "denied"
+            )
+            throw MiniAppWebMcpApprovalDenied()
+        } catch is CancellationError {
+            if invocationTraces.last?.callId != callId {
+                appendTrace(
+                    entry: entry,
+                    callId: callId,
+                    toolName: name,
+                    permissionDecision: permissionRequired ? "not-reached" : "not-required",
+                    stateRevision: nil,
+                    outcome: "cancelled"
+                )
+            }
             throw CancellationError()
+        } catch {
+            appendTrace(
+                entry: entry,
+                callId: callId,
+                toolName: name,
+                permissionDecision: permissionRequired ? "not-observed" : "not-required",
+                stateRevision: nil,
+                outcome: "failed"
+            )
+            throw error
         }
-        return Invocation(value: value)
+    }
+
+    func traces(accountKey: String, pluginId: String) -> [InvocationTrace] {
+        invocationTraces.filter {
+            $0.accountKey == accountKey && $0.pluginId == pluginId
+        }
+    }
+
+    private func appendTrace(
+        entry: Entry,
+        callId: String,
+        toolName: String,
+        permissionDecision: String,
+        stateRevision: Int?,
+        outcome: String
+    ) {
+        traceSequence = traceSequence == UInt64.max ? 1 : traceSequence + 1
+        let snapshot = entry.snapshot
+        invocationTraces.append(InvocationTrace(
+            sequence: traceSequence,
+            callId: callId,
+            accountKey: snapshot.accountKey,
+            pluginId: snapshot.pluginId,
+            version: snapshot.version,
+            artifactSha256: snapshot.artifactSha256,
+            pluginInstanceId: snapshot.pluginInstanceId,
+            nonceIdentifier: Self.nonceIdentifier(snapshot.nonce),
+            generation: snapshot.generation,
+            toolName: toolName,
+            permissionDecision: permissionDecision,
+            stateRevision: stateRevision,
+            outcome: outcome
+        ))
+        if invocationTraces.count > 256 {
+            invocationTraces.removeFirst(invocationTraces.count - 256)
+        }
+    }
+
+    private nonisolated static func nonceIdentifier(_ nonce: String) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in nonce.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return String(format: "fnv64-%016llx", hash)
+    }
+
+    private nonisolated static func stateRevision(from value: Any, depth: Int = 0) -> Int? {
+        guard depth < 5 else { return nil }
+        if let object = value as? [String: Any] {
+            if let revision = object["revision"] as? Int { return revision }
+            if let revision = object["revision"] as? NSNumber { return revision.intValue }
+            for key in ["state", "structuredContent", "runtime", "result"] {
+                if let nested = object[key],
+                   let revision = stateRevision(from: nested, depth: depth + 1) {
+                    return revision
+                }
+            }
+        }
+        return nil
     }
 
     func resetForTesting() {
         entriesByPluginId.removeAll()
+        invocationTraces.removeAll()
+        traceSequence = 0
     }
 }
