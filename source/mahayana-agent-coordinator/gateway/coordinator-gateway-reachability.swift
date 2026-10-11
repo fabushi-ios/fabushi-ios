@@ -66,6 +66,23 @@ enum GatewayReachability {
     }
 
     static func classifyOutcome(_ error: Error) -> GatewayReachabilityOutcome? {
+        let message = error.localizedDescription
+        let normalized = message.uppercased()
+        if normalized.contains("NO_STORAGE")
+            || message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
+            || message.contains(CLOUD_AGENT_STORAGE_DISABLED) {
+            return .noStorage
+        }
+        if normalized.contains("BOX_BLOCKED")
+            || normalized.contains(SAND_BOX_BLOCKED)
+            || hasSandBoxBlockedMarker(message) {
+            return .boxBlocked
+        }
+        if normalized.contains("ACCESS_DENIED")
+            || message.contains(GATEWAY_ACCESS_DENIED_MESSAGE_MARKER) {
+            return .accessDenied
+        }
+
         guard let error = error as? URLError else { return nil }
         switch error.code {
         case .notConnectedToInternet, .networkConnectionLost:

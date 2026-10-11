@@ -20,6 +20,24 @@ private final class GatewayAsyncGate {
 }
 
 @MainActor
+private final class GatewayFailureHost: MahayanaHostRequesting, @unchecked Sendable {
+    let error: Error
+    private(set) var requestCount = 0
+
+    init(error: Error) {
+        self.error = error
+    }
+
+    func request(
+        method: String,
+        params: [String: Any]
+    ) async throws -> MahayanaHostJSONResult {
+        requestCount += 1
+        throw error
+    }
+}
+
+@MainActor
 private final class GatewayEventHost: MahayanaHostRequesting, @unchecked Sendable {
     var envelope: [String: Any]
     init(envelope: [String: Any]) { self.envelope = envelope }
@@ -245,6 +263,39 @@ final class GatewayParityTests: XCTestCase {
         )
         XCTAssertEqual(refused, .refused)
         XCTAssertTrue(refused?.retryable == true)
+    }
+
+    func testGatewayShippingDispatchPreservesAccessDeniedAndDoesNotRetry() async {
+        let host = GatewayFailureHost(
+            error: NSError(
+                domain: "GatewayParityTests",
+                code: 403,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        GATEWAY_ACCESS_DENIED_MESSAGE_MARKER
+                ]
+            )
+        )
+        let supervisor = MahayanaLocalHostSupervisor(
+            host: host,
+            factory: { host }
+        )
+        let coordinator = MahayanaCoordinator(hostSupervisor: supervisor)
+
+        let outcome = await coordinator.dispatchTransport(
+            requestId: "access-denied",
+            method: "feature.receive",
+            args: .object([:])
+        )
+        guard case .failed(let failure) = outcome else {
+            return XCTFail("access denied must fail through shipping Gateway dispatch")
+        }
+        XCTAssertEqual(
+            failure.code,
+            GatewayFailureCode.unreachable.rawValue
+        )
+        XCTAssertEqual(failure.transportKind, "access_denied")
+        XCTAssertEqual(host.requestCount, 1)
     }
 
     func testGatewayFailureMapperPreservesReachabilityTransportKind() {
