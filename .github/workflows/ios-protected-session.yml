@@ -340,7 +340,13 @@ jobs:
             .removedAtEnd == true
           ' "$EVIDENCE_DIR/state.json" >/dev/null
           test -s "$EVIDENCE_DIR/webmcp-security.env"
-          grep -q '^registry_security_tests=passed            jq -e '
+          grep -q '^registry_security_tests=passed$' "$EVIDENCE_DIR/webmcp-security.env"
+          grep -q '^origin_fence_test=passed$' "$EVIDENCE_DIR/webmcp-security.env"
+          grep -q '^active_page_fence_test=passed$' "$EVIDENCE_DIR/webmcp-security.env"
+          grep -q '^protected_capability_fence_test=passed$' "$EVIDENCE_DIR/webmcp-security.env"
+          grep -q '^instance_nonce_grant_fence_test=passed$' "$EVIDENCE_DIR/webmcp-security.env"
+          if [ "${FABUSHI_E2E_REQUIRE_REAL_APPLE_COMMERCE:-0}" = "1" ]; then
+            jq -e '
               .purchaseTapped == true and
               .entitlementAllowed == true and
               .restoreTapped == true and
