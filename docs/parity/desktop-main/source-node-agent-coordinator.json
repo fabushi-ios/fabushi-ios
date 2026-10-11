@@ -122,13 +122,14 @@
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Callers receive stable failure categories instead of ambiguous transport errors.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/gateway/gateway-errors.swift; source/shared/gateway-reachability.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/gateway/gateway-errors.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Swift LocalizedError/CoordinatorFailure replaces Rust thiserror while preserving command/unreachable/transport separation.",
-      "implementation_status": "mapped",
-      "production_evidence": "GatewayCommandError, GatewayUnreachableError and GatewayFailureMapper are compiled into the shipping Coordinator source set.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift",
-      "notes": "IOS-MAIN-COORD-GW-004: reviewed Desktop blob 54f7725cdc51c2ed1d225c785375d3dcdab8e74e. Mapping is structural; end-to-end shipping error projection remains pending."
+      "implementation_status": "implemented",
+      "production_evidence": "MahayanaCoordinator.dispatchTransport is the shipping Renderer request entry and always passes Gateway-backed calls through shippingGatewayDispatcher -> GatewayRequestDispatcher -> CoordinatorGatewayClient. GatewayFailureMapper preserves GatewayCommandError as gateway-command-failed, GatewayUnreachableError as gateway-unreachable with transportKind, classifiable native reachability failures as gateway-unreachable, and only unclassified failures as gateway-transport-failed. IOSMainRuntime returns CoordinatorFailure over the live RendererPortServer and IOSCoordinatorPortClient preserves code/message/transportKind into the renderer-side PortError used by IOSFeatureEventBroker.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testGatewayFailureMapperPreservesReachabilityTransportKind; ::testGatewayClientDoesNotRetryCommandErrorOnReadSafeMethod; ::testGatewayShippingDispatchPreservesAccessDeniedAndDoesNotRetry; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift exercises real dispatchTransport shipping traffic.",
+      "notes": "IOS-MAIN-COORD-GW-004: re-read Desktop blob 54f7725cdc51c2ed1d225c785375d3dcdab8e74e at Desktop 371b72f1. Typed command/unreachable/transport separation now survives the real Coordinator -> Renderer boundary, including transportKind. Marked implemented only; exact-head CI is still required before verified.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway error projection ledger closure"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_event_families.rs",
@@ -153,13 +154,14 @@
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Reconnect policy and user-visible failure handling distinguish permanent refusals from retryable transport outages.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/gateway/coordinator-gateway-reachability.swift; source/shared/gateway-reachability.swift; source/ios-main/coordinator/desktop-connectivity.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/gateway/coordinator-gateway-reachability.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native URLSession/URLError and app lifecycle connectivity replace errno/socket-specific classification.",
-      "implementation_status": "mapped",
-      "production_evidence": "GatewayReachability and IOSConnectivity are in the shipping Xcode source graph; MahayanaCoordinator applies client-pause failure fencing.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift; mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "IOS-MAIN-COORD-GW-006: reviewed Desktop blob faa3f917969a9d6b76c94597c5dce95aea1e4c2c. Full HTTP status/system-error parity remains pending focused coverage."
+      "implementation_status": "implemented",
+      "production_evidence": "GatewayReachability classifies permanent NO_STORAGE/BOX_BLOCKED/ACCESS_DENIED markers, native URLError refused/DNS/timeout/network outcomes, HTTP 401/403 and 5xx classes, and loopback vs remote base URLs. CoordinatorGatewayClient uses the same classification to retry only read-safe retryable failures, invalidates stale health before retry, pins the endpoint across attempts and does not retry command/permanent failures. IOSFeatureEventBroker reuses the canonical retryable transport-kind policy for feature.receive recovery, so retry/no-retry behavior remains consistent through the shipping Renderer -> Coordinator -> Host -> Renderer chain.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift::testGatewayReachabilityMatchesDesktopRetryClasses; ::testGatewayFailureMapperPreservesReachabilityTransportKind; ::testGatewayShippingDispatchPreservesAccessDeniedAndDoesNotRetry; ::testGatewayClientRejectsEndpointDriftBeforeSecondTransportAttempt; mobile/ios/FabushiTests/PreloadParityTests.swift::testFeatureEventBrokerSurvivesEmptyStallAndRetryableDisconnect",
+      "notes": "IOS-MAIN-COORD-GW-006: re-read Desktop blob faa3f917969a9d6b76c94597c5dce95aea1e4c2c at Desktop 371b72f1. The native URL/Host replacement now preserves Desktop retryability and permanent refusal semantics end-to-end; raw errno/socket mechanics are platform-specific. Marked implemented only; exact-head CI is required before verified.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after Gateway reachability ledger closure"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/gateway/gateway_request_dispatcher.rs",
@@ -229,14 +231,15 @@
       "desktop_responsibility": "Incrementally buffer arbitrary SSE byte chunks and emit complete event blocks without losing partial UTF-8 data.",
       "desktop_owner": "coordinator",
       "desktop_visible_effect": "Gateway event streaming remains correct across network chunk boundaries instead of dropping or merging events.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/gateway/sse-block-decoder.swift",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/ios-preload/preload.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Swift String/Data stream parsing replaces the Rust byte buffer while preserving incremental block decoding.",
-      "implementation_status": "mapped",
-      "production_evidence": "SSEBlockDecoder is compiled into the shipping Coordinator source graph.",
-      "test_evidence": "",
-      "notes": "IOS-MAIN-COORD-GW-011: reviewed Desktop blob ffd47c5f32f05f6d47bf167ac40236d865dcc66e. Direct shipping stream consumer and split UTF-8 focused tests remain pending; keep mapped."
+      "ios_platform_delta": "The iOS shipping runtime does not consume a raw localhost SSE byte stream. IOSFeatureEventBroker replaces the long-lived socket with repeated typed feature.receive requests over the canonical Coordinator port: an empty request timeout starts a fresh poll, retryable disconnects use bounded reconnect backoff, permanent failures settle current waiters and allow a later waiter to restart, and cancellation of the last waiter cancels the pump. SSEBlockDecoder remains a compatibility/regression parser rather than a claimed shipping transport owner.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-main/FabushiRuntime.swift installs IOSPrimaryPreloadEntrypoint in the production composition root. source/ios-preload/preload.swift constructs IOSFeatureEventBroker and calls feature.receive through IOSCoordinatorPortClient; source/ios-main/IOSMainRuntime.swift serves that typed port; MahayanaCoordinator.dispatchTransport routes feature.receive through shippingGatewayDispatcher -> CoordinatorGatewayClient -> the canonical Mahayana Host request owner. There is no raw byte framing in this shipping path, so partial-frame/partial-UTF8 transport corruption is eliminated by the typed payload boundary. source/mahayana-agent-coordinator/gateway/sse-block-decoder.swift is retained only for compatible SSE parsing surfaces.",
+      "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift::testSSEDecoderPreservesPartialFrameAndSplitUTF8; ::testFeatureEventBrokerSurvivesEmptyStallAndRetryableDisconnect; ::testFeatureEventBrokerPermanentFailureRestartsForNextWaiter; ::testFeatureEventBrokerCancellationFencesLateReceive; ::testAppSurfacesDoNotBypassCanonicalFeatureEventBroker",
+      "notes": "IOS-MAIN-COORD-GW-011: re-read Desktop blob ffd47c5f32f05f6d47bf167ac40236d865dcc66e at Desktop 371b72f1. Raw SSE framing is not part of the iOS shipping topology; the native replacement owner is the canonical FeatureHost receive broker. The replacement now covers repeated empty-poll stall recovery, bounded retryable reconnect, permanent-error restart, last-waiter cancellation fencing, plus a compatibility decoder regression for split frames/UTF-8. Keep implemented until the post-ledger exact-head Actions finish.",
+      "exact_head_evidence": "pending exact-head GitHub Actions after SSE replacement ledger closure"
     },
     {
       "desktop_path": "source/node-agent-coordinator/src/inference_router.rs",
