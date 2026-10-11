@@ -2025,19 +2025,27 @@ final class MarketplaceModel {
         let accountScope = accountScope.trimmingCharacters(in: .whitespacesAndNewlines)
         let pluginId = pluginId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !accountScope.isEmpty, !pluginId.isEmpty else { return nil }
-        let digest = SHA256.hash(
-            data: Data("fabushi.miniapp.web-profile.v1\u{0}\(accountScope)\u{0}\(pluginId)".utf8)
-        )
-        let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+        let profileSeed =
+            "fabushi.miniapp.web-profile.v1\u{0}\(accountScope)\u{0}\(pluginId)"
+        let digest = SHA256.hash(data: Data(profileSeed.utf8))
+        let prefixBytes = Array(digest.prefix(16))
+        guard prefixBytes.count == 16 else { return nil }
+
+        var hex = ""
+        hex.reserveCapacity(32)
+        for byte in prefixBytes {
+            if byte < 0x10 { hex.append("0") }
+            hex.append(String(byte, radix: 16))
+        }
         guard hex.count == 32 else { return nil }
-        let uuid = [
-            String(hex.prefix(8)),
-            String(hex.dropFirst(8).prefix(4)),
-            String(hex.dropFirst(12).prefix(4)),
-            String(hex.dropFirst(16).prefix(4)),
-            String(hex.dropFirst(20).prefix(12)),
-        ].joined(separator: "-")
-        return UUID(uuidString: uuid)
+
+        let group1 = String(hex.prefix(8))
+        let group2 = String(hex.dropFirst(8).prefix(4))
+        let group3 = String(hex.dropFirst(12).prefix(4))
+        let group4 = String(hex.dropFirst(16).prefix(4))
+        let group5 = String(hex.dropFirst(20).prefix(12))
+        let uuidString = "\(group1)-\(group2)-\(group3)-\(group4)-\(group5)"
+        return UUID(uuidString: uuidString)
     }
 
     func miniAppWebsiteDataStoreIdentifier(pluginId: String) -> UUID? {
@@ -5326,7 +5334,7 @@ final class MarketplaceModel {
         }
     }
 
-    static func canonicalGeneratedMiniAppArtifactPath(_ raw: String) -> String? {
+    nonisolated static func canonicalGeneratedMiniAppArtifactPath(_ raw: String) -> String? {
         let path = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowered = path.lowercased()
         guard !path.isEmpty,

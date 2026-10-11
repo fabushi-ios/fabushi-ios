@@ -3192,9 +3192,17 @@ mod tests {
                 value: String::new(),
             },
         };
-        let draft = compute_fabapp_draft_digest(&manifest).unwrap();
+        sign_local_fabapp_manifest(signing, &mut manifest);
+        manifest
+    }
+
+    fn sign_local_fabapp_manifest(
+        signing: &ed25519_dalek::SigningKey,
+        manifest: &mut FabappManifest,
+    ) {
+        let draft = compute_fabapp_draft_digest(manifest).unwrap();
         manifest.local_author.as_mut().unwrap().draft_digest = draft;
-        let mut unsigned = serde_json::to_value(&manifest).unwrap();
+        let mut unsigned = serde_json::to_value(&*manifest).unwrap();
         unsigned.as_object_mut().unwrap().remove("signature");
         let canonical = jcs_canonicalize(&unsigned).unwrap();
         let mut message = FABAPP_SIGNATURE_DOMAIN.to_vec();
@@ -3203,7 +3211,6 @@ mod tests {
         let signature = signing.sign(&message);
         manifest.signature.value =
             base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature.to_bytes());
-        manifest
     }
 
     fn fabapp_zip(manifest: &FabappManifest, files: &[(&str, &[u8])]) -> Vec<u8> {
@@ -3373,6 +3380,146 @@ mod tests {
             ),
             Err(RuntimeError::FabappApprovalReplay)
         ));
+    }
+
+    #[test]
+    fn fabapp_install_survives_cold_installer_recreation() {
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[13_u8; 32]);
+        let scope = format!("{:x}", Sha256::digest(b"account-cold-relaunch"));
+        let html = b"<h1>cold relaunch</h1>";
+        let manifest = local_fabapp_manifest(
+            &signing,
+            &scope,
+            "private.fabushi.cold-relaunch",
+            "approval-cold",
+            "transaction-cold",
+            &[("index.html", html, "text/html")],
+        );
+        let trust = local_trust(&signing, &manifest);
+        let package = fabapp_zip(&manifest, &[("index.html", html)]);
+        let root = tempfile::tempdir().unwrap();
+
+        let pointer = PluginInstaller::new(root.path())
+            .unwrap()
+            .install_fabapp_bytes(
+                &package,
+                &FabappTrustContext::LocalGenerated(trust),
+            )
+            .unwrap();
+
+        let relaunched = PluginInstaller::new(root.path()).unwrap();
+        assert_eq!(
+            relaunched.active(&manifest.app_id).unwrap(),
+            Some(pointer.clone())
+        );
+        assert_eq!(
+            fs::read(Path::new(&pointer.installed_path).join("index.html")).unwrap(),
+            html
+        );
+    }
+
+    #[test]
+    fn fabapp_install_recovers_interrupted_staging_before_next_install() {
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[14_u8; 32]);
+        let scope = format!("{:x}", Sha256::digest(b"account-recovery"));
+        let html = b"<h1>recovered</h1>";
+        let manifest = local_fabapp_manifest(
+            &signing,
+            &scope,
+            "private.fabushi.recovery",
+            "approval-recovery",
+            "transaction-recovery",
+            &[("index.html", html, "text/html")],
+        );
+        let trust = local_trust(&signing, &manifest);
+        let package = fabapp_zip(&manifest, &[("index.html", html)]);
+        let root = tempfile::tempdir().unwrap();
+        let plugin_root = root.path().join(&manifest.app_id);
+        let stale_relative = ".fabapp-staging/interrupted";
+        let stale_staging = plugin_root.join(stale_relative);
+        fs::create_dir_all(&stale_staging).unwrap();
+        fs::write(stale_staging.join("partial.bin"), b"partial").unwrap();
+        runtime_atomic_write_json(
+            &plugin_root.join("install-journal.json"),
+            &FabappInstallJournal {
+                schema_version: 1,
+                transaction_id: "interrupted-transaction".into(),
+                package_sha256: "0".repeat(64),
+                state: "staged".into(),
+                staging_relative: Some(stale_relative.into()),
+            },
+        )
+        .unwrap();
+
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let pointer = installer
+            .install_fabapp_bytes(
+                &package,
+                &FabappTrustContext::LocalGenerated(trust),
+            )
+            .unwrap();
+
+        assert!(!stale_staging.exists());
+        assert_eq!(installer.active(&manifest.app_id).unwrap(), Some(pointer));
+        let journal: FabappInstallJournal = serde_json::from_slice(
+            &fs::read(plugin_root.join("install-journal.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(journal.state, "completed");
+        assert!(journal.staging_relative.is_none());
+    }
+
+    #[test]
+    fn fabapp_local_generated_upgrade_keeps_previous_and_rolls_back() {
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[15_u8; 32]);
+        let scope = format!("{:x}", Sha256::digest(b"account-upgrade"));
+        let app_id = "private.fabushi.upgrade";
+        let html_v1 = b"<h1>v1</h1>";
+        let manifest_v1 = local_fabapp_manifest(
+            &signing,
+            &scope,
+            app_id,
+            "approval-v1",
+            "transaction-v1",
+            &[("index.html", html_v1, "text/html")],
+        );
+        let package_v1 = fabapp_zip(&manifest_v1, &[("index.html", html_v1)]);
+        let trust_v1 = local_trust(&signing, &manifest_v1);
+
+        let html_v2 = b"<h1>v2</h1>";
+        let mut manifest_v2 = local_fabapp_manifest(
+            &signing,
+            &scope,
+            app_id,
+            "approval-v2",
+            "transaction-v2",
+            &[("index.html", html_v2, "text/html")],
+        );
+        manifest_v2.version = "2.0.0".into();
+        sign_local_fabapp_manifest(&signing, &mut manifest_v2);
+        let package_v2 = fabapp_zip(&manifest_v2, &[("index.html", html_v2)]);
+        let trust_v2 = local_trust(&signing, &manifest_v2);
+
+        let root = tempfile::tempdir().unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let pointer_v1 = installer
+            .install_fabapp_bytes(
+                &package_v1,
+                &FabappTrustContext::LocalGenerated(trust_v1),
+            )
+            .unwrap();
+        let pointer_v2 = installer
+            .install_fabapp_bytes(
+                &package_v2,
+                &FabappTrustContext::LocalGenerated(trust_v2),
+            )
+            .unwrap();
+        assert_eq!(pointer_v2.version, "2.0.0");
+        assert_eq!(installer.active(app_id).unwrap(), Some(pointer_v2));
+
+        let rolled_back = installer.rollback(app_id).unwrap().unwrap();
+        assert_eq!(rolled_back, pointer_v1);
+        assert_eq!(installer.active(app_id).unwrap(), Some(pointer_v1));
     }
 
     #[test]

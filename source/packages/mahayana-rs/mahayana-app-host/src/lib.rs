@@ -196,6 +196,31 @@ struct LocalFabappHostApproval {
     state: String,
 }
 
+fn local_fabapp_commit_records_match(
+    account: &PluginAccountContext,
+    expected_approval: &LocalFabappHostApproval,
+    current_approval: Option<&LocalFabappHostApproval>,
+    current_transaction: Option<&LocalFabappDraftTransaction>,
+) -> bool {
+    current_approval.is_some_and(|current| {
+        current.schema_version == 1
+            && current.state == "approved"
+            && current.account_scope == account.scope
+            && current.account_generation == account.generation
+            && current.user_approval_id == expected_approval.user_approval_id
+            && current.transaction_id == expected_approval.transaction_id
+            && current.draft_digest == expected_approval.draft_digest
+    }) && current_transaction.is_some_and(|current| {
+        current.schema_version == 1
+            && current.state == "approved"
+            && current.account_scope == account.scope
+            && current.account_generation == account.generation
+            && current.transaction_id == expected_approval.transaction_id
+            && current.approval_id.as_deref() == Some(expected_approval.user_approval_id.as_str())
+            && current.draft_digest.as_deref() == Some(expected_approval.draft_digest.as_str())
+    })
+}
+
 pub struct AppHost {
     app_data_dir: PathBuf,
     feature_mode: AppHostFeatureMode,
@@ -2475,23 +2500,12 @@ impl AppHost {
                 let latest_transaction = std::fs::read(&transaction_path)
                     .ok()
                     .and_then(|bytes| serde_json::from_slice::<LocalFabappDraftTransaction>(&bytes).ok());
-                latest_approval.is_some_and(|current| {
-                    current.schema_version == 1
-                        && current.state == "approved"
-                        && current.account_scope == account.scope
-                        && current.account_generation == account.generation
-                        && current.user_approval_id == approval.user_approval_id
-                        && current.transaction_id == approval.transaction_id
-                        && current.draft_digest == approval.draft_digest
-                }) && latest_transaction.is_some_and(|current| {
-                    current.schema_version == 1
-                        && current.state == "approved"
-                        && current.account_scope == account.scope
-                        && current.account_generation == account.generation
-                        && current.transaction_id == approval.transaction_id
-                        && current.approval_id.as_deref() == Some(approval.user_approval_id.as_str())
-                        && current.draft_digest.as_deref() == Some(approval.draft_digest.as_str())
-                })
+                local_fabapp_commit_records_match(
+                    &account,
+                    &approval,
+                    latest_approval.as_ref(),
+                    latest_transaction.as_ref(),
+                )
             })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
@@ -4063,6 +4077,84 @@ mod fabushi_shipping_inference_tests {
         assert!(strict_lower_hex_digest(&"B".repeat(64), "digest").is_err());
         assert!(strict_ascii_identifier("local-author.v1", "keyId").is_ok());
         assert!(strict_ascii_identifier("../../key", "keyId").is_err());
+    }
+
+    #[test]
+    fn local_fabapp_commit_records_fail_closed_after_cancel_or_stale_generation() {
+        let account = PluginAccountContext {
+            scope: "a".repeat(64),
+            generation: "b".repeat(64),
+            root: PathBuf::new(),
+        };
+        let approval = LocalFabappHostApproval {
+            schema_version: 1,
+            account_scope: account.scope.clone(),
+            account_generation: account.generation.clone(),
+            transaction_id: "transaction-1".into(),
+            reserved_app_id: "private.fabushi.generated-test".into(),
+            publisher_id: "local.fabushi".into(),
+            draft_digest: "c".repeat(64),
+            user_approval_id: "approval-1".into(),
+            key_id: "local-author.v1".into(),
+            public_key_sha256: "d".repeat(64),
+            state: "approved".into(),
+        };
+        let transaction = LocalFabappDraftTransaction {
+            schema_version: 1,
+            account_scope: account.scope.clone(),
+            account_generation: account.generation.clone(),
+            transaction_id: approval.transaction_id.clone(),
+            reserved_app_id: approval.reserved_app_id.clone(),
+            publisher_id: approval.publisher_id.clone(),
+            state: "approved".into(),
+            draft_digest: Some(approval.draft_digest.clone()),
+            approval_id: Some(approval.user_approval_id.clone()),
+        };
+
+        assert!(local_fabapp_commit_records_match(
+            &account,
+            &approval,
+            Some(&approval),
+            Some(&transaction),
+        ));
+
+        let mut cancelled_approval = approval.clone();
+        cancelled_approval.state = "cancelled".into();
+        assert!(!local_fabapp_commit_records_match(
+            &account,
+            &approval,
+            Some(&cancelled_approval),
+            Some(&transaction),
+        ));
+
+        let mut cancelled_transaction = transaction.clone();
+        cancelled_transaction.state = "cancelled".into();
+        assert!(!local_fabapp_commit_records_match(
+            &account,
+            &approval,
+            Some(&approval),
+            Some(&cancelled_transaction),
+        ));
+
+        let stale_account = PluginAccountContext {
+            generation: "e".repeat(64),
+            ..account.clone()
+        };
+        assert!(!local_fabapp_commit_records_match(
+            &stale_account,
+            &approval,
+            Some(&approval),
+            Some(&transaction),
+        ));
+
+        let mut stale_digest = transaction.clone();
+        stale_digest.draft_digest = Some("f".repeat(64));
+        assert!(!local_fabapp_commit_records_match(
+            &account,
+            &approval,
+            Some(&approval),
+            Some(&stale_digest),
+        ));
     }
 
     #[test]
