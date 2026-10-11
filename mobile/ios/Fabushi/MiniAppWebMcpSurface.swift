@@ -583,7 +583,7 @@ private struct MiniAppToolCommandPanel: View {
         defer { running = false }
         do {
             let payload = arguments.mapValues { $0.jsonObject }
-            _ = try await model.callWebMcpTool(
+            _ = try await model.callActiveWebMcpTool(
                 pluginId: plugin.pluginId,
                 name: tool.name,
                 arguments: payload
