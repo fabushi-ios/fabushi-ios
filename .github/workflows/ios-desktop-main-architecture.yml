@@ -175,9 +175,17 @@ jobs:
             -only-testing:FabushiTests/MarketplaceModelLifecycleTests \
             -only-testing:FabushiTests/SharedMarketplaceClientParityTests \
             -only-testing:FabushiTests/SharedMcpOAuthLifecycleParityTests \
+            -only-testing:FabushiTests/SharedMcpAuthWatchLifecycleParityTests \
+            -only-testing:FabushiTests/SharedMcpAccountLifecycleParityTests \
+            -only-testing:FabushiTests/SharedMcpManagerParityTests \
             -only-testing:FabushiTests/SharedMcpToolsDiscoveryParityTests \
             -only-testing:FabushiTests/CoordinatorMcpSurfaceTests \
+            -only-testing:FabushiTests/ActiveMiniAppWebMcpSessionRegistryTests \
+            -only-testing:FabushiTests/GlobalDharmaMiniAppParityTests \
             -only-testing:FabushiTests/OfflineMiniAppPackageVerifierTests \
+            -only-testing:FabushiTests/SharedWorkflowModelParityTests \
+            -only-testing:FabushiTests/SharedAccountMcpParityTests \
+            -only-testing:FabushiTests/FabushiAppAgentSurfaceTests \
             CODE_SIGNING_ALLOWED=NO
 
       - name: UI tests
