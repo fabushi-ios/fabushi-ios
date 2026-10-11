@@ -4079,6 +4079,121 @@ mod tests {
     }
 
     #[test]
+    fn catalog_fabapp_release_uses_strict_verifier_before_activation() {
+        let signing = ed25519_dalek::SigningKey::from_bytes(&[41_u8; 32]);
+        let html = b"<html><body>Global Dharma offline</body></html>";
+        let capabilities = vec!["offline.state.read".to_string()];
+        let mut manifest = FabappManifest {
+            manifest_version: 1,
+            package_class: Some(FabappPackageClass::Catalog),
+            app_id: "global-dharma".into(),
+            publisher_id: "fabushi-official".into(),
+            version: "1.1.0".into(),
+            display_name: "Global Dharma".into(),
+            entrypoint: "index.html".into(),
+            runtime: "web".into(),
+            min_host_api: FABAPP_HOST_API_V1,
+            offline_core: true,
+            requested_capabilities: capabilities.clone(),
+            network_policy: FabappNetworkPolicy {
+                mode: "deny".into(),
+                allowed_origins: Vec::new(),
+            },
+            files: BTreeMap::from([(
+                "index.html".into(),
+                FabappFileRecord {
+                    sha256: format!("{:x}", Sha256::digest(html)),
+                    bytes: html.len() as u64,
+                    mime: "text/html".into(),
+                },
+            )]),
+            local_author: None,
+            signature: FabappSignature {
+                algorithm: "Ed25519".into(),
+                key_id: "catalog-key".into(),
+                value: String::new(),
+            },
+        };
+        manifest.signature.value = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(signing.sign(&fabapp_signing_payload(&manifest).unwrap()).to_bytes());
+        let package = fabapp_zip(&manifest, &[("index.html", html)]);
+        let digest = format!("{:x}", Sha256::digest(&package));
+        let artifact = ReleaseArtifact {
+            id: "global-dharma-fabapp".into(),
+            runtime: "local-web".into(),
+            platforms: vec!["ios".into(), "mobile".into()],
+            source: ArtifactSource::Https {
+                url: "https://github.com/example/global-dharma/releases/download/v1.1.0/global-dharma-1.1.0.fabapp".into(),
+            },
+            sha256: digest.clone(),
+            size: package.len() as u64,
+            format: ArtifactFormat::Zip,
+            entry: Some("index.html".into()),
+        };
+        let binding = CatalogFabappTrustBinding {
+            publisher_id: "fabushi-official".into(),
+            app_id: "global-dharma".into(),
+            artifact_id: artifact.id.clone(),
+            key_id: "catalog-key".into(),
+            raw_public_key_base64_url: base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .encode(signing.verifying_key().to_bytes()),
+        };
+        let release = ExternalReleaseManifest {
+            schema_version: 1,
+            protocol: "mahayana.external-release.v1".into(),
+            plugin_id: "global-dharma".into(),
+            version: "1.1.0".into(),
+            permissions: capabilities,
+            artifacts: vec![artifact.clone()],
+            fabapp_trust: Some(binding.clone()),
+            install: None,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let installer = PluginInstaller::new(root.path()).unwrap();
+        let pointer = installer
+            .install_verified_bytes(&release, &artifact, &package)
+            .unwrap();
+        assert_eq!(pointer.plugin_id, "global-dharma");
+        assert_eq!(pointer.version, "1.1.0");
+        assert_eq!(pointer.artifact_sha256, digest);
+        assert!(pointer.artifact_id.starts_with("fabapp-"));
+        assert!(Path::new(&pointer.installed_path).join("index.html").is_file());
+
+        let mismatch_root = tempfile::tempdir().unwrap();
+        let mismatch_installer = PluginInstaller::new(mismatch_root.path()).unwrap();
+        let mut mismatched_release = release.clone();
+        mismatched_release.version = "1.1.1".into();
+        assert!(matches!(
+            mismatch_installer.install_verified_bytes(
+                &mismatched_release,
+                &artifact,
+                &package
+            ),
+            Err(RuntimeError::InvalidRelease(_))
+        ));
+        assert!(!mismatch_root.path().join("global-dharma").exists());
+
+        let wrong_key_root = tempfile::tempdir().unwrap();
+        let wrong_key_installer = PluginInstaller::new(wrong_key_root.path()).unwrap();
+        let wrong_signing = ed25519_dalek::SigningKey::from_bytes(&[42_u8; 32]);
+        let mut wrong_key_release = release.clone();
+        wrong_key_release.fabapp_trust = Some(CatalogFabappTrustBinding {
+            raw_public_key_base64_url: base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .encode(wrong_signing.verifying_key().to_bytes()),
+            ..binding
+        });
+        assert!(matches!(
+            wrong_key_installer.install_verified_bytes(
+                &wrong_key_release,
+                &artifact,
+                &package
+            ),
+            Err(RuntimeError::FabappSignature)
+        ));
+        assert!(!wrong_key_root.path().join("global-dharma").exists());
+    }
+
+    #[test]
     fn identical_plugin_ids_are_fully_isolated_across_account_roots() {
         fn release(version: &str, artifact: &ReleaseArtifact) -> ExternalReleaseManifest {
             ExternalReleaseManifest {
