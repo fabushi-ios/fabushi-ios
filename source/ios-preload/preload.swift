@@ -253,7 +253,7 @@ final class IOSFeatureEventBroker {
 }
 
 @MainActor
-final class IOSPreloadBridge {
+final class IOSPreloadBridge: IOSRPCEdgeTransport {
     struct JSONResult: @unchecked Sendable {
         let value: Any
     }
@@ -407,12 +407,68 @@ final class IOSPreloadBridge {
         )
     }
 
+    func invoke(
+        channel: String,
+        payload: CoordinatorPayload
+    ) async throws -> IOSEdgeReplyEnvelope {
+        guard let method = IOSRPCEdgeRuntime.methodName(
+            edge: IOSMainRPCRuntime.contractName,
+            channel: channel
+        ) else {
+            throw IOSEdgeReplyFailure(
+                code: IOSRPCEdgeRuntime.unknownMethodCode,
+                detail: "Unsupported iOS RPC edge channel: \(channel)"
+            )
+        }
+
+        do {
+            return .ok(try await client.request(method: method, args: payload))
+        } catch let error as IOSCoordinatorPortClient.PortError {
+            switch error.code {
+            case "port-not-ready", "port-settled":
+                throw error
+            default:
+                return .failed(IOSEdgeReplyFailure(
+                    code: error.code,
+                    detail: error.message
+                ))
+            }
+        }
+    }
+
+    func subscribe(
+        channel: String,
+        listener: @escaping @MainActor (CoordinatorPayload) -> Void
+    ) -> () -> Void {
+        guard let event = IOSRPCEdgeRuntime.eventName(
+            edge: IOSMainRPCRuntime.contractName,
+            channel: channel
+        ) else {
+            return {}
+        }
+
+        let observerID = addRendererEventObserver { family, payload in
+            guard family == event else { return }
+            listener(payload)
+        }
+        return { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.removeRendererEventObserver(observerID)
+            }
+        }
+    }
+
     private func requestPayload(
         method: String,
         params: [String: Any] = [:]
     ) async throws -> CoordinatorPayload {
         let payload = try CoordinatorPayload.fromFoundation(params)
-        return try await client.request(method: method, args: payload)
+        return try await IOSRPCEdgeRuntime.call(
+            edge: IOSMainRPCRuntime.contractName,
+            method: method,
+            payload: payload,
+            transport: self
+        )
     }
 
     func request(method: String, params: [String: Any] = [:]) async throws -> JSONResult {

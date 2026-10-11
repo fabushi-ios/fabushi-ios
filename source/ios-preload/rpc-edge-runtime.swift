@@ -33,6 +33,33 @@ enum IOSRPCEdgeRuntime {
         "sand-rpc:\(edge):e:\(event)"
     }
 
+    static func methodName(edge: String, channel: String) -> String? {
+        let prefix = "sand-rpc:\(edge):m:"
+        guard channel.hasPrefix(prefix) else { return nil }
+        let method = String(channel.dropFirst(prefix.count))
+        return method.isEmpty ? nil : method
+    }
+
+    static func eventName(edge: String, channel: String) -> String? {
+        let prefix = "sand-rpc:\(edge):e:"
+        guard channel.hasPrefix(prefix) else { return nil }
+        let event = String(channel.dropFirst(prefix.count))
+        return event.isEmpty ? nil : event
+    }
+
+    @MainActor
+    static func subscribe(
+        edge: String,
+        event: String,
+        transport: any IOSRPCEdgeTransport,
+        listener: @escaping @MainActor (CoordinatorPayload) -> Void
+    ) -> () -> Void {
+        transport.subscribe(
+            channel: eventChannel(edge: edge, event: event),
+            listener: listener
+        )
+    }
+
     @MainActor
     static func call(
         edge: String,
@@ -46,6 +73,8 @@ enum IOSRPCEdgeRuntime {
                 channel: methodChannel(edge: edge, method: method),
                 payload: payload
             )
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw IOSEdgeReplyFailure(
                 code: unknownMethodCode,

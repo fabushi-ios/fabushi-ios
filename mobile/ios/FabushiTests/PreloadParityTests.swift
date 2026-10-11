@@ -607,5 +607,124 @@ final class PreloadParityTests: XCTestCase {
         let runtime = IOSVNCPreloadEntrypoint.install()
         XCTAssertTrue(runtime.updateViewerVisibility(true))
         XCTAssertTrue(runtime.viewerIsVisible)
+    }    
+    @MainActor
+    func testRpcEdgeRuntimeUsesDesktopChannelsEnvelopesAndNativeCancellation() async throws {
+        let transport = RecordingRPCEdgeTransport()
+        transport.nextReply = .ok(.string("ok"))
+
+        let value = try await IOSRPCEdgeRuntime.call(
+            edge: IOSMainRPCRuntime.contractName,
+            method: "getLinkMetadata",
+            payload: .object(["url": .string("https://example.com")]),
+            transport: transport
+        )
+        XCTAssertEqual(value, .string("ok"))
+        XCTAssertEqual(
+            transport.invokedChannels,
+            ["sand-rpc:main:m:getLinkMetadata"]
+        )
+        XCTAssertEqual(
+            IOSRPCEdgeRuntime.methodName(
+                edge: "main",
+                channel: "sand-rpc:main:m:getUiPreferences"
+            ),
+            "getUiPreferences"
+        )
+        XCTAssertEqual(
+            IOSRPCEdgeRuntime.eventName(
+                edge: "main",
+                channel: "sand-rpc:main:e:deep-link"
+            ),
+            "deep-link"
+        )
+
+        transport.nextReply = .failed(.init(
+            code: "handler/failed",
+            detail: "deterministic"
+        ))
+        do {
+            _ = try await IOSRPCEdgeRuntime.call(
+                edge: "main",
+                method: "getUiPreferences",
+                payload: .object([:]),
+                transport: transport
+            )
+            XCTFail("expected edge handler failure")
+        } catch let error as IOSEdgeReplyFailure {
+            XCTAssertEqual(error.code, "handler/failed")
+            XCTAssertEqual(error.detail, "deterministic")
+        }
+
+        transport.nextError = CancellationError()
+        do {
+            _ = try await IOSRPCEdgeRuntime.call(
+                edge: "main",
+                method: "getUiPreferences",
+                payload: .object([:]),
+                transport: transport
+            )
+            XCTFail("expected native cancellation")
+        } catch is CancellationError {
+        }
+    }
+
+    func testPrimaryPreloadShippingRequestsTraverseRpcEdgeRuntime() throws {
+        let file = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = file
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let preloadSource = try String(
+            contentsOf: repositoryRoot
+                .appendingPathComponent("source/ios-preload/preload.swift"),
+            encoding: .utf8
+        )
+        let requestStart = try XCTUnwrap(
+            preloadSource.range(of: "private func requestPayload(")
+        )
+        let requestTail = String(preloadSource[requestStart.lowerBound...])
+        let requestEnd = requestTail.range(of: "\n    func request(")
+        let requestBody = requestEnd.map {
+            String(requestTail[..<$0.lowerBound])
+        } ?? requestTail
+
+        XCTAssertTrue(requestBody.contains("IOSRPCEdgeRuntime.call("))
+        XCTAssertTrue(requestBody.contains("transport: self"))
+        XCTAssertFalse(
+            requestBody.contains("return try await client.request("),
+            "shipping requestPayload must not bypass the canonical RPC edge runtime"
+        )
+    }
+
+}
+
+
+@MainActor
+private final class RecordingRPCEdgeTransport: IOSRPCEdgeTransport {
+    private(set) var invokedChannels: [String] = []
+    private(set) var subscribedChannels: [String] = []
+    var nextReply: IOSEdgeReplyEnvelope = .ok(.object([:]))
+    var nextError: Error?
+
+    func invoke(
+        channel: String,
+        payload: CoordinatorPayload
+    ) async throws -> IOSEdgeReplyEnvelope {
+        invokedChannels.append(channel)
+        if let nextError {
+            self.nextError = nil
+            throw nextError
+        }
+        return nextReply
+    }
+
+    func subscribe(
+        channel: String,
+        listener: @escaping @MainActor (CoordinatorPayload) -> Void
+    ) -> () -> Void {
+        subscribedChannels.append(channel)
+        return {}
     }
 }
