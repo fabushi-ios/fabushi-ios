@@ -107,6 +107,47 @@ final class IOSCoordinatorArchitectureTests: XCTestCase {
     }
 
     @MainActor
+    func testShippingCoordinatorRecoveryBackoffGenerationAndDisposal() {
+        var now = 1_000
+        let recovery = IOSCoordinatorTransportRecoveryController(
+            nowMilliseconds: { now }
+        )
+        XCTAssertEqual(recovery.generation, 1)
+
+        now = 1_100
+        let first = recovery.unexpectedFailure(.portClosed)
+        XCTAssertEqual(first?.generation, 2)
+        XCTAssertEqual(first?.relaunchSequence, 1)
+        XCTAssertEqual(first?.exitClass, .other)
+        XCTAssertEqual(first?.uptimeMilliseconds, 100)
+        XCTAssertEqual(first?.delayMilliseconds, 250)
+        XCTAssertTrue(recovery.didRelaunch(generation: 2))
+
+        now = 1_200
+        let second = recovery.unexpectedFailure(.protocolBreach)
+        XCTAssertEqual(second?.generation, 3)
+        XCTAssertEqual(second?.relaunchSequence, 2)
+        XCTAssertEqual(second?.exitClass, .breach)
+        XCTAssertEqual(second?.delayMilliseconds, 500)
+        XCTAssertTrue(recovery.didRelaunch(generation: 3))
+
+        now += CoordinatorTelemetry.healthyUptimeMilliseconds + 1
+        let afterHealthy = recovery.unexpectedFailure(.portClosed)
+        XCTAssertEqual(afterHealthy?.delayMilliseconds, 250)
+
+        let intentional = recovery.beginIntentionalRestart()
+        XCTAssertNotNil(intentional)
+        XCTAssertEqual(intentional?.generation, recovery.generation)
+        XCTAssertTrue(recovery.didRelaunch(generation: recovery.generation))
+
+        let stale = recovery.generation
+        recovery.dispose()
+        XCTAssertFalse(recovery.shouldRelaunch(generation: stale))
+        XCTAssertNil(recovery.unexpectedFailure(.portClosed))
+        XCTAssertNil(recovery.beginIntentionalRestart())
+    }
+
+    @MainActor
     func testIOSConnectivityTracksRecentResume() {
         var now = Date(timeIntervalSince1970: 100)
         let connectivity = IOSConnectivity(now: { now }, isOnline: { true })

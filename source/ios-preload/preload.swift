@@ -260,29 +260,29 @@ final class IOSPreloadBridge {
 
     typealias RendererEventObserver = @MainActor (_ family: String, _ payload: CoordinatorPayload) -> Void
 
-    private let server: RendererPortServer
-    private let client: IOSCoordinatorPortClient
+    private struct Transport {
+        let server: RendererPortServer
+        let client: IOSCoordinatorPortClient
+    }
+
+    private let main: IOSMainRuntime
+    private var server: RendererPortServer
+    private var client: IOSCoordinatorPortClient
+    private let transportRecovery: IOSCoordinatorTransportRecoveryController
+    private var transportRecoveryTask: Task<Void, Never>?
+    private var disposed = false
     private var featureEventBroker: IOSFeatureEventBroker?
     private var rendererEventObservers: [UUID: RendererEventObserver] = [:]
     private var bufferedRendererEvents: [(String, CoordinatorPayload)] = []
     private let rendererEventBufferLimit = 256
 
     init(main: IOSMainRuntime) {
-        let pair = InProcessCoordinatorPort.makePair(bootstrap: main.coordinatorBootstrap)
-        let server = main.makeRendererPortServer(port: pair.server)
-
-        pair.server.onFrame = { [weak server] frame in
-            server?.receive(frame)
-        }
-        pair.server.onClose = { [weak server] in
-            server?.portClosed()
-        }
-
-        self.server = server
-        client = IOSCoordinatorPortClient(port: pair.client)
-        client.setEventHandler { [weak self] family, payload in
-            self?.routeRendererEvent(family: family, payload: payload)
-        }
+        self.main = main
+        transportRecovery = IOSCoordinatorTransportRecoveryController()
+        let transport = Self.makeTransport(main: main)
+        server = transport.server
+        client = transport.client
+        bindCurrentTransport()
         featureEventBroker = IOSFeatureEventBroker { [weak self] timeoutMilliseconds in
             guard let self else { throw CancellationError() }
             let result = try await self.requestPayload(
@@ -292,6 +292,119 @@ final class IOSPreloadBridge {
             guard case .object = result else { return nil }
             return result
         }
+    }
+
+    private static func makeTransport(main: IOSMainRuntime) -> Transport {
+        let pair = InProcessCoordinatorPort.makePair(bootstrap: main.coordinatorBootstrap)
+        let server = main.makeRendererPortServer(port: pair.server)
+        pair.server.onFrame = { [weak server] frame in server?.receive(frame) }
+        pair.server.onClose = { [weak server] in server?.portClosed() }
+        return Transport(server: server, client: IOSCoordinatorPortClient(port: pair.client))
+    }
+
+    private func bindCurrentTransport() {
+        let boundClient = client
+        let boundGeneration = transportRecovery.generation
+        boundClient.setEventHandler { [weak self, weak boundClient] family, payload in
+            guard
+                let self,
+                let boundClient,
+                self.client === boundClient,
+                self.transportRecovery.generation == boundGeneration
+            else { return }
+            self.routeRendererEvent(family: family, payload: payload)
+        }
+        boundClient.setSettlementHandler { [weak self, weak boundClient] settlement in
+            guard
+                let self,
+                let boundClient,
+                self.client === boundClient,
+                self.transportRecovery.generation == boundGeneration
+            else { return }
+            self.transportSettled(settlement)
+        }
+    }
+
+    private func transportSettled(_ settlement: IOSCoordinatorPortClient.Settlement) {
+        guard !disposed else { return }
+        let failure: IOSCoordinatorTransportFailure
+        switch settlement {
+        case .shutdownRequested:
+            return
+        case .portClosed:
+            failure = .portClosed
+        case .protocolBreach:
+            failure = .protocolBreach
+        }
+        guard let plan = transportRecovery.unexpectedFailure(failure) else { return }
+
+        main.lifecycleReporter.report(
+            .coordinatorHandoff,
+            level: plan.uptimeMilliseconds < CoordinatorTelemetry.healthyUptimeMilliseconds ? .error : .warn,
+            metadata: [
+                "outcome": "exited",
+                "exit_class": plan.exitClass.rawValue,
+                "uptime_ms": String(plan.uptimeMilliseconds),
+                "relaunch_seq": String(plan.relaunchSequence),
+                "generation": String(plan.generation),
+            ]
+        )
+
+        transportRecoveryTask?.cancel()
+        transportRecoveryTask = Task { @MainActor [weak self] in
+            do {
+                try await Task<Never, Never>.sleep(
+                    nanoseconds: UInt64(plan.delayMilliseconds) * 1_000_000
+                )
+            } catch {
+                return
+            }
+            guard
+                let self,
+                !Task.isCancelled,
+                self.transportRecovery.shouldRelaunch(generation: plan.generation)
+            else { return }
+            self.installFreshTransport(generation: plan.generation)
+            guard self.transportRecovery.didRelaunch(generation: plan.generation) else { return }
+            self.main.lifecycleReporter.report(
+                .coordinatorHandoff,
+                metadata: [
+                    "outcome": "relaunched",
+                    "delay_ms": String(plan.delayMilliseconds),
+                    "relaunch_seq": String(plan.relaunchSequence),
+                    "generation": String(plan.generation),
+                ]
+            )
+        }
+    }
+
+    private func installFreshTransport(generation: UInt64) {
+        guard !disposed, transportRecovery.shouldRelaunch(generation: generation) else { return }
+        let transport = Self.makeTransport(main: main)
+        server = transport.server
+        client = transport.client
+        bindCurrentTransport()
+    }
+
+    func restartTransport(reason: String) {
+        guard !disposed, let restart = transportRecovery.beginIntentionalRestart() else { return }
+        transportRecoveryTask?.cancel()
+        transportRecoveryTask = nil
+        let retiring = client
+        retiring.setSettlementHandler(nil)
+        retiring.shutdown()
+        installFreshTransport(generation: restart.generation)
+        guard transportRecovery.didRelaunch(generation: restart.generation) else { return }
+        main.lifecycleReporter.report(
+            .coordinatorHandoff,
+            metadata: [
+                "outcome": "relaunched",
+                "delay_ms": "0",
+                "relaunch_seq": String(restart.relaunchSequence),
+                "generation": String(restart.generation),
+                "reason": reason,
+            ]
+        )
     }
 
     private func requestPayload(
@@ -358,10 +471,16 @@ final class IOSPreloadBridge {
     }
 
     func shutdown() {
+        guard !disposed else { return }
+        disposed = true
+        transportRecoveryTask?.cancel()
+        transportRecoveryTask = nil
+        transportRecovery.dispose()
         featureEventBroker?.dispose()
         featureEventBroker = nil
         rendererEventObservers.removeAll()
         bufferedRendererEvents.removeAll()
+        client.setSettlementHandler(nil)
         client.shutdown()
     }
 }

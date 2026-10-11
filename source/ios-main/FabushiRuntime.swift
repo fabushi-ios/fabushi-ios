@@ -364,6 +364,7 @@ final class FabushiRuntime {
             return
         }
         resumeTask?.cancel()
+        bridge.restartTransport(reason: "user-retry")
         let task = Task { [weak self] in
             guard let self else { return }
             await self.resyncAfterLifecycleRecovery(reason: "user-retry")

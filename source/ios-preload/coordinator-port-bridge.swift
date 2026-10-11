@@ -31,6 +31,7 @@ final class IOSCoordinatorPortClient {
     private var pending: [String: CheckedContinuation<CoordinatorPayload, Error>] = [:]
     private var nextRequestID = 0
     private var eventHandler: ((String, CoordinatorPayload) -> Void)?
+    private var settlementHandler: ((Settlement) -> Void)?
 
     private(set) var readyObserved = false
     private(set) var settlement: Settlement?
@@ -77,14 +78,19 @@ final class IOSCoordinatorPortClient {
         eventHandler = handler
     }
 
+    func setSettlementHandler(_ handler: ((Settlement) -> Void)?) {
+        settlementHandler = handler
+        if let settlement {
+            settlementHandler = nil
+            handler?(settlement)
+        }
+    }
+
     func shutdown() {
-        guard settlement == nil else { return }
-        // Pin the local settlement before notifying the peer. In-process
-        // transports can synchronously close the peer during post(), and that
-        // close must not overwrite an intentional shutdown as portClosed.
-        settlement = .shutdownRequested
-        port.post(.shutdown(reason: .requested, detail: nil))
-        finishSettlement()
+        commitSettlement(
+            .shutdownRequested,
+            peerNotification: .shutdown(reason: .requested, detail: nil)
+        )
     }
 
     private func cancel(_ requestID: String) {
@@ -141,18 +147,28 @@ final class IOSCoordinatorPortClient {
     }
 
     private func protocolBreach(_ detail: String) {
-        guard settlement == nil else { return }
-        port.post(.shutdown(reason: .protocolError, detail: detail))
-        settle(.protocolBreach(detail))
+        commitSettlement(
+            .protocolBreach(detail),
+            peerNotification: .shutdown(reason: .protocolError, detail: detail)
+        )
     }
 
     private func settle(_ value: Settlement) {
-        guard settlement == nil else { return }
-        settlement = value
-        finishSettlement()
+        commitSettlement(value, peerNotification: nil)
     }
 
-    private func finishSettlement() {
+    private func commitSettlement(
+        _ value: Settlement,
+        peerNotification: CoordinatorFrame?
+    ) {
+        guard settlement == nil else { return }
+        settlement = value
+        if let peerNotification {
+            port.post(peerNotification)
+        }
+
+        let handler = settlementHandler
+        settlementHandler = nil
         let error = PortError(code: "port-settled", message: "coordinator port settled before reply")
         for continuation in pending.values {
             continuation.resume(throwing: error)
@@ -162,5 +178,6 @@ final class IOSCoordinatorPortClient {
         if !port.isClosed {
             port.close()
         }
+        handler?(value)
     }
 }
