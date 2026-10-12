@@ -10,7 +10,7 @@
   "directChanges": [],
   "dependencyReview": {
     "status": "pending",
-    "reason": "Aggregate shared-contract review remains pending. The previously-open Coordinator reachability/DNS/transport telemetry slice is now wired into the single durable iOS lifecycle owner, and the Desktop attachment Main-RPC production edge is now implemented through an account+Agent-scoped native staging adapter backed by the existing canonical FeatureHost attachment owner. Both slices remain mapped until replacement exact-head Actions execute their focused Rust/Swift/protected evidence; unrelated shared-contract and full responsibility closure remains open.",
+    "reason": "Aggregate shared-contract review remains pending. The previously-open Coordinator reachability/DNS/transport telemetry slice is now wired into the single durable iOS lifecycle owner, and the Desktop attachment Main-RPC production edge is now implemented through an account+Agent-scoped native staging adapter backed by the existing canonical FeatureHost attachment owner. Both slices remain mapped until replacement exact-head Actions execute their focused Rust/Swift/protected evidence; unrelated shared-contract and full responsibility closure remains open. Exact-head rebaseline keeps aggregate review fail-closed: f0d2b9ec and descendant Settings/Global-Dharma owner-documentation runs are predecessor-only; installed Global Dharma local execution is the verified .fabapp -> Marketplace/Host source -> MiniAppWebMcpSurface -> active WKWebView session path, while GlobalDharmaMiniAppBridge remains explicitly online compatibility/service only.",
     "sameDirectoryReviewPaths": [
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0014_remote_computer_client_tokens.sql",
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0016_remote_computer_session_provider.sql",
@@ -2013,8 +2013,8 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "156138d26cd9da11b33f473df563451871b50364",
+    "requestedCheckpoint": "f0d2b9ec1cc98dee8403cdb0b47262610d30dbd1",
+    "preEvidenceIosHead": "14fbb93edd5b4fd576ee07a52f35614211c35582",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2051,7 +2051,17 @@
       38201996058,
       38201996276,
       38202077424,
-      38202077314
+      38202077314,
+      38203689543,
+      38203689537,
+      38204254745,
+      38204254746,
+      38204472511,
+      38204472545,
+      38204559438,
+      38204559466,
+      38204598214,
+      38204598215
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2085,9 +2095,27 @@
       114657213187,
       114657256751,
       114657503819,
-      114657541867
+      114657541867,
+      114662419549,
+      114662470889,
+      114662535103,
+      114662535211,
+      114664180625,
+      114664180803,
+      114664181202,
+      114664231045,
+      114664239729,
+      114664239949,
+      114665053963,
+      114665054077,
+      114665107509,
+      114665147529,
+      114665221095,
+      114665221151,
+      114665221490,
+      114665271426
     ],
-    "status": "transcript-card-resolver-feed-review-resulting-exact-head-ci-required",
+    "status": "global-dharma-owner-and-settings-rebaseline-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
@@ -2098,6 +2126,6 @@
       "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift"
     ],
-    "conclusion": "Strict inventory advanced through attachment view with resolver/feed stale mapped states corrected. Aggregate strict completeness/final acceptance remain open."
+    "conclusion": "Global Dharma installed local execution is now recorded under the unified Marketplace/Host local package + active WKWebView WebMCP owner; the old special SwiftUI owner is absent. Settings rows remain current-main-reviewed without verified promotion. Aggregate dependency/full/new-and-changed responsibility review and final acceptance remain open."
   }
 }
