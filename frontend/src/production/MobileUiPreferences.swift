@@ -125,6 +125,7 @@ internal struct MobileSettingsShellCopy: Equatable {
     let periodEnds: String
     let loadingUsage: String
     let reloadUsage: String
+    let reloadApp: String
     let agentConfiguration: String
     let loadingConfiguration: String
     let router: String
@@ -516,7 +517,7 @@ internal struct MobileUiPreferences: Equatable {
                 displayName: "显示名称", saving: "正在保存…", saveDisplayName: "保存显示名称",
                 displayNameValidationError: "显示名称必须为 1–200 个字符。",
                 email: "邮箱", currentPeriod: "当前周期", unlimited: "不限量", remaining: "剩余",
-                periodEnds: "周期结束", loadingUsage: "正在加载用量…", reloadUsage: "重新加载用量",
+                periodEnds: "周期结束", loadingUsage: "正在加载用量…", reloadUsage: "重新加载用量", reloadApp: "重新加载",
                 agentConfiguration: "Agent 配置", loadingConfiguration: "正在读取配置…",
                 router: "路由", routeAgentRequests: "Route Agent 请求", iosSection: "iOS", iosInstalled: "当前设备已安装 Fabushi iOS",
                 iosSelfReference: "Desktop 的“下载 iOS”入口在 iOS 上是自引用项；安装和更新由当前 App 与 App Store 生命周期负责。",
@@ -533,7 +534,7 @@ internal struct MobileUiPreferences: Equatable {
                 displayName: "顯示名稱", saving: "正在儲存…", saveDisplayName: "儲存顯示名稱",
                 displayNameValidationError: "顯示名稱必須為 1–200 個字元。",
                 email: "電子郵件", currentPeriod: "目前週期", unlimited: "不限量", remaining: "剩餘",
-                periodEnds: "週期結束", loadingUsage: "正在載入用量…", reloadUsage: "重新載入用量",
+                periodEnds: "週期結束", loadingUsage: "正在載入用量…", reloadUsage: "重新載入用量", reloadApp: "重新載入",
                 agentConfiguration: "Agent 設定", loadingConfiguration: "正在讀取設定…",
                 router: "路由", routeAgentRequests: "路由 Agent 請求", iosSection: "iOS", iosInstalled: "此裝置已安裝 Fabushi iOS",
                 iosSelfReference: "Desktop 的「下載 iOS」入口在 iOS 上是自我參照；安裝與更新由目前 App 與 App Store 生命週期負責。",
@@ -550,7 +551,7 @@ internal struct MobileUiPreferences: Equatable {
                 displayName: "表示名", saving: "保存中…", saveDisplayName: "表示名を保存",
                 displayNameValidationError: "表示名は 1〜200 文字で入力してください。",
                 email: "メール", currentPeriod: "現在の期間", unlimited: "無制限", remaining: "残り",
-                periodEnds: "期間終了", loadingUsage: "使用量を読み込み中…", reloadUsage: "使用量を再読み込み",
+                periodEnds: "期間終了", loadingUsage: "使用量を読み込み中…", reloadUsage: "使用量を再読み込み", reloadApp: "再読み込み",
                 agentConfiguration: "Agent 設定", loadingConfiguration: "設定を読み込み中…",
                 router: "ルーター", routeAgentRequests: "Agent リクエストをルーティング", iosSection: "iOS", iosInstalled: "このデバイスには Fabushi iOS がインストールされています",
                 iosSelfReference: "Desktop の「iOS をダウンロード」は iOS では自己参照です。インストールと更新は現在の App と App Store のライフサイクルが管理します。",
@@ -567,7 +568,7 @@ internal struct MobileUiPreferences: Equatable {
                 displayName: "표시 이름", saving: "저장 중…", saveDisplayName: "표시 이름 저장",
                 displayNameValidationError: "표시 이름은 1~200자여야 합니다.",
                 email: "이메일", currentPeriod: "현재 기간", unlimited: "무제한", remaining: "남음",
-                periodEnds: "기간 종료", loadingUsage: "사용량 불러오는 중…", reloadUsage: "사용량 다시 불러오기",
+                periodEnds: "기간 종료", loadingUsage: "사용량 불러오는 중…", reloadUsage: "사용량 다시 불러오기", reloadApp: "다시 불러오기",
                 agentConfiguration: "Agent 설정", loadingConfiguration: "설정 불러오는 중…",
                 router: "라우터", routeAgentRequests: "Agent 요청 라우팅", iosSection: "iOS", iosInstalled: "이 기기에 Fabushi iOS가 설치되어 있습니다",
                 iosSelfReference: "Desktop의 ‘iOS 다운로드’ 항목은 iOS에서는 자기 참조입니다. 설치와 업데이트는 현재 App 및 App Store 수명 주기가 관리합니다.",
@@ -584,7 +585,7 @@ internal struct MobileUiPreferences: Equatable {
                 displayName: "اسم العرض", saving: "جارٍ الحفظ…", saveDisplayName: "حفظ اسم العرض",
                 displayNameValidationError: "يجب أن يكون اسم العرض من 1 إلى 200 حرف.",
                 email: "البريد الإلكتروني", currentPeriod: "الفترة الحالية", unlimited: "غير محدود", remaining: "المتبقي",
-                periodEnds: "نهاية الفترة", loadingUsage: "جارٍ تحميل الاستخدام…", reloadUsage: "إعادة تحميل الاستخدام",
+                periodEnds: "نهاية الفترة", loadingUsage: "جارٍ تحميل الاستخدام…", reloadUsage: "إعادة تحميل الاستخدام", reloadApp: "إعادة التحميل",
                 agentConfiguration: "إعداد Agent", loadingConfiguration: "جارٍ قراءة الإعداد…",
                 router: "الموجّه", routeAgentRequests: "توجيه طلبات Agent", iosSection: "iOS", iosInstalled: "تم تثبيت Fabushi iOS على هذا الجهاز",
                 iosSelfReference: "خيار «تنزيل iOS» في Desktop مرجع ذاتي على iOS؛ تدير دورة حياة التطبيق وApp Store التثبيت والتحديثات.",
@@ -601,7 +602,7 @@ internal struct MobileUiPreferences: Equatable {
                 displayName: "שם תצוגה", saving: "שומר…", saveDisplayName: "שמירת שם תצוגה",
                 displayNameValidationError: "שם התצוגה חייב להכיל 1–200 תווים.",
                 email: "דוא״ל", currentPeriod: "התקופה הנוכחית", unlimited: "ללא הגבלה", remaining: "נותר",
-                periodEnds: "סיום התקופה", loadingUsage: "טוען נתוני שימוש…", reloadUsage: "טעינה מחדש של השימוש",
+                periodEnds: "סיום התקופה", loadingUsage: "טוען נתוני שימוש…", reloadUsage: "טעינה מחדש של השימוש", reloadApp: "טעינה מחדש",
                 agentConfiguration: "הגדרות Agent", loadingConfiguration: "קורא הגדרות…",
                 router: "נתב", routeAgentRequests: "ניתוב בקשות Agent", iosSection: "iOS", iosInstalled: "Fabushi iOS מותקן במכשיר הזה",
                 iosSelfReference: "האפשרות „הורדת iOS” ב-Desktop היא הפניה עצמית ב-iOS; ההתקנה והעדכונים מנוהלים על ידי היישום הנוכחי ומחזור החיים של App Store.",
@@ -618,7 +619,7 @@ internal struct MobileUiPreferences: Equatable {
                 displayName: "Display Name", saving: "Saving…", saveDisplayName: "Save Display Name",
                 displayNameValidationError: "Display name must be 1–200 characters.",
                 email: "Email", currentPeriod: "Current Period", unlimited: "Unlimited", remaining: "Remaining",
-                periodEnds: "Period Ends", loadingUsage: "Loading usage…", reloadUsage: "Reload Usage",
+                periodEnds: "Period Ends", loadingUsage: "Loading usage…", reloadUsage: "Reload Usage", reloadApp: "Reload",
                 agentConfiguration: "Agent Configuration", loadingConfiguration: "Loading configuration…",
                 router: "Router", routeAgentRequests: "Route Agent Requests", iosSection: "iOS", iosInstalled: "Fabushi iOS is installed on this device",
                 iosSelfReference: "Desktop's “Download iOS” entry is self-referential on iOS; installation and updates are owned by the current app and App Store lifecycle.",
