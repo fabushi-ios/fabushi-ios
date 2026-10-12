@@ -153,7 +153,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiBrand.swift; frontend/src/production/FabushiProductExperience.swift",
       "test_evidence": "mobile/ios/FabushiTests/FabushiProductExperienceTests.swift",
-      "notes": "Canonical name, English identity, tagline, mission and public domain match Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Keep below verified until same-head Actions pass."
+      "notes": "Canonical name, English identity, tagline, mission and public domain match Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Keep below verified until same-head Actions pass. Re-read exact Desktop blob d931bf052666f4f7d1ef55d8d15310b5c9f00433 at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. FabushiBrand.swift preserves canonical name, English identity, tagline, mission and domain exactly. Keep implemented; current-final-SHA verification/provenance is still required before verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/shared/src/business.ts",
@@ -168,7 +170,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Mechanism-only utility; product surfaces that actually expose byte/duration labels are audited at their owning rows."
+      "notes": "Mechanism-only utility; product surfaces that actually expose byte/duration labels are audited at their owning rows. Re-read exact Desktop blob 4984e91c0fc8405f65aed8175dc74a6cc42ab143 at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. This module only formats byte/minute presentation strings and owns no independent runtime or durable state. iOS surface owners use native Swift/Foundation presentation when needed, so no second shared formatter owner is introduced.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/shared/src/chat-experience.ts",
@@ -183,7 +187,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiProductExperience.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/GlobalDharmaMiniAppBridge.swift",
       "test_evidence": "mobile/ios/FabushiTests/FabushiProductExperienceTests.swift; mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Same-head ordinary/protected Actions and artifact provenance are required before verified promotion."
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Same-head ordinary/protected Actions and artifact provenance are required before verified promotion. Re-read exact Desktop blob a82d3c348d2c34b248bf046f7bd418ad886ad8c3 at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. Current iOS FabushiProductExperience preserves the hero prompts, Global Dharma regions/checklist, sentence splitting, cloze/bidirectional flashcard generation and Again/Hard/Good/Easy due labels on the shipping Product Hub. Keep implemented pending exact-final-head evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/shared/src/copy.ts",
@@ -198,7 +204,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Release/App Store/TestFlight acceptance is still outstanding and will be evidenced at the promotion/distribution gates rather than by porting this web-copy module."
+      "notes": "Release/App Store/TestFlight acceptance is still outstanding and will be evidenced at the promotion/distribution gates rather than by porting this web-copy module. Re-read exact Desktop blob 01f616e95e334005dcd3b443b2c69474004ef33f at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. This is the public website distribution/support copy owner. The installed iOS app must not duplicate website navigation, FAQ or mailto beta application state; iOS distribution remains governed by TestFlight/App Store/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/shared/src/index.ts",
@@ -230,7 +238,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; source/ios-main/FabushiRuntime.swift",
       "test_evidence": ".github/workflows/ios-desktop-pr20-architecture.yml; .github/workflows/ios-protected-session.yml",
-      "notes": "Implemented in the native Host composition; current-head CI remains required before any verified promotion."
+      "notes": "Implemented in the native Host composition; current-head CI remains required before any verified promotion. Re-read exact Desktop blob b443131f7f78f58452ae0db8b7a12549c343f7ac at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. The current iOS production composition routes the shared Host journey through IOSPreloadBridge/MarketplaceModel and the single Rust Host; no second mock journey owner is introduced. Keep implemented until current-final-head ordinary/protected evidence and provenance close.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/dev/DevShell.tsx",
