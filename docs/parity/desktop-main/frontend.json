@@ -5324,10 +5324,12 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Rust + Swift",
       "ios_platform_delta": "iOS maps the Desktop renderer bridge to a closed native AppHost sharing.* RPC surface. AppHost rejects malformed required parameters before product/network execution, while existing Rust and Swift projections preserve all-or-nothing shared-room state validation.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs (six-method closed sharing RPC dispatcher and fail-closed request validation); source/packages/mahayana-rs/mahayana-product/src/lib.rs (strict all-or-nothing /sand share-state projection); frontend/src/production/GrokMobileSharedRoomModel.swift (strict native projection).",
-      "test_evidence": "Focused AppHost sharing RPC contract tests lock the exact six shipping methods and reject missing/non-string/blank roomId/requestId/agentId/agentName plus missing/non-bool isApproved; existing mahayana-product strict shared-room projection tests and mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift cover state projection. Exact-HEAD ordinary/protected Actions remain required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and Desktop blob c9e6241a48ff2f8ab71496c6fdc11122801c088f. Responsibility is implemented but must remain unverified until the new exact HEAD passes ordinary and protected production evidence gates. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
+      "test_evidence": "Focused AppHost sharing RPC contract tests lock the exact six shipping methods and reject malformed required identities/replies; existing mahayana-product strict shared-room projection tests and GrokMobileSharedRoomModelTests cover state projection. Prior exact-HEAD 4e98060a ordinary/protected runs are predecessor evidence only; replacement exact-head ordinary/protected Actions are required before verified.",
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and Desktop blob c9e6241a48ff2f8ab71496c6fdc11122801c088f. Responsibility is implemented but must remain unverified until the new exact HEAD passes ordinary and protected production evidence gates. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully. 2026-10-12 exact-head correction: because PR HEAD moved, the prior verified state is demoted to implemented until replacement exact-head gates succeed; Desktop current blob is unchanged.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/terminal/output/model.ts",
@@ -5342,7 +5344,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileTerminalOutput.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Exact Desktop model.ts blob f0fb275659af4b57259f88f3829a0d417dc75537 reviewed on Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61."
+      "notes": "Exact Desktop model.ts blob f0fb275659af4b57259f88f3829a0d417dc75537 reviewed on Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. 2026-10-12 current-main revalidation: exact Desktop terminal-output blob unchanged; Desktop remains a read-only result/metadata leaf without a terminal execution owner, and MobileTerminalOutput remains the native projection. No verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/terminal/output/view.tsx",
@@ -5357,7 +5361,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileTerminalOutput.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift validates the projector; same-head build/UI evidence required before verified",
-      "notes": "Exact Desktop view.tsx blob 532d386bd5efbcb7162788e45df3dd6f227d7d8e reviewed; its source comment explicitly limits responsibility to an unmounted read-only leaf."
+      "notes": "Exact Desktop view.tsx blob 532d386bd5efbcb7162788e45df3dd6f227d7d8e reviewed; its source comment explicitly limits responsibility to an unmounted read-only leaf. 2026-10-12 current-main revalidation: exact Desktop terminal-output blob unchanged; Desktop remains a read-only result/metadata leaf without a terminal execution owner, and MobileTerminalOutput remains the native projection. No verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/update/required/view.tsx",
@@ -5372,7 +5378,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/update/sand-update-service.swift; source/ios-main/update/release-metadata.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/ProductionRenderer.view.swift; frontend/src/production/FabushiSceneRoot.swift; server authority bhrumom/fabushi@c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52 fabushi/web/src/handlers/app-version.js and fabushi/web/wrangler.toml",
       "test_evidence": "mobile/ios/FabushiTests/AppVersionPolicyParityTests.swift; current exact-HEAD Actions and production policy rollout evidence required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact required view blob 7b3456c6661481ef3e491549e6472a73572aa87a. iOS intentionally omits Desktop restart/stage binary mechanics; required compatibility policy remains fully applicable."
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact required view blob 7b3456c6661481ef3e491549e6472a73572aa87a. iOS intentionally omits Desktop restart/stage binary mechanics; required compatibility policy remains fully applicable. 2026-10-12 current-main revalidation: exact Desktop update blob unchanged; desktop binary staging/restart is platform-specific while iOS shipping compatibility UI routes through the App Store update URL. Release evidence remains pending.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/update/status/pill.tsx",
@@ -5387,7 +5395,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/update/sand-update-service.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/ProductionRenderer.view.swift",
       "test_evidence": "mobile/ios/FabushiTests/AppVersionPolicyParityTests.swift; current exact-HEAD Actions and App Store/TestFlight acceptance required before verified",
-      "notes": "Exact Desktop status pill blob d1ec24f4bbdbe74d142ff7016e00622187ca4a3d reviewed on Desktop main. App Store owns binary download/stage progress on iOS."
+      "notes": "Exact Desktop status pill blob d1ec24f4bbdbe74d142ff7016e00622187ca4a3d reviewed on Desktop main. App Store owns binary download/stage progress on iOS. 2026-10-12 current-main revalidation: exact Desktop update blob unchanged; desktop binary staging/restart is platform-specific while iOS shipping compatibility UI routes through the App Store update URL. Release evidence remains pending.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/app-alert/controller.contract.test.ts",
@@ -5402,7 +5412,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/window-chrome/MobileAppAlert.swift",
       "test_evidence": "mobile/ios/FabushiTests/MobileAppAlertParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Desktop main search found no production caller/mount for createAppAlertController or AppAlertHost beyond this recovered capability, matching view.tsx's explicit unmounted-until-root-owner comment. iOS ports the capability but does not invent a root mount."
+      "notes": "Desktop main search found no production caller/mount for createAppAlertController or AppAlertHost beyond this recovered capability, matching view.tsx's explicit unmounted-until-root-owner comment. iOS ports the capability but does not invent a root mount. 2026-10-12 current-main revalidation: exact Desktop alert blob unchanged; its recovered host is explicitly unmounted until a root owner exists, while iOS retains the native alert capability without inventing a duplicate root owner.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/app-alert/controller.ts",
@@ -5417,7 +5429,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/window-chrome/MobileAppAlert.swift",
       "test_evidence": "mobile/ios/FabushiTests/MobileAppAlertParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Desktop main search found no production caller/mount for createAppAlertController or AppAlertHost beyond this recovered capability, matching view.tsx's explicit unmounted-until-root-owner comment. iOS ports the capability but does not invent a root mount."
+      "notes": "Desktop main search found no production caller/mount for createAppAlertController or AppAlertHost beyond this recovered capability, matching view.tsx's explicit unmounted-until-root-owner comment. iOS ports the capability but does not invent a root mount. 2026-10-12 current-main revalidation: exact Desktop alert blob unchanged; its recovered host is explicitly unmounted until a root owner exists, while iOS retains the native alert capability without inventing a duplicate root owner.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/app-alert/view.tsx",
@@ -5432,7 +5446,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/window-chrome/MobileAppAlert.swift",
       "test_evidence": "mobile/ios/FabushiTests/MobileAppAlertParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Desktop main search found no production caller/mount for createAppAlertController or AppAlertHost beyond this recovered capability, matching view.tsx's explicit unmounted-until-root-owner comment. iOS ports the capability but does not invent a root mount."
+      "notes": "Desktop main search found no production caller/mount for createAppAlertController or AppAlertHost beyond this recovered capability, matching view.tsx's explicit unmounted-until-root-owner comment. iOS ports the capability but does not invent a root mount. 2026-10-12 current-main revalidation: exact Desktop alert blob unchanged; its recovered host is explicitly unmounted until a root owner exists, while iOS retains the native alert capability without inventing a duplicate root owner.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/global-keyboard-shortcuts.ts",
@@ -5447,7 +5463,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/window-chrome/hardware-keyboard.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "mobile/ios/FabushiTests/MobileHardwareKeyboardParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Exact Desktop shortcut blob f36271ee5d4de95526474d7f7cf7fa5e94740d69 reviewed on Desktop main. Native commands preserve the existing shell/navigation owners and remain implemented, not verified, until current-head shipping-path Actions succeed."
+      "notes": "Exact Desktop shortcut blob f36271ee5d4de95526474d7f7cf7fa5e94740d69 reviewed on Desktop main. Native commands preserve the existing shell/navigation owners and remain implemented, not verified, until current-head shipping-path Actions succeed. 2026-10-12 current-main revalidation: exact Desktop shortcut blob unchanged; native hardware-keyboard commands preserve root navigation/overlay ownership and accessibility.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/model.contract.test.ts",
@@ -5462,11 +5480,11 @@
       "implementation_status": "not-applicable",
       "production_evidence": "Native app uses UIKit/SwiftUI scene/window chrome rather than Electron DOM variables.",
       "test_evidence": "Final native orientation/safe-area/UI acceptance is the replacement evidence; no TypeScript source-regex/DOM contract is copied.",
-      "notes": "IOS-MAIN-WINDOW-CHROME-CONTRACT-001: Desktop current-main contract now explicitly guards data-platform cleanup on Darwin/fullscreen. The fake DOM/CSS test mechanism is not portable; iOS replacement is native scene/orientation/safe-area acceptance, not copied TypeScript machinery.",
+      "notes": "IOS-MAIN-WINDOW-CHROME-CONTRACT-001: Desktop current-main contract now explicitly guards data-platform cleanup on Darwin/fullscreen. The fake DOM/CSS test mechanism is not portable; iOS replacement is native scene/orientation/safe-area acceptance, not copied TypeScript machinery. 2026-10-12 current-main revalidation: exact Desktop window-chrome model/contract unchanged; DOM dataset/CSS window-control lifetime is Electron-specific and native scene/safe-area/orientation is the iOS replacement. Physical-device acceptance remains pending.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "responsibility_id": "IOS-MAIN-WINDOW-CHROME-CONTRACT-001",
       "desktop_runtime_entrypoint": "node:test window-chrome contract -> setWindowChromeVariables fake-document lifecycle",
       "desktop_state_machine": "test-only install -> assert data-platform/CSS vars -> disposer -> assert platform/vars cleared across Darwin/Windows/fullscreen cases",
@@ -5487,11 +5505,11 @@
       "implementation_status": "not-applicable",
       "production_evidence": "FabushiApp/FabushiSceneRoot and native navigation stacks own iOS window/safe-area composition.",
       "test_evidence": "Physical-device orientation/safe-area/navigation acceptance remains part of release validation.",
-      "notes": "IOS-MAIN-WINDOW-CHROME-PLATFORM-001: current-main expands Desktop dataset.platform lifetime to Darwin/fullscreen so CSS such as conversation traffic-light spacing can react correctly, and disposer fences cleanup to the installed platform. Electron DOM/CSS window-control mechanics do not exist on iOS; native scene/safe-area/navigation chrome remains the sole replacement. Keep not-applicable until physical-device orientation/safe-area acceptance.",
+      "notes": "IOS-MAIN-WINDOW-CHROME-PLATFORM-001: current-main expands Desktop dataset.platform lifetime to Darwin/fullscreen so CSS such as conversation traffic-light spacing can react correctly, and disposer fences cleanup to the installed platform. Electron DOM/CSS window-control mechanics do not exist on iOS; native scene/safe-area/navigation chrome remains the sole replacement. Keep not-applicable until physical-device orientation/safe-area acceptance. 2026-10-12 current-main revalidation: exact Desktop window-chrome model/contract unchanged; DOM dataset/CSS window-control lifetime is Electron-specific and native scene/safe-area/orientation is the iOS replacement. Physical-device acceptance remains pending.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "responsibility_id": "IOS-MAIN-WINDOW-CHROME-PLATFORM-001",
       "desktop_runtime_entrypoint": "ProductionRenderer root shell -> setWindowChromeVariables(platform,isFullscreen)",
       "desktop_state_machine": "mount/focus/window state -> install data-platform and non-Darwin/non-fullscreen control CSS vars -> disposer clears variables and only removes matching platform dataset",
@@ -5548,8 +5566,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift and frontend/src/production/ProductionRenderer.view.swift use native SwiftUI root loading/error/content composition and ProgressView rather than Desktop CSS.",
       "test_evidence": "Existing root-shell/error-boundary current-head tests plus exact-HEAD Actions; native ProgressView inherits platform Reduce Motion behavior instead of CSS media queries.",
-      "notes": "Exact Desktop blob 31e70d3af5322fc70d3aee0eed853a785ef13ee4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 31e70d3af5322fc70d3aee0eed853a785ef13ee4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying. 2026-10-12 current-main revalidation: exact Desktop root-shell blob unchanged; FabushiSceneRoot remains the single shipping native lifecycle/error owner.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/root-shell-state.tsx",
@@ -5564,7 +5583,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/ProductionRenderer.view.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/roster/status.swift",
       "test_evidence": "mobile/ios/FabushiTests/ErrorBoundaryParityTests.swift; mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Exact Desktop root-shell-state.tsx blob 88f3304cc487479cd6ac33a03fd6a99168e8d262 reviewed; native root/error lifecycle was already closed on the shipping path."
+      "notes": "Exact Desktop root-shell-state.tsx blob 88f3304cc487479cd6ac33a03fd6a99168e8d262 reviewed; native root/error lifecycle was already closed on the shipping path. 2026-10-12 current-main revalidation: exact Desktop root-shell blob unchanged; FabushiSceneRoot remains the single shipping native lifecycle/error owner.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/status-badge.css",
@@ -5579,8 +5600,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/root-resilience/connection-state.swift and frontend/src/production/GrokMobileShell+Home.swift render the native compact connection state without fixed Electron titlebar CSS.",
       "test_evidence": "Existing root connection-state focused tests and current-head Actions cover connected/connecting/disconnected projection.",
-      "notes": "Exact Desktop blob 142b69df0b7ed835e7f5bd123955565403fa3468 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 142b69df0b7ed835e7f5bd123955565403fa3468 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying. 2026-10-12 current-main revalidation: exact Desktop transport-status blob unchanged; native root-resilience connection state owns equivalent connecting/reconnecting/unreachable effects.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/status-badge.tsx",
@@ -5595,7 +5617,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/root-resilience/connection-state.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD evidence required before verified",
-      "notes": "Exact Desktop status-badge.tsx blob 39f063c85c0ab932e618107e348b31e2a03485d5 reviewed. Mobile presentation is intentionally transient rather than a desktop chrome badge."
+      "notes": "Exact Desktop status-badge.tsx blob 39f063c85c0ab932e618107e348b31e2a03485d5 reviewed. Mobile presentation is intentionally transient rather than a desktop chrome badge. 2026-10-12 current-main revalidation: exact Desktop transport-status blob unchanged; native root-resilience connection state owns equivalent connecting/reconnecting/unreachable effects.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/view.css",
@@ -5610,8 +5634,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "iOS uses UIKit/SwiftUI scene, safe-area and system navigation/window chrome; there is no Electron draggable titlebar or minimize/maximize/close control surface to port.",
       "test_evidence": "Native iOS scene/safe-area UI acceptance replaces Desktop CSS/window-control tests.",
-      "notes": "Exact Desktop blob 9f50cbcd9aa6da8d8b56cb291b627fe427165f72 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 9f50cbcd9aa6da8d8b56cb291b627fe427165f72 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying. 2026-10-12 current-main revalidation: exact Desktop OS window-control blob unchanged; Electron drag/minimize/maximize/close DOM mechanics are not applicable on iOS and WindowGroup/SwiftUI scene chrome is the replacement.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/view.tsx",
@@ -5626,7 +5651,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; mobile/ios/Fabushi/FabushiApp.swift",
       "test_evidence": "iOS scene/archive/install acceptance replaces Electron window-control tests",
-      "notes": "Exact Desktop view.tsx blob 2c2668290ba69f9b70f91322ff81e6b72bdb22e5 reviewed; only the OS window-control mechanism is N/A."
+      "notes": "Exact Desktop view.tsx blob 2c2668290ba69f9b70f91322ff81e6b72bdb22e5 reviewed; only the OS window-control mechanism is N/A. 2026-10-12 current-main revalidation: exact Desktop OS window-control blob unchanged; Electron drag/minimize/maximize/close DOM mechanics are not applicable on iOS and WindowGroup/SwiftUI scene chrome is the replacement.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/workspace-indicator.css",
@@ -5641,7 +5668,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/FabushiSceneRoot.swift",
       "test_evidence": "current exact-HEAD SwiftUI/UI and archive acceptance replace Desktop CSS geometry evidence",
-      "notes": "Exact Desktop workspace-indicator.css blob f9d506d10ff8a4adbcd605d67ae6f2749345d155 reviewed; only the Electron/CSS presentation mechanism is N/A, while workspace identity remains implemented in the adjacent TSX responsibility."
+      "notes": "Exact Desktop workspace-indicator.css blob f9d506d10ff8a4adbcd605d67ae6f2749345d155 reviewed; only the Electron/CSS presentation mechanism is N/A, while workspace identity remains implemented in the adjacent TSX responsibility. 2026-10-12 current-main revalidation: exact Desktop workspace-indicator blob unchanged; native conversation header preserves workspace identity/accessibility while CSS is a platform replacement.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/workspace-indicator.tsx",
@@ -5656,7 +5685,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "test_evidence": "current exact-HEAD SwiftUI/UI acceptance required before verified",
-      "notes": "Exact Desktop workspace-indicator.tsx blob 4bda5d7fecb38495111d40acecb96e84e5048ace reviewed."
+      "notes": "Exact Desktop workspace-indicator.tsx blob 4bda5d7fecb38495111d40acecb96e84e5048ace reviewed. 2026-10-12 current-main revalidation: exact Desktop workspace-indicator blob unchanged; native conversation header preserves workspace identity/accessibility while CSS is a platform replacement.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/async-action.ts",
@@ -5664,14 +5695,16 @@
       "desktop_responsibility": "Provide the renderer async-command lifecycle shared by UI actions: count overlapping pending calls, clear failure at run start, publish failure only from the latest generation, expose run/runOrThrow/fire-and-forget dispatch, and normalize non-source errors to client/command-failed.",
       "desktop_owner": "renderer shared async action state helper",
       "desktop_visible_effect": "Buttons and command surfaces can show stable pending/error state without an older failed request overwriting a newer action result.",
-      "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/runtime/async-action.swift",
-      "ios_language": "Swift / Observation",
-      "ios_platform_delta": "Swift concurrency replaces the React hook, but the current exact iOS HEAD has only feature-local busy/error state and no single reusable overlapping-call/latest-failure owner. This remains mapped until a native shared owner is composed into shipping action surfaces instead of merely adding an unused helper.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Exact Desktop async-action.ts blob c3844ef7a700df93830bbb06886d72ea355c8660 reviewed together with its SourceFailure dependency. No cancellation/disposal semantics should be invented because the Desktop owner intentionally has none."
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "Swift structured concurrency and feature-owned pending/failure state in shipping SwiftUI owners",
+      "ios_language": "Swift / SwiftUI",
+      "ios_platform_delta": "Desktop's helper is a React-hook mechanism rather than an independent service/store/protocol and explicitly has no cancellation/disposal contract. iOS keeps pending/latest-result/error behavior inside each shipping feature's structured-concurrency owner rather than introducing an unused global async-action owner; every consuming product action remains tracked separately.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "FabushiRuntime, GrokMobileShell and feature-owned SwiftUI action owners use Task/@State/Observation and scope/generation fencing where the corresponding product responsibility requires it; no second generic async-action runtime is introduced.",
+      "test_evidence": "Replacement evidence is supplied by focused tests of each consuming shipping feature; this mechanism disposition does not waive any feature responsibility.",
+      "notes": "Exact Desktop async-action.ts blob c3844ef7a700df93830bbb06886d72ea355c8660 reviewed together with its SourceFailure dependency. No cancellation/disposal semantics should be invented because the Desktop owner intentionally has none. 2026-10-12 current-main correction: the historical async-action.swift target does not exist on the canonical iOS tree. The React hook itself is a native mechanism replacement; SourceFailure taxonomy and all consuming feature actions remain independently fail-closed.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/coordinator-source-claimant.ts",
@@ -5686,7 +5719,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/ios-main/coordinator/coordinator-account-runtime.swift; source/ios-main/coordinator/coordinator-runtime.swift; source/ios-preload/preload.swift; source/ios-preload/coordinator-port-bridge.swift",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift; mobile/ios/FabushiTests/CoordinatorContractTests.swift",
-      "notes": "Exact Desktop claimant blob f5f7f3a870ab16badebf4f9e4d7dd728c7902f4b reviewed. The identity-safety responsibility is preserved by native account-scope and generation fencing; only the Electron transferred-port mechanism is N/A."
+      "notes": "Exact Desktop claimant blob f5f7f3a870ab16badebf4f9e4d7dd728c7902f4b reviewed. The identity-safety responsibility is preserved by native account-scope and generation fencing; only the Electron transferred-port mechanism is N/A. 2026-10-12 current-main revalidation: exact Desktop transferred-port claimant unchanged; iOS uses one in-process Coordinator/Preload boundary with account/generation fencing, so Electron port-claim mechanics remain a platform replacement.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/coordinator-source.ts",
@@ -5718,7 +5753,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/org-chart/workspace/model.swift",
       "test_evidence": "mobile/ios/FabushiTests/AgentNetworkParityTests.swift; current exact-HEAD UI acceptance",
-      "notes": "Exact Desktop define-entrypoint.ts blob 9ce2db1ba7eee04e46986989437df56c0258fa07 reviewed. React lazy-module mechanics are N/A; feature availability remains an applicable per-feature responsibility."
+      "notes": "Exact Desktop define-entrypoint.ts blob 9ce2db1ba7eee04e46986989437df56c0258fa07 reviewed. React lazy-module mechanics are N/A; feature availability remains an applicable per-feature responsibility. 2026-10-12 current-main revalidation: exact recovered-entrypoint blob unchanged; React lazy/reconstruction registry is not an independent iOS product owner and feature availability remains tracked per native feature.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/entrypoints.ts",
@@ -5733,7 +5770,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "current exact-HEAD Xcode generation/build plus per-feature focused tests",
-      "notes": "Exact Desktop entrypoints.ts blob 900ebaa97b322b26a5968bb7ca15213cfeac79bc reviewed. This row is recovery/provenance infrastructure, not a user-visible runtime registry required on iOS."
+      "notes": "Exact Desktop entrypoints.ts blob 900ebaa97b322b26a5968bb7ca15213cfeac79bc reviewed. This row is recovery/provenance infrastructure, not a user-visible runtime registry required on iOS. 2026-10-12 current-main revalidation: exact recovered-entrypoint blob unchanged; React lazy/reconstruction registry is not an independent iOS product owner and feature availability remains tracked per native feature.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/runtime-foundations.contract.test.ts",
@@ -5748,8 +5787,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/ios-main/FabushiRuntime.swift; frontend/src/production/GrokMobileShell.swift; native feature owners referenced by their ledger rows",
       "test_evidence": "Current iOS focused unit/UI suites and exact-HEAD architecture/build jobs replace this Desktop-only node:test file.",
-      "notes": "Exact Desktop blob 0b13169cc738523e48554ae51a81709f10c1a491 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; test harness is replaced, while each tested product contract remains tracked independently.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 0b13169cc738523e48554ae51a81709f10c1a491 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; test harness is replaced, while each tested product contract remains tracked independently. 2026-10-12 current-main revalidation: exact Desktop Node contract-test blob unchanged; the harness is platform-specific while tested product/runtime responsibilities remain separately tracked by native owners/tests.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/snapshot-store.ts",
@@ -5764,7 +5804,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/ios-main/FabushiRuntime.swift; mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "current exact-HEAD Swift unit/UI acceptance for the concrete observed owners",
-      "notes": "Exact Desktop snapshot-store.ts blob 41dd5919492fd7a3c190f1d4cb37b3ef7d465201 reviewed. The mechanism is N/A because native Observation owns the same state-propagation responsibility."
+      "notes": "Exact Desktop snapshot-store.ts blob 41dd5919492fd7a3c190f1d4cb37b3ef7d465201 reviewed. The mechanism is N/A because native Observation owns the same state-propagation responsibility. 2026-10-12 current-main revalidation: exact generic snapshot-store unchanged; Swift Observation/feature state is the native propagation mechanism.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/source-boundary.ts",
@@ -5779,7 +5821,9 @@
       "implementation_status": "mapped",
       "production_evidence": "source/shared/rpc/coordinator-port.swift; source/mahayana-agent-coordinator/gateway/gateway-errors.swift; source/ios-preload/coordinator-port-bridge.swift",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; additional failure-taxonomy parity still required",
-      "notes": "Exact Desktop source-boundary.ts blob e98f4259861db663b7bedd665cd8e8a5b2515627 reviewed with async-action.ts and coordinator-source.ts dependencies; do not mark implemented until retry/boundary metadata parity is closed."
+      "notes": "Exact Desktop source-boundary.ts blob e98f4259861db663b7bedd665cd8e8a5b2515627 reviewed with async-action.ts and coordinator-source.ts dependencies; do not mark implemented until retry/boundary metadata parity is closed. 2026-10-12 current-main revalidation: exact SourceFailure blob unchanged; native typed errors exist but complete code/boundary/retry/detail propagation is still not demonstrated, so the row remains mapped.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/movable-panel.ts",
@@ -5794,8 +5838,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI sheet/fullScreenCover/DragGesture and per-feature native panel layouts",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob ae1a770e1e973005731f090fbd507a210a272acd reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob ae1a770e1e973005731f090fbd507a210a272acd reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/overlay-primitives.tsx",
@@ -5810,8 +5855,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI sheet/fullScreenCover/confirmationDialog/Menu plus native focus and accessibility semantics",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 84881097e54a3b6daa9e32942ec66988718e7676 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 84881097e54a3b6daa9e32942ec66988718e7676 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-floating-primitives.css",
@@ -5826,8 +5872,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/Popover/sheet native presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 5d9521ef1ba621b398c6c62fe081b431bb0a065e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 5d9521ef1ba621b398c6c62fe081b431bb0a065e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-floating-primitives.tsx",
@@ -5842,8 +5889,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/Popover/sheet native presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob c4515218e59f1fab364200b223e3bf9c13e7385f reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob c4515218e59f1fab364200b223e3bf9c13e7385f reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-form-primitives.css",
@@ -5858,8 +5906,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI TextField/TextEditor/Toggle/Picker native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 3a44687258529ff4a10045508ad671ae79b9f2f2 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 3a44687258529ff4a10045508ad671ae79b9f2f2 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-form-primitives.tsx",
@@ -5874,8 +5923,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI TextField/TextEditor/Toggle/Picker native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 6562e203a3c8501248aa971427375607012b48c4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 6562e203a3c8501248aa971427375607012b48c4 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-icon-registry.ts",
@@ -5890,8 +5940,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SF Symbols and asset-catalog icons selected by each native feature surface",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 7581aa3dc9e7bf55b0d73d21cc9f7ac1971fce04 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 7581aa3dc9e7bf55b0d73d21cc9f7ac1971fce04 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-kit-primitives.css",
@@ -5906,8 +5957,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Button/Label/ProgressView and feature-owned native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 3d127c77fc5d8d1c6132fa903b5d86d8332f8379 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 3d127c77fc5d8d1c6132fa903b5d86d8332f8379 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-kit-primitives.tsx",
@@ -5922,8 +5974,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Button/Label/ProgressView and feature-owned native controls",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob e34cfc6b11d869710b4bd01ce37ebbdadcd8d978 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob e34cfc6b11d869710b4bd01ce37ebbdadcd8d978 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-menu-item.css",
@@ -5938,8 +5991,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/List/Button native row presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 0b8e91bd43506d33fb686414628708a4075a2c0d reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 0b8e91bd43506d33fb686414628708a4075a2c0d reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-menu-item.tsx",
@@ -5954,8 +6008,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI Menu/List/Button native row presentation",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob d6cf40d433db08bdcd85735da71ea0f5bf965b39 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob d6cf40d433db08bdcd85735da71ea0f5bf965b39 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-status-primitives.css",
@@ -5970,8 +6025,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI ProgressView/status labels and platform Reduce Motion behavior",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 107c6ece8d3d4c4d8fe8f7f556188078b2ab6f46 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 107c6ece8d3d4c4d8fe8f7f556188078b2ab6f46 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/ui/sand-status-primitives.tsx",
@@ -5986,8 +6042,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "SwiftUI ProgressView/status labels and feature-owned status composition",
       "test_evidence": "Consuming feature rows carry the shipping-path XCTest/UI-test evidence; no standalone React/DOM primitive is linked into the iOS product.",
-      "notes": "Exact Desktop blob 94e329140841d4a1b142f2405a05b37c6098002c reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 94e329140841d4a1b142f2405a05b37c6098002c reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The primitive is framework infrastructure, not an independent product store or protocol, so native replacement is authoritative. 2026-10-12 current-main revalidation: exact Desktop UI primitive unchanged; DOM/CSS/portal/pointer/focus infrastructure is replaced by SwiftUI native controls/presentation/accessibility while consuming feature responsibilities remain independently tracked.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/upstream.ts",
@@ -6002,8 +6059,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml; frontend/src/production/FabushiSceneRoot.swift",
       "test_evidence": "GitHub Actions Xcode project generation/build and shipping-root UI acceptance replace the Desktop recovered-renderer bootstrap.",
-      "notes": "Exact Desktop blob 865e563fea6c4b4ac4456596109478d826621991 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 865e563fea6c4b4ac4456596109478d826621991 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. 2026-10-12 current-main revalidation: exact Desktop renderer bootstrap/build-tool blob unchanged; reconstructed renderer/Vite/TypeScript mechanics are replaced by native App/XcodeGen composition and GitHub Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/tsconfig.json",
@@ -6018,8 +6076,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml (SWIFT_VERSION 6.0, iOS deployment target, source graph)",
       "test_evidence": "Current-head Xcode generation and Swift build/test jobs.",
-      "notes": "Exact Desktop blob 668d3ab8d2beb7dc82c64eea76e52ca7d1b7e8ba reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 668d3ab8d2beb7dc82c64eea76e52ca7d1b7e8ba reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. 2026-10-12 current-main revalidation: exact Desktop renderer bootstrap/build-tool blob unchanged; reconstructed renderer/Vite/TypeScript mechanics are replaced by native App/XcodeGen composition and GitHub Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/vite.config.ts",
@@ -6034,8 +6093,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml; current iOS GitHub Actions workflows",
       "test_evidence": "Exact-head architecture, Xcode generation, unit/UI, device-archive and protected-account jobs.",
-      "notes": "Exact Desktop blob d43c7209b0d5cf2c8788dedd8446480d9eebb5e9 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob d43c7209b0d5cf2c8788dedd8446480d9eebb5e9 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. 2026-10-12 current-main revalidation: exact Desktop renderer bootstrap/build-tool blob unchanged; reconstructed renderer/Vite/TypeScript mechanics are replaced by native App/XcodeGen composition and GitHub Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     }
   ]
 }
