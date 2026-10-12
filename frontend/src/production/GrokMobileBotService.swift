@@ -18,6 +18,105 @@ struct MobileAgentAsyncTask: Identifiable, Equatable {
 struct GrokMobileBotService {
     static let groupMaximumMembers = 6
 
+    static let pluginAuthAgentName = "Plugin Setup"
+    static let pluginAuthAgentDescription =
+        "Sets up git credentials on Grok Bot's computer so installed plugins can be fetched."
+    static let pluginAuthAgentPurpose = SandAgentPurpose.pluginAuth.rawValue
+    static let pluginAuthPrompt = [
+        "Some of my installed plugins can't be fetched.",
+        "Their content lives in a private git repository, and your computer — the machine Shell and Read act on, not mine — has no credentials to read it.",
+        "Set that up on your computer: run `gh auth login` there, then `gh auth setup-git` so git itself uses the credential.",
+        "When a step needs me (a device code, a password, 2FA, an OAuth approval), hand your computer over with request_box_help instead of guessing.",
+        "Then verify with a read-only `git ls-remote` against one of those plugin repositories and tell me whether it worked. Don't change my repositories or any other credentials.",
+    ].joined(separator: " ")
+
+    struct PluginAuthRosterEntry: Equatable, Sendable {
+        let id: String
+        let purpose: String?
+    }
+
+    nonisolated static func pluginAuthRoster(from value: Any) -> [PluginAuthRosterEntry]? {
+        let rows: [[String: Any]]
+        if let object = value as? [String: Any],
+           let agents = object["agents"] as? [[String: Any]] {
+            rows = agents
+        } else if let agents = value as? [[String: Any]] {
+            rows = agents
+        } else {
+            return nil
+        }
+        let parsed = rows.compactMap { row -> PluginAuthRosterEntry? in
+            guard let id = row["id"] as? String, !id.isEmpty else { return nil }
+            let purpose = (row["purpose"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return .init(id: id, purpose: purpose?.isEmpty == false ? purpose : nil)
+        }
+        return parsed.count == rows.count ? parsed : nil
+    }
+
+    nonisolated static func pluginAuthCreatedAgentId(from value: Any) -> String? {
+        guard let object = value as? [String: Any] else { return nil }
+        let candidate = (object["agent"] as? [String: Any]) ?? object
+        guard let id = candidate["id"] as? String else { return nil }
+        let normalized = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    func ensurePluginAuthAgent() async throws -> String {
+        let before = try await bridge.request(method: "listAgents")
+        guard let roster = Self.pluginAuthRoster(from: before.value) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 40,
+                userInfo: [NSLocalizedDescriptionKey: "Host returned an incomplete Agent roster."]
+            )
+        }
+        if let existing = roster.first(where: { $0.purpose == Self.pluginAuthAgentPurpose }) {
+            return existing.id
+        }
+
+        try Task.checkCancellation()
+        let created = try await bridge.request(
+            method: "createAgent",
+            params: [
+                "name": Self.pluginAuthAgentName,
+                "description": Self.pluginAuthAgentDescription,
+                "purpose": Self.pluginAuthAgentPurpose,
+                "isIntroductionSuppressed": true,
+            ]
+        )
+        guard let agentId = Self.pluginAuthCreatedAgentId(from: created.value) else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 41,
+                userInfo: [NSLocalizedDescriptionKey: "Plugin auth agent creation returned a malformed Agent reply."]
+            )
+        }
+
+        try Task.checkCancellation()
+        let after = try await bridge.request(method: "listAgents")
+        guard let durableRoster = Self.pluginAuthRoster(from: after.value),
+              durableRoster.contains(where: {
+                  $0.id == agentId && $0.purpose == Self.pluginAuthAgentPurpose
+              })
+        else {
+            throw NSError(
+                domain: "Fabushi.GrokMobileBotService",
+                code: 42,
+                userInfo: [NSLocalizedDescriptionKey: "Host did not persist the Plugin Setup Agent purpose."]
+            )
+        }
+
+        try Task.checkCancellation()
+        _ = try await bridge.request(
+            method: "sendPrompt",
+            params: [
+                "agentId": agentId,
+                "prompt": Self.pluginAuthPrompt,
+            ]
+        )
+        return agentId
+    }
+
     let bridge: IOSPreloadBridge
 
     func loadBots() async -> [MobileBotSummary] {
