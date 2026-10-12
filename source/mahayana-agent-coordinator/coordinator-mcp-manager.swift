@@ -1117,6 +1117,7 @@ final class CoordinatorMcpSurface {
         reportFailure: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         reportAuthTelemetry: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
         reportMigrationWatchTelemetry: @escaping @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void = { _, _, _ in },
+        backendUpdateRequirementSink: @escaping IOSCursorDashboardClient.BackendUpdateRequirementSink = { _ in },
         isClientPaused: @escaping @MainActor () -> Bool = { false }
     ) -> CoordinatorMcpSurface {
         let port = CoordinatorMcpHostPort(
@@ -1134,7 +1135,10 @@ final class CoordinatorMcpSurface {
                 try await cursorAuth.getMachineID()
             }
         )
-        let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        let dashboard = IOSCursorDashboardClient(
+            credentials: credentials,
+            backendUpdateRequirementSink: backendUpdateRequirementSink
+        )
         let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter = {
             operation, error in reportFailure("gateway-descriptor", operation, error)
         }
