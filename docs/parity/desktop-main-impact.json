@@ -2002,17 +2002,22 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "177fc994e2554ddc2f3213766d41909853b1a40c",
-    "preEvidenceIosHead": "fb6f4a7e84929c43e62a1fe086190cb8fc19f3d6",
-    "preEvidenceIosTree": "9a8f120ea71433f7508d3ea4b7845a12f4d253c9",
+    "requestedCheckpoint": "d705013a1ae4be5c36057b7ff1444f1a5b1aeb19",
+    "preEvidenceIosHead": "8a53722d0b2c8f5681781d0ce2e82f8b562b3243",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "changedIosPathsSinceRequestedCheckpoint": [
+      "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
       "docs/parity/desktop-main-index.json",
       "docs/parity/desktop-main-impact.json",
-      "docs/parity/desktop-main-release-evidence.json"
+      "docs/parity/desktop-main-release-evidence.json",
+      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md",
+      "mobile/ios/FabushiTests/CoordinatorFailureTelemetryParityTests.swift",
+      "source/ios-main/coordinator/coordinator-telemetry.swift",
+      "source/ios-preload/coordinator-port-bridge.swift",
+      "source/ios-preload/preload.swift"
     ],
-    "conclusion": "Desktop authority remains stable. PR #3 was synchronized with live iOS main 8b0e7236d75f8e16b868332e51cde41b6ee415fc using an ancestry-preserving merge with no PR tree loss; behind is now zero. Runs tied to 177fc994 and later predecessor heads are not accepted for current-head verification. Aggregate dependency/completeness/release acceptance remain pending and require replacement exact-head Actions."
+    "conclusion": "Desktop/Backend/Platform Core/Fabushi/Marketplace authorities are unchanged. PR #3 advanced beyond d705013a, including coordinator failure-episode telemetry at 8a53722d. Thirteen explicitly requested Desktop frontend owner/contracts were re-read at current main; current iOS shipping owners exist for this batch. commands.ts is demoted from stale verified to implemented; ProductionRenderer.tsx is promoted from mapped to implemented based on real shipping composition, not to verified. Fresh exact-head Actions and strict completeness remain mandatory."
   }
 }

@@ -17,7 +17,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/FabushiAppAgentSurface.swift; mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/GrokMobileShell+Semantic.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift; mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d. The native owner is shipping-composed; exact-head CI/acceptance for this audit commit is still required before current-head promotion."
+      "notes": "Reviewed against Desktop final HEAD 798cf51d. The native owner is shipping-composed; exact-head CI/acceptance for this audit commit is still required before current-head promotion. Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093 against the exact current blob and current iOS shipping owner. No current-head verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/app-surface.ts",
@@ -32,7 +34,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/FabushiAppAgentSurface.swift; mobile/ios/Fabushi/FabushiRemoteDeviceGateway.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/GrokMobileShell+Semantic.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift; mobile/ios/FabushiTests/FabushiRemoteDeviceGatewayTests.swift",
-      "notes": "Existing accessibility identifiers are supporting UI identity; canonical automation truth is the single FabushiAppAgentSurface instance owned by FabushiRuntime."
+      "notes": "Existing accessibility identifiers are supporting UI identity; canonical automation truth is the single FabushiAppAgentSurface instance owned by FabushiRuntime. Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093 against the exact current blob and current iOS shipping owner. No current-head verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/bridge.ts",
@@ -47,7 +51,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; protected run 37255135388 at b2b40be10608831d10aa069b15b32e3454c3fe4e",
-      "notes": "Current production path was exercised by the successful Global Dharma protected journey; this row remains implemented rather than verified until the audit/release completion policy is satisfied."
+      "notes": "Current production path was exercised by the successful Global Dharma protected journey; this row remains implemented rather than verified until the audit/release completion policy is satisfied. Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093 against the exact current blob and current iOS shipping owner. No current-head verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/commands.ts",
@@ -59,10 +65,12 @@
       "ios_target_path": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS preserves the canonical MCP inputSchema in MiniAppToolContract, injects that same schema into WebMCP registration, and ships a native /tool command bar matching Desktop zero-field and single-string direct calls plus schema-backed form defaults, enum/type/required validation, and approval-gated execution through the existing canonical MarketplaceModel runtime owner.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; exact-HEAD ordinary Actions 37260023238 (356 unit tests / 0 failures; 3 ordinary UI tests / 0 failures; device archive artifact 11324576826 sha256:c74be69b0559b1f809d123654adffab14382d851b0915999c66a3a6b165eee6d); protected Actions 37260023181 (Global Dharma journey passed; artifact 11324738029 sha256:fc88f41e994a3fa8fb83878a1857d70b75599d3e55f09755af12121b137b2bcd)",
-      "notes": "Verified on exact iOS HEAD 8d0ecaabf7b4514384246a71daf27f9a835da7f8 against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Ordinary architecture/Rust/unit/UI/device-archive and protected bounded-account Global Dharma/shared-runtime/commerce/restore/cleanup acceptance all completed successfully; later iOS HEADs still require their own current-head acceptance."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob ed10e4cfb5782f046a22f34545c3934f41091072. iOS shipping MiniAppWebMcpSurface preserves slash parsing, zero-field direct calls, one-string remainder calls, schema defaults, enum/type/required validation, approval gating and canonical MarketplaceModel execution. Historical verified evidence was bound to 8d0ecaab/old Desktop authority, so this row is deliberately demoted to implemented until current-head Actions plus artifact/reviewer provenance are complete.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/index.ts",
@@ -92,7 +100,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "The native contract preserves the product semantics without copying TypeScript compile-time types. MiniAppWebMcpSurface.swift is the single canonical ledger target; MarketplaceModel.swift remains supporting production evidence."
+      "notes": "The native contract preserves the product semantics without copying TypeScript compile-time types. MiniAppWebMcpSurface.swift is the single canonical ledger target; MarketplaceModel.swift remains supporting production evidence. Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093 against the exact current blob and current iOS shipping owner. No current-head verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/webmcp.ts",
@@ -107,7 +117,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MiniAppWebMcpSurface.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; protected artifact 11322562864 from run 37255135388",
-      "notes": "Protected evidence at b2b40be proves the real hosted/local WebMCP path and shared-runtime status call; row remains below verified pending overall audit/release completion."
+      "notes": "Protected evidence at b2b40be proves the real hosted/local WebMCP path and shared-runtime status call; row remains below verified pending overall audit/release completion. Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093 against the exact current blob and current iOS shipping owner. No current-head verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/shared/src/app-experience.ts",
@@ -122,7 +134,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiProductExperience.swift; frontend/src/production/GrokMobileShell+Home.swift; mobile/ios/Fabushi/GlobalDharmaMiniAppBridge.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "mobile/ios/FabushiTests/FabushiProductExperienceTests.swift; mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift",
-      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The six canonical modules are reachable from the shipping iOS home; same-head Actions and protected acceptance are still required before verified promotion."
+      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The six canonical modules are reachable from the shipping iOS home; same-head Actions and protected acceptance are still required before verified promotion. Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093 against the exact current blob and current iOS shipping owner. No current-head verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/shared/src/brand.ts",
@@ -280,7 +294,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/FabushiApp.swift; frontend/src/production/FabushiSceneRoot.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/ProductionRenderer.view.swift",
       "test_evidence": "Exact-HEAD ordinary Actions 37260023238 build-and-test/device-archive and protected Actions 37260023181",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d and current iOS shipping composition. Desktop reconstruction health POST/HMR are dev-only and intentionally not ported."
+      "notes": "Reviewed against Desktop final HEAD 798cf51d and current iOS shipping composition. Desktop reconstruction health POST/HMR are dev-only and intentionally not ported. Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093 against the exact current blob and current iOS shipping owner. No current-head verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/AgentDeleteConfirmation.tsx",
@@ -378,13 +394,14 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "iOS decomposes the Desktop renderer root across FabushiSceneRoot -> ProductionRenderer -> GrokMobileShell/ContentView while keeping domain state in the existing MarketplaceModel, MessagingModel, FeatureHost and Coordinator owners. ScenePhase/protected-data/memory/openURL hooks replace Electron window/root lifecycle; native sheets/covers replace DOM overlays; App Store/TestFlight lifecycle replaces Desktop updater chrome. The root now delegates Async Tasks exclusively to MobileAsyncTasksPanel instead of retaining a second renderer provider.",
-      "implementation_status": "mapped",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/ProductionRenderer.view.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; source/ios-main/FabushiRuntime.swift; mobile/ios/Fabushi/MessagingModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; mobile/ios/FabushiTests/AsyncTasksParityTests.swift; mobile/ios/FabushiTests/PackageShellPolicyParityTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift; exact-HEAD ordinary/protected GitHub Actions required before verified promotion; mobile/ios/FabushiTests/ChatSearchModelTests.swift",
-      "notes": "Re-audited against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 direct diff from 798cf51d96cb1cb98cf657af212bb47274ccb701. Current-main additions were decomposed rather than inherited: Human roster/transcript/reconnect/forward/call responsibilities remain in their existing iOS Human owners; new Agent identity now stages New chat + wedge/cyan and commits avatarShape/avatarColor atomically through canonical bot.create; persisted Agent conversation.openTail now reconciles a late authoritative baseline without erasing live/optimistic entries; Human conversations remain excluded from Agent-only duplicate/hide/profile semantics by native surface ownership; Electron document localization/zoom preferences are not portable runtime APIs and are replaced by the native SwiftUI/UIKit scene/platform preference lifecycle. Aggregate root is implemented but not verified: child ledger rows, 7,950 selected coverage, current-head ordinary/protected Actions, physical-device Human Call and IOS-MAIN-AC-01..21 remain independently gated. Current-main Human find-in-chat was re-audited against ProductionRenderer commits bc0956446db8548f0f993cf04e5cc967fe8f00dc and 17485f590c814d29809c45718dc6edc23677a6db: iOS now routes non-empty Human queries through the existing account-scoped mahayana-messaging Search(scope=conversation) owner, fences stale async results by query/conversation generation, settles the first canonical result automatically, and exposes a native durable-result preview even when the matching message is outside the bounded local snapshot. The row remains mapped/current-main-fenced until descendant exact-HEAD CI and aggregate dependency review close.",
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob af8a83a8dd7cf1444474889ce3e64fe796a7d458. The shipping iOS composition is real and singular: FabushiSceneRoot constructs one FabushiRuntime, ProductionRenderer injects MarketplaceModel/MessagingModel/IOSPreloadBridge/FabushiAppAgentSurface into GrokMobileShell, and scene/deep-link/protected-data/memory lifecycle remains Runtime-owned. Descendant responsibilities, 7,951-row completeness, physical-device Human Call and IOS-MAIN-AC-01..21 remain independently gated, so this aggregate row is implemented, not verified.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/production/agent-name-editor-model.ts",

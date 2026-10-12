@@ -27,40 +27,30 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20. Requested checkpoint 177fc994e2554ddc2f3213766d41909853b1a40c and runs 38194466221, 38194466227, 38194755369, 38194755382 are predecessor evidence only after the PR advanced and live iOS main synchronization completed. No predecessor green step or artifact is accepted for current-head verification. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full completeness and independent acceptance remain pending.",
+  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20. Requested checkpoint d705013a1ae4be5c36057b7ff1444f1a5b1aeb19 and runs 38194840503, 38194840499, 38194881441 are predecessor evidence only because PR #3 advanced through e8e22c1f and 8a53722d. Runs 38195149103/38195149107 and 38195278502/38195278457 are also predecessor once this evidence commit lands. Thirteen named Desktop frontend responsibilities were re-read at exact current-main blobs; no fabricated verified evidence was added. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full completeness and independent acceptance remain pending.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "177fc994e2554ddc2f3213766d41909853b1a40c",
-    "preEvidenceIosHead": "fb6f4a7e84929c43e62a1fe086190cb8fc19f3d6",
+    "requestedCheckpoint": "d705013a1ae4be5c36057b7ff1444f1a5b1aeb19",
+    "preEvidenceIosHead": "8a53722d0b2c8f5681781d0ce2e82f8b562b3243",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "predecessorWorkflowRuns": [
-      38190289874,
-      38190289840,
-      38192173184,
-      38192173175,
-      38192487666,
-      38192487704,
-      38192567443,
-      38192567432,
-      38192646437,
-      38192646349,
-      38192850135,
-      38192850173,
-      38193218500,
-      38193218520,
-      38193384215,
-      38193384217,
-      38193596582,
-      38194466221,
-      38194466227,
-      38194755369,
-      38194755382
+      38194840503,
+      38194840499,
+      38194881441,
+      38195149103,
+      38195149107,
+      38195278502,
+      38195278457
     ],
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20"
     },
-    "promotion": "none",
-    "status": "live-main-synchronized-behind-0-fresh-exact-head-actions-required-after-this-evidence-commit"
+    "backendAuthority": "9c56a77cbe02dfceebf574236a703b53cd257cb9",
+    "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
+    "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
+    "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
+    "promotion": "frontend-owner-review-and-status-correction-no-verification-promotion",
+    "status": "fresh-exact-head-actions-required-after-this-evidence-commit"
   }
 }
