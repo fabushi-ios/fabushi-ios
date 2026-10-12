@@ -117,10 +117,12 @@ final class IOSGatewayDescriptorFastPath {
         getAccountScope: @escaping AccountScopeProvider,
         reportFailure: @escaping FailureReporter = { _, _ in },
         isBrokerDenial: @escaping BrokerDenialClassifier = { error in
+            if let broker = error as? IOSCursorSandBoxBrokerError {
+                return broker.deniesCachedDescriptor
+            }
             let message = (error as NSError).localizedDescription
-            return message.contains("HTTP 401")
-                || message.contains("HTTP 403")
-                || message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
+            return message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
+                || message.contains(GATEWAY_ACCESS_DENIED_MESSAGE_MARKER)
         },
         resolveLive: @escaping ResolveLive
     ) {
