@@ -807,23 +807,27 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
     }
 
     typealias RequestExecutor = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    typealias BackendUpdateRequirementSink = @MainActor (Bool) -> Void
 
     private let credentials: AccountMcpCredentials
     private let backendURL: URL
     private let session: URLSession
     private let requestExecutor: RequestExecutor?
+    private let backendUpdateRequirementSink: BackendUpdateRequirementSink
     private let avatarCache = NSCache<NSString, NSString>()
 
     init(
         credentials: AccountMcpCredentials,
         backendURL: URL = URL(string: getConfiguredBackendUrl())!,
         session: URLSession = .shared,
-        requestExecutor: RequestExecutor? = nil
+        requestExecutor: RequestExecutor? = nil,
+        backendUpdateRequirementSink: @escaping BackendUpdateRequirementSink = { _ in }
     ) {
         self.credentials = credentials
         self.backendURL = backendURL
         self.session = session
         self.requestExecutor = requestExecutor
+        self.backendUpdateRequirementSink = backendUpdateRequirementSink
     }
 
     private func perform(_ request: URLRequest) async throws -> (Data, URLResponse) {
@@ -1045,12 +1049,20 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             timeoutMs: timeoutMs
         )
         let (data, response) = try await perform(request)
-        try validateConnectHTTP(
-            response,
-            method: "EnsureSandBox",
-            responseBody: data
-        )
-        return try IOSCursorDashboardProto.decodeEnsureSandBoxResponse(data)
+        do {
+            try validateConnectHTTP(
+                response,
+                method: "EnsureSandBox",
+                responseBody: data
+            )
+            await backendUpdateRequirementSink(false)
+            return try IOSCursorDashboardProto.decodeEnsureSandBoxResponse(data)
+        } catch let error as IOSCursorSandBoxBrokerError {
+            if case .updateRequired = error.kind {
+                await backendUpdateRequirementSink(true)
+            }
+            throw error
+        }
     }
 
     func recreateSandBox(
