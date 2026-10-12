@@ -115,6 +115,32 @@ internal final class HumanCallSystemCoordinator: NSObject,
         data.map { String(format: "%02x", $0) }.joined()
     }
 
+    nonisolated static func canonicalProviderResetDescriptors(
+        _ descriptors: [HumanCallPushDescriptor]
+    ) -> [HumanCallPushDescriptor] {
+        var latestByCallID: [String: HumanCallPushDescriptor] = [:]
+        for descriptor in descriptors {
+            if let current = latestByCallID[descriptor.callId],
+               current.generation >= descriptor.generation {
+                continue
+            }
+            latestByCallID[descriptor.callId] = descriptor
+        }
+        return latestByCallID.values.sorted { lhs, rhs in
+            if lhs.callId == rhs.callId {
+                return lhs.generation < rhs.generation
+            }
+            return lhs.callId < rhs.callId
+        }
+    }
+
+    private func drainProviderResetDescriptors() -> [HumanCallPushDescriptor] {
+        let descriptors = Self.canonicalProviderResetDescriptors(Array(callsByUUID.values))
+        callsByUUID.removeAll()
+        uuidsByCallID.removeAll()
+        return descriptors
+    }
+
     nonisolated func pushRegistry(
         _ registry: PKPushRegistry,
         didUpdate pushCredentials: PKPushCredentials,
@@ -182,9 +208,18 @@ internal final class HumanCallSystemCoordinator: NSObject,
 
         provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
             let succeeded = error == nil
-            Task { @MainActor [weak self, descriptor, completion] in
+            Task { @MainActor [weak self, descriptor, completion, uuid] in
                 defer { completion.value() }
-                guard succeeded, let self else { return }
+                guard let self else { return }
+                guard succeeded else {
+                    if self.callsByUUID[uuid] == descriptor {
+                        self.callsByUUID.removeValue(forKey: uuid)
+                    }
+                    if self.uuidsByCallID[descriptor.callId] == uuid {
+                        self.uuidsByCallID.removeValue(forKey: descriptor.callId)
+                    }
+                    return
+                }
                 try? await self.actionHandler?(.incoming(descriptor))
             }
         }
@@ -192,8 +227,15 @@ internal final class HumanCallSystemCoordinator: NSObject,
 
     nonisolated func providerDidReset(_ provider: CXProvider) {
         Task { @MainActor [weak self] in
-            self?.callsByUUID.removeAll()
-            self?.uuidsByCallID.removeAll()
+            guard let self else { return }
+            let descriptors = self.drainProviderResetDescriptors()
+            guard let actionHandler = self.actionHandler else { return }
+            for descriptor in descriptors {
+                // A CXProvider reset invalidates every projected system call.
+                // Best-effort terminalize the same canonical Host generation so
+                // a reset cannot leave an iOS-only ghost call behind.
+                try? await actionHandler(.end(descriptor))
+            }
         }
     }
 

@@ -57,6 +57,35 @@ final class HumanCallSystemCoordinatorTests: XCTestCase {
         ]))
     }
 
+    func testProviderResetDescriptorsKeepLatestGenerationPerCall() {
+        let older = HumanCallPushDescriptor(
+            callId: "call-b",
+            generation: 2,
+            displayName: "Older",
+            hasVideo: false
+        )
+        let newer = HumanCallPushDescriptor(
+            callId: "call-b",
+            generation: 4,
+            displayName: "Newer",
+            hasVideo: true
+        )
+        let other = HumanCallPushDescriptor(
+            callId: "call-a",
+            generation: 1,
+            displayName: "Other",
+            hasVideo: false
+        )
+
+        let descriptors = HumanCallSystemCoordinator.canonicalProviderResetDescriptors(
+            [older, newer, other]
+        )
+
+        XCTAssertEqual(descriptors.map(\.callId), ["call-a", "call-b"])
+        XCTAssertEqual(descriptors.map(\.generation), [1, 4])
+        XCTAssertEqual(descriptors.last?.displayName, "Newer")
+    }
+
     func testVoIPTokenEncodingIsStableLowercaseHex() {
         XCTAssertEqual(
             HumanCallSystemCoordinator.hexadecimalToken(Data([0x00, 0x0a, 0xff])),
