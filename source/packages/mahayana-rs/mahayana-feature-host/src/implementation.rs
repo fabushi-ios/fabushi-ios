@@ -7153,16 +7153,167 @@ impl FeatureHostController {
         })
     }
 
+    pub fn attachment_upload_direct(
+        &self,
+        agent_id: &str,
+        filename: &str,
+        mime_type: Option<String>,
+        bytes_base64: &str,
+    ) -> Result<AttachmentStored, FeatureHostError> {
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("attachment storage is unavailable".into()))?;
+        if !is_safe_memory_agent_id(agent_id) || !self.state()?.bots.contains_key(agent_id) {
+            return Err(FeatureHostError::Contract(format!(
+                "unknown attachment owner: {agent_id}"
+            )));
+        }
+        let filename = filename.trim();
+        if filename.is_empty() {
+            return Err(FeatureHostError::Contract(
+                "attachment filename must not be empty".into(),
+            ));
+        }
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(bytes_base64.trim())
+            .map_err(|error| {
+                FeatureHostError::Contract(format!("invalid attachment base64: {error}"))
+            })?;
+        if bytes.is_empty() {
+            return Err(FeatureHostError::Contract("attachment is empty".into()));
+        }
+        let limit = attachment_byte_limit_for_name(filename);
+        if bytes.len() as u64 > limit {
+            return Err(FeatureHostError::Contract(format!(
+                "attachment exceeds {} bytes",
+                limit
+            )));
+        }
+        let hash = format!("{:x}", Sha256::digest(&bytes));
+        let extension = Path::new(filename)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.to_ascii_lowercase())
+            .filter(|extension| {
+                extension
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())
+            })
+            .filter(|extension| !extension.is_empty())
+            .unwrap_or_else(|| "bin".into());
+        let attachments_dir = agent_root.join(agent_id).join("attachments");
+        std::fs::create_dir_all(&attachments_dir).map_err(|error| {
+            FeatureHostError::Contract(format!("create attachment directory: {error}"))
+        })?;
+        let path = attachments_dir.join(format!("{hash}.{extension}"));
+        if !path.exists() {
+            std::fs::write(&path, &bytes).map_err(|error| {
+                FeatureHostError::Contract(format!("write attachment: {error}"))
+            })?;
+        }
+        Ok(AttachmentStored {
+            id: hash.clone(),
+            agent_id: agent_id.to_string(),
+            name: filename.to_string(),
+            path: path.to_string_lossy().to_string(),
+            mime_type: clean_optional_string(mime_type)
+                .or_else(|| media_mime_type(filename).map(str::to_string)),
+            size_bytes: bytes.len() as u64,
+            hash,
+        })
+    }
+
+    pub fn attachment_read_text_direct(
+        &self,
+        agent_id: &str,
+        path: &str,
+    ) -> Result<AttachmentTextResult, FeatureHostError> {
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("attachment storage is unavailable".into()))?;
+        let resolved = resolve_agent_attachment_path(&agent_root, agent_id, path)?;
+        let metadata = std::fs::metadata(&resolved).map_err(|error| {
+            FeatureHostError::Contract(format!("read attachment metadata: {error}"))
+        })?;
+        let bytes = metadata.len();
+        let preview = read_file_prefix(&resolved, ATTACHMENT_TEXT_PREVIEW_BYTE_CAP)?;
+        let binary = !is_text_previewable_name(&resolved) || looks_like_binary(&preview);
+        Ok(AttachmentTextResult {
+            path: resolved.to_string_lossy().to_string(),
+            kind: if binary { "binary" } else { "text" }.into(),
+            text: (!binary).then(|| String::from_utf8_lossy(&preview).to_string()),
+            truncated: !binary && bytes > ATTACHMENT_TEXT_PREVIEW_BYTE_CAP as u64,
+            bytes,
+        })
+    }
+
+    pub fn attachment_read_chunk_direct(
+        &self,
+        agent_id: &str,
+        path: &str,
+        offset: u64,
+        length: u64,
+    ) -> Result<AttachmentChunkResult, FeatureHostError> {
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("attachment storage is unavailable".into()))?;
+        let resolved = resolve_agent_attachment_path(&agent_root, agent_id, path)?;
+        let metadata = std::fs::metadata(&resolved).map_err(|error| {
+            FeatureHostError::Contract(format!("read attachment metadata: {error}"))
+        })?;
+        let total_size = metadata.len();
+        let start = offset.min(total_size);
+        let length = length
+            .min(ATTACHMENT_CHUNK_MAX_BYTES as u64)
+            .min(total_size - start);
+        let bytes = read_file_range(&resolved, start, length as usize)?;
+        Ok(AttachmentChunkResult {
+            path: resolved.to_string_lossy().to_string(),
+            bytes_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
+            total_size,
+            mime: media_mime_type(resolved.to_string_lossy().as_ref()).map(str::to_string),
+        })
+    }
+
+    pub fn attachment_read_image_direct(
+        &self,
+        agent_id: &str,
+        path: &str,
+    ) -> Result<AttachmentImageResult, FeatureHostError> {
+        let agent_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract("attachment storage is unavailable".into()))?;
+        let resolved = resolve_agent_attachment_path(&agent_root, agent_id, path)?;
+        let mime = media_mime_type(resolved.to_string_lossy().as_ref())
+            .filter(|mime| mime.starts_with("image/"))
+            .ok_or_else(|| {
+                FeatureHostError::Contract("attachment is not a supported image".into())
+            })?;
+        let bytes = std::fs::read(&resolved).map_err(|error| {
+            FeatureHostError::Contract(format!("read image attachment: {error}"))
+        })?;
+        if bytes.len() as u64 > ATTACHMENT_BYTE_LIMIT {
+            return Err(FeatureHostError::Contract(
+                "image attachment exceeds preview limit".into(),
+            ));
+        }
+        let (width, height) = image_dimensions(&bytes, mime);
+        Ok(AttachmentImageResult {
+            path: resolved.to_string_lossy().to_string(),
+            data_url: format!(
+                "data:{mime};base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(bytes)
+            ),
+            width,
+            height,
+        })
+    }
+
     fn execute_attachment(
         &self,
         command: FeatureCommand,
     ) -> Result<CommandAccepted, FeatureHostError> {
         let request_id = command.request_id().to_string();
-        let agent_root = self
-            .active_account_root(self.memory_root_path.as_deref())
-            .ok_or_else(|| {
-                FeatureHostError::Contract("attachment storage is unavailable".into())
-            })?;
         match command {
             FeatureCommand::AttachmentUpload {
                 agent_id,
@@ -7171,92 +7322,23 @@ impl FeatureHostController {
                 bytes_base64,
                 ..
             } => {
-                if !is_safe_memory_agent_id(&agent_id)
-                    || !self.state()?.bots.contains_key(&agent_id)
-                {
-                    return Err(FeatureHostError::Contract(format!(
-                        "unknown attachment owner: {agent_id}"
-                    )));
-                }
-                let filename = filename.trim();
-                if filename.is_empty() {
-                    return Err(FeatureHostError::Contract(
-                        "attachment filename must not be empty".into(),
-                    ));
-                }
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(bytes_base64.trim())
-                    .map_err(|error| {
-                        FeatureHostError::Contract(format!("invalid attachment base64: {error}"))
-                    })?;
-                if bytes.is_empty() {
-                    return Err(FeatureHostError::Contract("attachment is empty".into()));
-                }
-                let limit = attachment_byte_limit_for_name(filename);
-                if bytes.len() as u64 > limit {
-                    return Err(FeatureHostError::Contract(format!(
-                        "attachment exceeds {} bytes",
-                        limit
-                    )));
-                }
-                let hash = format!("{:x}", Sha256::digest(&bytes));
-                let extension = Path::new(filename)
-                    .extension()
-                    .and_then(|extension| extension.to_str())
-                    .map(|extension| extension.to_ascii_lowercase())
-                    .filter(|extension| {
-                        extension
-                            .chars()
-                            .all(|character| character.is_ascii_alphanumeric())
-                    })
-                    .filter(|extension| !extension.is_empty())
-                    .unwrap_or_else(|| "bin".into());
-                let attachments_dir = agent_root.join(&agent_id).join("attachments");
-                std::fs::create_dir_all(&attachments_dir).map_err(|error| {
-                    FeatureHostError::Contract(format!("create attachment directory: {error}"))
-                })?;
-                let path = attachments_dir.join(format!("{hash}.{extension}"));
-                if !path.exists() {
-                    std::fs::write(&path, &bytes).map_err(|error| {
-                        FeatureHostError::Contract(format!("write attachment: {error}"))
-                    })?;
-                }
-                let attachment = AttachmentStored {
-                    id: hash.clone(),
-                    agent_id,
-                    name: filename.to_string(),
-                    path: path.to_string_lossy().to_string(),
-                    mime_type: clean_optional_string(mime_type)
-                        .or_else(|| media_mime_type(filename).map(str::to_string)),
-                    size_bytes: bytes.len() as u64,
-                    hash,
-                };
+                let attachment = self.attachment_upload_direct(
+                    &agent_id,
+                    &filename,
+                    mime_type,
+                    &bytes_base64,
+                )?;
                 self.state()?.events.push_back(HostEvent::AttachmentStored {
                     timestamp: timestamp(),
                     attachment,
                 });
             }
             FeatureCommand::AttachmentReadText { agent_id, path, .. } => {
-                let resolved = resolve_agent_attachment_path(&agent_root, &agent_id, &path)?;
-                let metadata = std::fs::metadata(&resolved).map_err(|error| {
-                    FeatureHostError::Contract(format!("read attachment metadata: {error}"))
-                })?;
-                let bytes = metadata.len();
-                let preview = read_file_prefix(&resolved, ATTACHMENT_TEXT_PREVIEW_BYTE_CAP)?;
-                let binary = !is_text_previewable_name(&resolved) || looks_like_binary(&preview);
-                let result = AttachmentTextResult {
-                    path: resolved.to_string_lossy().to_string(),
-                    kind: if binary { "binary" } else { "text" }.into(),
-                    text: (!binary).then(|| String::from_utf8_lossy(&preview).to_string()),
-                    truncated: !binary && bytes > ATTACHMENT_TEXT_PREVIEW_BYTE_CAP as u64,
-                    bytes,
-                };
-                self.state()?
-                    .events
-                    .push_back(HostEvent::AttachmentTextRead {
-                        timestamp: timestamp(),
-                        result,
-                    });
+                let result = self.attachment_read_text_direct(&agent_id, &path)?;
+                self.state()?.events.push_back(HostEvent::AttachmentTextRead {
+                    timestamp: timestamp(),
+                    result,
+                });
             }
             FeatureCommand::AttachmentReadChunk {
                 agent_id,
@@ -7265,60 +7347,19 @@ impl FeatureHostController {
                 length,
                 ..
             } => {
-                let resolved = resolve_agent_attachment_path(&agent_root, &agent_id, &path)?;
-                let metadata = std::fs::metadata(&resolved).map_err(|error| {
-                    FeatureHostError::Contract(format!("read attachment metadata: {error}"))
-                })?;
-                let total_size = metadata.len();
-                let start = offset.min(total_size);
-                let length = length
-                    .min(ATTACHMENT_CHUNK_MAX_BYTES as u64)
-                    .min(total_size - start);
-                let bytes = read_file_range(&resolved, start, length as usize)?;
-                let result = AttachmentChunkResult {
-                    path: resolved.to_string_lossy().to_string(),
-                    bytes_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
-                    total_size,
-                    mime: media_mime_type(resolved.to_string_lossy().as_ref()).map(str::to_string),
-                };
-                self.state()?
-                    .events
-                    .push_back(HostEvent::AttachmentChunkRead {
-                        timestamp: timestamp(),
-                        result,
-                    });
+                let result =
+                    self.attachment_read_chunk_direct(&agent_id, &path, offset, length)?;
+                self.state()?.events.push_back(HostEvent::AttachmentChunkRead {
+                    timestamp: timestamp(),
+                    result,
+                });
             }
             FeatureCommand::AttachmentReadImage { agent_id, path, .. } => {
-                let resolved = resolve_agent_attachment_path(&agent_root, &agent_id, &path)?;
-                let mime = media_mime_type(resolved.to_string_lossy().as_ref())
-                    .filter(|mime| mime.starts_with("image/"))
-                    .ok_or_else(|| {
-                        FeatureHostError::Contract("attachment is not a supported image".into())
-                    })?;
-                let bytes = std::fs::read(&resolved).map_err(|error| {
-                    FeatureHostError::Contract(format!("read image attachment: {error}"))
-                })?;
-                if bytes.len() as u64 > ATTACHMENT_BYTE_LIMIT {
-                    return Err(FeatureHostError::Contract(
-                        "image attachment exceeds preview limit".into(),
-                    ));
-                }
-                let (width, height) = image_dimensions(&bytes, mime);
-                let result = AttachmentImageResult {
-                    path: resolved.to_string_lossy().to_string(),
-                    data_url: format!(
-                        "data:{mime};base64,{}",
-                        base64::engine::general_purpose::STANDARD.encode(bytes)
-                    ),
-                    width,
-                    height,
-                };
-                self.state()?
-                    .events
-                    .push_back(HostEvent::AttachmentImageRead {
-                        timestamp: timestamp(),
-                        result,
-                    });
+                let result = self.attachment_read_image_direct(&agent_id, &path)?;
+                self.state()?.events.push_back(HostEvent::AttachmentImageRead {
+                    timestamp: timestamp(),
+                    result,
+                });
             }
             _ => unreachable!("non-attachment command routed to attachment executor"),
         }

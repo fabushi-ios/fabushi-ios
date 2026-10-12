@@ -1288,6 +1288,10 @@ impl AppHost {
             "feature.plugin.uiResource" => self.plugin_ui_resource(params),
             "feature.messaging.execute" => self.feature_messaging_execute(params),
             "feature.messaging.blob.read" => self.feature_messaging_blob_read(params),
+            "feature.attachment.uploadDirect" => self.feature_attachment_upload_direct(params),
+            "feature.attachment.readTextDirect" => self.feature_attachment_read_text_direct(params),
+            "feature.attachment.readChunkDirect" => self.feature_attachment_read_chunk_direct(params),
+            "feature.attachment.readImageDirect" => self.feature_attachment_read_image_direct(params),
             "feature.messaging.access.issue" => self.feature_messaging_access_issue(params),
             other => Err(AppHostError::InvalidRequest(format!(
                 "unknown feature method {other}"
@@ -1379,6 +1383,62 @@ impl AppHost {
             .interrupt(operation_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         Ok(Value::Null)
+    }
+
+    fn feature_attachment_upload_direct(&self, params: Value) -> Result<Value, AppHostError> {
+        let agent_id = string_param(&params, "agentId")?;
+        let filename = string_param(&params, "filename")?;
+        let bytes_base64 = string_param(&params, "bytesBase64")?;
+        let mime_type = params
+            .get("mimeType")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let attachment = self
+            .feature
+            .attachment_upload_direct(agent_id, filename, mime_type, bytes_base64)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        serde_json::to_value(attachment).map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_attachment_read_text_direct(&self, params: Value) -> Result<Value, AppHostError> {
+        let result = self
+            .feature
+            .attachment_read_text_direct(
+                string_param(&params, "agentId")?,
+                string_param(&params, "path")?,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        serde_json::to_value(result).map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_attachment_read_chunk_direct(&self, params: Value) -> Result<Value, AppHostError> {
+        let offset = params.get("offset").and_then(Value::as_u64).unwrap_or(0);
+        let length = params
+            .get("length")
+            .and_then(Value::as_u64)
+            .unwrap_or(4 * 1024 * 1024)
+            .clamp(1, 8 * 1024 * 1024);
+        let result = self
+            .feature
+            .attachment_read_chunk_direct(
+                string_param(&params, "agentId")?,
+                string_param(&params, "path")?,
+                offset,
+                length,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        serde_json::to_value(result).map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_attachment_read_image_direct(&self, params: Value) -> Result<Value, AppHostError> {
+        let result = self
+            .feature
+            .attachment_read_image_direct(
+                string_param(&params, "agentId")?,
+                string_param(&params, "path")?,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        serde_json::to_value(result).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
     fn feature_messaging_execute(&self, params: Value) -> Result<Value, AppHostError> {
