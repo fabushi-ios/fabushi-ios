@@ -272,7 +272,7 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         ]))
     }
 
-    func testBotFindSearchUsesOnlyMainTranscriptCopyableTextAndWrapsMatches() {
+    func testBotFindSearchUsesMainTranscriptSearchableTextAndWrapsMatches() {
         let root = MobileChatMessage(
             id: "root",
             role: .assistant,
@@ -301,7 +301,7 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
         )
 
         let searchable = mobileBotChatSearchEntries([root, branched, notice, user], botName: "Agent")
-        XCTAssertEqual(searchable.map(\.id), ["root", "user"])
+        XCTAssertEqual(searchable.map(\.id), ["root", "notice", "user"])
 
         let matches = chatSearchMatches(searchable, query: "ALPHA")
         XCTAssertEqual(
@@ -309,11 +309,70 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
             [
                 ChatSearchMatch(entryId: "root", occurrence: 0),
                 ChatSearchMatch(entryId: "root", occurrence: 1),
+                ChatSearchMatch(entryId: "notice", occurrence: 0),
                 ChatSearchMatch(entryId: "user", occurrence: 0),
             ]
         )
-        XCTAssertEqual(nextChatSearchIndex(current: 2, count: matches.count, delta: 1), 0)
-        XCTAssertEqual(nextChatSearchIndex(current: 0, count: matches.count, delta: -1), 2)
+        XCTAssertEqual(nextChatSearchIndex(current: 3, count: matches.count, delta: 1), 0)
+        XCTAssertEqual(nextChatSearchIndex(current: 0, count: matches.count, delta: -1), 3)
+    }
+
+    func testBotFindSearchIndexesWidgetEmailAndSlackVisibleText() throws {
+        let widget = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "widget-find",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "widget",
+                        "widget": [
+                            "prompt": "Deploy production?",
+                            "options": [["label": "Ship", "value": "ship"]],
+                        ],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+        let email = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "email-find",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "email-draft",
+                        "draft": [
+                            "to": ["ops@example.com"],
+                            "subject": "Release train",
+                            "body": "Ship build 42",
+                        ],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+        let slack = try XCTUnwrap(projectMobileTranscriptCard(
+            event: [
+                "entryId": "slack-find",
+                "card": [
+                    "kind": "send-message",
+                    "message": [
+                        "type": "slack-draft",
+                        "draft": [
+                            "target": "#release",
+                            "body": "Deployment complete",
+                        ],
+                    ],
+                ],
+            ],
+            operationId: nil
+        ))
+
+        let searchable = mobileBotChatSearchEntries([widget, email, slack], botName: "Agent")
+        XCTAssertEqual(searchable.map(\.id), [widget.id, email.id, slack.id])
+        XCTAssertEqual(chatSearchMatches(searchable, query: "DEPLOY").map(\.entryId), [widget.id, slack.id])
+        XCTAssertEqual(chatSearchMatches(searchable, query: "release").map(\.entryId), [email.id])
+        XCTAssertEqual(chatSearchMatches(searchable, query: "build 42").map(\.entryId), [email.id])
     }
 
     func testAgentForwardingRequiresCanonicalConversationAndSettledMessageIdentity() {

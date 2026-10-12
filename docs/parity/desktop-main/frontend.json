@@ -2621,8 +2621,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat renders approval detail, redacted proposed rule, Allow once/Always allow/Deny controls, persists always-allow through canonical auto-review settings, and fences completion by Bot generation/approvalId.",
       "test_evidence": "Existing approval projection/resolution and auto-review rule tests plus current-head CI/UI acceptance.",
-      "notes": "IOS-MAIN-DEP-AUTO-REVIEW-LEAF-20261009: exact Desktop auto-review-approval.tsx reviewed; leaf reuses the existing implemented auto-review action owner.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-AUTO-REVIEW-LEAF-20261009: exact Desktop auto-review-approval.tsx reviewed; leaf reuses the existing implemented auto-review action owner. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/cloud-agent.tsx",
@@ -2637,8 +2638,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift cloudAgentCard consumes MarketplaceModel.cloudAgentInfo-backed state from pollVisibleCloudAgents and is reached by the shipping cursor-agent transcript projection.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers strict cursor-agent projection and cloud-agent info/stat decoding. Exact-head Swift/UI/protected evidence is still pending.",
-      "notes": "IOS-MAIN-DEP-CLOUD-AGENT-LEAF-20261011: provider dependency is now production-composed; advance to implemented only, not verified.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-CLOUD-AGENT-LEAF-20261011: provider dependency is now production-composed; advance to implemented only, not verified. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/connector.tsx",
@@ -2653,8 +2655,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift connectorCard renders the singular connector projection and invokes MarketplaceModel.connectConnectorCard/retryConnectorCard/reopenConnectorCard from the one visible-card lifecycle.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers singular connector projection and canonical normalized/default-account/team-policy matching. Exact-head UI/protected evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-CONNECTOR-LEAF-20261011: connector-actions dependency is production-composed; keep at implemented pending same-head acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-CONNECTOR-LEAF-20261011: connector-actions dependency is production-composed; keep at implemented pending same-head acceptance. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/connectors.tsx",
@@ -2669,8 +2672,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift visibleConnectorNames/runConnectorCardLifecycle/connectorCard plus mobile/ios/Fabushi/MarketplaceModel.swift canonical connector action methods compose the plural shipping card.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers strict plural projection and normalized connector de-duplication plus canonical server matching. Exact-head UI/protected evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-CONNECTORS-LEAF-20261011: plural leaf now shares the canonical connector-actions owner; keep below verified pending same-final-HEAD evidence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-CONNECTORS-LEAF-20261011: plural leaf now shares the canonical connector-actions owner; keep below verified pending same-final-HEAD evidence. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/email-draft.tsx",
@@ -2685,8 +2689,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat renders editable To/Subject/Body, validates comma-separated email addresses and body, and exposes Send email/Discard. MarketplaceModel.resolveTranscriptDraft waits through sending to sent/discarded/failed over canonical FeatureHost transport.",
       "test_evidence": "SharedWorkflowTranscriptParityTests covers typed draft projection and recipient validation; FeatureHost tests cover draft send/discard and production connector send path; same-head UI acceptance pending.",
-      "notes": "IOS-MAIN-DEP-EMAIL-DRAFT-20261009: exact Desktop email-draft.tsx reviewed. Native implementation intentionally wires the existing real draft.resolve owner rather than preserving Desktop's recovered empty callbacks.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-EMAIL-DRAFT-20261009: exact Desktop email-draft.tsx reviewed. Native implementation intentionally wires the existing real draft.resolve owner rather than preserving Desktop's recovered empty callbacks. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/index.ts",
@@ -2701,7 +2706,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "",
-      "notes": "Mechanism-only row; no separate native barrel owner is appropriate."
+      "notes": "Mechanism-only row; no separate native barrel owner is appropriate. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/link-card.tsx",
@@ -2716,7 +2723,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat uses MobileLinkMetadataCard for both send-message:text bare-link presentation and legacy-link attachment presentation.",
       "test_evidence": "Provider projection is covered in SharedWorkflowTranscriptParityTests; exact visual/interaction acceptance awaits current exact-HEAD Swift UI/protected runs.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and canonical desktop blob 31b5091dbe31a38108a044549bff4cb077504c32. Native SwiftUI is the platform replacement for the web leaf."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and canonical desktop blob 31b5091dbe31a38108a044549bff4cb077504c32. Native SwiftUI is the platform replacement for the web leaf. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/listener-connect.tsx",
@@ -2731,8 +2740,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.listenerIntegrationCard exposes Connect/Connected/loading/error UI and calls MarketplaceModel.connectListenerIntegration over FeatureHost listener.connect.",
       "test_evidence": "MarketplaceModelLifecycleTests covers listener projection/HTTPS authorization URL; current-head UI acceptance pending.",
-      "notes": "IOS-MAIN-DEP-LISTENER-LEAF-20261009: exact Desktop listener-connect.tsx reviewed; shares the implemented listener integration owner.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-LISTENER-LEAF-20261009: exact Desktop listener-connect.tsx reviewed; shares the implemented listener integration owner. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/local-tool-permission.tsx",
@@ -2747,7 +2757,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/local-exec-daemon/LocalCapabilityRunner.swift; source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/ios-main/adapters/ios-native-local-capability-backend.swift; source/host/box/box-shell-command.rs; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to the Desktop renderer/global local-computer approval surface. iOS must continue to fail closed for unsupported local capabilities and route shell/process/box work through the remote-computer path; it does not treat Mini App approval or the retired permission-request transcript leaf as equivalent."
+      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to the Desktop renderer/global local-computer approval surface. iOS must continue to fail closed for unsupported local capabilities and route shell/process/box work through the remote-computer path; it does not treat Mini App approval or the retired permission-request transcript leaf as equivalent. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/secret-request.tsx",
@@ -2762,8 +2774,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.secretRequestCard + MarketplaceModel.provideTranscriptSecret use canonical FeatureHost secret.provide/secret.provided and never persist the plaintext secret.",
       "test_evidence": "Typed SecretRequest projection and Host no-secret-in-event tests exist; same-head UI acceptance pending.",
-      "notes": "IOS-MAIN-DEP-SECRET-LEAF-20261009: exact Desktop secret-request.tsx reviewed; reuses implemented secret-request action owner.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SECRET-LEAF-20261009: exact Desktop secret-request.tsx reviewed; reuses implemented secret-request action owner. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/send-message-text.tsx",
@@ -2778,8 +2791,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MarketplaceModel.projectMobileSendMessageText plus MobileBotChat.messageTextContent preserve text/image/streaming and URL-card projection before generic attachment handling.",
       "test_evidence": "SharedWorkflowTranscriptParityTests covers send-message text dispatch, URL classification and typed projection; same-head UI acceptance pending.",
-      "notes": "IOS-MAIN-DEP-SEND-TEXT-LEAF-20261009: exact Desktop send-message-text.tsx reviewed; existing native owner is production-complete pending acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SEND-TEXT-LEAF-20261009: exact Desktop send-message-text.tsx reviewed; existing native owner is production-complete pending acceptance. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/shared.tsx",
@@ -2794,8 +2808,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat supplies the common account/Agent/bridge/runtime context to native leaf helpers; MarketplaceModel centralizes strict payload projection and provider-backed resources. Adjacent leaf rows document their concrete production owners and actions.",
       "test_evidence": "Leaf-specific focused tests cover cloud-agent, connector, listener, secret, URL-card, approvals and permission replacement behavior; exact-head UI/device evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-AGGREGATE-20261011: canonical Desktop source reread on b826f59ccbba64d2e014d8bdcca3ab765a73c8e8; native production composition and focused tests are present. Historical child-dependency/mount-mechanism fences are closed at implementation level only. Keep below verified until same-final-HEAD Swift/UI/device/protected evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TRANSCRIPT-AGGREGATE-20261011: canonical Desktop source reread on b826f59ccbba64d2e014d8bdcca3ab765a73c8e8; native production composition and focused tests are present. Historical child-dependency/mount-mechanism fences are closed at implementation level only. Keep below verified until same-final-HEAD Swift/UI/device/protected evidence succeeds. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/slack-draft.tsx",
@@ -2810,8 +2825,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat renders native Slack draft body plus Send message/Discard and terminal/error state; MarketplaceModel.resolveTranscriptDraft waits for exact draft.changed terminal status.",
       "test_evidence": "Typed draft projection and FeatureHost draft transport tests cover the contract; same-head UI acceptance pending.",
-      "notes": "IOS-MAIN-DEP-SLACK-DRAFT-20261009: exact Desktop slack-draft.tsx reviewed; native implementation upgrades the recovered empty callbacks by reusing canonical draft.resolve.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SLACK-DRAFT-20261009: exact Desktop slack-draft.tsx reviewed; native implementation upgrades the recovered empty callbacks by reusing canonical draft.resolve. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/views/widget.tsx",
@@ -2826,8 +2842,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat transcriptWidgetCard renders prompt/help/options/custom answer/Dismiss, pending/error/settled state and A-F shortcuts. Host transcript cards are now durable in ConversationMessage.cards so settled widget state survives reopen.",
       "test_evidence": "SharedWorkflowTranscriptParityTests.testWidgetTranscriptProjectionAndDurableHistoryCards plus Rust widget metadata state-machine test; same-head architecture/rust-host/build/UI acceptance remains required before verified.",
-      "notes": "IOS-MAIN-DEP-WIDGET-LEAF-20261009: exact Desktop widget.tsx and widget-response contracts read. No parallel widget store introduced.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-WIDGET-LEAF-20261009: exact Desktop widget.tsx and widget-response contracts read. No parallel widget store introduced. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/widget-interactions.ts",
@@ -2842,8 +2859,9 @@
       "implementation_status": "implemented",
       "production_evidence": "FeatureCommand widget.respond/widget.dismiss and FeatureHost.production_widget_resolve validate account/conversation/Agent/entry/value, persist respondedValue or widgetDismissed, clear widgetSkipped, reject settled/stale/invalid choices, start hidden recoverable widget-response operation and rollback original metadata on start failure. TranscriptCard::Widget is serde-owned by mahayana-host-protocol and ConversationMessage.cards restores the durable card on reopen.",
       "test_evidence": "implementation.rs widget_response_metadata_is_durable_validated_and_stale_fenced covers exact card targeting, option validation, duplicate rejection, dismiss and stale-user-turn fencing; host-protocol serde test preserves Widget card state; same-head CI remains pending.",
-      "notes": "IOS-MAIN-DEP-WIDGET-INTERACTIONS-20261009: Desktop widget-interactions.ts plus source/host/src/extensions/transcript/widget_responses.rs and both widget_responses_* contract tests were read. Desktop appendUserMessage=false semantics are represented by hidden recoverable SendMessageRequest; rollback is fail-closed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-WIDGET-INTERACTIONS-20261009: Desktop widget-interactions.ts plus source/host/src/extensions/transcript/widget_responses.rs and both widget_responses_* contract tests were read. Desktop appendUserMessage=false semantics are represented by hidden recoverable SendMessageRequest; rollback is fail-closed. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/message-card-seam.ts",
@@ -2858,8 +2876,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (projectMobileMessageCardSeam, projectMobileTranscriptAdjacency, peer-message shipping branch, MobileLinkMetadataCard/copy actions) plus mobile/ios/Fabushi/MarketplaceModel.swift (MobileChatMessage special-variant/richText fields and live canonical projection).",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers source/fromUser and standalone-emoji guards, Markdown and richText HTTPS specialization, insecure/multi-token rejection, special Agent variant exclusion from ordinary seam/adjacency, and history projection. Same-final-HEAD Actions remain required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-MESSAGE-CARD-SEAM-20261011: implemented in the shipping native transcript without a second message owner. fromAgent/toAgent payload shape is deliberately not interpreted; only presence is retained because that is the Desktop seam discriminant. Keep below verified until exact-head ordinary/protected CI succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-MESSAGE-CARD-SEAM-20261011: implemented in the shipping native transcript without a second message owner. fromAgent/toAgent payload shape is deliberately not interpreted; only presence is retained because that is the Desktop seam discriminant. Keep below verified until exact-head ordinary/protected CI succeeds. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/tool-results/model.ts",
@@ -2874,8 +2893,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/shared/client-side-tool-v2-projection.swift (MobileToolResultCard, MobileToolResultStore.projectCall/projectResult/copy/publish); mobile/ios/Fabushi/MarketplaceModel.swift owns the single renderer observer/store and clears it on account identity change/logout.",
       "test_evidence": "mobile/ios/FabushiTests/ClientSideToolV2RelayParityTests.swift covers authoritative shell/edit projection, terminal success, cwd/output/diff, permission-denied, unsupported/orphan/out-of-order rejection and reset; same-final-HEAD Actions remain required before verified.",
-      "notes": "IOS-MAIN-DEP-TOOL-RESULT-MODEL-20261011: shipping native snapshot model is implemented and composed; exact-head CI/protected evidence remains pending.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TOOL-RESULT-MODEL-20261011: shipping native snapshot model is implemented and composed; exact-head CI/protected evidence remains pending. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/tool-results/proto-adapter.ts",
@@ -2890,8 +2910,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/shared/client-side-tool-v2-projection.swift (MobileProtoMessage, MobileToolResultRendererEvent, MobileToolResultStore); source/mahayana-agent-coordinator/client-side-tool-v2-relay.swift supplies canonical version/accountSlot/agent/epoch/sequence/toolCallId fencing.",
       "test_evidence": "mobile/ios/FabushiTests/ClientSideToolV2RelayParityTests.swift covers tools 7/15, unsupported tools, message-type/wire identity, result correlation, stale sequence, permission errors and reset; EditFileV2 production decoder is present and remains subject to exact-head build/test evidence.",
-      "notes": "IOS-MAIN-DEP-TOOL-RESULT-PROTO-20261011: generated-tool protobuf semantics are implemented downstream of the one canonical relay; no second transport owner.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TOOL-RESULT-PROTO-20261011: generated-tool protobuf semantics are implemented downstream of the one canonical relay; no second transport owner. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/tool-results/transcript-boundary.ts",
@@ -2906,8 +2927,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift (renderer observer, toolResultStore, account-change reset); frontend/src/recovered/features/conversation/MobileBotChat.swift (mobileToolResultForEntry exact generic-row + agent + toolCallId join); source/mahayana-agent-coordinator/client-side-tool-v2-relay.swift (epoch/sequence/reset lifecycle).",
       "test_evidence": "mobile/ios/FabushiTests/ClientSideToolV2RelayParityTests.swift proves Coordinator production receive, orphan/stale/reset behavior; mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift proves exact generic tool-call row/Agent join and rejects wrong Agent/non-tool rows. Exact-head CI remains required before verified.",
-      "notes": "IOS-MAIN-DEP-TOOL-RESULT-BOUNDARY-20261011: shipping transcript join is implemented without creating typed-only transcript rows or a second transcript feed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TOOL-RESULT-BOUNDARY-20261011: shipping transcript join is implemented without creating typed-only transcript rows or a second transcript feed. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/tool-results/view.tsx",
@@ -2922,8 +2944,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (toolResultCard and mobileToolResultForEntry) mounted from the shipping entry.kind == .toolCall branch.",
       "test_evidence": "mobile/ios/FabushiTests/ClientSideToolV2RelayParityTests.swift validates the snapshots consumed by the card and mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift validates exact row binding; same-final-HEAD Swift/UI/protected evidence remains required before verified.",
-      "notes": "IOS-MAIN-DEP-TOOL-RESULT-VIEW-20261011: read-only native tool-result card is implemented in the shipping transcript; exact-head CI/protected UI evidence pending.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TOOL-RESULT-VIEW-20261011: read-only native tool-result card is implemented in the shipping transcript; exact-head CI/protected UI evidence pending. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/acknowledgement.ts",
@@ -2938,8 +2961,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (mobileAcknowledgementLogicalNonce/retryNonce, applyMobileOptimisticUserEcho, applyMobileOptimisticAttachmentEcho, retryFailedSend, shipping pump transcript.card/chat.message wiring); mobile/ios/Fabushi/MarketplaceModel.swift (MobileChatMessage optimistic scope/nonce/prior-nonce/attachment-echo state); canonical Rust Host chat.send uses requestId as durable user MessageId.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers exact account+Agent nonce echo, old/fresh retry lineage, attachment-only whole-batch settlement, duplicate attachment echo rejection, wrong-scope fencing and text+attachment waiting for the user-message echo. Same-final-HEAD Actions remain required before verified.",
-      "notes": "IOS-MAIN-DEP-ACK-20261011: full native acknowledgement responsibility is implemented without a second send journal; direct iOS sends transition pending→dispatching rather than Desktop queued, while accepted/failed/echo semantics and logical retry identity remain equivalent.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-ACK-20261011: full native acknowledgement responsibility is implemented without a second send journal; direct iOS sends transition pending→dispatching rather than Desktop queued, while accepted/failed/echo semantics and logical retry identity remain equivalent. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/agent-avatar.tsx",
@@ -2954,8 +2978,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/ClothGhostAvatar.swift (MobileAgentAvatar, mobileAgentAvatarKind, mobileResolvePersonaColor/mobileResolvePersonaShape, groupAvatar, personaAvatar); shipping frontend/src/recovered/features/conversation/MobileBotChat.swift mounts MobileAgentAvatar in header, empty state, thinking and assistant transcript rows; canonical GrokMobileBotService roster projection supplies avatar data/shape/color/shared-room/group/activity state.",
       "test_evidence": "mobile/ios/FabushiTests/AvatarEditorParityTests.swift covers dispatcher precedence and deterministic fallbacks, Desktop activity-state priority, and roster/Mini App merge preservation; current exact-head ordinary/protected Actions remain required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-AGENT-AVATAR-20261011: current Desktop Agent-avatar user-visible responsibility is implemented in the native shipping owner. Web-only pointer-follow/spin/emphasis mechanics are replaced by native activity/reduce-motion animation. Keep below verified until exact-head CI/protected evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-AGENT-AVATAR-20261011: current Desktop Agent-avatar user-visible responsibility is implemented in the native shipping owner. Web-only pointer-follow/spin/emphasis mechanics are replaced by native activity/reduce-motion animation. Keep below verified until exact-head CI/protected evidence succeeds. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/chat-header.tsx",
@@ -2970,8 +2995,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (chatHeader, MobileConversationHeaderControlPolicy, App-Agent computer action); frontend/src/production/MobileBotSharedRoom.swift (same MobileBotSharedRoomTrigger lifecycle with .header presentation); frontend/src/production/GrokMobileShell.swift (onOpenComputer -> existing remoteComputerAgentTarget -> RemoteComputerSurface).",
       "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers group-specific Computer suppression; mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift covers sharing-state projection/fencing/action policy and header/settings presentation enum. Current exact-head ordinary/protected Actions remain required before verified.",
-      "notes": "IOS-MAIN-DEP-CHAT-HEADER-20261011: shared-room and Computer controls now use their pre-existing canonical owners from the shipping header; no duplicate sharing or remote-computer runtime was introduced. Keep below verified pending exact-head CI/protected evidence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-CHAT-HEADER-20261011: shared-room and Computer controls now use their pre-existing canonical owners from the shipping header; no duplicate sharing or remote-computer runtime was introduced. Keep below verified pending exact-head CI/protected evidence. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/composer.tsx",
@@ -3095,11 +3121,12 @@
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI + canonical plugin/workflow sources",
       "ios_platform_delta": "SwiftUI uses the existing MarketplaceModel/Coordinator MCP runtime and the single MobileBotChat composer owner. The composer derives the canonical MCP backend identity from cursorAuth.status (authId, then email), projects only matching server.accountKey rows, preserves serverIdentifier/serverId/status/catalog icon semantics, inserts workflowReference id mcp:${serverId}, and fences App-account/Agent/reconnect/request generations without a second MCP runtime.",
-      "implementation_status": "mapped",
+      "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift (mcpBackendAccountKey; refreshMcpReferenceSnapshot); frontend/src/recovered/features/conversation/MobileBotChat.swift (projectMobileEditorMcpSuggestions; projectScopedMobileEditorMcpSuggestions; refreshEditorSuggestions; mobileComposerRichText); source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs and mahayana-host-protocol/src/lib.rs (validated mcpReferences/richText shipping protocol).",
       "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers default/non-default account isolation, duplicate serverIdentifier, catalog icon/status, disabled policy, auth-completion status refresh, MCP/App-account/Agent fencing and workflowReference rich text. Current exact-head Actions are still required before verified promotion.",
-      "notes": "Implemented in shipping composer on PR #3 descendants 997f403072098e08b6ef1d02ace5cc06cf38f9bc / 257f04d509f4eaab25edcb4b9ca262d3f16d98a2 / e2076fc94acc0fea9d1cb564acfe71c3f4b13f6a. Keep below verified until same final HEAD ordinary/protected CI and completeness evidence succeed. Exact-head promotion is intentionally fail-closed: production/test evidence exists, but current final-head ordinary/protected CI has not yet completed successfully, so this row remains mapped until that evidence is attached.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Implemented in shipping composer on PR #3 descendants 997f403072098e08b6ef1d02ace5cc06cf38f9bc / 257f04d509f4eaab25edcb4b9ca262d3f16d98a2 / e2076fc94acc0fea9d1cb564acfe71c3f4b13f6a. Keep below verified until same final HEAD ordinary/protected CI and completeness evidence succeed. Exact-head promotion is intentionally fail-closed: production/test evidence exists, but current final-head ordinary/protected CI has not yet completed successfully, so this row remains mapped until that evidence is attached. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/editor-pr-reference-provider.ts",
@@ -3111,11 +3138,12 @@
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "MobileBotChat projects PR candidates from canonical transcript richText (including prReference nodes and link marks), plain-text fallback GitHub/Cursor review URLs, and the existing cloud-agent polling owner. It preserves node > cloud > text precedence, PR-number dedupe, account+Agent scope fencing, SwiftUI task cancellation/release on scope/disappear, and stale-result checks without creating another GitHub/cloud provider.",
-      "implementation_status": "mapped",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (projectMobileEditorPrReferences; projectMobileEditorPrSuggestionItems; mobileComposerRichText; cloudAgentScopeFingerprint; pollVisibleCloudAgents; send/retry durable PR references); source/ios-main/account/cursor-dashboard-client.swift (canonical cloud-agent PR metadata).",
       "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers node>cloud>text priority, PR-number dedupe, GitHub/Cursor URL projection, account and Agent switch fencing, suggestion insertion and MCP+PR rich-text coexistence. Current exact-head Actions are still required before verified promotion.",
-      "notes": "Implemented in the shipping composer during the current PR #3 descendant chain; focused Agent-switch fencing added at 775c4eabddf48b970eefdc6126e7207c469df676. Keep below verified until same final HEAD ordinary/protected CI and completeness evidence succeed. Exact-head promotion is intentionally fail-closed: production/test evidence exists, but current final-head ordinary/protected CI has not yet completed successfully, so this row remains mapped until that evidence is attached.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Implemented in the shipping composer during the current PR #3 descendant chain; focused Agent-switch fencing added at 775c4eabddf48b970eefdc6126e7207c469df676. Keep below verified until same final HEAD ordinary/protected CI and completeness evidence succeed. Exact-head promotion is intentionally fail-closed: production/test evidence exists, but current final-head ordinary/protected CI has not yet completed successfully, so this row remains mapped until that evidence is attached. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/editor-suggestion-production-adapter.ts",
@@ -3156,17 +3184,17 @@
       "desktop_owner": "renderer conversation workspace find controller over canonical transcript projection",
       "desktop_visible_effect": "Users can find text by message body, author, and attachment filename and cycle through occurrences without filtering away the transcript or leaking state across conversations.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/ChatSearchModel.swift; mobile/ios/Fabushi/MessagingModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
+      "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/ChatSearchModel.swift; mobile/ios/Fabushi/MessagingModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "Native SwiftUI search/ScrollViewReader replace the Desktop controller. Canonical messaging remains the only actor/message owner: sync/message events project senderId to `You` or an existing MessagingContact displayName solely for search indexing; unknown actors fail closed with no invented author. Existing mediaFileName/contact/poll/forward-origin search projection preserves attachment/media coverage.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/ChatSearchModel.swift; mobile/ios/Fabushi/MessagingModel.swift (searchAuthorByMessageId lifecycle); frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
-      "test_evidence": "mobile/ios/FabushiTests/ChatSearchModelTests.swift covers self/contact/unknown author projection and occurrence navigation; exact-current-head Actions required before promotion",
-      "notes": "Current-main delta adds message.author and attachment.name to Desktop searchable text. iOS already indexed media filename and other canonical message payload text but omitted author. The shipping MessagingModel now derives search-only author labels from existing canonical senderId + synced actor contacts and maintains them across sync/message add/change/delete/conversation removal; no server schema or second contact store is introduced. Aggregate review remains open, so status stays mapped/current-main-fenced.",
+      "ios_platform_delta": "Native SwiftUI search/ScrollViewReader replace the Desktop controller while canonical messaging remains the only message owner. Human search retains sender/media projection. Agent search mirrors current Desktop visible search text across main-transcript message body/author/attachment filename, notice text, Widget prompt, Email subject/body and Slack body; branched thread-only entries remain outside the main search surface.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (mobileBotChatSearchEntries over canonical transcript/card projectors); mobile/ios/Fabushi/ChatSearchModel.swift; mobile/ios/Fabushi/MessagingModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers Agent main-transcript occurrence/wrap search plus notice/widget/email/slack visible text; mobile/ios/FabushiTests/ChatSearchModelTests.swift covers Human sender projection and occurrence navigation. Exact-head Actions required before verified promotion.",
+      "notes": "Current-main delta adds message.author and attachment.name to Desktop searchable text. iOS already indexed media filename and other canonical message payload text but omitted author. The shipping MessagingModel now derives search-only author labels from existing canonical senderId + synced actor contacts and maintains them across sync/message add/change/delete/conversation removal; no server schema or second contact store is introduced. Aggregate review remains open, so status stays mapped/current-main-fenced. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/find-in-chat.tsx",
@@ -3337,12 +3365,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "iOS has canonical replyTargetId/replyIsFork, durable replyToMessageId/branched projection, generation-fenced full-thread loading and scope reset on bot change. Exact target-content resolution and out-of-scope preview/navigation semantics remain incomplete.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat.beginReply/openThread/loadCompleteThread/send and MarketplaceModel reply projection are the existing owners; no second thread controller exists.",
-      "test_evidence": "SharedWorkflowTranscriptParityTests covers reply/thread counts/projection/history; target-content resolution/out-of-scope navigation tests remain required.",
-      "notes": "IOS-MAIN-DEP-REPLY-THREAD-20261009: exact Desktop reply-thread-controller.ts reviewed; core identity/fork path exists, preview/navigation delta remains.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "ios_platform_delta": "SwiftUI keeps reply selection in MobileBotChat, resolves durable target text/attachment/link/missing previews, navigates main targets by scroll or opens thread, loads full thread history with generation+account+Agent+root fencing, projects replyToMessageId/isFork into durable sends/retries, and clears transient state on submission/scope replacement.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (mobileStableReplyTargetID, mobileResolveReplyReference, mobileReplyReferenceNavigation, replyTargetId/replyIsFork, openThread/loadCompleteThread, chat.send and durable retry projection).",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers reply/thread topology, resolved/missing preview, main-scroll/thread navigation, labels and durable relations. Exact-head Actions required before verified promotion.",
+      "notes": "IOS-MAIN-DEP-REPLY-THREAD-20261009: exact Desktop reply-thread-controller.ts reviewed; core identity/fork path exists, preview/navigation delta remains. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/rich-text-editor.tsx",
@@ -3699,11 +3728,11 @@
       "implementation_status": "mapped",
       "production_evidence": "Human chat presents ForwardMessageSheet from message actions. Agent forwarding uses mobileBotForwardMessageId to reject missing canonical IDs, streaming, pending/acceptedAwaitingEcho/failed phases and empty non-attachment content.",
       "test_evidence": "ForwardMessageParityTests.testAgentForwardRequiresSettledCanonicalMessageIdentity covers the Agent settlement/actionability gate. Exact-head UI evidence remains pending.",
-      "notes": "IOS-MAIN-FORWARD-TRANSCRIPT-001: current Desktop transcript Forward actionability reviewed; native paths are real but stay mapped until same-head required UI checks finish. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence.",
+      "notes": "IOS-MAIN-FORWARD-TRANSCRIPT-001: current Desktop transcript Forward actionability reviewed; native paths are real but stay mapped until same-head required UI checks finish. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012: current Desktop main exact source was re-read with shipping callers/owner/state/effects against the current iOS production owner; no verified promotion until same-final-HEAD completeness/release acceptance.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/view.css",

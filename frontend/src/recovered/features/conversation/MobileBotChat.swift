@@ -1592,21 +1592,59 @@ internal func mobileBotChatSearchEntries(
 ) -> [ChatSearchEntry] {
     let normalizedBotName = botName.trimmingCharacters(in: .whitespacesAndNewlines)
     return mobileMainTranscriptEntries(entries).compactMap { entry in
-        guard entry.kind == .message else { return nil }
         var fields: [String] = []
-        if let text = mobileTranscriptCopyText(entry)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !text.isEmpty
-        {
-            fields.append(text)
+
+        switch entry.kind {
+        case .message:
+            if let text = mobileTranscriptCopyText(entry)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !text.isEmpty
+            {
+                fields.append(text)
+            }
+            fields.append(
+                entry.role == .user
+                    ? "You"
+                    : (normalizedBotName.isEmpty ? "Agent" : normalizedBotName)
+            )
+            if let fileName = entry.attachmentFileName?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !fileName.isEmpty
+            {
+                fields.append(fileName)
+            }
+
+        case .notice:
+            let text = entry.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty {
+                fields.append(text)
+            }
+
+        case .action:
+            if let widget = mobileTranscriptWidgetProjection(entry) {
+                let prompt = widget.widget.prompt
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !prompt.isEmpty {
+                    fields.append(prompt)
+                }
+            } else if let draft = mobileTranscriptDraftProjection(entry.canonicalTranscriptCard) {
+                switch draft {
+                case let .email(email):
+                    let subject = email.subject.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let body = email.body.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !subject.isEmpty { fields.append(subject) }
+                    if !body.isEmpty { fields.append(body) }
+                case let .slack(slack):
+                    let body = slack.body.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !body.isEmpty { fields.append(body) }
+                }
+            }
+
+        default:
+            return nil
         }
-        fields.append(entry.role == .user ? "You" : (normalizedBotName.isEmpty ? "Agent" : normalizedBotName))
-        if let fileName = entry.attachmentFileName?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !fileName.isEmpty
-        {
-            fields.append(fileName)
-        }
+
+        guard !fields.isEmpty else { return nil }
         return ChatSearchEntry(id: entry.id, text: fields.joined(separator: "\n"))
     }
 }
