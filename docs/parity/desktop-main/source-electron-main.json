@@ -87,8 +87,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/account/cursor-dashboard-client.swift getCursorAvatarDataURL/fetchAvatarDataURL; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift canonical getCursorAvatar route.",
       "test_evidence": "mobile/ios/FabushiTests/CursorAvatarParityTests.swift covers preferred URL, no Authorization leakage, timeout, data URL conversion, numeric GitHub fallback and declared oversize rejection. Current exact-head Actions required before verified.",
-      "notes": "Exact Desktop cursor-avatar.ts reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": " Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/cursor-machine-id.ts",
@@ -103,8 +104,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/account/cursor-machine-id.swift; source/ios-main/account/cursor-auth.swift IOSCursorAuthService.getMachineID() consumes the resolver from the canonical credential store.",
       "test_evidence": "mobile/ios/FabushiTests/CursorMachineIDParityTests.swift covers existing value, post-settlement second read, single generation/persist and reuse; current exact-head Actions remain required before verified.",
-      "notes": "Exact Desktop cursor-machine-id.ts@dc762cb2bbe73c54740cd0219d0739b7980852c6 and native cursor-machine-id.swift@0938fe3c0213f92b4df2418c90773b5b15c7c5e6 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": " Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/cursor-pr-review.ts",
@@ -119,8 +121,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Primary native owner: source/ios-main/account/cursor-dashboard-client.swift getPrReviewPreferences(). Shipping composition: source/mahayana-agent-coordinator/coordinator-mcp-manager.swift canonical getCursorPrReviewPreferences route on CoordinatorMcpSurface, matching source/ios-preload/main-rpc-runtime.swift.",
       "test_evidence": "mobile/ios/FabushiTests/CursorPrReviewPreferencesParityTests.swift covers canonical routes, 10 second timeout, parallel two-request fetch shape, user/team decoding, team fallback and unknown-mode nil; current exact-head Actions remain required before verified.",
-      "notes": "Exact Desktop cursor-pr-review.ts@700ee2f8bf05f317a74e724f413b78b154ab4221 plus generated dashboard/background-composer wire fields reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Shared SandPrReviewPreferences owner is reused. Canonical renderer contract is getCursorPrReviewPreferences; no alternate account RPC namespace is introduced.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Shared SandPrReviewPreferences owner is reused. Canonical renderer contract is getCursorPrReviewPreferences; no alternate account RPC namespace is introduced. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/cursor-profile.ts",
@@ -135,8 +138,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Primary native owner: source/ios-main/account/cursor-dashboard-client.swift implements update name, avatar, weekly/full usage, privacy, trial cancellation, bounded dashboard actions and authoritative local-tool ceiling decoding. CoordinatorMcpSurface composes these through the existing IOSCursorAuthService/SandSettingsStore/Feature Host owners. The ceiling uses GetTeamAdminSettingsOrEmptyIfNotInTeam response field 60 -> LocalToolControls field 1 and only changed effective permission is projected.",
       "test_evidence": "CursorProfileParityTests.swift plus CursorAvatarParityTests.swift cover the shipping profile/usage/privacy/trial/avatar paths and local-tool ceiling login/logout/generation/dedup/failure contracts. Current exact-head Actions remain required before verified.",
-      "notes": "Exact Desktop cursor-profile.ts@69645a4dee5b40a700fef5199c044892f46eaf3a reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The previously open local-tool permission ceiling is now composed without another account/usage/permission store; verified remains gated on same-head Actions.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "The previously open local-tool permission ceiling is now composed without another account/usage/permission store; verified remains gated on same-head Actions. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/cursor-transcribe.ts",
@@ -151,8 +155,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/account/cursor-dashboard-client.swift transcribeAudio sends AiService/TranscribeAudio with exact protobuf fields and 60s deadline; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift handles the canonical transcribeAudio main-RPC method through the existing signed-in Cursor owner.",
       "test_evidence": "mobile/ios/FabushiTests/CursorTranscribeParityTests.swift covers exact AiService route, protobuf request fields, MIME stripping, default en-US, 60s timeout, response projection and pre-network empty-audio rejection. Current exact-head Actions required before verified.",
-      "notes": "Exact Desktop cursor-transcribe.ts@374ac5658035a3c1231fb5d006522d68740daf5f and generated TranscribeAudioRequest/Response wire fields reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Desktop main-edge caller also confirmed Uint8Array/ArrayBuffer non-empty validation and audio/webm default. Native OfflineSpeechTranscriber remains the iOS composer owner.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Desktop main-edge caller also confirmed Uint8Array/ArrayBuffer non-empty validation and audio/webm default. Native OfflineSpeechTranscriber remains the iOS composer owner. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/env-descriptor-account-binding.ts",
@@ -167,8 +172,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/coordinator/coordinator-account-runtime.swift observes only settled Host auth replies; source/ios-main/coordinator/account-transition-cleanup.swift clears the previous Coordinator scope before replacement; source/ios-main/IOSMainRuntime.swift composes those owners in the production root.",
       "test_evidence": "Existing Coordinator account transition/protected-account contracts cover stable-slot adoption and replacement cleanup; current exact-head Actions are still required before verified. No claim is made that iOS carries Desktop devBox binding files.",
-      "notes": "Exact Desktop env-descriptor-account-binding.ts@7584b45fd36b5298b11023bacc09d39e1ce5150c and its production caller were reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is replacement, not a mechanical filesystem port.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Platform disposition is replacement, not a mechanical filesystem port. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/production-account-authorization.ts",
@@ -183,8 +189,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/IOSMainRuntime.swift lines composing cleanup -> IOSAccountAuthorizer -> CoordinatorAccountRuntime; source/ios-main/account/account-authorization.swift scopes only the settled Host slot.",
       "test_evidence": "Existing Coordinator account runtime/transition tests and protected-account acceptance exercise the production root; current exact-head Actions remain required before verified.",
-      "notes": "Exact Desktop production-account-authorization.ts@10ed5490a4324eba60957fdaf4edd2a46aac769d reviewed with account-authorization.ts and env-descriptor-account-binding.ts at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop production-account-authorization.ts@10ed5490a4324eba60957fdaf4edd2a46aac769d reviewed with account-authorization.ts and env-descriptor-account-binding.ts at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current-main re-read confirmed exact blob identity at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093; existing native production owner remains applicable. No verified promotion before replacement exact-head Actions.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/session-funnel-telemetry.ts",
@@ -244,11 +251,12 @@
       "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "CoordinatorMcpSurface is the single native composition owner for IOSCursorAuthService and IOSCursorDashboardClient. PR review, transcription, avatar and most cursor-profile methods are now composed there. Local-tool permission ceiling parity still remains, so the aggregate edge stays mapped.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift owns one cursorAuth/dashboard pair and canonical handlers; source/ios-main/account/cursor-dashboard-client.swift owns Dashboard/AiService transport including avatar resolution.",
-      "test_evidence": "PR review, transcribe and cursor-profile focused tests exist; aggregate edge cannot promote until avatar/local-tool ceiling and current-head Actions close.",
-      "notes": "Exact Desktop account-edge.ts@b9d422b18bfcf692708a70a2d5625106c1da6e38 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "implemented",
+      "production_evidence": "Desktop 371b72f1 account-edge.ts@b9d422b1 composes one auth/runtime edge for Sand access, avatar, weekly/full usage, PR review, privacy, trial/dashboard actions, MCP reset+Host refresh and transcription. iOS CoordinatorMcpSurface composes one IOSCursorAuthService + IOSCursorDashboardClient + IOSCursorSandAccessReader + local-tool ceiling synchronizer. getCursorAuthStatus/loginCursor/cancelCursorLogin/logoutCursor now have real shipping handlers through IOSCursorAuthMainRpcCompatibility; successful login forces SandMcpManager.reloadServers(), and cancel/logout invalidate manager state. getSandAccess/Fresh, avatar, usage, PR review, privacy, trial/dashboard and transcribe handlers all use the same auth/dashboard owners.",
+      "test_evidence": "CursorAccessParityTests, CursorAvatarParityTests, CursorPrReviewPreferencesParityTests, CursorProfileParityTests, CursorTranscribeParityTests and IOSCursorAuthMainRpcCompatibilityTests cover the composed edge responsibilities. Exact-head GitHub Actions are still required before verified.",
+      "notes": "Current-main account-edge.ts exact blob b9d422b18bfcf692708a70a2d5625106c1da6e38 re-read at Desktop 371b72f1. The previous local-tool-ceiling/MCP-refresh gap note is obsolete after canonical composition repair. Aggregate dependency/full-review gates remain fail-closed.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/adapters/account-oauth.ts",
