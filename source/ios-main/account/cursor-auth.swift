@@ -5,6 +5,86 @@ import Security
 let IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY = "cursor-access-token"
 let IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY = "cursor-refresh-token"
 let IOS_CURSOR_AUTH_REDIRECT_TARGET = "sand"
+let IOS_CURSOR_MDM_SIGN_IN_POLICY_HEADER_NAME = "x-cursor-mdm-signin-policy"
+let IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR = "sign_in_policy_violation"
+let IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_MESSAGE = "Sign-in on this device is restricted by your organization's device policy. Sign in with an allowed account to continue."
+let IOS_CURSOR_MANAGED_CONFIGURATION_KEY = "com.apple.configuration.managed"
+
+private func iosPolicyStrings(_ raw: Any?) -> [String] {
+    if let values = raw as? [String] {
+        return values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+    guard let raw else { return [] }
+    return String(describing: raw)
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+}
+
+private func iosPolicyBool(_ raw: Any?) -> Bool {
+    if let value = raw as? Bool { return value }
+    if let value = raw as? NSNumber { return value.intValue == 1 }
+    guard let raw else { return false }
+    return ["1", "true", "yes", "on"].contains(String(describing: raw).trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+}
+
+func iosCursorMdmSignInPolicyHeaderValue(_ raw: [String: Any]) -> String? {
+    let enforced = iosPolicyBool(raw["SignInEnforcement"])
+    let organizationIds = Array(Set(iosPolicyStrings(raw["AllowedOrganizationIds"]).compactMap { value -> String? in
+        guard let number = UInt64(value), number > 0 else { return nil }
+        return String(number)
+    })).sorted()
+    let teamIds = Array(Set(
+        (iosPolicyStrings(raw["AllowedTeamIds"]) + iosPolicyStrings(raw["AllowedTeamId"]))
+            .compactMap { value -> String? in
+                guard let number = UInt64(value), number > 0 else { return nil }
+                return String(number)
+            }
+    )).sorted()
+    let emails = Array(Set(iosPolicyStrings(raw["AllowedLoginEmails"]).map { $0.lowercased() }.filter { $0.contains("@") })).sorted()
+    let domains = Array(Set(iosPolicyStrings(raw["AllowedLoginDomains"]).compactMap { raw -> String? in
+        var value = raw.lowercased()
+        if value.hasPrefix("@") { value.removeFirst() }
+        guard !value.isEmpty, !value.contains("@"), !value.contains(where: { $0.isWhitespace }) else { return nil }
+        return value
+    })).sorted()
+    guard enforced || !organizationIds.isEmpty || !teamIds.isEmpty || !emails.isEmpty || !domains.isEmpty else {
+        return nil
+    }
+    let payload: [String: Any] = [
+        "enforced": enforced,
+        "allowedOrganizationIds": organizationIds,
+        "allowedTeamIds": teamIds,
+        "allowedLoginEmails": emails,
+        "allowedLoginDomains": domains,
+    ]
+    guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else { return nil }
+    let base64 = data.base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
+    return "v1.\(base64)"
+}
+
+func iosCursorManagedSignInPolicyHeaderValue(
+    defaults: UserDefaults = .standard
+) -> String? {
+    guard let raw = defaults.dictionary(forKey: IOS_CURSOR_MANAGED_CONFIGURATION_KEY) else { return nil }
+    return iosCursorMdmSignInPolicyHeaderValue(raw)
+}
+
+func applyIOSCursorMdmSignInPolicy(
+    to request: inout URLRequest,
+    headerValue: String? = iosCursorManagedSignInPolicyHeaderValue()
+) {
+    guard let headerValue, !headerValue.isEmpty else { return }
+    request.setValue(headerValue, forHTTPHeaderField: IOS_CURSOR_MDM_SIGN_IN_POLICY_HEADER_NAME)
+}
+
+func iosCursorIsSignInPolicyViolationPayload(_ data: Data) -> Bool {
+    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+    return object["error"] as? String == IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR
+}
 
 struct IOSCursorAuthStatus: Equatable, Sendable {
     let loggedIn: Bool
@@ -25,6 +105,7 @@ enum IOSCursorAuthError: Error, LocalizedError, Equatable {
     case loginAttemptNotFound
     case loginRejected(Int)
     case tokenRefreshFailed(Int)
+    case signInPolicyViolation
     case keychain(OSStatus)
     case secureRandom(OSStatus)
 
@@ -40,6 +121,8 @@ enum IOSCursorAuthError: Error, LocalizedError, Equatable {
             "MCP backend sign-in failed with HTTP \(status)."
         case .tokenRefreshFailed(let status):
             "MCP backend session refresh failed with HTTP \(status)."
+        case .signInPolicyViolation:
+            IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_MESSAGE
         case .keychain(let status):
             "Keychain operation failed with status \(status)."
         case .secureRandom(let status):
@@ -353,6 +436,7 @@ final class IOSCursorAuthService {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("true", forHTTPHeaderField: "local-cli-mode")
+        applyIOSCursorMdmSignInPolicy(to: &request)
         let data: Data
         let response: URLResponse
         do {
@@ -365,6 +449,10 @@ final class IOSCursorAuthService {
             throw IOSCursorAuthError.invalidLoginResponse
         }
         if http.statusCode == 404 { return nil }
+        if http.statusCode == 403, iosCursorIsSignInPolicyViolationPayload(data) {
+            authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "policy_refused")))
+            throw IOSCursorAuthError.signInPolicyViolation
+        }
         guard (200..<300).contains(http.statusCode) else {
             authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
             throw IOSCursorAuthError.loginRejected(http.statusCode)
@@ -498,6 +586,7 @@ final class IOSCursorAuthService {
         request.httpMethod = "POST"
         request.timeoutInterval = 20
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        applyIOSCursorMdmSignInPolicy(to: &request)
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "client_id": getAuthClientId(resolved.absoluteString),
             "grant_type": "refresh_token",
@@ -532,11 +621,35 @@ final class IOSCursorAuthService {
             }
             throw IOSCursorAuthError.tokenRefreshFailed(http.statusCode)
         }
-        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              object["shouldLogout"] as? Bool != true,
-              let nextAccess = object["access_token"] as? String,
-              !nextAccess.isEmpty
-        else {
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            noteRefreshFailure(.badPayload)
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .unparseable,
+                    signinCause: "session_expired"
+                )
+            }
+            throw IOSCursorAuthError.invalidLoginResponse
+        }
+        if object["shouldLogout"] as? Bool == true {
+            if object["error"] as? String == IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR {
+                if isCurrentAuthOperation(operationEpoch) {
+                    try? await clearCredentials(
+                        sessionCause: .policy,
+                        signinCause: "account_refused"
+                    )
+                }
+                throw IOSCursorAuthError.signInPolicyViolation
+            }
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .sessionRevoked,
+                    signinCause: "session_expired"
+                )
+            }
+            throw IOSCursorAuthError.signInRequired
+        }
+        guard let nextAccess = object["access_token"] as? String, !nextAccess.isEmpty else {
             noteRefreshFailure(.badPayload)
             if isCurrentAuthOperation(operationEpoch) {
                 try? await clearCredentials(

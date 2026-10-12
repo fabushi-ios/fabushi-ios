@@ -439,3 +439,52 @@ final class CursorAuthOperationEpochParityTests: XCTestCase {
         }
     }
 }
+
+
+final class CursorMdmSignInPolicyParityTests: XCTestCase {
+    func testManagedPolicyEncodingNormalizesDesktopFields() throws {
+        let header = try XCTUnwrap(iosCursorMdmSignInPolicyHeaderValue([
+            "SignInEnforcement": "true",
+            "AllowedOrganizationIds": "00042, 42, 0",
+            "AllowedTeamIds": "7, 9",
+            "AllowedTeamId": 7,
+            "AllowedLoginEmails": "Admin@Example.COM, person@example.com",
+            "AllowedLoginDomains": "@Example.COM, corp.example",
+        ]))
+        XCTAssertTrue(header.hasPrefix("v1."))
+        let encoded = String(header.dropFirst(3))
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let padded = encoded + String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+        let data = try XCTUnwrap(Data(base64Encoded: padded))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["enforced"] as? Bool, true)
+        XCTAssertEqual(object["allowedOrganizationIds"] as? [String], ["42"])
+        XCTAssertEqual(object["allowedTeamIds"] as? [String], ["7", "9"])
+        XCTAssertEqual(object["allowedLoginEmails"] as? [String], ["admin@example.com", "person@example.com"])
+        XCTAssertEqual(object["allowedLoginDomains"] as? [String], ["corp.example", "example.com"])
+    }
+
+    func testManagedPolicyHeaderIsAbsentWithoutRestrictions() {
+        XCTAssertNil(iosCursorMdmSignInPolicyHeaderValue([:]))
+        var request = URLRequest(url: URL(string: "https://backend.example.test/auth/poll")!)
+        applyIOSCursorMdmSignInPolicy(to: &request, headerValue: "v1.policy")
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: IOS_CURSOR_MDM_SIGN_IN_POLICY_HEADER_NAME),
+            "v1.policy"
+        )
+    }
+
+    func testPolicyViolationPayloadIsNarrowAndUsesCanonicalError() {
+        XCTAssertTrue(iosCursorIsSignInPolicyViolationPayload(
+            Data(#"{"error":"sign_in_policy_violation"}"#.utf8)
+        ))
+        XCTAssertFalse(iosCursorIsSignInPolicyViolationPayload(
+            Data(#"{"error":"other"}"#.utf8)
+        ))
+        XCTAssertEqual(
+            IOSCursorAuthError.signInPolicyViolation.errorDescription,
+            IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_MESSAGE
+        )
+    }
+}
