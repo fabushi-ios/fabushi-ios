@@ -2,7 +2,7 @@ import Foundation
 
 struct CoordinatorAccountRevocationResult: Equatable, Sendable {
     let kind: String
-    let status: CoordinatorPayload
+    let status: IOSCursorAuthStatus
     let error: String?
 }
 

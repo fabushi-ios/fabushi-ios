@@ -47,6 +47,7 @@ final class IOSMainRuntime {
     private let boxVisibilityTracker: IOSBoxVisibilityTracker
     private let passkeyProvider: IOSAuthenticationServicesPasskeyProvider
     private let accountRuntime: CoordinatorAccountRuntime
+    private let cursorAccountRevoker: ProductionCoordinatorAccountRevoker
     private let userTimeZoneProjectionFence = IOSUserTimeZoneProjectionFence()
     private let updateWiring: IOSUpdateServiceWiring
     private let attachmentMainRPC: IOSAttachmentMainRPCAdapter
@@ -152,6 +153,23 @@ final class IOSMainRuntime {
             }
         )
         self.coordinator = coordinator
+        cursorAccountRevoker = ProductionCoordinatorAccountRevoker(
+            revoke: {
+                guard let result = await coordinator.revokeCursorAuthForAccountRefusal() else {
+                    let message = "Cursor authentication service is unavailable."
+                    return .init(
+                        kind: "failed",
+                        status: .init(loggedIn: false, errorMessage: message),
+                        error: message
+                    )
+                }
+                return .init(
+                    kind: result.kind,
+                    status: result.status,
+                    error: result.error
+                )
+            }
+        )
         attachmentMainRPC = try IOSAttachmentMainRPCAdapter(
             appDataDirectory: appDataDirectory,
             currentAccountScope: { coordinatorLocalHumanIdentity.value },
@@ -245,6 +263,10 @@ final class IOSMainRuntime {
                 "session_id": lifecycleRecovery.currentCheckpoint.sessionID,
             ]
         )
+    }
+
+    func revokeCursorAuthForAccountRefusal() async -> CoordinatorAccountRevocationResult {
+        await cursorAccountRevoker.revokeRefusedAccount()
     }
 
     var coordinatorBootstrap: ValidatedCoordinatorBootstrap {

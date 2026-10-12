@@ -928,7 +928,11 @@ final class IOSCursorAuthMainRpcCompatibility {
             return ["kind": "logging-in", "freshness": NSNumber(value: status.freshness)]
         }
         guard status.loggedIn else {
-            return ["kind": "logged-out", "freshness": NSNumber(value: status.freshness)]
+            return [
+                "kind": "logged-out",
+                "errorMessage": status.errorMessage ?? NSNull(),
+                "freshness": NSNumber(value: status.freshness),
+            ]
         }
         return [
             "kind": "logged-in",
@@ -1109,6 +1113,14 @@ final class CoordinatorMcpSurface {
             accessToken: accessToken,
             machineID: try await cursorAuth.getMachineID()
         )
+    }
+
+    func revokeCursorAuthForAccountRefusal() async -> IOSCursorAccountRefusalRevocation {
+        stopComputerMigrationWatch(clearState: true)
+        await gatewayDescriptorCache.clear()
+        let result = await cursorAuth.revokeForAccountRefusal()
+        await manager.reload()
+        return result
     }
 
     static func make(
@@ -2384,6 +2396,7 @@ final class CoordinatorMcpSurface {
             "displayName": status.displayName ?? NSNull(),
             "profilePictureUrl": status.profilePictureUrl ?? NSNull(),
             "isAnysphereUser": status.isAnysphereUser.map { NSNumber(value: $0) } ?? NSNull(),
+            "errorMessage": status.errorMessage ?? NSNull(),
             "expiresAtMs": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
             "freshness": NSNumber(value: status.freshness),
         ]

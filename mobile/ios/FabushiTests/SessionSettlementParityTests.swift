@@ -360,6 +360,103 @@ final class SessionSettlementParityTests: XCTestCase {
     }
 
     @MainActor
+    func testAccountRefusalRevokesCanonicalCredentialsAndShipsAccountRefusedSettlement() async throws {
+        let recorder = IOSSettlementRequestRecorder()
+        let store = IOSSettlementCredentialStore(values: [
+            IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY: "refused-access",
+            IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY: "refused-refresh",
+            iosMachineIDSecretKey: "machine-refused",
+        ])
+        let service = IOSCursorAuthService(
+            store: store,
+            backendURL: try XCTUnwrap(URL(string: "https://api2.cursor.sh")),
+            structuredLogRequestExecutor: { request in
+                await recorder.record(request)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!
+                return (Data(#"{"logsProcessed":1,"logsDropped":0}"#.utf8), response)
+            }
+        )
+
+        let result = await service.revokeForAccountRefusal()
+
+        XCTAssertEqual(result.kind, "completed")
+        XCTAssertNil(result.error)
+        XCTAssertFalse(result.status.loggedIn)
+        XCTAssertEqual(result.status.errorMessage, IOS_CURSOR_ACCOUNT_REFUSED_MESSAGE)
+        XCTAssertEqual(
+            store.deleteAttempts,
+            [IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY]
+        )
+        XCTAssertNil(store.values[IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY])
+        XCTAssertNil(store.values[IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY])
+        let captures = await recorder.captures()
+        XCTAssertEqual(captures.count, 1)
+        let body = String(data: captures[0].body, encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains(#""phase":"signed_out""#))
+        XCTAssertTrue(body.contains(#""cause":"account_refused""#))
+        XCTAssertTrue(body.contains(#""durable":"true""#))
+        XCTAssertFalse(body.contains("refused-access"))
+    }
+
+    @MainActor
+    func testAccountRefusalDeleteFailureRemainsFailClosedAndReportsRetainedCredentialWarning() async throws {
+        let recorder = IOSSettlementRequestRecorder()
+        let store = IOSSettlementCredentialStore(
+            values: [
+                IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY: "retained-refused-access",
+                IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY: "retained-refused-refresh",
+                iosMachineIDSecretKey: "machine-refused-retained",
+            ],
+            deleteFailures: [IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY]
+        )
+        let service = IOSCursorAuthService(
+            store: store,
+            backendURL: try XCTUnwrap(URL(string: "https://api2.cursor.sh")),
+            structuredLogRequestExecutor: { request in
+                await recorder.record(request)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!
+                return (Data(#"{"logsProcessed":1,"logsDropped":0}"#.utf8), response)
+            }
+        )
+
+        let result = await service.revokeForAccountRefusal()
+
+        XCTAssertEqual(result.kind, "failed")
+        XCTAssertNotNil(result.error)
+        XCTAssertFalse(result.status.loggedIn)
+        XCTAssertEqual(
+            result.status.errorMessage,
+            IOS_CURSOR_ACCOUNT_REFUSED_CREDENTIALS_RETAINED_MESSAGE
+        )
+        XCTAssertEqual(
+            store.deleteAttempts,
+            [IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY]
+        )
+        do {
+            _ = try await service.getValidAccessToken()
+            XCTFail("failed refusal cleanup must still revoke credentials in the current process")
+        } catch let error as IOSCursorAuthError {
+            XCTAssertEqual(error, .signInRequired)
+        }
+        let captures = await recorder.captures()
+        XCTAssertEqual(captures.count, 2)
+        let signedOut = String(data: captures[0].body, encoding: .utf8) ?? ""
+        XCTAssertTrue(signedOut.contains(#""cause":"account_refused""#))
+        XCTAssertTrue(signedOut.contains(#""durable":"false""#))
+        XCTAssertFalse(signedOut.contains("retained-refused-access"))
+    }
+
+    @MainActor
     func testNetworkFailureDoesNotFabricateSettlementSuccess() async throws {
         var failures: [String] = []
         let shipper = IOSCursorSessionSettlementShipper(

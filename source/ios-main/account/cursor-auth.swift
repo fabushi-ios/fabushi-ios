@@ -8,6 +8,8 @@ let IOS_CURSOR_AUTH_REDIRECT_TARGET = "sand"
 let IOS_CURSOR_MDM_SIGN_IN_POLICY_HEADER_NAME = "x-cursor-mdm-signin-policy"
 let IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR = "sign_in_policy_violation"
 let IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_MESSAGE = "Sign-in on this device is restricted by your organization's device policy. Sign in with an allowed account to continue."
+let IOS_CURSOR_ACCOUNT_REFUSED_MESSAGE = "This computer is linked to another Cursor account. Sign in with that account to continue."
+let IOS_CURSOR_ACCOUNT_REFUSED_CREDENTIALS_RETAINED_MESSAGE = "This computer is linked to another Cursor account. Fabushi couldn't remove the saved Cursor sign-in, so the account may return after restart. Sign in with the linked account to continue."
 let IOS_CURSOR_MANAGED_CONFIGURATION_KEY = "com.apple.configuration.managed"
 
 private func iosPolicyStrings(_ raw: Any?) -> [String] {
@@ -98,8 +100,17 @@ struct IOSCursorAuthStatus: Equatable, Sendable {
     var authId: String? = nil
     var email: String? = nil
     var displayName: String? = nil
+    var profilePictureUrl: String? = nil
+    var isAnysphereUser: Bool? = nil
+    var errorMessage: String? = nil
     var expiresAtMs: Int64? = nil
     var freshness: UInt64 = 0
+}
+
+struct IOSCursorAccountRefusalRevocation: Equatable, Sendable {
+    let kind: String
+    let status: IOSCursorAuthStatus
+    let error: String?
 }
 
 struct IOSCursorLoginStart: Equatable, Sendable {
@@ -243,6 +254,7 @@ final class IOSCursorAuthService {
     private var credentialMutationWaiters: [CheckedContinuation<Void, Never>] = []
     private var refreshFlights: [String: RefreshFlight] = [:]
     private var credentialsRevoked = false
+    private var reportedLoggedOutErrorMessage: String?
     private var signoutSettled = false
     private var keychainUnavailableSettled = false
 
@@ -355,7 +367,11 @@ final class IOSCursorAuthService {
 
     func status() async -> IOSCursorAuthStatus {
         guard !credentialsRevoked else {
-            return .init(loggedIn: false, freshness: statusFreshness)
+            return .init(
+                loggedIn: false,
+                errorMessage: reportedLoggedOutErrorMessage,
+                freshness: statusFreshness
+            )
         }
         guard let token = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
               !token.isEmpty,
@@ -562,6 +578,7 @@ final class IOSCursorAuthService {
         }
         guard stored else { return await status() }
         credentialsRevoked = false
+        reportedLoggedOutErrorMessage = nil
         signoutSettled = false
         keychainUnavailableSettled = false
         pending.removeValue(forKey: attemptId)
@@ -580,6 +597,24 @@ final class IOSCursorAuthService {
             sessionCause: .userAction,
             signinCause: "user_logout"
         )
+    }
+
+    func revokeForAccountRefusal() async -> IOSCursorAccountRefusalRevocation {
+        do {
+            try await clearCredentials(
+                sessionCause: .accountRefused,
+                signinCause: "account_refused",
+                loggedOutErrorMessage: IOS_CURSOR_ACCOUNT_REFUSED_MESSAGE,
+                retainedCredentialErrorMessage: IOS_CURSOR_ACCOUNT_REFUSED_CREDENTIALS_RETAINED_MESSAGE
+            )
+            return .init(kind: "completed", status: await status(), error: nil)
+        } catch {
+            return .init(
+                kind: "failed",
+                status: await status(),
+                error: String(error.localizedDescription.prefix(512))
+            )
+        }
     }
 
     func getMachineID() async throws -> String {
@@ -777,6 +812,7 @@ final class IOSCursorAuthService {
             throw IOSCursorAuthError.signInRequired
         }
         credentialsRevoked = false
+        reportedLoggedOutErrorMessage = nil
         signoutSettled = false
         keychainUnavailableSettled = false
         if nextRefresh != refresh {
@@ -809,11 +845,14 @@ final class IOSCursorAuthService {
 
     private func clearCredentials(
         sessionCause: IOSCursorSessionSignoutCause,
-        signinCause: String
+        signinCause: String,
+        loggedOutErrorMessage: String? = nil,
+        retainedCredentialErrorMessage: String? = nil
     ) async throws {
         let logoutOperationEpoch = advanceAuthOperationEpoch()
         pending.removeAll()
         credentialsRevoked = true
+        reportedLoggedOutErrorMessage = loggedOutErrorMessage
         profileByAuthId.removeAll()
 
         // Credential mutation is serialized with login writes so an older poll
@@ -847,7 +886,13 @@ final class IOSCursorAuthService {
             cause: durable ? signinCause : "retained_after_failed_logout"
         )))
         if current {
-            publishStatus(.init(loggedIn: false))
+            reportedLoggedOutErrorMessage = durable
+                ? loggedOutErrorMessage
+                : (retainedCredentialErrorMessage ?? loggedOutErrorMessage)
+            publishStatus(.init(
+                loggedIn: false,
+                errorMessage: reportedLoggedOutErrorMessage
+            ))
         }
 
         if let departingAccessToken, !signoutSettled {

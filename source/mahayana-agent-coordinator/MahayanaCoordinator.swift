@@ -769,6 +769,11 @@ final class MahayanaCoordinator {
         )
     }
 
+    func revokeCursorAuthForAccountRefusal() async -> IOSCursorAccountRefusalRevocation? {
+        guard let mcpSurface else { return nil }
+        return await mcpSurface.revokeCursorAuthForAccountRefusal()
+    }
+
     static func make(
         appDataDirectory: URL,
         featureHostTest: Bool = false,

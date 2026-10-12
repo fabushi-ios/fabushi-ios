@@ -444,3 +444,66 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(source.contains("await manager.reload()"))
     }
 }
+
+
+extension IOSCursorAuthMainRpcCompatibilityTests {
+    func testLoggedOutProjectionCarriesCanonicalRefusalError() async {
+        let runtime = IOSCursorAuthMainRpcCompatibility(
+            dependencies: .init(
+                readStatus: {
+                    .init(
+                        loggedIn: false,
+                        errorMessage: IOS_CURSOR_ACCOUNT_REFUSED_MESSAGE,
+                        freshness: 11
+                    )
+                },
+                isLoginPending: { false },
+                beginLogin: {
+                    .init(
+                        attemptId: "unused",
+                        loginURL: URL(string: "https://cursor.com/login")!
+                    )
+                },
+                pollLogin: { _ in nil },
+                cancelPendingLogins: {},
+                logout: {},
+                openExternal: { _ in },
+                reloadAuthoritativeMcp: {},
+                invalidateMcp: {},
+                sleepBeforePoll: {}
+            )
+        )
+
+        let value = await runtime.getStatus()
+        XCTAssertEqual(value["kind"] as? String, "logged-out")
+        XCTAssertEqual(value["errorMessage"] as? String, IOS_CURSOR_ACCOUNT_REFUSED_MESSAGE)
+        XCTAssertEqual((value["freshness"] as? NSNumber)?.uint64Value, 11)
+    }
+
+    func testAccountRefusalProductionWiringUsesCanonicalCursorAuthOwner() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let surfaceSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+        let runtimeSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/ios-main/IOSMainRuntime.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(surfaceSource.contains("cursorAuth.revokeForAccountRefusal()"))
+        XCTAssertTrue(surfaceSource.contains("await gatewayDescriptorCache.clear()"))
+        XCTAssertTrue(surfaceSource.contains("await manager.reload()"))
+        XCTAssertTrue(runtimeSource.contains("ProductionCoordinatorAccountRevoker("))
+        XCTAssertTrue(runtimeSource.contains("coordinator.revokeCursorAuthForAccountRefusal()"))
+    }
+}
