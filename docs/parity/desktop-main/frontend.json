@@ -3450,8 +3450,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "MediaViewer.swift uses native PDFKit/SwiftUI and does not carry a web stylesheet/runtime.",
       "test_evidence": "Native build/UI acceptance replaces CSS tests.",
-      "notes": "IOS-MAIN-DEP-PDF-CSS-20261009: Web stylesheet replaced by native platform presentation.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-PDF-CSS-20261012: Desktop web-only PDF layout/viewport stylesheet remains not-applicable-with-replacement; iOS uses PDFKit/SwiftUI native presentation, native loading/error surfaces and accessibility. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, native shipping owner, state/lifecycle, failure and scope behavior were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/pdf-viewer.tsx",
@@ -3466,8 +3467,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MediaViewer.swift: nativePdfPreviewByteCap, isNativePdfAttachment, NativePDFPreview and PDF-specific content/load path.",
       "test_evidence": "SharedMediaParityTests.testNativePdfPreviewDetectionAndDesktopPreviewCap verifies MIME/extension detection and exact 25 MiB cap; same-head build/UI evidence still required before verified.",
-      "notes": "IOS-MAIN-DEP-PDF-VIEWER-20261009: exact Desktop pdf-viewer.tsx reviewed and ported through PDFKit; implemented fence pending same-head CI.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-PDF-VIEWER-20261012: Desktop current-main pdf.js byte cap/loading/error/zoom/download responsibilities were re-read; shipping iOS MediaViewer keeps the 25 MB preview cap, PDFKit rendering, native zoom/navigation and unavailable/too-large failures without a second PDF runtime. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, native shipping owner, state/lifecycle, failure and scope behavior were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/referenced-message-preview.tsx",
@@ -3482,8 +3484,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (mobileReplyReferencePreview/mobileResolveReplyReference/mobileReplyReferenceQuoteLabel/mobileReplyReferenceNavigation/replyReferenceContent/transcriptList ScrollViewReader) plus source/shared/media/markdown-preview.swift.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.testReplyReferencePreviewLabelsAndNavigationMatchDesktopSemantics covers canonical resolution, main-scope scroll versus thread fallback, image/file/link/missing labels and Markdown quote normalization. Exact-head UI/CI evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-REFERENCED-PREVIEW-20261011: native replacement preserves user effect and navigation without browser hover machinery; keep below verified pending exact-head acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-REFERENCED-PREVIEW-20261012: current-main text/image/file/link/missing reference projection plus in-scope jump/out-of-scope thread semantics were re-read; MobileBotChat resolves canonical references and preserves native navigation without browser hover machinery. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, native shipping owner, state/lifecycle, failure and scope behavior were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/reply-preview.tsx",
@@ -3498,8 +3501,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (MobileReplyReferencePreview, mobileResolveReplyReference, mobileReplyReferenceComposerLabel, replyBanner, beginReply) is the single shipping reply owner.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.testReplyReferencePreviewLabelsAndNavigationMatchDesktopSemantics plus existing reply/thread projection tests. Exact-head CI remains required before verified.",
-      "notes": "IOS-MAIN-DEP-REPLY-PREVIEW-20261011: raw target-id presentation is replaced by canonical target preview; no parallel reply store added.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-REPLY-PREVIEW-20261012: current-main compact reply label, jump/open-thread, composer reply target and cancel semantics were re-read; the shipping MobileBotChat canonical target resolver/banner/retry path remains the sole native owner. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, native shipping owner, state/lifecycle, failure and scope behavior were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/reply-thread-controller.ts",
@@ -3531,11 +3535,11 @@
       "implementation_status": "mapped",
       "production_evidence": "MobileBotChat shipping composer -> MobileComposerTextView/MobileComposerUITextView -> MobileComposerTextCoordinator; GrokMobileShell botDraftBinding/botTranscriptBinding use mobileBotConversationScopeKey(accountScopeKey:agentID:).",
       "test_evidence": "MobileComposerImeAcceptanceTests exercises real UIKit setMarkedText/unmarkText for Chinese and Japanese, Enter/Escape fencing, same-scope external draft synchronization, account/Agent scope switching and natural bidi direction; FabushiUITests.testNativeAgentComposerIsShippingTextViewAndAcceptsBidiCommittedText reaches the shipping Agent composer and enters committed Chinese+Arabic text. Exact-descendant GitHub Actions are required before verified promotion.",
-      "notes": "IOS-MAIN-CONVERSATION-IME-001: current-main rich-text-editor.tsx@988a89ff68792b3764d8982df08e98c2a8fce49b was re-read against the native shipping composer. This descendant replaces implicit SwiftUI TextField composition ownership with an explicit UIKit marked-text fence and closes the discovered account+Agent draft/transcript keying leak. Keep implementation_status mapped and authority review fenced until the descendant exact-head Xcode/UI/protected jobs succeed and aggregate dependency/shared-contract review closes.",
+      "notes": "IOS-MAIN-CONVERSATION-RICH-EDITOR-20261012: current-main Tiptap composition/suggestion/serialization/paste/keyboard behavior was re-read against MobileComposerTextView + MobileBotChat. Native marked-text IME fencing, suggestions, paste and durable richText/reference command state are shipping, but the aggregate Desktop editor surface is not yet exhaustively equivalent. Keep mapped and current-main-reviewed; exact-head Xcode/UI/protected evidence and remaining rich-text deltas are still required. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, native shipping owner, state/lifecycle, failure and scope behavior were rechecked. Current-main review only; no verified promotion.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "responsibility_id": "IOS-MAIN-CONVERSATION-IME-001",
       "desktop_runtime_entrypoint": "ProductionRenderer Agent workspace -> PromptRichTextEditor -> ProseMirror/TipTap editorProps composition/key handlers -> caller-owned scoped draft",
       "desktop_state_machine": "scope/clear external sync -> compositionstart acquires editor ownership -> marked text ignores Enter/Escape and external setContent -> compositionend commits -> ordinary Enter submits; bidi direction follows first strong character",
