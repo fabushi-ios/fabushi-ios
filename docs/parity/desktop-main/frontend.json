@@ -4830,7 +4830,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/root-resilience/connection-state.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/ProductionRenderer.view.swift; source/ios-main/FabushiRuntime.swift; frontend/src/production/FabushiSceneRoot.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact connection-state.ts blob c8de518fbc65f1ae03b0d58f8be64f501e054bb9. Native structured-concurrency retry replaces the browser controller waiter/subscription object while preserving the single runtime owner."
+      "notes": "IOS-MAIN-DEP-CONNECTION-STATE-20261012: current-main account identity, privacy gating, transport phase, retry coalescing/generation and dispose semantics were re-read against the native MobileCoordinatorConnectionProjection/notice and Fabushi runtime reconnect owner. Keep implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/root-resilience/connection-state.tsx",
@@ -4845,7 +4847,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/root-resilience/connection-state.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD build/UI evidence required before verified",
-      "notes": "Exact Desktop TSX blob ed2ef6c69609ec7c45be7288bedbc8ea8435bf62 reviewed on Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native view reuses the existing home/access composition instead of mounting a second root."
+      "notes": "IOS-MAIN-DEP-CONNECTION-HOST-20261012: current-main root host reuses roster loading/error/reconnect surfaces and keeps one Retry owner. Native root projection does the same through FabushiSceneRoot/runtime. Keep implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/roster/access-readiness.ts",
@@ -4860,7 +4864,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/roster-snapshot-store.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Exact Desktop access-readiness.ts blob 76ee042975b6550864392084cc2a04548d48f6b3 reviewed on Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61."
+      "notes": "IOS-MAIN-DEP-ROSTER-READINESS-20261012: account-bound, loaded, connected, selected-agent, privacy and failure projection were re-read. AccessRosterSnapshotProjection is the canonical native owner with equivalent selected-agent and transport gating. Keep implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/roster/privacy-blocked.tsx",
@@ -4875,7 +4881,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/roster/privacy-blocked.swift; frontend/src/production/GrokMobileShell+Home.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD UI/build evidence required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and privacy-blocked.tsx@e566c979053099caabd6df1cd6cfbb241d210407."
+      "notes": "IOS-MAIN-DEP-ROSTER-PRIVACY-20261012: current-main privacy-mode block copy, sign-out and external settings action were re-read against MobileRosterPrivacyBlockedView. Native focus mechanics replace browser modal focus restoration. Keep implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/roster/reconnect-notice.tsx",
@@ -4890,7 +4898,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/root-resilience/connection-state.swift; frontend/src/production/GrokMobileShell+Home.swift; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD evidence required before verified",
-      "notes": "Exact Desktop reconnect-notice.tsx blob ce30806d3bf77e4dc20f7885ae2df549e78429be reviewed on Desktop main."
+      "notes": "IOS-MAIN-DEP-ROSTER-RECONNECT-20261012: reconnect status, disabled in-flight retry and retry copy were re-read against the native root connection notice. One canonical runtime retry owner remains. Keep implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/roster/selection-state.ts",
@@ -4905,7 +4915,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/roster-snapshot-store.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD evidence required before verified",
-      "notes": "Exact Desktop selection-state.ts blob 23db0f0b38085e3723525cc02c389456738330ad reviewed on Desktop main. No second selection store introduced."
+      "notes": "IOS-MAIN-DEP-ROSTER-SELECTION-20261012: current-main selection reconcile/persistence scope was re-read against AccessRosterSelectionState/roster snapshot persistence. Account scope and stale selection removal remain native-owned. Keep implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/roster/status.tsx",
@@ -4920,7 +4932,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/roster/status.swift; frontend/src/recovered/features/root-resilience/connection-state.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD build/UI evidence required before verified",
-      "notes": "Exact Desktop status.tsx blob fa389ebc756e49d0d0a84906d7224ae84c77ed9e reviewed on Desktop main."
+      "notes": "IOS-MAIN-DEP-ROSTER-STATUS-20261012: loading/error/empty/all-hidden states and hidden-chat affordance were re-read against MobileRosterStatusView plus root resilience ownership for loading/error. Keep implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/runtime-theme-token-installer.ts",
@@ -4935,7 +4949,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "current exact-HEAD compile/UI acceptance remains required for native appearance; DOM style-node lifecycle is platform-inapplicable",
-      "notes": "Exact Desktop blob c6b47e51f430ca3b21a29b63af284221b0460443 reviewed on Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The mechanism is DOM-specific; native semantic color inheritance is the platform replacement."
+      "notes": "IOS-MAIN-DEP-RUNTIME-THEME-20261012: DOM/CSS runtime token installation is renderer-specific. Native SwiftUI semantic colors/environment replace it; product theming is retained without injecting web CSS tokens. Keep not-applicable-with-replacement. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/settings/overlay/auto-review.tsx",
