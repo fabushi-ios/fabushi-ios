@@ -410,3 +410,31 @@ final class CursorAuthFreshnessParityTests: XCTestCase {
         XCTAssertEqual(observed.last?.freshness, 1)
     }
 }
+
+@MainActor
+final class CursorAuthOperationEpochParityTests: XCTestCase {
+    func testNewLoginSupersedesOlderAttemptBeforePolling() async throws {
+        let service = IOSCursorAuthService(
+            store: CursorAuthFreshnessCredentialStore(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            websiteURL: URL(string: "https://cursor.example.test")!
+        )
+        let older = try service.beginLogin()
+        let newer = try service.beginLogin()
+
+        do {
+            _ = try await service.pollLogin(attemptId: older.attemptId)
+            XCTFail("superseded login attempt must not poll or mutate credentials")
+        } catch let error as IOSCursorAuthError {
+            XCTAssertEqual(error, .loginAttemptNotFound)
+        }
+
+        service.cancelLogin(attemptId: newer.attemptId)
+        do {
+            _ = try await service.pollLogin(attemptId: newer.attemptId)
+            XCTFail("cancelled login attempt must remain superseded")
+        } catch let error as IOSCursorAuthError {
+            XCTAssertEqual(error, .loginAttemptNotFound)
+        }
+    }
+}

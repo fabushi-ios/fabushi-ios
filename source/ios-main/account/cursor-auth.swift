@@ -122,6 +122,7 @@ final class IOSCursorAuthService {
     private struct PendingLogin {
         let uuid: String
         let verifier: String
+        let operationEpoch: UInt64
     }
 
     private let store: any IOSCursorCredentialStoring
@@ -137,6 +138,9 @@ final class IOSCursorAuthService {
     private var statusObserver: StatusObserver?
     private var statusObserverGeneration: UInt64 = 0
     private var statusFreshness: UInt64 = 0
+    private var authOperationEpoch: UInt64 = 0
+    private var credentialMutationActive = false
+    private var credentialMutationWaiters: [CheckedContinuation<Void, Never>] = []
     private var credentialsRevoked = false
     private var signoutSettled = false
     private var keychainUnavailableSettled = false
@@ -202,6 +206,47 @@ final class IOSCursorAuthService {
         return published
     }
 
+    @discardableResult
+    private func advanceAuthOperationEpoch() -> UInt64 {
+        authOperationEpoch = authOperationEpoch == UInt64.max ? 1 : authOperationEpoch + 1
+        return authOperationEpoch
+    }
+
+    private func isCurrentAuthOperation(_ epoch: UInt64) -> Bool {
+        epoch == authOperationEpoch
+    }
+
+    private func acquireCredentialMutation() async {
+        if !credentialMutationActive {
+            credentialMutationActive = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            credentialMutationWaiters.append(continuation)
+        }
+    }
+
+    private func releaseCredentialMutation() {
+        if credentialMutationWaiters.isEmpty {
+            credentialMutationActive = false
+            return
+        }
+        credentialMutationWaiters.removeFirst().resume()
+    }
+
+    private func mutateCredentials<T>(
+        _ operation: () async throws -> T
+    ) async rethrows -> T {
+        await acquireCredentialMutation()
+        defer { releaseCredentialMutation() }
+        return try await operation()
+    }
+
+    private func rollbackSupersededAuthentication() async {
+        try? await store.deleteSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+        try? await store.deleteSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY)
+    }
+
     func status() async -> IOSCursorAuthStatus {
         guard !credentialsRevoked else {
             return .init(loggedIn: false, freshness: statusFreshness)
@@ -235,6 +280,8 @@ final class IOSCursorAuthService {
     }
 
     func beginLogin() throws -> IOSCursorLoginStart {
+        pending.removeAll()
+        let operationEpoch = advanceAuthOperationEpoch()
         let verifierBytes = try secureRandomBytes(count: 32)
         let verifier = base64URL(verifierBytes)
         let challenge = base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
@@ -253,13 +300,19 @@ final class IOSCursorAuthService {
         guard let loginURL = components?.url else {
             throw IOSCursorAuthError.invalidLoginResponse
         }
-        pending[attemptId] = .init(uuid: uuid, verifier: verifier)
+        pending[attemptId] = .init(
+            uuid: uuid,
+            verifier: verifier,
+            operationEpoch: operationEpoch
+        )
         authTelemetry.report(iosCursorSigninTelemetry(.loginStarted))
         return .init(attemptId: attemptId, loginURL: loginURL)
     }
 
     func pollLogin(attemptId: String) async throws -> IOSCursorAuthStatus? {
-        guard let login = pending[attemptId] else {
+        guard let login = pending[attemptId],
+              isCurrentAuthOperation(login.operationEpoch)
+        else {
             throw IOSCursorAuthError.loginAttemptNotFound
         }
         var components = URLComponents(
@@ -303,8 +356,27 @@ final class IOSCursorAuthService {
             authTelemetry.report(iosCursorSigninTelemetry(.loginFailed(cause: "error")))
             throw IOSCursorAuthError.invalidLoginResponse
         }
-        try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: accessToken)
-        try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: refreshToken)
+        let stored = try await mutateCredentials { () -> Bool in
+            guard self.isCurrentAuthOperation(login.operationEpoch),
+                  self.pending[attemptId]?.operationEpoch == login.operationEpoch
+            else { return false }
+            try await self.store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: accessToken)
+            guard self.isCurrentAuthOperation(login.operationEpoch),
+                  self.pending[attemptId]?.operationEpoch == login.operationEpoch
+            else {
+                await self.rollbackSupersededAuthentication()
+                return false
+            }
+            try await self.store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: refreshToken)
+            guard self.isCurrentAuthOperation(login.operationEpoch),
+                  self.pending[attemptId]?.operationEpoch == login.operationEpoch
+            else {
+                await self.rollbackSupersededAuthentication()
+                return false
+            }
+            return true
+        }
+        guard stored else { return await status() }
         credentialsRevoked = false
         signoutSettled = false
         keychainUnavailableSettled = false
@@ -315,9 +387,11 @@ final class IOSCursorAuthService {
     }
 
     func cancelLogin(attemptId: String) {
-        if pending.removeValue(forKey: attemptId) != nil {
-            authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: "forced")))
+        guard let login = pending.removeValue(forKey: attemptId) else { return }
+        if isCurrentAuthOperation(login.operationEpoch) {
+            _ = advanceAuthOperationEpoch()
         }
+        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: "forced")))
     }
 
     func logout() async throws {
@@ -452,25 +526,31 @@ final class IOSCursorAuthService {
         sessionCause: IOSCursorSessionSignoutCause,
         signinCause: String
     ) async throws {
+        let logoutOperationEpoch = advanceAuthOperationEpoch()
         pending.removeAll()
-
-        // Freeze the departing account credential before revocation/deletion.
-        // This is the only token the terminal settlement is allowed to use.
-        let departingAccessToken = await readDepartingSessionToken()
         credentialsRevoked = true
 
-        var deletionErrors: [Error] = []
-        for key in [
-            IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
-            IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY,
-        ] {
-            do {
-                try await store.deleteSecret(key)
-            } catch {
-                deletionErrors.append(error)
+        // Credential mutation is serialized with login writes so an older poll
+        // cannot recreate a deleted token after logout/new-login supersedes it.
+        let mutation = await mutateCredentials { () -> (String?, [Error]) in
+            let departingAccessToken = await self.readDepartingSessionToken()
+            var deletionErrors: [Error] = []
+            for key in [
+                IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+                IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY,
+            ] {
+                do {
+                    try await self.store.deleteSecret(key)
+                } catch {
+                    deletionErrors.append(error)
+                }
             }
+            return (departingAccessToken, deletionErrors)
         }
+        let departingAccessToken = mutation.0
+        let deletionErrors = mutation.1
         let durable = deletionErrors.isEmpty
+        let current = isCurrentAuthOperation(logoutOperationEpoch)
 
         let localProjection = iosCursorSessionTelemetry(.signedOut(
             cause: sessionCause,
@@ -480,7 +560,9 @@ final class IOSCursorAuthService {
         authTelemetry.report(iosCursorSigninTelemetry(.signedOut(
             cause: durable ? signinCause : "retained_after_failed_logout"
         )))
-        publishStatus(.init(loggedIn: false))
+        if current {
+            publishStatus(.init(loggedIn: false))
+        }
 
         if let departingAccessToken, !signoutSettled {
             signoutSettled = true
