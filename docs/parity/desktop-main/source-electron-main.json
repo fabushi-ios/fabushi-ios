@@ -491,12 +491,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/about/overlay/view.view.swift; frontend/src/recovered/features/window-chrome/MobileAppAlert.swift; source/ios-main/IOSMainRuntime.swift",
       "ios_language": "Swift / SwiftUI / UIKit lifecycle",
-      "ios_platform_delta": "iOS has no Electron application menu or desktop DevTools/reload menu. Applicable product actions are owned by native app lifecycle/settings/about/feedback surfaces; desktop-only menu mechanics are not reproduced.",
+      "ios_platform_delta": "Desktop application-menu chrome is decomposed into iOS-native app surfaces and OS-owned behavior rather than represented by an Electron-style global menu. About/Help/Feedback are explicit AccountMenuView actions; edit commands are native UIKit/SwiftUI responder actions; quit/hide/services/window/fullscreen roles are OS/window-model responsibilities; developer controls are debug-gated. The Desktop explicit Reload command still needs a deliberate native replacement/entrypoint rather than being silently dropped.",
       "implementation_status": "mapped",
-      "production_evidence": "Current iOS shipping graph has native lifecycle ownership in IOSMainRuntime and native About/alert surfaces; no Electron-style global application-menu owner is introduced.",
-      "test_evidence": "Current-head Swift/UI acceptance remains required; dedicated Help/feedback navigation parity is still part of aggregate UI review.",
-      "notes": "Reviewed exact Desktop blob f8c51e4ac01815849d1e6cc2f58108f50200a46d. Kept mapped rather than verified/N/A because Help/feedback and lifecycle-visible effects still require current-main aggregate UI acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Desktop application-menu.ts@f8c51e4ac01815849d1e6cc2f58108f50200a46d was re-read for About, Help Center, Feedback, Reload, DevTools, edit, fullscreen/window and platform roles. iOS AccountMenuView ships Help Center through MarketplaceModel.openAccountHelp, native AccountFeedbackView, and FabushiAboutOverlayView with version/build/release-track projection. IOSDevControls is DEBUG-only and routes through production dev-control gates. Native editing and window/app lifecycle are owned by SwiftUI/UIKit/iOS. No single shipping native command currently proves Desktop View > Reload equivalence, so the aggregate responsibility remains open.",
+      "test_evidence": "AboutOverlayParityTests and FeedbackOverlayParityTests verify the native user surfaces and production feedback request contract; DevControlsParityTests verify debug-only control boundaries. Reload replacement remains unverified and exact-head CI is pending.",
+      "notes": "Current-main review complete. Do not classify the whole desktop menu as N/A. Keep mapped until the explicit Reload product effect is either implemented as a native recovery/reload action or narrowly dispositioned with a verified replacement, then obtain same-head CI.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/attachments/attachment-manager.ts",
