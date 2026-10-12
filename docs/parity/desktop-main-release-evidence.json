@@ -328,25 +328,15 @@
   "note": "All runs through 38190289874/38190289840/38192173184/38192173175/38192487666/38192487704/38192567443/38192567432/38192646437/38192646349/38192850135/38192850173/38193218500/38193218520 are predecessor only after this evidence commit. 38193218500 is a deterministic strict-architecture failure caused by stale authority-review metadata on the implemented os-notification row; current Desktop main preserves the exact source blob and this commit repairs only the authority binding, not the validator. finalAcceptance remains false and finalIosCommit null. Production signer, real StoreKit, signed archive/device install/upgrade, TestFlight/App Store, completeness and independent acceptance are still required on one final SHA.",
   "currentHeadRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "a93626a8f60dcc36dc229f0980a3cee9ea552a82",
-    "preEvidenceIosHead": "b13b769f414193022634021230018d1e6e839f76",
-    "preEvidenceIosTree": "cf5d9b4a7d3929566e23f7e7548aca7e7482610f",
+    "requestedCheckpoint": "c408673139a8ebb92a6e94aeb73727de01124ac1",
+    "preEvidenceIosHead": "8ef28eee7dce561f3dc8e577e70d839b78663d8a",
     "baseMain": "f098639ab178a839690b9dece60fa0d11c5d2e25",
     "predecessorWorkflowRuns": [
-      38190289874,
-      38190289840,
-      38192173184,
-      38192173175,
-      38192487666,
-      38192487704,
-      38192567443,
-      38192567432,
-      38192646437,
-      38192646349,
-      38192850135,
-      38192850173,
-      38193218500,
-      38193218520
+      38193384215,
+      38193384217,
+      38193596582,
+      38194466221,
+      38194466227
     ],
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
@@ -356,8 +346,7 @@
     "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
-    "localExecProvider": "account-scoped Cursor sandbox exec-daemon via CoordinatorMcpSurface/IOSRemoteExecDaemonClient",
     "promotion": "none",
-    "status": "fresh-exact-head-actions-required-after-this-evidence-commit"
+    "status": "fresh-exact-head-actions-and-release-evidence-required"
   }
 }
