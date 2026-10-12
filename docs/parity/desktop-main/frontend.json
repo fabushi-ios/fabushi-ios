@@ -1865,7 +1865,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/overlay/entrypoint.ts",
-      "desktop_blob_sha": "d8f83f27662ec77413f8b4be8ce4709a392e5f7d",
+      "desktop_blob_sha": "d8f739e4f7f22d85df6815bd86a5af86ad2b9321",
       "desktop_responsibility": "Desktop-only lazy registration for the Computer overlay; it declares the overlay always available and lazy-loads a view that intentionally renders no UI.",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "No independent Computer overlay is visible; the entrypoint only participates in Desktop renderer lazy-module registration.",
@@ -1882,7 +1882,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/overlay/view.tsx",
-      "desktop_blob_sha": "e83bf5df12a3dc7226d8aa28be15fefae2e0f2fa",
+      "desktop_blob_sha": "e83c5e37a282d06855a11c78e39c9327905a807f",
       "desktop_responsibility": "Intentional empty Desktop Computer overlay view; the recovered React component returns null.",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "The overlay contributes no visible DOM; actual Computer UI is owned elsewhere.",
@@ -1899,7 +1899,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/rebuild/banner.tsx",
-      "desktop_blob_sha": "eaf3e28ac80aa207553259c9572a02dc0b2cf6cf",
+      "desktop_blob_sha": "eaf9324f9f8eef3a264ba80da124f4ab52752282",
       "desktop_responsibility": "Own rebuild progress/reconnect presentation; current-main direct changes replace legacy Grok Bot Computer copy with Fabushi while preserving the existing Computer lifecycle/state semantics.",
       "desktop_owner": "Desktop Computer presentation over canonical Computer/rebuild/update owners",
       "desktop_visible_effect": "Computer update/rebuild/reconnect UI uses current Fabushi branding without changing lifecycle guards or progress semantics.",
