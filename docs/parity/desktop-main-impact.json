@@ -2013,8 +2013,8 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "104bce479808926509fed9a843593584dec4b42f",
-    "preEvidenceIosHead": "104bce479808926509fed9a843593584dec4b42f",
+    "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
+    "preEvidenceIosHead": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2070,7 +2070,9 @@
       38204921287,
       38204921448,
       38205042929,
-      38205042937
+      38205042937,
+      38206242108,
+      38206242109
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2129,22 +2131,24 @@
       114667448517,
       114667491776,
       114666555716,
-      114666555801
+      114666555801,
+      114670245589,
+      114670279943,
+      114670280166,
+      114670280441,
+      114670247340,
+      114670247403
     ],
-    "status": "mcp-desktop-runtime-closure-resulting-exact-head-ci-required",
+    "status": "mcp-ledger-schema-repair-human-call-implemented-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
-      "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
-      "mobile/ios/Fabushi/MarketplaceModel.swift",
-      "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
-      "mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift",
-      "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
       "docs/parity/desktop-main/source-electron-main.json",
+      "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
       "docs/parity/desktop-main-impact.json",
       "docs/parity/desktop-main-release-evidence.json",
       "docs/parity/desktop-main-index.json"
     ],
-    "conclusion": "MCP team-popularity is closed as strict not-applicable-with-replacement after exhaustive current-main renderer caller-graph review. The MCP Desktop aggregate now has native plugin-variable projection and updatePluginInstall shipping wiring through the existing Coordinator/SandMcpManager owner. Full 7,951-row responsibility closure remains open.",
-    "currentImplementationHead": "104bce479808926509fed9a843593584dec4b42f"
+    "conclusion": "Architecture failure 38206242108/job 114670245589 was a fail-closed ledger target-path schema error, not a validator weakening. MCP aggregate keeps one canonical source target while production participants remain in evidence. Human Call current-main production composition is implemented, including Broadcast Upload Extension and CallKit/PushKit wiring, but physical two-device/APNs evidence remains open.",
+    "currentImplementationHead": "66a94cd9e2d2c614aed6293254dcbb791de4a55f"
   }
 }
