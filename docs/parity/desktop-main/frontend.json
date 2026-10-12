@@ -85,7 +85,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml",
       "test_evidence": "",
-      "notes": "Mechanism-only row; no separate iOS runtime owner should be invented."
+      "notes": "Mechanism-only row; no separate iOS runtime owner should be invented. Re-read exact Desktop barrel blob 7809281a897865a38e83de2bdd70783e0cdac314 at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. This file only re-exports adjacent SDK modules and owns no independent runtime state or user effect; Swift target/module visibility is the iOS replacement. Adjacent runtime owners remain audited as separate responsibilities, so this row stays not-applicable rather than inventing a second iOS runtime owner.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/mcp-app-sdk/src/types.ts",
