@@ -27,11 +27,11 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Desktop/Backend/Platform Core/Fabushi/Marketplace authorities remain unchanged. PR #3 advanced past d705013a; predecessor runs now include 38195681012/38195680859 and exact-input strict completeness 38195693072 on b12c1016. Six command-palette provider/model/root responsibilities were re-read against Desktop 371b72f1 and current iOS shipping owners; stale verified rows were demoted to implemented and mapped rows with real production owners were corrected to implemented. No verified evidence fields were fabricated.",
+  "notes": "Authorities remain unchanged. efbe80b1d7fc87233d87968f137596e4e6b47b9a and runs 38198629796/38198629791 are predecessor evidence after protected-account-ui exposed an unqualified CoordinatorError compile failure. Current implementation head 4ecf69b2657ec47b74d054b307797855e955cbd1 qualifies the canonical MahayanaCoordinator.CoordinatorError without weakening any gate. Fresh exact-head Actions are required.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "177fc994e2554ddc2f3213766d41909853b1a40c",
-    "preEvidenceIosHead": "b12c1016e80fc937f6a3181a381983cc329c9559",
+    "preEvidenceIosHead": "efbe80b1d7fc87233d87968f137596e4e6b47b9a",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -48,9 +48,11 @@
       38194466221,
       38194466227,
       38194755369,
-      38194755382
+      38194755382,
+      38198629796,
+      38198629791
     ],
-    "status": "coordinator-telemetry-advanced-attachment-host-gap-corrected-fresh-exact-head-actions-required",
+    "status": "protected-ui-compile-gap-fixed-fresh-exact-head-actions-required",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
@@ -61,6 +63,6 @@
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
     "promotion": "command-palette-owner-review-and-status-correction-no-verification-promotion",
-    "currentImplementationHead": "011cd3a7542fc484770ed6538bd626091ce96889"
+    "currentImplementationHead": "4ecf69b2657ec47b74d054b307797855e955cbd1"
   }
 }
