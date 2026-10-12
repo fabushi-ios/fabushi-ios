@@ -26,4 +26,35 @@ enum IOSUpdateTelemetry {
         if order < 0 { return "downgrade" }
         return "same"
     }
+    static func check(
+        trigger: String,
+        result: String,
+        currentVersion: String,
+        targetVersion: String?,
+        errorClass: String? = nil
+    ) -> IOSUpdateTelemetryProjection {
+        var metadata: [String: String] = [
+            "action": "check",
+            "trigger": trigger,
+            "track": "stable",
+            "result": result,
+            "mechanism": "app-store-connect",
+            "self_update_supported": "false",
+            "direction": direction(
+                targetVersion: targetVersion,
+                currentVersion: currentVersion
+            ),
+        ]
+        if let targetVersion, !targetVersion.isEmpty {
+            metadata["target_version"] = targetVersion
+        }
+        if let errorClass, !errorClass.isEmpty {
+            metadata["error_class"] = String(errorClass.prefix(128))
+        }
+        return .init(
+            level: result == "error" ? "warn" : "info",
+            metadata: metadata
+        )
+    }
+
 }

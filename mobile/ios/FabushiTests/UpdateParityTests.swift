@@ -200,4 +200,49 @@ final class UpdateParityTests: XCTestCase {
         }
         XCTAssertEqual(idleFailure.code, "ios-update-idle-apply-managed-by-app-store")
     }
+    func testUpdateWiringEmitsRealCheckAndStoreManagedTelemetry() async throws {
+        let expectedMetadata = metadata()
+        let offeredPolicy = policy()
+        let service = IOSAppStoreUpdateService(
+            metadataProvider: { expectedMetadata },
+            policyFetcher: { _ in offeredPolicy }
+        )
+        var projections: [IOSUpdateTelemetryProjection] = []
+        let wiring = IOSUpdateServiceWiring(
+            service: service,
+            telemetry: { projections.append($0) }
+        )
+
+        _ = await wiring.route(method: "checkForUpdates", args: .object([:]))
+        _ = await wiring.route(method: "quitAndInstallUpdate", args: .object([:]))
+
+        XCTAssertEqual(projections.count, 2)
+        XCTAssertEqual(projections[0].level, "info")
+        XCTAssertEqual(projections[0].metadata["action"], "check")
+        XCTAssertEqual(projections[0].metadata["trigger"], "rpc")
+        XCTAssertEqual(projections[0].metadata["result"], "available")
+        XCTAssertEqual(projections[0].metadata["direction"], "upgrade")
+        XCTAssertEqual(projections[0].metadata["target_version"], "1.2.66")
+        XCTAssertNil(projections[0].metadata["error_class"])
+        XCTAssertEqual(projections[1], IOSUpdateTelemetry.storeManaged(
+            action: "quitAndInstallUpdate",
+            accepted: false
+        ))
+    }
+
+    func testUpdateCheckTelemetryUsesPrivacySafeErrorClass() {
+        let projection = IOSUpdateTelemetry.check(
+            trigger: "runtime_refresh",
+            result: "error",
+            currentVersion: "1.2.65",
+            targetVersion: nil,
+            errorClass: "policy_fetch_failed"
+        )
+        XCTAssertEqual(projection.level, "warn")
+        XCTAssertEqual(projection.metadata["result"], "error")
+        XCTAssertEqual(projection.metadata["direction"], "unknown")
+        XCTAssertEqual(projection.metadata["error_class"], "policy_fetch_failed")
+    }
+
+
 }

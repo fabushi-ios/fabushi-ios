@@ -205,7 +205,15 @@ final class IOSMainRuntime {
                 return authorization
             }
         )
-        updateWiring = IOSUpdateServiceWiring()
+        updateWiring = IOSUpdateServiceWiring(
+            telemetry: { projection in
+                reporter.report(
+                    .update,
+                    level: IOSLifecycleTelemetryLevel(rawValue: projection.level) ?? .info,
+                    metadata: projection.metadata
+                )
+            }
+        )
 
         lifecycleReporter.report(
             .startup,

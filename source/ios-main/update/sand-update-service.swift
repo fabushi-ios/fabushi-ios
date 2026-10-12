@@ -34,6 +34,10 @@ final class IOSAppStoreUpdateService {
         self.policyFetcher = policyFetcher
     }
 
+    func currentVersionForTelemetry() -> String {
+        metadataProvider()?.version ?? "unknown"
+    }
+
     func statusPayload() throws -> CoordinatorPayload {
         guard let metadata = metadataProvider() else {
             throw ServiceError.releaseMetadataUnavailable

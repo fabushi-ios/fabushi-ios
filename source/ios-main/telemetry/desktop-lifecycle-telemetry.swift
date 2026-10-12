@@ -12,6 +12,7 @@ enum IOSLifecycleTelemetryFamily: String, CaseIterable, Equatable, Sendable {
     case rendererLifecycle
     case coordinatorHandoff
     case localExecLifecycle
+    case update
     case uncleanExit
     case desktopSession
     case desktopSignin

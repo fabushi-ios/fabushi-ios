@@ -2,10 +2,17 @@ import Foundation
 
 @MainActor
 final class IOSUpdateServiceWiring {
-    private let service: IOSAppStoreUpdateService
+    typealias TelemetrySink = @MainActor (IOSUpdateTelemetryProjection) -> Void
 
-    init(service: IOSAppStoreUpdateService = .init()) {
+    private let service: IOSAppStoreUpdateService
+    private let telemetry: TelemetrySink
+
+    init(
+        service: IOSAppStoreUpdateService = .init(),
+        telemetry: @escaping TelemetrySink = { _ in }
+    ) {
         self.service = service
+        self.telemetry = telemetry
     }
 
     var policyLoadState: IOSAppVersionPolicyLoadState {
@@ -15,15 +22,58 @@ final class IOSUpdateServiceWiring {
     func refreshPolicy() async -> IOSAppVersionPolicyLoadState {
         do {
             _ = try await service.checkForUpdates()
+            reportCheck(trigger: "runtime_refresh", state: service.policyLoadState)
             return service.policyLoadState
         } catch is CancellationError {
+            reportCheck(
+                trigger: "runtime_refresh",
+                state: service.policyLoadState,
+                cancelled: true
+            )
             return service.policyLoadState
         } catch {
-            return .failed(
+            let failed = IOSAppVersionPolicyLoadState.failed(
                 message: error.localizedDescription,
                 retained: service.policyLoadState.policy
             )
+            reportCheck(trigger: "runtime_refresh", state: failed)
+            return failed
         }
+    }
+
+    private func reportCheck(
+        trigger: String,
+        state: IOSAppVersionPolicyLoadState,
+        cancelled: Bool = false
+    ) {
+        let result: String
+        let errorClass: String?
+        if cancelled {
+            result = "aborted"
+            errorClass = "CancellationError"
+        } else {
+            switch state {
+            case .ready(let policy):
+                result = policy.updateAvailable ? "available" : "up-to-date"
+                errorClass = nil
+            case .failed:
+                result = "error"
+                errorClass = "policy_fetch_failed"
+            case .idle:
+                result = "idle"
+                errorClass = nil
+            case .loading:
+                result = "checking"
+                errorClass = nil
+            }
+        }
+        telemetry(IOSUpdateTelemetry.check(
+            trigger: trigger,
+            result: result,
+            currentVersion: service.currentVersionForTelemetry(),
+            targetVersion: state.policy?.latestVersion,
+            errorClass: errorClass
+        ))
     }
 
     func route(
@@ -36,7 +86,9 @@ final class IOSUpdateServiceWiring {
                 return .ok(try service.statusPayload())
 
             case "checkForUpdates":
-                return .ok(try await service.checkForUpdates())
+                let payload = try await service.checkForUpdates()
+                reportCheck(trigger: "rpc", state: service.policyLoadState)
+                return .ok(payload)
 
             case "setUpdateTrack":
                 guard let object = args.foundationValue as? [String: Any],
@@ -48,14 +100,26 @@ final class IOSUpdateServiceWiring {
                     ))
                 }
                 guard track == "stable" else {
+                    telemetry(IOSUpdateTelemetry.storeManaged(
+                        action: "setUpdateTrack",
+                        accepted: false
+                    ))
                     return .failed(.init(
                         code: "ios-update-track-managed-by-app-store",
                         message: "App Store/TestFlight controls the iOS release track."
                     ))
                 }
+                telemetry(IOSUpdateTelemetry.storeManaged(
+                    action: "setUpdateTrack",
+                    accepted: true
+                ))
                 return .ok(try service.statusPayload())
 
             case "quitAndInstallUpdate":
+                telemetry(IOSUpdateTelemetry.storeManaged(
+                    action: "quitAndInstallUpdate",
+                    accepted: false
+                ))
                 return .ok(service.unsupportedActionPayload("quitAndInstallUpdate"))
 
             case "setAutoUpdateWhenIdleOptIn":
@@ -68,11 +132,19 @@ final class IOSUpdateServiceWiring {
                     ))
                 }
                 guard !enabled else {
+                    telemetry(IOSUpdateTelemetry.storeManaged(
+                        action: "setAutoUpdateWhenIdleOptIn",
+                        accepted: false
+                    ))
                     return .failed(.init(
                         code: "ios-update-idle-apply-managed-by-app-store",
                         message: "iOS updates are installed by App Store/TestFlight, not by an in-app idle relaunch."
                     ))
                 }
+                telemetry(IOSUpdateTelemetry.storeManaged(
+                    action: "setAutoUpdateWhenIdleOptIn",
+                    accepted: true
+                ))
                 return .ok(try service.statusPayload())
 
             default:
