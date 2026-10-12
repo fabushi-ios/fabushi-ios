@@ -27,12 +27,13 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20. Requested checkpoint d705013a1ae4be5c36057b7ff1444f1a5b1aeb19 and runs 38194840503, 38194840499, 38194881441 are predecessor evidence only because PR #3 advanced through e8e22c1f and 8a53722d. Runs 38195149103/38195149107 and 38195278502/38195278457 are also predecessor once this evidence commit lands. Thirteen named Desktop frontend responsibilities were re-read at exact current-main blobs; no fabricated verified evidence was added. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full completeness and independent acceptance remain pending.",
+  "notes": "Desktop/Backend/Platform Core/Fabushi/Marketplace authorities remain unchanged. PR #3 advanced past d705013a; predecessor runs now include 38195681012/38195680859 and exact-input strict completeness 38195693072 on b12c1016. Six command-palette provider/model/root responsibilities were re-read against Desktop 371b72f1 and current iOS shipping owners; stale verified rows were demoted to implemented and mapped rows with real production owners were corrected to implemented. No verified evidence fields were fabricated.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "d705013a1ae4be5c36057b7ff1444f1a5b1aeb19",
-    "preEvidenceIosHead": "8a53722d0b2c8f5681781d0ce2e82f8b562b3243",
-    "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
+    "preEvidenceIosHead": "b12c1016e80fc937f6a3181a381983cc329c9559",
+    "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+    "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
       38194840503,
       38194840499,
@@ -40,8 +41,13 @@
       38195149103,
       38195149107,
       38195278502,
-      38195278457
+      38195278457,
+      38195681012,
+      38195680859,
+      38195693072
     ],
+    "status": "command-palette-provider-batch-current-main-reviewed-no-verification-promotion-fresh-exact-head-ci-required",
+    "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20"
@@ -50,7 +56,6 @@
     "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
-    "promotion": "frontend-owner-review-and-status-correction-no-verification-promotion",
-    "status": "fresh-exact-head-actions-required-after-this-evidence-commit"
+    "promotion": "command-palette-owner-review-and-status-correction-no-verification-promotion"
   }
 }

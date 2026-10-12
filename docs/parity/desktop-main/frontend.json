@@ -458,10 +458,12 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Swift structured-concurrency cancellation replaces the Desktop provider request-id lifecycle; canonical HTTP(S) links are projected from MessagingModel and enriched through trusted getLinkMetadata.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift; source/ios-preload/main-rpc-runtime.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob 94a341a4dfd6fc999850d551430dff3083317eba. iOS shipping palette projects links from canonical MessagingModel and enriches via the existing trusted metadata RPC with task cancellation/account-shell fencing. Historical verified evidence is predecessor-only, so current status is implemented.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-message-provider.ts",
@@ -473,10 +475,12 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "The native palette searches the canonical hydrated MessagingModel transcript directly and navigates by exact conversation/message identity instead of owning a second search cache.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob 888e5d683d941018856291197662033c44edc506. iOS searches the canonical hydrated MessagingModel transcript and navigates exact conversation/message identities without a second cache; current-head verification evidence is not yet complete, so status is implemented.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-model.ts",
@@ -488,12 +492,12 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Swift native collections and LazyVStack replace DOM virtualization mechanics. Search normalization/fuzzy scoring, hidden ordering and newest-row/first-slot de-duplication stay deterministic; native Human conversation entries are an additive iOS product entry rather than a replacement for Agent rows.",
-      "implementation_status": "mapped",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift is the shipping search/projection owner used by GrokMobileShell+CommandPalette.swift. It preserves Desktop normalization, bounded fuzzy span, word/camel boundaries, tab filtering, hidden-after-visible search ordering and first-slot/newest-row roster de-duplication; SwiftUI LazyVStack is the native virtualization replacement rather than a second manual geometry owner.",
       "test_evidence": "GrokMobileCommandPaletteTests and MobileCommandPaletteCurrentMainTests cover normalization, fuzzy span rejection, camelCase scoring, hidden ordering, duplicate canonical roster identity, tabs, messages/files/links/routines and current-main projections. Exact-head Actions remain required before verified.",
-      "notes": "IOS-MAIN-COMMAND-PALETTE-MODEL-002: current Desktop model fully read. Platform-specific DOM virtual-window geometry is replaced by native LazyVStack while the user-visible deterministic search/order contract is implemented. Global current-main review fence remains active. Exact-head promotion is intentionally fail-closed: production/test evidence exists, but current final-head ordinary/protected CI has not yet completed successfully, so this row remains mapped until that evidence is attached.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "authority_review_state": "requires-current-main-review",
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob 8f3ac50a132c2b2e050a51ccc911b81dca897b21. GrokMobileCommandPaletteModel is the shipping owner for normalization, fuzzy/camelCase scoring, tab filtering, hidden-after-visible ordering, roster de-duplication and entry activation; SwiftUI LazyVStack replaces DOM geometry. Production owner and focused tests exist, so mapped is corrected to implemented; verification remains pending exact-head evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
       "historical_implementation_status": "verified",
       "historical_ios_disposition": "ios-adapted"
     },
@@ -507,10 +511,12 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "listAllAutomations remains the canonical owner; Swift Task cancellation replaces AbortController provider lifecycle.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/production/GrokMobileCommandPaletteModel.swift; source/ios-preload/main-rpc-runtime.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob e96c3b5cec57fc141ec30fc46b0c475ea16aaf21. iOS keeps the canonical Host automation roster as owner and uses Swift Task cancellation/fail-closed unavailable state; historical verified evidence is predecessor-only, so status is implemented.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-root-commands.ts",
@@ -522,14 +528,14 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell+CommandPalette.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "Native shell retains additive iOS global New Bot/Workspace/Contacts actions but projects Desktop current-chat commands separately. Active-chat rows now fail closed without an active Agent; Members appears only for non-shared groups, Channels only when the native messaging roster has a channel, Chat Settings only with an active Agent, and Computer update remains caller-owned by the existing guarded Computer lifecycle.",
-      "implementation_status": "mapped",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift (MobileCommandPaletteRootProjection; Computer update projection); frontend/src/production/GrokMobileShell+CommandPalette.swift (active Agent/channel scope, Members native groupMembersTarget route, Channels/Settings routes, Computer confirmation/queue/force owner); RemoteComputerStatusStore/RemoteComputerSurface and Coordinator remain authoritative for Computer lifecycle.",
       "test_evidence": "MobileCommandPaletteCurrentMainTests covers null-agent fail-closed root projection, individual/group/shared-room Members/Channels/Settings gating plus Computer ready/busy/no-update/pending/queued/stale-activity conditions. Exact-head Actions remain required before verified.",
-      "notes": "IOS-MAIN-COMMAND-PALETTE-COMPUTER-001: current-main root command projection was re-audited and the prior unconditional Members/Channels/Chat Settings drift was repaired on current PR descendants 9f271306..6d3d76e4. No second navigation or Computer state machine introduced; global re-review fence remains active. Exact-head promotion is intentionally fail-closed: production/test evidence exists, but current final-head ordinary/protected CI has not yet completed successfully, so this row remains mapped until that evidence is attached.",
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob 48c7c7878843756a800414aa6f9db68b723aed47. GrokMobileShell+CommandPalette and MobileCommandPaletteRootProjection ship current-chat Members/Channels/Settings gating and canonical Computer update confirmation/queue semantics without a second navigation or Computer lifecycle owner. Production owner and focused tests exist, so mapped is corrected to implemented; verification remains pending exact-head evidence.",
       "historical_implementation_status": "verified",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-search-provider.ts",
@@ -541,10 +547,12 @@
       "ios_target_path": "frontend/src/production/GrokMobileCommandPaletteModel.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS derives searchable files from canonical local message media fields instead of maintaining a second searchMedia cache.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell+CommandPalette.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob 9c1d24f19e5dfcb13462ab5feec1152505d2feff. iOS derives file/media search from canonical message media fields and navigates exact conversation/message identity without a second search cache; historical verified evidence is predecessor-only, so status is implemented.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-update-command.ts",
