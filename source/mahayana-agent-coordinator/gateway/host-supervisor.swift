@@ -88,6 +88,125 @@ final class IOSGatewayDescriptorKeychainCache {
 }
 
 @MainActor
+final class IOSGatewayDescriptorFastPath {
+    typealias Connection = IOSCursorSandBoxConnection
+    typealias ResolveLive = @MainActor () async throws -> Connection
+    typealias AccountScopeProvider = @MainActor () -> String?
+    typealias FailureReporter = @MainActor (_ operation: String, _ error: Error) -> Void
+    typealias BrokerDenialClassifier = @MainActor (_ error: Error) -> Bool
+
+    private struct PendingRefresh {
+        let id: UUID
+        let accountScope: String?
+        let task: Task<Connection, Error>
+    }
+
+    private let cache: IOSGatewayDescriptorKeychainCache
+    private let getAccountScope: AccountScopeProvider
+    private let resolveLive: ResolveLive
+    private let reportFailure: FailureReporter
+    private let isBrokerDenial: BrokerDenialClassifier
+    private var hasLiveConnection = false
+    private var liveAccountScope: String?
+    private var pendingRefresh: PendingRefresh?
+    private var reportedRefreshes = Set<UUID>()
+    private var deniedScopes = Set<String>()
+
+    init(
+        cache: IOSGatewayDescriptorKeychainCache,
+        getAccountScope: @escaping AccountScopeProvider,
+        reportFailure: @escaping FailureReporter = { _, _ in },
+        isBrokerDenial: @escaping BrokerDenialClassifier = { error in
+            let message = (error as NSError).localizedDescription
+            return message.contains("HTTP 401")
+                || message.contains("HTTP 403")
+                || message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
+        },
+        resolveLive: @escaping ResolveLive
+    ) {
+        self.cache = cache
+        self.getAccountScope = getAccountScope
+        self.reportFailure = reportFailure
+        self.isBrokerDenial = isBrokerDenial
+        self.resolveLive = resolveLive
+    }
+
+    func resolve() async throws -> Connection {
+        let accountScope = getAccountScope()
+        if hasLiveConnection, liveAccountScope == accountScope {
+            return try await resolveLiveConnection(for: accountScope)
+        }
+
+        let cached: Connection?
+        if let accountScope, !deniedScopes.contains(accountScope) {
+            cached = await cache.read(accountScope: accountScope)
+        } else {
+            cached = nil
+        }
+
+        let refresh = startRefresh(for: accountScope)
+        guard let cached else {
+            return try await refresh.task.value
+        }
+
+        if reportedRefreshes.insert(refresh.id).inserted {
+            Task { @MainActor [weak self] in
+                do {
+                    _ = try await refresh.task.value
+                } catch {
+                    self?.reportFailure("refresh", error)
+                }
+                self?.reportedRefreshes.remove(refresh.id)
+            }
+        }
+        return cached
+    }
+
+    private func startRefresh(for accountScope: String?) -> PendingRefresh {
+        if let pendingRefresh, pendingRefresh.accountScope == accountScope {
+            return pendingRefresh
+        }
+        let id = UUID()
+        let task = Task { @MainActor [weak self] () throws -> Connection in
+            guard let self else { throw CancellationError() }
+            defer { self.settlePendingRefresh(id) }
+            return try await self.resolveLiveConnection(for: accountScope)
+        }
+        let refresh = PendingRefresh(id: id, accountScope: accountScope, task: task)
+        pendingRefresh = refresh
+        return refresh
+    }
+
+    private func settlePendingRefresh(_ id: UUID) {
+        guard pendingRefresh?.id == id else { return }
+        pendingRefresh = nil
+    }
+
+    private func resolveLiveConnection(for accountScope: String?) async throws -> Connection {
+        do {
+            let connection = try await resolveLive()
+            if getAccountScope() == accountScope {
+                hasLiveConnection = true
+                liveAccountScope = accountScope
+                if let accountScope {
+                    deniedScopes.remove(accountScope)
+                    await cache.write(accountScope: accountScope, connection: connection)
+                }
+            }
+            return connection
+        } catch {
+            if let accountScope,
+               getAccountScope() == accountScope,
+               isBrokerDenial(error) {
+                deniedScopes.insert(accountScope)
+                await cache.clear()
+            }
+            throw error
+        }
+    }
+}
+
+@MainActor
 final class CoordinatorHostSupervisor {
     static let healthTimeoutMilliseconds = 1_500
     static let healthProbeTTLMilliseconds = 5_000
