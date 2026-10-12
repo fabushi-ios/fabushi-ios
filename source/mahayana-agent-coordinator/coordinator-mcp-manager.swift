@@ -997,8 +997,13 @@ final class CoordinatorMcpSurface {
     private var accountScope: String?
     private var routedScopeGeneration: UInt64 = 0
 
-    private lazy var gatewayDescriptorFastPath: IOSGatewayDescriptorFastPath = {
-        IOSGatewayDescriptorFastPath(
+    private var retainedGatewayDescriptorFastPath: IOSGatewayDescriptorFastPath?
+
+    private var gatewayDescriptorFastPath: IOSGatewayDescriptorFastPath {
+        if let retainedGatewayDescriptorFastPath {
+            return retainedGatewayDescriptorFastPath
+        }
+        let fastPath = IOSGatewayDescriptorFastPath(
             cache: gatewayDescriptorCache,
             getAccountScope: { [weak self] in self?.accountScope },
             reportFailure: gatewayDescriptorFailureReporter,
@@ -1018,7 +1023,9 @@ final class CoordinatorMcpSurface {
                 return try await self.dashboard.ensureSandBox()
             }
         )
-    }()
+        retainedGatewayDescriptorFastPath = fastPath
+        return fastPath
+    }
 
     private lazy var routedMcpBridge: RoutedMCPBridge = {
         let manager = self.manager
