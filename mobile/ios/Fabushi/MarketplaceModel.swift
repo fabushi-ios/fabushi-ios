@@ -2010,6 +2010,7 @@ final class MarketplaceModel {
     @ObservationIgnored private var listenerRequestSerial = 0
     @ObservationIgnored private var mcpOAuthGeneration = 0
     @ObservationIgnored private var mcpAccountEpoch = 0
+    @ObservationIgnored private var accountDisplayNameRequestSerial = 0
     @ObservationIgnored private var mcpBackendStatusRequestSerial = 0
     @ObservationIgnored private var mcpBackendStatusFreshness: UInt64 = 0
     @ObservationIgnored private var mcpServerRequestSerial = 0
@@ -2627,15 +2628,39 @@ final class MarketplaceModel {
                 userInfo: [NSLocalizedDescriptionKey: "名称必须为 1–200 个字符。"]
             )
         }
-        _ = try await bridge.request(
+        accountDisplayNameRequestSerial = accountDisplayNameRequestSerial == Int.max
+            ? 1
+            : accountDisplayNameRequestSerial + 1
+        let requestSerial = accountDisplayNameRequestSerial
+        let expectedEpoch = mcpAccountEpoch
+        let expectedScope = globalDharmaAccountScope
+        let update = try await bridge.request(
             method: "updateCursorAccountName",
             params: ["name": normalized]
         )
+        try Task.checkCancellation()
+        guard requestSerial == accountDisplayNameRequestSerial,
+              expectedEpoch == mcpAccountEpoch,
+              expectedScope == globalDharmaAccountScope,
+              loggedIn
+        else { return }
+        let settledDisplayName = ((update.value as? [String: Any])?["displayName"] as? String)
+            .map(Self.normalizedAccountDisplayName)
+            .flatMap { $0.isEmpty ? nil : $0 }
+            ?? normalized
         let status = try await bridge.request(method: "feature.auth.status")
+        try Task.checkCancellation()
+        guard requestSerial == accountDisplayNameRequestSerial,
+              expectedEpoch == mcpAccountEpoch,
+              expectedScope == globalDharmaAccountScope
+        else { return }
         applyAuth(status.value as? [String: Any], defaultLoggedIn: true)
-        if accountName == "Fabushi" || accountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            accountName = normalized
-        }
+        guard requestSerial == accountDisplayNameRequestSerial,
+              expectedEpoch == mcpAccountEpoch,
+              expectedScope == globalDharmaAccountScope,
+              loggedIn
+        else { return }
+        accountName = settledDisplayName
     }
 
     func openAccountHelp() async throws {
