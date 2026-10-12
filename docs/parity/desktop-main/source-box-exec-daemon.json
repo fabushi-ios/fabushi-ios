@@ -17,7 +17,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (native remote Computer surface and lifecycle); source/ios-preload/coordinator-port-bridge.swift and Coordinator-owned remote service calls",
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
-      "notes": "Exact Desktop source/box-exec-daemon/Cargo.toml@477f8705412d38ed775bcd2f17058689b1ef0c0e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary."
+      "notes": "Exact Desktop source/box-exec-daemon/Cargo.toml@477f8705412d38ed775bcd2f17058689b1ef0c0e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Manifest only composes the remote box daemon; iOS correctly does not embed this process. User-facing Remote Computer/remote execution remains through the canonical Coordinator-owned replacement. No status promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "source/box-exec-daemon/src/cli.rs",
@@ -32,7 +34,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (native remote Computer surface and lifecycle); source/ios-preload/coordinator-port-bridge.swift and Coordinator-owned remote service calls",
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
-      "notes": "Exact Desktop source/box-exec-daemon/src/cli.rs@553d7bd05bef899d3c9ff7cf1c9a2b9a1ace68b5 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary."
+      "notes": "Exact Desktop source/box-exec-daemon/src/cli.rs@553d7bd05bef899d3c9ff7cf1c9a2b9a1ace68b5 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. CLI only invokes the daemon entrypoint and exits non-zero on failure; it is remote-box process wiring, not an iOS-device responsibility. No status promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "source/box-exec-daemon/src/lib.rs",
@@ -47,7 +51,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (native remote Computer surface and lifecycle); source/ios-preload/coordinator-port-bridge.swift and Coordinator-owned remote service calls",
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
-      "notes": "Exact Desktop source/box-exec-daemon/src/lib.rs@419215b4a5cab74df928c3175f2269348fb2a9fa reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary."
+      "notes": "Exact Desktop source/box-exec-daemon/src/lib.rs@419215b4a5cab74df928c3175f2269348fb2a9fa reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Library exports entrypoint/server only; iOS preserves applicable semantics through typed RemoteRunner without duplicating the daemon. No status promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "source/box-exec-daemon/src/main.rs",
@@ -62,7 +68,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (native remote Computer surface and lifecycle); source/ios-preload/coordinator-port-bridge.swift and Coordinator-owned remote service calls",
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
-      "notes": "Exact Desktop source/box-exec-daemon/src/main.rs@eca0d794be7f61fd3906b41697fa2b2767677846 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary."
+      "notes": "Exact Desktop source/box-exec-daemon/src/main.rs@eca0d794be7f61fd3906b41697fa2b2767677846 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Reviewed env/port/auth/workspace/terminal configuration, ready event, signal/parent-pipe shutdown and graceful stop. Those are remote daemon lifecycle mechanics; iOS replacement remains Coordinator/RemoteRunner. No status promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "source/box-exec-daemon/src/server.rs",
@@ -77,7 +85,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/box-exec-daemon/server.swift preserves typed box execution vocabulary. b36884be supplies shipping RemoteRunner with IOSGenerationFencedRemoteRunnerTransport through the canonical MahayanaCoordinator/Host request graph. A concrete Host/Agent caller into the box/local-exec replacement is still pending.",
       "test_evidence": "RunnerParityTests covers typed write/redacted-read/shell-stream/stdin projection, RemoteRunner behavior, account/Host generation fencing and shipping composition. Exact-head Actions plus a real production caller remain required.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport composition is present; daemon process remains platform-inapplicable and caller-level replacement closure remains pending."
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport composition is present; daemon process remains platform-inapplicable and caller-level replacement closure remains pending. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Reviewed loopback auth, workspace/terminal canonical-path confinement, symlink rejection, read/write/shell/stream/stdin/background semantics, timeout/hard-timeout, disconnect abort and MCP/environment configuration. iOS keeps the daemon platform-inapplicable while server.swift + RemoteRunner + IOSGenerationFencedRemoteRunnerTransport preserve applicable typed semantics with account/Host-generation fencing. Exact-head CI and real production caller closure remain separate; no verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     }
   ]
 }
