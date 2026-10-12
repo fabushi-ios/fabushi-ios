@@ -688,12 +688,15 @@ final class GatewayParityTests: XCTestCase {
             forkVNCBaseURL: ""
         )
         await cache.write(accountScope: "a", connection: value)
-        XCTAssertEqual(await cache.read(accountScope: "a"), value)
-        XCTAssertNil(await cache.read(accountScope: "b"))
+        let sameScope = await cache.read(accountScope: "a")
+        XCTAssertEqual(sameScope, value)
+        let foreignScope = await cache.read(accountScope: "b")
+        XCTAssertNil(foreignScope)
         await cache.write(accountScope: "a", connection: value)
         XCTAssertEqual(store.writeCount, 1)
         now += IOSGatewayDescriptorKeychainCache.maxAgeMilliseconds + 1
-        XCTAssertNil(await cache.read(accountScope: "a"))
+        let expired = await cache.read(accountScope: "a")
+        XCTAssertNil(expired)
     }
 
     func testGatewayDescriptorFastPathReturnsCacheWhileSingleflightRefreshes() async throws {
@@ -760,8 +763,10 @@ final class GatewayParityTests: XCTestCase {
         scope = "b"
         gate.open()
         for _ in 0..<64 { await Task.yield() }
-        XCTAssertEqual(await cache.read(accountScope: "a"), cached)
-        XCTAssertNil(await cache.read(accountScope: "b"))
+        let retained = await cache.read(accountScope: "a")
+        XCTAssertEqual(retained, cached)
+        let foreign = await cache.read(accountScope: "b")
+        XCTAssertNil(foreign)
 
         let denialStore = GatewayDescriptorTestStore()
         let denied = IOSGatewayDescriptorFastPath(
