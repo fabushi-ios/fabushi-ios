@@ -353,12 +353,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/shared/node/experiments/cursor-experiments.swift; source/shared/node/experiments/feature-flag-overrides.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "The iOS Coordinator owns the shared SandExperimentService directly instead of wrapping it in an Electron adapter; native app-data paths and account scope replace Electron app.getPath/process.env while the same experiment/cache/override semantics remain shared Swift responsibilities.",
+      "ios_platform_delta": "Electron process composition is replaced by the existing iOS MahayanaCoordinator-owned experiment runtime. SandExperimentService remains the single experiment state owner; Cursor auth/machine identity are read through CoordinatorMcpSurface, cache lives under the app sandbox, renderer updates use the typed coordinator event sink, and host override projection uses the existing host-settings supervisor rather than IPC.",
       "implementation_status": "mapped",
-      "production_evidence": "MahayanaCoordinator constructs SandExperimentService at the app-data experiments directory, starts cached hydration, exposes snapshots/gates/model selection and disposes the service; shared experiment Swift modules own remote state, overrides and diagnostics.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedExperimentServiceParityTests.swift; mobile/ios/FabushiTests/SharedExperimentsSupportParityTests.swift; current-head Actions required before implementation/verification promotion.",
-      "notes": "Reviewed exact Desktop blob 4cefd20a838019c34ac1e954ef5d6d86d223e013. Core experiment lifecycle is present; authenticated live refresh, override push and RPC-trace shipping entrypoints will be verified under their specific responsibility rows before promotion.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Desktop current-main experiments.ts@4cefd20a838019c34ac1e954ef5d6d86d223e013, production-experiments-binding.ts@d38cb11e8659e1f0e568234f5b3b5faad0eeb8df, and experiments-runtime.ts@c370d497ad37136ae8ee22c3f52f47c7bb1a24c4 were re-read end-to-end. iOS MahayanaCoordinator.make() constructs SandExperimentService in the shipping app-data directory and calls startExperimentRuntime(). The runtime hydrates cache, performs startup/poll/auth-change refresh through canonical Cursor access token + machine ID, subscribes snapshots into the renderer event sink, generation-fences Anysphere membership and host feature-flag override projection, exposes snapshot/gates/default-model to production calls, and cancels polling/refresh/membership/override tasks plus disposes the service during shutdown. MarketplaceModel consumes experiments-changed and getExperimentsSnapshot with account/request fencing.",
+      "test_evidence": "SharedExperimentServiceParityTests verify generated flag/experiment/config inventories, cache hydration, live authenticated bootstrap, auth-change stale refresh rejection, overrides and persistence. SharedExperimentsSupportParityTests plus Coordinator architecture tests cover supporting contracts. Same-head GitHub Actions are still required before implementation-status promotion.",
+      "notes": "Current-main review complete with no N/A denominator reduction. The production composition is present and uses the canonical auth/host owners; this row intentionally remains mapped until a descendant exact HEAD completes required architecture/rust-host/protected evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/adapters/index.ts",
@@ -436,12 +437,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/shared/node/experiments/cursor-experiments.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "MahayanaCoordinator owns SandExperimentService directly on iOS, with the same account-scoped settings/Host synchronization boundary; no zero-input Electron binding wrapper is needed.",
+      "ios_platform_delta": "Electron process composition is replaced by the existing iOS MahayanaCoordinator-owned experiment runtime. SandExperimentService remains the single experiment state owner; Cursor auth/machine identity are read through CoordinatorMcpSurface, cache lives under the app sandbox, renderer updates use the typed coordinator event sink, and host override projection uses the existing host-settings supervisor rather than IPC.",
       "implementation_status": "mapped",
-      "production_evidence": "MahayanaCoordinator constructs the shared experiment service, exposes snapshots/gates/model resolution, and coordinates shared settings/Host updates through the native Coordinator lifecycle.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedExperimentServiceParityTests.swift; SharedExperimentsSupportParityTests.swift; CoordinatorAdapterTests.swift; current-head Actions required before promotion.",
-      "notes": "Reviewed exact Desktop blob d38cb11e8659e1f0e568234f5b3b5faad0eeb8df. Native composition exists, but authenticated live override propagation and failure telemetry remain to be tied to one current-head shipping test before implementation promotion.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Desktop current-main experiments.ts@4cefd20a838019c34ac1e954ef5d6d86d223e013, production-experiments-binding.ts@d38cb11e8659e1f0e568234f5b3b5faad0eeb8df, and experiments-runtime.ts@c370d497ad37136ae8ee22c3f52f47c7bb1a24c4 were re-read end-to-end. iOS MahayanaCoordinator.make() constructs SandExperimentService in the shipping app-data directory and calls startExperimentRuntime(). The runtime hydrates cache, performs startup/poll/auth-change refresh through canonical Cursor access token + machine ID, subscribes snapshots into the renderer event sink, generation-fences Anysphere membership and host feature-flag override projection, exposes snapshot/gates/default-model to production calls, and cancels polling/refresh/membership/override tasks plus disposes the service during shutdown. MarketplaceModel consumes experiments-changed and getExperimentsSnapshot with account/request fencing.",
+      "test_evidence": "SharedExperimentServiceParityTests verify generated flag/experiment/config inventories, cache hydration, live authenticated bootstrap, auth-change stale refresh rejection, overrides and persistence. SharedExperimentsSupportParityTests plus Coordinator architecture tests cover supporting contracts. Same-head GitHub Actions are still required before implementation-status promotion.",
+      "notes": "Current-main review complete with no N/A denominator reduction. The production composition is present and uses the canonical auth/host owners; this row intentionally remains mapped until a descendant exact HEAD completes required architecture/rust-host/protected evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/adapters/provider-guards.ts",
