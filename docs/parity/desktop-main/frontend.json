@@ -3560,9 +3560,10 @@
       "implementation_status": "implemented",
       "production_evidence": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift (resolveLocalToolPermissionWithApprovalLifecycle, clearLocalToolApprovalsAfterAcceptedSend, feature.execute success-gated cleanup, account/revision fencing, native.composerQueue owner); source/shared/node/settings/sand-settings-store.swift (durable account-scoped localToolApprovals + composerSubmissionQueue); mobile/ios/Fabushi/MarketplaceModel.swift (typed lifecycle bridge facade); frontend/src/recovered/features/conversation/MobileBotChat.swift (shipping send/offline queue/cancel/retry composition).",
       "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift covers restart/account isolation, allow-once persistence, accepted-send cleanup, cleanup-persistence failure without flipping send success, rejected-send no-clear, queue cancel/remove no-clear, old-account late-cleanup fencing, queue persistence/order/dedup/account fencing. Exact-head GitHub Actions evidence remains required before verified.",
-      "notes": "IOS-MAIN-DEP-SEND-JOURNAL-APPROVAL-20261011: exact Desktop lifecycle and local-tool store/bridge callers re-read at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. iOS uses one Coordinator/settings owner: cleanup runs only after Host accepts chat.send; cancel/remove do not clear; account/revision fencing rejects late cleanup; cleanup failure is separately surfaced. Status is implemented, not verified, pending same-head Rust/Xcode/UI/protected evidence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "ios_owner": "Mahayana Coordinator + account-scoped SandSettingsStore"
+      "notes": "IOS-MAIN-DEP-SEND-JOURNAL-APPROVAL-20261012: Desktop still clears temporary approvals only after accepted send or a resend that journaled a new entry; cancel/remove do not clear, clear failure is separately surfaced, and generation/dispose fence late results. MahayanaCoordinator keeps the same account/revision-fenced post-accept cleanup in the canonical settings owner. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; canonical iOS owner and current shipping semantics were checked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "ios_owner": "Mahayana Coordinator + account-scoped SandSettingsStore",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-agent-preview-content.tsx",
@@ -3577,8 +3578,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "GrokMobileShell+Home.swift botRow/mobileBotHomeSubtitle renders status preview and relative time in the shipping touch-first roster.",
       "test_evidence": "Same-head SwiftUI build/UI acceptance covers the native replacement; pointer-hover lifecycle is not applicable.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-PREVIEW-CONTENT-20261009: exact Desktop source reviewed; touch-first direct row summary replaces hover-only affordance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-PREVIEW-CONTENT-20261012: Desktop hover/focus card is pointer-window presentation. iOS replaces it with the touch-first row/summary surface while preserving waiting-reason > draft/preview/last-message user effect and status accessibility through the canonical mobile sidebar owner. Disposition remains not-applicable-with-replacement. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; canonical iOS owner and current shipping semantics were checked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-agent-preview-header.tsx",
@@ -3593,8 +3595,9 @@
       "implementation_status": "mapped",
       "production_evidence": "GrokMobileShell+Home.swift botRow + ClothGhostAvatar + MobileBotSummary are the canonical native roster identity/status owners.",
       "test_evidence": "Existing mobile roster/avatar tests cover shipping owners; exact shared-room/title/status accessibility parity remains required.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-PREVIEW-HEADER-20261009: exact Desktop source reviewed; partial native projection retained.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-PREVIEW-HEADER-20261012: Desktop avatar/status projection (working, needs-attention, unread plus accessibility) was re-read. GrokMobileShell+Home ships the same status priority and avatar/badge semantics in touch-first rows, but the aggregate preview-header row stays mapped pending remaining exact visual/avatar-shape parity and exact-head acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; canonical iOS owner and current shipping semantics were checked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-agent-status.ts",
@@ -3609,8 +3612,9 @@
       "implementation_status": "mapped",
       "production_evidence": "mobileBotHomeSubtitle and botRow are shipping status projection/render owners; GrokMobileBotService supplies unread/running/waiting/composing state.",
       "test_evidence": "MobileBotSummary/service/UI tests cover current status data path; focused waiting/running/unread accessibility parity remains before implemented.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-STATUS-20261009: exact Desktop source reviewed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-STATUS-20261012: Desktop waiting/unread/running/activity status projection was re-read. projectMobileSidebarAgentVisual preserves blocked > unread > working > idle priority and accessibility labels in the canonical iOS sidebar; the broad row stays mapped until named-activity/ring and remaining sidebar presentation parity are fully closed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; canonical iOS owner and current shipping semantics were checked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-collapse-state.ts",
