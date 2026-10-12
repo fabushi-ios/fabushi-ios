@@ -321,12 +321,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/mahayana-agent-coordinator/gateway/gateway-client.swift; source/mahayana-agent-coordinator/gateway/gateway-request-dispatcher.swift; source/mahayana-agent-coordinator/local-host-supervisor.swift; source/ios-main/account/cursor-auth.swift",
       "ios_language": "Swift / Rust",
-      "ios_platform_delta": "iOS uses actor/in-process Coordinator composition and URLSession/native gateway clients rather than Electron process adapters. Cursor auth remains the sole token owner, the native Coordinator gateway owns remote routing, and local-exec/recreate responsibilities stay behind their existing typed services.",
+      "ios_platform_delta": "Desktop remote-host connector composition is adapted to the existing iOS Coordinator/Host/Remote Runner topology. Account-scoped credentials and machine identity come from the canonical Cursor auth owner; local-host requests use the typed gateway/client supervisor; capabilities that require desktop shell/process/box execution are routed to the account-fenced Remote Runner rather than executed inside the iOS sandbox; egress remains a separate fail-closed tunnel controller.",
       "implementation_status": "mapped",
-      "production_evidence": "The iOS Coordinator gateway modules and local Host supervisor are shipping source; Cursor auth owns authenticated credential settlement and Coordinator tests exercise gateway/Host reuse and recovery.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorAdapterTests.swift; mobile/ios/FabushiTests/CoordinatorContractTests.swift; current-head Actions required before implementation/verification promotion.",
-      "notes": "Reviewed exact Desktop blob f2d6f2577b1500958e98a939c8b65dbad2da09be. Mapping preserves one auth/gateway owner; descriptor fast-path, egress wrapping and local-exec credential equivalence still need method-level current-main closure.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Desktop coordinator-gateway.ts@f2d6f2577b1500958e98a939c8b65dbad2da09be was re-read for authenticated token/machine identity, descriptor fast path, settings-routed connection, reconnect/recreate, local-exec credentials and egress. iOS CoordinatorGatewayClient provides request-id fingerprint dedupe, cancellation, endpoint pinning across retries, safe-read-only retry policy, traceparent/telemetry/DNS diagnostics; CoordinatorHostSupervisor provides singleflight resolution, health TTL and invalidation; MahayanaCoordinator owns the shipping gateway dispatcher and account/remote-runner generation fences; IOSProductionLocalExecutor/IOSLocalExecSupervisor route unsupported shell/process/box semantics to Remote Runner; shared egress tunnel fails closed without a remote relay and enforces target policy.",
+      "test_evidence": "GatewayParityTests/GatewayTelemetryParityTests cover retry safety, endpoint drift, request identity, lifecycle and telemetry; RemoteComputer* tests cover Remote Runner ownership/rebuild; SharedEgressTunnelParityTests cover IP policy, relay and fail-closed behavior. Row stays mapped until exact-head required CI and the wider remote/device acceptance chain succeed.",
+      "notes": "Current-main review complete. No N/A denominator reduction. Source/runtime composition appears present, but device/remote-host acceptance and same-head CI are still required before promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/adapters/coordinator-native.ts",
@@ -337,12 +338,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/mahayana-agent-coordinator/local-host-supervisor.swift; source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/ios-main/coordinator/desktop-connectivity.swift; source/mahayana-agent-coordinator/webauthn/provider.swift",
       "ios_language": "Swift / Rust",
-      "ios_platform_delta": "iOS replaces utilityProcess/MessageChannelMain with actors and in-process typed Coordinator ports, Electron net/powerMonitor with native connectivity/resume state, BrowserWindow WebAuthn with native authentication owners, and Desktop process spawning with the iOS local/remote execution supervisor policy.",
+      "ios_platform_delta": "Electron utilityProcess/MessageChannelMain/BrowserWindow/net/powerMonitor are platform-adapted rather than copied. iOS keeps Coordinator and Host within typed actor/runtime boundaries, uses InProcessCoordinatorPort for the MessageChannel contract, AuthenticationServices for passkeys, app/scene lifecycle plus IOSConnectivity for resume/online state, and an allow-listed local capability runner with Remote Runner fallback for desktop process semantics.",
       "implementation_status": "mapped",
-      "production_evidence": "MahayanaCoordinator and local-host-supervisor compose the native Coordinator lifecycle; desktop-connectivity owns online/resume projection; WebAuthn and local-exec supervisors are separate native owners rather than duplicated Electron shims.",
-      "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift; mobile/ios/FabushiTests/CoordinatorAdapterTests.swift; current-head Actions required before promotion.",
-      "notes": "Reviewed exact Desktop blob 319a06fcca678e546b594abe40ebf5a895570299. The platform substitution is mapped, with restart/order/connectivity tests present; passkey and local-exec shipping equivalence remains subject to their dedicated rows.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Desktop coordinator-native.ts@319a06fcca678e546b594abe40ebf5a895570299 was re-read end-to-end. iOS IOSCoordinatorRuntime owns start/restart/dispose generations and transport recovery; IOSCoordinatorPortBridge/InProcessCoordinatorPort enforce protocol hello/ready, typed request/reply/event/cancel, cancellation and one-shot settlement on close/breach; IOSAuthenticationServicesPasskeyProvider enforces relying-party allow-list, one ceremony, timeout/stall and cancellation; IOSConnectivity records online/recent resume; LocalCapabilityRunner/IOSLocalExecSupervisor reject arbitrary iOS shell/process semantics locally and route shell/process/box capabilities to the existing remote execution owner.",
+      "test_evidence": "IOSCoordinatorArchitectureTests/CoordinatorContractTests exercise launch/port/runtime boundaries; PasskeyParityTests cover native passkey ceremony and relying-party constraints; IOSLifecycleParityTests cover iOS lifecycle replacement; local-exec and RemoteComputer tests cover native-vs-remote routing. Exact-head CI is still required before promotion.",
+      "notes": "Current-main platform-delta review complete without using 'iOS has no Electron' as a blanket exemption. The responsibility remains mapped pending same-head CI and device lifecycle acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/adapters/experiments.ts",
