@@ -3,6 +3,20 @@ import Foundation
 struct ControlPortCallError: LocalizedError, Equatable, Sendable {
     let code: String
     let message: String
+    let transportKind: String?
+    let details: [String: CoordinatorPayload]?
+
+    init(
+        code: String,
+        message: String,
+        transportKind: String? = nil,
+        details: [String: CoordinatorPayload]? = nil
+    ) {
+        self.code = code
+        self.message = message
+        self.transportKind = transportKind
+        self.details = details
+    }
 
     var errorDescription: String? { "\(code): \(message)" }
 }
@@ -76,7 +90,12 @@ final class CoordinatorControlPortClient {
             case .ok(let value):
                 continuation.resume(returning: value)
             case .failed(let failure):
-                continuation.resume(throwing: ControlPortCallError(code: failure.code, message: failure.message))
+                continuation.resume(throwing: ControlPortCallError(
+                    code: failure.code,
+                    message: failure.message,
+                    transportKind: failure.transportKind,
+                    details: failure.details
+                ))
             }
 
         case .shutdown(let reason, let detail):

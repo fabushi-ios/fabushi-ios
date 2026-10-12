@@ -122,11 +122,24 @@ struct CoordinatorFailure: Codable, Equatable, Sendable {
     let code: String
     let message: String
     let transportKind: String?
+    /// Open structured metadata carried across the Coordinator boundary.
+    ///
+    /// Desktop SourceFailureDetail is an open record with only `code` required.
+    /// Keeping additional fields as CoordinatorPayload preserves source-specific
+    /// boundary/retry/detail data without teaching the shared wire about every
+    /// feature-specific failure taxonomy.
+    let details: [String: CoordinatorPayload]?
 
-    init(code: String, message: String, transportKind: String? = nil) {
+    init(
+        code: String,
+        message: String,
+        transportKind: String? = nil,
+        details: [String: CoordinatorPayload]? = nil
+    ) {
         self.code = code
         self.message = message
         self.transportKind = transportKind
+        self.details = details
     }
 }
 

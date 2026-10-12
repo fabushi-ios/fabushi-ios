@@ -1124,3 +1124,101 @@ final class CoordinatorContractTests: XCTestCase {
     }
 
 }
+
+
+extension CoordinatorContractTests {
+    func testCoordinatorFailureRoundTripPreservesOpenStructuredDetails() throws {
+        let failure = CoordinatorFailure(
+            code: "host/down",
+            message: "host unavailable",
+            transportKind: "sse",
+            details: [
+                "boundary": .string("gateway"),
+                "retry": .object(["kind": .string("reconnect")]),
+                "attempt": .number(3),
+            ]
+        )
+        let frame = CoordinatorFrame.reply(requestId: "r-details", outcome: .failed(failure))
+        let encoded = try JSONEncoder().encode(frame)
+        let decoded = try JSONDecoder().decode(CoordinatorFrame.self, from: encoded)
+        XCTAssertEqual(decoded, frame)
+    }
+
+    @MainActor
+    func testControlPortFailurePreservesStructuredDetails() async {
+        let port = TestCoordinatorPort()
+        let client = CoordinatorControlPortClient(port: port, autoStart: false)
+        client.start()
+        client.receive(.ready(protocolVersion: CoordinatorProtocol.version))
+        let pending = Task { @MainActor in
+            try await client.call(method: "structured-failure", args: .object([:]))
+        }
+        await Task.yield()
+        client.receive(.reply(
+            requestId: "c-1",
+            outcome: .failed(.init(
+                code: "host/down",
+                message: "host unavailable",
+                transportKind: "sse",
+                details: [
+                    "boundary": .string("gateway"),
+                    "retryable": .bool(true),
+                ]
+            ))
+        ))
+        do {
+            _ = try await pending.value
+            XCTFail("structured failure must reject the pending call")
+        } catch let error as ControlPortCallError {
+            XCTAssertEqual(error.code, "host/down")
+            XCTAssertEqual(error.transportKind, "sse")
+            XCTAssertEqual(error.details?["boundary"], .string("gateway"))
+            XCTAssertEqual(error.details?["retryable"], .bool(true))
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    @MainActor
+    func testIOSPreloadPortPreservesStructuredFailureDetails() async throws {
+        let pair = InProcessCoordinatorPort.makePair(bootstrap: try validatedTestCoordinatorBootstrap())
+        let server = RendererPortServer(port: pair.server) { _, _ in
+            .failed(.init(
+                code: "gateway-unreachable",
+                message: "offline",
+                transportKind: "sse",
+                details: [
+                    "boundary": .string("gateway"),
+                    "transportKind": .string("sse"),
+                ]
+            ))
+        }
+        pair.server.onFrame = { [weak server] frame in server?.receive(frame) }
+        pair.server.onClose = { [weak server] in server?.portClosed() }
+        let client = IOSCoordinatorPortClient(port: pair.client)
+        XCTAssertTrue(client.readyObserved)
+
+        do {
+            _ = try await client.request(method: "structured-failure")
+            XCTFail("preload request must preserve the Coordinator failure")
+        } catch let error as IOSCoordinatorPortClient.PortError {
+            XCTAssertEqual(error.code, "gateway-unreachable")
+            XCTAssertEqual(error.transportKind, "sse")
+            XCTAssertEqual(error.details?["boundary"], .string("gateway"))
+            XCTAssertEqual(error.details?["transportKind"], .string("sse"))
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    func testGatewayFailureMapperPreservesStructuredBoundaryMetadata() {
+        let failure = GatewayFailureMapper.failure(for: GatewayUnreachableError(
+            transportKind: "sse",
+            message: "offline"
+        ))
+        XCTAssertEqual(failure.code, GatewayFailureCode.unreachable.rawValue)
+        XCTAssertEqual(failure.transportKind, "sse")
+        XCTAssertEqual(failure.details?["boundary"], .string("gateway"))
+        XCTAssertEqual(failure.details?["transportKind"], .string("sse"))
+    }
+}

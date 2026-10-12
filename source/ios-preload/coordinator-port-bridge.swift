@@ -17,11 +17,18 @@ final class IOSCoordinatorPortClient {
         let code: String
         let message: String
         let transportKind: String?
+        let details: [String: CoordinatorPayload]?
 
-        init(code: String, message: String, transportKind: String? = nil) {
+        init(
+            code: String,
+            message: String,
+            transportKind: String? = nil,
+            details: [String: CoordinatorPayload]? = nil
+        ) {
             self.code = code
             self.message = message
             self.transportKind = transportKind
+            self.details = details
         }
 
         var errorDescription: String? { "\(code): \(message)" }
@@ -142,7 +149,8 @@ final class IOSCoordinatorPortClient {
                 continuation.resume(throwing: PortError(
                     code: failure.code,
                     message: failure.message,
-                    transportKind: failure.transportKind
+                    transportKind: failure.transportKind,
+                    details: failure.details
                 ))
             }
 
