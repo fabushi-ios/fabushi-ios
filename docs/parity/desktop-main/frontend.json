@@ -966,7 +966,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerForeverBoxProjection plus WebKit navigation→box lifecycle ingestion).; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "RemoteComputerRebuildTests covers pulling/running/local/starting/sleeping/off projection and shipping-owner navigation hydration.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
-      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
+      "notes": "Re-read exact Desktop blob 71a5ee313a6ad236952451ce7a8a854373ff4740 at current Desktop main 371b72f1. RemoteComputerForeverBoxProjection plus WebKit/noVNC lifecycle ingestion preserve pulling/running/local/starting/sleeping/off box phases and reconnect hydration. Keep implemented pending same-final-SHA ordinary/protected code/test/artifact/independent evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-migration-store.ts",
@@ -981,7 +983,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerMigrationAccumulator and RemoteComputerRebuildOwner hydrateMigration).; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "RemoteComputerRebuildTests covers operation-scoped phase-history reset and owner launch/reconnect hydration.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
-      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
+      "notes": "Re-read exact Desktop blob 8d869d07849783966f859c3162bfa2e16ee1ecef at current Desktop main 371b72f1. RemoteComputerMigrationAccumulator and RemoteComputerRebuildOwner preserve operation-scoped migration episodes, phase history, reconnect hydration and terminal reset semantics. Keep implemented pending same-final-SHA ordinary/protected code/test/artifact/independent evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-model.ts",
@@ -996,7 +1000,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildState/Event/Reducer and shipping RemoteComputerRebuildOwner).; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift covers stale operation-id terminal fencing, matching done→settled, failed and deactivate→cancelled, and healthy→disconnect→reconnect transport tracking.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
-      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
+      "notes": "Re-read exact Desktop blob 9e455c2e4392e7f51bd13d71259b78cec698b474 at current Desktop main 371b72f1. RemoteComputerRebuildState/Event/Reducer preserve update/reset/recover/reconnecting transitions, locked-box and operation-id fencing, teardown/reconnect readiness and settled/failed/cancelled resolution. Keep implemented pending same-final-SHA ordinary/protected code/test/artifact/independent evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-transport-store.ts",
@@ -1011,7 +1017,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift plus frontend/src/recovered/features/app-shell/ContentView.swift, ContentView+Root.swift and frontend/src/production/GrokMobileShell.swift carry the existing bridge/reconnect generation into the single Computer owner.; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "RemoteComputerRebuildTests covers healthy→disconnect→reconnect and owner reconnect hydration over one injected source.; mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift; current exact-head CI pending",
-      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS production has a real managed Computer lifecycle path: IOSRemoteComputerRebuildSource -> IOSPreloadBridge -> CoordinatorMcpSurface -> authenticated IOSCursorDashboardClient recreate/force-recreate/migration watch, with client-pause and sign-in fail-closed gates plus operation/resume-offset fencing. Native WebKit/noVNC remains the box/transport owner. Keep implemented until fresh exact-head ordinary/protected CI and artifact provenance succeed."
+      "notes": "Re-read exact Desktop blob 10b420511d4bf0653b01cbe0f2401b695ce01a37 at current Desktop main 371b72f1. The single RemoteComputer owner derives transport truth from the restricted WebKit/noVNC session plus lifecycle reconnect generation, retaining disconnect/reconnect fencing and migration hydration. Keep implemented pending same-final-SHA ordinary/protected code/test/artifact/independent evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/first-box-gate.ts",
@@ -1060,7 +1068,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift",
-      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Electron onDevBoxRebuild is still not applicable on iOS; RemoteComputerRebuildOwner directly consumes native WebKit/noVNC lifecycle and generation-fences hydration/requests. Managed update/reset/recover is now separately served by the authenticated CoordinatorMcpSurface lifecycle route. Keep this mechanism row not-applicable-with-replacement."
+      "notes": "Re-read exact Desktop blob 463a96a6a0a41c893f37e624276b3f98db8a9536 at current Desktop main 371b72f1. Electron onDevBoxRebuild is a platform-specific signal; iOS replaces it with RemoteComputerRebuildOwner consuming native WebKit/noVNC lifecycle and generation-fenced authenticated managed lifecycle operations. Keep not-applicable-with-replacement; this platform disposition does not waive the managed lifecycle behavior tracked by the adjacent rows.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/roster-snapshot-store.ts",
