@@ -151,4 +151,50 @@ final class AccountSessionFrontendParityTests: XCTestCase {
     }
 
 
+    func testNormalReloadEntryRoutesThroughCanonicalRuntimeRecovery() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let menu = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "frontend/src/recovered/features/account/session/menu.view.swift"
+            ),
+            encoding: .utf8
+        )
+        let scene = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "frontend/src/production/FabushiSceneRoot.swift"
+            ),
+            encoding: .utf8
+        )
+        let runtime = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/ios-main/FabushiRuntime.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(menu.contains("@Environment(\\.fabushiRuntimeReloadAction)"))
+        XCTAssertTrue(menu.contains(#"accessibilityIdentifier("account-runtime-reload")"#))
+        XCTAssertTrue(menu.contains("await runtimeReloadAction.run()"))
+        XCTAssertTrue(scene.contains("\\.fabushiRuntimeReloadAction"))
+        XCTAssertTrue(scene.contains("await runtime.retryConnection()"))
+        XCTAssertTrue(runtime.contains(#"bridge.restartTransport(reason: "user-retry")"#))
+        XCTAssertTrue(runtime.contains(#"resyncAfterLifecycleRecovery(reason: "user-retry")"#))
+    }
+
+    func testNormalReloadCopyUsesSelectedSettingsLocale() {
+        XCTAssertEqual(MobileUiPreferences(localeRaw: "en").shellCopy().reloadApp, "Reload")
+        XCTAssertEqual(MobileUiPreferences(localeRaw: "zh-Hans").shellCopy().reloadApp, "重新加载")
+        XCTAssertEqual(MobileUiPreferences(localeRaw: "zh-Hant").shellCopy().reloadApp, "重新載入")
+        XCTAssertEqual(MobileUiPreferences(localeRaw: "ja").shellCopy().reloadApp, "再読み込み")
+        XCTAssertEqual(MobileUiPreferences(localeRaw: "ko").shellCopy().reloadApp, "다시 불러오기")
+        XCTAssertEqual(MobileUiPreferences(localeRaw: "ar").shellCopy().reloadApp, "إعادة التحميل")
+        XCTAssertEqual(MobileUiPreferences(localeRaw: "he").shellCopy().reloadApp, "טעינה מחדש")
+    }
+
+
 }
