@@ -1257,10 +1257,10 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return try IOSCursorDashboardProto.decodeTeams(response)
     }
 
-    func getAvailableModels(
+    func getAvailableModelsJSON(
         timeoutMs: Int = 12_000
-    ) async throws -> [String: Any] {
-        try await rpc(
+    ) async throws -> IOSCursorDashboardJSON {
+        IOSCursorDashboardJSON(value: try await rpc(
             "AvailableModels",
             service: "AiService",
             body: [
@@ -1268,7 +1268,13 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
                 "useModelParameters": true,
             ],
             timeoutMs: timeoutMs
-        )
+        ))
+    }
+
+    func getAvailableModels(
+        timeoutMs: Int = 12_000
+    ) async throws -> [String: Any] {
+        try await getAvailableModelsJSON(timeoutMs: timeoutMs).value
     }
 
     func transcribeAudio(

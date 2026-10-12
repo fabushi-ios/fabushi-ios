@@ -75,7 +75,7 @@ final class IOSCoordinatorPortClient {
 
         do {
             let value = try await withTaskCancellationHandler {
-                try await withCheckedThrowingContinuation { continuation in
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CoordinatorPayload, Error>) in
                     if Task.isCancelled {
                         continuation.resume(throwing: CancellationError())
                         return

@@ -1,7 +1,7 @@
 import UIKit
 import UserNotifications
 
-final class FabushiAgentNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+final class FabushiAgentNotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     static let shared = FabushiAgentNotificationDelegate()
 
     func userNotificationCenter(

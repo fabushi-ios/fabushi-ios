@@ -377,7 +377,7 @@ final class IOSAttachmentMainRPCAdapter {
         let value = try requiredString(raw, field)
         guard value != ".", value != "..",
               !value.contains("/"), !value.contains("\\"),
-              value.unicodeScalars.allSatisfy({ !$0.properties.isControl })
+              value.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) })
         else { throw AdapterError.invalid("\(field) must be a safe file name") }
         return String(value.prefix(240))
     }

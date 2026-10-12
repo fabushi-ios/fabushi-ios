@@ -1405,6 +1405,8 @@ struct RemoteComputerSurface: View {
     let reconnectGeneration: Int
     let onClose: () -> Void
 
+    private let bridge: IOSPreloadBridge?
+
     @StateObject private var rebuildOwner: RemoteComputerRebuildOwner
     @StateObject private var agentBoxOwner: RemoteComputerAgentBoxOwner
     @StateObject private var activityOwner: RemoteComputerHostActivityOwner
@@ -1414,6 +1416,10 @@ struct RemoteComputerSurface: View {
     @State private var errorMessage: String?
     @State private var resetConfirmationPresented = false
     @State private var recoverConfirmationPresented = false
+    @State private var updateConfirmationPresented = false
+    @State private var updateConfirmationContent: RemoteComputerUpdateConfirmationContent?
+    @State private var updateQueued = false
+    @State private var updatePreparationError: String?
     @State private var vncIdentity = RemoteComputerShellVNCIdentity(host: nil, display: nil)
     @State private var trustedCursor: IOSVNCCursorTelemetry?
     @State private var lastLivenessReport: IOSVNCLivenessReport?
@@ -1425,6 +1431,7 @@ struct RemoteComputerSurface: View {
         reconnectGeneration: Int = 0,
         onClose: @escaping () -> Void
     ) {
+        self.bridge = bridge
         self.scope = scope
         self.reconnectGeneration = reconnectGeneration
         self.onClose = onClose

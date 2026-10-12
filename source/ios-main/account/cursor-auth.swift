@@ -353,7 +353,7 @@ final class IOSCursorAuthService {
     }
 
     private func mutateCredentials<T>(
-        _ operation: () async throws -> T
+        _ operation: @MainActor () async throws -> T
     ) async rethrows -> T {
         await acquireCredentialMutation()
         defer { releaseCredentialMutation() }

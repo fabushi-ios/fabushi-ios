@@ -1002,6 +1002,17 @@ final class CoordinatorMcpSurface {
             cache: gatewayDescriptorCache,
             getAccountScope: { [weak self] in self?.accountScope },
             reportFailure: gatewayDescriptorFailureReporter,
+            isBrokerDenial: { error in
+                if let broker = error as? IOSCursorSandBoxBrokerError {
+                    return broker.deniesCachedDescriptor
+                }
+                let message = (error as NSError).localizedDescription
+                return message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
+                    || message.contains(GATEWAY_ACCESS_DENIED_MESSAGE_MARKER)
+            },
+            nowMilliseconds: {
+                Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+            },
             resolveLive: { [weak self] in
                 guard let self else { throw IOSRemoteRunnerFenceError.unavailable }
                 return try await self.dashboard.ensureSandBox()
@@ -2115,7 +2126,7 @@ final class CoordinatorMcpSurface {
                 throw IOSCursorAuthError.signInRequired
             }
             try Task.checkCancellation()
-            let models = try await dashboard.getAvailableModels()
+            let models = try await dashboard.getAvailableModelsJSON().value
             try Task.checkCancellation()
             let latestAuth = await cursorAuth.status()
             guard routedScopeToken() == scope,
