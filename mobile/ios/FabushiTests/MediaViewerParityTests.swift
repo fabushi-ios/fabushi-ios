@@ -123,4 +123,21 @@ final class MediaViewerParityTests: XCTestCase {
         )
     }
 
+
+    @MainActor
+    func testImageContextSourceAddressOnlyAcceptsHTTPFamily() {
+        XCTAssertEqual(
+            NativeImageContextActions.canExposeSourceAddress("https://example.com/image.png")?.absoluteString,
+            "https://example.com/image.png"
+        )
+        XCTAssertEqual(
+            NativeImageContextActions.canExposeSourceAddress("http://example.com/image.png")?.absoluteString,
+            "http://example.com/image.png"
+        )
+        XCTAssertNil(NativeImageContextActions.canExposeSourceAddress("file:///tmp/image.png"))
+        XCTAssertNil(NativeImageContextActions.canExposeSourceAddress("data:image/png;base64,AAAA"))
+        XCTAssertNil(NativeImageContextActions.canExposeSourceAddress("javascript:alert(1)"))
+        XCTAssertNil(NativeImageContextActions.canExposeSourceAddress(nil))
+    }
+
 }
