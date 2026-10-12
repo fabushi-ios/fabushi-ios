@@ -5,6 +5,28 @@ struct IOSCursorDashboardError: Error, LocalizedError, Sendable {
     var errorDescription: String? { message }
 }
 
+struct IOSCursorSandBoxBrokerError: Error, LocalizedError, Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
+        case noStorage
+        case blocked(retryAfterMilliseconds: Int?)
+        case updateRequired
+        case accessDenied
+        case http(status: Int)
+    }
+
+    let kind: Kind
+    let message: String
+
+    var errorDescription: String? { message }
+
+    var deniesCachedDescriptor: Bool {
+        switch kind {
+        case .noStorage, .accessDenied: true
+        default: false
+        }
+    }
+}
+
 
 private enum IOSCursorDashboardProto {
     private enum WireValue {
@@ -935,15 +957,48 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
 
     private func validateConnectHTTP(
         _ response: URLResponse,
-        method: String
+        method: String,
+        responseBody: Data? = nil
     ) throws {
         guard let http = response as? HTTPURLResponse else {
             throw IOSCursorDashboardError(message: "GrokBot Connect RPC returned no HTTP response.")
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw IOSCursorDashboardError(
-                message: "GrokBot Connect RPC \(method) failed with HTTP \(http.statusCode)."
-            )
+            let hint = http.value(forHTTPHeaderField: "x-automation-failure-hint")
+            let retryAfterMilliseconds = http.value(forHTTPHeaderField: "retry-after")
+                .flatMap(Double.init)
+                .map { Int(min(max($0, 0), 15 * 60) * 1_000) }
+            let bodyDetail = responseBody
+                .flatMap { String(data: $0, encoding: .utf8) }?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = bodyDetail?.isEmpty == false ? String(bodyDetail!.prefix(512)) : nil
+
+            let kind: IOSCursorSandBoxBrokerError.Kind
+            let message: String
+            switch hint {
+            case CLOUD_AGENT_STORAGE_DISABLED:
+                kind = .noStorage
+                message = GATEWAY_NO_STORAGE_MESSAGE_MARKER
+            case SAND_BOX_BLOCKED:
+                kind = .blocked(retryAfterMilliseconds: retryAfterMilliseconds)
+                message = detail ?? encodeSandBoxBlockedMessage(.init(
+                    reason: "",
+                    title: "",
+                    detail: ""
+                ))
+            case "SAND_CLIENT_UPDATE_REQUIRED":
+                kind = .updateRequired
+                message = detail ?? "Sand client update is required."
+            default:
+                if http.statusCode == 401 || http.statusCode == 403 {
+                    kind = .accessDenied
+                    message = GATEWAY_ACCESS_DENIED_MESSAGE_MARKER
+                } else {
+                    kind = .http(status: http.statusCode)
+                    message = detail ?? "GrokBot Connect RPC \(method) failed with HTTP \(http.statusCode)."
+                }
+            }
+            throw IOSCursorSandBoxBrokerError(kind: kind, message: message)
         }
     }
 
@@ -990,7 +1045,11 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             timeoutMs: timeoutMs
         )
         let (data, response) = try await perform(request)
-        try validateConnectHTTP(response, method: "EnsureSandBox")
+        try validateConnectHTTP(
+            response,
+            method: "EnsureSandBox",
+            responseBody: data
+        )
         return try IOSCursorDashboardProto.decodeEnsureSandBoxResponse(data)
     }
 
