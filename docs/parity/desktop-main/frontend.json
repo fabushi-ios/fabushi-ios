@@ -1684,10 +1684,13 @@
       "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "SwiftUI Form/Picker/TextField replace the React/select/input leaf. The native editor preserves the 15-minute picker and fail-closed custom schedule behavior, delegates schedule grammar to the existing canonical iOS schedule runtime, and commits through the existing MobileBotRoutinesController rather than owning a second persistence path.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotRoutines.swift (shipping native add/edit routine sheet, 96 quarter-hour picker options, controlled custom schedule field, and canonical create/update wiring through MobileBotRoutinesController). The editor delegates schedule normalization/validation to the existing source/shared/automation-schedule.swift runtime rather than owning a second parser.",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers the exact 15-minute/96-option picker contract, custom blur normalization/commit decision, accepted aliases/@every/time-zone forms, and malformed/out-of-range fail-closed cases. Fresh exact-HEAD ordinary/protected Actions are required before verified. Verified on iOS exact HEAD 84360d57bce6099fb8c76bd043e47896bffbda24: ordinary run 37408708632 completed success across architecture/rust-host/build-and-test/device-archive including unit/UI tests and archive/package/upload; artifact 11388507597 digest sha256:b9c10e695d953e69cd57ddd5269e384651d45045aea10192e4259fcdfe0cc041. Protected run 37408708546 completed success through the real protected Global Dharma journey, complete-state assertion, evidence collection/upload and simulator erase; artifact 11389053903 digest sha256:fca705844b16f1667f9812037a8d690b432f3d5be65a984004fd7dc7e92c0455.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. Native SwiftUI replaces the recovered React draft editor while preserving the shipped schedule leaf responsibilities; trigger-draft multi-row semantics remain separately gated by trigger-draft-controller.ts / trigger-schema.ts rows. Exact-HEAD production acceptance is closed at 84360d57; subsequent HEADs must independently revalidate before release evidence is claimed."
+      "notes": "Re-read exact Desktop blob a418a750ea143fcbfc200e85e7bd7f7adf58de01 at current Desktop main 371b72f1. Native MobileBotRoutines preserves the 15-minute/96-option picker, controlled custom schedule normalization and fail-closed blur/commit behavior, while persistence remains in MobileBotRoutinesController. Historical verified evidence belongs to predecessor iOS HEAD 84360d57 and is not inherited; keep implemented until same-final-SHA code/test/artifact/independent evidence is complete.",
+      "historical_implementation_status": "verified",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/schedule.ts",
@@ -1699,10 +1702,13 @@
       "ios_target_path": "source/shared/automation-schedule.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "The iOS product keeps the canonical raw schedule string at the Host boundary instead of recreating the renderer-only TypeScript ScheduleSpec graph. source/shared/automation-schedule.swift owns normalization, aliases, cron parsing/ranges, @every, time zones, next-run computation, and descriptions; the native editor reuses that owner for validation.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "source/shared/automation-schedule.swift is the existing canonical iOS schedule runtime for normalization, cron aliases, five-field parsing/ranges, @every intervals, CRON_TZ/TZ validation, next-run computation, and human schedule descriptions. frontend/src/production/MobileBotRoutines.swift reuses it for the native editor instead of duplicating schedule ownership.",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift adds editor-facing validation coverage; existing exact-HEAD Rust/Swift application test gates exercise the shared automation runtime in shipping composition. Fresh ordinary/protected Actions are required before verified. Verified on iOS exact HEAD 84360d57bce6099fb8c76bd043e47896bffbda24: ordinary run 37408708632 completed success across architecture/rust-host/build-and-test/device-archive including unit/UI tests and archive/package/upload; artifact 11388507597 digest sha256:b9c10e695d953e69cd57ddd5269e384651d45045aea10192e4259fcdfe0cc041. Protected run 37408708546 completed success through the real protected Global Dharma journey, complete-state assertion, evidence collection/upload and simulator erase; artifact 11389053903 digest sha256:fca705844b16f1667f9812037a8d690b432f3d5be65a984004fd7dc7e92c0455.",
-      "notes": "Platform delta: iOS retains the canonical raw schedule string as the Host contract and does not recreate the renderer-only TypeScript ScheduleSpec object graph. The applicable parse/validate/execute/describe semantics are owned by source/shared/automation-schedule.swift; the native editor emits canonical cron directly. Exact-HEAD production acceptance is closed at 84360d57; subsequent HEADs must independently revalidate before release evidence is claimed."
+      "notes": "Re-read exact Desktop blob 217da00e31009564b9b51c6bbb2615f48920d701 at current Desktop main 371b72f1. source/shared/automation-schedule.swift remains the canonical iOS owner for cron aliases/ranges, @every, time zones, validation and descriptions; the native editor reuses it rather than duplicating a schedule parser. Historical verified evidence belongs to predecessor iOS HEAD 84360d57 and is not inherited; keep implemented until same-final-SHA code/test/artifact/independent evidence is complete.",
+      "historical_implementation_status": "verified",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/trigger-draft-controller.ts",
@@ -1714,10 +1720,13 @@
       "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "A @MainActor ObservableObject replaces the TypeScript closure controller while retaining persistence injection and keeping Host/bridge knowledge out of this state machine. It reuses native RoutineTriggerForm/AutomationTrigger validation, preserves the Desktop eight-row bound and last-valid semantics, and exposes SwiftUI-ready menu/editor/focus/pending/error state.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotRoutines.swift contains MobileBotRoutineTriggerDraftController with bounded rows, raw draft change callbacks, valid-only commit/revert persistence injection, menu/editor/focus-return state, custom schedule validation, pending/error state, generation fencing, reset and disposal.",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers valid grouped commits, the eight-row cap, invalid custom schedule fail-closed behavior with last-valid close-time revert, focus return, single-row removal semantics, and disposal fencing of an in-flight persistence callback. Fresh exact-HEAD ordinary/protected Actions are required before verified. Verified on iOS exact HEAD 84360d57bce6099fb8c76bd043e47896bffbda24: ordinary run 37408708632 completed success across architecture/rust-host/build-and-test/device-archive including unit/UI tests and archive/package/upload; artifact 11388507597 digest sha256:b9c10e695d953e69cd57ddd5269e384651d45045aea10192e4259fcdfe0cc041. Protected run 37408708546 completed success through the real protected Global Dharma journey, complete-state assertion, evidence collection/upload and simulator erase; artifact 11389053903 digest sha256:fca705844b16f1667f9812037a8d690b432f3d5be65a984004fd7dc7e92c0455.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This row owns draft lifecycle only; rich-trigger durable Host encoding and the shipping multi-trigger editor remain separate composition gates and are not implied by this implemented status. Exact-HEAD production acceptance is closed at 84360d57; subsequent HEADs must independently revalidate before release evidence is claimed."
+      "notes": "Re-read exact Desktop blob 4a85d3604cceb81b48d5ada26a1903cf02decfd0 at current Desktop main 371b72f1. MobileBotRoutineTriggerDraftController preserves the eight-row cap, last-valid draft, menu/editor/focus-return state, valid-only commit/revert, pending/error and generation/disposal fencing without bridge ownership. Historical verified evidence belongs to predecessor iOS HEAD 84360d57 and is not inherited; keep implemented until same-final-SHA code/test/artifact/independent evidence is complete.",
+      "historical_implementation_status": "verified",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/trigger-schema.ts",
@@ -1729,10 +1738,13 @@
       "ios_target_path": "source/shared/automations.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "The native product reuses the existing iOS-owned AutomationTrigger/AutomationTriggerMember model instead of recreating TypeScript wire types. Swift helpers now project editable RoutineTriggerForm values into that canonical model, enforce the Desktop eight-listener cap and platform validation rules, round-trip forms, and reuse native trigger description helpers. Persistence/wire expansion for rich triggers remains owned by the separate draft/controller and Host protocol responsibilities.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "source/shared/automations.swift now owns native RoutineTriggerForm schema/projection for schedule, Slack, GitHub, Teams, Linear, Sentry and PagerDuty on top of the existing AutomationTrigger model, including schedule validation through source/shared/automation-schedule.swift, GitHub repo/CI-branch validation, reaction emoji and allowlist normalization, integration token projection, bounded group construction, reverse projection, and existing native trigger descriptions.",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift covers supported-form round-trip, the eight-row group bound, malformed schedule/Slack/GitHub/Teams/integration fail-closed cases, reaction emoji dedupe/normalization, and case-insensitive GitHub allowlist dedupe. Fresh exact-HEAD ordinary/protected Actions are required before verified. Verified on iOS exact HEAD 84360d57bce6099fb8c76bd043e47896bffbda24: ordinary run 37408708632 completed success across architecture/rust-host/build-and-test/device-archive including unit/UI tests and archive/package/upload; artifact 11388507597 digest sha256:b9c10e695d953e69cd57ddd5269e384651d45045aea10192e4259fcdfe0cc041. Protected run 37408708546 completed success through the real protected Global Dharma journey, complete-state assertion, evidence collection/upload and simulator erase; artifact 11389053903 digest sha256:fca705844b16f1667f9812037a8d690b432f3d5be65a984004fd7dc7e92c0455.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This row is the pure schema/projection responsibility only. Do not treat it as proof that rich triggers are durably persisted or editable in shipping UI; trigger-draft-controller.ts and Host wire composition remain separate gates. Exact-HEAD production acceptance is closed at 84360d57; subsequent HEADs must independently revalidate before release evidence is claimed."
+      "notes": "Re-read exact Desktop blob a4a776cb4e7b74bcf53e8955c7aa6c4e58947b80 at current Desktop main 371b72f1. source/shared/automations.swift retains the canonical native trigger model and strict schedule/Slack/GitHub/Teams/Linear/Sentry/PagerDuty form projection, validation, normalization, bounded grouping and descriptions. Historical verified evidence belongs to predecessor iOS HEAD 84360d57 and is not inherited; keep implemented until same-final-SHA code/test/artifact/independent evidence is complete.",
+      "historical_implementation_status": "verified",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/view.css",
@@ -1747,7 +1759,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/MobileBotRoutines.swift provides the native SwiftUI replacement layout for the Routines section and editor; no CSS runtime is shipped on iOS.",
       "test_evidence": "Native UI compilation plus exact-HEAD build/device/protected acceptance are the replacement evidence; no CSS-specific unit test is applicable.",
-      "notes": "Platform mechanism only. This disposition does not waive any user-visible Routines behavior from view.tsx."
+      "notes": "Re-read exact Desktop blob 62f2b907c7aea58bc206f983d96dca307c689340 at current Desktop main 371b72f1. DOM/CSS layout is a platform mechanism; SwiftUI Form/Section/VStack/HStack/List/Sheet is the native replacement while behavioral obligations remain tracked under the routines view/controller/schema rows. This current-main review does not waive any behavioral responsibility or imply release verification.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/automations/routines/view.tsx",
@@ -1759,10 +1773,13 @@
       "ios_target_path": "frontend/src/production/MobileBotRoutines.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "SwiftUI replaces the React information pane. Existing iOS production code already ships loading/empty/error/list, enable/delete/run controls, add/edit sheets, controller lifecycle, and schedule editing. Full parity still requires shipping composition of the native rich-trigger draft/schema, trigger descriptions, and the existing run-history provider/clock in the detail surface before this row can advance beyond mapped.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotRoutines.swift ships MobileBotRoutinesSection in Agent Settings with canonical grouped-trigger editing/description plus MobileBotRoutineRunHistoryProvider-backed inline history; the provider owns account/Agent/routine projection, reconnect refresh and the single shared presentation clock without a second history RPC or timer.",
       "test_evidence": "GrokMobileRoutinesControllerTests cover controller/schedule/trigger schema-draft plus provider lifecycle, reconnect refresh, account/Agent stale fencing, per-routine row isolation, single subscription/timer behavior and disposal. Fresh exact-HEAD ordinary/protected acceptance and same-HEAD artifacts/provenance are required before verified. Verified on iOS exact HEAD 84360d57bce6099fb8c76bd043e47896bffbda24: ordinary run 37408708632 completed success across architecture/rust-host/build-and-test/device-archive including unit/UI tests and archive/package/upload; artifact 11388507597 digest sha256:b9c10e695d953e69cd57ddd5269e384651d45045aea10192e4259fcdfe0cc041. Protected run 37408708546 completed success through the real protected Global Dharma journey, complete-state assertion, evidence collection/upload and simulator erase; artifact 11389053903 digest sha256:fca705844b16f1667f9812037a8d690b432f3d5be65a984004fd7dc7e92c0455.",
-      "notes": "Shipping composition is now implemented against Desktop PR #20 authority 798cf51d96cb1cb98cf657af212bb47274ccb701. Do not promote to verified until the new exact HEAD has terminal ordinary + protected success and artifact provenance. Exact-HEAD production acceptance is closed at 84360d57; subsequent HEADs must independently revalidate before release evidence is claimed."
+      "notes": "Re-read exact Desktop blob 2db869d92eb380488cf5687ea8260734bc56f1ee at current Desktop main 371b72f1. MobileBotRoutinesSection is shipping-composed in Agent Settings and provides list/empty/error, create/edit, enable/delete/Test run, grouped-trigger editing/descriptions, reconnect-aware run history and native navigation over the canonical Host owner. Historical verified evidence belongs to predecessor iOS HEAD 84360d57 and is not inherited; keep implemented until same-final-SHA code/test/artifact/independent evidence is complete.",
+      "historical_implementation_status": "verified",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/overlay/entrypoint.ts",
