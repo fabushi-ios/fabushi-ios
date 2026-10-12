@@ -141,4 +141,105 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
         _ = try decoder.append(Data([0, 0, 0, 0, 4, 1, 2]))
         XCTAssertThrowsError(try decoder.requireEmptyAtEOF())
     }
+
+    func testEnsureSandBoxPreservesBrokerFailureContracts() async throws {
+        struct Case {
+            let status: Int
+            let hint: String?
+            let retryAfter: String?
+            let expected: IOSCursorSandBoxBrokerError.Kind
+        }
+        let cases: [Case] = [
+            .init(
+                status: 403,
+                hint: CLOUD_AGENT_STORAGE_DISABLED,
+                retryAfter: nil,
+                expected: .noStorage
+            ),
+            .init(
+                status: 503,
+                hint: SAND_BOX_BLOCKED,
+                retryAfter: "7",
+                expected: .blocked(retryAfterMilliseconds: 7_000)
+            ),
+            .init(
+                status: 409,
+                hint: "SAND_CLIENT_UPDATE_REQUIRED",
+                retryAfter: nil,
+                expected: .updateRequired
+            ),
+            .init(
+                status: 401,
+                hint: nil,
+                retryAfter: nil,
+                expected: .accessDenied
+            ),
+            .init(
+                status: 500,
+                hint: nil,
+                retryAfter: nil,
+                expected: .http(status: 500)
+            ),
+        ]
+
+        for value in cases {
+            let client = IOSCursorDashboardClient(
+                credentials: lifecycleCredentials(),
+                backendURL: URL(string: "https://backend.example.test")!,
+                requestExecutor: { request in
+                    var headers = ["Content-Type": "application/proto"]
+                    if let hint = value.hint {
+                        headers["x-automation-failure-hint"] = hint
+                    }
+                    if let retryAfter = value.retryAfter {
+                        headers["retry-after"] = retryAfter
+                    }
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: value.status,
+                        httpVersion: "HTTP/2",
+                        headerFields: headers
+                    )!
+                    return (Data("backend detail".utf8), response)
+                }
+            )
+
+            do {
+                _ = try await client.ensureSandBox()
+                XCTFail("broker failure must not decode as a successful descriptor")
+            } catch let error as IOSCursorSandBoxBrokerError {
+                XCTAssertEqual(error.kind, value.expected)
+            } catch {
+                XCTFail("unexpected error type: \(error)")
+            }
+        }
+    }
+
+    func testEnsureSandBoxNoStorageAndAccessDeniedInvalidateDescriptorEligibility() {
+        XCTAssertTrue(
+            IOSCursorSandBoxBrokerError(
+                kind: .noStorage,
+                message: GATEWAY_NO_STORAGE_MESSAGE_MARKER
+            ).deniesCachedDescriptor
+        )
+        XCTAssertTrue(
+            IOSCursorSandBoxBrokerError(
+                kind: .accessDenied,
+                message: GATEWAY_ACCESS_DENIED_MESSAGE_MARKER
+            ).deniesCachedDescriptor
+        )
+        XCTAssertFalse(
+            IOSCursorSandBoxBrokerError(
+                kind: .blocked(retryAfterMilliseconds: 1_000),
+                message: "blocked"
+            ).deniesCachedDescriptor
+        )
+        XCTAssertFalse(
+            IOSCursorSandBoxBrokerError(
+                kind: .updateRequired,
+                message: "update"
+            ).deniesCachedDescriptor
+        )
+    }
+
 }
