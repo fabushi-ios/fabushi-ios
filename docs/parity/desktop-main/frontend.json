@@ -3227,8 +3227,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift stageImportedComposerAttachments/materializeComposerPasteProvider plus mobileComposerStageFileName/mobileComposerStageFailureNotice; canonical Host attachment.upload store remains the sole staging/commit owner.",
       "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers payload, limits, anonymous-name fallback, failure notices and paste type selection; current exact-head CI remains required before verified.",
-      "notes": "IOS-MAIN-DEP-DESKTOP-STAGING-20261011: native staging/commit replacement is production-composed; no Electron staging bridge is copied.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-DESKTOP-STAGING-20261011: native staging/commit replacement is production-composed; no Electron staging bridge is copied. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/draft-state.ts",
@@ -3243,8 +3244,9 @@
       "implementation_status": "implemented",
       "production_evidence": "shipping MobileBotChat/GrokMobileShell composer bindings use the native MobileComposerDraft persistence owner and existing client persistence substrate; no second draft runtime exists.",
       "test_evidence": "mobile/ios/FabushiTests/MobileComposerDraftPersistenceTests.swift covers account/Agent isolation, attachment-only recovery, clearing, corruption and schema mismatch. Exact-head UI/CI evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-DRAFT-STATE-20261011: persistent account+Agent draft/recovery lifecycle is implemented; retain implemented until final exact-head acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-DRAFT-STATE-20261011: persistent account+Agent draft/recovery lifecycle is implemented; retain implemented until final exact-head acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/editor-mcp-reference-provider.ts",
@@ -3293,8 +3295,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.swift (suggestion context/rows, restore/persistEditorSuggestionRecents, refreshEditorSuggestions, chooseEditorSuggestion, shipping editorSuggestionList) plus MobileUiAgentRefsPersistence.swift and canonical Coordinator transport phase.",
       "test_evidence": "MobileComposerParityTests covers transport fail-closed behavior, current-catalog emoji ranking, workflow icons, MCP/PR integration and corrected account-level recency. MobileUiAgentRefsPersistenceTests covers relaunch/account isolation/same-account Agent reuse/caps/corrupt cleanup/actual emoji. Same-final-HEAD Actions remain required before verified promotion.",
-      "notes": "Native production adapter is mounted in the one shipping composer. Recency follows Desktop account scope; Agent scope remains only on live provider requests and stale-result fencing. Keep below verified until exact-head ordinary/protected CI succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Native production adapter is mounted in the one shipping composer. Recency follows Desktop account scope; Agent scope remains only on live provider requests and stale-result fencing. Keep below verified until exact-head ordinary/protected CI succeeds. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/editor-suggestion-provider.ts",
@@ -3309,8 +3312,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.swift (projectMobileEditorMentionSuggestions; projectMobileEditorWorkflowSuggestions; mobileEditorSuggestionRows; mobileEditorSuggestionScore; mobileEditorSuggestionNextIndex; mobileEditorSuggestionProviderIsAvailable; refreshEditorSuggestions; editorSuggestionScopeFingerprint; durable recents restore/record) + MobileUiAgentRefsPersistence.swift + GrokMobileShell.swift Coordinator connection phase. MobileUiAgentRefsPersistence supplies the account-level durable recency dependency; MobileBotChat preserves Agent fencing for asynchronous source refresh while intentionally sharing recency across Agents in the same account.",
       "test_evidence": "MobileComposerParityTests covers MCP/PR integration, fuzzy/hash selection, account/Agent fencing, emoji recent ordering and transport fail-closed behavior; MobileUiAgentRefsPersistenceTests covers durable account/Agent isolation and caps. Exact-head GitHub Actions remain required before verified promotion. MobileUiAgentRefsPersistenceTests and corrected MobileComposerParityTests cover account-scope durability and emoji projection.",
-      "notes": "IOS-MAIN-DEP-EDITOR-SUGGESTIONS-20261011: production source/ranking/navigation/transport and durable recents are all wired in the one shipping composer. Promoted to implemented only; verified still requires current exact-head ordinary/protected evidence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-EDITOR-SUGGESTIONS-20261011: production source/ranking/navigation/transport and durable recents are all wired in the one shipping composer. Promoted to implemented only; verified still requires current exact-head ordinary/protected evidence. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/find-in-chat-controller.ts",
@@ -3344,8 +3348,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (findSearchEntries/findMatches/currentFindMatch/find bar/openFind/closeFind/stepFind plus transcriptList highlight and scrollTo composition) reuses the existing ChatSearchModel algorithm owner.",
       "test_evidence": "mobile/ios/FabushiTests/ChatSearchModelTests.swift and SharedWorkflowTranscriptParityTests.testBotFindSearchUsesOnlyMainTranscriptCopyableTextAndWrapsMatches cover search/author/attachment fields and wrapping. Current exact-head UI/CI evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-FIND-IN-CHAT-20261011: shipping native find UI is production-composed; keep below verified pending exact-head UI acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-FIND-IN-CHAT-20261011: shipping native find UI is production-composed; keep below verified pending exact-head UI acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/math.tsx",
@@ -3360,8 +3365,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileMathRenderer.swift (splitMobileAssistantMath, mobileMathExpressionError, MobileMathExpressionView, MobileAssistantMathTextView) is composed by the shipping MobileBotChat.messageTextContent for assistant text/send-message projections; mobile/ios/project.yml pins mgriebling/SwiftMath 1.7.3; NOTICE.md records MIT provenance.",
       "test_evidence": "mobile/ios/FabushiTests/MobileMathRendererParityTests.swift covers no-single-dollar grammar, inline/display delimiters, valid native parsing and invalid-expression fallback. Current exact-head Xcode build/test/protected acceptance remains required before verified.",
-      "notes": "IOS-MAIN-DEP-MATH-20261011: native math rendering is production-composed on descendant of ebca419c6f8041314d03ca7866ebf4f0d9003102; dependency is exact-pinned and notice recorded. Keep below verified pending exact-head CI/UI acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-MATH-20261011: native math rendering is production-composed on descendant of ebca419c6f8041314d03ca7866ebf4f0d9003102; dependency is exact-pinned and notice recorded. Keep below verified pending exact-head CI/UI acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/media-viewer.tsx",
@@ -3376,8 +3382,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-messaging/src/message.rs (MediaGroupMetadata + bounded structured client id parser); source/packages/mahayana-messaging/src/engine.rs (media-only durable projection into Message); mobile/ios/Fabushi/MessagingModel.swift (multi-blob upload, unique child idempotency keys, raw attachments/mediaGroup parse, pure projectHumanMediaGroups); frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift (multi-file picker and projected Human transcript); mobile/ios/Fabushi/MediaViewer.swift (attachment selection/filmstrip over canonical blob loader). MessagingModel HumanMediaGroupRetryPlan/HumanMediaGroupSendError now preserve the same mediaGroup id and original child index/count across partial retry, upload only the unsent suffix, and reuse child clientMessageId for idempotent ambiguity recovery; ContentView holds retry bytes only in the active Human chat view and fences late UI mutation by conversation id.",
       "test_evidence": "source/packages/mahayana-messaging/src/message.rs media_group_metadata_tests; source/packages/mahayana-messaging/tests/m4_media_contract.rs structured_media_client_id_becomes_durable_group_metadata; mobile/ios/FabushiTests/SharedMessagingCoreParityTests human media projection isolation/order test; mobile/ios/FabushiTests/MediaViewerParityTests gallery selection test. Exact-head Rust/Xcode/UI/device evidence remains required. SharedMessagingCoreParityTests.testHumanMediaGroupRetryPlanPreservesChildIdentityAndSuffix covers stable child id and invalid retry-plan rejection; same-head integration evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-MEDIA-VIEWER-20261011: canonical Desktop Human send path and projectTranscriptEntry/mergeCorrelatedUserAttachments confirm real grouping through same-message attachments[] and shared clientNonce. iOS durable mediaGroup uses structured child client ids, canonical engine metadata and one MessagingModel owner. Partial outbound failure now returns a typed retry plan that keeps the original group id/count, advances only past confirmed children, reuploads only the remaining suffix and reuses exact child clientMessageId so an ambiguous already-accepted child is duplicate-suppressed. Unsent blobs are cleaned; user may retry or discard the view-local retry draft. Status remains implemented until exact-head Rust/Xcode/UI/device evidence closes.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-MEDIA-VIEWER-20261011: canonical Desktop Human send path and projectTranscriptEntry/mergeCorrelatedUserAttachments confirm real grouping through same-message attachments[] and shared clientNonce. iOS durable mediaGroup uses structured child client ids, canonical engine metadata and one MessagingModel owner. Partial outbound failure now returns a typed retry plan that keeps the original group id/count, advances only past confirmed children, reuploads only the remaining suffix and reuses exact child clientMessageId so an ambiguous already-accepted child is duplicate-suppressed. Unsent blobs are cleaned; user may retry or discard the view-local retry draft. Status remains implemented until exact-head Rust/Xcode/UI/device evidence closes. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/mermaid.tsx",
@@ -3388,12 +3395,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileMermaidRenderer.swift; frontend/src/recovered/features/conversation/MobileMathRenderer.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "A controlled offline native renderer is composed into the canonical assistant transcript owner instead of WKWebView/CDN execution. It handles flowchart/graph, state/class/ER graph families, sequence diagrams and pie charts with strict directive rejection, source/line/node/edge/text limits, readable source fallback, a serialized 64-entry theme-keyed render cache/queue, and native fullscreen 0.1x-8x zoom plus true viewport fit with scroll-based pan. Other Mermaid families still fail closed to source, so full generic Mermaid parity remains review-fenced.",
+      "ios_platform_delta": "A controlled offline native renderer is composed into the canonical assistant transcript owner instead of WKWebView/CDN execution. It handles flowchart/graph, state/class/ER graph families, sequence diagrams, pie charts, Gantt and timeline diagrams with strict directive rejection, source/line/node/edge/text limits, readable source fallback, a serialized 64-entry theme-keyed render cache/queue, and native fullscreen 0.1x-8x zoom plus true viewport fit with scroll-based pan. Additional Mermaid families and syntax accepted by the shipped Desktop runtime remain review-fenced.",
       "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat passes account+agent+conversation+entry identity into MobileAssistantMathTextView; MobileMathRenderer projects closed Mermaid fences before preserving existing math behavior; MobileMermaidRenderer parses/renders supported families entirely offline. SwiftUI task identity, cancellation checks, active request fencing and onDisappear invalidation reject late results after account/conversation/entry replacement. MobileMermaidRenderQueue serializes parse work and retains at most 64 theme+source results; fullscreen sizing computes real natural bounds and Fit scales to the current viewport rather than merely resetting to 1x. Native Gantt support now covers title/section/task status, ISO YYYY-MM-DD scheduling, d/h/w/m durations, after-id dependencies and milestone rendering through the same offline render queue.",
-      "test_evidence": "MobileMermaidRendererParityTests covers fence projection, graph direction/labels/edges, sequence, pie, strict runtime-directive rejection, byte cap, unsupported-family fail-closed fallback, account/conversation/entry render-scope isolation, bounded render-cache eviction, and viewport fit sizing. Exact-head Xcode/UI evidence remains pending. MobileMermaidRendererParityTests now also covers offline Gantt section/date/dependency/status projection, unsupported date-format fail-closed behavior and task-cap enforcement.",
-      "notes": "IOS-MAIN-DEP-MERMAID-20261011: Desktop mermaid.tsx delegates valid syntax to the shipped strict Mermaid runtime and has no repository family-specific contract suite. Native iOS now supports flowchart/state/class/ER/sequence/pie plus a bounded Gantt subset, with no CDN/WebView runtime. Keep mapped: shipped Mermaid can accept additional valid families/syntax not yet proven equivalent; exact-head Xcode/UI evidence is also pending.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "MobileBotChat passes account+Agent+conversation+entry identity into MobileAssistantMathTextView; MobileMathRenderer projects closed Mermaid fences before preserving existing math behavior; MobileMermaidRenderer parses/renders supported families entirely offline. SwiftUI task identity, cancellation checks, active request fencing and onDisappear invalidation reject late results after account/conversation/entry replacement. MobileMermaidRenderQueue serializes parse work and retains at most 64 theme+source results; fullscreen sizing computes real natural bounds and Fit scales to the current viewport. Native Gantt and timeline parsing/rendering run through the same bounded offline owner.",
+      "test_evidence": "MobileMermaidRendererParityTests covers fence projection, graph direction/labels/edges, sequence, pie, Gantt, timeline sections/period continuation, strict runtime-directive rejection, byte/complexity caps, unsupported-family fail-closed fallback, account/conversation/entry render-scope isolation, bounded render-cache eviction, and viewport fit sizing. Exact-head Xcode/UI evidence remains pending.",
+      "notes": "IOS-MAIN-DEP-MERMAID-20261012: native timeline parity was added on top of flowchart/state/class/ER/sequence/pie/Gantt while preserving strict offline rendering and scope fencing. Keep mapped because Desktop's shipped Mermaid runtime still accepts additional valid families/syntax not yet proven equivalent. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/model.ts",
@@ -3404,12 +3412,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "ios_language": "Swift + shared media policies",
-      "ios_platform_delta": "MarketplaceModel/MobileChatMessage plus shared media policies already carry canonical message/card/reaction/thread/attachment projections, but some Desktop model variants remain incomplete in the native transcript, notably typed tool-result snapshots, persistent rich composer draft and exact standalone reply-preview model.",
+      "ios_platform_delta": "MarketplaceModel/MobileChatMessage, MobileBotChat and shared media policies carry canonical message/card/reaction/thread/attachment/tool-result/reply and durable composer projections. Current-main audit confirms typed tool-result cards, reply targets/previews and persisted rich composer command state are shipping-composed; the aggregate model row remains mapped until every Desktop union variant and helper is exhaustively reconciled against its child responsibility rows rather than inferred from partial coverage.",
       "implementation_status": "mapped",
-      "production_evidence": "MarketplaceModel.swift is the canonical MobileChatMessage projection owner; source/shared/media/* owns attachment classification/limits; MobileBotChat consumes those models.",
-      "test_evidence": "SharedWorkflowTranscriptParityTests and SharedMediaParityTests cover current projection/media contracts; remaining model variants track their dedicated mapped rows.",
-      "notes": "IOS-MAIN-DEP-WORKSPACE-MODEL-20261009: exact Desktop model.ts reviewed; aggregate model remains mapped until child gaps close.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "MarketplaceModel.swift is the canonical MobileChatMessage/card projection owner; MobileBotChat.swift composes tool-result cards, reply targeting/retry and durable rich composer command fields; source/shared/media/* and the iOS messaging core own attachment classification/grouping. No second transcript/model store is introduced.",
+      "test_evidence": "SharedWorkflowTranscriptParityTests, MobileComposerDraftPersistenceTests, MobileComposerParityTests and SharedMediaParityTests cover current transcript/tool/reply/draft/media contracts. Aggregate variant-by-variant reconciliation and current exact-head CI remain pending, so this row stays mapped.",
+      "notes": "IOS-MAIN-DEP-WORKSPACE-MODEL-20261012: the prior note naming typed tool-result, persistent rich draft and reply-preview as missing was stale; those shipping paths now exist. Aggregate model remains mapped solely because the full Desktop union/helper surface has not yet been exhaustively reconciled child-by-child. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/pagination.ts",
@@ -3424,8 +3433,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift transcriptList/loadOlderConversationEntries/transcriptPrependAnchorId plus canonical conversation.openWindowed Host transport.",
       "test_evidence": "mobile/ios/FabushiTests/MobileConversationPaginationParityTests.swift covers prepend/dedupe ordering and SharedWorkflowTranscriptParityTests covers window reconciliation/thread paging. Current exact-head UI/CI evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-PAGINATION-20261011: main Bot history pagination and viewport-anchor preservation are shipping-composed; keep at implemented pending same-head acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-PAGINATION-20261011: main Bot history pagination and viewport-anchor preservation are shipping-composed; keep at implemented pending same-head acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; direct callers, shipping owner, lifecycle/state, persistence, failure/cancellation/retry and account/Agent fencing were rechecked. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/pdf-viewer.css",

@@ -89,6 +89,13 @@ internal struct MobileMermaidGanttTask: Identifiable, Equatable, Sendable {
     let durationDays: Double?
 }
 
+internal struct MobileMermaidTimelineEvent: Identifiable, Equatable, Sendable {
+    let id: Int
+    let section: String
+    let period: String
+    let label: String
+}
+
 internal enum MobileMermaidDiagram: Equatable, Sendable {
     case graph(
         direction: MobileMermaidDirection,
@@ -101,6 +108,7 @@ internal enum MobileMermaidDiagram: Equatable, Sendable {
     )
     case pie(slices: [MobileMermaidPieSlice])
     case gantt(title: String?, tasks: [MobileMermaidGanttTask])
+    case timeline(title: String?, events: [MobileMermaidTimelineEvent])
 }
 
 internal enum MobileAssistantRichSegmentKind: Equatable {
@@ -655,6 +663,53 @@ private func mobileMermaidGantt(lines: [String]) throws -> MobileMermaidDiagram 
     return .gantt(title: title, tasks: tasks)
 }
 
+private func mobileMermaidTimeline(lines: [String]) throws -> MobileMermaidDiagram {
+    var title: String?
+    var section = ""
+    var period: String?
+    var events: [MobileMermaidTimelineEvent] = []
+
+    for raw in lines.dropFirst() {
+        let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty, !line.hasPrefix("%%") else { continue }
+        let lower = line.lowercased()
+        if lower.hasPrefix("title ") {
+            let candidate = mobileMermaidCleanLabel(String(line.dropFirst(6)))
+            title = candidate.isEmpty ? nil : candidate
+            continue
+        }
+        if lower.hasPrefix("section ") {
+            section = mobileMermaidCleanLabel(String(line.dropFirst(8)))
+            continue
+        }
+        guard let colon = line.firstIndex(of: ":") else {
+            throw MobileMermaidParseError.malformed("timeline event is missing ':'")
+        }
+        let periodCandidate = line[..<colon].trimmingCharacters(in: .whitespacesAndNewlines)
+        if !periodCandidate.isEmpty {
+            period = mobileMermaidCleanLabel(periodCandidate)
+        }
+        let label = mobileMermaidCleanLabel(String(line[line.index(after: colon)...]))
+        guard let period, !period.isEmpty, !label.isEmpty else {
+            throw MobileMermaidParseError.malformed("timeline event requires a period and label")
+        }
+        guard events.count < mobileMermaidNodeCap else {
+            throw MobileMermaidParseError.tooComplex
+        }
+        events.append(.init(
+            id: events.count,
+            section: section,
+            period: period,
+            label: label
+        ))
+    }
+
+    guard !events.isEmpty else {
+        throw MobileMermaidParseError.malformed("timeline diagram contains no events")
+    }
+    return .timeline(title: title, events: events)
+}
+
 internal func parseMobileMermaidDiagram(_ source: String) throws -> MobileMermaidDiagram {
     guard !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         throw MobileMermaidParseError.empty
@@ -707,6 +762,9 @@ internal func parseMobileMermaidDiagram(_ source: String) throws -> MobileMermai
     }
     if firstLower == "gantt" {
         return try mobileMermaidGantt(lines: lines)
+    }
+    if firstLower == "timeline" {
+        return try mobileMermaidTimeline(lines: lines)
     }
 
     let kind = first.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) ?? first
@@ -1098,6 +1156,43 @@ private struct MobileMermaidGanttView: View {
     }
 }
 
+private struct MobileMermaidTimelineView: View {
+    let title: String?
+    let events: [MobileMermaidTimelineEvent]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title, !title.isEmpty {
+                Text(title)
+                    .font(.headline)
+            }
+            ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                if index == 0 || events[index - 1].section != event.section {
+                    if !event.section.isEmpty {
+                        Text(event.section)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.top, index == 0 ? 0 : 6)
+                    }
+                }
+                HStack(alignment: .top, spacing: 12) {
+                    Text(event.period)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 112, alignment: .trailing)
+                    Circle()
+                        .frame(width: 7, height: 7)
+                        .padding(.top, 5)
+                    Text(event.label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(10)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Mermaid timeline diagram with \(events.count) events")
+    }
+}
+
 private struct MobileMermaidDiagramSurface: View {
     let diagram: MobileMermaidDiagram
 
@@ -1112,6 +1207,8 @@ private struct MobileMermaidDiagramSurface: View {
             MobileMermaidPieView(slices: slices)
         case .gantt(let title, let tasks):
             MobileMermaidGanttView(title: title, tasks: tasks)
+        case .timeline(let title, let events):
+            MobileMermaidTimelineView(title: title, events: events)
         }
     }
 }
@@ -1139,6 +1236,12 @@ internal func mobileMermaidNaturalSize(_ diagram: MobileMermaidDiagram) -> CGSiz
         return CGSize(
             width: 720,
             height: max(220, CGFloat(tasks.count) * 34 + CGFloat(sectionCount) * 28 + 48)
+        )
+    case .timeline(_, let events):
+        let sectionCount = Set(events.map(\.section).filter { !$0.isEmpty }).count
+        return CGSize(
+            width: 680,
+            height: max(220, CGFloat(events.count) * 42 + CGFloat(sectionCount) * 28 + 56)
         )
     }
 }

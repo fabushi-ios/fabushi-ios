@@ -132,6 +132,30 @@ final class MobileMermaidRendererParityTests: XCTestCase {
         }
     }
 
+    func testNativeMermaidParserProjectsTimelineSectionsAndContinuationOffline() throws {
+        let diagram = try parseMobileMermaidDiagram(
+            """
+            timeline
+              title Migration milestones
+              section Audit
+              2026-10-10 : Rebaseline
+                         : Current-main review
+              section Release
+              2026-10-12 : Exact-head acceptance
+            """
+        )
+        guard case let .timeline(title, events) = diagram else {
+            return XCTFail("expected timeline")
+        }
+        XCTAssertEqual(title, "Migration milestones")
+        XCTAssertEqual(events.map(\.section), ["Audit", "Audit", "Release"])
+        XCTAssertEqual(events.map(\.period), ["2026-10-10", "2026-10-10", "2026-10-12"])
+        XCTAssertEqual(
+            events.map(\.label),
+            ["Rebaseline", "Current-main review", "Exact-head acceptance"]
+        )
+    }
+
     func testRenderScopeFencesAccountConversationAndEntryIdentity() {
         let base = mobileMermaidRenderScopeID(
             accountKey: "account-a",
