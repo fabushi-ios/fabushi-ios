@@ -310,6 +310,8 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(source.contains(
             #"guard let name = params["name"] as? String, name.count <= 200 else {"#
         ))
+        XCTAssertTrue(source.contains("cursorAuth.updateDisplayName(name)"))
+        XCTAssertTrue(source.contains(#""displayName": status.displayName ?? NSNull()"#))
     }
 }
 
