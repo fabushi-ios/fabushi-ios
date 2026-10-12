@@ -338,14 +338,14 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
             event: [
                 "entryId": "email-find",
                 "card": [
-                    "kind": "send-message",
-                    "message": [
-                        "type": "email-draft",
-                        "draft": [
-                            "to": ["ops@example.com"],
-                            "subject": "Release train",
-                            "body": "Ship build 42",
-                        ],
+                    "kind": "emailDraft",
+                    "draft": [
+                        "kind": "email",
+                        "id": "email-draft-find",
+                        "to": ["ops@example.com"],
+                        "subject": "Release train",
+                        "body": "Ship build 42",
+                        "status": "draft",
                     ],
                 ],
             ],
@@ -355,13 +355,13 @@ final class SharedWorkflowTranscriptParityTests: XCTestCase {
             event: [
                 "entryId": "slack-find",
                 "card": [
-                    "kind": "send-message",
-                    "message": [
-                        "type": "slack-draft",
-                        "draft": [
-                            "target": "#release",
-                            "body": "Deployment complete",
-                        ],
+                    "kind": "slackDraft",
+                    "draft": [
+                        "kind": "slack",
+                        "id": "slack-draft-find",
+                        "target": "#release",
+                        "body": "Deployment complete",
+                        "status": "draft",
                     ],
                 ],
             ],
