@@ -2013,8 +2013,8 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "f0d2b9ec1cc98dee8403cdb0b47262610d30dbd1",
-    "preEvidenceIosHead": "57d7d3e6c457a41ebe5d1019f01e67bea4fc7e0f",
+    "requestedCheckpoint": "104bce479808926509fed9a843593584dec4b42f",
+    "preEvidenceIosHead": "104bce479808926509fed9a843593584dec4b42f",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2068,7 +2068,9 @@
       38204797115,
       38204797055,
       38204921287,
-      38204921448
+      38204921448,
+      38205042929,
+      38205042937
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2123,20 +2125,26 @@
       114665271426,
       114662443099,
       114664846107,
-      114664894265
+      114664894265,
+      114667448517,
+      114667491776,
+      114666555716,
+      114666555801
     ],
-    "status": "runtime-source-closure-advanced-resulting-exact-head-ci-required",
+    "status": "mcp-desktop-runtime-closure-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
-      "docs/parity/desktop-main/frontend.json",
+      "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "mobile/ios/Fabushi/MarketplaceModel.swift",
+      "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
+      "mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift",
+      "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
+      "docs/parity/desktop-main/source-electron-main.json",
       "manifests/desktop-main-authority.json",
-      "docs/parity/desktop-main-index.json",
       "docs/parity/desktop-main-impact.json",
       "docs/parity/desktop-main-release-evidence.json",
-      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md",
-      "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
-      "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift"
+      "docs/parity/desktop-main-index.json"
     ],
-    "conclusion": "Frontend current-main review is closed; source-boundary structured failure propagation and primary preload current-main responsibility are implemented. Full 7,951-row responsibility closure remains open, including 819 unreviewed source-packages rows and broad shared/electron-main mapped debt.",
-    "currentImplementationHead": "57d7d3e6c457a41ebe5d1019f01e67bea4fc7e0f"
+    "conclusion": "MCP team-popularity is closed as strict not-applicable-with-replacement after exhaustive current-main renderer caller-graph review. The MCP Desktop aggregate now has native plugin-variable projection and updatePluginInstall shipping wiring through the existing Coordinator/SandMcpManager owner. Full 7,951-row responsibility closure remains open.",
+    "currentImplementationHead": "104bce479808926509fed9a843593584dec4b42f"
   }
 }

@@ -520,3 +520,81 @@ final class SharedMcpCatalogMarketplaceParityTests: XCTestCase {
     }
 
 }
+
+
+private actor PluginUpdateAccountMcpClientStub: AccountMcpClient {
+    private var lastPluginId: UInt64?
+    private var lastVariables: [String: String]?
+
+    func getAvailableMcpServers(timeoutMs: Int) async throws -> [AvailableMcpServer] { [] }
+    func getMcpConfig(
+        teamScope: Bool,
+        redactSecrets: Bool,
+        teamId: UInt64?,
+        timeoutMs: Int?
+    ) async throws -> AccountMcpConfigResponse {
+        .init(configJson: #"{"mcpServers":{}}"#, serverMetadataByName: [:])
+    }
+    func getEffectiveUserPlugins(excludeConfiguredVariables: Bool) async throws -> [EffectivePluginWire] { [] }
+    func setMcpConfig(configJson: String, serverIdsByName: [String: UInt64]) async throws {}
+    func installUserPlugin(pluginId: UInt64, variables: [String: String]?) async throws {}
+    func uninstallUserPlugin(pluginId: UInt64) async throws {}
+    func updateUserPluginInstall(pluginId: UInt64, variables: [String: String]) async throws {
+        lastPluginId = pluginId
+        lastVariables = variables
+    }
+    func snapshot() -> (UInt64?, [String: String]?) { (lastPluginId, lastVariables) }
+}
+
+private actor PluginUpdateReloadCounter {
+    private var count = 0
+    func record() { count += 1 }
+    func value() -> Int { count }
+}
+
+final class SharedMcpPluginUpdateParityTests: XCTestCase {
+    func testCatalogUpdateWritesVariablesThroughAccountWriterAndReloads() async throws {
+        let client = PluginUpdateAccountMcpClientStub()
+        let writer = AccountMcpWriter(dependencies: .init(
+            getAccessToken: { _ in "token" },
+            getMachineId: { "machine" },
+            getBackendUrl: { "https://backend.example.test" },
+            createClient: { _ in client }
+        ))
+        let reloadCounter = PluginUpdateReloadCounter()
+        let plugin = SandMarketplacePlugin(
+            pluginId: "101",
+            name: "github",
+            displayName: "GitHub",
+            description: "Repository tools",
+            category: "Developer",
+            connectors: [.init(name: "github", description: "GitHub MCP")],
+            variableFields: [
+                .init(
+                    key: "API_TOKEN",
+                    label: "API Token",
+                    placeholder: "API_TOKEN",
+                    isRequired: true,
+                    isSecret: true
+                ),
+            ]
+        )
+        let catalog = SandMcpCatalogFlow(core: .init(
+            isAuthenticated: { true },
+            fetchMarketplace: { .init(plugins: [plugin], includesPrivateMarketplaces: true) },
+            requireAccountWriter: { writer },
+            reloadServers: { await reloadCounter.record() }
+        ))
+
+        _ = try await catalog.getCatalog()
+        try await catalog.updatePluginInstall(
+            pluginId: "101",
+            values: ["API_TOKEN": "rotated-secret"]
+        )
+
+        let snapshot = await client.snapshot()
+        XCTAssertEqual(snapshot.0, 101)
+        XCTAssertEqual(snapshot.1?["API_TOKEN"], "rotated-secret")
+        let reloads = await reloadCounter.value()\n        XCTAssertEqual(reloads, 1)
+    }
+}

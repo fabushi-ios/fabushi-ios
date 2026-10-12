@@ -1796,12 +1796,24 @@ struct PluginPermissionRequest: Identifiable, Equatable {
     }
 }
 
+struct MobileConnectorVariableField: Identifiable, Equatable, Sendable {
+    let key: String
+    let label: String
+    let placeholder: String
+    let isRequired: Bool
+    let isSecret: Bool
+    var defaultValue: String? = nil
+    var hint: String? = nil
+    var id: String { key }
+}
+
 struct MobileConnectorCatalogEntry: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let displayName: String
     let connectors: [String]
     var iconURL: String? = nil
+    var fields: [MobileConnectorVariableField] = []
 }
 
 func normalizeMobileConnectorName(_ value: String) -> String {
@@ -1954,6 +1966,8 @@ final class MarketplaceModel {
     var mcpRenameDraftByIdentity: [String: String] = [:]
     var mcpInstructionsDraftByServerId: [String: String] = [:]
     var mcpMutatingServerId: String?
+    var mcpPluginDraftValuesByPluginId: [String: [String: String]] = [:]
+    var mcpUpdatingPluginId: String?
     var featureHostSmokeStatus: String?
     var sandModelExperimentEnabled = false
     var authResolved = false
@@ -2492,6 +2506,8 @@ final class MarketplaceModel {
         connectorCardGeneration = connectorCardGeneration == Int.max ? 1 : connectorCardGeneration + 1
         connectorCardRequestSerial = connectorCardRequestSerial == Int.max ? 1 : connectorCardRequestSerial + 1
         connectorCatalog = []
+        mcpPluginDraftValuesByPluginId = [:]
+        mcpUpdatingPluginId = nil
         connectorCardActions = [:]
         connectorCardErrors = [:]
         connectorCardAuthorizationURLByKey = [:]
@@ -4226,6 +4242,39 @@ final class MarketplaceModel {
         "\(normalizeMobileConnectorName(connector)):\(accountKey ?? DEFAULT_MCP_ACCOUNT_KEY)"
     }
 
+    nonisolated static func mcpCatalogEntry(
+        from row: [String: Any]
+    ) -> MobileConnectorCatalogEntry? {
+        guard let id = row["id"] as? String,
+              let name = row["name"] as? String,
+              let displayName = row["displayName"] as? String,
+              let connectors = row["connectors"] as? [String]
+        else { return nil }
+        let fields = (row["fields"] as? [[String: Any]] ?? []).compactMap { field -> MobileConnectorVariableField? in
+            guard let key = field["key"] as? String,
+                  let label = field["label"] as? String,
+                  let placeholder = field["placeholder"] as? String
+            else { return nil }
+            return .init(
+                key: key,
+                label: label,
+                placeholder: placeholder,
+                isRequired: field["isRequired"] as? Bool ?? false,
+                isSecret: field["isSecret"] as? Bool ?? false,
+                defaultValue: field["defaultValue"] as? String,
+                hint: field["hint"] as? String
+            )
+        }
+        return .init(
+            id: id,
+            name: name,
+            displayName: displayName,
+            connectors: connectors,
+            iconURL: row["iconUrl"] as? String,
+            fields: fields
+        )
+    }
+
     nonisolated static func connectorCatalogEntry(
         _ catalog: [MobileConnectorCatalogEntry],
         connector: String
@@ -4264,6 +4313,17 @@ final class MarketplaceModel {
             return matches.first(where: { $0.accountKey == accountKey })
         }
         return matches.first(where: { $0.accountKey == DEFAULT_MCP_ACCOUNT_KEY }) ?? matches.first
+    }
+
+    private func applyMcpCatalog(_ entries: [MobileConnectorCatalogEntry]) {
+        connectorCatalog = entries
+        for entry in entries {
+            var draft = mcpPluginDraftValuesByPluginId[entry.id] ?? [:]
+            for field in entry.fields where draft[field.key] == nil {
+                draft[field.key] = field.defaultValue ?? ""
+            }
+            mcpPluginDraftValuesByPluginId[entry.id] = draft
+        }
     }
 
     func openConnectorCards() async {
@@ -4306,20 +4366,7 @@ final class MarketplaceModel {
                   let object = response.value as? [String: Any],
                   let rows = object["entries"] as? [[String: Any]]
             else { return }
-            connectorCatalog = rows.compactMap { row in
-                guard let id = row["id"] as? String,
-                      let name = row["name"] as? String,
-                      let displayName = row["displayName"] as? String,
-                      let connectors = row["connectors"] as? [String]
-                else { return nil }
-                return .init(
-                    id: id,
-                    name: name,
-                    displayName: displayName,
-                    connectors: connectors,
-                    iconURL: row["iconUrl"] as? String
-                )
-            }
+            applyMcpCatalog(rows.compactMap(Self.mcpCatalogEntry(from:)))
             await refreshMcpServers()
         } catch {
             guard generation == connectorCardGeneration,
@@ -4769,26 +4816,13 @@ final class MarketplaceModel {
         else {
             throw CancellationError()
         }
-        let nextCatalog = rows.compactMap { row -> MobileConnectorCatalogEntry? in
-            guard let id = row["id"] as? String,
-                  let name = row["name"] as? String,
-                  let displayName = row["displayName"] as? String,
-                  let connectors = row["connectors"] as? [String]
-            else { return nil }
-            return .init(
-                id: id,
-                name: name,
-                displayName: displayName,
-                connectors: connectors,
-                iconURL: row["iconUrl"] as? String
-            )
-        }
+        let nextCatalog = rows.compactMap(Self.mcpCatalogEntry(from:))
         guard await refreshMcpServers(),
               epoch == mcpAccountEpoch
         else {
             throw CancellationError()
         }
-        connectorCatalog = nextCatalog
+        applyMcpCatalog(nextCatalog)
         return (mcpServers, nextCatalog)
     }
 
@@ -4828,6 +4862,55 @@ final class MarketplaceModel {
                 "instructions": instructions,
             ]
         )
+    }
+
+    func updateMcpPluginInstall(pluginId rawPluginId: String) async {
+        let pluginId = rawPluginId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard loggedIn,
+              mcpBackendLoggedIn,
+              !pluginId.isEmpty,
+              mcpUpdatingPluginId == nil,
+              connectorCatalog.contains(where: { $0.id == pluginId })
+        else { return }
+
+        let epoch = mcpAccountEpoch
+        let mutationKey = "plugin-update:\(pluginId)"
+        let previous = mcpMutationSerial[mutationKey] ?? 0
+        let serial = previous == Int.max ? 1 : previous + 1
+        mcpMutationSerial[mutationKey] = serial
+        mcpUpdatingPluginId = pluginId
+        mcpError = nil
+        defer {
+            if epoch == mcpAccountEpoch,
+               mcpMutationSerial[mutationKey] == serial,
+               mcpUpdatingPluginId == pluginId {
+                mcpUpdatingPluginId = nil
+            }
+        }
+
+        do {
+            let response = try await bridge.request(
+                method: "coordinator.mcp.updatePluginInstall",
+                params: [
+                    "pluginId": pluginId,
+                    "values": mcpPluginDraftValuesByPluginId[pluginId] ?? [:],
+                ]
+            )
+            try Task.checkCancellation()
+            guard epoch == mcpAccountEpoch,
+                  mcpMutationSerial[mutationKey] == serial,
+                  let object = response.value as? [String: Any],
+                  let rows = object["servers"] as? [[String: Any]]
+            else { return }
+            mcpServers = rows.compactMap(Self.mcpServer(from:))
+        } catch is CancellationError {
+            return
+        } catch {
+            guard epoch == mcpAccountEpoch,
+                  mcpMutationSerial[mutationKey] == serial
+            else { return }
+            mcpError = error.localizedDescription
+        }
     }
 
     func removeMcpServer(_ server: MarketplaceMcpServer) async {

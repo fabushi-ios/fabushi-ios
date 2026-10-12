@@ -440,3 +440,62 @@ final class MarketplaceMcpTeamPolicyProjectionTests: XCTestCase {
         XCTAssertFalse(server.isDisabledByTeamAdminPolicy)
     }
 }
+
+
+final class MarketplaceMcpPluginUpdateShippingTests: XCTestCase {
+    func testCatalogProjectionPreservesEditableAndSecretFieldSemantics() throws {
+        let entry = try XCTUnwrap(MarketplaceModel.mcpCatalogEntry(from: [
+            "id": "101",
+            "name": "github",
+            "displayName": "GitHub",
+            "connectors": ["github"],
+            "iconUrl": "https://example.test/icon.png",
+            "fields": [[
+                "key": "API_TOKEN",
+                "label": "API Token",
+                "placeholder": "API_TOKEN",
+                "isRequired": true,
+                "isSecret": true,
+                "defaultValue": NSNull(),
+                "hint": "Personal access token",
+            ]],
+        ]))
+        XCTAssertEqual(entry.id, "101")
+        XCTAssertEqual(entry.iconURL, "https://example.test/icon.png")
+        XCTAssertEqual(entry.fields.count, 1)
+        XCTAssertEqual(entry.fields[0].key, "API_TOKEN")
+        XCTAssertTrue(entry.fields[0].isRequired)
+        XCTAssertTrue(entry.fields[0].isSecret)
+        XCTAssertEqual(entry.fields[0].hint, "Personal access token")
+    }
+
+    func testShippingMcpPluginConfigUsesCanonicalCoordinatorUpdateRoute() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let modelSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("mobile/ios/Fabushi/MarketplaceModel.swift"),
+            encoding: .utf8
+        )
+        let surfaceSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"),
+            encoding: .utf8
+        )
+        let coordinatorSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(coordinatorSource.contains(#"case "coordinator.mcp.updatePluginInstall":"#))
+        XCTAssertTrue(coordinatorSource.contains("try await manager.updatePluginInstall"))
+        XCTAssertTrue(modelSource.contains(#"method: "coordinator.mcp.updatePluginInstall""#))
+        XCTAssertTrue(modelSource.contains("plugin-update:"))
+        XCTAssertTrue(modelSource.contains("Task.checkCancellation()"))
+        XCTAssertTrue(surfaceSource.contains("SecureField("))
+        XCTAssertTrue(surfaceSource.contains("mcp-plugin-config-save-"))
+        XCTAssertTrue(surfaceSource.contains("model.updateMcpPluginInstall(pluginId: pluginId)"))
+        XCTAssertTrue(surfaceSource.contains("await model.loadConnectorCardData()"))
+    }
+}

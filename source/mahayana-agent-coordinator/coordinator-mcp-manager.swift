@@ -1648,12 +1648,27 @@ final class CoordinatorMcpSurface {
             let entries = try await manager.getCatalog(forceRefresh: forceRefresh)
             return .handled([
                 "entries": entries.map { entry in
-                    [
+                    var row: [String: Any] = [
                         "id": entry.id,
                         "name": entry.name,
                         "displayName": entry.displayName,
                         "connectors": entry.connectors.map(\.name),
-                    ] as [String: Any]
+                        "fields": entry.fields.map { field -> [String: Any] in
+                            [
+                                "key": field.key,
+                                "label": field.label,
+                                "placeholder": field.placeholder,
+                                "isRequired": field.isRequired,
+                                "isSecret": field.isSecret,
+                                "defaultValue": field.defaultValue ?? NSNull(),
+                                "hint": field.hint ?? NSNull(),
+                            ]
+                        },
+                    ]
+                    if let iconUrl = entry.iconUrl, !iconUrl.isEmpty {
+                        row["iconUrl"] = iconUrl
+                    }
+                    return row
                 },
             ])
 
@@ -1663,6 +1678,15 @@ final class CoordinatorMcpSurface {
             }
             let values = (params["values"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
             try await manager.installEntry(entryId: entryId, values: values)
+            let state = try await manager.listServers()
+            return .handled(["servers": state.servers.map(projectServer)])
+
+        case "coordinator.mcp.updatePluginInstall":
+            guard let pluginId = nonEmptyString(params["pluginId"]) else {
+                throw SandMcpConfigError("MCP plugin id is required.")
+            }
+            let values = (params["values"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+            try await manager.updatePluginInstall(pluginId: pluginId, values: values)
             let state = try await manager.listServers()
             return .handled(["servers": state.servers.map(projectServer)])
 

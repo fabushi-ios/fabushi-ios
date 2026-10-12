@@ -1857,6 +1857,70 @@ extension ContentView {
                                     }
                                 }
 
+                                if let pluginId = server.pluginId,
+                                   let catalogEntry = model.connectorCatalog.first(where: { $0.id == pluginId }),
+                                   !catalogEntry.fields.isEmpty,
+                                   !server.isTeamServer,
+                                   !server.managedByTeamPluginPolicy {
+                                    DisclosureGroup("插件配置") {
+                                        ForEach(catalogEntry.fields) { field in
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(field.isRequired ? "\(field.label) *" : field.label)
+                                                    .font(.caption)
+                                                Group {
+                                                    if field.isSecret {
+                                                        SecureField(
+                                                            field.placeholder,
+                                                            text: Binding(
+                                                                get: {
+                                                                    model.mcpPluginDraftValuesByPluginId[pluginId]?[field.key]
+                                                                        ?? field.defaultValue
+                                                                        ?? ""
+                                                                },
+                                                                set: { value in
+                                                                    var draft = model.mcpPluginDraftValuesByPluginId[pluginId] ?? [:]
+                                                                    draft[field.key] = value
+                                                                    model.mcpPluginDraftValuesByPluginId[pluginId] = draft
+                                                                }
+                                                            )
+                                                        )
+                                                    } else {
+                                                        TextField(
+                                                            field.placeholder,
+                                                            text: Binding(
+                                                                get: {
+                                                                    model.mcpPluginDraftValuesByPluginId[pluginId]?[field.key]
+                                                                        ?? field.defaultValue
+                                                                        ?? ""
+                                                                },
+                                                                set: { value in
+                                                                    var draft = model.mcpPluginDraftValuesByPluginId[pluginId] ?? [:]
+                                                                    draft[field.key] = value
+                                                                    model.mcpPluginDraftValuesByPluginId[pluginId] = draft
+                                                                }
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                                .textInputAutocapitalization(.never)
+                                                .autocorrectionDisabled()
+                                                if let hint = field.hint, !hint.isEmpty {
+                                                    Text(hint)
+                                                        .font(.caption2)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            .accessibilityIdentifier("mcp-plugin-field-\(pluginId)-\(field.key)")
+                                        }
+                                        Button(model.mcpUpdatingPluginId == pluginId ? "保存中…" : "保存插件配置") {
+                                            Task { await model.updateMcpPluginInstall(pluginId: pluginId) }
+                                        }
+                                        .disabled(model.mcpUpdatingPluginId != nil)
+                                        .accessibilityIdentifier("mcp-plugin-config-save-\(pluginId)")
+                                    }
+                                    .accessibilityIdentifier("mcp-plugin-config-\(pluginId)")
+                                }
+
                                 HStack(spacing: 8) {
                                     TextField(
                                         "自定义说明",
@@ -2002,7 +2066,7 @@ extension ContentView {
                         await model.refreshPrivateSkills()
                     }
                     if model.loggedIn {
-                        await model.refreshMcpServers()
+                        await model.loadConnectorCardData()
                     }
                 }
             }
@@ -2016,7 +2080,7 @@ extension ContentView {
                         await model.refreshPrivateSkills()
                     }
                     if model.loggedIn && model.mcpServers.isEmpty {
-                        await model.refreshMcpServers()
+                        await model.loadConnectorCardData()
                     }
                 }
             }
@@ -2029,7 +2093,7 @@ extension ContentView {
                             await model.refreshPrivateSkills()
                         }
                         if model.loggedIn && model.mcpServers.isEmpty {
-                            await model.refreshMcpServers()
+                            await model.loadConnectorCardData()
                         }
                     }
                 }

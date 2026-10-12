@@ -98,8 +98,8 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "156138d26cd9da11b33f473df563451871b50364",
+    "requestedCheckpoint": "104bce479808926509fed9a843593584dec4b42f",
+    "preEvidenceIosHead": "104bce479808926509fed9a843593584dec4b42f",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -136,7 +136,9 @@
       38201996058,
       38201996276,
       38202077424,
-      38202077314
+      38202077314,
+      38205042929,
+      38205042937
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -170,9 +172,14 @@
       114657213187,
       114657256751,
       114657503819,
-      114657541867
+      114657541867,
+      114667448517,
+      114667491776,
+      114666555716,
+      114666555801
     ],
-    "status": "transcript-card-resolver-feed-current-main-reviewed-resulting-exact-head-ci-required",
-    "rowCount": 7951
+    "status": "mcp-desktop-runtime-closure-resulting-exact-head-ci-required",
+    "rowCount": 7951,
+    "currentImplementationHead": "104bce479808926509fed9a843593584dec4b42f"
   }
 }
