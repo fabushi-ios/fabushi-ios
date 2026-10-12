@@ -325,18 +325,20 @@
       "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
     }
   },
-  "note": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / tree 3116c54a1e36da95189c740bdc789ad543ce2d20. Requested checkpoint a93626a8f60dcc36dc229f0980a3cee9ea552a82 and runs 38190289874/38190289840 are predecessor only; the subsequent 948f60d02bb927a73660f9cf17ba9472f3aa5d87 runs 38192173184/38192173175 are also predecessor because production process.exec was completed at 5dda071eb22a1a8c197fb8e9c8755579968e7814. This evidence update itself creates a newer exact HEAD, so every release gate still requires replacement same-head terminal evidence. The shipping local-exec provider now reuses the account-scoped Cursor sandbox exec-daemon without a second runtime or Host re-entry, but this is not a release promotion. Production signer, real StoreKit commerce, signed archive/device install/upgrade, TestFlight/App Store and independent acceptance remain pending. finalAcceptance remains false and finalIosCommit remains null.",
+  "note": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / tree 3116c54a1e36da95189c740bdc789ad543ce2d20. Requested checkpoint a93626a8f60dcc36dc229f0980a3cee9ea552a82 and all runs 38190289874/38190289840/38192173184/38192173175/38192487666/38192487704 are predecessor only after the shipping remote-exec implementation and focused fencing-test completion at pre-evidence c9a3a8e3effa05de568cb2ee536f7bc3394f7cf3. This commit creates a newer exact HEAD, so every release gate requires replacement same-head terminal evidence. local-exec now has the authority-backed account-scoped exec-daemon provider plus explicit provider-failure/cancellation/account-switch/Host-generation/late-result/unknown-method contracts, but no release status is promoted before Actions. Production signer, real StoreKit commerce, signed archive/device install/upgrade, TestFlight/App Store and independent acceptance remain pending. finalAcceptance remains false and finalIosCommit remains null.",
   "currentHeadRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "a93626a8f60dcc36dc229f0980a3cee9ea552a82",
-    "preEvidenceIosHead": "5dda071eb22a1a8c197fb8e9c8755579968e7814",
-    "preEvidenceIosTree": "f57aa160e7ced7e0397d37235c1db9e2e5c15d25",
+    "preEvidenceIosHead": "c9a3a8e3effa05de568cb2ee536f7bc3394f7cf3",
+    "preEvidenceIosTree": "df089aa97be6d5514753c46f322d23be06fbf62a",
     "baseMain": "f098639ab178a839690b9dece60fa0d11c5d2e25",
     "predecessorWorkflowRuns": [
       38190289874,
       38190289840,
       38192173184,
-      38192173175
+      38192173175,
+      38192487666,
+      38192487704
     ],
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",

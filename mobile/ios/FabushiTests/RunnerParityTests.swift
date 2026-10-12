@@ -208,6 +208,105 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(dispatchCount, 2)
     }
 
+    @MainActor
+    func testGenerationFencedRemoteRunnerRejectsIndependentAccountAndHostGenerationLateResults() async throws {
+        var identity = IOSRemoteRunnerExecutionIdentity(
+            accountScope: "account-1",
+            accountRevision: 7,
+            hostGeneration: 11
+        )
+
+        let accountSwitch = IOSGenerationFencedRemoteRunnerTransport(
+            currentIdentity: { identity },
+            dispatch: { _, _ in
+                identity = .init(
+                    accountScope: "account-2",
+                    accountRevision: 8,
+                    hostGeneration: 11
+                )
+                return .object(["late": .bool(true)])
+            }
+        )
+        do {
+            _ = try await accountSwitch.dispatch(method: "local-exec.shell.exec", params: .object([:]))
+            XCTFail("account switch must discard the late provider result")
+        } catch let error as IOSRemoteRunnerFenceError {
+            XCTAssertEqual(error, .stale)
+        }
+
+        identity = .init(
+            accountScope: "account-1",
+            accountRevision: 7,
+            hostGeneration: 11
+        )
+        let hostRestart = IOSGenerationFencedRemoteRunnerTransport(
+            currentIdentity: { identity },
+            dispatch: { _, _ in
+                identity = .init(
+                    accountScope: "account-1",
+                    accountRevision: 7,
+                    hostGeneration: 12
+                )
+                return .object(["late": .bool(true)])
+            }
+        )
+        do {
+            _ = try await hostRestart.dispatch(method: "local-exec.box.exec", params: .object([:]))
+            XCTFail("Host generation change must discard the late provider result")
+        } catch let error as IOSRemoteRunnerFenceError {
+            XCTAssertEqual(error, .stale)
+        }
+    }
+
+    @MainActor
+    func testGenerationFencedRemoteRunnerPropagatesProviderFailureAndCancellation() async throws {
+        enum ExpectedProviderFailure: Error {
+            case failed
+        }
+
+        let identity = IOSRemoteRunnerExecutionIdentity(
+            accountScope: "account-1",
+            accountRevision: 7,
+            hostGeneration: 11
+        )
+        let failing = IOSGenerationFencedRemoteRunnerTransport(
+            currentIdentity: { identity },
+            dispatch: { _, _ in
+                throw ExpectedProviderFailure.failed
+            }
+        )
+        do {
+            _ = try await failing.dispatch(method: "local-exec.shell.exec", params: .object([:]))
+            XCTFail("provider failure must propagate")
+        } catch ExpectedProviderFailure.failed {
+        } catch {
+            XCTFail("unexpected provider failure: \(error)")
+        }
+
+        let cancellable = IOSGenerationFencedRemoteRunnerTransport(
+            currentIdentity: { identity },
+            dispatch: { _, _ in
+                try await Task.sleep(nanoseconds: 5_000_000_000)
+                return .object(["unexpected": .bool(true)])
+            }
+        )
+        let task = Task {
+            try await cancellable.dispatch(
+                method: "local-exec.process.exec",
+                params: .object(["program": .string("git")])
+            )
+        }
+        await Task.yield()
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("cancelled provider dispatch must not return a result")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
+    }
+
     func testShippingCoordinatorComposesRemoteRunnerIntoCanonicalHostGraph() throws {
         let iosRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -592,6 +691,15 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertTrue(mcp.contains("IOSRemoteExecDaemonClient("))
         XCTAssertTrue(mcp.contains("guard routedScopeToken() == token"))
         XCTAssertTrue(mcp.contains("try refuseComputerConnectionWhileClientPaused()"))
+        let executor = try String(
+            contentsOf: sourceRoot
+                .appendingPathComponent("local-exec-daemon/production-executor.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(executor.contains(#"case "local-exec.process", "local-exec.process.exec", "local-exec.process.spawn":"#))
+        XCTAssertTrue(executor.contains("map(Self.shellQuotedArgument)"))
+        XCTAssertTrue(executor.contains(#"appendingPathComponent("agent.v1.ExecService")"#))
+        XCTAssertTrue(executor.contains(#"appendingPathComponent("Exec")"#))
     }
 
 

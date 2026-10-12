@@ -27,18 +27,20 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20 with 7,951 selected source identities. PR #3 advanced beyond requested checkpoint a93626a8f60dcc36dc229f0980a3cee9ea552a82 to pre-evidence-update 5dda071eb22a1a8c197fb8e9c8755579968e7814 / tree f57aa160e7ced7e0397d37235c1db9e2e5c15d25. Runs 38190289874/38190289840 and 38192173184/38192173175 are predecessor evidence only. The shipping local-exec final edge now composes the account-scoped Cursor sandbox exec-daemon through CoordinatorMcpSurface and IOSRemoteExecDaemonClient; process.exec is preserved as structured argv until the final provider and encoded only there into the canonical authenticated ExecService ShellStream. No GD/FPM/IOS-MAIN status is promoted until fresh exact-head Actions pass. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full dependency closure and independent acceptance remain pending; baselineReady/dependenciesReviewed/completenessAccepted/acceptanceAccepted stay false.",
+  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20 with 7,951 selected source identities. PR #3 advanced beyond requested checkpoint a93626a8f60dcc36dc229f0980a3cee9ea552a82 to pre-evidence-update c9a3a8e3effa05de568cb2ee536f7bc3394f7cf3 / tree df089aa97be6d5514753c46f322d23be06fbf62a. Runs 38190289874/38190289840/38192173184/38192173175/38192487666/38192487704 are predecessor evidence only. The shipping local-exec final edge composes the account-scoped Cursor sandbox exec-daemon through CoordinatorMcpSurface and IOSRemoteExecDaemonClient; focused tests now independently cover provider failure, cancellation, account switch, Host generation late-result fencing and unknown methods. No GD/FPM/IOS-MAIN status is promoted until fresh exact-head Actions pass. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full dependency closure and independent acceptance remain pending; baselineReady/dependenciesReviewed/completenessAccepted/acceptanceAccepted stay false.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "a93626a8f60dcc36dc229f0980a3cee9ea552a82",
-    "preEvidenceIosHead": "5dda071eb22a1a8c197fb8e9c8755579968e7814",
-    "preEvidenceIosTree": "f57aa160e7ced7e0397d37235c1db9e2e5c15d25",
+    "preEvidenceIosHead": "c9a3a8e3effa05de568cb2ee536f7bc3394f7cf3",
+    "preEvidenceIosTree": "df089aa97be6d5514753c46f322d23be06fbf62a",
     "baseMain": "f098639ab178a839690b9dece60fa0d11c5d2e25",
     "predecessorWorkflowRuns": [
       38190289874,
       38190289840,
       38192173184,
-      38192173175
+      38192173175,
+      38192487666,
+      38192487704
     ],
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
