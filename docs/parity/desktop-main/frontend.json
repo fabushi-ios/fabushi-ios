@@ -690,7 +690,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/local-exec-daemon/LocalCapabilityRunner.swift; source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/ios-main/adapters/ios-native-local-capability-backend.swift; source/host/box/box-shell-command.rs; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to the Desktop renderer/global local-computer approval surface. iOS must continue to fail closed for unsupported local capabilities and route shell/process/box work through the remote-computer path; it does not treat Mini App approval or the retired permission-request transcript leaf as equivalent."
+      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to the Desktop renderer/global local-computer approval surface. iOS must continue to fail closed for unsupported local capabilities and route shell/process/box work through the remote-computer path; it does not treat Mini App approval or the retired permission-request transcript leaf as equivalent. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/model.ts",
@@ -724,11 +726,11 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "mobile/ios/FabushiUITests/FabushiUITests.swift plus child-responsibility focused tests; final physical-device accessibility/UI acceptance remains separately gated",
-      "notes": "Current-main diff adds Desktop-only CSS mechanics for font fallbacks/accessibility data attributes, new-Agent identity controls, transcript bubble sizing and Forward dialog. These mechanisms are not copied into native iOS; their product effects are owned by SwiftUI/UIKit and independently tracked child rows. This row is current-main reviewed as not-applicable-with-replacement only for the CSS mechanism, not as acceptance of those child behaviors. Validator run 37836845827 confirmed every direct-changed source must remain behind the current-main re-review fence while aggregate review is incomplete; retain the audited disposition/evidence but do not mark authority review closed yet.",
+      "notes": "Current-main diff adds Desktop-only CSS mechanics for font fallbacks/accessibility data attributes, new-Agent identity controls, transcript bubble sizing and Forward dialog. These mechanisms are not copied into native iOS; their product effects are owned by SwiftUI/UIKit and independently tracked child rows. This row is current-main reviewed as not-applicable-with-replacement only for the CSS mechanism, not as acceptance of those child behaviors. Validator run 37836845827 confirmed every direct-changed source must remain behind the current-main re-review fence while aggregate review is incomplete; retain the audited disposition/evidence but do not mark authority review closed yet. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
       "historical_implementation_status": "not-applicable",
       "historical_ios_disposition": "not-applicable-with-replacement",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/production/reaction-root.ts",
@@ -743,7 +745,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MessagingModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedMessagingCoreParityTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. No alternate transcript/reaction owner is introduced; rollback only applies to the latest matching optimistic mutation. Keep below verified pending current-head acceptance."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. No alternate transcript/reaction owner is introduced; rollback only applies to the latest matching optimistic mutation. Keep below verified pending current-head acceptance. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/runtime-assets.ts",
@@ -758,7 +762,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The responsibility is retained through the native app-bundle resource system; the Desktop URL-resolution mechanism itself is not applicable."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. The responsibility is retained through the native app-bundle resource system; the Desktop URL-resolution mechanism itself is not applicable. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/settings-notice-controller.ts",
@@ -773,7 +779,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/settings-notice-controller.swift; frontend/src/recovered/features/app-shell/ContentView+Root.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/SettingsNoticeControllerParityTests.swift; this commit changes the notice publication path so fresh exact-head ordinary/protected Actions are required before verified promotion.",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Root scope/presenter ownership is native and production-wired; SurfaceNoticePublisher now centralizes typed publication while exact-head CI remains the promotion gate."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Root scope/presenter ownership is native and production-wired; SurfaceNoticePublisher now centralizes typed publication while exact-head CI remains the promotion gate. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/sidebar-model.ts",
@@ -788,7 +796,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/ios-preload/main-rpc-runtime.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Native reorder interaction differs, but Host ownership and ordered visible effect are preserved. Keep below verified pending current-head CI."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Native reorder interaction differs, but Host ownership and ordered visible effect are preserved. Keep below verified pending current-head CI. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/strict-mode-disposal.ts",
@@ -803,7 +813,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift; mobile/ios/FabushiTests/SharedMcpAuthWatchLifecycleParityTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. React replay is a platform mechanism; native scene/runtime ownership is the replacement."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. React replay is a platform mechanism; native scene/runtime ownership is the replacement. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/catalog.ts",
@@ -818,7 +830,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift; frontend/src/production/ProductionRenderer.swift",
       "test_evidence": "mobile/ios/FabushiUITests/GlobalDharmaJourneyUITests.swift; current exact-head UI acceptance pending",
-      "notes": "Strict platform replacement: no iOS product responsibility is removed. Only Desktop reconstruction/dev inspection machinery is omitted; native SwiftUI composition and accessibility/UI acceptance replace its diagnostic purpose."
+      "notes": "Strict platform replacement: no iOS product responsibility is removed. Only Desktop reconstruction/dev inspection machinery is omitted; native SwiftUI composition and accessibility/UI acceptance replace its diagnostic purpose. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/desktop-bridge.contract.test.ts",
@@ -833,7 +847,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/coordinator-port-bridge.swift; source/ios-preload/runtime/PreloadPrimary.swift; source/ios-main/IOSMainRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift (pre-hello rejection, handshake, cancellation, disconnect/protocol breach, preload port client, restart generation fencing); mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift; exact-HEAD CI pending",
-      "notes": "Native replacement preserves the ownership/fail-closed purpose rather than Desktop object-key names. Keep implemented until current exact-head ordinary/protected acceptance succeeds."
+      "notes": "Native replacement preserves the ownership/fail-closed purpose rather than Desktop object-key names. Keep implemented until current exact-head ordinary/protected acceptance succeeds. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/desktop-bridge.ts",
@@ -842,17 +858,17 @@
       "desktop_owner": "renderer-facing Desktop preload aggregate over platform/Main/Host owners",
       "desktop_visible_effect": "Desktop Settings and Human Call surfaces consume bounded UI preference and media-device capabilities through the preload contract.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-preload/preload.swift; mobile/ios/Fabushi/HumanCallMediaPort.swift; SwiftUI/UIKit accessibility environment",
+      "ios_target_path": "source/ios-preload/preload.swift",
       "ios_language": "Swift + Rust",
-      "ios_platform_delta": "iOS keeps IOSPreloadBridge for cross-boundary product RPC but does not emulate Electron-only bridge families. AVFoundation/AVAudioSession/UserDefaults own call-media permission/device preferences; ReplayKit owns display capture; locale/layout direction/Dynamic Type/reduced-motion/high-contrast come from native UIKit/SwiftUI accessibility/system settings rather than a second persisted Electron-style uiPreferences bridge.",
-      "implementation_status": "mapped",
-      "production_evidence": "source/ios-preload/preload.swift; mobile/ios/Fabushi/HumanCallMediaPort.swift; mobile/ios/Fabushi/HumanCallsView.swift; native SwiftUI/UIKit environment",
-      "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift; mobile/ios/FabushiTests/HumanCallMediaPortTests.swift; final accessibility/physical-device evidence remains open",
-      "notes": "Current-main delta adds DesktopUiPreferences/DesktopCallMediaPreferences, DesktopBridge.callMedia, DesktopBridge.uiPreferences, and Fabushi-branded missing-bridge error copy. Native iOS already has the separate platform owners for call media and system accessibility rather than exposing Electron-shaped APIs through IOSPreloadBridge. Aggregate bridge dependency review remains open, so this row stays mapped/current-main-fenced.",
+      "ios_platform_delta": "iOS preserves one fail-closed typed preload/Coordinator bridge rather than Electron window.desktop. IOSMainRPCRuntime mirrors the current Desktop main method surface and per-event dispositions; native MobileUiPreferencesStore and HumanCallMediaPort own UI/call-media platform state without becoming a second preload authority. Electron-only window/chrome mechanics remain explicit platform replacements and child capabilities retain their own acceptance gates.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/ios-preload/preload.swift; source/ios-preload/main-rpc-runtime.swift; source/ios-preload/rpc-edge-runtime.swift; frontend/src/production/MobileUiPreferences.swift; mobile/ios/Fabushi/HumanCallMediaPort.swift",
+      "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift locks the current 127 Desktop authority methods, UI/call-media shapes, 19 event dispositions, edge envelopes/cancellation; CoordinatorContractTests.swift and IOSCoordinatorArchitectureTests.swift cover handshake/readiness/settlement/ownership. Physical Human Call acceptance remains a child gate; same-final-HEAD CI is still required before verified.",
+      "notes": "Current-main delta adds DesktopUiPreferences/DesktopCallMediaPreferences, DesktopBridge.callMedia, DesktopBridge.uiPreferences, and Fabushi-branded missing-bridge error copy. Native iOS already has the separate platform owners for call media and system accessibility rather than exposing Electron-shaped APIs through IOSPreloadBridge. Aggregate bridge dependency review remains open, so this row stays mapped/current-main-fenced. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified. Full 595-line aggregate bridge was re-read at current main. The aggregate ownership/fail-closed boundary is implemented; this does not close physical-device call-media or other child responsibility acceptance.",
       "historical_implementation_status": "mapped",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/main-rpc.ts",
@@ -867,7 +883,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/main-rpc-runtime.swift keeps the exact Desktop method/event identities and sand-rpc channel helpers, while IOSMainRPCEventDisposition records one reviewed native owner/product effect for every Desktop main event family. IOSMainRPCRuntime.isEvent is backed by the disposition table, so a newly named upstream event is rejected until reviewed. Existing native owners remain authoritative; the registry does not create a second event/state owner or fake Electron transport.",
       "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift locks the exact ordered 19-event set, exact disposition-key coverage, representative native owners, explicit platform-mechanism replacements, non-empty owner/effect evidence, unknown-event rejection, argument shapes, and sand-rpc:main channel names. Same-final-HEAD GitHub Actions build/unit/UI/device evidence is still required before verified.",
-      "notes": "Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 event-family review is explicit per event. This row is implemented, not verified: current exact-head Xcode/UI/device/protected evidence must succeed before any verified promotion."
+      "notes": "Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 event-family review is explicit per event. This row is implemented, not verified: current exact-head Xcode/UI/device/protected evidence must succeed before any verified promotion. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/rpc-edge.ts",
@@ -882,7 +900,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/rpc-edge-runtime.swift; source/ios-preload/preload.swift",
       "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift covers canonical method/event channel names; fresh exact-head acceptance is required before verified promotion and malformed-envelope decoding remains separately auditable.",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Direct native contract exists, but this row is not promoted verified solely from channel-name tests."
+      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Direct native contract exists, but this row is not promoted verified solely from channel-name tests. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/contracts/surface-notice.ts",
@@ -894,14 +914,14 @@
       "ios_target_path": "frontend/src/production/settings-notice-controller.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "Native enums mirror the Desktop operation vocabulary and feed the single SettingsNoticeController. MarketplaceModel string/error fields remain compatibility presentation rather than a second notice authority.",
-      "implementation_status": "mapped",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/settings-notice-controller.swift (SettingsNoticeOperation/RootSettingsNoticeEvent/SettingsNoticeController); frontend/src/recovered/features/app-shell/ContentView+Root.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "mobile/ios/FabushiTests/SettingsNoticeControllerParityTests.swift asserts the complete Desktop Settings/Plugins raw-value sets including settings-ui-preferences and settings-call-media; exact-current-head Actions required before promotion",
-      "notes": "Current-main exact diff adds `settings-ui-preferences` and `settings-call-media` to the typed Settings notice vocabulary. iOS had the same typed root owner but its enum/test were still at the historical set, so those two operations could not be represented without falling back to an untyped message. The shipping enum and exact set contract now include both operations. Broader dependency review remains open; keep mapped/current-main-fenced.",
+      "notes": "Current-main exact diff adds `settings-ui-preferences` and `settings-call-media` to the typed Settings notice vocabulary. iOS had the same typed root owner but its enum/test were still at the historical set, so those two operations could not be represented without falling back to an untyped message. The shipping enum and exact set contract now include both operations. Broader dependency review remains open; keep mapped/current-main-fenced. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified. Current native SettingsNoticeOperation/PluginsNoticeOperation sets and focused tests include the current-main settings-ui-preferences and settings-call-media operations, so the typed contract gap is closed at implementation level only.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/about/overlay/view.tsx",
@@ -916,7 +936,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/about/overlay/view.view.swift; frontend/src/recovered/features/account/session/menu.view.swift",
       "test_evidence": "mobile/ios/FabushiTests/AboutOverlayParityTests.swift; mobile/ios/FabushiUITests/FabushiUITests.swift; fresh exact-head ordinary/protected Actions are required before verified promotion.",
-      "notes": "Migrated from Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701 with a real Account-menu shipping entrypoint. Do not promote until the commit carrying this implementation passes exact-head acceptance."
+      "notes": "Migrated from Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701 with a real Account-menu shipping entrypoint. Do not promote until the commit carrying this implementation passes exact-head acceptance. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access-cover.contract.test.ts",
@@ -931,7 +953,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift",
-      "notes": "Test-file responsibility only; shipping roster/composition gaps remain separately mapped."
+      "notes": "Test-file responsibility only; shipping roster/composition gaps remain separately mapped. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access-roster-state.contract.test.ts",
@@ -946,7 +970,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/composition.swift; frontend/src/recovered/features/access/cover/roster-snapshot-store.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; mobile/ios/Fabushi/RemoteComputerStatusStore.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift (access suppression, account-scoped roster cache, selection persistence/reconcile/settle); mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; exact-HEAD GitHub Actions pending",
-      "notes": "Production wiring and focused contracts are implemented on the current source tree. Keep below verified until this exact iOS HEAD passes ordinary Swift/Rust/UI/device evidence and applicable protected acceptance; do not inherit earlier-head runs."
+      "notes": "Production wiring and focused contracts are implemented on the current source tree. Keep below verified until this exact iOS HEAD passes ordinary Swift/Rust/UI/device evidence and applicable protected acceptance; do not inherit earlier-head runs. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/composition.ts",
@@ -1194,11 +1220,13 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift covers individual-only candidates, 1-6 bounds, shared/nested rejection and account/reconnect fencing; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift covers canonical group.update payload.",
-      "notes": "Current-main test-file mechanism is not applicable on iOS and is replaced by focused XCTest over the shipping native/Host owner. No second group store is introduced; final exact-head evidence is still required.",
+      "notes": "Current-main test-file mechanism is not applicable on iOS and is replaced by focused XCTest over the shipping native/Host owner. No second group store is introduced; final exact-head evidence is still required. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-B: exact Desktop 371b72f1 source, production callers/owner/lifecycle and the current native iOS owner/replacement were re-read; this records source closure only and does not inherit predecessor CI or promote verified.",
       "ios_symbol": "GrokMobileGroupMembersModel; MobileBotGroupMembersSheet; GrokMobileBotService.groupUpdateCommand",
       "ios_owner": "Native XCTest replaces the Desktop node:test file; production group membership remains owned by the existing Host-backed group roster/update path.",
       "ios_runtime_entrypoint": "MobileBotChat group info -> MobileBotGroupMembersSheet -> GrokMobileGroupMembersModel -> GrokMobileBotService.groupUpdateCommand -> canonical Host group.update",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/clock.ts",
