@@ -2097,6 +2097,26 @@ final class CoordinatorMcpSurface {
             )
             return .handled(result.foundationValue)
 
+        case "getAvailableModels":
+            let auth = await cursorAuth.status()
+            guard auth.loggedIn, let scope = routedScopeToken() else {
+                throw IOSCursorAuthError.signInRequired
+            }
+            try Task.checkCancellation()
+            let models = try await dashboard.getAvailableModels()
+            try Task.checkCancellation()
+            let latestAuth = await cursorAuth.status()
+            guard routedScopeToken() == scope,
+                  latestAuth.loggedIn,
+                  latestAuth.authId == auth.authId,
+                  latestAuth.freshness == auth.freshness
+            else {
+                throw SandMcpConfigError(
+                    "Available models account scope changed before response."
+                )
+            }
+            return .handled(models)
+
         case "getCursorAuthStatus":
             return .handled(await mainRpcCursorAuth.getStatus())
 

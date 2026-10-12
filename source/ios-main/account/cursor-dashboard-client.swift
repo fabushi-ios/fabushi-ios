@@ -839,6 +839,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
 
     private func rpc(
         _ method: String,
+        service: String = "DashboardService",
         body: [String: Any],
         timeoutMs: Int
     ) async throws -> [String: Any] {
@@ -852,7 +853,7 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             resolveGhostMode: { _ in "true" }
         )
         let url = backendURL
-            .appendingPathComponent("aiserver.v1.DashboardService")
+            .appendingPathComponent("aiserver.v1.\(service)")
             .appendingPathComponent(method)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1254,6 +1255,20 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             timeoutMs: timeoutMs
         )
         return try IOSCursorDashboardProto.decodeTeams(response)
+    }
+
+    func getAvailableModels(
+        timeoutMs: Int = 12_000
+    ) async throws -> [String: Any] {
+        try await rpc(
+            "AvailableModels",
+            service: "AiService",
+            body: [
+                "scope": "AVAILABLE_MODELS_SCOPE_USER_AVAILABLE",
+                "useModelParameters": true,
+            ],
+            timeoutMs: timeoutMs
+        )
     }
 
     func transcribeAudio(
