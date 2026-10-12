@@ -684,7 +684,7 @@ impl NativeEngine {
 
             let declared_tools = tool_definitions(
                 self.config.enable_process_tools,
-                matches!(self.config.process_execution, ProcessExecution::Remote(_)),
+                matches!(&self.config.process_execution, ProcessExecution::Remote(_)),
                 self.web_research.is_some(),
             );
             let mut model_instructions = runtime_model_instructions(
@@ -1323,7 +1323,7 @@ impl NativeEngine {
                             "stepId": format!("box-handoff:{}", call.call_id),
                             "status": "completed",
                             "provider": {
-                                "toolCallId": call.call_id,
+                                "toolCallId": call.call_id.clone(),
                                 "instruction": instruction,
                                 "reason": reason,
                                 "domain": domain,
