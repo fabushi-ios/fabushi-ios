@@ -4098,7 +4098,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift owns one MobileHiddenChatsMutationController scoped by account and active Agent; frontend/src/production/GrokMobileShell+Bots.swift projects optimistic hide/unhide into the existing canonical bots roster, rolls back deterministic failures, holds transport failures, retries on reconnect, ingests authoritative roster updates, and generation-fences scope changes; frontend/src/production/GrokMobileShell+Home.swift owns the native Hidden Bots modal/open/unhide/focus-accessibility surface; frontend/src/production/GrokMobileBotService.swift reuses the existing bot.setHidden transport without creating another store; frontend/src/production/MobileHiddenChatsMutationController.swift owns pending/held/reset/dispose semantics.",
       "test_evidence": "mobile/ios/FabushiTests/HiddenChatsParityTests.swift covers optimistic confirmation, deterministic rollback, transport-failure hold, reconnect retry, account/active-agent scope generation fencing, and dispose/reset; existing GrokMobileBotServiceTests.swift continues to cover canonical Bot command/service behavior.",
-      "notes": "Reviewed and implemented against Desktop main exact Hidden Chats blobs on 3bc92400826cc4ca7ac665b467708e22261edc61. Keep implemented until ordinary CI, protected acceptance, focused tests, and artifacts succeed on the same exact iOS HEAD."
+      "notes": "IOS-MAIN-DEP-HIDDEN-CSS-20261012: Desktop modal CSS was re-read; SwiftUI list/sheet/accessibility presentation replaces browser styling while the hidden-chat behavior remains in the canonical native owner. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/hidden-chats/overlay/view.tsx",
@@ -4130,7 +4132,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob 0cd4400c54385fa09fc53daf03bedb8d5cdbf91b. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding character.tsx responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/computer-readiness.ts",
@@ -4145,7 +4149,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob 345d94a5bb1078d0ebd343b7eaa18742d3195916. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding computer-readiness.ts responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/model.ts",
@@ -4160,7 +4166,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob d4c70e8bfd64348923047a3e425b9645b7a7c4c7. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding model.ts responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/scene.ts",
@@ -4175,7 +4183,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob 1324670d8a08c7322a535352664fbc50d9af5bbd. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding scene.ts responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/suggestions.ts",
@@ -4190,7 +4200,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob 4a1341bc01ca939bd0158be3ff1801eff44ff142. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding suggestions.ts responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/tool-assets.ts",
@@ -4205,7 +4217,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob ba1eb07bfbbb26f4c8f6492da066631a9b2acefa. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding tool-assets.ts responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/view.css",
@@ -4220,7 +4234,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob 3ea7ab82413bbbe5a193df60f9496d674ba2b2cf. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding view.css responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/view.tsx",
@@ -4235,7 +4251,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileSignedInOnboarding.swift owns the exact signed-in step/route/draft/tool/suggestion/identity contracts; frontend/src/production/MobileOnboardingCharacter.swift owns the native exact color/shape character renderer with idle/happy/working and Reduce Motion; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift owns the shipping signed-in flow, account/generation fencing, create/retry/hand-off UI, tool selection, suggestions, accessibility, and cancellable lifecycle; mobile/ios/Fabushi/MarketplaceModel.swift owns account-scoped seen/route state; frontend/src/production/GrokMobileBotService.swift reuses the canonical Host bot roster/create transport and performs bounded 60s readiness with 2.5s retry before create; source/shared/media/avatar-image.swift remains the shared avatar policy.",
       "test_evidence": "mobile/ios/FabushiTests/MobileSignedInOnboardingParityTests.swift locks route semantics, step order, exact first-run color/shape catalog, 45-tool source order/filtering, suggestion ranking and deterministic persona identity, daily-tool description, canonical 2000-character bot.create projection with stable requestId, and recoverable transport error wording.",
-      "notes": "Reviewed and implemented against Desktop main exact blob 835004f96c67972c9901e3eea37ae357a5332b19. Keep implemented until the focused Swift tests, ordinary CI, protected acceptance, and current-head evidence artifacts all succeed on the same exact iOS SHA."
+      "notes": "IOS-MAIN-DEP-ONBOARDING-20261012: current-main signed-in onboarding view.tsx responsibilities were re-read against MobileSignedInOnboarding, MobileOnboardingCharacter and ContentView+HomeAuth. Native route/readiness/scene/suggestions/tool presentation remains account-scoped and single-owner. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/entrypoint.ts",
@@ -4250,7 +4268,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping composition exists on the PR branch: FabushiAgentNetworkView plus GrokMobileShell trigger/full-screen route; canonical roster fields and conversationPartnerIds are retained through GrokMobileBotService, MobileBotSummary, hidden projection and AccessRosterPersistence v3. sand_agent_network is read through the existing getExperimentsSnapshot bridge and fails closed.",
       "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Implemented is source-level only until the final iOS exact HEAD passes shipping-path Actions and artifact provenance; do not promote to verified from older runs."
+      "notes": "IOS-MAIN-DEP-ORG-CHART-20261012: current-main entrypoint.ts responsibilities were re-read against FabushiAgentNetworkView, GrokMobileShell+Bots/Home and the canonical roster owner. Gate/retained-empty, membership/message edges, 120-second recent/talking activity, waiting/typing/working/idle, inspector/open routing and accessibility remain native-owned. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/graph.css",
@@ -4265,7 +4285,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping composition exists on the PR branch: FabushiAgentNetworkView plus GrokMobileShell trigger/full-screen route; canonical roster fields and conversationPartnerIds are retained through GrokMobileBotService, MobileBotSummary, hidden projection and AccessRosterPersistence v3. sand_agent_network is read through the existing getExperimentsSnapshot bridge and fails closed.",
       "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Implemented is source-level only until the final iOS exact HEAD passes shipping-path Actions and artifact provenance; do not promote to verified from older runs."
+      "notes": "IOS-MAIN-DEP-ORG-CHART-20261012: current-main graph.css responsibilities were re-read against FabushiAgentNetworkView, GrokMobileShell+Bots/Home and the canonical roster owner. Gate/retained-empty, membership/message edges, 120-second recent/talking activity, waiting/typing/working/idle, inspector/open routing and accessibility remain native-owned. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/graph.tsx",
@@ -4280,9 +4302,9 @@
       "implementation_status": "mapped",
       "production_evidence": "Shipping GrokMobileShell opens FabushiAgentNetworkView from the same bots roster. GeometryReader supplies live native container size; Canvas uses MobileAgentNetworkModel.edges; DragGesture/MagnificationGesture use the same live proxy size for clamped viewport math; selection/open routing returns to selectBotForConversation without a second roster owner.",
       "test_evidence": "MobileAgentNetworkParityTests.testResponsiveGeometryAndViewportBounds, edge/activity, selection/reconcile, open-routing and accessibility tests cover the native responsive replacement. Descendant exact-head Actions/UI/device evidence is still required.",
-      "notes": "IOS-MAIN-AGENT-NETWORK-RESPONSIVE-GEOMETRY-001: reread Desktop graph.tsx current blob a1fd0a426dba3964dfbc9bab82e4ed01a0f7f967 against 7f1f8da0a0b0c88cda658ee7ce388f3b27f552ce. The current-main delta removes fixed default dimensions from production ownership, measures the real container with ResizeObserver, and feeds live layoutWidth/layoutHeight through render, wheel zoom and pointer pan. Native GeometryReader/gesture geometry is the platform-equivalent shipping owner. Keep mapped until exact-head CI plus aggregate dependency/shared review closes.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
-      "authority_review_state": "requires-current-main-review",
+      "notes": "IOS-MAIN-DEP-ORG-GRAPH-20261012: current-main graph selection, edge rendering/activity, pan/zoom/reset and empty-roster behavior were re-read against FabushiAgentNetworkView. Native shipping coverage is substantial, but this aggregate graph row remains mapped until exact geometry/gesture and device acceptance are closed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "responsibility_id": "IOS-MAIN-AGENT-NETWORK-RESPONSIVE-GEOMETRY-001",
@@ -4305,7 +4327,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping composition exists on the PR branch: FabushiAgentNetworkView plus GrokMobileShell trigger/full-screen route; canonical roster fields and conversationPartnerIds are retained through GrokMobileBotService, MobileBotSummary, hidden projection and AccessRosterPersistence v3. sand_agent_network is read through the existing getExperimentsSnapshot bridge and fails closed.",
       "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Implemented is source-level only until the final iOS exact HEAD passes shipping-path Actions and artifact provenance; do not promote to verified from older runs."
+      "notes": "IOS-MAIN-DEP-ORG-CHART-20261012: current-main inspector.tsx responsibilities were re-read against FabushiAgentNetworkView, GrokMobileShell+Bots/Home and the canonical roster owner. Gate/retained-empty, membership/message edges, 120-second recent/talking activity, waiting/typing/working/idle, inspector/open routing and accessibility remain native-owned. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/layout.ts",
@@ -4320,7 +4344,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping composition exists on the PR branch: FabushiAgentNetworkView plus GrokMobileShell trigger/full-screen route; canonical roster fields and conversationPartnerIds are retained through GrokMobileBotService, MobileBotSummary, hidden projection and AccessRosterPersistence v3. sand_agent_network is read through the existing getExperimentsSnapshot bridge and fails closed.",
       "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Implemented is source-level only until the final iOS exact HEAD passes shipping-path Actions and artifact provenance; do not promote to verified from older runs."
+      "notes": "IOS-MAIN-DEP-ORG-CHART-20261012: current-main layout.ts responsibilities were re-read against FabushiAgentNetworkView, GrokMobileShell+Bots/Home and the canonical roster owner. Gate/retained-empty, membership/message edges, 120-second recent/talking activity, waiting/typing/working/idle, inspector/open routing and accessibility remain native-owned. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/model.ts",
@@ -4335,7 +4361,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping composition exists on the PR branch: FabushiAgentNetworkView plus GrokMobileShell trigger/full-screen route; canonical roster fields and conversationPartnerIds are retained through GrokMobileBotService, MobileBotSummary, hidden projection and AccessRosterPersistence v3. sand_agent_network is read through the existing getExperimentsSnapshot bridge and fails closed.",
       "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Implemented is source-level only until the final iOS exact HEAD passes shipping-path Actions and artifact provenance; do not promote to verified from older runs."
+      "notes": "IOS-MAIN-DEP-ORG-CHART-20261012: current-main model.ts responsibilities were re-read against FabushiAgentNetworkView, GrokMobileShell+Bots/Home and the canonical roster owner. Gate/retained-empty, membership/message edges, 120-second recent/talking activity, waiting/typing/working/idle, inspector/open routing and accessibility remain native-owned. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/network-trigger.ts",
@@ -4350,7 +4378,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping composition exists on the PR branch: FabushiAgentNetworkView plus GrokMobileShell trigger/full-screen route; canonical roster fields and conversationPartnerIds are retained through GrokMobileBotService, MobileBotSummary, hidden projection and AccessRosterPersistence v3. sand_agent_network is read through the existing getExperimentsSnapshot bridge and fails closed.",
       "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Implemented is source-level only until the final iOS exact HEAD passes shipping-path Actions and artifact provenance; do not promote to verified from older runs."
+      "notes": "IOS-MAIN-DEP-ORG-CHART-20261012: current-main network-trigger.ts responsibilities were re-read against FabushiAgentNetworkView, GrokMobileShell+Bots/Home and the canonical roster owner. Gate/retained-empty, membership/message edges, 120-second recent/talking activity, waiting/typing/working/idle, inspector/open routing and accessibility remain native-owned. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/org-chart/workspace/view.tsx",
@@ -4365,7 +4395,9 @@
       "implementation_status": "implemented",
       "production_evidence": "Shipping composition exists on the PR branch: FabushiAgentNetworkView plus GrokMobileShell trigger/full-screen route; canonical roster fields and conversationPartnerIds are retained through GrokMobileBotService, MobileBotSummary, hidden projection and AccessRosterPersistence v3. sand_agent_network is read through the existing getExperimentsSnapshot bridge and fails closed.",
       "test_evidence": "mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift covers gate/empty roster, edge dedupe/self-loop rejection, 120s recent/talking, waiting/typing/working/idle, selection/roster reconciliation, history partner extraction, account/reconnect/roster stale fencing and responsive geometry. Current-head Actions/provenance are still required before verified.",
-      "notes": "Exact Desktop blob reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Implemented is source-level only until the final iOS exact HEAD passes shipping-path Actions and artifact provenance; do not promote to verified from older runs."
+      "notes": "IOS-MAIN-DEP-ORG-CHART-20261012: current-main view.tsx responsibilities were re-read against FabushiAgentNetworkView, GrokMobileShell+Bots/Home and the canonical roster owner. Gate/retained-empty, membership/message edges, 120-second recent/talking activity, waiting/typing/working/idle, inspector/open routing and accessibility remain native-owned. Status remains implemented; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/permissions/local-tool/store.ts",
