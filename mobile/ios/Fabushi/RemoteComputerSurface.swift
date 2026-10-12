@@ -1112,6 +1112,61 @@ final class RemoteComputerRebuildOwner: ObservableObject {
     }
 }
 
+enum RemoteComputerUpdateConfirmationAction: Equatable, Sendable {
+    case ready
+    case busyOverride
+}
+
+struct RemoteComputerUpdateConfirmationContent: Equatable, Sendable {
+    let action: RemoteComputerUpdateConfirmationAction
+    let title: String
+    let description: String
+    let confirmLabel: String
+    let destructiveLabel: String?
+}
+
+enum RemoteComputerUpdateConfirmationProjection {
+    static func project(
+        imageUpdateAvailable: Bool?,
+        isPending: Bool,
+        hasActiveRebuild: Bool,
+        workingAgentNames: [String]
+    ) -> RemoteComputerUpdateConfirmationContent? {
+        guard imageUpdateAvailable == true,
+              !isPending,
+              !hasActiveRebuild
+        else { return nil }
+
+        let names = workingAgentNames
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if names.isEmpty {
+            return .init(
+                action: .ready,
+                title: "更新我的电脑？",
+                description: "这会把所有 Agent 共用的电脑更新到最新版本，并保留文件和登录状态。",
+                confirmLabel: "更新我的电脑",
+                destructiveLabel: nil
+            )
+        }
+
+        let subject: String
+        if names.count == 1 {
+            subject = "\(names[0]) 正在工作"
+        } else {
+            subject = "\(names.count) 个 Agent 正在工作"
+        }
+        return .init(
+            action: .busyOverride,
+            title: "Agent 正在工作时更新？",
+            description: "\(subject)。更新会重新创建电脑并中断当前任务；文件和登录状态会保留。",
+            confirmLabel: names.count == 1 ? "Agent 完成后更新" : "Agent 都完成后更新",
+            destructiveLabel: "仍然更新"
+        )
+    }
+}
+
 struct RemoteComputerHostActivitySnapshot: Equatable, Sendable {
     let agentID: String?
     let runningComputerSubagentIDs: [String]
@@ -1419,6 +1474,10 @@ struct RemoteComputerSurface: View {
                     await refreshShippingMonitors()
                 }
             }
+            .task(id: updateQueued) {
+                guard updateQueued else { return }
+                await waitForQueuedUpdate()
+            }
             .onDisappear {
                 deactivateSurface()
             }
@@ -1426,6 +1485,34 @@ struct RemoteComputerSurface: View {
 
     private var confirmationSurface: some View {
         lifecycleSurface
+            .confirmationDialog(
+                updateConfirmationContent?.title ?? "更新我的电脑？",
+                isPresented: $updateConfirmationPresented,
+                titleVisibility: .visible
+            ) {
+                if updateConfirmationContent?.action == .busyOverride {
+                    Button(updateConfirmationContent?.confirmLabel ?? "Agent 完成后更新") {
+                        updateQueued = true
+                        updatePreparationError = nil
+                    }
+                    if let destructiveLabel = updateConfirmationContent?.destructiveLabel {
+                        Button(destructiveLabel, role: .destructive) {
+                            updateQueued = false
+                            updatePreparationError = nil
+                            Task { await rebuildOwner.requestUpdate(force: true) }
+                        }
+                    }
+                } else {
+                    Button(updateConfirmationContent?.confirmLabel ?? "更新我的电脑") {
+                        updateQueued = false
+                        updatePreparationError = nil
+                        Task { await rebuildOwner.requestUpdate(force: false) }
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text(updateConfirmationContent?.description ?? "")
+            }
             .confirmationDialog(
                 "重置我的电脑？",
                 isPresented: $resetConfirmationPresented,
@@ -1501,9 +1588,18 @@ struct RemoteComputerSurface: View {
 
     private var accountActionsMenu: some View {
         Menu {
-            if rebuildOwner.managedLifecycleAvailable {
-                Button("更新电脑") {
-                    Task { await rebuildOwner.requestUpdate() }
+            if rebuildOwner.managedLifecycleAvailable,
+               rebuildOwner.state.imageUpdateAvailable == true
+            {
+                if updateQueued {
+                    Button("取消排队更新", role: .destructive) {
+                        updateQueued = false
+                        updatePreparationError = nil
+                    }
+                } else {
+                    Button("更新电脑") {
+                        Task { await prepareUpdateConfirmation() }
+                    }
                 }
             }
             Button("重新连接") {
@@ -1548,6 +1644,26 @@ struct RemoteComputerSurface: View {
                 .accessibilityIdentifier("remote-computer-rebuild-error")
         }
 
+        if updateQueued {
+            Text("电脑会在所有 Agent 停止工作后自动更新。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .accessibilityIdentifier("remote-computer-update-queued")
+        }
+
+        if let updatePreparationError {
+            Text(updatePreparationError)
+                .font(.caption)
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .accessibilityIdentifier("remote-computer-update-preparation-error")
+        }
+
         if let errorMessage {
             remoteComputerErrorCard(errorMessage)
         }
@@ -1587,6 +1703,86 @@ struct RemoteComputerSurface: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .accessibilityIdentifier("remote-computer-error")
+    }
+
+    @MainActor
+    private func prepareUpdateConfirmation() async {
+        guard rebuildOwner.managedLifecycleAvailable,
+              rebuildOwner.state.imageUpdateAvailable == true,
+              !rebuildOwner.state.isPending,
+              rebuildOwner.state.kind == nil
+        else { return }
+
+        do {
+            let workingAgentNames = try await loadWorkingAgentNames()
+            guard let content = RemoteComputerUpdateConfirmationProjection.project(
+                imageUpdateAvailable: rebuildOwner.state.imageUpdateAvailable,
+                isPending: rebuildOwner.state.isPending,
+                hasActiveRebuild: rebuildOwner.state.kind != nil,
+                workingAgentNames: workingAgentNames
+            ) else { return }
+            updatePreparationError = nil
+            updateConfirmationContent = content
+            updateConfirmationPresented = true
+        } catch is CancellationError {
+            return
+        } catch {
+            updatePreparationError = "无法安全确认当前 Agent 是否正在工作：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func loadWorkingAgentNames() async throws -> [String] {
+        guard let bridge else {
+            throw MahayanaCoordinator.CoordinatorError.unavailable
+        }
+        return try await GrokMobileBotService(bridge: bridge)
+            .loadOnboardingAgents()
+            .filter { !$0.isGroup && $0.isRunning }
+            .map(\.name)
+    }
+
+    @MainActor
+    private func waitForQueuedUpdate() async {
+        while updateQueued && !Task.isCancelled {
+            guard rebuildOwner.state.imageUpdateAvailable == true else {
+                updateQueued = false
+                return
+            }
+            guard !rebuildOwner.state.isPending,
+                  rebuildOwner.state.kind == nil
+            else {
+                do {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                } catch {
+                    return
+                }
+                continue
+            }
+
+            do {
+                let workingAgentNames = try await loadWorkingAgentNames()
+                guard updateQueued, !Task.isCancelled else { return }
+                if workingAgentNames.isEmpty {
+                    updateQueued = false
+                    updatePreparationError = nil
+                    await rebuildOwner.requestUpdate(force: false)
+                    return
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                updateQueued = false
+                updatePreparationError = "无法继续排队更新：\(error.localizedDescription)"
+                return
+            }
+
+            do {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+            } catch {
+                return
+            }
+        }
     }
 
     @MainActor

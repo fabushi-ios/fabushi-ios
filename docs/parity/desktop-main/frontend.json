@@ -1903,14 +1903,14 @@
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "The sole native RemoteComputerSurface/RemoteComputerRebuildOwner replaces Desktop portal/shell/confirmation presentation. Native localized `我的电脑` update/reset/recover/reconnect copy is product-current and contains no legacy Grok branding; lifecycle/guard ownership remains unchanged.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildPresentation, lifecycle owner, guarded update/reset/recover actions)",
-      "test_evidence": "Remote Computer focused tests plus exact-current-head Actions; real-device Computer lifecycle evidence remains independently gated",
-      "notes": "Current-main exact source diff is branding-only for this row. iOS already uses native product-current Computer copy and the existing canonical lifecycle owner; no duplicate state machine or literal Desktop copy is introduced. Keep mapped/current-main-fenced pending aggregate dependency/current-head acceptance.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift: RemoteComputerRebuildPresentation; RemoteComputerRebuildBanner; RemoteComputerRebuildReducer; RemoteComputerMigrationAccumulator",
+      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; exact-head GitHub Actions required before verified promotion",
+      "notes": "Re-read Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 rebuild banner with its ProductionRenderer composition. Native RemoteComputerRebuildPresentation mirrors update/reset/recover step ordering, migration phase folding, pull/start progression, reconnect checking/network/restarting variants and accessibility status while RemoteComputerRebuildReducer owns the canonical lifecycle state. SwiftUI replaces the renderer portal/CSS only. Implemented/current-main-reviewed, not verified until replacement exact-head Actions pass.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/controller.ts",
@@ -2091,14 +2091,14 @@
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "The sole native RemoteComputerSurface/RemoteComputerRebuildOwner replaces Desktop portal/shell/confirmation presentation. Native localized `我的电脑` update/reset/recover/reconnect copy is product-current and contains no legacy Grok branding; lifecycle/guard ownership remains unchanged.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildPresentation, lifecycle owner, guarded update/reset/recover actions)",
-      "test_evidence": "Remote Computer focused tests plus exact-current-head Actions; real-device Computer lifecycle evidence remains independently gated",
-      "notes": "Current-main exact source diff is branding-only for this row. iOS already uses native product-current Computer copy and the existing canonical lifecycle owner; no duplicate state machine or literal Desktop copy is introduced. Keep mapped/current-main-fenced pending aggregate dependency/current-head acceptance.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift: RemoteComputerUpdateConfirmationProjection; prepareUpdateConfirmation; waitForQueuedUpdate; accountActionsMenu; RemoteComputerRebuildOwner.requestUpdate(force:)",
+      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift:testComputerUpdateConfirmationFailsClosedAndSeparatesBusyOverride; exact-head GitHub Actions required before verified promotion",
+      "notes": "Re-read Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 confirmation controller plus ProductionRenderer direct caller. Desktop only exposes update when an image update is available and the current scope is actionable, projects ready vs busy-override from running Agent names, queues the non-destructive busy action until Agents become idle, and reserves force=true for the explicit destructive override. iOS previously called requestUpdate() directly from the account menu. This descendant closes that production gap: update is hidden unless imageUpdateAvailable is true; a strict canonical bot.list probe determines running individual Agents; unknown roster fails closed; busy confirmation offers queued update vs explicit destructive force; the queue rechecks canonical Host roster and dispatches force=false only after all Agents are idle; cancellation/disappear cancels the SwiftUI task and no synthetic busy state is accepted. Implemented/current-main-reviewed, not verified until replacement exact-head Actions pass.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/notice/view.tsx",

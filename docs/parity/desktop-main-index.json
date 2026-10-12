@@ -99,7 +99,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1",
+    "preEvidenceIosHead": "28d252ccd74ee70bd75e3a34dceb4dbc25be6957",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -120,7 +120,9 @@
       38200945961,
       38200945964,
       38201133850,
-      38201133843
+      38201133843,
+      38201247586,
+      38201247593
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -132,9 +134,13 @@
       114654113503,
       114654113634,
       114654646116,
-      114654683170
+      114654683170,
+      114654989020,
+      114654989193,
+      114654987413,
+      114655027482
     ],
-    "status": "avatar-channels-current-main-reviewed-no-verification-promotion-fresh-resulting-exact-head-ci-required",
+    "status": "computer-update-confirmation-repaired-no-verification-promotion-fresh-resulting-exact-head-ci-required",
     "rowCount": 7951
   }
 }

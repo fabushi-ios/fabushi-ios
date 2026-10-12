@@ -69,6 +69,57 @@ final class RemoteComputerRebuildTests: XCTestCase {
 
     }
 
+    func testComputerUpdateConfirmationFailsClosedAndSeparatesBusyOverride() {
+        XCTAssertNil(RemoteComputerUpdateConfirmationProjection.project(
+            imageUpdateAvailable: false,
+            isPending: false,
+            hasActiveRebuild: false,
+            workingAgentNames: []
+        ))
+        XCTAssertNil(RemoteComputerUpdateConfirmationProjection.project(
+            imageUpdateAvailable: true,
+            isPending: true,
+            hasActiveRebuild: false,
+            workingAgentNames: []
+        ))
+        XCTAssertNil(RemoteComputerUpdateConfirmationProjection.project(
+            imageUpdateAvailable: true,
+            isPending: false,
+            hasActiveRebuild: true,
+            workingAgentNames: []
+        ))
+
+        let ready = RemoteComputerUpdateConfirmationProjection.project(
+            imageUpdateAvailable: true,
+            isPending: false,
+            hasActiveRebuild: false,
+            workingAgentNames: []
+        )
+        XCTAssertEqual(ready?.action, .ready)
+        XCTAssertNil(ready?.destructiveLabel)
+
+        let busy = RemoteComputerUpdateConfirmationProjection.project(
+            imageUpdateAvailable: true,
+            isPending: false,
+            hasActiveRebuild: false,
+            workingAgentNames: [" Research "]
+        )
+        XCTAssertEqual(busy?.action, .busyOverride)
+        XCTAssertEqual(busy?.confirmLabel, "Agent 完成后更新")
+        XCTAssertEqual(busy?.destructiveLabel, "仍然更新")
+        XCTAssertTrue(busy?.description.contains("Research 正在工作") == true)
+
+        let many = RemoteComputerUpdateConfirmationProjection.project(
+            imageUpdateAvailable: true,
+            isPending: false,
+            hasActiveRebuild: false,
+            workingAgentNames: ["A", "B", "C"]
+        )
+        XCTAssertEqual(many?.action, .busyOverride)
+        XCTAssertEqual(many?.confirmLabel, "Agent 都完成后更新")
+        XCTAssertTrue(many?.description.contains("3 个 Agent 正在工作") == true)
+    }
+
     func testAgentComputerScopeIsExplicitAndStable() {
         let scoped = RemoteComputerScope(
             accountScopeKey: "account-a",
