@@ -954,6 +954,8 @@ final class CoordinatorMcpSurface {
     private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
+    private let gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache
+    private let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter
     private let isClientPaused: @MainActor () -> Bool
     private var experimentAuthObserver: ((IOSCursorAuthStatus) -> Void)?
     private var computerMigrationWatchTask: Task<Void, Never>?
@@ -964,6 +966,18 @@ final class CoordinatorMcpSurface {
     private var computerMigrationGeneration: UInt64 = 0
     private var accountScope: String?
     private var routedScopeGeneration: UInt64 = 0
+
+    private lazy var gatewayDescriptorFastPath: IOSGatewayDescriptorFastPath = {
+        IOSGatewayDescriptorFastPath(
+            cache: gatewayDescriptorCache,
+            getAccountScope: { [weak self] in self?.accountScope },
+            reportFailure: gatewayDescriptorFailureReporter,
+            resolveLive: { [weak self] in
+                guard let self else { throw IOSRemoteRunnerFenceError.unavailable }
+                return try await self.dashboard.ensureSandBox()
+            }
+        )
+    }()
 
     private lazy var routedMcpBridge: RoutedMCPBridge = {
         let manager = self.manager
@@ -1009,6 +1023,8 @@ final class CoordinatorMcpSurface {
         feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
         localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer,
+        gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache,
+        gatewayDescriptorFailureReporter: @escaping IOSGatewayDescriptorFastPath.FailureReporter,
         isClientPaused: @escaping @MainActor () -> Bool
     ) {
         self.manager = manager
@@ -1020,6 +1036,8 @@ final class CoordinatorMcpSurface {
         self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
         self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
+        self.gatewayDescriptorCache = gatewayDescriptorCache
+        self.gatewayDescriptorFailureReporter = gatewayDescriptorFailureReporter
         self.isClientPaused = isClientPaused
     }
 
@@ -1032,7 +1050,7 @@ final class CoordinatorMcpSurface {
             throw IOSRemoteRunnerFenceError.unavailable
         }
         try Task.checkCancellation()
-        let descriptor = try await dashboard.ensureSandBox()
+        let descriptor = try await gatewayDescriptorFastPath.resolve()
         try Task.checkCancellation()
         guard routedScopeToken() == token else {
             throw IOSRemoteRunnerFenceError.stale
@@ -1088,6 +1106,14 @@ final class CoordinatorMcpSurface {
             }
         )
         let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter = {
+            operation, error in reportFailure("gateway-descriptor", operation, error)
+        }
+        let gatewayDescriptorCache = IOSGatewayDescriptorKeychainCache(
+            reportFailure: { operation, error in
+                reportFailure("gateway-descriptor", "cache-\(operation)", error)
+            }
+        )
         cursorAuth.setProfileFetcher { [weak dashboard] in
             await dashboard?.getCursorAuthProfile()
         }
@@ -1249,6 +1275,8 @@ final class CoordinatorMcpSurface {
             feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
             localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
+            gatewayDescriptorCache: gatewayDescriptorCache,
+            gatewayDescriptorFailureReporter: gatewayDescriptorFailureReporter,
             isClientPaused: isClientPaused
         )
         cursorAuth.setStatusObserver { [weak surface] status in
