@@ -4667,7 +4667,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift; current exact-HEAD GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop main exact SHA 3bc92400826cc4ca7ac665b467708e22261edc61 and reaction-system.contract.test.ts@bdc0c1dde0ed40073eafdbcdf6fde6cf774949fe. Production path is implemented; keep below verified until the replacement iOS exact HEAD passes ordinary/protected Actions and artifact provenance."
+      "notes": "Reviewed against Desktop main exact SHA 3bc92400826cc4ca7ac665b467708e22261edc61 and reaction-system.contract.test.ts@bdc0c1dde0ed40073eafdbcdf6fde6cf774949fe. Production path is implemented; keep below verified until the replacement iOS exact HEAD passes ordinary/protected Actions and artifact provenance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main reaction contract was re-read as regression evidence over the already-reviewed canonical reaction projection/feed/workspace owners; iOS keeps the shipping MobileBotChat/Host path and focused XCTest replacement. No runtime owner or verified status is added by this test row.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-configuration-models.contract.test.ts",
@@ -4682,7 +4684,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/account/session/menu.view.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/shared/sand-auto-review-instructions.swift; source/shared/inference-router.swift; source/shared/node/settings/sand-settings-store.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; frontend/src/production/FabushiAgentNetworkView.swift; frontend/src/production/MobileAgentSidebarSections.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift; mobile/ios/FabushiTests/MobileAgentNetworkParityTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; replacement exact-HEAD Actions required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob 31884d984fdf1c59ece67d5453480d207d24e721. Source-level implementation only; do not promote to verified until current-head shipping-path Actions and provenance pass."
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob 31884d984fdf1c59ece67d5453480d207d24e721. Source-level implementation only; do not promote to verified until current-head shipping-path Actions and provenance pass. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main cross-feature configuration contract was re-read against the already-reviewed settings, inference-router, Org Chart and sidebar projection owners. Native production ownership remains unchanged; this row records regression coverage only and is not promoted to verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-conversation-infra.contract.test.ts",
@@ -4697,11 +4701,11 @@
       "implementation_status": "mapped",
       "production_evidence": "The tested ForwardRecipientNavigation helper is called directly by the shipping SwiftUI ForwardMessageSheet key handler.",
       "test_evidence": "ForwardMessageParityTests covers navigation clamp/page size and the descendant test covers Cmd+Enter and Ctrl+Enter acceptance plus rejection of bare/non-Return cases. Exact-head test run pending.",
-      "notes": "IOS-MAIN-FORWARD-TEST-002: current Desktop contract read and mapped to native focused XCTest; remains mapped pending exact-head run. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence.",
+      "notes": "IOS-MAIN-FORWARD-TEST-002: current Desktop contract read and mapped to native focused XCTest; remains mapped pending exact-head run. Validator contract keeps every current-main added/blob-changed row re-review-fenced until the global new/changed responsibility review is accepted; detailed review evidence is recorded without lifting that fence. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main conversation-infra contract was re-read across timeline/feed, hidden-chat, find, routine history, draft restore and Forward keyboard seams. The shipping iOS owners remain the previously reviewed canonical state/transport owners; mapped status is intentionally retained pending exact-head acceptance.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-foundations.contract.test.ts",
@@ -4716,11 +4720,11 @@
       "implementation_status": "not-applicable",
       "production_evidence": "FabushiAgentNetworkView.swift is the shipping native Agent-network graph owner and is reachable from the current product surface; it uses live GeometryReader dimensions, Canvas edges, bounded pan/zoom/reset, canonical roster relationships and existing open-chat/open-room routing.",
       "test_evidence": "MobileAgentNetworkParityTests covers responsive width/height layout, scale clamps, offset bounds, relationship/activity projection, selection reconciliation, routing and accessibility identifiers. Exact-head descendant Actions remain required.",
-      "notes": "IOS-MAIN-AGENT-NETWORK-CONTRACT-001: current-main adds a Desktop source-contract guard that rejects regression to fixed-size graph geometry. The TypeScript source-regex mechanism remains not-applicable-with-replacement; native responsive behavior is exercised through the shipping Swift owner and focused XCTest. Do not convert this test-only row into a production responsibility or verified status before exact-head Actions/device acceptance.",
+      "notes": "IOS-MAIN-AGENT-NETWORK-CONTRACT-001: current-main adds a Desktop source-contract guard that rejects regression to fixed-size graph geometry. The TypeScript source-regex mechanism remains not-applicable-with-replacement; native responsive behavior is exercised through the shipping Swift owner and focused XCTest. Do not convert this test-only row into a production responsibility or verified status before exact-head Actions/device acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main foundation contract was re-read; the Desktop source-regex/ResizeObserver guard remains test-mechanism-only and native GeometryReader/Canvas behavior stays the replacement owner. Not-applicable-with-replacement is retained; no production or verified promotion.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "responsibility_id": "IOS-MAIN-AGENT-NETWORK-CONTRACT-001",
       "desktop_runtime_entrypoint": "node:test recovered-foundations contract -> source inspection of org-chart/workspace/graph.tsx",
       "desktop_state_machine": "test-only invariant: responsive container ref/ResizeObserver and wheel viewport geometry must remain coupled to live layoutWidth/layoutHeight",
@@ -4741,7 +4745,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileGroupMembersModel.swift; frontend/src/production/MobileBotGroupMembers.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob be29dba95f7e271e4d2ea36d65cd5c361056f2ed. Native implementation only; no verified promotion before same-head shipping evidence."
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob be29dba95f7e271e4d2ea36d65cd5c361056f2ed. Native implementation only; no verified promotion before same-head shipping evidence. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main navigation contract was re-read against the reviewed native search and account-generation-fenced local-group/member routing. Existing iOS production owners remain unchanged; exact-head acceptance is still required before verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-owner-utilities.contract.test.ts",
@@ -4756,7 +4762,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotRoutines.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileRoutinesControllerTests.swift; mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob c5c9e749994b94e9a056274b2f124928d73b9a98. Existing clock owner was already complete; this review closed the missing optimistic MCP tool projection. Keep below verified until same-head evidence succeeds."
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob c5c9e749994b94e9a056274b2f124928d73b9a98. Existing clock owner was already complete; this review closed the missing optimistic MCP tool projection. Keep below verified until same-head evidence succeeds. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main owner-utilities contract was re-read against native routine-clock and account-scoped MCP tool state owners. It adds regression coverage, not a second state owner; existing implemented status remains below verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-runtime-models.contract.test.ts",
@@ -4771,7 +4779,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/production/MobileTerminalOutput.swift; frontend/src/recovered/features/access/cover/roster-snapshot-store.swift",
       "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; mobile/ios/FabushiTests/AccessCoverParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob 8b10071d92c1679a470b7d145b4eb7f6f7fb981d. No terminal execution surface is claimed because upstream view.tsx explicitly states none is mounted."
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob 8b10071d92c1679a470b7d145b4eb7f6f7fb981d. No terminal execution surface is claimed because upstream view.tsx explicitly states none is mounted. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main runtime-model contract was re-read against native async-task timing, terminal-result projection and account-bound roster readiness. No terminal execution surface is invented; existing implemented status remains below verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-shell-models.contract.test.ts",
@@ -4786,8 +4796,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/window-chrome/hardware-keyboard.swift; mobile/ios/Fabushi/RemoteComputerSurface.swift; source/mahayana-agent-coordinator/client-side-tool-v2-relay.swift",
       "test_evidence": "mobile/ios/FabushiTests/MobileHardwareKeyboardParityTests.swift; mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; iOS exact-HEAD unit-test job remains authoritative for native replacements.",
-      "notes": "Exact Desktop blob 02c34ddaee843b976303640bbc52a308ecf53042 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop blob 02c34ddaee843b976303640bbc52a308ecf53042 reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main Desktop Node shell-model harness was re-read. Native hardware-keyboard, Computer and tool-result focused tests remain the replacement; the Node harness itself stays not-applicable-with-replacement and is not promoted.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/recovered-state-models.contract.test.ts",
@@ -4802,7 +4813,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/MobileAvatarEditor.swift; source/shared/media/avatar-image.swift",
       "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift; mobile/ios/FabushiTests/AvatarEditorParityTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob c22993d0620a2e0a24ce523c9fa6516ff51f10cb. Source-level implementation only."
+      "notes": "Reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and exact contract blob c22993d0620a2e0a24ce523c9fa6516ff51f10cb. Source-level implementation only. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Current-main state-model contract was re-read against native async-task reconnect/generation fencing and bounded avatar geometry owners. Existing production ownership remains single-source; implemented status remains below verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/root-resilience/connection-state.ts",
