@@ -1,6 +1,22 @@
 import Foundation
 import SwiftUI
 
+@MainActor
+struct FabushiRuntimeReloadAction {
+    let run: @MainActor () async -> Void
+}
+
+private struct FabushiRuntimeReloadActionKey: EnvironmentKey {
+    static let defaultValue: FabushiRuntimeReloadAction? = nil
+}
+
+extension EnvironmentValues {
+    var fabushiRuntimeReloadAction: FabushiRuntimeReloadAction? {
+        get { self[FabushiRuntimeReloadActionKey.self] }
+        set { self[FabushiRuntimeReloadActionKey.self] = newValue }
+    }
+}
+
 /// UI-safe projection of the server-authoritative Fabushi model budget.
 ///
 /// The renderer receives only aggregate budget fields. Account credentials stay
@@ -95,6 +111,7 @@ struct AccountMenuView: View {
     @State private var feedbackPresented = false
     @State private var actionError: String?
     @Environment(\.mobileUiPreferencesStore) private var uiPreferencesStore
+    @Environment(\.fabushiRuntimeReloadAction) private var runtimeReloadAction
 
     private var shellCopy: MobileSettingsShellCopy {
         (uiPreferencesStore?.preferences ?? MobileUiPreferences()).shellCopy()
@@ -145,6 +162,18 @@ struct AccountMenuView: View {
                         Label(shellCopy.settings, systemImage: "gearshape")
                     }
                     .accessibilityIdentifier("account-settings-entry")
+
+                    if let runtimeReloadAction {
+                        Button {
+                            onClose()
+                            Task { @MainActor in
+                                await runtimeReloadAction.run()
+                            }
+                        } label: {
+                            Label(shellCopy.reloadApp, systemImage: "arrow.clockwise")
+                        }
+                        .accessibilityIdentifier("account-runtime-reload")
+                    }
 
                     Button {
                         Task {
