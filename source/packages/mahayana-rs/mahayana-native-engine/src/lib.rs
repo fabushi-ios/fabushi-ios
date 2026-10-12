@@ -3756,6 +3756,131 @@ mod tests {
             .unwrap();
         assert_eq!(caller.await.unwrap().unwrap()["success"], true);
     }
+    #[tokio::test]
+    async fn external_machine_handlers_round_trip_platform_broker() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        let model = Arc::new(FakeModel {
+            outputs: Mutex::new(VecDeque::new()),
+        });
+        let mut config = NativeEngineConfig::embedded("remote-machine-tools");
+        config.enable_process_tools = true;
+        config.process_execution = ProcessExecution::Remote(Arc::clone(&broker));
+        let engine = NativeEngine::new(model, config).expect("create remote machine engine");
+        let session_id = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                workspace_root: None,
+                model: None,
+                metadata: Value::Null,
+            })
+            .await
+            .expect("open remote machine session");
+        let session = engine.session(&session_id).expect("remote machine session");
+        let mut session = session.lock().await;
+        let policy = ExecutionPolicy {
+            approval_mode: mahayana_kernel::ApprovalMode::Never,
+            max_unattended_risk: RiskLevel::SystemWrite,
+            allow_network: true,
+            allow_process: true,
+            allow_workspace_writes: true,
+        };
+        let control = OperationControl::default();
+        let events: SharedKernelEventSink = Arc::new(Events::default());
+
+        let shell_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease shell request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({"success":true,"code":0,"stdout":"ok","stderr":""}),
+                            )
+                            .expect("resolve shell request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let shell_operation = OperationId::from_string("external-shell-round-trip");
+        let shell_call = FunctionCall {
+            call_id: "tool-shell".into(),
+            name: "ExternalShell".into(),
+            arguments: json!({
+                "command": "pwd",
+                "workingDirectory": "/workspace",
+            }),
+        };
+        let shell_result = engine
+            .execute_tool(
+                &mut session,
+                &shell_operation,
+                &shell_call,
+                &policy,
+                &control,
+                Arc::clone(&events),
+            )
+            .await
+            .expect("execute ExternalShell");
+        let shell_request = shell_service.await.expect("join shell service");
+        assert_eq!(shell_request.method, "shell.exec");
+        assert_eq!(shell_request.params["command"], "pwd");
+        assert_eq!(shell_request.params["workingDirectory"], "/workspace");
+        assert_eq!(shell_request.params["toolCallId"], "tool-shell");
+        assert_eq!(shell_result["stdout"], "ok");
+
+        let read_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease read request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({"success":true,"content":"hello"}),
+                            )
+                            .expect("resolve read request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let read_operation = OperationId::from_string("external-read-round-trip");
+        let read_call = FunctionCall {
+            call_id: "tool-read".into(),
+            name: "ExternalRead".into(),
+            arguments: json!({
+                "path": "/workspace/README.md",
+                "offset": 4,
+                "limit": 16,
+                "encodingHint": "utf-8",
+            }),
+        };
+        let read_result = engine
+            .execute_tool(
+                &mut session,
+                &read_operation,
+                &read_call,
+                &policy,
+                &control,
+                events,
+            )
+            .await
+            .expect("execute ExternalRead");
+        let read_request = read_service.await.expect("join read service");
+        assert_eq!(read_request.method, "box.exec");
+        assert_eq!(read_request.params["case"], "readArgs");
+        assert_eq!(read_request.params["args"]["path"], "/workspace/README.md");
+        assert_eq!(read_request.params["args"]["offset"], 4);
+        assert_eq!(read_request.params["args"]["limit"], 16);
+        assert_eq!(read_request.params["args"]["encodingHint"], "utf-8");
+        assert_eq!(read_request.params["args"]["toolCallId"], "tool-read");
+        assert_eq!(read_result["content"], "hello");
+    }
+
     use mahayana_model::ModelProviderMode;
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};

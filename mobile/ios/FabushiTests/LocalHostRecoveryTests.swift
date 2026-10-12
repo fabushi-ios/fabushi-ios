@@ -402,6 +402,68 @@ extension LocalHostRecoveryTests {
     }
 
     @MainActor
+    func testPlatformExecDiscardsResultAfterHostGenerationRecovery() async throws {
+        let host = AwaitTurnHostStub(
+            terminalResponses: [],
+            platformRequests: [[
+                "requestId": "platform-generation",
+                "method": "shell.exec",
+                "params": ["command": "pwd"],
+            ]]
+        )
+        let provider = PlatformExecutionProviderStub(
+            result: .object([
+                "success": .bool(true),
+                "stdout": .string("stale"),
+            ]),
+            delayNanoseconds: 100_000_000
+        )
+        let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
+        let coordinator = MahayanaCoordinator(
+            hostSupervisor: supervisor,
+            remoteExecutionProvider: provider
+        )
+        coordinator.updateAccountSettingsScope("account-generation")
+        let identity = IOSRemoteRunnerExecutionIdentity(
+            accountScope: "account-generation",
+            accountRevision: 1,
+            hostGeneration: 1
+        )
+
+        let task = Task { @MainActor in
+            try await coordinator.servicePendingPlatformExecution(
+                expectedIdentity: identity
+            )
+        }
+        for _ in 0..<128 {
+            if !(await provider.recordedMethods()).isEmpty {
+                break
+            }
+            await Task.yield()
+        }
+        XCTAssertEqual(
+            await provider.recordedMethods(),
+            ["local-exec.shell.exec"]
+        )
+        XCTAssertTrue(
+            try supervisor.recoverAfterFailure(
+                observedGeneration: identity.hostGeneration
+            )
+        )
+        XCTAssertEqual(supervisor.generation, 2)
+        XCTAssertTrue(try await task.value)
+
+        XCTAssertTrue(
+            host.platformResolutions.isEmpty,
+            "a result from the previous Host generation must never be committed"
+        )
+        XCTAssertTrue(
+            host.platformRejections.isEmpty,
+            "the replacement Host must not receive settlement for the previous generation"
+        )
+    }
+
+    @MainActor
     func testWorkflowRunTransportStampsAwaitTurnAndSourceBeforeHostDispatch() async throws {
         let host = AwaitTurnHostStub(terminalResponses: [["status": "completed"]])
         let supervisor = MahayanaLocalHostSupervisor(host: host, factory: { host })
