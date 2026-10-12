@@ -210,6 +210,28 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
     }
 
 
+    func testPluginPermissionRequestRetainsInstallAccountGeneration() {
+        let original = MarketplacePluginAccountIdentity(
+            accountScope: String(repeating: "a", count: 64),
+            accountGeneration: String(repeating: "b", count: 64)
+        )
+        let request = PluginPermissionRequest(
+            pluginId: "global-dharma",
+            runtime: "local-web",
+            permissions: ["network"],
+            accountIdentity: original
+        )
+        XCTAssertTrue(request.accepts(identity: original))
+        XCTAssertFalse(request.accepts(identity: MarketplacePluginAccountIdentity(
+            accountScope: original.accountScope,
+            accountGeneration: String(repeating: "c", count: 64)
+        )))
+        XCTAssertFalse(request.accepts(identity: MarketplacePluginAccountIdentity(
+            accountScope: String(repeating: "d", count: 64),
+            accountGeneration: original.accountGeneration
+        )))
+    }
+
     func testMarketplacePluginAccountIdentityRequiresCompleteStrictHostIdentity() throws {
         let identity = try XCTUnwrap(MarketplaceModel.marketplacePluginAccountIdentity(from: [
             "protocol": "fabushi.plugin-account-identity.v1",

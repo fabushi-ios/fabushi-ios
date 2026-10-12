@@ -1787,7 +1787,12 @@ struct PluginPermissionRequest: Identifiable, Equatable {
     let pluginId: String
     let runtime: String
     let permissions: [String]
+    let accountIdentity: MarketplacePluginAccountIdentity
     var id: String { pluginId }
+
+    func accepts(identity: MarketplacePluginAccountIdentity) -> Bool {
+        accountIdentity == identity
+    }
 }
 
 struct MobileConnectorCatalogEntry: Identifiable, Equatable, Sendable {
@@ -2515,6 +2520,8 @@ final class MarketplaceModel {
             resetToolResultCards()
             resetAgentDockBadgeForScopeChange()
             installedPluginIds = []
+            permissionRequest = nil
+            installingPluginId = nil
         }
 
         guard let user = auth?["user"] as? [String: Any] else {
@@ -5447,7 +5454,8 @@ final class MarketplaceModel {
                 permissionRequest = PluginPermissionRequest(
                     pluginId: pluginId,
                     runtime: runtime,
-                    permissions: permissions
+                    permissions: permissions,
+                    accountIdentity: identity
                 )
                 message = "\(pluginId) 请求 \(permissions.count) 项权限"
             }
@@ -5514,6 +5522,11 @@ final class MarketplaceModel {
         message = "正在授权 \(request.pluginId)…"
         do {
             let identity = try await pluginAccountIdentity()
+            guard request.accepts(identity: identity) else {
+                throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                    "Account generation changed before plugin permission approval"
+                )
+            }
             for permission in request.permissions {
                 _ = try await bridge.request(
                     method: "plugin.permission.grant",
