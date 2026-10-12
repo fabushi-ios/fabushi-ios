@@ -19,14 +19,14 @@ final class IOSUpdateServiceWiring {
         service.policyLoadState
     }
 
-    func refreshPolicy() async -> IOSAppVersionPolicyLoadState {
+    func refreshPolicy(trigger: String = "runtime_refresh") async -> IOSAppVersionPolicyLoadState {
         do {
             _ = try await service.checkForUpdates()
-            reportCheck(trigger: "runtime_refresh", state: service.policyLoadState)
+            reportCheck(trigger: trigger, state: service.policyLoadState)
             return service.policyLoadState
         } catch is CancellationError {
             reportCheck(
-                trigger: "runtime_refresh",
+                trigger: trigger,
                 state: service.policyLoadState,
                 cancelled: true
             )
@@ -36,8 +36,17 @@ final class IOSUpdateServiceWiring {
                 message: error.localizedDescription,
                 retained: service.policyLoadState.policy
             )
-            reportCheck(trigger: "runtime_refresh", state: failed)
+            reportCheck(trigger: trigger, state: failed)
             return failed
+        }
+    }
+
+    func noteBackendUpdateRequirement(_ required: Bool) {
+        guard service.noteBackendUpdateRequirement(required) else { return }
+        if required {
+            Task { @MainActor [weak self] in
+                _ = await self?.refreshPolicy(trigger: "backend_gate")
+            }
         }
     }
 
