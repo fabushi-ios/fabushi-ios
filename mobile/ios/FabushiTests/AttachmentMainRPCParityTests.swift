@@ -80,6 +80,42 @@ final class AttachmentMainRPCParityTests: XCTestCase {
     }
 
     @MainActor
+    func testRestartPurgesStaleNativeStaging() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-attachment-restart-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let first = try IOSAttachmentMainRPCAdapter(
+            appDataDirectory: root,
+            currentAccountScope: { "account-a" },
+            hostRequest: { _, _ in [String: Any]() }
+        )
+        let staged = try await first.route(
+            method: "stageAttachmentBytes",
+            args: try CoordinatorPayload.fromFoundation([
+                "agentId": "agent-a",
+                "filename": "restart.txt",
+                "bytesBase64": Data("stale".utf8).base64EncodedString(),
+            ])
+        )
+        guard case .ok(let stagedPayload)? = staged,
+              let row = stagedPayload.foundationValue as? [String: Any],
+              let path = row["path"] as? String
+        else { return XCTFail("expected staged path") }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+
+        _ = try IOSAttachmentMainRPCAdapter(
+            appDataDirectory: root,
+            currentAccountScope: { "account-a" },
+            hostRequest: { _, _ in [String: Any]() }
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: path),
+            "native-main recreation must not resurrect half-staged transfers"
+        )
+    }
+
+    @MainActor
     func testPreviewCapBoundedReadsAndRemoteImageFallback() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("fabushi-attachment-read-\(UUID().uuidString)", isDirectory: true)
@@ -141,6 +177,178 @@ final class AttachmentMainRPCParityTests: XCTestCase {
         else { return XCTFail("expected image projection") }
         XCTAssertEqual(mediaRow["kind"] as? String, "image")
         XCTAssertTrue(methods.contains("feature.attachment.readImageDirect"))
+    }
+
+    @MainActor
+    func testPreviewRejectsOversizedPayloadBeforeStreaming() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-attachment-cap-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var chunkCalls = 0
+        let adapter = try IOSAttachmentMainRPCAdapter(
+            appDataDirectory: root,
+            currentAccountScope: { "account-a" },
+            hostRequest: { method, _ in
+                guard method == "feature.attachment.readChunkDirect" else {
+                    return [String: Any]()
+                }
+                chunkCalls += 1
+                return [
+                    "bytesBase64": Data([0x61]).base64EncodedString(),
+                    "totalSize": IOSAttachmentMainRPCAdapter.previewByteCap + 1,
+                ]
+            }
+        )
+
+        let result = try await adapter.route(
+            method: "readAttachmentBytes",
+            args: try CoordinatorPayload.fromFoundation([
+                "agentId": "agent-a",
+                "path": "/canonical/too-large.bin",
+                "maxBytes": IOSAttachmentMainRPCAdapter.previewByteCap,
+            ])
+        )
+        guard case .ok(let payload)? = result,
+              let row = payload.foundationValue as? [String: Any]
+        else { return XCTFail("expected too-large result") }
+        XCTAssertEqual(row["kind"] as? String, "too-large")
+        XCTAssertEqual(row["size"] as? Int, IOSAttachmentMainRPCAdapter.previewByteCap + 1)
+        XCTAssertEqual(chunkCalls, 1, "oversized preview must stop after the size probe")
+    }
+
+    @MainActor
+    func testGatewayReadsNeverExceedFourMiBChunks() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-attachment-chunks-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let totalSize = IOSAttachmentMainRPCAdapter.gatewayReadChunkBytes + 1
+        var requestedLengths: [Int] = []
+        let adapter = try IOSAttachmentMainRPCAdapter(
+            appDataDirectory: root,
+            currentAccountScope: { "account-a" },
+            hostRequest: { method, params in
+                guard method == "feature.attachment.readChunkDirect" else {
+                    return [String: Any]()
+                }
+                let offset = params["offset"] as? Int ?? 0
+                let length = params["length"] as? Int ?? 0
+                requestedLengths.append(length)
+                let emitted = max(0, min(length, totalSize - offset))
+                return [
+                    "bytesBase64": Data(repeating: 0x61, count: emitted).base64EncodedString(),
+                    "totalSize": totalSize,
+                ]
+            }
+        )
+
+        let result = try await adapter.route(
+            method: "readAttachmentBytes",
+            args: try CoordinatorPayload.fromFoundation([
+                "agentId": "agent-a",
+                "path": "/canonical/chunked.bin",
+                "maxBytes": IOSAttachmentMainRPCAdapter.previewByteCap,
+            ])
+        )
+        guard case .ok(let payload)? = result,
+              let row = payload.foundationValue as? [String: Any]
+        else { return XCTFail("expected bytes result") }
+        XCTAssertEqual(row["kind"] as? String, "bytes")
+        XCTAssertEqual(
+            requestedLengths,
+            [1, IOSAttachmentMainRPCAdapter.gatewayReadChunkBytes, 1]
+        )
+        XCTAssertLessThanOrEqual(
+            requestedLengths.max() ?? 0,
+            IOSAttachmentMainRPCAdapter.gatewayReadChunkBytes
+        )
+    }
+
+    @MainActor
+    func testDownloadCancellationAndIncompleteTransferDeletePartialFiles() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fabushi-attachment-download-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let downloadRoot = root.appendingPathComponent("attachment-downloads", isDirectory: true)
+
+        var cancelledCalls = 0
+        let cancelled = try IOSAttachmentMainRPCAdapter(
+            appDataDirectory: root,
+            currentAccountScope: { "account-a" },
+            hostRequest: { method, _ in
+                guard method == "feature.attachment.readChunkDirect" else {
+                    return [String: Any]()
+                }
+                cancelledCalls += 1
+                if cancelledCalls == 1 {
+                    return [
+                        "bytesBase64": Data([0x61]).base64EncodedString(),
+                        "totalSize": 5,
+                    ]
+                }
+                throw CancellationError()
+            }
+        )
+        do {
+            _ = try await cancelled.route(
+                method: "downloadAttachment",
+                args: try CoordinatorPayload.fromFoundation([
+                    "agentId": "agent-a",
+                    "path": "/canonical/cancelled.txt",
+                    "suggestedName": "cancelled.txt",
+                ])
+            )
+            XCTFail("cancelled Host transfer must propagate cancellation")
+        } catch is CancellationError {
+            // Expected: IOSMainRuntime translates this to coordinator-cancelled.
+        }
+        XCTAssertTrue(
+            try FileManager.default.contentsOfDirectory(
+                at: downloadRoot,
+                includingPropertiesForKeys: nil
+            ).isEmpty,
+            "cancelled download must not leave a .partial file"
+        )
+
+        var incompleteCalls = 0
+        let incomplete = try IOSAttachmentMainRPCAdapter(
+            appDataDirectory: root,
+            currentAccountScope: { "account-a" },
+            hostRequest: { method, _ in
+                guard method == "feature.attachment.readChunkDirect" else {
+                    return [String: Any]()
+                }
+                incompleteCalls += 1
+                if incompleteCalls == 1 {
+                    return [
+                        "bytesBase64": Data([0x61]).base64EncodedString(),
+                        "totalSize": 5,
+                    ]
+                }
+                return [
+                    "bytesBase64": "",
+                    "totalSize": 5,
+                ]
+            }
+        )
+        let result = try await incomplete.route(
+            method: "downloadAttachment",
+            args: try CoordinatorPayload.fromFoundation([
+                "agentId": "agent-a",
+                "path": "/canonical/incomplete.txt",
+                "suggestedName": "incomplete.txt",
+            ])
+        )
+        guard case .ok(let payload)? = result else {
+            return XCTFail("expected failed download result")
+        }
+        XCTAssertEqual(payload.foundationValue as? Bool, false)
+        XCTAssertTrue(
+            try FileManager.default.contentsOfDirectory(
+                at: downloadRoot,
+                includingPropertiesForKeys: nil
+            ).isEmpty,
+            "incomplete download must remove temporary output"
+        )
     }
 
     func testShippingMainRuntimeOwnsAttachmentAdapterBeforeCoordinatorFallback() throws {
