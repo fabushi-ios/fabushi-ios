@@ -389,3 +389,11 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - The Computer busy-update guard and started-untrackable recovery remain in the descendant.
 - Strict inventory review advanced through notice, retired permission-request, timeline event automation/registry/resolver/card, attachment-data, auto-review approval actions, cloud-agent provider and connector actions against Desktop current main `371b72f1cd20de03dc4dff9a15ed761054968093`. All are current-main-reviewed/implemented only; none is verified.
 - Next strict inventory position is the emoji catalog/picker family. Global Dharma artifact provenance, strict completeness, signer, StoreKit, signed archive/device/distribution, independent acceptance and final acceptance remain open.
+
+
+## Current exact-head rebaseline — 2026-10-12 emoji and transcript-card audit
+
+- Pre-evidence head `733f2b2a4f93bbd4295d6882cf25f0f3a8fc85af` and its workflow runs `38201844264` / `38201844272` are predecessor-only after this responsibility correction.
+- Desktop emoji catalog/picker was re-read against `371b72f1cd20de03dc4dff9a15ed761054968093`. iOS does not depend on the system keyboard for the product catalog: it bundles an `emojibase-data@17.0.0` native catalog with 3,944 entries / 2,030 skin variants, bounded search, categories, aliases, recents ranking, reacted-state accessibility and navigation semantics. The catalog row is therefore `ios-adapted/implemented`; the picker moves from mapped to implemented. Fixed web CSS remains a native-layout replacement.
+- Frame/index/listener/message-actions/mount/protocol/reaction-actions were individually re-read against their shipping native owners. No verified promotion is made.
+- Strict inventory continues with reaction-feed / reaction-picker handoff / registry-resolver and later rows. Global Dharma artifact provenance, strict completeness, signer, StoreKit, signed archive/device/distribution and independent acceptance remain open.

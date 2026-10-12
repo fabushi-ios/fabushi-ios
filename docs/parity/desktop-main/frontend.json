@@ -85,7 +85,7 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/project.yml",
       "test_evidence": "",
-      "notes": "Mechanism-only row; no separate iOS runtime owner should be invented. Re-read exact Desktop barrel blob 7809281a897865a38e83de2bdd70783e0cdac314 at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. This file only re-exports adjacent SDK modules and owns no independent runtime state or user effect; Swift target/module visibility is the iOS replacement. Adjacent runtime owners remain audited as separate responsibilities, so this row stays not-applicable rather than inventing a second iOS runtime owner.",
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Existing native production evidence/test evidence was checked against current source responsibility; no new product-state owner or deterministic implementation gap was found. not-applicable/not-applicable-with-replacement, current-main-reviewed only; verified still requires resulting exact-head Actions and applicable UI/device evidence.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed"
     },
@@ -2300,15 +2300,16 @@
       "desktop_responsibility": "Load and cache the Desktop shipped emoji metadata/assets, normalize aliases/native presentation, group entries into categories, rank bounded search results with recent-reaction preference, and generation-fence loader reset/disposal.",
       "desktop_owner": "Desktop renderer transcript-card emoji catalog/store",
       "desktop_visible_effect": "The expanded reaction picker can browse/search a stable emoji catalog, prioritize recent matches, and recover cleanly from loader failure without stale catalog state.",
-      "ios_disposition": "not-applicable-with-replacement",
+      "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "iOS does not ship the Desktop Vite emoji chunks or duplicate their cache/search owner. The existing SwiftUI reaction sheet keeps Fabushi quick reactions and arbitrary emoji input while the platform emoji keyboard supplies the native catalog, categories, search, recents and skin-tone selection.",
-      "implementation_status": "not-applicable",
-      "production_evidence": "MobileBotChat.swift owns reactionPickerSheet/openReactionPicker/submitReactionPicker and exposes quick reactions plus an arbitrary Emoji TextField through the native iOS keyboard; reaction mutation remains in the existing transcript owner.",
-      "test_evidence": "Existing reaction picker semantic identifiers and transcript reaction tests remain the acceptance surface; same-head UI/physical-device parity evidence is still required.",
-      "notes": "IOS-MAIN-DEP-EMOJI-CATALOG-20261009: exact Desktop blob e526884f4d6bcd483476fc9f9ae9f667f5e4d625 reviewed. Web runtime emoji assets are replaced by the iOS system emoji input surface, not ported.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "ios_platform_delta": "The Desktop Vite/chunk loader and JS store are replaced by an in-bundle native catalog generated from emojibase-data@17.0.0. MobileBotChat owns a 3,944-entry canonical catalog with 2,030 skin variants, category aliases, shortcodes, bounded 96-result search and recent-aware ranking; no network or system-keyboard dependency is required for catalog availability. Swift value data has no separate mutable cache/store to stale across account scope.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift: mobileDesktopEmojiCatalog/mobileReactionCatalog/mobileReactionPickerResults; generated native emoji catalog data is bundled with the target.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift:testNativeReactionPickerCatalogSearchCategoryAliasesSkinsRankingAndLimit,testNativeReactionPickerAccessibilityReflectsCurrentUserState,testNativeReactionPickerKeyboardGridNavigationIsBounded; resulting exact-head Actions required before verified.",
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Native iOS now ships an explicit canonical catalog rather than relying on the system keyboard; the old N/A description was stale. Implemented/current-main-reviewed only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-picker-content.css",
@@ -2323,8 +2324,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "MobileBotChat.reactionPickerSheet uses NavigationStack, Form, LazyVGrid and presentationDetents([.medium]) for the shipping reaction picker.",
       "test_evidence": "Same-head SwiftUI build/protected UI/physical-device acceptance remains required.",
-      "notes": "IOS-MAIN-DEP-EMOJI-CSS-20261009: exact Desktop blob 757849094c1fd16e397141d5b5dd2875e83fcba8 reviewed; web-only layout replaced by native SwiftUI.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Fixed DOM pixel/grid CSS remains platform-only and is replaced by SwiftUI adaptive sheet/grid sizing, Dynamic Type and native focus. No independent product-state owner exists; not-applicable-with-replacement/current-main-reviewed.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-picker-content.tsx",
@@ -2335,12 +2337,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "SwiftUI replaces DOM focus/grid keyboard handling. Existing reactionPickerSheet provides accessible quick choices and arbitrary emoji input, while the system emoji keyboard supplies native browse/search/category/recents behavior; Fabushi still owns selection and reaction state.",
-      "implementation_status": "mapped",
-      "production_evidence": "MobileBotChat.reactionMenu opens reactionPickerSheet; the sheet exposes quick reaction buttons plus an accessible arbitrary-emoji TextField and routes selection only through submitReactionPicker/toggleReaction.",
-      "test_evidence": "Current semantic IDs mobile-bot-reaction-picker and mobile-bot-reaction-picker-input provide UI acceptance hooks; final same-head device parity remains pending.",
-      "notes": "IOS-MAIN-DEP-EMOJI-PICKER-CONTENT-20261009: exact Desktop blob 329821ce3db08b39ca0fa287df3310f5d7122814 reviewed. Keep mapped until current-head UI/device acceptance confirms the native replacement.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "ios_platform_delta": "SwiftUI replaces DOM refs and browser key events but preserves bounded search, categories, reacted-state accessibility, recents ranking, grid navigation semantics and selection callbacks using the bundled native emojibase catalog. Reaction dispatch stays in the canonical transcript owner.",
+      "implementation_status": "implemented",
+      "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift: mobileReactionPickerResults/mobileReactionPickerAccessibilityLabel/mobileReactionPickerNextIndex/reactionPickerSheet/openReactionPicker/submitReactionPicker/toggleReaction",
+      "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift:testNativeReactionPickerCatalogSearchCategoryAliasesSkinsRankingAndLimit,testNativeReactionPickerAccessibilityReflectsCurrentUserState,testNativeReactionPickerKeyboardGridNavigationIsBounded,testNativeReactionPickerFailsClosedUntilCanonicalMessageIsSettled; resulting exact-head UI/device evidence required before verified.",
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. The shipping native picker is no longer merely mapped: complete catalog/search/category/recents/a11y/navigation behavior and selection routing are present with focused tests. Implemented/current-main-reviewed only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/frame.tsx",
@@ -2355,8 +2358,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.transcriptList computes one adjacency array for mobileMainTranscriptEntries and composes every native card leaf inside the same transcript row/root. projectMobileTranscriptAdjacency supplies group boundaries; specialized leaf views do not own transport or transcript state.",
       "test_evidence": "SharedWorkflowTranscriptParityTests covers the six-field adjacency contract, group boundaries and specialized transcript-card projections. Same-head Swift/UI evidence remains required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-AGGREGATE-20261011: canonical Desktop source reread on b826f59ccbba64d2e014d8bdcca3ab765a73c8e8; native production composition and focused tests are present. Historical child-dependency/mount-mechanism fences are closed at implementation level only. Keep below verified until same-final-HEAD Swift/UI/device/protected evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Existing native production evidence/test evidence was checked against current source responsibility; no new product-state owner or deterministic implementation gap was found. implemented/ios-adapted, current-main-reviewed only; verified still requires resulting exact-head Actions and applicable UI/device evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/index.ts",
@@ -2371,7 +2375,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "",
-      "notes": "Mechanism-only row; no separate iOS runtime owner should be invented."
+      "notes": "Mechanism-only row; no separate iOS runtime owner should be invented.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/listener-integrations.ts",
@@ -2386,8 +2392,9 @@
       "implementation_status": "implemented",
       "production_evidence": "FeatureHost production ListenerList overlays live connector truth and ListenerConnect routes non-Git platforms through the canonical ConnectorConnect/MCP OAuth owner. MarketplaceModel now projects listener.listed state, scopes refresh/connect to the authenticated account, fences OAuth generations, and MobileBotChat renders a real Connect/Connected card with a visibility-lifetime 5s refresh.",
       "test_evidence": "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift covers transcript listener platform projection, Host integration field filtering, and HTTPS-only authorization URL validation; same-head GitHub Actions build/protected acceptance remains required before verified.",
-      "notes": "IOS-MAIN-DEP-LISTENER-INTEGRATIONS-20261009: exact Desktop blob 0a0498e8cac1f1ffae850591e30528a02b65cc81 and its listener-connect leaf were read against Desktop main. No parallel connection/runtime owner was introduced; keep at implemented until current-head CI plus aggregate dependency review close. Ledger target normalized to the single shipping source owner required by strict architecture validation; collaborating owners remain documented in production evidence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Existing native production evidence/test evidence was checked against current source responsibility; no new product-state owner or deterministic implementation gap was found. implemented/ios-adapted, current-main-reviewed only; verified still requires resulting exact-head Actions and applicable UI/device evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/message-actions.tsx",
@@ -2402,8 +2409,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat filters branched replies from the main feed, exposes Reply/Start Thread/Copy/React, renders View thread reply counts, and opens a native thread sheet over the same transcript entries. Conversation history topology is preserved by the canonical Rust Host contract.",
       "test_evidence": "SharedWorkflowTranscriptParityTests.testMobileTranscriptMessageActionsProjectMainThreadCountsAndCopySemantics plus existing transcript thread/reaction tests; current-head Actions/device acceptance pending.",
-      "notes": "IOS-MAIN-DEP-MESSAGE-ACTIONS-20261009: exact Desktop blob 517029e6b5addca641f1a53b6f3e149c404d0ba8 reviewed. DOM-only focus restoration/selection exclusion is replaced by native menu semantics; keep implemented until same-head CI/UI acceptance. Ledger target normalized to the single shipping source owner required by strict architecture validation; collaborating owners remain documented in production evidence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Existing native production evidence/test evidence was checked against current source responsibility; no new product-state owner or deterministic implementation gap was found. implemented/ios-adapted, current-main-reviewed only; verified still requires resulting exact-head Actions and applicable UI/device evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/mount-contract.ts",
@@ -2418,8 +2426,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat is the sole shipping transcript composition root; MarketplaceModel and the canonical bridge/runtime own typed state/actions. Widget, cloud-agent, connector, listener, secret, draft and reaction actions are invoked through those scoped owners and reset/fence on account/Agent replacement.",
       "test_evidence": "SharedWorkflowTranscriptParityTests plus leaf-specific MobileComposer/GlobalDharma/approval/reaction tests exercise the composed scope. Exact-head UI/device evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-AGGREGATE-20261011: canonical Desktop source reread on b826f59ccbba64d2e014d8bdcca3ab765a73c8e8; native production composition and focused tests are present. Historical child-dependency/mount-mechanism fences are closed at implementation level only. Keep below verified until same-final-HEAD Swift/UI/device/protected evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Existing native production evidence/test evidence was checked against current source responsibility; no new product-state owner or deterministic implementation gap was found. implemented/ios-adapted, current-main-reviewed only; verified still requires resulting exact-head Actions and applicable UI/device evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/protocol.ts",
@@ -2434,8 +2443,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mahayana-host-protocol serde-validates TranscriptCard/MessageDraft; MarketplaceModel.projectMobileCanonicalHostTranscriptCard and projectMobileTranscriptCard are the single native protocol projectors consumed by MobileBotChat. All actual Desktop transcript-card discriminants now have an implemented native leaf or an explicit iOS replacement for Desktop-local computer permission.",
       "test_evidence": "SharedWorkflowTranscriptParityTests.testCanonicalHostTranscriptCardsPreserveValidatedPayloadAndFailClosed plus widget/draft/secret/attachment/connector/approval focused tests cover strict projection and action state. Same-head build/UI/device evidence remains required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-AGGREGATE-20261011: canonical Desktop source reread on b826f59ccbba64d2e014d8bdcca3ab765a73c8e8; native production composition and focused tests are present. Historical child-dependency/mount-mechanism fences are closed at implementation level only. Keep below verified until same-final-HEAD Swift/UI/device/protected evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Existing native production evidence/test evidence was checked against current source responsibility; no new product-state owner or deterministic implementation gap was found. implemented/ios-adapted, current-main-reviewed only; verified still requires resulting exact-head Actions and applicable UI/device evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-actions.ts",
@@ -2450,7 +2460,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift; exact-HEAD ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Production wiring is implemented; keep below verified until the new iOS exact HEAD passes ordinary Rust/Swift/UI/device-archive and applicable protected evidence."
+      "notes": "Re-read Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Existing native production evidence/test evidence was checked against current source responsibility; no new product-state owner or deterministic implementation gap was found. implemented/ios-adapted, current-main-reviewed only; verified still requires resulting exact-head Actions and applicable UI/device evidence.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/reaction-feed.ts",
