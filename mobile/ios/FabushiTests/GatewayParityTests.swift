@@ -785,4 +785,56 @@ final class GatewayParityTests: XCTestCase {
         XCTAssertEqual(denialStore.deleteCount, 1)
     }
 
+
+    func testGatewayDescriptorFastPathHonorsBlockedRetryHold() async throws {
+        let store = GatewayDescriptorTestStore()
+        let cache = IOSGatewayDescriptorKeychainCache(store: store)
+        var now: Int64 = 10_000
+        var calls = 0
+        let live = IOSCursorSandBoxConnection(
+            networkToken: "live", execDaemonAuthToken: "live",
+            execDaemonURL: "https://live.example", vncURL: "",
+            gatewayURL: "", gatewayToken: "", forkVNCBaseURL: ""
+        )
+        let fastPath = IOSGatewayDescriptorFastPath(
+            cache: cache,
+            getAccountScope: { "account-a" },
+            nowMilliseconds: { now },
+            resolveLive: {
+                calls += 1
+                if calls == 1 {
+                    throw IOSCursorSandBoxBrokerError(
+                        kind: .blocked(retryAfterMilliseconds: 7_000),
+                        message: "blocked"
+                    )
+                }
+                return live
+            }
+        )
+
+        do {
+            _ = try await fastPath.resolve()
+            XCTFail("first broker block must fail")
+        } catch let error as IOSCursorSandBoxBrokerError {
+            XCTAssertEqual(error.kind, .blocked(retryAfterMilliseconds: 7_000))
+        }
+        XCTAssertEqual(calls, 1)
+
+        now += 1_000
+        do {
+            _ = try await fastPath.resolve()
+            XCTFail("active hold must fail without another broker request")
+        } catch let error as IOSCursorSandBoxBrokerError {
+            guard case .blocked(let retry) = error.kind else {
+                return XCTFail("expected blocked hold")
+            }
+            XCTAssertEqual(retry, 6_000)
+        }
+        XCTAssertEqual(calls, 1)
+
+        now += 6_001
+        XCTAssertEqual(try await fastPath.resolve(), live)
+        XCTAssertEqual(calls, 2)
+    }
+
 }
