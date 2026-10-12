@@ -66,7 +66,7 @@ final class IOSAttachmentMainRPCAdapter {
         method: String,
         args: CoordinatorPayload
     ) async throws -> CoordinatorReplyOutcome? {
-        guard IOSMainRPCRuntime.methods.contains(method),
+        guard IOSMainRPCRuntime.isMethod(method),
               let params = args.foundationValue as? [String: Any]
         else { return nil }
 
