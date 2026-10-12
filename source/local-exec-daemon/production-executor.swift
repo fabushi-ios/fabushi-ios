@@ -443,7 +443,35 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 redacted: caseName == "redactedReadArgs"
             )
         case "local-exec.process", "local-exec.process.exec", "local-exec.process.spawn":
-            throw IOSRemoteExecDaemonError.unsupported(method)
+            guard let program = object["program"] as? String,
+                  !program.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !program.contains("\0"),
+                  !program.contains("\r"),
+                  !program.contains("\n")
+            else {
+                throw IOSRemoteExecDaemonError.invalidRequest("process program is required")
+            }
+            let args: [String]
+            if let rawArgs = object["args"] {
+                guard let values = rawArgs as? [String],
+                      values.allSatisfy({ !$0.contains("\0") })
+                else {
+                    throw IOSRemoteExecDaemonError.invalidRequest("process args must be strings without NUL bytes")
+                }
+                args = values
+            } else {
+                args = []
+            }
+            let command = ([program] + args)
+                .map(Self.shellQuotedArgument)
+                .joined(separator: " ")
+            body = try IOSRemoteExecDaemonWire.shellRequest(
+                id: 1,
+                execID: execID,
+                command: command,
+                workingDirectory: object["workingDirectory"] as? String ?? "",
+                toolCallID: object["toolCallId"] as? String ?? ""
+            )
         default:
             throw IOSRemoteExecDaemonError.unsupported(method)
         }
@@ -530,6 +558,10 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             "cwd": exit.cwd,
             "aborted": exit.aborted,
         ])
+    }
+
+    private static func shellQuotedArgument(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
     private static func integer(_ value: Any?) -> Int? {
