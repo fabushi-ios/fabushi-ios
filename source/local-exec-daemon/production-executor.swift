@@ -1,5 +1,29 @@
 import Foundation
 
+protocol IOSRemoteExecutionProviding: Sendable {
+    func dispatch(
+        method: String,
+        params: CoordinatorPayload
+    ) async throws -> CoordinatorPayload
+}
+
+enum IOSRemoteExecutionProviderError: LocalizedError, Equatable, Sendable {
+    case unavailable
+
+    var errorDescription: String? {
+        "Remote execution provider is not configured for this shipping build."
+    }
+}
+
+struct IOSUnavailableRemoteExecutionProvider: IOSRemoteExecutionProviding {
+    func dispatch(
+        method: String,
+        params: CoordinatorPayload
+    ) async throws -> CoordinatorPayload {
+        throw IOSRemoteExecutionProviderError.unavailable
+    }
+}
+
 protocol IOSLocalCapabilityBackend: Sendable {
     func execute(
         capability: LocalCapabilityRunner.Capability,

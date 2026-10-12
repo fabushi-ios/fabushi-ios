@@ -222,8 +222,25 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertTrue(source.contains("remoteTransport: IOSGenerationFencedRemoteRunnerTransport("))
         XCTAssertTrue(source.contains("accountRevision: localToolApprovalScopeRevision"))
         XCTAssertTrue(source.contains("hostGeneration: hostSupervisor.generation"))
-        XCTAssertTrue(source.contains("let result = try await self.request(method: method, params: object)"))
+        XCTAssertTrue(source.contains("servicePendingPlatformExecution("))
+        XCTAssertTrue(source.contains("self.remoteExecutionProvider.dispatch("))
+        XCTAssertFalse(source.contains("let result = try await self.request(method: method, params: object)"))
         XCTAssertFalse(source.contains("remoteTransport: IOSFailClosedRemoteRunnerTransport()"))
+    }
+
+    func testShippingRemoteExecutionProviderFailsClosedUntilReviewedProviderIsConfigured() async {
+        let provider = IOSUnavailableRemoteExecutionProvider()
+        do {
+            _ = try await provider.dispatch(
+                method: "local-exec.process.exec",
+                params: .object(["program": .string("git")])
+            )
+            XCTFail("shipping fallback must not fabricate process execution")
+        } catch let error as IOSRemoteExecutionProviderError {
+            XCTAssertEqual(error, .unavailable)
+        } catch {
+            XCTFail("unexpected unavailable-provider error: \(error)")
+        }
     }
 
     func testProductionRemoteRunnerScrubsDesktopOnlyEnvironmentVariables() async throws {

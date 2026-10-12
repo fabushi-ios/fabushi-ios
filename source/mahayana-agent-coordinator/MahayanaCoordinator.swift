@@ -370,6 +370,7 @@ final class MahayanaCoordinator {
     private let devControlAdapter: (any CoordinatorDevControlAdapting)?
     private let clientSideToolV2Relay = ClientSideToolV2Relay()
     private let nativeLocalCapabilities = IOSNativeLocalCapabilityBackend()
+    private let remoteExecutionProvider: any IOSRemoteExecutionProviding
     private lazy var productionLocalExecutor: IOSProductionLocalExecutor = {
         IOSProductionLocalExecutor(
             localBackend: nativeLocalCapabilities,
@@ -379,11 +380,10 @@ final class MahayanaCoordinator {
                 },
                 dispatch: { [weak self] method, params in
                     guard let self else { throw CoordinatorError.unavailable }
-                    guard case .object = params,
-                          let object = params.foundationValue as? [String: Any]
-                    else { throw CoordinatorError.invalidParams }
-                    let result = try await self.request(method: method, params: object)
-                    return try CoordinatorPayload.fromFoundation(result.value)
+                    return try await self.remoteExecutionProvider.dispatch(
+                        method: method,
+                        params: params
+                    )
                 }
             )
         )
@@ -453,12 +453,14 @@ final class MahayanaCoordinator {
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
         mcpSurface: CoordinatorMcpSurface? = nil,
         transportStageRecorder: TransportStageRecorder = .init(),
+        remoteExecutionProvider: any IOSRemoteExecutionProviding = IOSUnavailableRemoteExecutionProvider(),
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
         self.transportStageRecorder = transportStageRecorder
+        self.remoteExecutionProvider = remoteExecutionProvider
         self.hostSettingsReconciler = settingsStore.map { store in
             IOSHostSettingsReconciler(
                 readLocal: { store.getHasSeenOnboarding() },
@@ -531,6 +533,107 @@ final class MahayanaCoordinator {
             accountRevision: localToolApprovalScopeRevision,
             hostGeneration: hostSupervisor.generation
         )
+    }
+
+    private func rejectPlatformExecIfCurrent(
+        requestId: String,
+        code: String,
+        message: String,
+        expectedHostGeneration: UInt64
+    ) async {
+        guard hostSupervisor.generation == expectedHostGeneration else { return }
+        _ = try? await hostSupervisor.request(
+            method: "platformExec.reject",
+            params: [
+                "requestId": requestId,
+                "code": code,
+                "message": message,
+            ]
+        )
+    }
+
+    @discardableResult
+    func servicePendingPlatformExecution(
+        expectedIdentity: IOSRemoteRunnerExecutionIdentity?
+    ) async throws -> Bool {
+        let expectedHostGeneration = expectedIdentity?.hostGeneration ?? hostSupervisor.generation
+        guard hostSupervisor.generation == expectedHostGeneration else { return false }
+
+        let next = try await hostSupervisor.request(
+            method: "platformExec.next",
+            params: [:]
+        )
+        if next.value is NSNull {
+            return false
+        }
+        guard let request = next.value as? [String: Any],
+              let requestId = (request["requestId"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !requestId.isEmpty,
+              let method = (request["method"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !method.isEmpty,
+              let rawParams = request["params"]
+        else {
+            throw CoordinatorError.invalidResponse
+        }
+
+        guard let expectedIdentity,
+              currentRemoteRunnerIdentity() == expectedIdentity,
+              hostSupervisor.generation == expectedHostGeneration
+        else {
+            await rejectPlatformExecIfCurrent(
+                requestId: requestId,
+                code: "stale_execution_scope",
+                message: "Platform execution scope changed before dispatch.",
+                expectedHostGeneration: expectedHostGeneration
+            )
+            return true
+        }
+
+        do {
+            try Task.checkCancellation()
+            let params = try CoordinatorPayload.fromFoundation(rawParams)
+            let result = try await productionLocalExecutor.execute(
+                method: method,
+                params: params
+            )
+            try Task.checkCancellation()
+            guard currentRemoteRunnerIdentity() == expectedIdentity,
+                  hostSupervisor.generation == expectedHostGeneration
+            else {
+                await rejectPlatformExecIfCurrent(
+                    requestId: requestId,
+                    code: "stale_execution_scope",
+                    message: "Platform execution scope changed before result commit.",
+                    expectedHostGeneration: expectedHostGeneration
+                )
+                return true
+            }
+            _ = try await hostSupervisor.request(
+                method: "platformExec.resolve",
+                params: [
+                    "requestId": requestId,
+                    "result": result.foundationValue,
+                ]
+            )
+        } catch is CancellationError {
+            await rejectPlatformExecIfCurrent(
+                requestId: requestId,
+                code: "cancelled",
+                message: "Platform execution was cancelled.",
+                expectedHostGeneration: expectedHostGeneration
+            )
+            throw CancellationError()
+        } catch {
+            await rejectPlatformExecIfCurrent(
+                requestId: requestId,
+                code: "remote_execution_failed",
+                message: error.localizedDescription,
+                expectedHostGeneration: expectedHostGeneration
+            )
+        }
+        return true
     }
 
     func structuredLogCredentials(
@@ -1379,6 +1482,7 @@ final class MahayanaCoordinator {
         }()
         let requestId = UUID().uuidString.lowercased()
         let observedHostGeneration = hostSupervisor.generation
+        let observedRemoteRunnerIdentity = currentRemoteRunnerIdentity()
         let awaitTurn = method == "feature.execute" && (params["awaitTurn"] as? Bool) == true
         var awaitedOperationId: String?
         inFlight.insert(requestId)
@@ -1416,6 +1520,9 @@ final class MahayanaCoordinator {
                 }
                 switch status {
                 case "pending":
+                    _ = try await servicePendingPlatformExecution(
+                        expectedIdentity: observedRemoteRunnerIdentity
+                    )
                     continue
                 case "completed":
                     awaitedOperationId = nil
