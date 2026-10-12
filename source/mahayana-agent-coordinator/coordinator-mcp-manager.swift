@@ -1797,8 +1797,10 @@ final class CoordinatorMcpSurface {
             guard (await cursorAuth.status()).loggedIn else {
                 throw IOSCursorAuthError.signInRequired
             }
-            guard let name = params["name"] as? String else {
-                throw SandMcpConfigError("updateCursorAccountName requires name.")
+            guard let name = params["name"] as? String, name.count <= 200 else {
+                throw SandMcpConfigError(
+                    "updateCursorAccountName requires a bounded name string."
+                )
             }
             try await dashboard.updateCursorAccountName(name)
             return .handled([:])
@@ -1903,7 +1905,7 @@ final class CoordinatorMcpSurface {
                 throw SandMcpConfigError("MCP backend sign-in attempt id is required.")
             }
             if let status = try await cursorAuth.pollLogin(attemptId: attemptId) {
-                await manager.reload()
+                _ = try await manager.reloadServers()
                 return .handled([
                     "completed": true,
                     "auth": projectCursorAuthStatus(status),

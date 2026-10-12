@@ -288,3 +288,27 @@ final class CoordinatorSkillPublishAuthoritativeProjectionTests: XCTestCase {
         )
     }
 }
+
+extension CoordinatorMcpSurfaceTests {
+    func testCursorAccountEdgeShippingWiringRefreshesServersAndBoundsName() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains(
+            #"if let status = try await cursorAuth.pollLogin(attemptId: attemptId) {"#
+        ))
+        XCTAssertTrue(source.contains("_ = try await manager.reloadServers()"))
+        XCTAssertTrue(source.contains(
+            #"guard let name = params["name"] as? String, name.count <= 200 else {"#
+        ))
+    }
+}
