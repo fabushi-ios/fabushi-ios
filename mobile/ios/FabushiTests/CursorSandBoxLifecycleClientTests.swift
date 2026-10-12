@@ -143,7 +143,7 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
     }
 
     func testEnsureSandBoxPreservesBrokerFailureContracts() async throws {
-        struct Case {
+        struct Case: Sendable {
             let status: Int
             let hint: String?
             let retryAfter: String?
