@@ -1916,6 +1916,21 @@ struct MarketplacePluginAccountIdentity: Equatable, Sendable {
     }
 }
 
+struct MarketplacePluginAuthBlock: Identifiable, Equatable, Sendable {
+    let pluginId: String
+    let pluginName: String
+    let marketplaceName: String?
+
+    var id: String { "\(marketplaceName ?? ""):\(pluginId)" }
+}
+
+enum MarketplacePluginAuthStatus: String, Equatable, Sendable {
+    case idle
+    case loading
+    case ready
+    case failed
+}
+
 @MainActor
 @Observable
 final class MarketplaceModel {
@@ -1927,6 +1942,11 @@ final class MarketplaceModel {
     var installedPluginIds: Set<String> = []
     var plugins: [MarketplacePlugin] = []
     var pluginBrowserTab: MarketplaceBrowserTab = .marketplace
+    var pluginAuthStatus: MarketplacePluginAuthStatus = .idle
+    var pluginAuthBlocks: [MarketplacePluginAuthBlock] = []
+    var pluginAuthLaunching = false
+    var pluginAuthFailure: String?
+    var pluginAuthAgentId: String?
     var privateSkillOwnershipFilter: MarketplaceSkillOwnershipFilter = .all
     var privateSkillQuery = ""
     var privateSkills: [MarketplacePrivateSkill] = []
@@ -2022,6 +2042,8 @@ final class MarketplaceModel {
     @ObservationIgnored private var mcpMutationSerial: [String: Int] = [:]
     @ObservationIgnored private var privateSkillRequestSerial = 0
     @ObservationIgnored private var privateSkillScopeGeneration = 0
+    @ObservationIgnored private var pluginAuthScopeGeneration = 0
+    @ObservationIgnored private var pluginAuthRequestGeneration = 0
     @ObservationIgnored private let toolResultStore = MobileToolResultStore()
     @ObservationIgnored private let localMiniAppSigningAuthority = LocalMiniAppSigningAuthority()
     @ObservationIgnored private let agentDockBadgeController = IOSDockBadgeController()
@@ -2109,6 +2131,153 @@ final class MarketplaceModel {
             result[key] = value
         }
         return result
+    }
+
+    nonisolated static func pluginAuthBlocks(from value: Any?) -> [MarketplacePluginAuthBlock] {
+        guard let object = value as? [String: Any],
+              let candidates = object["authBlocked"] as? [Any]
+        else { return [] }
+        return candidates.compactMap { candidate in
+            guard let row = candidate as? [String: Any],
+                  let pluginId = row["pluginId"] as? String,
+                  !pluginId.isEmpty,
+                  let pluginName = row["pluginName"] as? String,
+                  !pluginName.isEmpty
+            else { return nil }
+            let marketplaceName = (row["marketplaceName"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return MarketplacePluginAuthBlock(
+                pluginId: pluginId,
+                pluginName: pluginName,
+                marketplaceName: marketplaceName?.isEmpty == false ? marketplaceName : nil
+            )
+        }
+    }
+
+    nonisolated static func pluginAuthBlockedDetail(
+        _ blocks: [MarketplacePluginAuthBlock]
+    ) -> String {
+        let names = blocks.map(\.pluginName).filter { !$0.isEmpty }
+        if names.isEmpty || names.count > 3 {
+            let count = blocks.count
+            return "\(count) installed \(count == 1 ? "plugin" : "plugins") can't be fetched until Grok Bot's computer can read their source repository."
+        }
+        return "\(names.joined(separator: ", ")) \(names.count == 1 ? "is" : "are") installed, but their content can't be fetched until Grok Bot's computer can read the source repository."
+    }
+
+    private func resetPluginAuthState() {
+        pluginAuthScopeGeneration = pluginAuthScopeGeneration == Int.max
+            ? 1
+            : pluginAuthScopeGeneration + 1
+        pluginAuthRequestGeneration = pluginAuthRequestGeneration == Int.max
+            ? 1
+            : pluginAuthRequestGeneration + 1
+        pluginAuthStatus = .idle
+        pluginAuthBlocks = []
+        pluginAuthLaunching = false
+        pluginAuthFailure = nil
+        pluginAuthAgentId = nil
+    }
+
+    func disposePluginAuthScope() {
+        resetPluginAuthState()
+    }
+
+    private func nextPluginAuthRequestGeneration() -> Int {
+        pluginAuthRequestGeneration = pluginAuthRequestGeneration == Int.max
+            ? 1
+            : pluginAuthRequestGeneration + 1
+        return pluginAuthRequestGeneration
+    }
+
+    private func acceptsPluginAuthResult(
+        scopeGeneration: Int,
+        requestGeneration: Int,
+        accountKey: String
+    ) -> Bool {
+        loggedIn
+            && pluginAuthScopeGeneration == scopeGeneration
+            && pluginAuthRequestGeneration == requestGeneration
+            && settingsNoticeAccountKey == accountKey
+    }
+
+    func refreshPluginAuthStatus() async {
+        guard loggedIn else {
+            resetPluginAuthState()
+            return
+        }
+        let accountKey = settingsNoticeAccountKey
+        let scopeGeneration = pluginAuthScopeGeneration
+        let requestGeneration = nextPluginAuthRequestGeneration()
+        pluginAuthStatus = .loading
+        pluginAuthFailure = nil
+        do {
+            let identity = try await pluginAccountIdentity()
+            let result = try await bridge.request(method: "getPluginSyncStatus")
+            try await ensurePluginAccountIdentity(identity)
+            guard acceptsPluginAuthResult(
+                scopeGeneration: scopeGeneration,
+                requestGeneration: requestGeneration,
+                accountKey: accountKey
+            ) else { return }
+            pluginAuthBlocks = Self.pluginAuthBlocks(from: result.value)
+            pluginAuthStatus = .ready
+        } catch is CancellationError {
+            return
+        } catch {
+            guard acceptsPluginAuthResult(
+                scopeGeneration: scopeGeneration,
+                requestGeneration: requestGeneration,
+                accountKey: accountKey
+            ) else { return }
+            pluginAuthStatus = .failed
+            pluginAuthFailure = error.localizedDescription
+        }
+    }
+
+    @discardableResult
+    func fixPluginGitHubAuth() async -> String? {
+        guard loggedIn, !pluginAuthLaunching, !pluginAuthBlocks.isEmpty else {
+            return nil
+        }
+        let accountKey = settingsNoticeAccountKey
+        let scopeGeneration = pluginAuthScopeGeneration
+        let requestGeneration = nextPluginAuthRequestGeneration()
+        pluginAuthLaunching = true
+        pluginAuthFailure = nil
+        do {
+            let identity = try await pluginAccountIdentity()
+            let agentId = try await GrokMobileBotService(bridge: bridge).ensurePluginAuthAgent()
+            try Task.checkCancellation()
+            try await ensurePluginAccountIdentity(identity)
+            guard acceptsPluginAuthResult(
+                scopeGeneration: scopeGeneration,
+                requestGeneration: requestGeneration,
+                accountKey: accountKey
+            ) else { return nil }
+            pluginAuthAgentId = agentId
+            pluginAuthLaunching = false
+            message = "Plugin Setup Agent 已启动；请在 Bots 中完成 GitHub 授权。"
+            return agentId
+        } catch is CancellationError {
+            guard acceptsPluginAuthResult(
+                scopeGeneration: scopeGeneration,
+                requestGeneration: requestGeneration,
+                accountKey: accountKey
+            ) else { return nil }
+            pluginAuthLaunching = false
+            return nil
+        } catch {
+            guard acceptsPluginAuthResult(
+                scopeGeneration: scopeGeneration,
+                requestGeneration: requestGeneration,
+                accountKey: accountKey
+            ) else { return nil }
+            pluginAuthLaunching = false
+            pluginAuthStatus = .failed
+            pluginAuthFailure = error.localizedDescription
+            return nil
+        }
     }
 
     private func pluginAccountIdentity() async throws -> MarketplacePluginAccountIdentity {
@@ -2602,6 +2771,7 @@ final class MarketplaceModel {
             installedPluginIds = []
             permissionRequest = nil
             installingPluginId = nil
+            resetPluginAuthState()
         }
 
         guard let user = auth?["user"] as? [String: Any] else {
@@ -5568,6 +5738,11 @@ final class MarketplaceModel {
                 installedPluginIds = []
             }
             message = "原生 iOS · Rust Host 已连接"
+            if loggedIn {
+                await refreshPluginAuthStatus()
+            } else {
+                resetPluginAuthState()
+            }
         } catch {
             let notice = "市场加载失败：\(error.localizedDescription)"
             message = notice
