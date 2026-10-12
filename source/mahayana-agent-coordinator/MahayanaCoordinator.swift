@@ -545,7 +545,8 @@ final class MahayanaCoordinator {
         remoteExecutionProvider: (any IOSRemoteExecutionProviding)? = nil,
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
-        gatewayTelemetryReporter: @escaping CoordinatorGatewayClient.TelemetrySink = { _ in }
+        gatewayTelemetryReporter: @escaping CoordinatorGatewayClient.TelemetrySink = { _ in },
+        backendUpdateRequirementSink: @escaping IOSCursorDashboardClient.BackendUpdateRequirementSink = { _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
@@ -601,6 +602,7 @@ final class MahayanaCoordinator {
                         metadata: metadata
                     ))
                 },
+                backendUpdateRequirementSink: backendUpdateRequirementSink,
                 isClientPaused: isClientPaused
             )
         } else {
@@ -775,6 +777,7 @@ final class MahayanaCoordinator {
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
         gatewayTelemetryReporter: @escaping CoordinatorGatewayClient.TelemetrySink = { _ in },
+        backendUpdateRequirementSink: @escaping IOSCursorDashboardClient.BackendUpdateRequirementSink = { _ in },
         experimentDiagnosticReporter: ((ExperimentDiagnostic) -> Void)? = nil
     ) throws -> MahayanaCoordinator {
         if let experimentDiagnosticReporter {
@@ -801,7 +804,8 @@ final class MahayanaCoordinator {
             devControlAdapter: devControlAdapter,
             mcpFailureReporter: mcpFailureReporter,
             mcpAuthTelemetryReporter: mcpAuthTelemetryReporter,
-            gatewayTelemetryReporter: gatewayTelemetryReporter
+            gatewayTelemetryReporter: gatewayTelemetryReporter,
+            backendUpdateRequirementSink: backendUpdateRequirementSink
         )
         coordinator.startExperimentRuntime()
         return coordinator
