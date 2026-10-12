@@ -4363,6 +4363,73 @@ mod fabushi_shipping_inference_tests {
     use super::*;
 
     #[test]
+    fn direct_attachment_host_methods_are_owner_scoped_and_bounded() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-direct-attachment-{}-{}",
+            std::process::id(),
+            app_host_now_ms()
+        ));
+        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
+            .expect("create test app host");
+
+        let upload = host.dispatch(HostRequest {
+            id: Some(json!(1)),
+            method: "feature.attachment.uploadDirect".into(),
+            params: json!({
+                "agentId": "mahayana-assistant",
+                "filename": "notes.txt",
+                "mimeType": "text/plain",
+                "bytesBase64": base64::engine::general_purpose::STANDARD.encode(b"hello canonical host"),
+            }),
+        });
+        assert!(upload.ok, "{:?}", upload.error);
+        let attachment = upload.result.expect("upload result");
+        let path = attachment["path"].as_str().expect("attachment path");
+        assert!(Path::new(path).is_file());
+
+        let chunk = host.dispatch(HostRequest {
+            id: Some(json!(2)),
+            method: "feature.attachment.readChunkDirect".into(),
+            params: json!({
+                "agentId": "mahayana-assistant",
+                "path": path,
+                "offset": 6,
+                "length": 1024 * 1024 * 64_u64,
+            }),
+        });
+        assert!(chunk.ok, "{:?}", chunk.error);
+        let chunk = chunk.result.expect("chunk result");
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD
+                .decode(chunk["bytesBase64"].as_str().expect("chunk base64"))
+                .expect("decode chunk"),
+            b"canonical host"
+        );
+
+        let escaped = host.dispatch(HostRequest {
+            id: Some(json!(3)),
+            method: "feature.attachment.readTextDirect".into(),
+            params: json!({
+                "agentId": "mahayana-assistant",
+                "path": root.join("outside.txt").to_string_lossy(),
+            }),
+        });
+        assert!(!escaped.ok);
+
+        let wrong_owner = host.dispatch(HostRequest {
+            id: Some(json!(4)),
+            method: "feature.attachment.readTextDirect".into(),
+            params: json!({
+                "agentId": "unknown-agent",
+                "path": path,
+            }),
+        });
+        assert!(!wrong_owner.ok);
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn plugin_account_scope_is_stable_irreversible_and_disjoint() {
         let a1 = stable_plugin_account_scope("account-a");
         let a2 = stable_plugin_account_scope(" account-a ");
