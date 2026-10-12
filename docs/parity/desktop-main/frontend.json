@@ -2137,7 +2137,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.transcript renders .notice on the shipping Bot transcript surface and both Bot event pumps consume projectMobileTranscriptCard.",
       "test_evidence": "SharedWorkflowTranscriptParityTests projects notice text/id/timestamp and rejects malformed cards.",
-      "notes": "Fresh exact-HEAD Actions are required before verified."
+      "notes": "Desktop leaf is read-only text+timestamp; native projection requires non-empty text, preserves timestamp and adds no actions. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/permission-request/view.tsx",
@@ -2152,7 +2154,9 @@
       "implementation_status": "implemented",
       "production_evidence": "projectMobileTranscriptCard emits .permissionRequest and MobileBotChat renders it without any action callback.",
       "test_evidence": "SharedWorkflowTranscriptParityTests covers nested permission.title projection and malformed rejection.",
-      "notes": "The actionable local-tool permission owner remains separate; this row is the Desktop retired transcript leaf only. Fresh exact-HEAD Actions required."
+      "notes": "Desktop leaf is retired/read-only; native retired transcript projection stays actionless while live approval.requested uses a separate operation-scoped owner. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/timeline-event-automation.tsx",
@@ -2167,7 +2171,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat renders the automation name as an Open routine action; GrokMobileShell carries timelineAutomationId through MobileBotAgentSettingsSheet into MobileBotRoutinesSection, which resolves the exact routine from its live controller snapshot and opens MobileBotRoutineEditorSheet.",
       "test_evidence": "SharedWorkflowTranscriptParityTests preserves automation id/action/name projection; GrokMobileRoutinesControllerTests verifies exact focused-routine selection and fail-closed missing/nil ids. Fresh exact-HEAD Actions required.",
-      "notes": "Native navigation reuses the real routine owner; it does not substitute generic settings or a disabled button. Fresh exact-HEAD ordinary/protected evidence is still required before verified."
+      "notes": "Routine handoff is exposed only for a strictly projected automation-changed event with non-empty automationId/action/name. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/timeline-event-registry.ts",
@@ -2182,7 +2188,9 @@
       "implementation_status": "implemented",
       "production_evidence": "projectMobileTimelineEvent handles name-changed, channel-connected, channel-disconnected and automation-changed; unknown/malformed variants fail closed.",
       "test_evidence": "SharedWorkflowTranscriptParityTests exercises valid variants through projectMobileTranscriptCard plus malformed rejection.",
-      "notes": "Fresh exact-HEAD Actions required before verified."
+      "notes": "Native registry accepts only name-changed, channel-connected, channel-disconnected and automation-changed; unknown/malformed variants fail closed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/timeline-event-resolver.tsx",
@@ -2197,7 +2205,9 @@
       "implementation_status": "implemented",
       "production_evidence": "projectMobileTranscriptCard plus MobileBotChat.transcript form the native resolver/composition boundary.",
       "test_evidence": "SharedWorkflowTranscriptParityTests rejects unknown/malformed event cards and proves supported projections.",
-      "notes": "Automation navigation remains tracked separately on row 117; resolver semantics themselves are implemented."
+      "notes": "Swift typed projection replaces React lazy resolution; unknown/malformed timeline protocol shapes fail closed rather than becoming generic actionable cards. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/timeline-event.tsx",
@@ -2212,7 +2222,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.transcript renders .timelineEvent in the shipping LazyVStack and projectMobileTranscriptCard carries timestamp into createdAt.",
       "test_evidence": "SharedWorkflowTranscriptParityTests validates description and timestamp projection; fresh Swift UI/current-head acceptance remains required.",
-      "notes": "Fresh exact-HEAD Actions required before verified."
+      "notes": "Native row preserves typed description/timestamp behavior; SwiftUI replaces Desktop CSS/layout only. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/attachment-data.ts",
@@ -2227,7 +2239,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift defines classifyMobileAttachmentURL/projectMobileAttachmentCard/projectMobileChatMessageAttachment and wires live chat.message plus transcript.card attachment events into one typed MobileChatMessage projection. frontend/src/recovered/features/conversation/MobileBotChat.swift consumes that projection on the shipping transcript for box/link/media/file presentation, including user attachments.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers Desktop attachment kind classification, box metadata, normalized legacy links, media/file classification, user-attachment metadata/basename projection, malformed metadata rejection, and shared transcript/live-chat typed projection. Fresh exact-HEAD ordinary/protected Actions required before verified.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701 and canonical desktop blob 52c8606066fe778b297759434c0f8a28d95fc696. MarketplaceModel.swift is the single attachment data/projection owner; MobileBotChat.swift is supporting shipping presentation evidence, not a second data owner. Implemented on current branch; do not promote to verified until current exact-HEAD CI and artifact provenance are terminal-success."
+      "notes": "Native typed owner preserves box/link/media/file classification, HTTP normalization, batch/reply/clientNonce metadata, basename fallback and malformed-metadata rejection. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/auto-review-actions.ts",
@@ -2242,7 +2256,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/shared/sand-auto-review-redact.swift; source/shared/sand-auto-review-instructions.swift; source/shared/node/settings/sand-settings-store.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs",
       "test_evidence": "mobile/ios/FabushiTests/AutoReviewApprovalParityTests.swift; Rust Host/Swift/Swift UI current-head Actions still required before verified.",
-      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Runtime approval operationId is preserved into the Host wire so concurrent Bot pumps cannot claim another operation's request. Remains implemented, not verified, until same-head CI and artifacts succeed."
+      "notes": "Native approval flow preserves pending/submitting/settled/stale/failed, operation/generation fencing, redacted/bounded Always persistence and one-time fallback on persistence failure. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/cloud-agent-provider.ts",
@@ -2257,7 +2273,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift (MobileCloudAgentInfo, projectMobileCloudAgentInfo, MarketplaceModel.cloudAgentInfo); frontend/src/recovered/features/conversation/MobileBotChat.swift (visibleCloudAgentIds, cloudAgentScopeFingerprint, resetCloudAgentState, pollVisibleCloudAgents, cloudAgentCard) through the shipping MobileBotChat transcript surface; source/ios-main/account/cursor-dashboard-client.swift supplies the canonical cloud-agent backend contract.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers exact-bcId decoding/stat projection and strict cursor-agent card projection. Current exact-head ordinary/protected GitHub Actions and protected UI evidence remain required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-CLOUD-AGENT-PROVIDER-20261011: production provider and shipping leaf composition are present on exact HEAD 79bbe08a36611b661bde5b333b740429748e232b. Status advances only to implemented; final-head CI/protected/device evidence remains fail-closed."
+      "notes": "Canonical Cursor path preserves exact bcId lookup, visible-card polling, terminal stop/recovery polling, account+Bot+scope fencing and exact Cursor handoff. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/connector-actions.ts",
@@ -2272,7 +2290,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift (connectorCardKey, connectorCatalogEntry, connectorServer, openConnectorCards, closeConnectorCards, loadConnectorCardData, connectConnectorCard, retryConnectorCard, reopenConnectorCard plus existing MCP OAuth/session owner); frontend/src/recovered/features/conversation/MobileBotChat.swift (visibleConnectorNames, connectorCardScopeFingerprint, runConnectorCardLifecycle, connectorCard) is the shipping transcript caller.",
       "test_evidence": "mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers strict singular/plural connector projection, normalized de-duplication, default-account preference and team-policy fail-closed matching. Current exact-head ordinary/protected Actions remain required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-CONNECTOR-ACTIONS-20261011: canonical MCP connector provider/action lifecycle is shipping-composed on exact HEAD 79bbe08a36611b661bde5b333b740429748e232b. Keep below verified until same-final-HEAD CI/protected evidence succeeds."
+      "notes": "Canonical MCP owners preserve catalog/list, normalized identity, install/auth OAuth/reopen/retry, duplicate suppression, auth refresh, account/generation fencing and team-policy fail-closed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Implemented/current-main-reviewed only; resulting exact-head CI is required before verified promotion.",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/cards/transcript-card/emoji-catalog.ts",

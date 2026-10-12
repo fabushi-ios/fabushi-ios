@@ -381,3 +381,11 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - The canonical iOS Computer surface now hides update unless the Host reports an image update, strictly reads current individual Agent running state from canonical `bot.list`, fails closed when that state cannot be established, distinguishes ready from busy override, queues `force=false` until all Agents are idle, and uses `force=true` only after explicit destructive confirmation. The queue is surface-lifecycle owned and cancels with the SwiftUI task/disposal rather than creating a second durable state owner.
 - Desktop rebuild-banner semantics were also re-read against the native reducer/presentation: update/reset/recover step ordering, migration progression and reconnect checking/network/restarting states remain native equivalents.
 - Pre-repair head `28d252ccd74ee70bd75e3a34dceb4dbc25be6957`, runs `38201247586` / `38201247593`, and jobs `114654989020` / `114654989193` / `114654987413` / `114655027482` are predecessor evidence only after this source change. No verified, GD-OFF/GD-WEBMCP, strict-completeness, release, payment or final-acceptance promotion is made by this audit.
+
+
+## Current exact-head rebaseline — 2026-10-12 conversation-card audit
+
+- Exact-head drift superseded `2e36130fe670abcd8be15123e1eb40b44d18488e` and `bc534f90023c33a9a0f6e91e9e59f2fc8e6079e5`; their runs/jobs are predecessor evidence only. Pre-evidence head `b55bfb679b4c0b2dc2dc99798ff6ff95b26b93e9` is also superseded by this required ledger/evidence commit.
+- The Computer busy-update guard and started-untrackable recovery remain in the descendant.
+- Strict inventory review advanced through notice, retired permission-request, timeline event automation/registry/resolver/card, attachment-data, auto-review approval actions, cloud-agent provider and connector actions against Desktop current main `371b72f1cd20de03dc4dff9a15ed761054968093`. All are current-main-reviewed/implemented only; none is verified.
+- Next strict inventory position is the emoji catalog/picker family. Global Dharma artifact provenance, strict completeness, signer, StoreKit, signed archive/device/distribution, independent acceptance and final acceptance remain open.

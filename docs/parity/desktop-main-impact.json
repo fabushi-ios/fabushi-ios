@@ -49,7 +49,8 @@
       "2026-10-12 coordinator telemetry delta: native gateway reachability, DNS episode and transport-stage projections now flow through MahayanaCoordinator to the existing IOSLifecycleReporter, closing the low-level cause-stamping gap while preserving one telemetry owner. Aggregate dependency review remains pending.",
       "2026-10-12 local-tool permission scope audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 and pre-evidence iOS 49c566a9c37373f4040c8624db2ef07e2171ce75: Desktop ProductionRenderer owns one createLocalToolPermissionScopeGate instance, enters current transcript account, accepts only current scope/revision, preserves a per-account re-entry floor across reset, and disposes with renderer lifecycle. The prior iOS ledger N/A claim was stale because MahayanaCoordinator already owns Always/Never/allow-once permission persistence and scope+revision checks. This delta adds IOSLocalToolApprovalScopeFence as that canonical native fence, binds same-scope stability/account re-entry/reset/dispose semantics, retains pre-persist/pre-dispatch/post-dispatch stale checks plus Host-generation RemoteRunner fencing, and adds focused behavioral coverage. No verified/full-review promotion occurs before replacement exact-head Actions.",
       "2026-10-12 Avatar Editor + Channels audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 / iOS pre-evidence 2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1: Avatar production adapter is account+Agent scoped with generation/dispose/cancel fencing, and iOS MobileAvatarEditorScope binds account+Agent+reconnect with cancellation/dismissal and stale completion rejection; image size/crop/output/character constants match. Channels controller has load/mutation lifecycle generations, prior snapshot, strict decoding and retry; iOS task identity binds Agent+account+reconnect, rejects stale completion, uses SecureField, while Rust channel_management stores account-scoped metadata separately from encrypted credentials and never returns tokens. These rows are current-main-reviewed/implemented only; exact-head CI and aggregate review remain open.",
-      "2026-10-12 Computer update audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 / iOS pre-repair 28d252ccd74ee70bd75e3a34dceb4dbc25be6957: Desktop ProductionRenderer only exposes update for an available image update and actionable active-Agent scope; confirmation projects ready vs busy-override from running Agent names, queues normal update until idle, and sends force=true only for explicit destructive override. iOS account menu previously called requestUpdate() directly. The production surface now probes canonical bot.list strictly, fails closed on unknown activity, hides update when no image update exists, queues non-force update until all individual Agents are idle, and requires explicit destructive confirmation for force=true. Rebuild banner was also re-read and mapped to the existing native reducer/presentation. No verified/full-review promotion occurs before replacement exact-head Actions."
+      "2026-10-12 Computer update audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 / iOS pre-repair 28d252ccd74ee70bd75e3a34dceb4dbc25be6957: Desktop ProductionRenderer only exposes update for an available image update and actionable active-Agent scope; confirmation projects ready vs busy-override from running Agent names, queues normal update until idle, and sends force=true only for explicit destructive override. iOS account menu previously called requestUpdate() directly. The production surface now probes canonical bot.list strictly, fails closed on unknown activity, hides update when no image update exists, queues non-force update until all individual Agents are idle, and requires explicit destructive confirmation for force=true. Rebuild banner was also re-read and mapped to the existing native reducer/presentation. No verified/full-review promotion occurs before replacement exact-head Actions.",
+      "2026-10-12 conversation-card current-main audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093: individually re-read notice, retired permission-request, timeline automation/registry/resolver/card, attachment-data, auto-review actions, cloud-agent provider and connector actions against their native shipping owners/focused tests. Unknown/malformed events fail closed; retired permission cards stay read-only; live approvals are separate operation-scoped state; attachments are strict; Always is redacted/bounded with safe fallback; cloud-agent/connectors are account/generation scoped. Review only, no verified promotion."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -2010,7 +2011,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "28d252ccd74ee70bd75e3a34dceb4dbc25be6957",
+    "preEvidenceIosHead": "b55bfb679b4c0b2dc2dc99798ff6ff95b26b93e9",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2033,7 +2034,13 @@
       38201133850,
       38201133843,
       38201247586,
-      38201247593
+      38201247593,
+      38201515001,
+      38201515024,
+      38201722002,
+      38201721998,
+      38201780139,
+      38201780145
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2049,9 +2056,13 @@
       114654989020,
       114654989193,
       114654987413,
-      114655027482
+      114655027482,
+      114655769047,
+      114655808586,
+      114655934880,
+      114655935017
     ],
-    "status": "computer-update-confirmation-production-gap-repaired-fresh-resulting-exact-head-ci-required",
+    "status": "conversation-card-current-main-review-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
@@ -2062,6 +2073,6 @@
       "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift"
     ],
-    "conclusion": "Computer update confirmation now has a real native ready/busy/queued/force boundary and fail-closed running-Agent probe. Rebuild banner is current-main-reviewed. Remaining Computer rows and aggregate strict inventory still require review; final acceptance remains false."
+    "conclusion": "Computer repair and untrackable-update follow-up remain in descendant. Conversation rows through connector-actions are current-main-reviewed only. Strict inventory continues at emoji-catalog; aggregate acceptance remains open."
   }
 }
