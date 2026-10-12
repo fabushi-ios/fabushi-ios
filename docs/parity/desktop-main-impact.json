@@ -2014,7 +2014,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "580687d941578af2289453a4ea9485cf703e2abe",
+    "preEvidenceIosHead": "4238e4e265f348149ded4a876e569772c2e2ab91",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2076,7 +2076,11 @@
       38206192675,
       38206193373,
       38206476939,
-      38206477006
+      38206477006,
+      38206962610,
+      38206962604,
+      38207653717,
+      38207653739
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2151,9 +2155,13 @@
       114670962514,
       114670999830,
       114671175314,
-      114671175405
+      114671175405,
+      114672527200,
+      114672586563,
+      114672635792,
+      114672636029
     ],
-    "status": "account-access-runtime-repair-resulting-exact-head-ci-required",
+    "status": "cursor-auth-freshness-account-fence-repair-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -2166,9 +2174,13 @@
       "source/ios-main/account/cursor-dashboard-client.swift",
       "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "mobile/ios/FabushiTests/CursorAccessParityTests.swift",
-      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md"
+      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md",
+      "mobile/ios/Fabushi/MarketplaceModel.swift",
+      "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
+      "mobile/ios/FabushiTests/CursorProfileParityTests.swift"
     ],
-    "conclusion": "Current-main access.ts was re-read with cursor-auth-wiring/main-edge callers. The iOS ABI declared getSandAccess/getSandAccessFresh but had no native handler; this descendant adds the missing 10-second Dashboard fetch, settled authId ?? email identity, generation-fenced reader, production routing and focused tests. All predecessor runs/jobs remain diagnostic only; full 7,951-row/dependency/GD/FPM closure remains open.",
-    "currentImplementationHead": "580687d941578af2289453a4ea9485cf703e2abe"
+    "conclusion": "Current-main cursor-auth-wiring shipping callers were re-read. The production repair adds monotonic Cursor auth freshness at the single Keychain owner, projects it through the Coordinator, and fences Marketplace MCP backend status/login/logout writes by app-account epoch, latest request serial and auth freshness. 0e5bbe6a and 4238e4e Actions are predecessor-only after this metadata descendant; source/dependency/release/device closure remains open.",
+    "currentImplementationHead": "4238e4e265f348149ded4a876e569772c2e2ab91",
+    "promotion": "none"
   }
 }
