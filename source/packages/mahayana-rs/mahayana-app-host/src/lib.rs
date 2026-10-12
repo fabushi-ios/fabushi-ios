@@ -1262,9 +1262,10 @@ impl AppHost {
             }
             "feature.marketplace.browse" => self.marketplace_browse(params),
             "feature.marketplace.release" => self.marketplace_release(params),
-            "feature.marketplace.added" => self.marketplace_added(),
+            "feature.marketplace.added" => self.marketplace_added(params),
             "feature.marketplace.add" => self.marketplace_add(params),
             "feature.marketplace.remove" => self.marketplace_remove(params),
+            "feature.plugin.accountIdentity" => self.plugin_account_identity(),
             "feature.plugin.install" => self.install_plugin(params),
             // Trusted native-shell only. WebMCP and Agent tool surfaces never receive
             // these methods, signing keys, or install authority.
@@ -1282,7 +1283,7 @@ impl AppHost {
             "feature.plugin.uninstall" => self.uninstall_plugin(params),
             "feature.plugin.rollback" => self.rollback_plugin(params),
             "feature.plugin.active" => self.active_plugin(params),
-            "feature.plugin.listInstalled" => self.list_installed_plugins(),
+            "feature.plugin.listInstalled" => self.list_installed_plugins(params),
             "feature.plugin.uiDocument" => self.plugin_ui_document(params),
             "feature.plugin.uiResource" => self.plugin_ui_resource(params),
             "feature.messaging.execute" => self.feature_messaging_execute(params),
@@ -1486,6 +1487,7 @@ impl AppHost {
     }
 
     fn marketplace_browse(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let query = params.get("query").and_then(Value::as_str);
         if self.feature_mode == AppHostFeatureMode::Test {
             let term = query.unwrap_or_default().trim().to_lowercase();
@@ -1513,12 +1515,15 @@ impl AppHost {
             .get("platform")
             .and_then(Value::as_str)
             .unwrap_or(host_platform());
-        self.product
+        let result = self.product
             .marketplace_browse(query, Some(requested_platform))
-            .map_err(|error| AppHostError::Operation(error.to_string()))
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        Ok(result)
     }
 
     fn marketplace_release(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let version = string_param(&params, "version")?;
         if self.feature_mode == AppHostFeatureMode::Test {
@@ -1585,15 +1590,18 @@ impl AppHost {
             .get("platform")
             .and_then(Value::as_str)
             .unwrap_or(host_platform());
-        self.product
+        let result = self.product
             .marketplace_release_metadata(plugin_id, version, Some(requested_platform))
-            .map_err(|error| AppHostError::Operation(error.to_string()))
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        Ok(result)
     }
 
-    fn marketplace_added(&self) -> Result<Value, AppHostError> {
+    fn marketplace_added(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         if self.feature_mode == AppHostFeatureMode::Test {
             let plugins = self
-                .list_installed_plugins()?
+                .list_installed_plugins(params.clone())?
                 .get("plugins")
                 .and_then(Value::as_array)
                 .cloned()
@@ -1610,12 +1618,15 @@ impl AppHost {
                 .collect::<Vec<_>>();
             return Ok(json!({"apps": plugins}));
         }
-        self.product
+        let result = self.product
             .marketplace_added()
-            .map_err(|error| AppHostError::Operation(error.to_string()))
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        Ok(result)
     }
 
     fn marketplace_add(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let requested_platform = params
             .get("platform")
@@ -1643,12 +1654,15 @@ impl AppHost {
                 },
             }));
         }
-        self.product
+        let result = self.product
             .marketplace_add(plugin_id, marketplace_platform)
-            .map_err(|error| AppHostError::Operation(error.to_string()))
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        Ok(result)
     }
 
     fn marketplace_remove(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         if self.feature_mode == AppHostFeatureMode::Test {
             if !TEST_MARKETPLACE_PLUGINS
@@ -1665,9 +1679,11 @@ impl AppHost {
                 "accountSynchronized": true,
             }));
         }
-        self.product
+        let result = self.product
             .marketplace_remove(plugin_id)
-            .map_err(|error| AppHostError::Operation(error.to_string()))
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
+        Ok(result)
     }
 
     fn current_plugin_account_identity(&self) -> Result<(String, String), AppHostError> {
@@ -1711,10 +1727,45 @@ impl AppHost {
         expected_generation: &str,
     ) -> Result<(), AppHostError> {
         let (scope, generation) = self.current_plugin_account_identity()?;
-        if scope != expected_scope || generation != expected_generation {
+        if !plugin_account_identity_matches(
+            expected_scope,
+            expected_generation,
+            &scope,
+            &generation,
+        ) {
             return Err(AppHostError::Operation(
                 "account generation changed while plugin operation was in flight".into(),
             ));
+        }
+        Ok(())
+    }
+
+    fn plugin_account_identity(&self) -> Result<Value, AppHostError> {
+        let (account_scope, account_generation) = self.current_plugin_account_identity()?;
+        Ok(json!({
+            "protocol": "fabushi.plugin-account-identity.v1",
+            "accountScope": account_scope,
+            "accountGeneration": account_generation,
+        }))
+    }
+
+    fn expected_plugin_account_identity(
+        &self,
+        params: &Value,
+    ) -> Result<Option<(String, String)>, AppHostError> {
+        let expected = parse_expected_plugin_account_identity(params)?;
+        if let Some((scope, generation)) = expected.as_ref() {
+            self.ensure_plugin_account_current(scope, generation)?;
+        }
+        Ok(expected)
+    }
+
+    fn ensure_expected_plugin_account_identity_current(
+        &self,
+        expected: Option<&(String, String)>,
+    ) -> Result<(), AppHostError> {
+        if let Some((scope, generation)) = expected {
+            self.ensure_plugin_account_current(scope, generation)?;
         }
         Ok(())
     }
@@ -1796,6 +1847,7 @@ impl AppHost {
     }
 
     fn install_plugin(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let release_value = params
             .get("release")
             .cloned()
@@ -1874,6 +1926,7 @@ impl AppHost {
             ],
         };
         let account = self.plugin_account_context()?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
@@ -1896,6 +1949,7 @@ impl AppHost {
             })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -2562,8 +2616,10 @@ impl AppHost {
     }
 
     fn uninstall_plugin(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.disable_plugin_runtime(plugin_id, false)?;
@@ -2584,6 +2640,7 @@ impl AppHost {
             })
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         Ok(json!({
             "pluginId": plugin_id,
             "removed": removed,
@@ -2618,8 +2675,10 @@ impl AppHost {
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
-    fn list_installed_plugins(&self) -> Result<Value, AppHostError> {
+    fn list_installed_plugins(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let account = self.plugin_account_context()?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let root = account.root.clone();
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
@@ -2627,6 +2686,8 @@ impl AppHost {
         let entries = match std::fs::read_dir(&root) {
             Ok(entries) => entries,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+                self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
                 return Ok(json!({"plugins": plugins}));
             }
             Err(error) => return Err(AppHostError::Operation(error.to_string())),
@@ -2650,6 +2711,7 @@ impl AppHost {
         }
         plugins.sort_by(|left, right| left.plugin_id.cmp(&right.plugin_id));
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         Ok(json!({"plugins": plugins}))
     }
 
@@ -4132,6 +4194,46 @@ fn validate_local_generated_artifact_source_path(raw: &str) -> Result<&str, AppH
     Ok(path)
 }
 
+fn plugin_account_identity_matches(
+    expected_scope: &str,
+    expected_generation: &str,
+    current_scope: &str,
+    current_generation: &str,
+) -> bool {
+    expected_scope == current_scope && expected_generation == current_generation
+}
+
+fn strict_plugin_account_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn parse_expected_plugin_account_identity(
+    params: &Value,
+) -> Result<Option<(String, String)>, AppHostError> {
+    let scope = params.get("expectedAccountScope").and_then(Value::as_str);
+    let generation = params
+        .get("expectedAccountGeneration")
+        .and_then(Value::as_str);
+    match (scope, generation) {
+        (None, None) => Ok(None),
+        (Some(scope), Some(generation))
+            if strict_plugin_account_digest(scope)
+                && strict_plugin_account_digest(generation) =>
+        {
+            Ok(Some((scope.to_string(), generation.to_string())))
+        }
+        (Some(_), Some(_)) => Err(AppHostError::InvalidRequest(
+            "expected plugin account identity must contain lowercase 64-byte hex digests".into(),
+        )),
+        _ => Err(AppHostError::InvalidRequest(
+            "expectedAccountScope and expectedAccountGeneration must be supplied together".into(),
+        )),
+    }
+}
+
 fn harden_generated_miniapp_document(html: &str) -> String {
     const POLICY: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; media-src data:; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'\">";
     let lower = html.to_ascii_lowercase();
@@ -4273,6 +4375,48 @@ mod fabushi_shipping_inference_tests {
             &approval,
             Some(&approval),
             Some(&stale_digest),
+        ));
+    }
+
+    #[test]
+    fn expected_plugin_account_identity_is_paired_strict_and_generation_bound() {
+        assert_eq!(
+            parse_expected_plugin_account_identity(&json!({})).unwrap(),
+            None
+        );
+        assert!(parse_expected_plugin_account_identity(&json!({
+            "expectedAccountScope": "a".repeat(64)
+        }))
+        .is_err());
+        assert!(parse_expected_plugin_account_identity(&json!({
+            "expectedAccountScope": "A".repeat(64),
+            "expectedAccountGeneration": "b".repeat(64),
+        }))
+        .is_err());
+
+        let expected = parse_expected_plugin_account_identity(&json!({
+            "expectedAccountScope": "a".repeat(64),
+            "expectedAccountGeneration": "b".repeat(64),
+        }))
+        .unwrap()
+        .expect("expected account identity");
+        assert!(plugin_account_identity_matches(
+            &expected.0,
+            &expected.1,
+            &"a".repeat(64),
+            &"b".repeat(64),
+        ));
+        assert!(!plugin_account_identity_matches(
+            &expected.0,
+            &expected.1,
+            &"a".repeat(64),
+            &"c".repeat(64),
+        ));
+        assert!(!plugin_account_identity_matches(
+            &expected.0,
+            &expected.1,
+            &"d".repeat(64),
+            &"b".repeat(64),
         ));
     }
 
