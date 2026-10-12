@@ -2649,13 +2649,16 @@ impl AppHost {
     }
 
     fn active_plugin(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -2873,9 +2876,11 @@ impl AppHost {
     }
 
     fn plugin_ui_document(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let (account_scope, account_generation, pointer, root) =
             self.active_plugin_ui_root(plugin_id)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let entry = self.plugin_ui_entry(plugin_id, &pointer, &root)?;
         let relative = safe_ui_relative_path(&entry)?;
         let document = std::fs::canonicalize(root.join(relative))
@@ -2888,6 +2893,7 @@ impl AppHost {
         let html = std::fs::read_to_string(document)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account_scope, &account_generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         Ok(json!({
             "pluginId": plugin_id,
             "html": html,
@@ -2899,10 +2905,12 @@ impl AppHost {
     }
 
     fn plugin_ui_resource(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let path = string_param(&params, "path")?;
         let (account_scope, account_generation, pointer, root) =
             self.active_plugin_ui_root(plugin_id)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
         if let Some(expected_version) = params.get("version").and_then(Value::as_str)
             && expected_version != pointer.version
@@ -2954,6 +2962,7 @@ impl AppHost {
 
         let normalized_path = relative.to_string_lossy().replace('\\', "/");
         self.ensure_plugin_account_current(&account_scope, &account_generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         Ok(json!({
             "pluginId": plugin_id,
             "path": normalized_path,

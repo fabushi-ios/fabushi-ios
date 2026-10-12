@@ -1685,6 +1685,7 @@ struct LocalMiniAppInstallApproval: Equatable, Sendable {
 }
 
 struct LocalMiniAppSource: Equatable, Sendable {
+    let accountIdentity: MarketplacePluginAccountIdentity
     let pluginId: String
     let version: String
     let artifactSha256: String
@@ -5621,7 +5622,10 @@ final class MarketplaceModel {
     ) async throws {
         let active = try await bridge.request(
             method: "feature.plugin.active",
-            params: ["pluginId": plugin.pluginId]
+            params: Self.accountBoundParams(
+                ["pluginId": plugin.pluginId],
+                identity: identity
+            )
         )
         try await ensurePluginAccountIdentity(identity)
         if Self.activeLocalInstallSatisfies(
@@ -6041,7 +6045,10 @@ final class MarketplaceModel {
     ) async throws -> LocalMiniAppSource {
         let result = try await bridge.request(
             method: "feature.plugin.uiDocument",
-            params: ["pluginId": pluginId]
+            params: Self.accountBoundParams(
+                ["pluginId": pluginId],
+                identity: identity
+            )
         )
         try await ensurePluginAccountIdentity(identity)
         guard let object = result.value as? [String: Any],
@@ -6065,6 +6072,7 @@ final class MarketplaceModel {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
         return LocalMiniAppSource(
+            accountIdentity: identity,
             pluginId: pluginId,
             version: version,
             artifactSha256: artifactSha256.lowercased(),
@@ -6105,15 +6113,19 @@ final class MarketplaceModel {
     ) async throws -> LocalMiniAppResourceChunk {
         let result = try await bridge.request(
             method: "feature.plugin.uiResource",
-            params: [
-                "pluginId": source.pluginId,
-                "path": path,
-                "version": source.version,
-                "artifactSha256": source.artifactSha256,
-                "offset": NSNumber(value: offset),
-                "length": NSNumber(value: min(max(length, 1), 1024 * 1024)),
-            ]
+            params: Self.accountBoundParams(
+                [
+                    "pluginId": source.pluginId,
+                    "path": path,
+                    "version": source.version,
+                    "artifactSha256": source.artifactSha256,
+                    "offset": NSNumber(value: offset),
+                    "length": NSNumber(value: min(max(length, 1), 1024 * 1024)),
+                ],
+                identity: source.accountIdentity
+            )
         )
+        try await ensurePluginAccountIdentity(source.accountIdentity)
         guard let object = result.value as? [String: Any],
               object["pluginId"] as? String == source.pluginId,
               object["version"] as? String == source.version,
