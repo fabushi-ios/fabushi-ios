@@ -232,6 +232,81 @@ final class IOSCoordinatorFailureTelemetryTracker {
 }
 
 
+
+struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
+    let event: String
+    let level: IOSLifecycleTelemetryLevel
+    let metadata: [String: String]
+
+    static let routedMethods: Set<String> = [
+        "reportAgentsUnreachable",
+        "reportRecoveryAction",
+        "reportRebuildLifecycle",
+        "reportReconciliation",
+        "reportResyncCompleted",
+    ]
+
+    static func project(method: String, report: [String: Any]) -> IOSCoordinatorBroadTelemetryProjection? {
+        guard routedMethods.contains(method) else { return nil }
+        let event: String
+        let level: IOSLifecycleTelemetryLevel
+        switch method {
+        case "reportAgentsUnreachable":
+            event = "agents_unreachable"
+            level = (report["phase"] as? String) == "retry" ? .info : .warn
+        case "reportRecoveryAction":
+            event = "recovery_action"
+            level = (report["outcome"] as? String) == "failed" ? .warn : .info
+        case "reportRebuildLifecycle":
+            event = "rebuild_lifecycle"
+            let phase = report["phase"] as? String
+            level = (phase == "escalation" || phase == "pending_stall") ? .warn : .info
+        case "reportReconciliation":
+            event = "reconciliation"
+            let outcome = report["outcome"] as? String
+            level = (outcome == "failed" || outcome == "partial") ? .warn : .info
+        case "reportResyncCompleted":
+            event = "resync_completed"
+            let failed = (report["failed"] as? NSNumber)?.intValue ?? 0
+            level = failed > 0 ? .warn : .info
+        default:
+            return nil
+        }
+
+        var metadata: [String: String] = [
+            "event": event,
+            "platform_replacement": "ios_lifecycle_reporter",
+        ]
+        var accepted = 0
+        for key in report.keys.sorted() {
+            guard accepted < 64, metadata[key] == nil,
+                  let value = boundedScalar(report[key])
+            else { continue }
+            metadata[key] = value
+            accepted += 1
+        }
+        return .init(event: event, level: level, metadata: metadata)
+    }
+
+    private static func boundedScalar(_ raw: Any?) -> String? {
+        let value: String
+        switch raw {
+        case let string as String:
+            value = string
+        case let bool as Bool:
+            value = bool ? "true" : "false"
+        case let number as NSNumber:
+            value = number.stringValue
+        case is NSNull:
+            value = "null"
+        default:
+            return nil
+        }
+        return String(value.prefix(512))
+    }
+}
+
+
 enum IOSAuthTelemetryStream: String, Equatable, Sendable {
     case session
     case signin

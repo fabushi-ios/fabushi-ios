@@ -356,6 +356,28 @@ final class IOSMainRuntime {
             }
             return .ok(.object([:]))
         }
+        if IOSCoordinatorBroadTelemetryProjection.routedMethods.contains(method) {
+            guard let report = args.foundationValue as? [String: Any],
+                  let projection = IOSCoordinatorBroadTelemetryProjection.project(
+                    method: method,
+                    report: report
+                  )
+            else {
+                return .failed(.init(
+                    code: "invalid-params",
+                    message: "\(method) requires an object telemetry report"
+                ))
+            }
+            lifecycleReporter.report(
+                .coordinatorHandoff,
+                level: projection.level,
+                metadata: projection.metadata
+            )
+            if method == "reportResyncCompleted" {
+                lifecycleRecovery.markResyncCompleted()
+            }
+            return .ok(.object([:]))
+        }
         if let updateOutcome = await updateWiring.route(method: method, args: args) {
             return updateOutcome
         }
