@@ -242,4 +242,49 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
         )
     }
 
+
+    @MainActor
+    func testEnsureSandBoxProjectsBackendUpdateRequirementAndClearsOnSuccess() async throws {
+        var requiredEvents: [Bool] = []
+        let requiredClient = IOSCursorDashboardClient(
+            credentials: lifecycleCredentials(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 409,
+                    httpVersion: "HTTP/2",
+                    headerFields: [
+                        "Content-Type": "application/proto",
+                        "x-automation-failure-hint": "SAND_CLIENT_UPDATE_REQUIRED",
+                    ]
+                )!
+                return (Data(), response)
+            },
+            backendUpdateRequirementSink: { requiredEvents.append($0) }
+        )
+        do {
+            _ = try await requiredClient.ensureSandBox()
+            XCTFail("update-required broker response must fail the connection")
+        } catch let error as IOSCursorSandBoxBrokerError {
+            XCTAssertEqual(error.kind, .updateRequired)
+        }
+        XCTAssertEqual(requiredEvents, [true])
+
+        requiredEvents.removeAll()
+        var body = Data()
+        body += lifecycleBytesField(5, "exec-auth")
+        body += lifecycleBytesField(6, "https://exec.example.test")
+        let successfulClient = IOSCursorDashboardClient(
+            credentials: lifecycleCredentials(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                lifecycleResponse(request, data: body)
+            },
+            backendUpdateRequirementSink: { requiredEvents.append($0) }
+        )
+        _ = try await successfulClient.ensureSandBox()
+        XCTAssertEqual(requiredEvents, [false])
+    }
+
 }
