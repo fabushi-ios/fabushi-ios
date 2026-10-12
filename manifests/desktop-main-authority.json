@@ -27,11 +27,11 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Authorities remain unchanged at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093, Backend 9c56a77cbe02dfceebf574236a703b53cd257cb9, Platform Core c301820b93274bda586fbb82be982afc3c2ee4d4, Fabushi server c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52, Marketplace 1971f2a93197cfb79d1e8f0856345f36776f3ca3, and iOS main 8b0e7236d75f8e16b868332e51cde41b6ee415fc. Requested evidence head e9070d368902c65f669464ccdcd9ea1bcbfe3d91 and runs 38200123560/38200123558 with jobs 114651452123/114651495111/114651618109/114651618294 are predecessor-only after PR #3 advanced to 49c566a9c37373f4040c8624db2ef07e2171ce75; no predecessor green result or unfinished artifact may be promoted. This review also corrects the local-tool permission scope row and adds a native re-entry/stale/reset/dispose fence; fresh exact-head Actions are required.",
+  "notes": "Authority rebaseline after PR #3 advanced through e9070d368902c65f669464ccdcd9ea1bcbfe3d91 -> 27dd89bb5c6f5e2f6099b31ba36971dd4274589b -> 2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1. Current pre-evidence HEAD is 2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1; all listed predecessor runs/jobs are non-promotable. External authorities remain Desktop 371b72f1cd20de03dc4dff9a15ed761054968093, Backend 9c56a77cbe02dfceebf574236a703b53cd257cb9, Platform Core c301820b93274bda586fbb82be982afc3c2ee4d4, Fabushi server c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52, Marketplace 1971f2a93197cfb79d1e8f0856345f36776f3ca3; iOS base main remains 8b0e7236d75f8e16b868332e51cde41b6ee415fc. Avatar Editor and Channels rows were independently current-main-reviewed without verified promotion.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "49c566a9c37373f4040c8624db2ef07e2171ce75",
+    "preEvidenceIosHead": "2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -54,15 +54,25 @@
       38200123560,
       38200123558,
       38200626640,
-      38200626642
+      38200626642,
+      38200945961,
+      38200945964,
+      38201133850,
+      38201133843
     ],
     "predecessorWorkflowJobs": [
       114651452123,
       114651495111,
       114651618109,
-      114651618294
+      114651618294,
+      114654023611,
+      114654076196,
+      114654113503,
+      114654113634,
+      114654646116,
+      114654683170
     ],
-    "status": "local-tool-permission-scope-fence-repaired-fresh-exact-head-actions-required",
+    "status": "avatar-channels-current-main-reviewed-fresh-resulting-exact-head-actions-required",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
@@ -72,7 +82,7 @@
     "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
-    "promotion": "local-tool-permission-scope-current-main-review-and-native-fence-no-verification-promotion",
-    "currentImplementationHead": "49c566a9c37373f4040c8624db2ef07e2171ce75"
+    "promotion": "avatar-editor-and-channels-current-main-review-only-no-verification-promotion",
+    "currentImplementationHead": "2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1"
   }
 }

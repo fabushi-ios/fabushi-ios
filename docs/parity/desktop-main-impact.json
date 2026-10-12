@@ -47,7 +47,8 @@
       "2026-10-12 coordinator telemetry: per-domain+operation failure episodes plus reportAgentsUnreachable/reportRecoveryAction/reportRebuildLifecycle/reportReconciliation/reportResyncCompleted now route into native durable IOSLifecycleReporter. Native reachability/DNS/transport-stream cause stamping is still open; broad row remains mapped.",
       "2026-10-12 attachment production closure delta: IOSAttachmentMainRPCAdapter now owns native staging/download semantics and delegates durable upload/read to canonical FeatureHost direct APIs. app-host focused Rust execution was added to ios-desktop-main-architecture.yml. No ledger status promotion occurs before replacement exact-head Actions.",
       "2026-10-12 coordinator telemetry delta: native gateway reachability, DNS episode and transport-stage projections now flow through MahayanaCoordinator to the existing IOSLifecycleReporter, closing the low-level cause-stamping gap while preserving one telemetry owner. Aggregate dependency review remains pending.",
-      "2026-10-12 local-tool permission scope audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 and pre-evidence iOS 49c566a9c37373f4040c8624db2ef07e2171ce75: Desktop ProductionRenderer owns one createLocalToolPermissionScopeGate instance, enters current transcript account, accepts only current scope/revision, preserves a per-account re-entry floor across reset, and disposes with renderer lifecycle. The prior iOS ledger N/A claim was stale because MahayanaCoordinator already owns Always/Never/allow-once permission persistence and scope+revision checks. This delta adds IOSLocalToolApprovalScopeFence as that canonical native fence, binds same-scope stability/account re-entry/reset/dispose semantics, retains pre-persist/pre-dispatch/post-dispatch stale checks plus Host-generation RemoteRunner fencing, and adds focused behavioral coverage. No verified/full-review promotion occurs before replacement exact-head Actions."
+      "2026-10-12 local-tool permission scope audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 and pre-evidence iOS 49c566a9c37373f4040c8624db2ef07e2171ce75: Desktop ProductionRenderer owns one createLocalToolPermissionScopeGate instance, enters current transcript account, accepts only current scope/revision, preserves a per-account re-entry floor across reset, and disposes with renderer lifecycle. The prior iOS ledger N/A claim was stale because MahayanaCoordinator already owns Always/Never/allow-once permission persistence and scope+revision checks. This delta adds IOSLocalToolApprovalScopeFence as that canonical native fence, binds same-scope stability/account re-entry/reset/dispose semantics, retains pre-persist/pre-dispatch/post-dispatch stale checks plus Host-generation RemoteRunner fencing, and adds focused behavioral coverage. No verified/full-review promotion occurs before replacement exact-head Actions.",
+      "2026-10-12 Avatar Editor + Channels audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 / iOS pre-evidence 2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1: Avatar production adapter is account+Agent scoped with generation/dispose/cancel fencing, and iOS MobileAvatarEditorScope binds account+Agent+reconnect with cancellation/dismissal and stale completion rejection; image size/crop/output/character constants match. Channels controller has load/mutation lifecycle generations, prior snapshot, strict decoding and retry; iOS task identity binds Agent+account+reconnect, rejects stale completion, uses SecureField, while Rust channel_management stores account-scoped metadata separately from encrypted credentials and never returns tokens. These rows are current-main-reviewed/implemented only; exact-head CI and aggregate review remain open."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -2008,7 +2009,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "49c566a9c37373f4040c8624db2ef07e2171ce75",
+    "preEvidenceIosHead": "2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2025,25 +2026,35 @@
       38200123560,
       38200123558,
       38200626640,
-      38200626642
+      38200626642,
+      38200945961,
+      38200945964,
+      38201133850,
+      38201133843
     ],
     "predecessorWorkflowJobs": [
       114651452123,
       114651495111,
       114651618109,
-      114651618294
+      114651618294,
+      114654023611,
+      114654076196,
+      114654113503,
+      114654113634,
+      114654646116,
+      114654683170
     ],
-    "status": "local-tool-permission-scope-native-fence-added-no-verification-promotion-fresh-exact-head-ci-required",
+    "status": "avatar-channels-current-main-review-only-fresh-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
-      "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
-      "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
       "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
       "docs/parity/desktop-main-index.json",
       "docs/parity/desktop-main-impact.json",
       "docs/parity/desktop-main-release-evidence.json",
-      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md"
+      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md",
+      "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
+      "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift"
     ],
-    "conclusion": "Desktop local-tool permission scope responsibility is now current-main-reviewed against its direct ProductionRenderer caller and mapped to the canonical native Coordinator owner with focused re-entry/stale/reset/dispose coverage. Aggregate dependency review, strict completeness, release acceptance, production signer, StoreKit/device/distribution evidence and independent acceptance remain open."
+    "conclusion": "Local-tool scope production fence is in history; Avatar Editor and Channels are now current-main-reviewed with native lifecycle/account/cancellation/persistence evidence. No verified/full-review/final-acceptance promotion occurs. Strict inventory continues with Group Members and later unreviewed rows."
   }
 }

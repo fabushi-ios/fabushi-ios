@@ -99,7 +99,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "49c566a9c37373f4040c8624db2ef07e2171ce75",
+    "preEvidenceIosHead": "2eb2fcf6554a9da49e461ddfd262f7a8aaa54dc1",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -116,15 +116,25 @@
       38200123560,
       38200123558,
       38200626640,
-      38200626642
+      38200626642,
+      38200945961,
+      38200945964,
+      38201133850,
+      38201133843
     ],
     "predecessorWorkflowJobs": [
       114651452123,
       114651495111,
       114651618109,
-      114651618294
+      114651618294,
+      114654023611,
+      114654076196,
+      114654113503,
+      114654113634,
+      114654646116,
+      114654683170
     ],
-    "status": "local-tool-permission-scope-current-main-reviewed-implemented-not-verified-fresh-exact-head-ci-required",
+    "status": "avatar-channels-current-main-reviewed-no-verification-promotion-fresh-resulting-exact-head-ci-required",
     "rowCount": 7951
   }
 }
