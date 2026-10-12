@@ -520,3 +520,28 @@ extension MarketplaceModelLifecycleTests {
         ))
     }
 }
+
+
+final class AccountDisplayNameMutationShippingTests: XCTestCase {
+    func testShippingDisplayNameMutationUsesLatestRequestAndAccountEpochFences() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "mobile/ios/Fabushi/MarketplaceModel.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("let requestSerial = accountDisplayNameRequestSerial"))
+        XCTAssertTrue(source.contains("let expectedEpoch = mcpAccountEpoch"))
+        XCTAssertTrue(source.contains("let expectedScope = globalDharmaAccountScope"))
+        XCTAssertTrue(source.contains("requestSerial == accountDisplayNameRequestSerial"))
+        XCTAssertTrue(source.contains("expectedEpoch == mcpAccountEpoch"))
+        XCTAssertTrue(source.contains("expectedScope == globalDharmaAccountScope"))
+        XCTAssertTrue(source.contains("accountName = settledDisplayName"))
+    }
+}
