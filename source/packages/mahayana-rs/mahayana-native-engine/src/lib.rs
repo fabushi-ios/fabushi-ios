@@ -3769,7 +3769,7 @@ mod tests {
         let session_id = engine
             .open_session(OpenSessionRequest {
                 profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
-                workspace_root: None,
+                workspace_root: Some(std::env::temp_dir().to_string_lossy().to_string()),
                 model: None,
                 metadata: Value::Null,
             })
@@ -3830,6 +3830,53 @@ mod tests {
         assert_eq!(shell_request.params["workingDirectory"], "/workspace");
         assert_eq!(shell_request.params["toolCallId"], "tool-shell");
         assert_eq!(shell_result["stdout"], "ok");
+
+        let process_service = {
+            let broker = Arc::clone(&broker);
+            tokio::spawn(async move {
+                loop {
+                    if let Some(request) = broker.next_request().expect("lease process request") {
+                        broker
+                            .resolve(
+                                &request.request_id,
+                                json!({"success":true,"code":0,"stdout":"","stderr":""}),
+                            )
+                            .expect("resolve process request");
+                        return request;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+        };
+        let process_operation = OperationId::from_string("process-exec-round-trip");
+        let process_call = FunctionCall {
+            call_id: "tool-process".into(),
+            name: "process_exec".into(),
+            arguments: json!({
+                "program": "git",
+                "args": ["status", "--short"],
+            }),
+        };
+        let process_result = engine
+            .execute_tool(
+                &mut session,
+                &process_operation,
+                &process_call,
+                &policy,
+                &control,
+                Arc::clone(&events),
+            )
+            .await
+            .expect("execute process_exec");
+        let process_request = process_service.await.expect("join process service");
+        assert_eq!(process_request.method, "process.exec");
+        assert_eq!(process_request.params["program"], "git");
+        assert_eq!(process_request.params["args"], json!(["status", "--short"]));
+        assert_eq!(
+            process_request.params["workingDirectory"],
+            std::env::temp_dir().to_string_lossy().to_string()
+        );
+        assert_eq!(process_result["success"], true);
 
         let read_service = {
             let broker = Arc::clone(&broker);
