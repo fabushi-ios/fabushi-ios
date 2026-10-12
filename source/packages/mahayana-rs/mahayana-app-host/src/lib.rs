@@ -1770,6 +1770,26 @@ impl AppHost {
         Ok(())
     }
 
+    fn ensure_plugin_account_context_matches_expected(
+        &self,
+        account: &PluginAccountContext,
+        expected: Option<&(String, String)>,
+    ) -> Result<(), AppHostError> {
+        if let Some((scope, generation)) = expected
+            && !plugin_account_identity_matches(
+                scope,
+                generation,
+                &account.scope,
+                &account.generation,
+            )
+        {
+            return Err(AppHostError::Operation(
+                "captured plugin account does not match expected account generation".into(),
+            ));
+        }
+        Ok(())
+    }
+
     fn reconcile_plugin_runtime_accounts(&self) -> Result<(), AppHostError> {
         let mut bindings = self
             .runtime_accounts
@@ -2652,6 +2672,7 @@ impl AppHost {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
@@ -2722,6 +2743,7 @@ impl AppHost {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
@@ -2762,6 +2784,7 @@ impl AppHost {
         let plugin_id = string_param(&params, "pluginId")?;
         let permission = string_param(&params, "permission")?;
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account.as_ref())?;
         let pointer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?
             .active(plugin_id)
@@ -2814,7 +2837,7 @@ impl AppHost {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let (account_scope, account_generation, _pointer, root) =
-            self.active_plugin_ui_root(plugin_id)?;
+            self.active_plugin_ui_root(plugin_id, expected_account.as_ref())?;
         let report = scan_package_compatibility(&root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account_scope, &account_generation)?;
@@ -2825,8 +2848,10 @@ impl AppHost {
     fn active_plugin_ui_root(
         &self,
         plugin_id: &str,
+        expected_account: Option<&(String, String)>,
     ) -> Result<(String, String, InstalledPluginPointer, PathBuf), AppHostError> {
         let account = self.plugin_account_context()?;
+        self.ensure_plugin_account_context_matches_expected(&account, expected_account)?;
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let pointer = installer
@@ -2879,7 +2904,7 @@ impl AppHost {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let (account_scope, account_generation, pointer, root) =
-            self.active_plugin_ui_root(plugin_id)?;
+            self.active_plugin_ui_root(plugin_id, expected_account.as_ref())?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let entry = self.plugin_ui_entry(plugin_id, &pointer, &root)?;
         let relative = safe_ui_relative_path(&entry)?;
@@ -2909,7 +2934,7 @@ impl AppHost {
         let plugin_id = string_param(&params, "pluginId")?;
         let path = string_param(&params, "path")?;
         let (account_scope, account_generation, pointer, root) =
-            self.active_plugin_ui_root(plugin_id)?;
+            self.active_plugin_ui_root(plugin_id, expected_account.as_ref())?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
 
         if let Some(expected_version) = params.get("version").and_then(Value::as_str)
@@ -2980,7 +3005,7 @@ impl AppHost {
         let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?.to_string();
         let (account_scope, account_generation, pointer, root) =
-            self.active_plugin_ui_root(&plugin_id)?;
+            self.active_plugin_ui_root(&plugin_id, expected_account.as_ref())?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         if !matches!(
             pointer.runtime.as_str(),
@@ -4438,6 +4463,28 @@ mod fabushi_shipping_inference_tests {
             &expected.1,
             &"d".repeat(64),
             &"b".repeat(64),
+        ));
+    }
+
+    #[test]
+    fn captured_plugin_account_must_match_expected_generation_before_reads() {
+        let account = PluginAccountContext {
+            scope: "a".repeat(64),
+            generation: "b".repeat(64),
+            root: PathBuf::from("/tmp/unused"),
+        };
+        let expected = ("a".repeat(64), "b".repeat(64));
+        assert!(plugin_account_identity_matches(
+            &expected.0,
+            &expected.1,
+            &account.scope,
+            &account.generation,
+        ));
+        assert!(!plugin_account_identity_matches(
+            &expected.0,
+            &"c".repeat(64),
+            &account.scope,
+            &account.generation,
         ));
     }
 
