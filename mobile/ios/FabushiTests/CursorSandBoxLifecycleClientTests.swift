@@ -275,11 +275,12 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
         var body = Data()
         body += lifecycleBytesField(5, "exec-auth")
         body += lifecycleBytesField(6, "https://exec.example.test")
+        let responseBody = body
         let successfulClient = IOSCursorDashboardClient(
             credentials: lifecycleCredentials(),
             backendURL: URL(string: "https://backend.example.test")!,
             requestExecutor: { request in
-                lifecycleResponse(request, data: body)
+                lifecycleResponse(request, data: responseBody)
             },
             backendUpdateRequirementSink: { requiredEvents.append($0) }
         )
