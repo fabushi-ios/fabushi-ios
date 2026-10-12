@@ -146,6 +146,20 @@ internal func projectMobileRootNotificationTrays(_ value: Any) -> [MobileRootNot
     (value as? [Any] ?? []).compactMap(projectMobileRootNotificationTray)
 }
 
+internal let mobileRootNotificationProviderOverloadedMessage =
+    "The model provider is under heavy load right now. This is usually temporary — try again shortly."
+
+internal func mobileRootNotificationDisplayDetail(
+    _ tray: MobileRootNotificationTray,
+    isSandModelExperiment: Bool
+) -> String? {
+    guard let detail = tray.detail else { return nil }
+    if tray.errorKind == "provider_overloaded", isSandModelExperiment {
+        return mobileRootNotificationProviderOverloadedMessage
+    }
+    return detail
+}
+
 internal func reduceMobileRootNotificationEvent(
     _ current: [MobileRootNotificationTray],
     event: [String: Any]
@@ -301,7 +315,10 @@ extension GrokMobileShell {
                                         .accessibilityLabel("Occurred \(count) times")
                                 }
                             }
-                            if let detail = tray.detail {
+                            if let detail = mobileRootNotificationDisplayDetail(
+                                tray,
+                                isSandModelExperiment: model.sandModelExperimentEnabled
+                            ) {
                                 Text(detail)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
@@ -383,6 +400,9 @@ extension GrokMobileShell {
         rootNotificationCopiedRequestID = nil
 
         guard model.authResolved, model.loggedIn else { return }
+
+        await model.refreshSandModelExperimentPresentation()
+        guard !Task.isCancelled, model.loggedIn else { return }
 
         do {
             try await refreshRootNotifications()

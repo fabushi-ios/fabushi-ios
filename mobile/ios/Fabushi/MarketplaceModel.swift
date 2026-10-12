@@ -1955,6 +1955,7 @@ final class MarketplaceModel {
     var mcpInstructionsDraftByServerId: [String: String] = [:]
     var mcpMutatingServerId: String?
     var featureHostSmokeStatus: String?
+    var sandModelExperimentEnabled = false
     var authResolved = false
     var loggedIn = false
     var accountName = "Fabushi"
@@ -2009,6 +2010,7 @@ final class MarketplaceModel {
     @ObservationIgnored private let agentDockBadgeController = IOSDockBadgeController()
     @ObservationIgnored private let agentNotificationController = IOSAgentNotificationController()
     @ObservationIgnored private var agentDockBadgeGeneration: UInt64 = 0
+    @ObservationIgnored private var experimentPresentationRequestSerial = 0
     @ObservationIgnored private var toolResultRendererObserver: UUID?
 
     init(bridge: IOSPreloadBridge) {
@@ -2018,6 +2020,44 @@ final class MarketplaceModel {
         onboardingStep = MobileSignedInOnboardingStep.meet.rawValue
         toolResultRendererObserver = bridge.addRendererEventObserver { [weak self] family, payload in
             self?.consumeRendererEvent(family: family, payload: payload)
+        }
+    }
+
+    nonisolated static func sandModelExperimentEnabled(from value: Any?) -> Bool {
+        guard let snapshot = value as? [String: Any],
+              let experiment = snapshot["sandModelExperiment"],
+              !(experiment is NSNull)
+        else { return false }
+        return true
+    }
+
+    func refreshSandModelExperimentPresentation() async {
+        experimentPresentationRequestSerial = experimentPresentationRequestSerial == Int.max
+            ? 1
+            : experimentPresentationRequestSerial + 1
+        let requestSerial = experimentPresentationRequestSerial
+        let expectedScope = globalDharmaAccountScope
+
+        guard loggedIn else {
+            sandModelExperimentEnabled = false
+            return
+        }
+
+        do {
+            let response = try await bridge.request(method: "getExperimentsSnapshot")
+            try Task.checkCancellation()
+            guard requestSerial == experimentPresentationRequestSerial,
+                  loggedIn,
+                  globalDharmaAccountScope == expectedScope
+            else { return }
+            sandModelExperimentEnabled = Self.sandModelExperimentEnabled(from: response.value)
+        } catch is CancellationError {
+            return
+        } catch {
+            guard requestSerial == experimentPresentationRequestSerial,
+                  globalDharmaAccountScope == expectedScope
+            else { return }
+            sandModelExperimentEnabled = false
         }
     }
 
@@ -2073,6 +2113,11 @@ final class MarketplaceModel {
     }
 
     private func consumeRendererEvent(family: String, payload: CoordinatorPayload) {
+        if family == "experiments-changed" {
+            sandModelExperimentEnabled = loggedIn
+                && Self.sandModelExperimentEnabled(from: payload.foundationValue)
+            return
+        }
         guard family == ClientSideToolV2Transport.family,
               let event = MobileToolResultRendererEvent.fromFoundation(payload.foundationValue),
               toolResultStore.consume(event)
@@ -2517,6 +2562,10 @@ final class MarketplaceModel {
         }
 
         if previousMcpScope != globalDharmaAccountScope || !loggedIn {
+            experimentPresentationRequestSerial = experimentPresentationRequestSerial == Int.max
+                ? 1
+                : experimentPresentationRequestSerial + 1
+            sandModelExperimentEnabled = false
             resetMcpState()
             resetToolResultCards()
             resetAgentDockBadgeForScopeChange()

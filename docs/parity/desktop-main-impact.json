@@ -10,7 +10,7 @@
   "directChanges": [],
   "dependencyReview": {
     "status": "pending",
-    "reason": "Desktop selected source identities remain unchanged. iOS now composes the existing account-scoped Cursor sandbox exec-daemon as the shipping Remote Runner provider, including structured process.exec translation at the final authenticated provider edge. Fresh exact-head CI, completeness, production signer/commerce and release acceptance remain pending.",
+    "reason": "Desktop selected source identities remain unchanged. Local-exec uses the existing account-scoped exec-daemon provider. Native root notification trays are now current-main-reviewed and production reachable through the existing Coordinator→Host FeatureHost tray owner, including Sand-model provider-overload presentation. Aggregate shared-contract review, exact-head CI, completeness, signer/commerce and release acceptance remain pending.",
     "sameDirectoryReviewPaths": [
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0014_remote_computer_client_tokens.sql",
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0016_remote_computer_session_provider.sql",
@@ -40,7 +40,8 @@
       "2026-10-12 local-exec shipping-edge review at pre-evidence iOS 5dda071eb22a1a8c197fb8e9c8755579968e7814 / f57aa160e7ced7e0397d37235c1db9e2e5c15d25: CoordinatorMcpSurface dispatches through dashboard.ensureSandBox() to IOSRemoteExecDaemonClient using the account-scoped execDaemonURL/token. MahayanaCoordinator composes this provider into IOSGenerationFencedRemoteRunnerTransport, preserving account revision + Host generation pre/post fences. process_exec remains process.exec through PlatformExecBroker/Coordinator and is only safely argv-quoted into the canonical ExecService ShellStream at the final provider; ExternalShell and ExternalRead use the same provider without Host re-entry. Unknown methods remain fail-closed. Runs 38190289874/38190289840/38192173184/38192173175 are predecessor only; no verification promotion occurs before replacement exact-head Actions.",
       "2026-10-12 focused fencing-test completion at pre-evidence iOS c9a3a8e3effa05de568cb2ee536f7bc3394f7cf3 / df089aa97be6d5514753c46f322d23be06fbf62a: provider failure and cancellation now have explicit tests; account-switch and Host-generation late-result rejection are tested independently; unknown remote methods remain fail-closed. Runs 38192487666/38192487704 are predecessor because this evidence/test commit creates a newer exact HEAD.",
       "2026-10-12 strict architecture repair: run 38192567443 rejected the implemented local-exec main row because ios_target_path contained three semicolon-delimited supporting paths. The row now names only source/mahayana-agent-coordinator/local-exec/supervisor.swift as canonical iOS owner; production-executor.swift and local-exec-process-identity.swift remain supporting evidence. Validator behavior is unchanged.",
-      "2026-10-12 shared notification authority repair at pre-evidence iOS b13b769f414193022634021230018d1e6e839f76 / cf5d9b4a7d3929566e23f7e7548aca7e7482610f: Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 still stores source/shared/os-notification.ts as exact blob ffaf599dada09e938f362d75aa202327eed3a4ad. Shipping MarketplaceModel -> IOSAgentNotificationController -> SandOsNotificationDecider -> IOSUserNotificationScheduler/UNUserNotificationCenter caller mapping is retained as implemented, while authority_review_state is corrected from requires-current-main-review to current-main-reviewed and desktop_review_commit is rebound to 371b72f1cd20de03dc4dff9a15ed761054968093. Run 38193218500 is predecessor deterministic evidence; no verified/release promotion is made."
+      "2026-10-12 shared notification authority repair at pre-evidence iOS b13b769f414193022634021230018d1e6e839f76 / cf5d9b4a7d3929566e23f7e7548aca7e7482610f: Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 still stores source/shared/os-notification.ts as exact blob ffaf599dada09e938f362d75aa202327eed3a4ad. Shipping MarketplaceModel -> IOSAgentNotificationController -> SandOsNotificationDecider -> IOSUserNotificationScheduler/UNUserNotificationCenter caller mapping is retained as implemented, while authority_review_state is corrected from requires-current-main-review to current-main-reviewed and desktop_review_commit is rebound to 371b72f1cd20de03dc4dff9a15ed761054968093. Run 38193218500 is predecessor deterministic evidence; no verified/release promotion is made.",
+      "2026-10-12 root notification current-main review at pre-evidence iOS c408673139a8ebb92a6e94aeb73727de01124ac1 / deb1f353389e9e435a99ac6906b3d6c6d22e4db5: Desktop notification-host.tsx and notification-host.css were re-read at Desktop 371b72f1. The prior ledger gap was partly stale: shipping GrokMobileShell already reached canonical FeatureHost tray state. This delta adds the remaining provider_overloaded Sand-experiment presentation, focused projection/reducer/shipping-wiring tests, and promotes only those two rows to implemented. Coordinator broad transport, aggregate review, and release acceptance remain open."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -1954,6 +1955,18 @@
         "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
         "status": "current-main-reviewed-native-feedback-implemented-pending-exact-head",
         "finding": "Shipping iOS had an older Rust /api/feedback menu-report path that dropped accountSlot/conversationId. CoordinatorMcpSurface now intercepts submitFeedback and uses the existing Cursor auth/machine-id owners for current-main /sand/feedback, token identity fencing, checksum/client headers, bounded Sentry IDs, 15-second timeout and stable HTTP error mapping. Focused request-contract tests added; exact-head CI pending."
+      },
+      {
+        "path": "frontend/src/recovered/features/window-chrome/notification-host.tsx",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-root-tray-implemented-pending-exact-head",
+        "finding": "Shipping SwiftUI root tray reuses canonical Coordinator/Host FeatureHost tray state, preserves account/reconnect lifecycle and safe URL/dashboard actions, buffers hydration-race events, and now preserves the Sand-model provider_overloaded user-facing detail. Focused tests are added; verified remains pending exact-head Actions."
+      },
+      {
+        "path": "frontend/src/recovered/features/window-chrome/notification-host.css",
+        "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+        "status": "current-main-reviewed-native-presentation-implemented-pending-exact-head",
+        "finding": "Desktop CSS is replaced by the shipping SwiftUI stack with count/detail/actions, clear/copy/dismiss controls and native accessibility; no CSS runtime is copied to iOS."
       }
     ]
   },
@@ -1988,18 +2001,17 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "54832f40583009aa963d31573e7c502cc7700ce1",
-    "preEvidenceIosHead": "b6ae32fed4ea822ab82864a8858d2137cbc69c31",
-    "preEvidenceIosTree": "b68ac57e5b7ccc82e38be419648c4845efe8135f",
+    "requestedCheckpoint": "c408673139a8ebb92a6e94aeb73727de01124ac1",
+    "preEvidenceIosHead": "c408673139a8ebb92a6e94aeb73727de01124ac1",
+    "preEvidenceIosTree": "deb1f353389e9e435a99ac6906b3d6c6d22e4db5",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "changedIosPathsSinceRequestedCheckpoint": [
       "mobile/ios/Fabushi/MarketplaceModel.swift",
-      "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
-      "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
-      "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
-      "docs/parity/desktop-main/source-electron-main.json"
+      "frontend/src/production/GrokMobileShell+Home.swift",
+      "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
+      "docs/parity/desktop-main/frontend.json"
     ],
-    "conclusion": "Desktop direct impact remains unchanged. The iOS delta tightens account/runtime fencing and closes two platform-specific startup responsibility reviews; it requires replacement exact-head CI and does not promote aggregate review or release acceptance."
+    "conclusion": "Desktop authority remains stable. Live iOS main advanced independently to 8b0e7236d75f8e16b868332e51cde41b6ee415fc. This delta closes the native root notification tray shipping surface and Sand-model provider-overload presentation through existing Coordinator/Host and experiment owners; aggregate dependency/completeness/release acceptance remain pending and require replacement exact-head Actions."
   }
 }

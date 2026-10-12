@@ -5043,11 +5043,13 @@
       "ios_target_path": "frontend/src/production/GrokMobileShell.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "Native SwiftUI notification-tray presentation is composed in the existing GrokMobileShell owner together with the mapped notification-host lifecycle; CSS itself is not copied to iOS.",
-      "implementation_status": "mapped",
-      "production_evidence": "Native SwiftUI notification-tray presentation is composed in the existing GrokMobileShell owner together with the mapped notification-host lifecycle; CSS itself is not copied to iOS.",
-      "test_evidence": "Current native notification-host row remains mapped and must obtain focused shipping-path tests/current-head Actions before this presentation row can be promoted.",
-      "notes": "Exact Desktop blob d6bf52a04d9e5d5d016ff714df08c99db3aebdce reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; disposition reflects native iOS replacement rather than mechanical CSS/Node-test copying.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "implemented",
+      "production_evidence": "Shipping GrokMobileShell rootNotificationStack is the native SwiftUI replacement for Desktop CSS presentation: bounded stacked error cards, count/detail/action layout, clear-all, request-ID copy, dismiss controls, material/background emphasis and native accessibility labels/identifiers. CSS is intentionally not copied.",
+      "test_evidence": "SharedPermissionsAndNotificationsParityTests validates notification projection/reducer and the static shipping surface; exact-head Swift build/unit/UI Actions remain required before verified.",
+      "notes": "IOS-MAIN-ROOT-TRAY-STYLE-001: exact Desktop blob d6bf52a04d9e5d5d016ff714df08c99db3aebdce re-reviewed at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. Native SwiftUI styling is the platform replacement and is now production composed. Marked implemented, not verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending fresh exact-head GitHub Actions after native root notification closure"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/notification-host.tsx",
@@ -5058,11 +5060,14 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "frontend/src/production/GrokMobileShell.swift",
       "ios_language": "Swift / SwiftUI",
-      "ios_platform_delta": "No iOS getTrays/dismissTray/clearTrays contract exists on the current exact HEAD, so drawing a toast-only shell would not preserve the authoritative notification lifecycle. The future native host must reuse the canonical Coordinator notification RPC owner once ported, rather than invent local notification state.",
-      "implementation_status": "mapped",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Exact Desktop notification-host.tsx blob 9b4e52d341517e46c391f7a68106c819ca6fd2db reviewed. Repository symbol search found no current iOS tray RPC surface; this is a real remaining transport/composition gap."
+      "ios_platform_delta": "iOS uses the existing native GrokMobileShell overlay plus GrokMobileShell+Home projection/reducer helpers and MarketplaceModel's existing renderer-event observer. It retains canonical Coordinator/Host tray ownership, native UIPasteboard, SwiftUI accessibility, account/reconnect task cancellation, and does not create a second notification runtime.",
+      "implementation_status": "implemented",
+      "production_evidence": "Shipping GrokMobileShell overlays rootNotificationStack and restarts runRootNotificationLifecycle on auth/account/reconnect identity. GrokMobileShell+Home sends tray.list/dismiss/clear through feature.execute, consumes tray.listed/tray.changed through IOSFeatureEventBroker, projects bounded actions/count/request IDs, routes only HTTP(S) URLs through openExternal and dashboard actions through invokeCursorDashboardAction, and renders copy/dismiss/clear/action/a11y controls. IOSFeatureEventBroker buffers unmatched events during initial hydration. MahayanaCoordinator routes feature.execute to MahayanaHostRuntime -> mahayana-app-host -> mahayana-feature-host, whose FeatureHostController owns trays and emits TrayListed/TrayChanged. MarketplaceModel reuses the existing experiments-changed observer and getExperimentsSnapshot to preserve Desktop provider_overloaded experiment wording.",
+      "test_evidence": "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift covers URL fail-closed projection, action bound/count/request-id projection, push/replace/dismiss/clear reducer semantics, account/reconnect lifecycle keys, provider_overloaded experiment detail, exact tray command shapes, and static shipping reachability through Coordinator/app-host/FeatureHost. Existing Rust Feature Host tests cover canonical tray state/events. Fresh exact-head GitHub Actions are still required before verified.",
+      "notes": "IOS-MAIN-ROOT-TRAY-001: re-reviewed against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093. The prior no-iOS-tray finding was stale: the shipping native root tray is production reachable and preserves Host ownership. This change also closes the remaining Sand-model provider_overloaded presentation delta. Marked implemented only; verified remains pending same-final-HEAD Actions and aggregate acceptance.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending fresh exact-head GitHub Actions after native root notification closure"
     },
     {
       "desktop_path": "frontend/src/recovered/features/window-chrome/root-shell-state.css",
@@ -5230,7 +5235,9 @@
       "implementation_status": "mapped",
       "production_evidence": "source/shared/rpc/coordinator.swift; source/shared/rpc/coordinator-port.swift; source/ios-preload/coordinator-port-bridge.swift; source/ios-preload/preload.swift; source/mahayana-agent-coordinator/renderer-port-server.swift; source/mahayana-agent-coordinator/gateway/gateway-errors.swift",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift",
-      "notes": "Exact Desktop coordinator-source.ts blob db7859728adba5129fab1d0572720390807dabad reviewed. getTrays/dismissTray/clearTrays are already present in the native CoordinatorMethodRegistry; notification composition must not create a parallel transport."
+      "notes": "Exact Desktop coordinator-source.ts blob db7859728adba5129fab1d0572720390807dabad reviewed at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. The tray slice is now closed through the existing feature.execute/feature.receive Coordinator→Host owner and must not create a parallel transport. This broad row intentionally remains mapped because Desktop's full SourceFailure specialization and per-domain failure/recovery telemetry still require separate native equivalence review.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/runtime/define-entrypoint.ts",

@@ -435,6 +435,172 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         XCTAssertFalse(sandWebauthnProxyMirroredEnablement(false, platform: "ios"))
     }
 
+    func testRootNotificationProjectionReducerAndExperimentPresentationMatchDesktopContract() throws {
+        let openURL = try XCTUnwrap(projectMobileRootNotificationAction([
+            "kind": "open-url",
+            "label": "Open",
+            "url": "https://example.com/support",
+        ]))
+        switch openURL.kind {
+        case .openURL(let url):
+            XCTAssertEqual(url.absoluteString, "https://example.com/support")
+        case .dashboard:
+            XCTFail("HTTPS action must remain an open-URL action")
+        }
+        XCTAssertNil(projectMobileRootNotificationAction([
+            "kind": "open-url",
+            "label": "Unsafe",
+            "url": "file:///private/secret",
+        ]))
+
+        let dashboard: [String: Any] = [
+            "kind": "dashboard-action",
+            "label": "Upgrade",
+            "action": "upgrade-plan",
+            "args": ["source": "tray"],
+            "successMessage": "Upgraded",
+        ]
+        let rawTray: [String: Any] = [
+            "kind": "error",
+            "id": "tray-1",
+            "title": "Provider unavailable",
+            "detail": "raw provider detail",
+            "requestId": "request-1",
+            "errorKind": "provider_overloaded",
+            "count": NSNumber(value: 3),
+            "actions": [dashboard, dashboard, dashboard, dashboard],
+        ]
+        let tray = try XCTUnwrap(projectMobileRootNotificationTray(rawTray))
+        XCTAssertEqual(tray.actions.count, 3)
+        XCTAssertEqual(tray.count, 3)
+        XCTAssertEqual(tray.requestID, "request-1")
+        XCTAssertEqual(
+            mobileRootNotificationDisplayDetail(tray, isSandModelExperiment: true),
+            mobileRootNotificationProviderOverloadedMessage
+        )
+        XCTAssertEqual(
+            mobileRootNotificationDisplayDetail(tray, isSandModelExperiment: false),
+            "raw provider detail"
+        )
+        XCTAssertTrue(MarketplaceModel.sandModelExperimentEnabled(from: [
+            "sandModelExperiment": ["variant": "enabled"],
+        ]))
+        XCTAssertFalse(MarketplaceModel.sandModelExperimentEnabled(from: [
+            "sandModelExperiment": NSNull(),
+        ]))
+
+        let pushed = reduceMobileRootNotificationEvent([], event: [
+            "type": "tray.changed",
+            "action": "pushed",
+            "tray": rawTray,
+        ])
+        XCTAssertEqual(pushed.map(\.id), ["tray-1"])
+
+        var replacement = rawTray
+        replacement["title"] = "Provider still unavailable"
+        let replaced = reduceMobileRootNotificationEvent(pushed, event: [
+            "type": "tray.changed",
+            "action": "pushed",
+            "tray": replacement,
+        ])
+        XCTAssertEqual(replaced.count, 1)
+        XCTAssertEqual(replaced.first?.title, "Provider still unavailable")
+
+        let dismissed = reduceMobileRootNotificationEvent(replaced, event: [
+            "type": "tray.changed",
+            "action": "dismissed",
+            "id": "tray-1",
+        ])
+        XCTAssertTrue(dismissed.isEmpty)
+        XCTAssertTrue(reduceMobileRootNotificationEvent(pushed, event: [
+            "type": "tray.changed",
+            "action": "cleared",
+        ]).isEmpty)
+
+        XCTAssertEqual(mobileRootNotificationListCommand(requestID: "list-1")["type"] as? String, "tray.list")
+        XCTAssertEqual(mobileRootNotificationClearCommand(requestID: "clear-1")["type"] as? String, "tray.clear")
+        XCTAssertNil(mobileRootNotificationDismissCommand(id: "   ", requestID: "dismiss-1"))
+        XCTAssertEqual(
+            mobileRootNotificationDismissCommand(id: " tray-1 ", requestID: "dismiss-1")?["id"] as? String,
+            "tray-1"
+        )
+        XCTAssertNotEqual(
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 1
+            ),
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-b",
+                reconnectGeneration: 1
+            )
+        )
+        XCTAssertNotEqual(
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 1
+            ),
+            mobileRootNotificationLifecycleKey(
+                authResolved: true,
+                loggedIn: true,
+                accountScopeKey: "account-a",
+                reconnectGeneration: 2
+            )
+        )
+    }
+
+    func testRootNotificationShippingSurfaceReusesCanonicalCoordinatorHostTrayOwner() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+
+        let shell = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("frontend/src/production/GrokMobileShell.swift"),
+            encoding: .utf8
+        )
+        let home = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("frontend/src/production/GrokMobileShell+Home.swift"),
+            encoding: .utf8
+        )
+        let coordinator = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("source/mahayana-agent-coordinator/MahayanaCoordinator.swift"),
+            encoding: .utf8
+        )
+        let appHost = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("source/packages/mahayana-rs/mahayana-app-host/src/lib.rs"),
+            encoding: .utf8
+        )
+        let featureHost = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(shell.contains(".overlay(alignment: .top)"))
+        XCTAssertTrue(shell.contains("rootNotificationStack"))
+        XCTAssertTrue(shell.contains(".task(id: rootNotificationLifecycleKey)"))
+        XCTAssertTrue(home.contains(#""type": "tray.list""#))
+        XCTAssertTrue(home.contains(#""type": "tray.dismiss""#))
+        XCTAssertTrue(home.contains(#""type": "tray.clear""#))
+        XCTAssertTrue(home.contains(#"method: "feature.execute""#))
+        XCTAssertTrue(home.contains("receiveFeatureEvent"))
+        XCTAssertTrue(home.contains(#"method: "invokeCursorDashboardAction""#))
+        XCTAssertTrue(home.contains(#"method: "openExternal""#))
+        XCTAssertTrue(coordinator.contains("hostSupervisor.request"))
+        XCTAssertTrue(appHost.contains(#""feature.execute" => self.feature_execute"#))
+        XCTAssertTrue(featureHost.contains("FeatureCommand::TrayList"))
+        XCTAssertTrue(featureHost.contains("FeatureCommand::TrayDismiss"))
+        XCTAssertTrue(featureHost.contains("FeatureCommand::TrayClear"))
+        XCTAssertTrue(featureHost.contains("HostEvent::TrayListed"))
+        XCTAssertTrue(featureHost.contains("HostEvent::TrayChanged"))
+    }
+
     func testWindowChromeKeepsPureCompatibilityMathWithoutEmulatingDesktopChrome() {
         XCTAssertTrue(IOS_USES_NATIVE_SCENE_CHROME)
         XCTAssertEqual(blendRgbaOverHex((255, 255, 255), alpha: 0.5, backgroundHex: "#000000"), "#808080")
