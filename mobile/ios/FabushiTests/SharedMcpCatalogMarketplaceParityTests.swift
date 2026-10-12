@@ -595,6 +595,7 @@ final class SharedMcpPluginUpdateParityTests: XCTestCase {
         let snapshot = await client.snapshot()
         XCTAssertEqual(snapshot.0, 101)
         XCTAssertEqual(snapshot.1?["API_TOKEN"], "rotated-secret")
-        let reloads = await reloadCounter.value()\n        XCTAssertEqual(reloads, 1)
+        let reloads = await reloadCounter.value()
+        XCTAssertEqual(reloads, 1)
     }
 }
