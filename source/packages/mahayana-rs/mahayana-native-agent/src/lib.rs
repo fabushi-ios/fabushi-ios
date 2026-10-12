@@ -40,6 +40,9 @@ pub struct NativeAgentConfig {
     pub profile: RuntimeProfile,
     pub workspace_root: Option<PathBuf>,
     pub mcp_registry: NativeMcpRegistry,
+    /// True only when the owning Host installed a reviewed process execution
+    /// backend. MobileEmbedded never infers this from its platform profile.
+    pub allow_process: bool,
 }
 
 #[derive(Clone)]
@@ -698,7 +701,10 @@ impl AgentBackend for NativeAgentBackend {
                     session_id: thread.session_id.clone(),
                     operation_id: kernel_operation_id.clone(),
                     input: request.text,
-                    policy: policy_for_profile(self.config.profile),
+                    policy: policy_for_profile(
+                        self.config.profile,
+                        self.config.allow_process,
+                    ),
                     required_capabilities: CapabilitySet::new([Capability::Model]),
                     metadata: json!({"clientMessageId":request.client_message_id}),
                 },
@@ -1284,14 +1290,33 @@ fn mcp_result_text(result: &Value) -> String {
         })
 }
 
-fn policy_for_profile(profile: RuntimeProfile) -> ExecutionPolicy {
-    match profile {
+fn policy_for_profile(profile: RuntimeProfile, allow_process: bool) -> ExecutionPolicy {
+    let mut policy = match profile {
         RuntimeProfile::DesktopFull | RuntimeProfile::Headless => {
             ExecutionPolicy::interactive_default()
         }
         RuntimeProfile::MobileEmbedded | RuntimeProfile::WebWasm => {
             ExecutionPolicy::mobile_default()
         }
+    };
+    policy.allow_process = match profile {
+        RuntimeProfile::DesktopFull | RuntimeProfile::Headless => true,
+        RuntimeProfile::MobileEmbedded => allow_process,
+        RuntimeProfile::WebWasm => false,
+    };
+    policy
+}
+
+#[cfg(test)]
+mod platform_process_policy_tests {
+    use super::*;
+
+    #[test]
+    fn mobile_process_policy_requires_explicit_host_backend() {
+        assert!(!policy_for_profile(RuntimeProfile::MobileEmbedded, false).allow_process);
+        assert!(policy_for_profile(RuntimeProfile::MobileEmbedded, true).allow_process);
+        assert!(!policy_for_profile(RuntimeProfile::WebWasm, true).allow_process);
+        assert!(policy_for_profile(RuntimeProfile::DesktopFull, false).allow_process);
     }
 }
 

@@ -360,6 +360,7 @@ impl NativeRunnerComposition {
         profile: mahayana_kernel::RuntimeProfile,
         cwd: PathBuf,
         mcp_registry: NativeMcpRegistry,
+        allow_process: bool,
     ) -> Self {
         let engine_backend: Arc<dyn EngineBackend> = native_engine.clone();
         let agent_backend: Arc<dyn mahayana_agent::AgentBackend> =
@@ -369,6 +370,7 @@ impl NativeRunnerComposition {
                     profile,
                     workspace_root: Some(cwd),
                     mcp_registry,
+                    allow_process,
                 },
             ));
         Self {
@@ -384,6 +386,8 @@ impl NativeRunnerComposition {
         cwd: PathBuf,
         mcp_registry: NativeMcpRegistry,
     ) -> Result<Self, HostError> {
+        let allow_process = engine_config.enable_process_tools
+            && !matches!(engine_config.process_execution, ProcessExecution::Unavailable);
         let native_engine = Arc::new(
             NativeEngine::new(model_runtime, engine_config)
                 .map_err(|error| HostError::new(error.to_string()))?,
@@ -393,6 +397,7 @@ impl NativeRunnerComposition {
             profile,
             cwd,
             mcp_registry,
+            allow_process,
         ))
     }
 }
@@ -880,6 +885,7 @@ mod tests {
             mahayana_kernel::RuntimeProfile::MobileEmbedded,
             PathBuf::from("."),
             NativeMcpRegistry::new(Vec::new(), None),
+            false,
         );
 
         assert_eq!(before, 1);
