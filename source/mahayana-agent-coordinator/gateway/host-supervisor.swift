@@ -106,11 +106,13 @@ final class IOSGatewayDescriptorFastPath {
     private let resolveLive: ResolveLive
     private let reportFailure: FailureReporter
     private let isBrokerDenial: BrokerDenialClassifier
+    private let nowMilliseconds: @MainActor () -> Int64
     private var hasLiveConnection = false
     private var liveAccountScope: String?
     private var pendingRefresh: PendingRefresh?
     private var reportedRefreshes = Set<UUID>()
     private var deniedScopes = Set<String>()
+    private var blockedUntilByScope: [String: Int64] = [:]
 
     init(
         cache: IOSGatewayDescriptorKeychainCache,
@@ -124,12 +126,16 @@ final class IOSGatewayDescriptorFastPath {
             return message.contains(GATEWAY_NO_STORAGE_MESSAGE_MARKER)
                 || message.contains(GATEWAY_ACCESS_DENIED_MESSAGE_MARKER)
         },
+        nowMilliseconds: @escaping @MainActor () -> Int64 = {
+            Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        },
         resolveLive: @escaping ResolveLive
     ) {
         self.cache = cache
         self.getAccountScope = getAccountScope
         self.reportFailure = reportFailure
         self.isBrokerDenial = isBrokerDenial
+        self.nowMilliseconds = nowMilliseconds
         self.resolveLive = resolveLive
     }
 
@@ -144,6 +150,22 @@ final class IOSGatewayDescriptorFastPath {
             cached = await cache.read(accountScope: accountScope)
         } else {
             cached = nil
+        }
+
+        if let accountScope,
+           let blockedUntil = blockedUntilByScope[accountScope],
+           blockedUntil > nowMilliseconds() {
+            if let cached { return cached }
+            throw IOSCursorSandBoxBrokerError(
+                kind: .blocked(
+                    retryAfterMilliseconds: Int(blockedUntil - nowMilliseconds())
+                ),
+                message: encodeSandBoxBlockedMessage(.init(
+                    reason: "",
+                    title: "",
+                    detail: ""
+                ))
+            )
         }
 
         let refresh = startRefresh(for: accountScope)
@@ -192,16 +214,23 @@ final class IOSGatewayDescriptorFastPath {
                 liveAccountScope = accountScope
                 if let accountScope {
                     deniedScopes.remove(accountScope)
+                    blockedUntilByScope[accountScope] = nil
                     await cache.write(accountScope: accountScope, connection: connection)
                 }
             }
             return connection
         } catch {
-            if let accountScope,
-               getAccountScope() == accountScope,
-               isBrokerDenial(error) {
-                deniedScopes.insert(accountScope)
-                await cache.clear()
+            if let accountScope, getAccountScope() == accountScope {
+                if let broker = error as? IOSCursorSandBoxBrokerError,
+                   case .blocked(let retryAfterMilliseconds) = broker.kind {
+                    let requested = retryAfterMilliseconds ?? 60_000
+                    let hold = max(1_000, min(requested, 15 * 60_000))
+                    blockedUntilByScope[accountScope] = nowMilliseconds() + Int64(hold)
+                }
+                if isBrokerDenial(error) {
+                    deniedScopes.insert(accountScope)
+                    await cache.clear()
+                }
             }
             throw error
         }
