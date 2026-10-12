@@ -5438,7 +5438,11 @@ final class MarketplaceModel {
                 fence: noticeFence
             )
             if permissions.isEmpty {
-                await startPortableRuntime(pluginId: pluginId, runtime: runtime)
+                await startPortableRuntime(
+                    pluginId: pluginId,
+                    runtime: runtime,
+                    identity: identity
+                )
             } else {
                 permissionRequest = PluginPermissionRequest(
                     pluginId: pluginId,
@@ -5509,12 +5513,17 @@ final class MarketplaceModel {
         installingPluginId = request.pluginId
         message = "正在授权 \(request.pluginId)…"
         do {
+            let identity = try await pluginAccountIdentity()
             for permission in request.permissions {
                 _ = try await bridge.request(
                     method: "plugin.permission.grant",
-                    params: ["pluginId": request.pluginId, "permission": permission]
+                    params: Self.accountBoundParams(
+                        ["pluginId": request.pluginId, "permission": permission],
+                        identity: identity
+                    )
                 )
             }
+            try await ensurePluginAccountIdentity(identity)
             installingPluginId = nil
             publishPluginsNotice(
                 .authenticate,
@@ -5522,7 +5531,11 @@ final class MarketplaceModel {
                 message: "\(request.pluginId) 权限已授权",
                 fence: noticeFence
             )
-            await startPortableRuntime(pluginId: request.pluginId, runtime: request.runtime)
+            await startPortableRuntime(
+                pluginId: request.pluginId,
+                runtime: request.runtime,
+                identity: identity
+            )
         } catch {
             installingPluginId = nil
             let notice = "授权失败：\(error.localizedDescription)"
@@ -5538,24 +5551,40 @@ final class MarketplaceModel {
         message = "\(request.pluginId) 已安装，但权限未授权"
     }
 
-    private func startPortableRuntime(pluginId: String, runtime: String) async {
+    private func startPortableRuntime(
+        pluginId: String,
+        runtime: String,
+        identity: MarketplacePluginAccountIdentity
+    ) async {
         guard ["deepseek-js", "javascript", "cordis-js"].contains(runtime) else {
-            message = "\(pluginId) 已安装 · \(runtime)"
+            do {
+                try await ensurePluginAccountIdentity(identity)
+                message = "\(pluginId) 已安装 · \(runtime)"
+            } catch {
+                message = "\(pluginId) 已安装但账号已变化：\(error.localizedDescription)"
+            }
             return
         }
         installingPluginId = pluginId
         do {
             let compatibility = try await bridge.request(
                 method: "plugin.compatibility",
-                params: ["pluginId": pluginId]
+                params: Self.accountBoundParams(
+                    ["pluginId": pluginId],
+                    identity: identity
+                )
             )
             guard let object = compatibility.value as? [String: Any], object["portableCompatible"] as? Bool == true else {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("插件不满足移动端 portable runtime 约束")
             }
             _ = try await bridge.request(
                 method: "runtime.start",
-                params: ["pluginId": pluginId, "config": [String: Any]()]
+                params: Self.accountBoundParams(
+                    ["pluginId": pluginId, "config": [String: Any]()],
+                    identity: identity
+                )
             )
+            try await ensurePluginAccountIdentity(identity)
             message = "\(pluginId) 已安装并启动 · \(runtime)"
         } catch {
             message = "\(pluginId) 已安装但启动失败：\(error.localizedDescription)"

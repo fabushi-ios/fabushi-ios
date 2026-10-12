@@ -2716,6 +2716,7 @@ impl AppHost {
     }
 
     fn plugin_permissions(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let account = self.plugin_account_context()?;
         let pointer = PluginInstaller::new(&account.root)
@@ -2740,6 +2741,7 @@ impl AppHost {
             )
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let granted = manager.grants_for(plugin_id);
         let missing = pointer
             .requested_permissions
@@ -2753,6 +2755,7 @@ impl AppHost {
     }
 
     fn set_permission(&self, params: Value, grant: bool) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let permission = string_param(&params, "permission")?;
         let account = self.plugin_account_context()?;
@@ -2789,6 +2792,7 @@ impl AppHost {
                 .map_err(|error| AppHostError::Operation(error.to_string()))?;
         }
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         let granted = manager.grants_for(plugin_id);
         let missing = pointer
             .requested_permissions
@@ -2804,12 +2808,14 @@ impl AppHost {
     }
 
     fn plugin_compatibility(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?;
         let (account_scope, account_generation, _pointer, root) =
             self.active_plugin_ui_root(plugin_id)?;
         let report = scan_package_compatibility(&root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account_scope, &account_generation)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         serde_json::to_value(report).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
@@ -2962,9 +2968,11 @@ impl AppHost {
     }
 
     fn start_runtime(&self, params: Value) -> Result<Value, AppHostError> {
+        let expected_account = self.expected_plugin_account_identity(&params)?;
         let plugin_id = string_param(&params, "pluginId")?.to_string();
         let (account_scope, account_generation, pointer, root) =
             self.active_plugin_ui_root(&plugin_id)?;
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         if !matches!(
             pointer.runtime.as_str(),
             "deepseek-js" | "javascript" | "cordis-js"
@@ -3005,6 +3013,9 @@ impl AppHost {
         if self
             .ensure_plugin_account_current(&account_scope, &account_generation)
             .is_err()
+            || self
+                .ensure_expected_plugin_account_identity_current(expected_account.as_ref())
+                .is_err()
         {
             let _ = host.disable_plugin(&plugin_id);
             bindings.remove(&plugin_id);
@@ -3019,6 +3030,7 @@ impl AppHost {
                 account_generation,
             },
         );
+        self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         serde_json::to_value(state).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
