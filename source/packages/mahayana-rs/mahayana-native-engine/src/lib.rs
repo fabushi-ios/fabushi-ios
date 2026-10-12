@@ -682,8 +682,11 @@ impl NativeEngine {
                 metadata: json!({"engine": "mahayana-native"}),
             })?;
 
-            let declared_tools =
-                tool_definitions(self.config.enable_process_tools, self.web_research.is_some());
+            let declared_tools = tool_definitions(
+                self.config.enable_process_tools,
+                matches!(self.config.process_execution, ProcessExecution::Remote(_)),
+                self.web_research.is_some(),
+            );
             let mut model_instructions = runtime_model_instructions(
                 &self.config.system_instructions,
                 self.model.provider_mode(),
@@ -1690,6 +1693,65 @@ impl NativeEngine {
                         })?
                         .fetch(&urls, format)
                         .await
+                }
+                "ExternalShell" => {
+                    if !self.config.enable_process_tools || !policy.allow_process {
+                        return Err(KernelError::PolicyDenied(
+                            "external shell execution is disabled by Mahayana policy".into(),
+                        ));
+                    }
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalShell requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let command = string_arg(&call.arguments, "command")?;
+                    let working_directory = call
+                        .arguments
+                        .get("workingDirectory")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    broker
+                        .execute(
+                            "shell.exec",
+                            json!({
+                                "command": command,
+                                "workingDirectory": working_directory,
+                                "toolCallId": call.call_id,
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
+                }
+                "ExternalRead" => {
+                    let ProcessExecution::Remote(broker) = &self.config.process_execution else {
+                        return Err(KernelError::CapabilityUnavailable(
+                            "ExternalRead requires the mobile platform Remote Runner".into(),
+                        ));
+                    };
+                    let path = string_arg(&call.arguments, "path")?;
+                    let mut args = serde_json::Map::new();
+                    args.insert("path".into(), Value::String(path.to_string()));
+                    args.insert("toolCallId".into(), Value::String(call.call_id.clone()));
+                    if let Some(offset) = call.arguments.get("offset").cloned() {
+                        args.insert("offset".into(), offset);
+                    }
+                    if let Some(limit) = call.arguments.get("limit").cloned() {
+                        args.insert("limit".into(), limit);
+                    }
+                    if let Some(encoding_hint) = call.arguments.get("encodingHint").cloned() {
+                        args.insert("encodingHint".into(), encoding_hint);
+                    }
+                    broker
+                        .execute(
+                            "box.exec",
+                            json!({
+                                "case": "readArgs",
+                                "args": Value::Object(args),
+                            }),
+                        )
+                        .await
+                        .map_err(KernelError::Backend)
                 }
                 "process_exec" => {
                     if !self.config.enable_process_tools || !policy.allow_process {
@@ -3279,14 +3341,15 @@ fn is_delivery_tool(tool: &str) -> bool {
 fn tool_risk(tool: &str) -> RiskLevel {
     match tool {
         "workspace_write" | "workspace_restore" => RiskLevel::WorkspaceWrite,
-        "process_exec" => RiskLevel::SystemWrite,
+        "process_exec" | "ExternalShell" => RiskLevel::SystemWrite,
         _ => RiskLevel::ReadOnly,
     }
 }
 
 fn tool_capability(tool: &str) -> Capability {
     match tool {
-        "workspace_read" | "workspace_search" | "codebase_graph" | "code_symbols" => {
+        "workspace_read" | "workspace_search" | "codebase_graph" | "code_symbols"
+        | "ExternalRead" => {
             Capability::FilesystemRead
         }
         "workspace_write" | "workspace_restore" => Capability::FilesystemWrite,
@@ -3296,7 +3359,7 @@ fn tool_capability(tool: &str) -> Capability {
         "workflow_create" | "workflow_status" => Capability::Workflow,
         "subagent_run" => Capability::Subagent,
         "web_search" | "web_fetch" => Capability::WebSearch,
-        "process_exec" => Capability::Process,
+        "process_exec" | "ExternalShell" => Capability::Process,
         "git_status" | "git_diff" => Capability::Git,
         _ => Capability::ToolProtocol,
     }
@@ -3309,6 +3372,8 @@ fn permission_target(call: &FunctionCall) -> String {
         "memory_get" | "memory_put" => call.arguments.get("key"),
         "workflow_status" => call.arguments.get("workflow_id"),
         "process_exec" => call.arguments.get("program"),
+        "ExternalShell" => call.arguments.get("command"),
+        "ExternalRead" => call.arguments.get("path"),
         "web_search" => call.arguments.get("query"),
         "web_fetch" => call
             .arguments
@@ -3488,7 +3553,11 @@ fn model_error(error: ModelError) -> KernelError {
     KernelError::Backend(error.to_string())
 }
 
-fn tool_definitions(enable_process_tools: bool, enable_web_research: bool) -> Vec<Value> {
+fn tool_definitions(
+    enable_process_tools: bool,
+    enable_external_machine_tools: bool,
+    enable_web_research: bool,
+) -> Vec<Value> {
     let mut tools = vec![
         function_tool(
             "send_message",
@@ -3587,6 +3656,20 @@ fn tool_definitions(enable_process_tools: bool, enable_web_research: bool) -> Ve
                 "web_fetch",
                 "Fetch and extract readable content from up to 10 public HTTP(S) URLs returned by web search or provided by the user. Prefer markdown for research and verify important claims from source content rather than snippets alone.",
                 json!({"type":"object","properties":{"urls":{"type":"array","minItems":1,"maxItems":10,"items":{"type":"string"}},"format":{"type":"string","enum":["markdown","text"]}},"required":["urls"],"additionalProperties":false}),
+            ),
+        ]);
+    }
+    if enable_external_machine_tools {
+        tools.extend([
+            function_tool(
+                "ExternalShell",
+                "Run a shell command on the user's connected computer.",
+                json!({"type":"object","additionalProperties":false,"required":["command"],"properties":{"command":{"type":"string","minLength":1},"workingDirectory":{"type":"string"}}}),
+            ),
+            function_tool(
+                "ExternalRead",
+                "Read a file from the user's connected computer.",
+                json!({"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"offset":{"type":"integer"},"limit":{"type":"integer","minimum":0},"encodingHint":{"type":"string"}}}),
             ),
         ]);
     }
@@ -3804,7 +3887,7 @@ mod tests {
 
     #[test]
     fn simple_first_party_conversation_keeps_full_tool_schema() {
-        let tools = tool_definitions(false, false);
+        let tools = tool_definitions(false, false, false);
         assert!(
             tools.iter().any(|tool| tool.get("name").and_then(Value::as_str) == Some("send_message")),
             "current Desktop main removed CHAT-013 fast-lane tool suppression; visible simple turns must retain canonical delivery tools"
@@ -3892,7 +3975,7 @@ mod tests {
         )
         .expect("create engine without web");
         assert!(!without_web.capabilities().contains(Capability::WebSearch));
-        assert!(!tool_definitions(false, false).iter().any(|tool| matches!(
+        assert!(!tool_definitions(false, false, false).iter().any(|tool| matches!(
             tool.get("name").and_then(Value::as_str),
             Some("web_search" | "web_fetch")
         )));
@@ -3909,7 +3992,7 @@ mod tests {
         .expect("create engine with web");
         assert!(with_web.capabilities().contains(Capability::WebSearch));
         assert!(with_web.capabilities().contains(Capability::Network));
-        let names = tool_definitions(false, true)
+        let names = tool_definitions(false, false, true)
             .into_iter()
             .filter_map(|tool| tool.get("name").and_then(Value::as_str).map(str::to_owned))
             .collect::<Vec<_>>();
@@ -3920,8 +4003,29 @@ mod tests {
     }
 
     #[test]
+    fn external_machine_tools_are_declared_only_for_remote_runner_composition() {
+        let without_remote = tool_definitions(true, false, false)
+            .into_iter()
+            .filter_map(|tool| tool.get("name").and_then(Value::as_str).map(str::to_owned))
+            .collect::<Vec<_>>();
+        assert!(!without_remote.contains(&"ExternalShell".to_string()));
+        assert!(!without_remote.contains(&"ExternalRead".to_string()));
+
+        let with_remote = tool_definitions(true, true, false)
+            .into_iter()
+            .filter_map(|tool| tool.get("name").and_then(Value::as_str).map(str::to_owned))
+            .collect::<Vec<_>>();
+        assert!(with_remote.contains(&"ExternalShell".to_string()));
+        assert!(with_remote.contains(&"ExternalRead".to_string()));
+        assert_eq!(tool_capability("ExternalShell"), Capability::Process);
+        assert_eq!(tool_capability("ExternalRead"), Capability::FilesystemRead);
+        assert_eq!(tool_risk("ExternalShell"), RiskLevel::SystemWrite);
+        assert_eq!(tool_risk("ExternalRead"), RiskLevel::ReadOnly);
+    }
+
+    #[test]
     fn strict_dsml_tool_calls_normalize_into_declared_native_tools() {
-        let tools = tool_definitions(false, false);
+        let tools = tool_definitions(false, false, false);
         let dsml = concat!(
             "<｜｜DSML｜｜ calls>\n",
             "<｜｜DSML｜｜ invoke name=\"send_message\">\n",
@@ -3948,7 +4052,7 @@ mod tests {
 
     #[test]
     fn dsml_compatibility_fails_closed_for_mixed_or_undeclared_text() {
-        let tools = tool_definitions(false, false);
+        let tools = tool_definitions(false, false, false);
         for text in [
             "prefix <｜｜DSML｜｜ calls><｜｜DSML｜｜ invoke name=\"send_message\"></｜｜DSML｜｜ invoke></｜｜DSML｜｜ calls>",
             "<｜｜DSML｜｜ calls><｜｜DSML｜｜ invoke name=\"unknown_tool\"></｜｜DSML｜｜ invoke></｜｜DSML｜｜ calls>",
