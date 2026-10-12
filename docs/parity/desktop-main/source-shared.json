@@ -2238,11 +2238,11 @@
       "implementation_status": "implemented",
       "production_evidence": "source/shared/os-notification.swift preserves transition, message-identity dedupe, focus/hidden/preference gating, 5-second throttle and bounded content. Shipping MarketplaceModel owns IOSAgentNotificationController, projects the canonical live Agent roster into NotificationSnapshot values, and calls update on each roster refresh. source/ios-main/notifications/dock-badge.swift composes that decider with IOSUserNotificationScheduler/UNUserNotificationCenter; account-scope changes advance the shared generation and reset pending/delivered Agent notifications.",
       "test_evidence": "SharedPermissionsAndNotificationsParityTests covers needs-input/done transition gating, seeded-baseline behavior, native scheduling, foreground/hidden suppression and stale-generation/account reset. Exact-head GitHub Actions are still required before verified promotion.",
-      "notes": "IOS-MAIN-SHARED-OS-NOTIFICATION-20261012: production caller reachability is proven through MarketplaceModel -> IOSAgentNotificationController -> SandOsNotificationDecider -> IOSUserNotificationScheduler/UNUserNotificationCenter, reusing the same generation fence as dock badge updates. Implemented, not verified.",
+      "notes": "IOS-MAIN-SHARED-OS-NOTIFICATION-20261012: production caller reachability is proven through MarketplaceModel -> IOSAgentNotificationController -> SandOsNotificationDecider -> IOSUserNotificationScheduler/UNUserNotificationCenter, reusing the same generation fence as dock badge updates. Implemented, not verified. Current Desktop main 371b72f1 retains exact blob ffaf599dada09e938f362d75aa202327eed3a4ad; caller/owner review is therefore bound to current authority rather than the historical 3bc924 snapshot. Exact-head CI remains required before verified promotion.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "source/shared/persistence.ts",

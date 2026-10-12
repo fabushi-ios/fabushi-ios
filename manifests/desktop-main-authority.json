@@ -27,12 +27,12 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20 with 7,951 selected source identities. PR #3 advanced beyond requested checkpoint a93626a8f60dcc36dc229f0980a3cee9ea552a82 to pre-evidence-update c9a3a8e3effa05de568cb2ee536f7bc3394f7cf3 / tree df089aa97be6d5514753c46f322d23be06fbf62a. Runs 38190289874/38190289840/38192173184/38192173175/38192487666/38192487704 are predecessor evidence only. The shipping local-exec final edge composes the account-scoped Cursor sandbox exec-daemon through CoordinatorMcpSurface and IOSRemoteExecDaemonClient; focused tests now independently cover provider failure, cancellation, account switch, Host generation late-result fencing and unknown methods. No GD/FPM/IOS-MAIN status is promoted until fresh exact-head Actions pass. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full dependency closure and independent acceptance remain pending; baselineReady/dependenciesReviewed/completenessAccepted/acceptanceAccepted stay false. Architecture run 38192567443 at 9a94335f is predecessor failure evidence only: strict validation correctly rejected a multi-path ios_target_path for an implemented ledger row. This evidence commit normalizes that row to one canonical owner without relaxing the validator.",
+  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20. PR #3 advanced beyond requested checkpoint a93626a8 to pre-evidence b13b769f414193022634021230018d1e6e839f76 / tree cf5d9b4a7d3929566e23f7e7548aca7e7482610f. Runs 38190289874/38190289840/38192173184/38192173175/38192487666/38192487704/38192567443/38192567432/38192646437/38192646349/38192850135/38192850173/38193218500/38193218520 are predecessor evidence only. The local-exec final provider remains the existing account-scoped Cursor sandbox exec-daemon with independent provider-failure/cancellation/account-switch/Host-generation/late-result/unknown-method tests. Predecessor run 38193218500 correctly rejected source/shared/os-notification.ts because its implemented row was still bound to a historical review SHA; current Desktop main retains the same exact blob ffaf599d..., so this commit binds that row to 371b72f1cd20de03dc4dff9a15ed761054968093 with authority_review_state=current-main-reviewed without promoting it to verified. No GD/FPM/IOS-MAIN release status is promoted. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full completeness and independent acceptance remain pending.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "a93626a8f60dcc36dc229f0980a3cee9ea552a82",
-    "preEvidenceIosHead": "9a94335f94ab2a71984080f965783bf36040824a",
-    "preEvidenceIosTree": "09ef8189a31e9b180bd9da14c08ca9198bc43ac5",
+    "preEvidenceIosHead": "b13b769f414193022634021230018d1e6e839f76",
+    "preEvidenceIosTree": "cf5d9b4a7d3929566e23f7e7548aca7e7482610f",
     "baseMain": "f098639ab178a839690b9dece60fa0d11c5d2e25",
     "predecessorWorkflowRuns": [
       38190289874,
@@ -42,7 +42,13 @@
       38192487666,
       38192487704,
       38192567443,
-      38192567432
+      38192567432,
+      38192646437,
+      38192646349,
+      38192850135,
+      38192850173,
+      38193218500,
+      38193218520
     ],
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
