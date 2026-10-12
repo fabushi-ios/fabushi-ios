@@ -99,7 +99,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "b52591079409dcb84465e9ae1ba1cf5b774802a8",
+    "preEvidenceIosHead": "9a5dd92561467de7e344afdd5431c2fd38d6f28b",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -162,7 +162,11 @@
       38209221884,
       38209221880,
       38209909251,
-      38209909254
+      38209909254,
+      38210445699,
+      38210445669,
+      38211182945,
+      38211182835
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -238,11 +242,19 @@
       114678247239,
       114678300876,
       114678379750,
-      114678379878
+      114678379878,
+      114683201404,
+      114683257968,
+      114683315361,
+      114683315591,
+      114685518773,
+      114685558177,
+      114685570433,
+      114685570595
     ],
-    "status": "application-menu-reload-resulting-exact-head-ci-required",
+    "status": "box-host-broker-contract-resulting-exact-head-ci-required",
     "rowCount": 7951,
-    "currentImplementationHead": "b52591079409dcb84465e9ae1ba1cf5b774802a8",
+    "currentImplementationHead": "9a5dd92561467de7e344afdd5431c2fd38d6f28b",
     "promotion": "none"
   }
 }
