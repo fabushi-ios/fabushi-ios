@@ -1402,6 +1402,47 @@ extension ContentView {
                     }
                 }
 
+                if model.pluginBrowserTab == .marketplace, !model.pluginAuthBlocks.isEmpty {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Complete GitHub auth to sync installed plugins")
+                                .font(.headline)
+                            Text(MarketplaceModel.pluginAuthBlockedDetail(model.pluginAuthBlocks))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 8) {
+                                Button(model.pluginAuthLaunching ? "Opening…" : "Fix with agent") {
+                                    Task {
+                                        if await model.fixPluginGitHubAuth() != nil {
+                                            activeSection = .bots
+                                            destination = .home
+                                        }
+                                    }
+                                }
+                                .disabled(model.pluginAuthLaunching)
+                                .accessibilityIdentifier("plugin-github-auth-fix")
+
+                                if model.pluginAuthStatus == .failed {
+                                    Button("Retry") {
+                                        Task { await model.refreshPluginAuthStatus() }
+                                    }
+                                    .disabled(model.pluginAuthLaunching)
+                                    .accessibilityIdentifier("plugin-github-auth-retry")
+                                }
+                            }
+                            if let failure = model.pluginAuthFailure, !failure.isEmpty {
+                                Text(failure)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .accessibilityIdentifier("plugin-github-auth-error")
+                            }
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Plugin content needs GitHub authentication")
+                        .accessibilityIdentifier("plugin-github-auth-banner")
+                    }
+                }
+
                 if model.pluginBrowserTab == .marketplace, let permission = model.permissionRequest {
                     Section("插件权限") {
                         VStack(alignment: .leading, spacing: 8) {
@@ -2074,6 +2115,8 @@ extension ContentView {
                 if model.pluginBrowserTab == .marketplace {
                     if model.plugins.isEmpty {
                         await model.refresh()
+                    } else {
+                        await model.refreshPluginAuthStatus()
                     }
                 } else {
                     if model.hasPrivateSkillAgentScope && model.privateSkills.isEmpty {
@@ -2087,7 +2130,11 @@ extension ContentView {
             .onChange(of: model.pluginBrowserTab) { _, tab in
                 Task {
                     if tab == .marketplace {
-                        if model.plugins.isEmpty { await model.refresh() }
+                        if model.plugins.isEmpty {
+                            await model.refresh()
+                        } else {
+                            await model.refreshPluginAuthStatus()
+                        }
                     } else {
                         if model.hasPrivateSkillAgentScope {
                             await model.refreshPrivateSkills()
@@ -2097,6 +2144,9 @@ extension ContentView {
                         }
                     }
                 }
+            }
+            .onDisappear {
+                model.disposePluginAuthScope()
             }
         }
     }
