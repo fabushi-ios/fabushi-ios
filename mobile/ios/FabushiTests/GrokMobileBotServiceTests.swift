@@ -822,3 +822,43 @@ final class GrokMobileBotServiceTests: XCTestCase {
     }
 
 }
+
+
+final class PluginAuthAgentProtocolTests: XCTestCase {
+    func testPluginAuthConstantsAndRosterProjectionMatchDesktopContract() throws {
+        XCTAssertEqual(GrokMobileBotService.pluginAuthAgentName, "Plugin Setup")
+        XCTAssertEqual(GrokMobileBotService.pluginAuthAgentPurpose, "plugin-auth")
+        XCTAssertTrue(GrokMobileBotService.pluginAuthPrompt.contains("gh auth login"))
+        XCTAssertTrue(GrokMobileBotService.pluginAuthPrompt.contains("gh auth setup-git"))
+        XCTAssertTrue(GrokMobileBotService.pluginAuthPrompt.contains("git ls-remote"))
+
+        let roster = try XCTUnwrap(GrokMobileBotService.pluginAuthRoster(from: [
+            "agents": [
+                ["id": "agent-1", "purpose": "disk-saver"],
+                ["id": "plugin-setup", "purpose": "plugin-auth"],
+            ],
+        ]))
+        XCTAssertEqual(roster.count, 2)
+        XCTAssertEqual(
+            roster.first(where: { $0.purpose == GrokMobileBotService.pluginAuthAgentPurpose })?.id,
+            "plugin-setup"
+        )
+        XCTAssertNil(GrokMobileBotService.pluginAuthRoster(from: [
+            "agents": [["purpose": "plugin-auth"]],
+        ]))
+    }
+
+    func testPluginAuthAgentCreationReplyAcceptsCanonicalNestedAndRootShapes() {
+        XCTAssertEqual(
+            GrokMobileBotService.pluginAuthCreatedAgentId(from: [
+                "agent": ["id": "nested-agent"],
+            ]),
+            "nested-agent"
+        )
+        XCTAssertEqual(
+            GrokMobileBotService.pluginAuthCreatedAgentId(from: ["id": "root-agent"]),
+            "root-agent"
+        )
+        XCTAssertNil(GrokMobileBotService.pluginAuthCreatedAgentId(from: ["agent": [:]]))
+    }
+}
