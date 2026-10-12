@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "group": "source-product",
+  "fileCount": 5,
+  "files": [
+    {
+      "path": "source/product/fabushi/entry.ts",
+      "blobSha": "62ec343f968963c111cff33a209774567b40a0e2",
+      "size": 202
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-adapters.ts",
+      "blobSha": "4b44163fc8dfe1788e50a1c9ae8170d4a2ec8107",
+      "size": 6925
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-policy.ts",
+      "blobSha": "c7faad3934f84b088736409fc490ba50597fce58",
+      "size": 4110
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-service.contract.test.ts",
+      "blobSha": "4c0ce7213c1b36422222bcb9af900c616a67c499",
+      "size": 3130
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-service.ts",
+      "blobSha": "b0bd689dc430fd36ce1e2089027563f80d47b54e",
+      "size": 15597
+    }
+  ]
+}

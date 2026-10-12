@@ -1,0 +1,857 @@
+{
+  "sourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "group": "source-shared",
+  "fileCount": 170,
+  "files": [
+    {
+      "path": "source/shared/agents/agent-model.ts",
+      "blobSha": "d983756971219d8c07d907cde94684a24bd427d3",
+      "size": 339
+    },
+    {
+      "path": "source/shared/agents/agent-summaries.ts",
+      "blobSha": "36ad3be297143178ecdab28b79c53a53696818e8",
+      "size": 597
+    },
+    {
+      "path": "source/shared/agents/agent-tool-names.ts",
+      "blobSha": "7eecec96039b02338df0ec243e9e26503d548ca2",
+      "size": 1537
+    },
+    {
+      "path": "source/shared/agents/agents.ts",
+      "blobSha": "4aa91a720b0882ac7ffcfa2a24df9d26f84e710c",
+      "size": 1929
+    },
+    {
+      "path": "source/shared/agents/disk-saver.ts",
+      "blobSha": "d175b498b15fd13290de1f28c160d914efc10fdf",
+      "size": 1478
+    },
+    {
+      "path": "source/shared/agents/model-catalog.ts",
+      "blobSha": "79d22399d73c090d477fdc8adc4e2577cc50c7b7",
+      "size": 6823
+    },
+    {
+      "path": "source/shared/agents/onboarding.ts",
+      "blobSha": "a95d6bc56dc5ab53aa34fdd82c29f2a3de0ae482",
+      "size": 2084
+    },
+    {
+      "path": "source/shared/agents/sand-agent-model.ts",
+      "blobSha": "c89e0b9c1b20b06ade9464199977d8e7c1b21635",
+      "size": 1543
+    },
+    {
+      "path": "source/shared/agents/sharing.ts",
+      "blobSha": "6f943725c20eff6425628ea76c68bbe52ceff05f",
+      "size": 1622
+    },
+    {
+      "path": "source/shared/agents/subagents.ts",
+      "blobSha": "df6f0fd407c058b98f92c63f8aed25f6c8a3cd93",
+      "size": 165
+    },
+    {
+      "path": "source/shared/agents/teach-recording.ts",
+      "blobSha": "7ea485df40470c034298b632e3085010f31a9885",
+      "size": 217
+    },
+    {
+      "path": "source/shared/auth.ts",
+      "blobSha": "351520bafadd29f46ba77579051114b793c83b80",
+      "size": 391
+    },
+    {
+      "path": "source/shared/automation-schedule.ts",
+      "blobSha": "2864c2b928def09308872cd2e52e77a2b49e009d",
+      "size": 13639
+    },
+    {
+      "path": "source/shared/automations.ts",
+      "blobSha": "1ea04ea14ec5cc2371c6958cfc528bdf965546ed",
+      "size": 7619
+    },
+    {
+      "path": "source/shared/box-migration.ts",
+      "blobSha": "85f541cd08c594dc34f8b02f7870ffcf67f5d257",
+      "size": 509
+    },
+    {
+      "path": "source/shared/box-runtime.ts",
+      "blobSha": "d8e256188f9aab4ae29c34f531d15d56ed4db411",
+      "size": 259
+    },
+    {
+      "path": "source/shared/box-secrets.ts",
+      "blobSha": "23a4d23e5976edd3c0be094f661c308e59a9880d",
+      "size": 2102
+    },
+    {
+      "path": "source/shared/channel-messaging.ts",
+      "blobSha": "33a52c1eddd7ea71114d3cccb9071158651b1f24",
+      "size": 12412
+    },
+    {
+      "path": "source/shared/channels.ts",
+      "blobSha": "31bc319bf498bc4d45df6b8758b9adc27ba53120",
+      "size": 1900
+    },
+    {
+      "path": "source/shared/client-persistence-store.ts",
+      "blobSha": "86cfc673614297769586111fa5e6a6c744e7414a",
+      "size": 7663
+    },
+    {
+      "path": "source/shared/connect-errors.ts",
+      "blobSha": "4a9b44f51bfd734cc8a8dccc80b6ca3fe6140c60",
+      "size": 1463
+    },
+    {
+      "path": "source/shared/deep-link.ts",
+      "blobSha": "0fc20bc37ee986130b3337b4f954c406222d4b99",
+      "size": 4954
+    },
+    {
+      "path": "source/shared/desktop.ts",
+      "blobSha": "0d786b53d38efdaeba61ba2c6f4ad2902a2016b4",
+      "size": 3581
+    },
+    {
+      "path": "source/shared/env-file.ts",
+      "blobSha": "387386fba6703706573585fda35000a766a19f5e",
+      "size": 60
+    },
+    {
+      "path": "source/shared/errors.ts",
+      "blobSha": "2e1888920f7b847a246e835f5688b955dd4ec7f3",
+      "size": 396
+    },
+    {
+      "path": "source/shared/errors/bounded.ts",
+      "blobSha": "7d2e1b4e104b6e9c3b7a6b1eb7cc2ec4ae695243",
+      "size": 1199
+    },
+    {
+      "path": "source/shared/errors/registry.ts",
+      "blobSha": "2f682a1bc5abcbaf6dad25fe8e3e95dceda321cd",
+      "size": 31582
+    },
+    {
+      "path": "source/shared/external-url-policy.ts",
+      "blobSha": "a126587a99580c5ea0be801b688cc164a16947df",
+      "size": 3532
+    },
+    {
+      "path": "source/shared/feedback.ts",
+      "blobSha": "2fe0ea651f3bcccdd86b34ab0ae5bb29a4d94aa7",
+      "size": 301
+    },
+    {
+      "path": "source/shared/forever-box.ts",
+      "blobSha": "e31e85c9d298e1e03b16d1bc99a90c4753aa0175",
+      "size": 711
+    },
+    {
+      "path": "source/shared/foundations.test.ts",
+      "blobSha": "db9c944b3816157669eaf955c693f39b3a7423d9",
+      "size": 8298
+    },
+    {
+      "path": "source/shared/gateway-reachability.ts",
+      "blobSha": "c3f20f34511284f2ba801401044f56d743f0327e",
+      "size": 1723
+    },
+    {
+      "path": "source/shared/gateway-wire.ts",
+      "blobSha": "bf2b067f6c6b3d301fdf7deb475138e4b76966f3",
+      "size": 484
+    },
+    {
+      "path": "source/shared/host-settings-field.ts",
+      "blobSha": "d42c80580522a85459220303771d2cdf98a0e786",
+      "size": 3078
+    },
+    {
+      "path": "source/shared/host-settings.ts",
+      "blobSha": "24e5ba53252727b8a21d7f66285ed4171da8b9b6",
+      "size": 162
+    },
+    {
+      "path": "source/shared/inference-router.ts",
+      "blobSha": "2bc1550891cfc60a1f5b36ee35e39ac80f63e5bd",
+      "size": 1196
+    },
+    {
+      "path": "source/shared/invariant.ts",
+      "blobSha": "f4cff86342623b030c05cd47db0a1f3450ac9b63",
+      "size": 1951
+    },
+    {
+      "path": "source/shared/link-preview-policy.ts",
+      "blobSha": "b77faa51d5d297b83789126e62ee1c0aa272dfa7",
+      "size": 379
+    },
+    {
+      "path": "source/shared/listener-integrations.ts",
+      "blobSha": "5595e4a866a9c2489cc4e53e5bd6c844f93f3447",
+      "size": 762
+    },
+    {
+      "path": "source/shared/local-exec-daemon.ts",
+      "blobSha": "e25a367e34d94349796c7ee124b352143ee3c894",
+      "size": 405
+    },
+    {
+      "path": "source/shared/local-exec-gateway.ts",
+      "blobSha": "a0e6c5e2959ed2169f766c25845baea66e9d6e10",
+      "size": 2164
+    },
+    {
+      "path": "source/shared/local-exec-process-identity.ts",
+      "blobSha": "6a88e8229a8243c0022a66ae429ea3fbe2af7b3e",
+      "size": 2440
+    },
+    {
+      "path": "source/shared/local-tool-permission-machinery.ts",
+      "blobSha": "b8b0c1636eef216040c9e8024682f21781af196f",
+      "size": 7412
+    },
+    {
+      "path": "source/shared/local-tool-permission.ts",
+      "blobSha": "c0f2f92be1747d28472a7212e7a16e301f0a9cc2",
+      "size": 1477
+    },
+    {
+      "path": "source/shared/mcp-custom-instructions.ts",
+      "blobSha": "d7a91b9bda2a3de3a6165273756f85a1a4682630",
+      "size": 2350
+    },
+    {
+      "path": "source/shared/mcp-oauth-callback-page.ts",
+      "blobSha": "81379ccf65861c5639b60dcc2b47d080f465659a",
+      "size": 2009
+    },
+    {
+      "path": "source/shared/mcp.ts",
+      "blobSha": "94e43601d08949fe404d791fc9203e8c686cccb3",
+      "size": 2539
+    },
+    {
+      "path": "source/shared/media/attachment-limits.ts",
+      "blobSha": "b4e6c2036503804d6d8605e203ff95deb898f347",
+      "size": 1091
+    },
+    {
+      "path": "source/shared/media/attachment-open-policy.ts",
+      "blobSha": "8dac94ebbc270ab5c6bb154ab3d6246d41dacbe6",
+      "size": 310
+    },
+    {
+      "path": "source/shared/media/attachment-preview.ts",
+      "blobSha": "0cd50e0ccb07392d81fd02f8ea8692f5c3d6dc59",
+      "size": 1571
+    },
+    {
+      "path": "source/shared/media/attachment-summary.ts",
+      "blobSha": "b9a0bd5cfbdc39299aec01da873548e958e4990c",
+      "size": 3825
+    },
+    {
+      "path": "source/shared/media/attachments.ts",
+      "blobSha": "88cd6b78d908db716a34b2904edb2cbd17639c6b",
+      "size": 2449
+    },
+    {
+      "path": "source/shared/media/avatar-image.ts",
+      "blobSha": "c55081105b723433cb1ceefbd14c8ee7b686d46d",
+      "size": 674
+    },
+    {
+      "path": "source/shared/media/file-preview-kind.ts",
+      "blobSha": "a6b3ae54ab74e241f68c353a54e4749cc7bcb411",
+      "size": 1791
+    },
+    {
+      "path": "source/shared/media/image-dimensions.ts",
+      "blobSha": "4d3bf6f7b327feb68a6c5952a74c2368420ac76a",
+      "size": 9958
+    },
+    {
+      "path": "source/shared/media/image-mime.ts",
+      "blobSha": "2b3765185b1cc87b34735ba5b5b80f7f649659b3",
+      "size": 956
+    },
+    {
+      "path": "source/shared/media/link-preview-image-bounds.ts",
+      "blobSha": "14c1f3cb2efef5bf7de76302fa8441f4927bcef9",
+      "size": 3319
+    },
+    {
+      "path": "source/shared/media/markdown-preview.ts",
+      "blobSha": "e201c0f863c0f789a9f5038eac1a4b6832a373f1",
+      "size": 806
+    },
+    {
+      "path": "source/shared/media/media-extensions.ts",
+      "blobSha": "0ec3e7901addd73ccb2313102fed16c9e2bdc8f9",
+      "size": 1411
+    },
+    {
+      "path": "source/shared/media/video-dimensions.ts",
+      "blobSha": "7748aeef817ac0a5f82e7b5a5bbaa4c3e44c0449",
+      "size": 4408
+    },
+    {
+      "path": "source/shared/message-reference.ts",
+      "blobSha": "a17ad4362cb0126660f03a6535764a8a30c1ed31",
+      "size": 184
+    },
+    {
+      "path": "source/shared/node/analytics/product-analytics.ts",
+      "blobSha": "9c20842b59e1baf76c5d4eebd59533602cab9270",
+      "size": 7134
+    },
+    {
+      "path": "source/shared/node/async.ts",
+      "blobSha": "30bd807ebb727269a1c108a19004bab992496a4c",
+      "size": 669
+    },
+    {
+      "path": "source/shared/node/atomic-write.ts",
+      "blobSha": "8f2da8007453261ece6a6bb27b532a159c924061",
+      "size": 919
+    },
+    {
+      "path": "source/shared/node/cursor-backend/account-mcp.ts",
+      "blobSha": "ffbb57149a5f992cf1746875be4e19a2ca1d08ef",
+      "size": 15997
+    },
+    {
+      "path": "source/shared/node/cursor-backend/backend-mcp-exec.ts",
+      "blobSha": "6e76db2678a4d832f1e13f12117e40b231529a62",
+      "size": 8829
+    },
+    {
+      "path": "source/shared/node/cursor-backend/cursor-generate-image.ts",
+      "blobSha": "eb6d4a76e4332822f7aaff5816e719b5782c8620",
+      "size": 1701
+    },
+    {
+      "path": "source/shared/node/cursor-backend/cursor-inference.ts",
+      "blobSha": "296eeb02b7b0bc37256fc0d89b5c215d7cd1d501",
+      "size": 14464
+    },
+    {
+      "path": "source/shared/node/cursor-backend/rpc-tracing.ts",
+      "blobSha": "5abce7ae7aa30d7116817abb58d238960822c44b",
+      "size": 6562
+    },
+    {
+      "path": "source/shared/node/cursor-token.ts",
+      "blobSha": "4a93d2c0deca69823870b131fc40ab8d34a34b27",
+      "size": 2682
+    },
+    {
+      "path": "source/shared/node/egress-tunnel/box-connection.ts",
+      "blobSha": "2494454bd0ba5a32905bc8a771df3baf45bda401",
+      "size": 1477
+    },
+    {
+      "path": "source/shared/node/egress-tunnel/egress-tunnel-controller.ts",
+      "blobSha": "cf854d12040107a9abca589c2f1bd5d8ddb024ea",
+      "size": 3375
+    },
+    {
+      "path": "source/shared/node/egress-tunnel/exit-client.ts",
+      "blobSha": "074b2f2af4ea124bfd4038ca93e649d3f6ed4919",
+      "size": 11893
+    },
+    {
+      "path": "source/shared/node/egress-tunnel/websocket-client.ts",
+      "blobSha": "1422157cbebe6231d7aa58db56b7e50c02f2c6ea",
+      "size": 661
+    },
+    {
+      "path": "source/shared/node/egress-tunnel/ws.d.ts",
+      "blobSha": "029b8600d96bc38de75e8f773cc049644a588bb0",
+      "size": 636
+    },
+    {
+      "path": "source/shared/node/experiments/cursor-experiments.ts",
+      "blobSha": "b9f644e1795bccc5c27aacc5b0e90b5953409de9",
+      "size": 20284
+    },
+    {
+      "path": "source/shared/node/experiments/experiment-config.gen.ts",
+      "blobSha": "b4ac08fbb9ec2bf6cccc77c1b1245e08d295ff5e",
+      "size": 212974
+    },
+    {
+      "path": "source/shared/node/experiments/experiments-diagnostics.ts",
+      "blobSha": "2781c8e99de0ef6be59a751fb3843a199c18584e",
+      "size": 744
+    },
+    {
+      "path": "source/shared/node/experiments/feature-flag-overrides.ts",
+      "blobSha": "1b137f25d09257bb0a1447eeb4bcf7ab68c7f7d7",
+      "size": 3902
+    },
+    {
+      "path": "source/shared/node/experiments/gate-property.ts",
+      "blobSha": "3557eab7c35af1b8a5d8d612978227917bbda4d1",
+      "size": 769
+    },
+    {
+      "path": "source/shared/node/experiments/sand-model-config.ts",
+      "blobSha": "af27b6bbcd641951375493b1ec9366c450655116",
+      "size": 2424
+    },
+    {
+      "path": "source/shared/node/experiments/sand-model-experiment.ts",
+      "blobSha": "8673e7e22fc62c3177e07e3fe9b9ebeb194a9ede",
+      "size": 1256
+    },
+    {
+      "path": "source/shared/node/experiments/statsig-bootstrap.ts",
+      "blobSha": "06e68f25f7dfbea51583392950a411238b1d779c",
+      "size": 5581
+    },
+    {
+      "path": "source/shared/node/http-image.ts",
+      "blobSha": "b2c75230d341a863f5ecd29dce958efc0c947358",
+      "size": 1299
+    },
+    {
+      "path": "source/shared/node/inference-router-local.ts",
+      "blobSha": "6d2f70f570b05a117aeec7fd03c6028eb102e85d",
+      "size": 2966
+    },
+    {
+      "path": "source/shared/node/marketplace/cursor-marketplace-client.ts",
+      "blobSha": "4363bb6efec0212a63e757d9044dbb8c14f53761",
+      "size": 2390
+    },
+    {
+      "path": "source/shared/node/marketplace/cursor-marketplace-logo-registry.ts",
+      "blobSha": "0815cb51920f9a3211247e400363faf389646527",
+      "size": 220
+    },
+    {
+      "path": "source/shared/node/mcp/account-display-cache.ts",
+      "blobSha": "90886b230d5b091881ad02ed061efcea5f51717c",
+      "size": 925
+    },
+    {
+      "path": "source/shared/node/mcp/builtin-mcp.ts",
+      "blobSha": "ff3b5be4eb5e78c967ae30c434a25cbb9da176f9",
+      "size": 3165
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-account-slot-lifecycle.ts",
+      "blobSha": "e162c6a2509acea35d3af5e485e29e5cad38855f",
+      "size": 4376
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-auth-cleanup.ts",
+      "blobSha": "f1bbc8777ca6af714f13a51243fa9f7dba98a320",
+      "size": 1042
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-auth-watch-lifecycle.ts",
+      "blobSha": "eb538d8bc3df4e86e948cfed805343e31c7c014f",
+      "size": 13721
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-auth-watch.ts",
+      "blobSha": "ee25badb52858b0afd5dfa02d6f4db6fc3e23d72",
+      "size": 270
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-catalog-cache.ts",
+      "blobSha": "181a7e237c36ebdcf31eab264aa5df2bd409a688",
+      "size": 675
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-catalog-flow.ts",
+      "blobSha": "1b8392c2afef6ba2ce21d514c8f32f565260ad01",
+      "size": 5193
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-config-error.ts",
+      "blobSha": "fc7d8098057ba72bb073e0bb69eb9a2a25f60142",
+      "size": 133
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-definition-source.ts",
+      "blobSha": "ac85cb6f9f7f7d75b3cf6d749247ca0c3a43f5c3",
+      "size": 4293
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-diagnostics.ts",
+      "blobSha": "7050fc055e07c7f24805bcb54e9b12fbf0e8f16a",
+      "size": 2965
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-discovery-settlement.contract.test.ts",
+      "blobSha": "d052d3d904c0b5090f88e892c85605b9ebf82fd9",
+      "size": 1659
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-discovery-settlement.ts",
+      "blobSha": "1966d5c413a3beba93c5a8e1c3c6c688a51d8f93",
+      "size": 1041
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-display-runtime.ts",
+      "blobSha": "ec8cd459d779827629bf8dcd1920faff568b2d2f",
+      "size": 2965
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-image-assets.ts",
+      "blobSha": "cfd311bf1b8e34873d5007f8f2f324dac62901a8",
+      "size": 1868
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-instructions-and-toggles.ts",
+      "blobSha": "d0ade41ff69a8866f969aca183befefded04ab4f",
+      "size": 4762
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-listing-summaries.ts",
+      "blobSha": "bcdc9cbbfd6da7d585a5ef9901514ec5a0c598c9",
+      "size": 4603
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-manager.ts",
+      "blobSha": "865ec3f96ea9cc6c2b47f4443db314a64595c9e9",
+      "size": 21021
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-marketplace-logo.ts",
+      "blobSha": "d6718abe33d4dad46747ed7ec3ab734a13e7ec22",
+      "size": 2502
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-marketplace.ts",
+      "blobSha": "7329be23e57a39f39549908e1d91c2bbcefa81da",
+      "size": 9912
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-oauth-loopback.ts",
+      "blobSha": "20f5bf3f7fa75e6bc3e8c5cc5e7767c9f97a7cfd",
+      "size": 10994
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-plugin-variables.ts",
+      "blobSha": "29c8bb0c4a5a3abba9afc3dc735992a9a2cc57c3",
+      "size": 2096
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-result-factory.ts",
+      "blobSha": "985505fadafaa12a0382fd4a4ad1f208710f4599",
+      "size": 1441
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-server-id.ts",
+      "blobSha": "fe477dbe135a3333e5422b47136310c38556813e",
+      "size": 687
+    },
+    {
+      "path": "source/shared/node/mcp/mcp-validation.ts",
+      "blobSha": "7a498788658cf825cdf6a304f2a4f58686670295",
+      "size": 1583
+    },
+    {
+      "path": "source/shared/node/mcp/tools-discovery.ts",
+      "blobSha": "ae33a1211849a163873648de0018f03b5d6f06c4",
+      "size": 18537
+    },
+    {
+      "path": "source/shared/node/paths.ts",
+      "blobSha": "184e471cd5faf5e41e433b5da365597f5d07a50c",
+      "size": 2012
+    },
+    {
+      "path": "source/shared/node/sand-client-metadata.ts",
+      "blobSha": "ce898c5e9d629eee0cadf2b1f84a71e6e22df12a",
+      "size": 1710
+    },
+    {
+      "path": "source/shared/node/sand-data-root.ts",
+      "blobSha": "53310a97346d7e11c42596d339f57bb51f6802a1",
+      "size": 2598
+    },
+    {
+      "path": "source/shared/node/sand-variant.ts",
+      "blobSha": "e44ae593200bb6374e5a85dce1099547ce6f87ee",
+      "size": 365
+    },
+    {
+      "path": "source/shared/node/settings/sand-settings-store.ts",
+      "blobSha": "52aeef0a22edeb64dab446a4aecf8c79590ee90f",
+      "size": 25483
+    },
+    {
+      "path": "source/shared/observability/connector-auth-telemetry.ts",
+      "blobSha": "ebf583ae29480bdb451df58d026e1d571778cd9a",
+      "size": 1779
+    },
+    {
+      "path": "source/shared/observability/heap-metrics.ts",
+      "blobSha": "19462b714c99a13982d355cb641dd12bcb00631f",
+      "size": 1730
+    },
+    {
+      "path": "source/shared/observability/log-ship-cadence.ts",
+      "blobSha": "b2ac7564ab9f60a678bb8704dcab0721c072593a",
+      "size": 3010
+    },
+    {
+      "path": "source/shared/observability/request-lineage.ts",
+      "blobSha": "a7f3b1a9dfeaa699216eab09751677ac9252a1c5",
+      "size": 721
+    },
+    {
+      "path": "source/shared/observability/send-trace.ts",
+      "blobSha": "b1ecad36be5ab83c7928e43a6b9d2318a9332d83",
+      "size": 2295
+    },
+    {
+      "path": "source/shared/observability/sentry-privacy-mode.ts",
+      "blobSha": "f7460aa6d17bcbc69e79202ce4c67c79ca3e8198",
+      "size": 527
+    },
+    {
+      "path": "source/shared/observability/sentry-scrub.gen.ts",
+      "blobSha": "ef22402d56db45415a851049bcda3dba50c8504c",
+      "size": 22620
+    },
+    {
+      "path": "source/shared/observability/sentry.ts",
+      "blobSha": "d3dca4139e6140d97048ecec13b1251d107d783f",
+      "size": 5851
+    },
+    {
+      "path": "source/shared/observability/structured-log-spill.ts",
+      "blobSha": "f87e1441364e278d92c7d1284c5400c1c033f041",
+      "size": 63
+    },
+    {
+      "path": "source/shared/observability/structured-log-transport.ts",
+      "blobSha": "742bffb8e5e9653b70798d63875cd5c4f775e935",
+      "size": 18164
+    },
+    {
+      "path": "source/shared/observability/telemetry-events.ts",
+      "blobSha": "aa54c81ed2426ef517ff3bdda5057b77c6bc42c9",
+      "size": 6869
+    },
+    {
+      "path": "source/shared/observability/telemetry.ts",
+      "blobSha": "0c1b8a8f51c9f092f87b82cf71e71f18c7b1a58a",
+      "size": 1006
+    },
+    {
+      "path": "source/shared/ordering.ts",
+      "blobSha": "69841a5fd357c9651c00c697840f197f095e93fb",
+      "size": 202
+    },
+    {
+      "path": "source/shared/os-notification.ts",
+      "blobSha": "ffaf599dada09e938f362d75aa202327eed3a4ad",
+      "size": 6694
+    },
+    {
+      "path": "source/shared/persistence.ts",
+      "blobSha": "f3b893c43b08cced29435c9c1a57e141a91a214b",
+      "size": 278
+    },
+    {
+      "path": "source/shared/pr-review.ts",
+      "blobSha": "d61742f65230baeaa2c2b346e026f45b4c131faf",
+      "size": 346
+    },
+    {
+      "path": "source/shared/product-name.ts",
+      "blobSha": "2b3707cc8e2dfb08a8717e7ce9868dcc6bdcf818",
+      "size": 141
+    },
+    {
+      "path": "source/shared/retry-after.ts",
+      "blobSha": "b273be34ee8e52ed3497202b9e453698c8a664d0",
+      "size": 461
+    },
+    {
+      "path": "source/shared/rpc/client-side-tool-v2-transport.ts",
+      "blobSha": "e0a298c7dd5ca454ae2b61e8337a9d74bf18b8ba",
+      "size": 5150
+    },
+    {
+      "path": "source/shared/rpc/coordinator-main.ts",
+      "blobSha": "12e0310503db0e054451a0a6c9eda212fe10fd20",
+      "size": 1290
+    },
+    {
+      "path": "source/shared/rpc/coordinator-port.ts",
+      "blobSha": "b79cce9ad413e5e0a775996f29ca7109a44ad208",
+      "size": 6817
+    },
+    {
+      "path": "source/shared/rpc/coordinator.ts",
+      "blobSha": "72b5adc91432fc208731cee9b11a2fe1e21ea10d",
+      "size": 9218
+    },
+    {
+      "path": "source/shared/rpc/dev-controls.ts",
+      "blobSha": "d8303fe48ae5ff1bf2ca8ec6c30188bca73aec5a",
+      "size": 1581
+    },
+    {
+      "path": "source/shared/rpc/main.ts",
+      "blobSha": "d564647d56b6ad1a65d53878db3f64b55a2a697c",
+      "size": 5609
+    },
+    {
+      "path": "source/shared/rpc/vnc.ts",
+      "blobSha": "8b4a56a8a5275c3a06d92c543719cc30fc0bb1d9",
+      "size": 407
+    },
+    {
+      "path": "source/shared/sand-access.ts",
+      "blobSha": "a554bcae9c91ba71442ffddd0f6b80469b11f289",
+      "size": 566
+    },
+    {
+      "path": "source/shared/sand-auto-review-instructions.ts",
+      "blobSha": "37fbdea4ffaf3241e630a7b494d2d7e89d94614d",
+      "size": 1474
+    },
+    {
+      "path": "source/shared/sand-auto-review-redact.ts",
+      "blobSha": "c4c416ec3ff51ed5f16ee98eaeb7a77ac61112d1",
+      "size": 945
+    },
+    {
+      "path": "source/shared/sand-spotlight.ts",
+      "blobSha": "21ab8a595ed7cd77c4fd1d674a097401e094cbcc",
+      "size": 3286
+    },
+    {
+      "path": "source/shared/sand-text.ts",
+      "blobSha": "7a07409738b63c71904c0a6f4d713a548bd998ce",
+      "size": 647
+    },
+    {
+      "path": "source/shared/sand-timeline-events.ts",
+      "blobSha": "7e7911842675187f40acb57c9d8ee3b866b9c2ba",
+      "size": 1918
+    },
+    {
+      "path": "source/shared/sand-widgets.ts",
+      "blobSha": "547214d1303644370bf99c68b4078229fceb211c",
+      "size": 2220
+    },
+    {
+      "path": "source/shared/send-acceptance.ts",
+      "blobSha": "4d1795af42ff76206a0f779dfaac19f78d95e1c8",
+      "size": 189
+    },
+    {
+      "path": "source/shared/send-message-preview.ts",
+      "blobSha": "cdad0ee5bb5668013a18d3156ca6b5522236e6f0",
+      "size": 2854
+    },
+    {
+      "path": "source/shared/sidebar-sections.ts",
+      "blobSha": "04408b2a350e220732cdf48c7a5348866a1d81bd",
+      "size": 2585
+    },
+    {
+      "path": "source/shared/system-errno.ts",
+      "blobSha": "ccf5f11d6a12465a96d49e5de1a0c76e7cc9c050",
+      "size": 440
+    },
+    {
+      "path": "source/shared/team-rules.ts",
+      "blobSha": "1bb25198331c88ad97b19cbcba30beca36c57161",
+      "size": 1532
+    },
+    {
+      "path": "source/shared/timezone.ts",
+      "blobSha": "7534b0ce53f1eee86f0f545b0259a20ac1ee45f2",
+      "size": 1369
+    },
+    {
+      "path": "source/shared/transcript-threads.ts",
+      "blobSha": "156e959d2cb26fdd8ea29ddbab3d5c168a9c7499",
+      "size": 1501
+    },
+    {
+      "path": "source/shared/transcript.ts",
+      "blobSha": "37d025c238b84828546920d046ba9883fa181c5a",
+      "size": 4677
+    },
+    {
+      "path": "source/shared/transport-types.ts",
+      "blobSha": "93e5d66bc1259d8cf4c617f7edb75893e71bff9c",
+      "size": 207
+    },
+    {
+      "path": "source/shared/update-track.ts",
+      "blobSha": "34733696bf85dcde26c8d2c2cfd1332b946d92fe",
+      "size": 1987
+    },
+    {
+      "path": "source/shared/update.ts",
+      "blobSha": "838c56677eb813c5125362fb5650d9e1689074f2",
+      "size": 300
+    },
+    {
+      "path": "source/shared/usage.ts",
+      "blobSha": "ef882480d2ba0fda0c785ab16222c4fd7cd29a31",
+      "size": 2500
+    },
+    {
+      "path": "source/shared/vnc-liveness.ts",
+      "blobSha": "4b2cdb788e6132d535aafbd4537100783559e907",
+      "size": 933
+    },
+    {
+      "path": "source/shared/vnc-viewer-visibility.ts",
+      "blobSha": "7e8120bcacf1a0c778e789644c36db56036155aa",
+      "size": 69
+    },
+    {
+      "path": "source/shared/webauthn-gateway.ts",
+      "blobSha": "c7ad9fa32953417618d9e71dce43d7cf2ca44d2c",
+      "size": 1983
+    },
+    {
+      "path": "source/shared/webauthn-proxy-availability.ts",
+      "blobSha": "fa0effe29a959d97b67b9f9852efe54413ef9c3d",
+      "size": 407
+    },
+    {
+      "path": "source/shared/window-chrome.ts",
+      "blobSha": "5ade8e92ee8e114f25c4fdb4924e464eda7a6d64",
+      "size": 1941
+    },
+    {
+      "path": "source/shared/workflow-model.ts",
+      "blobSha": "18577adff39e241df9837f0b73eda47e25f9214f",
+      "size": 14864
+    },
+    {
+      "path": "source/shared/workflows.ts",
+      "blobSha": "191c94b00326494d550e6f76a5080c838ec48580",
+      "size": 384
+    },
+    {
+      "path": "source/shared/write-epoch.ts",
+      "blobSha": "39aa4a862aeef6287b84d53eb44517d167796aab",
+      "size": 572
+    }
+  ]
+}

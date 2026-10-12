@@ -1,0 +1,4852 @@
+{
+  "sourceCommit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+  "group": "source-host",
+  "fileCount": 969,
+  "files": [
+    {
+      "path": "source/host/Cargo.toml",
+      "blobSha": "1f9c61e67199c3e4abbda9f00057ea7706dde1b5",
+      "size": 1188
+    },
+    {
+      "path": "source/host/app/Cargo.toml",
+      "blobSha": "c5997022b2f8b4b18ca1301ac6c40a6c2224f9b2",
+      "size": 703
+    },
+    {
+      "path": "source/host/app/src/main.rs",
+      "blobSha": "ecda239337befc94722898af09e0694801e1c233",
+      "size": 581116
+    },
+    {
+      "path": "source/host/build.rs",
+      "blobSha": "c9ae9d84176310741c75416524d4658fa56d050b",
+      "size": 69588
+    },
+    {
+      "path": "source/host/local-exec/local-exec-daemon-protocol.ts",
+      "blobSha": "5ed4c7c8493c6d4b23ecacf9a8764e637c8dd486",
+      "size": 307
+    },
+    {
+      "path": "source/host/local-exec/local-exec-daemon.ts",
+      "blobSha": "091d1e9332eb3df062569b3c4ff7242605534ec1",
+      "size": 8430
+    },
+    {
+      "path": "source/host/local-exec/local-exec-machine.ts",
+      "blobSha": "2879fb5070695c0334f5dc31b6c01aea256d05b6",
+      "size": 3711
+    },
+    {
+      "path": "source/host/local-exec/local-exec-provider.ts",
+      "blobSha": "59e86ee759ba9e365c6108cc566011a0fe2cf0ec",
+      "size": 16938
+    },
+    {
+      "path": "source/host/local-exec/local-tool-approvals.ts",
+      "blobSha": "6073ccbc46298057200f287e4a01bfab30b54adf",
+      "size": 4967
+    },
+    {
+      "path": "source/host/local-exec/sentry.ts",
+      "blobSha": "3c06c219ff068e5d7fd9c75a522dca31a72936f3",
+      "size": 2245
+    },
+    {
+      "path": "source/host/proto/agent/v1/local_exec.proto",
+      "blobSha": "6e1bf9e41ab7573ffeaba28c1685d81f8b857a6c",
+      "size": 10317
+    },
+    {
+      "path": "source/host/src/agent_isolation/agent_store_worker.rs",
+      "blobSha": "f0e00680fda3358fe3e8501707c4b09d03d5e3a5",
+      "size": 323
+    },
+    {
+      "path": "source/host/src/agent_isolation/agent_worker_pool.rs",
+      "blobSha": "adfd1a261bb9ba92738b90dee7efd44d110d2448",
+      "size": 35398
+    },
+    {
+      "path": "source/host/src/agent_isolation/conversation_blob_db.rs",
+      "blobSha": "cce3bfaee92a0f9be538ce663a19933f594de477",
+      "size": 27270
+    },
+    {
+      "path": "source/host/src/agent_isolation/conversation_blob_gc.rs",
+      "blobSha": "7fd6d3803c2e229f1fd02d4fd8b48f2b3f88b124",
+      "size": 6256
+    },
+    {
+      "path": "source/host/src/agent_isolation/conversation_blob_store.rs",
+      "blobSha": "9e778c386e0474b38a569574648c9a96fdfd8733",
+      "size": 18792
+    },
+    {
+      "path": "source/host/src/agent_isolation/legacy_blob_retirement.rs",
+      "blobSha": "6f897a2f1b70d581c8f836f17c74c1bbdabd6005",
+      "size": 2323
+    },
+    {
+      "path": "source/host/src/agent_isolation/mod.rs",
+      "blobSha": "a12200c7e027b6c1b202fd14a4768b4af092a64e",
+      "size": 1918
+    },
+    {
+      "path": "source/host/src/agent_isolation/transcript_mirror_offload.rs",
+      "blobSha": "fe21e43039dd5fce9e6795250647e0ba9e1d5dc1",
+      "size": 17023
+    },
+    {
+      "path": "source/host/src/agent_isolation/transcript_mirror_worker.rs",
+      "blobSha": "fc9de2159f539d8d2443785c1840d93021983260",
+      "size": 4137
+    },
+    {
+      "path": "source/host/src/agent_isolation/worker_blob_store.rs",
+      "blobSha": "5131ef6a84f19f2f64d8088264285739bf41ed8b",
+      "size": 2457
+    },
+    {
+      "path": "source/host/src/agents/agent_avatar.rs",
+      "blobSha": "d234f8718ebeeb61315422cb347a8fb4eed4ac8b",
+      "size": 9283
+    },
+    {
+      "path": "source/host/src/agents/agent_clone.rs",
+      "blobSha": "b00837d110afbcbafcdd7847ba42c0b3f14ff9f2",
+      "size": 7333
+    },
+    {
+      "path": "source/host/src/agents/agent_messaging.rs",
+      "blobSha": "15ba54d0bd3769ac3776844fe3ad0cf310545ebe",
+      "size": 7445
+    },
+    {
+      "path": "source/host/src/agents/agent_profile.rs",
+      "blobSha": "2f74cf0894577f312e1a0f13a7f76b22fddc6d8c",
+      "size": 3067
+    },
+    {
+      "path": "source/host/src/agents/agent_workflow_enablement.rs",
+      "blobSha": "62bf1142fda33f80def29655548b68cd5bbd4f24",
+      "size": 3423
+    },
+    {
+      "path": "source/host/src/agents/mod.rs",
+      "blobSha": "c7618d3fd8d7a1db15b7fff47f081c2f9bdb49f7",
+      "size": 149
+    },
+    {
+      "path": "source/host/src/agents/settings_file.rs",
+      "blobSha": "aae2e417ef0e360a1ca9f5d8dd439dd1ba2ea323",
+      "size": 1897
+    },
+    {
+      "path": "source/host/src/attachment_paths.rs",
+      "blobSha": "55a816100d698bbccf69a38bd226cf2417cff4c9",
+      "size": 2169
+    },
+    {
+      "path": "source/host/src/automations/automation.rs",
+      "blobSha": "4b27d9f5a7c4174a26e1244c50bef683d2c01482",
+      "size": 8775
+    },
+    {
+      "path": "source/host/src/automations/automation_id.rs",
+      "blobSha": "7565275096e3351ffd18a6e55b7591e89292c534",
+      "size": 565
+    },
+    {
+      "path": "source/host/src/automations/automation_schedule.rs",
+      "blobSha": "156e0483699813d1c98cdec187ed4b3b477a7489",
+      "size": 7108
+    },
+    {
+      "path": "source/host/src/automations/automation_status_reminder.rs",
+      "blobSha": "a67331f1b0d01247a55213706013b2a291e18f18",
+      "size": 3862
+    },
+    {
+      "path": "source/host/src/automations/automation_store.rs",
+      "blobSha": "8ffd2175c7afb65611f65a1d56f3368b79881220",
+      "size": 17115
+    },
+    {
+      "path": "source/host/src/automations/automation_trigger.rs",
+      "blobSha": "5cdc73f9c41bf469bb56dfc6fcf497e8995cb0d6",
+      "size": 23273
+    },
+    {
+      "path": "source/host/src/automations/listener_integrations.rs",
+      "blobSha": "b13d6ce7c86e5da36f7752d3f92d23fe3d8a0e7a",
+      "size": 1284
+    },
+    {
+      "path": "source/host/src/automations/mod.rs",
+      "blobSha": "80dfb80933d17ec2dcfe30334a8a9c1e2add2061",
+      "size": 218
+    },
+    {
+      "path": "source/host/src/automations/routine_notices.rs",
+      "blobSha": "96907676d4b22be2e046c949349264377a6a78b9",
+      "size": 1889
+    },
+    {
+      "path": "source/host/src/box/box_capabilities.rs",
+      "blobSha": "d95a8231de6dd88d5a54557679fc29f96bb519d2",
+      "size": 4478
+    },
+    {
+      "path": "source/host/src/box/box_env.rs",
+      "blobSha": "0817968f791d742b932d9bf376d89f34dc8e2dfc",
+      "size": 921
+    },
+    {
+      "path": "source/host/src/box/box_factory.rs",
+      "blobSha": "b0d446757dcb036f91a835f947db53b74f83aa45",
+      "size": 5250
+    },
+    {
+      "path": "source/host/src/box/box_file_transfer.rs",
+      "blobSha": "eeb9f73515de672ba6236272650743962c5d6035",
+      "size": 8973
+    },
+    {
+      "path": "source/host/src/box/box_mcp.rs",
+      "blobSha": "d193088214087d4c5b8e29f712f0d75d588790e6",
+      "size": 3139
+    },
+    {
+      "path": "source/host/src/box/box_monitor_layout.rs",
+      "blobSha": "adfe116bf8012e798374450df8b97a192d025ac8",
+      "size": 527
+    },
+    {
+      "path": "source/host/src/box/box_remote_accessor.rs",
+      "blobSha": "fd74139f8e75e9635c85faf43de2637bbcbe4686",
+      "size": 12126
+    },
+    {
+      "path": "source/host/src/box/box_shell_command.rs",
+      "blobSha": "916051fc944fd26805aec0d9d1027a92425a0276",
+      "size": 1469
+    },
+    {
+      "path": "source/host/src/box/box_store_backend_policy.rs",
+      "blobSha": "5781b09edfa66174b095d586e4b2a4fefa835d78",
+      "size": 2715
+    },
+    {
+      "path": "source/host/src/box/box_transfer.rs",
+      "blobSha": "bd5ee50cdddb5e4b3eeb79c88d6743dbb693d879",
+      "size": 11359
+    },
+    {
+      "path": "source/host/src/box/box_windows.rs",
+      "blobSha": "e6a2924c6e64b373bbd3e4b199795721d50a0f98",
+      "size": 8004
+    },
+    {
+      "path": "source/host/src/box/exec_daemon_process.rs",
+      "blobSha": "5cf8ed0995ea57e7532ed0d08dd339e0edaa9975",
+      "size": 12998
+    },
+    {
+      "path": "source/host/src/box/generated_production.rs",
+      "blobSha": "7affe6a1f54e906f42cc0185a078ce13ee7c1686",
+      "size": 65072
+    },
+    {
+      "path": "source/host/src/box/loopback_sand_box.rs",
+      "blobSha": "ac2fcd557f09eb3c5fce9e8d22001dd6600266d3",
+      "size": 23140
+    },
+    {
+      "path": "source/host/src/box/mod.rs",
+      "blobSha": "3582bef8527009b4a77b56030a5a72a53aaac99d",
+      "size": 440
+    },
+    {
+      "path": "source/host/src/box/production.rs",
+      "blobSha": "96aa8c1ccf7ca2c0f8a5085a11279d29c113706e",
+      "size": 5682
+    },
+    {
+      "path": "source/host/src/box/protected_path_guard.rs",
+      "blobSha": "8b6603db82177734007f969b25e8c3592d8a3527",
+      "size": 2763
+    },
+    {
+      "path": "source/host/src/box/shared_desktop_sand_box.rs",
+      "blobSha": "dfce60df4441cd96118d6a844e06fba48021f10d",
+      "size": 17081
+    },
+    {
+      "path": "source/host/src/cloud_agents/cloud_agent_images.rs",
+      "blobSha": "942a7f425ec433bbfe48e063e68ea802a929ff92",
+      "size": 5235
+    },
+    {
+      "path": "source/host/src/cloud_agents/cloud_agent_tool.rs",
+      "blobSha": "6a5a1aacbe87bd302e99e730211d2d464eb56046",
+      "size": 33675
+    },
+    {
+      "path": "source/host/src/cloud_agents/cloud_agent_trace_format.rs",
+      "blobSha": "fdc0a68f24ecd4461f866a62492ddc99d7c23d68",
+      "size": 21341
+    },
+    {
+      "path": "source/host/src/cloud_agents/cloud_agent_transcript_dump.rs",
+      "blobSha": "1915a80102beeb7f6932ea42c8877e5bb05764ce",
+      "size": 2662
+    },
+    {
+      "path": "source/host/src/cloud_agents/mod.rs",
+      "blobSha": "577bb39e28ee7877c032783b345212580e3614a2",
+      "size": 125
+    },
+    {
+      "path": "source/host/src/connectors/channel_attachment.rs",
+      "blobSha": "225fc409e4f2dfe68ff14f89ecbc81dc5e8a6da8",
+      "size": 2402
+    },
+    {
+      "path": "source/host/src/connectors/channel_delivery.rs",
+      "blobSha": "67a2766a16d5f59a664e9b4d9c1d7fb3dbcacc5d",
+      "size": 1934
+    },
+    {
+      "path": "source/host/src/connectors/mod.rs",
+      "blobSha": "ee0dc2cf8c6c7c611286d30a08b5bc2d891b8607",
+      "size": 54
+    },
+    {
+      "path": "source/host/src/cursor_backend.rs",
+      "blobSha": "4b48a00341229a2500fe444293455339b6e42552",
+      "size": 19995
+    },
+    {
+      "path": "source/host/src/durable_file_policy.rs",
+      "blobSha": "e7ae627726b1765e3f723482940d641c7a07608d",
+      "size": 652
+    },
+    {
+      "path": "source/host/src/extensions/action_audit/action_audit_backend.rs",
+      "blobSha": "6180f84211e0dface14fd0ae5f3f57dbaa2b8f3f",
+      "size": 6479
+    },
+    {
+      "path": "source/host/src/extensions/action_audit/action_audit_service.rs",
+      "blobSha": "bfd5e6e650131148a761b174ceac9a7de8c32102",
+      "size": 9861
+    },
+    {
+      "path": "source/host/src/extensions/action_audit/extension.rs",
+      "blobSha": "2b1f9d14f9e1c4423e249da622caae51332f9c37",
+      "size": 3056
+    },
+    {
+      "path": "source/host/src/extensions/action_audit/mod.rs",
+      "blobSha": "ea586e626929ee72e5157fd6bdc63bb36fcd4f19",
+      "size": 79
+    },
+    {
+      "path": "source/host/src/extensions/attachments/attachments_service.rs",
+      "blobSha": "783a78e21ad4c87db1930cadf3ba46dd6bbb806e",
+      "size": 53631
+    },
+    {
+      "path": "source/host/src/extensions/attachments/box_staging.rs",
+      "blobSha": "06672eb3fa8c7c87d58e996a10f801aec737d16f",
+      "size": 2134
+    },
+    {
+      "path": "source/host/src/extensions/attachments/extension.rs",
+      "blobSha": "fcb0696d8e3559e942411ac594ed5c80ebff096f",
+      "size": 1526
+    },
+    {
+      "path": "source/host/src/extensions/attachments/generate_image_resource_accessor.rs",
+      "blobSha": "ea082b6c6a0e397f5ba562d8e9970d6a71d1a73d",
+      "size": 4959
+    },
+    {
+      "path": "source/host/src/extensions/attachments/generate_image_service.rs",
+      "blobSha": "579bb7118c0b296298893f5cdc1e756fca8db202",
+      "size": 8827
+    },
+    {
+      "path": "source/host/src/extensions/attachments/link_preview_image_bounds.rs",
+      "blobSha": "70c9b03ef8c4d75044a05ef3f4e9c874439302c7",
+      "size": 10182
+    },
+    {
+      "path": "source/host/src/extensions/attachments/mod.rs",
+      "blobSha": "4b7d279895426fbbe4beb867c54c7404b2140224",
+      "size": 245
+    },
+    {
+      "path": "source/host/src/extensions/attachments/safe_link_preview_fetch.rs",
+      "blobSha": "44589257ab633eef2bd7fed3520e2d857ecc7d43",
+      "size": 13979
+    },
+    {
+      "path": "source/host/src/extensions/attachments/video_playback_rendition.rs",
+      "blobSha": "66f8a5fa24bef498932de494b7eb36d04f88122c",
+      "size": 14102
+    },
+    {
+      "path": "source/host/src/extensions/auth/auth_service.rs",
+      "blobSha": "893cfcf0d5ec9c0470058867dd101325a810d8d7",
+      "size": 13380
+    },
+    {
+      "path": "source/host/src/extensions/auth/credential_renewer.rs",
+      "blobSha": "dfe4f8e1ba1e25e5ede8c545fb731dec161750e7",
+      "size": 15398
+    },
+    {
+      "path": "source/host/src/extensions/auth/extension.rs",
+      "blobSha": "afc6c89fc2d39d17b5cf20ea622cdabe639261fe",
+      "size": 4027
+    },
+    {
+      "path": "source/host/src/extensions/auth/mod.rs",
+      "blobSha": "ce3eba8a78900efd5f5dfb857b07146332944963",
+      "size": 102
+    },
+    {
+      "path": "source/host/src/extensions/auth/user_full_name_service.rs",
+      "blobSha": "a1bd19df957da3b55a49e3abd0771cedabb1ad23",
+      "size": 5062
+    },
+    {
+      "path": "source/host/src/extensions/auto_review/auto_review_service.rs",
+      "blobSha": "113d452894668480eb4ae48c8c0183fd6e24e124",
+      "size": 19320
+    },
+    {
+      "path": "source/host/src/extensions/auto_review/extension.rs",
+      "blobSha": "5953a89f4fa3090f3ba814854f9aeb8b0b79b3c2",
+      "size": 4383
+    },
+    {
+      "path": "source/host/src/extensions/auto_review/mod.rs",
+      "blobSha": "3de75af900063b803c2498fcf92ae4a0e125fa50",
+      "size": 132
+    },
+    {
+      "path": "source/host/src/extensions/auto_review/sand_auto_review_awaiting.rs",
+      "blobSha": "8d6c5af3fc6229c97784ea5efb17bd87d0cc99c3",
+      "size": 4306
+    },
+    {
+      "path": "source/host/src/extensions/auto_review/sand_backend_smart_mode_classifier_exec.rs",
+      "blobSha": "02600c44505f82ebd2afdba2229ccc31d25aab78",
+      "size": 18379
+    },
+    {
+      "path": "source/host/src/extensions/automations/automations_proto.rs",
+      "blobSha": "33164a54bb73e8cd5a53a9f9c14bef7cf5be430a",
+      "size": 11893
+    },
+    {
+      "path": "source/host/src/extensions/automations/backend_relay_source.rs",
+      "blobSha": "1543a2c3364cb0b14f5f5eeba507bed123ab2fe3",
+      "size": 16277
+    },
+    {
+      "path": "source/host/src/extensions/automations/backend_transport.rs",
+      "blobSha": "6dc4477c72a38179d71ab33013c9b7e2c3b89991",
+      "size": 3305
+    },
+    {
+      "path": "source/host/src/extensions/automations/connect_unary.rs",
+      "blobSha": "94f8388973d755176b8736fe3c68058e74dce965",
+      "size": 4737
+    },
+    {
+      "path": "source/host/src/extensions/automations/extension.rs",
+      "blobSha": "96638d1c3c8532deb726f85ebc99bf93022c767d",
+      "size": 5651
+    },
+    {
+      "path": "source/host/src/extensions/automations/fire_delivery.rs",
+      "blobSha": "04e3a192e7fa9b1d3bda7ea1757084153679bd79",
+      "size": 16482
+    },
+    {
+      "path": "source/host/src/extensions/automations/listener_connect_watcher.rs",
+      "blobSha": "11bdcdc6c99c761775a109dea45110191a44d42a",
+      "size": 3018
+    },
+    {
+      "path": "source/host/src/extensions/automations/listener_connect_watcher_production.rs",
+      "blobSha": "3e99ae3c54f637e64ab6bc025053dfd910a914ee",
+      "size": 5509
+    },
+    {
+      "path": "source/host/src/extensions/automations/listener_integrations.rs",
+      "blobSha": "2602bce81af72f2710ea0e30558712dcb8076c9f",
+      "size": 7445
+    },
+    {
+      "path": "source/host/src/extensions/automations/mod.rs",
+      "blobSha": "70825dc9432cdc120fe65ce5bc684b6a5c6bbd8c",
+      "size": 450
+    },
+    {
+      "path": "source/host/src/extensions/automations/production.rs",
+      "blobSha": "3927e9736bebd27302cd9c4c2139b583e80b7aa4",
+      "size": 10802
+    },
+    {
+      "path": "source/host/src/extensions/automations/production_lifecycle.rs",
+      "blobSha": "acc5d67aef35ede93a0f87e317f966013ee2eb8b",
+      "size": 20741
+    },
+    {
+      "path": "source/host/src/extensions/automations/sand_automation_cloud_sync.rs",
+      "blobSha": "184e4398e5fc0f2dbe3ac7556ba7d03c0c57877e",
+      "size": 38196
+    },
+    {
+      "path": "source/host/src/extensions/automations/sand_automation_cloud_trigger.rs",
+      "blobSha": "2e26dd5275cd62fe1708f6ca2d2eab1cf59bcf12",
+      "size": 2347
+    },
+    {
+      "path": "source/host/src/extensions/automations/sand_automation_fire_consumer.rs",
+      "blobSha": "b38b1614a95a34bbfe34acff39b8c3cdfaae943e",
+      "size": 11770
+    },
+    {
+      "path": "source/host/src/extensions/automations/sand_trigger_hub.rs",
+      "blobSha": "28bea088715a13b75556e7ff5f2afde48b667780",
+      "size": 1893
+    },
+    {
+      "path": "source/host/src/extensions/box_lifecycle/box_lifecycle_service.rs",
+      "blobSha": "ec633a97a895b6ce5042fe1cf0e4dd50151e175f",
+      "size": 1863
+    },
+    {
+      "path": "source/host/src/extensions/box_lifecycle/extension.rs",
+      "blobSha": "5466de682a3029531404cd56a1c7054c10a7b5f5",
+      "size": 776
+    },
+    {
+      "path": "source/host/src/extensions/box_lifecycle/mod.rs",
+      "blobSha": "a7e41ff30ade27922d5d94bd31c698dfcb3de732",
+      "size": 555
+    },
+    {
+      "path": "source/host/src/extensions/box_lifecycle/production.rs",
+      "blobSha": "0681af954e6ba09b45eb80fc9c931d18b058d34b",
+      "size": 11678
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/agent_store_sand_files.rs",
+      "blobSha": "74677e38fe395ab6fd6d3cda153347e530adf3df",
+      "size": 47086
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_copy_in.rs",
+      "blobSha": "779e42560eb686b4c1bbdf60492b8e8e377312c2",
+      "size": 53363
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_object_store.rs",
+      "blobSha": "7f78aadade3ee8f5308238ad14e46e292ea2cf78",
+      "size": 22702
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_diagnostics.rs",
+      "blobSha": "c2acf4cd6e5488a2870cb3db407affaf33573947",
+      "size": 661
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_download.rs",
+      "blobSha": "21bae3e50e36d17a0560e9e9cad95763b90dbce2",
+      "size": 58048
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_hydration.rs",
+      "blobSha": "16b657949d713c59332c56cb0c2a5090e2965f41",
+      "size": 3939
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_manifest.rs",
+      "blobSha": "9fcc90bfb87a066b8d5d114415fa7f6821718672",
+      "size": 26663
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_manifest_format.rs",
+      "blobSha": "869874485f1a595784c298df102ce7f26ac3418f",
+      "size": 4098
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_pack.rs",
+      "blobSha": "ccad8c8cd8961e7355f4778e08257eb65b886c7e",
+      "size": 15576
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_pack_pipeline.rs",
+      "blobSha": "71019c8d9bd18ea6ce616209301a936938b80e12",
+      "size": 2308
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_sync.rs",
+      "blobSha": "1e4568af72e58e4f69d7ca3266b3b2efa70327ad",
+      "size": 9785
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_sync_error.rs",
+      "blobSha": "76a3b7cde419b0e3b28e92bd7d2d114e1fa9b1bb",
+      "size": 251
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_sync_service.rs",
+      "blobSha": "65d5079c1c64b45e2730b2909930ba2815def7e1",
+      "size": 3354
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_transfer.rs",
+      "blobSha": "0aeb9c28c00716b02014e9a2cf3ed9be1f2c6379",
+      "size": 40564
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_vacuum_worker.rs",
+      "blobSha": "fe02d30c6a8c9e5e4be6126fb9dcc5b0b95fe10b",
+      "size": 1226
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/chrome_session_stage.rs",
+      "blobSha": "ac843370208b73b9775b8ac4c445e78e58126793",
+      "size": 13315
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/chrome_session_watcher.rs",
+      "blobSha": "439bea0d0bc1c30bdf12a5268e1ca881834c37f8",
+      "size": 7435
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/extension.rs",
+      "blobSha": "4903a08d408290e70520a55c16bc29739d6e2a5c",
+      "size": 5858
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/files.rs",
+      "blobSha": "f5d9403900f523ab6029ff78fe69052c597d50c6",
+      "size": 58
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/mod.rs",
+      "blobSha": "0e321c8c157376f04cd534c22add8ea9d32d00f4",
+      "size": 812
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/object_store_port.rs",
+      "blobSha": "0e038a2f9c3d120c9626df12a1a0cb48cebbdf40",
+      "size": 1395
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/production.rs",
+      "blobSha": "d37ec70db1d2690ef63ec2081e7ef17af723be57",
+      "size": 109810
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/request_coalescer.rs",
+      "blobSha": "bb78da033526400f0ead215c4110c8b23240d918",
+      "size": 7473
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/sand_box_store_files.rs",
+      "blobSha": "6dac3235931aaa43bdadcf0fa536da5f9ad3b01d",
+      "size": 36775
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/sand_box_store_v2_client.rs",
+      "blobSha": "6765b51ea7e996121f8ab1d88f7decefe48090aa",
+      "size": 36216
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/sqlite_snapshot.rs",
+      "blobSha": "b9773c971648ccba54017bdfd3896d4eac95e0db",
+      "size": 11452
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/store_db_bundle_capture.rs",
+      "blobSha": "5ace630e229e46cc4cc9c86b526b3ccdf3124535",
+      "size": 4852
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/store_db_capture.rs",
+      "blobSha": "c111d04b1ca517ac25845097a9b0b937968453f8",
+      "size": 4482
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/store_db_snapshot_upload.rs",
+      "blobSha": "aed2caea9a70686a6ef25c7fa12acbbf02ff54d9",
+      "size": 8798
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/workspace_ignore.rs",
+      "blobSha": "f7996492fd7acb6df9c7fe939e9a9d293cdb96c0",
+      "size": 12087
+    },
+    {
+      "path": "source/host/src/extensions/browser_ua/extension.rs",
+      "blobSha": "57bdfdf9105a1ab6a63d9bcfb7c1b3e0b37fd0d9",
+      "size": 3633
+    },
+    {
+      "path": "source/host/src/extensions/browser_ua/mod.rs",
+      "blobSha": "cf7d66caa739822a5f55516f1eb2f87255add606",
+      "size": 319
+    },
+    {
+      "path": "source/host/src/extensions/browser_ua/ua_owner_stamp_service.rs",
+      "blobSha": "c68759fe8dd8c2395f718dd0025d9ff98451d402",
+      "size": 2390
+    },
+    {
+      "path": "source/host/src/extensions/browser_ua/ua_token_kill_switch_service.rs",
+      "blobSha": "7fe428f4c510279cb8907dc989a6fd8687d482b1",
+      "size": 1982
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/cloud_agent_launch_error.rs",
+      "blobSha": "934f58f86ec938377aa48ade91665abc214017b8",
+      "size": 259
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/cloud_agent_poll_loop.rs",
+      "blobSha": "5ef5518ffcd5b634eac28c36862be6b674e07120",
+      "size": 18656
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/cloud_agent_request_composition.rs",
+      "blobSha": "36cd8949fb834215a693381172fc0ea39fb8b7bc",
+      "size": 12786
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/cloud_agent_wire.rs",
+      "blobSha": "6b66d2e50331ebef6135176f7357217d1aa00df1",
+      "size": 14850
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/cloud_agents_service.rs",
+      "blobSha": "8e5c51151abd4dc0aab35febeed30836acc7e9b4",
+      "size": 49146
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/extension.rs",
+      "blobSha": "d13bce67abda83a35cb659fa9cd3e0a4cfee288d",
+      "size": 2117
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/mod.rs",
+      "blobSha": "688981095214dcb9f2e7b9de0b3909464bb9bc82",
+      "size": 210
+    },
+    {
+      "path": "source/host/src/extensions/cloud_agents/model_catalog_fetch.rs",
+      "blobSha": "21eb12be9d8f998e93fc0e7bc284a79f047c3c5a",
+      "size": 11527
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/codebase_snapshot_trigger.rs",
+      "blobSha": "ca1f043dded6b20660d8d5489d91d4da070e075f",
+      "size": 3462
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/codebase_telemetry_adapter.rs",
+      "blobSha": "6bf538ebb0a735ac9a166921f88a4279801d17dd",
+      "size": 15505
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/codebase_telemetry_host.rs",
+      "blobSha": "98b6868ad4b705e70c277e47a766803e3e627fab",
+      "size": 10196
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/codebase_telemetry_service.rs",
+      "blobSha": "c2b012d6678ea4fd5afb688303f810265c9d9ee8",
+      "size": 11964
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/csnaps_capability.rs",
+      "blobSha": "351c26abe3395cc5ab618b31e9153e6f2422fb2e",
+      "size": 2983
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/csnaps_process.rs",
+      "blobSha": "77a9071ee904a697b16d4a77f0222d2c73d4e17f",
+      "size": 15833
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/csnaps_protocol.rs",
+      "blobSha": "5f1523f020558e3303cab0dc10bb67fb82f9938f",
+      "size": 15032
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/extension.rs",
+      "blobSha": "001e4ec58de70b726bb30612b93dd550eb6a8212",
+      "size": 7846
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/mod.rs",
+      "blobSha": "1be6aa0cc117fd8247f9405fa7b5395205fd4b72",
+      "size": 257
+    },
+    {
+      "path": "source/host/src/extensions/codebase_telemetry/privacy_mode.rs",
+      "blobSha": "0b3963b06a4806ef546e65b3e1ec3481d8d411b9",
+      "size": 11008
+    },
+    {
+      "path": "source/host/src/extensions/content_search/agent_content_search.rs",
+      "blobSha": "49ef853b73fdea376a13156631ace97004eb482c",
+      "size": 5107
+    },
+    {
+      "path": "source/host/src/extensions/content_search/extension.rs",
+      "blobSha": "de352c29b522180afb77e5521b70b1f3595dad9c",
+      "size": 11009
+    },
+    {
+      "path": "source/host/src/extensions/content_search/mod.rs",
+      "blobSha": "275fb5b0a684e37b71987ffc65837c7aeb1cc1d7",
+      "size": 162
+    },
+    {
+      "path": "source/host/src/extensions/content_search/search_index_db.rs",
+      "blobSha": "8d07eae4cf89bbcbe161c2e051c6c8e7e2abd7a1",
+      "size": 9638
+    },
+    {
+      "path": "source/host/src/extensions/content_search/search_index_service.rs",
+      "blobSha": "561cdb6ef5375f5e25e2d9b8dad3de63805b7495",
+      "size": 27131
+    },
+    {
+      "path": "source/host/src/extensions/content_search/search_index_worker.rs",
+      "blobSha": "fed841480151fed3201c7cbdd8723356a132a060",
+      "size": 4674
+    },
+    {
+      "path": "source/host/src/extensions/content_search/search_index_writer.rs",
+      "blobSha": "419f1307e13849c799183a90c638d29039ce73be",
+      "size": 22916
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/extension.rs",
+      "blobSha": "1668ea33986aa6970c2b86956f5cfde040dff38f",
+      "size": 4254
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/mod.rs",
+      "blobSha": "b71aae3348646606d5213c4d7dd6e58b19ae11f9",
+      "size": 395
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/production.rs",
+      "blobSha": "7689d824a7ecace001a6bed6d24075405e8e56fe",
+      "size": 31416
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_departure_obligations.rs",
+      "blobSha": "dd61c083ef99d45fe8409b6c18a3fadbb28ce9d1",
+      "size": 4142
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_entry_publisher.rs",
+      "blobSha": "2dcf30c41db575b579e539d77831fc6460ff518a",
+      "size": 12060
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_pending_departure_store.rs",
+      "blobSha": "42e69412fe082386673db933163b3c34dd473f2c",
+      "size": 3298
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_relay.rs",
+      "blobSha": "cbd8a4b6dcacddbcfa74554642c89e49fc293833",
+      "size": 20034
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_remote_turns.rs",
+      "blobSha": "d071da39033722db6bde5f2b5e7c17fd755ba20b",
+      "size": 15755
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_room_tombstone_store.rs",
+      "blobSha": "a9b33f8af9384df8a107b9010080d85f0d74777d",
+      "size": 2671
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_sharing_environment.rs",
+      "blobSha": "8ebd6e21f3c4986461cb2cc473f4002efc33b20d",
+      "size": 2587
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_sharing_service.rs",
+      "blobSha": "258e9aa3e5260e607a70a512292cfb4cdc6d8362",
+      "size": 28004
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_state_reconcile.rs",
+      "blobSha": "496db868debd50060818085f7d03986af9db9664",
+      "size": 2067
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_turn_dedupe_store.rs",
+      "blobSha": "939657ffa56c0198dba3867b72f959d2ccb371a5",
+      "size": 4290
+    },
+    {
+      "path": "source/host/src/extensions/cross_user_sharing/xuser_wire_normalization.rs",
+      "blobSha": "8a8a1c2526cc23cf0e22998f2fff7c0e0156346e",
+      "size": 3681
+    },
+    {
+      "path": "source/host/src/extensions/experiments/extension.rs",
+      "blobSha": "3559c6a739dd6ebe97f06e71b805b09f6657389c",
+      "size": 48820
+    },
+    {
+      "path": "source/host/src/extensions/experiments/mod.rs",
+      "blobSha": "7443d53ba3a48d8520ac7d4646feca55adb7d482",
+      "size": 519
+    },
+    {
+      "path": "source/host/src/extensions/extension_ids.generated.rs",
+      "blobSha": "6fdf471a6a100d92f3fc2c41f3ce36348ed21a67",
+      "size": 4434
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/disk_pressure.rs",
+      "blobSha": "46c0ed1d24a497e62aff51ac55d1e546bae86d4c",
+      "size": 17606
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/disk_pressure_guard.rs",
+      "blobSha": "611736d4f753b65264d93a6a3f1cbba38465e0b1",
+      "size": 11467
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/extension.rs",
+      "blobSha": "9cf8db3140bb10020e1731e0d8524ab472b4d92b",
+      "size": 5747
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/forever_box_service.rs",
+      "blobSha": "2c549d54d607b567289a21e5c5a370f834bdbe37",
+      "size": 17264
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/host_box.rs",
+      "blobSha": "c841d53cc412e8813ce1904cfb90e329fff9dd30",
+      "size": 9966
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/mod.rs",
+      "blobSha": "98b5f6fcff63e5f4f6c70cd080a8d0071ab84d4d",
+      "size": 1078
+    },
+    {
+      "path": "source/host/src/extensions/forever_box/runner_tools.rs",
+      "blobSha": "b72846bba116968d5e1a557d7a7fdcd8897131a5",
+      "size": 41366
+    },
+    {
+      "path": "source/host/src/extensions/host_upgrade/extension.rs",
+      "blobSha": "c2d3a5e494f6be6fe864ff4fd73989e073b4b745",
+      "size": 8588
+    },
+    {
+      "path": "source/host/src/extensions/host_upgrade/host_bundle_source.rs",
+      "blobSha": "ba33880f4b97bab840b158f7bdc672c9db22044c",
+      "size": 6759
+    },
+    {
+      "path": "source/host/src/extensions/host_upgrade/host_bundle_upgrade.rs",
+      "blobSha": "c0d0c71a5d9b367414b2674037e9afff4c17c4ee",
+      "size": 10183
+    },
+    {
+      "path": "source/host/src/extensions/host_upgrade/host_upgrade_marker.rs",
+      "blobSha": "c47a37fc35fffe3e84a1b03a74d7bbbfc4a355b5",
+      "size": 5189
+    },
+    {
+      "path": "source/host/src/extensions/host_upgrade/host_upgrade_service.rs",
+      "blobSha": "213c4ae5604a94f4c0f6eee2092370d5768c50a4",
+      "size": 13171
+    },
+    {
+      "path": "source/host/src/extensions/host_upgrade/mod.rs",
+      "blobSha": "d7bc068072794c5c1d120a436f65b8d36ae7dad8",
+      "size": 155
+    },
+    {
+      "path": "source/host/src/extensions/host_upgrade/production.rs",
+      "blobSha": "90606429ea52411e40203dde4be1c5ec166f4d8c",
+      "size": 6300
+    },
+    {
+      "path": "source/host/src/extensions/inference/codex_direct_responses.rs",
+      "blobSha": "30a2bce97b1620985df4fb151347e1edf8c581b0",
+      "size": 24904
+    },
+    {
+      "path": "source/host/src/extensions/inference/cursor_inference_transport.rs",
+      "blobSha": "0b5204cc323d0f6c35cdd59dc7f29749d9ceabbd",
+      "size": 40383
+    },
+    {
+      "path": "source/host/src/extensions/inference/cursor_session.rs",
+      "blobSha": "37c75c0aabd9c4f6449c38d7ba73350eec75dc33",
+      "size": 10140
+    },
+    {
+      "path": "source/host/src/extensions/inference/cursor_web_tools.rs",
+      "blobSha": "0fa8b54c2aec2a8d05b03936861d64a39c6656cf",
+      "size": 9574
+    },
+    {
+      "path": "source/host/src/extensions/inference/extension.rs",
+      "blobSha": "29246071a1109607ae8a7bc1218f16592f7b71c3",
+      "size": 2569
+    },
+    {
+      "path": "source/host/src/extensions/inference/generated_inference_codec.rs",
+      "blobSha": "17bd798e0dcf59d396b0e5ff86eab1916b28363e",
+      "size": 3382
+    },
+    {
+      "path": "source/host/src/extensions/inference/inference_service.rs",
+      "blobSha": "9340412fa13721e69573366f82c5446a6ddfa844",
+      "size": 2599
+    },
+    {
+      "path": "source/host/src/extensions/inference/mod.rs",
+      "blobSha": "b0d0f5ca4b8611afab506931255f475018195079",
+      "size": 299
+    },
+    {
+      "path": "source/host/src/extensions/inference/production.rs",
+      "blobSha": "08b49172f3b9c46b426bdd1ec8ba19bcb374ea02",
+      "size": 20767
+    },
+    {
+      "path": "source/host/src/extensions/inference/provider_session.rs",
+      "blobSha": "deee36b88327478ec0cedad4be33f314d7d0ad06",
+      "size": 81752
+    },
+    {
+      "path": "source/host/src/extensions/inference/sand_labeling.rs",
+      "blobSha": "46a69ad8a7a47d2036148ba70ae94d7a42d95766",
+      "size": 8423
+    },
+    {
+      "path": "source/host/src/extensions/inference/sand_model_experiment.rs",
+      "blobSha": "58e75505925fbfbad91a4409dec5c523a1c5cd7b",
+      "size": 3718
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/agent_v1_exec_wire.rs",
+      "blobSha": "6120c6735ffcd28eea942ed3bff8d99c6f2024f5",
+      "size": 1087
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/extension.rs",
+      "blobSha": "241bd7b1a6078a204690afec848c442aba77c2f9",
+      "size": 7200
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/gateway_local_exec_sand_box.rs",
+      "blobSha": "022166743cd66714c1d6e5cbf50801ed1984e4d1",
+      "size": 24244
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/local_exec_bridge.rs",
+      "blobSha": "8af34bebf2c96f7b302ba2f881d1a4c0ee6c9caa",
+      "size": 23957
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/local_exec_error.rs",
+      "blobSha": "fe152b44e05add024a37ea7cc1a719d3f6aa2dfc",
+      "size": 267
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/local_exec_failure_classifier.rs",
+      "blobSha": "684d0d446a642df8dfddd3af134d8ed116b89ab3",
+      "size": 1389
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/mod.rs",
+      "blobSha": "255f6ef63614391447df6c64650b9bcc5f295c55",
+      "size": 197
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/production.rs",
+      "blobSha": "8a5ca2dae2760db4e093c0cf3fb7630053814bda",
+      "size": 6560
+    },
+    {
+      "path": "source/host/src/extensions/local_tool_permission/extension.rs",
+      "blobSha": "829889281cf49162aed3b3cad8086473ec153011",
+      "size": 5563
+    },
+    {
+      "path": "source/host/src/extensions/local_tool_permission/local_tool_permission_controller.rs",
+      "blobSha": "2e7722129582974b7cdbacc058fca3dae490ba2c",
+      "size": 44031
+    },
+    {
+      "path": "source/host/src/extensions/local_tool_permission/local_tool_permission_resolution.rs",
+      "blobSha": "7a125b9894e2dfad27eab1d86ebe36a1af149039",
+      "size": 3215
+    },
+    {
+      "path": "source/host/src/extensions/local_tool_permission/mod.rs",
+      "blobSha": "57cd9bf8c17b2414d0e0ec9394e0516db508608c",
+      "size": 104
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/cursor_skills_marketplace.rs",
+      "blobSha": "0e51a2d959eb2b7d82e7ef143777efafc391a740",
+      "size": 9278
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/extension.rs",
+      "blobSha": "8323c3e2365e9ff38471c51281c4112d85cd36e2",
+      "size": 3370
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/managed_skills_cache.rs",
+      "blobSha": "9349e4cd37c7042ecea884087d0fd6a4bb64b31a",
+      "size": 4874
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/managed_skills_service.rs",
+      "blobSha": "b96a064e1783d7bb4bb8fbd7093ba4584f975ae1",
+      "size": 5663
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/mod.rs",
+      "blobSha": "8399a98cbd9e9e9b595f5c413ad46e19332843f7",
+      "size": 185
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/production.rs",
+      "blobSha": "1ff40a86d29734a4a42941a1b8a11d8cf101dd06",
+      "size": 2956
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/sand_managed_skills.rs",
+      "blobSha": "68097353db975c2833294bc4df2eb969985a5d83",
+      "size": 3957
+    },
+    {
+      "path": "source/host/src/extensions/managed_setup/team_rules.rs",
+      "blobSha": "16ead6a31a8b9f5dc7b5882f79b1026834c3d903",
+      "size": 11732
+    },
+    {
+      "path": "source/host/src/extensions/mcp/box_mcp_exec.rs",
+      "blobSha": "d691fc1a059588d33f3ceaccff5e35303c184008",
+      "size": 3948
+    },
+    {
+      "path": "source/host/src/extensions/mcp/coordinator_relay.rs",
+      "blobSha": "d80a32be9556a708d8cdc8841855400d708d6cd8",
+      "size": 20068
+    },
+    {
+      "path": "source/host/src/extensions/mcp/extension.rs",
+      "blobSha": "623f879c7b29c5d1ac18c82932b99b5ec24e82ea",
+      "size": 8001
+    },
+    {
+      "path": "source/host/src/extensions/mcp/legacy_live_references.rs",
+      "blobSha": "a7312d47eff0e7d9dcb8802139d93f19a309ea30",
+      "size": 4186
+    },
+    {
+      "path": "source/host/src/extensions/mcp/mcp_service.rs",
+      "blobSha": "c7998a53fb6f23f6e0850b6ebe5ac5c1a69ea248",
+      "size": 19227
+    },
+    {
+      "path": "source/host/src/extensions/mcp/mod.rs",
+      "blobSha": "d19e113a3179578cb7ec87959c9e31b6be6b54bb",
+      "size": 247
+    },
+    {
+      "path": "source/host/src/extensions/mcp/plugin_skills.rs",
+      "blobSha": "19e06a2ad57cf6caecdbf8263430f68a04641b14",
+      "size": 19353
+    },
+    {
+      "path": "source/host/src/extensions/mcp/plugin_skills_cache.rs",
+      "blobSha": "c4d15cd841ed1acd1345325dacc49de79576a219",
+      "size": 7800
+    },
+    {
+      "path": "source/host/src/extensions/mcp/plugin_skills_sync_tests.rs",
+      "blobSha": "321bb7b4d342ab7fb03ce8830d9a714096f140c1",
+      "size": 14803
+    },
+    {
+      "path": "source/host/src/extensions/mcp/production.rs",
+      "blobSha": "c90cdc2eed0d22ccbc3ebaa8e4eb9877b6eb964f",
+      "size": 11565
+    },
+    {
+      "path": "source/host/src/extensions/mcp/production_box_state.rs",
+      "blobSha": "ed10c6b76df61a0f3fdf5aa1f60844ace5f172b2",
+      "size": 6158
+    },
+    {
+      "path": "source/host/src/extensions/mcp/skill_publish.rs",
+      "blobSha": "4e321cee1464e7f306b7d7d491ab29ec293fb84b",
+      "size": 19839
+    },
+    {
+      "path": "source/host/src/extensions/memory/agent_state.rs",
+      "blobSha": "6c2d53435579e35a557a63ee9981330f8b3d6fe8",
+      "size": 20575
+    },
+    {
+      "path": "source/host/src/extensions/memory/extension.rs",
+      "blobSha": "c57cd1e66a31e7fb35f9208aed0f5f9f6a1447ca",
+      "size": 2851
+    },
+    {
+      "path": "source/host/src/extensions/memory/memory_service.rs",
+      "blobSha": "c6deba2687888c6f91731c0dc2fb8cf74b5403a4",
+      "size": 47970
+    },
+    {
+      "path": "source/host/src/extensions/memory/memory_synthesis_service.rs",
+      "blobSha": "311004f3481f8a2477ab3a6012214c72db92dfc9",
+      "size": 43579
+    },
+    {
+      "path": "source/host/src/extensions/memory/mod.rs",
+      "blobSha": "c11d1a5a3653d1256631343771e6f64e32688564",
+      "size": 146
+    },
+    {
+      "path": "source/host/src/extensions/memory/production.rs",
+      "blobSha": "28d7a78ee2d498708ba884b95743f756a9c6126b",
+      "size": 5269
+    },
+    {
+      "path": "source/host/src/extensions/memory/project_membership.rs",
+      "blobSha": "915251308910868f14db69480c228a02a56eaec0",
+      "size": 3253
+    },
+    {
+      "path": "source/host/src/extensions/mod.rs",
+      "blobSha": "48ec3653bad48ae278d82d17473594ac437592d1",
+      "size": 850
+    },
+    {
+      "path": "source/host/src/extensions/notifications/extension.rs",
+      "blobSha": "74ad7e92451cd9ad1c40b7a35ecd6e28776bddab",
+      "size": 9155
+    },
+    {
+      "path": "source/host/src/extensions/notifications/mobile_push_notifier.rs",
+      "blobSha": "291dddae9ca3bdba5f31569571602314ae235681",
+      "size": 10638
+    },
+    {
+      "path": "source/host/src/extensions/notifications/mod.rs",
+      "blobSha": "18afdfb8eaa8770a44e86ea998bcba617885db9e",
+      "size": 49
+    },
+    {
+      "path": "source/host/src/extensions/notify_bus/extension.rs",
+      "blobSha": "31b24a243e13b8b205eb4ae6fec24ffd239bc373",
+      "size": 9652
+    },
+    {
+      "path": "source/host/src/extensions/notify_bus/mod.rs",
+      "blobSha": "f47dfb1355eb0684dd1907a90e6cc34f21048903",
+      "size": 46
+    },
+    {
+      "path": "source/host/src/extensions/notify_bus/notify_bus_client.rs",
+      "blobSha": "d55861fd295cb79ac449282f1ebb84a418828312",
+      "size": 9383
+    },
+    {
+      "path": "source/host/src/extensions/registry.rs",
+      "blobSha": "2195452339ca84f13ce0f91009517849adc5f79c",
+      "size": 2378
+    },
+    {
+      "path": "source/host/src/extensions/secrets/extension.rs",
+      "blobSha": "f18a1402bc7c1873ff54b8c725bdfdea284280c2",
+      "size": 4016
+    },
+    {
+      "path": "source/host/src/extensions/secrets/mod.rs",
+      "blobSha": "004f2ce0ac5b86d4deacc2b4be3fe5d38cb62a17",
+      "size": 44
+    },
+    {
+      "path": "source/host/src/extensions/secrets/secrets_service.rs",
+      "blobSha": "d57be254edb21f9e183e72bd971ae6e07fdc1e9e",
+      "size": 15768
+    },
+    {
+      "path": "source/host/src/extensions/session/agent_db.rs",
+      "blobSha": "91ed720449b8e171a94887d032343103be6c829b",
+      "size": 104999
+    },
+    {
+      "path": "source/host/src/extensions/session/agent_db_recovery.rs",
+      "blobSha": "03b6ac1255e9c18233d58a3f4f36710c71dd7b0e",
+      "size": 10452
+    },
+    {
+      "path": "source/host/src/extensions/session/agent_db_schema.rs",
+      "blobSha": "3d381c12c55d8444caac81f61b64bd81efa5e2bd",
+      "size": 6774
+    },
+    {
+      "path": "source/host/src/extensions/session/agent_db_serde.rs",
+      "blobSha": "02e78b03594a0c3b1b957dba051b4edb042d1cb0",
+      "size": 10309
+    },
+    {
+      "path": "source/host/src/extensions/session/agent_db_transcript_pages.rs",
+      "blobSha": "a7bf6b9a24b84ee6b3be4163d44da02f22758e40",
+      "size": 4201
+    },
+    {
+      "path": "source/host/src/extensions/session/agent_session.rs",
+      "blobSha": "4d2cde4d9e1feb56f61a0b38268bf112a14a30b9",
+      "size": 26517
+    },
+    {
+      "path": "source/host/src/extensions/session/box_handoff_service.rs",
+      "blobSha": "d01f7108f3e3dc5d11103b9e6131e8f87ab7039e",
+      "size": 11917
+    },
+    {
+      "path": "source/host/src/extensions/session/call_session.rs",
+      "blobSha": "f97f628ec14618ab2788bdf5b5c301f7a00c81f6",
+      "size": 21746
+    },
+    {
+      "path": "source/host/src/extensions/session/channel_store.rs",
+      "blobSha": "c1af306ecc5040132913a4eabe31e7447cd00244",
+      "size": 11410
+    },
+    {
+      "path": "source/host/src/extensions/session/connector_secret_store.rs",
+      "blobSha": "d304c7cb153a03d0c07a9f310aa01a81e533edba",
+      "size": 4698
+    },
+    {
+      "path": "source/host/src/extensions/session/conversation_blobs_path.rs",
+      "blobSha": "7d3842e6bd5fd16c8c468badc5b52558b06f6b0d",
+      "size": 258
+    },
+    {
+      "path": "source/host/src/extensions/session/conversation_recovery.rs",
+      "blobSha": "4c07b8789b6f001aaa74979560dcee50e28851ed",
+      "size": 9807
+    },
+    {
+      "path": "source/host/src/extensions/session/conversation_size_limits.rs",
+      "blobSha": "e66a14f6f578818e1f7d7ba516139bc2646b3580",
+      "size": 15695
+    },
+    {
+      "path": "source/host/src/extensions/session/extension.rs",
+      "blobSha": "f34b1d871a4d635e0f83b7103a0bbe1150388c4b",
+      "size": 4953
+    },
+    {
+      "path": "source/host/src/extensions/session/gateway.rs",
+      "blobSha": "e77e6bc40d9b12a020b7ad5eec1fcb6d11c68550",
+      "size": 40996
+    },
+    {
+      "path": "source/host/src/extensions/session/mod.rs",
+      "blobSha": "f8defefb19934c8e9c53b59034a389c71a038a4b",
+      "size": 845
+    },
+    {
+      "path": "source/host/src/extensions/session/native_messaging.rs",
+      "blobSha": "984c5e023bdf2475cbec5f5db73330ad162dd78d",
+      "size": 35943
+    },
+    {
+      "path": "source/host/src/extensions/session/pending_card_sweeps.rs",
+      "blobSha": "39513fb90cf7d22447a3fee90d759b29bacdb7b7",
+      "size": 4037
+    },
+    {
+      "path": "source/host/src/extensions/session/production.rs",
+      "blobSha": "d2b455d19e7ee012f046227fd6eb4845669b7ee7",
+      "size": 143360
+    },
+    {
+      "path": "source/host/src/extensions/session/production_agent_store.rs",
+      "blobSha": "fc1263a0c71f5a1f3f811b6e456160c2e55cdc37",
+      "size": 15569
+    },
+    {
+      "path": "source/host/src/extensions/session/session_conversation_state.rs",
+      "blobSha": "c8e5b2385036b7c1f53b7de5b56f5c513041a90e",
+      "size": 31736
+    },
+    {
+      "path": "source/host/src/extensions/session/session_diagnostics.rs",
+      "blobSha": "9ecf0dbcda78774357d200ebe545bb6a9bec888d",
+      "size": 1003
+    },
+    {
+      "path": "source/host/src/extensions/session/session_maintenance.rs",
+      "blobSha": "53b03cf2291717cf8024a0410c974217e1df34bf",
+      "size": 16796
+    },
+    {
+      "path": "source/host/src/extensions/session/session_materialization.rs",
+      "blobSha": "d161dc4b86d1b08569e2a01fb1ca8a4abdbd69de",
+      "size": 8233
+    },
+    {
+      "path": "source/host/src/extensions/session/session_mutations.rs",
+      "blobSha": "946e8e23169a5cfc196146f03df22c6cfedb4103",
+      "size": 2833
+    },
+    {
+      "path": "source/host/src/extensions/session/session_paths.rs",
+      "blobSha": "d703762772211f6a77bb6638a25017f8e62e80be",
+      "size": 4640
+    },
+    {
+      "path": "source/host/src/extensions/session/session_profile_files.rs",
+      "blobSha": "297d8f07b44a232fde6b182616954039e0306851",
+      "size": 4753
+    },
+    {
+      "path": "source/host/src/extensions/session/session_projection.rs",
+      "blobSha": "0d0bc08039a331aa3a14f7accb461dcc02c0f644",
+      "size": 10771
+    },
+    {
+      "path": "source/host/src/extensions/session/session_recovery.rs",
+      "blobSha": "86f0e03e8b214980555c018fdb009960653a9a59",
+      "size": 4733
+    },
+    {
+      "path": "source/host/src/extensions/session/session_roster.rs",
+      "blobSha": "689f49e87b531bd2678a3b88655b23382b20a9a6",
+      "size": 10154
+    },
+    {
+      "path": "source/host/src/extensions/session/session_store_factories.rs",
+      "blobSha": "533852ec90686b870dcf217b482715322de5b8b7",
+      "size": 3531
+    },
+    {
+      "path": "source/host/src/extensions/session/session_summaries.rs",
+      "blobSha": "2a6f90ad4ee48171685a870c50c031f35f3f49e0",
+      "size": 13389
+    },
+    {
+      "path": "source/host/src/extensions/settings/extension.rs",
+      "blobSha": "e53252e5f67cd0679090c24cf29772de92958560",
+      "size": 447
+    },
+    {
+      "path": "source/host/src/extensions/settings/mod.rs",
+      "blobSha": "49fe5cae2489fb08e1dd377c4d5038194e4539bc",
+      "size": 45
+    },
+    {
+      "path": "source/host/src/extensions/settings/settings_service.rs",
+      "blobSha": "f34a4d90ac1bf5a3b8208cc4d573ea97c9f8da72",
+      "size": 51266
+    },
+    {
+      "path": "source/host/src/extensions/source_map/extension.rs",
+      "blobSha": "ebf369f1a230fdafcf9a412db46e7d017f19bbe8",
+      "size": 349
+    },
+    {
+      "path": "source/host/src/extensions/source_map/mod.rs",
+      "blobSha": "6260658713a8ff626286e7660bc774cdee38d083",
+      "size": 47
+    },
+    {
+      "path": "source/host/src/extensions/source_map/source_map_service.rs",
+      "blobSha": "f8203816e048122c7a58e662329af8d4930e249d",
+      "size": 4684
+    },
+    {
+      "path": "source/host/src/extensions/state_backstop/extension.rs",
+      "blobSha": "83c970c7a7cdb7e3645a2218e0852e7734a3fa47",
+      "size": 2106
+    },
+    {
+      "path": "source/host/src/extensions/state_backstop/mod.rs",
+      "blobSha": "c07008e725ba8b993fdaa49d5d0cc6d8a51d9b49",
+      "size": 51
+    },
+    {
+      "path": "source/host/src/extensions/state_backstop/state_backstop_service.rs",
+      "blobSha": "1b926b586363ca7667f033bcaf98043fd8f55ac3",
+      "size": 10042
+    },
+    {
+      "path": "source/host/src/extensions/teach_recording/extension.rs",
+      "blobSha": "c53d3ccd3d8536292628c725cdc16519d5f344d6",
+      "size": 5252
+    },
+    {
+      "path": "source/host/src/extensions/teach_recording/mod.rs",
+      "blobSha": "fd7e6f8baee1090d1236d7c20ebac9b4044902a9",
+      "size": 52
+    },
+    {
+      "path": "source/host/src/extensions/teach_recording/teach_recording_service.rs",
+      "blobSha": "021df34c0d47f61a863959429a10cc614e70817a",
+      "size": 50152
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/agent_error_telemetry.rs",
+      "blobSha": "ee4a68ad7608902dae56821b3e59a2662333907c",
+      "size": 2659
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/agent_open_telemetry.rs",
+      "blobSha": "41ce1dad604f251fca584e423af1a35a35d36659",
+      "size": 819
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/analytics_service.rs",
+      "blobSha": "7c9d9506fd98a10ca93254dc1b218a46a0d17515",
+      "size": 21891
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/auto_review_approval_telemetry.rs",
+      "blobSha": "b72ad0c82174c8863ed792ded2a16d1c815b6842",
+      "size": 1313
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/automation_fire_telemetry.rs",
+      "blobSha": "de889b53f0bd9b43a72f996e014c38fa74f418a1",
+      "size": 3770
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/automation_lifecycle_telemetry.rs",
+      "blobSha": "57f5adfaa08b40a970fcf4a9441ffcceb16ebb72",
+      "size": 1399
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/automation_shadow_prune_telemetry.rs",
+      "blobSha": "b4cd39822c3ec578e8d53ffe793eab9ddb4470cd",
+      "size": 1615
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/bot_block_telemetry.rs",
+      "blobSha": "272b5abd50a8921f8536912da60973846499de37",
+      "size": 1328
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/box_copy_in_telemetry.rs",
+      "blobSha": "580a8613b4085d0e5a132a9c972edb7015e12094",
+      "size": 377
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/box_log_ship_telemetry.rs",
+      "blobSha": "7f49859a742dcd2b54e8131ab28d56aa4f5b8eae",
+      "size": 2322
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/box_log_shipper.rs",
+      "blobSha": "bb7cbdfbeee9ba1bc4af36d3d3627ab1e9293932",
+      "size": 27804
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/box_recreate_decided_telemetry.rs",
+      "blobSha": "128587e91387dbdf789115e3d7274b48528d4859",
+      "size": 389
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/connector_auth_telemetry.rs",
+      "blobSha": "1ad96dcfdd5ec58cef65feaaa36a63f2d814d7a2",
+      "size": 2787
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/conversation_gc_telemetry.rs",
+      "blobSha": "8f4afce628a557a8c4f978dc9619f5b048677803",
+      "size": 3135
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/desktop_health_forwarder.rs",
+      "blobSha": "dad0855560bd050d18e9b3bbaee9eceec90e00ed",
+      "size": 11200
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/disk_pressure_telemetry.rs",
+      "blobSha": "d33f9a80ac477a6c3aa7d2076eb1985f40c1a762",
+      "size": 1089
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/event_loop_telemetry.rs",
+      "blobSha": "9adc04cc98946c4b633d4d3948be6efcfe279afc",
+      "size": 8269
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/experiments_diagnostic_telemetry.rs",
+      "blobSha": "ab2b9a2112bd549ff1cec9f478bf12f72ee0808b",
+      "size": 1882
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/extension.rs",
+      "blobSha": "218fa8cac7ba58e9e1b4027a4cfbf4e6b55cf4b5",
+      "size": 4084
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/gateway_command_telemetry.rs",
+      "blobSha": "6f526e6b7e65e5195006e44723ab0cfff235f308",
+      "size": 2226
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/host_crash_marker.rs",
+      "blobSha": "62bf174287981dea7c8882e35874876631cc9af4",
+      "size": 9619
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/host_diagnostic_telemetry.rs",
+      "blobSha": "e9225a4656c7ab26a07cbf41e56a8d4b067e3183",
+      "size": 1227
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/host_event_bus_telemetry.rs",
+      "blobSha": "c5afa617541e8f57939fa6f8a8c836c4227b987f",
+      "size": 773
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/host_extension_diagnostic_telemetry.rs",
+      "blobSha": "b5fec2bd8e813ecd3acf1752b2357a8e755b3a57",
+      "size": 3252
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/host_lifecycle_progress.rs",
+      "blobSha": "10acce5dee6323cdb2960968773773a6493d3e63",
+      "size": 5254
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/host_telemetry_service.rs",
+      "blobSha": "17c4bd90182aed1797035b7a9a7532786acaf160",
+      "size": 87149
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/host_tracing.rs",
+      "blobSha": "3f7ccd235734984307a2563f689f3e6eff5e23a4",
+      "size": 28728
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/invariant_violation_telemetry.rs",
+      "blobSha": "cc304ce2efb5fd7edeefece0e895015c1012e4ec",
+      "size": 493
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/journal_outcome_telemetry.rs",
+      "blobSha": "f406022d293ef2864902385468f5834790e083b0",
+      "size": 1859
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/lifecycle_telemetry.rs",
+      "blobSha": "9eb8c417f27ca9410d8a438255a1ee62302907a5",
+      "size": 13011
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/local_exec_telemetry.rs",
+      "blobSha": "9ce8e9131c1f1f521ada3255cf479b71dba0f4e7",
+      "size": 6488
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/mcp_discovery_telemetry.rs",
+      "blobSha": "1fd05f1b7eb3f73d92355c6b476aff6e01764efd",
+      "size": 783
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/memory_synthesis_telemetry.rs",
+      "blobSha": "2dde20ad80fde5d7f3f387204e7821a7b48cbdc4",
+      "size": 2437
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/mod.rs",
+      "blobSha": "29d890ce6757a53af4af1d26530aaaf0fdae553d",
+      "size": 1733
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/model_experiment_exposure.rs",
+      "blobSha": "7ff636d90d684f70e1923a5284a8bd256f31d792",
+      "size": 2972
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/pressure_cpu_profiler.rs",
+      "blobSha": "c0d14984e12bd482f2a21eabb1131987a72c74c2",
+      "size": 28847
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/queue_telemetry_mappers.rs",
+      "blobSha": "14c769121cb2f1e8940af037e8d4fbd825bbdc36",
+      "size": 8149
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/revival_telemetry_mappers.rs",
+      "blobSha": "94b821f28e679f2b5de41761c05aabae5320db3c",
+      "size": 3101
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/sand_error_tags.rs",
+      "blobSha": "797a55a87e8c8f1ecf0235e5e9c6943ed83a542b",
+      "size": 12637
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/search_index_health_telemetry.rs",
+      "blobSha": "7b31c399b612b7ae1f766eda628d7ffa33806a53",
+      "size": 1225
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/send_trace_sampler.rs",
+      "blobSha": "c808f99db18ab69da810f0dee5ef890b3774e037",
+      "size": 1182
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/session_diagnostic_telemetry.rs",
+      "blobSha": "a6fb23e046407369edbee44d89da306999770707",
+      "size": 2545
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/structured_log_telemetry.rs",
+      "blobSha": "5c6cb25a4ec4f28a3f09127cb5bd358e0f4f325f",
+      "size": 18208
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/turn_empty_delivery_telemetry.rs",
+      "blobSha": "ce186c55b3ff7bb9ceef02bd7eb090da89b6f3e1",
+      "size": 1799
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/turn_telemetry_mappers.rs",
+      "blobSha": "f94320f53bca2134260ccfd98153916bc259a06d",
+      "size": 9938
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/webauthn_proxy_telemetry.rs",
+      "blobSha": "5ea0487b095e0b68b23a3d44ea6cdb2bd7d0238f",
+      "size": 4141
+    },
+    {
+      "path": "source/host/src/extensions/transcript/ack_obligations.rs",
+      "blobSha": "334d5f825331c8ab1d016c9731ca3e1723e5e83b",
+      "size": 19796
+    },
+    {
+      "path": "source/host/src/extensions/transcript/agent_lifecycle.rs",
+      "blobSha": "f333bbad9b18196ab904e1ea6e66f52b9c8fb8ff",
+      "size": 34662
+    },
+    {
+      "path": "source/host/src/extensions/transcript/agent_run_error.rs",
+      "blobSha": "bb4c32acb46feefc9c9d1e35be81fe5b3485b047",
+      "size": 14923
+    },
+    {
+      "path": "source/host/src/extensions/transcript/agent_to_agent_messaging.rs",
+      "blobSha": "89d33abcdbc7e37142c8d5fba918b6d46f4ad55c",
+      "size": 13130
+    },
+    {
+      "path": "source/host/src/extensions/transcript/async_task_union.rs",
+      "blobSha": "c05e484508737d8d9a7ec81712ac9fa755ea573c",
+      "size": 3465
+    },
+    {
+      "path": "source/host/src/extensions/transcript/automation_event_fires.rs",
+      "blobSha": "0cab169c66da397a9bb2777995c67178461edc43",
+      "size": 10570
+    },
+    {
+      "path": "source/host/src/extensions/transcript/automation_run_path.rs",
+      "blobSha": "7bedae399879f7269cfded2c5bf629ad9204a0b1",
+      "size": 17160
+    },
+    {
+      "path": "source/host/src/extensions/transcript/automation_runtime.rs",
+      "blobSha": "2a30406f2dd138a29a9bb90cf9f5324aa944e731",
+      "size": 32849
+    },
+    {
+      "path": "source/host/src/extensions/transcript/automation_snapshot.rs",
+      "blobSha": "1adb51eeeda486b016b701afe81024cd9347fbc4",
+      "size": 2116
+    },
+    {
+      "path": "source/host/src/extensions/transcript/automation_spend_guard_runtime.rs",
+      "blobSha": "fada66204486c53491dbcaecac913650653364c0",
+      "size": 13608
+    },
+    {
+      "path": "source/host/src/extensions/transcript/background_wakes.rs",
+      "blobSha": "e373d0e3a7c492d8adf13d459ab6458b5830ba6e",
+      "size": 13690
+    },
+    {
+      "path": "source/host/src/extensions/transcript/box_handoff_resume.rs",
+      "blobSha": "f4528b5b33432c63e1ac06b563299486251aee85",
+      "size": 8933
+    },
+    {
+      "path": "source/host/src/extensions/transcript/box_request_entries.rs",
+      "blobSha": "8c0ab22f82ead39c52fb2282f6c2c7bffdab8b25",
+      "size": 2731
+    },
+    {
+      "path": "source/host/src/extensions/transcript/channel_delivery_unregistered_error.rs",
+      "blobSha": "91dc78ebf71a2877ed041cb8af547527f1845e08",
+      "size": 163
+    },
+    {
+      "path": "source/host/src/extensions/transcript/client_side_tool_v2_inventory.rs",
+      "blobSha": "0c205925c4eca1f559d51e28baabd193ffb86bdb",
+      "size": 6641
+    },
+    {
+      "path": "source/host/src/extensions/transcript/client_side_tool_v2_producer.rs",
+      "blobSha": "ee80788bb3f4cf525d061f12506895310c036862",
+      "size": 6489
+    },
+    {
+      "path": "source/host/src/extensions/transcript/client_side_tool_v2_projection.rs",
+      "blobSha": "c8079c6f241045e7112fa80d00fdd103687f4457",
+      "size": 45032
+    },
+    {
+      "path": "source/host/src/extensions/transcript/completion_revivals.rs",
+      "blobSha": "b06f87124f566365b6e41190fc1382bf9c5628cd",
+      "size": 18871
+    },
+    {
+      "path": "source/host/src/extensions/transcript/extension.rs",
+      "blobSha": "ef69506c36a58988645764714a7d172c02ce57f4",
+      "size": 12612
+    },
+    {
+      "path": "source/host/src/extensions/transcript/group_chat_glue.rs",
+      "blobSha": "dfb3adfc93e3f2042a25e1b6ce3d9ab25fb00a94",
+      "size": 9956
+    },
+    {
+      "path": "source/host/src/extensions/transcript/group_chat_orchestrator.rs",
+      "blobSha": "5c29378ec40b1eb365be9c27f0f32c730d07a1ed",
+      "size": 5107
+    },
+    {
+      "path": "source/host/src/extensions/transcript/inline_image_materialization.rs",
+      "blobSha": "bf3b419d25bba1f30aa46e6c3fab1b8ebb27dd68",
+      "size": 2280
+    },
+    {
+      "path": "source/host/src/extensions/transcript/mod.rs",
+      "blobSha": "e808f77b36b20d83e7f6fa7e62859c70ca0e2dd3",
+      "size": 1598
+    },
+    {
+      "path": "source/host/src/extensions/transcript/pending_wake_rearm.rs",
+      "blobSha": "7520306135c9210bde37f59cdee6a5584c516410",
+      "size": 13147
+    },
+    {
+      "path": "source/host/src/extensions/transcript/production_runtime.rs",
+      "blobSha": "249133724863295b2992e89f168139679959c93a",
+      "size": 62899
+    },
+    {
+      "path": "source/host/src/extensions/transcript/profile_watch.rs",
+      "blobSha": "5db12edd446f235feda18fa14ed7d1a8ab401904",
+      "size": 12496
+    },
+    {
+      "path": "source/host/src/extensions/transcript/prompt_acceptance_ledger.rs",
+      "blobSha": "2b9c15f8ce8f161dee62bd7502ddd56cda6c4fce",
+      "size": 18233
+    },
+    {
+      "path": "source/host/src/extensions/transcript/replica_writer.rs",
+      "blobSha": "035800ff9496d7d8572260a93ccadac2330dca2a",
+      "size": 2169
+    },
+    {
+      "path": "source/host/src/extensions/transcript/roster_emit.rs",
+      "blobSha": "5fb7bb1e99b3a04f5e9617b0fade44025b99ca7b",
+      "size": 17420
+    },
+    {
+      "path": "source/host/src/extensions/transcript/roster_projection.rs",
+      "blobSha": "8b919420cc9aa22a646e4082edc52142a9a985eb",
+      "size": 5793
+    },
+    {
+      "path": "source/host/src/extensions/transcript/roster_search.rs",
+      "blobSha": "9040ebf8d4738bf7688969339ae4df64d64db85a",
+      "size": 10799
+    },
+    {
+      "path": "source/host/src/extensions/transcript/run_lifecycle.rs",
+      "blobSha": "518d1095e641188c942c8f5ca9885c58778ac2ea",
+      "size": 16053
+    },
+    {
+      "path": "source/host/src/extensions/transcript/run_scheduler.rs",
+      "blobSha": "eb8994dc45b3722e8bfcc672e9e610c662429650",
+      "size": 15223
+    },
+    {
+      "path": "source/host/src/extensions/transcript/runner_registry.rs",
+      "blobSha": "431bb56a3f6447b0b9355eaa452fb2d019cd2e63",
+      "size": 12128
+    },
+    {
+      "path": "source/host/src/extensions/transcript/sand_ack_obligation_store.rs",
+      "blobSha": "e51c66a6e7d585a1a53ca79a8af39a97e96a5c72",
+      "size": 6286
+    },
+    {
+      "path": "source/host/src/extensions/transcript/sand_automation_failure.rs",
+      "blobSha": "4b4269b47763d32d8e6254d295b7e89eec35e5d8",
+      "size": 2704
+    },
+    {
+      "path": "source/host/src/extensions/transcript/sand_automation_spend_guard.rs",
+      "blobSha": "2155ee95fd17cd8f907ca60384e955ba0de5f195",
+      "size": 8033
+    },
+    {
+      "path": "source/host/src/extensions/transcript/sand_pending_wake_store.rs",
+      "blobSha": "f889a28a0c2fab16f2db90dc46bb12f5afe87d0c",
+      "size": 9663
+    },
+    {
+      "path": "source/host/src/extensions/transcript/sand_upgrade_resume_store.rs",
+      "blobSha": "1e6faf5e09516cbe4a4420b18595780fe6c757f3",
+      "size": 5273
+    },
+    {
+      "path": "source/host/src/extensions/transcript/send_acceptance.rs",
+      "blobSha": "4f8bac7537cbc01ccce3c303748a7f65e7259524",
+      "size": 6281
+    },
+    {
+      "path": "source/host/src/extensions/transcript/send_group_fanout.rs",
+      "blobSha": "f67898a1c93dffdaf81d38349bb454300ae56ea0",
+      "size": 14069
+    },
+    {
+      "path": "source/host/src/extensions/transcript/send_message_shaping.rs",
+      "blobSha": "f43ed9960d4e0e42e9cc997b4921674adcda0cd2",
+      "size": 18205
+    },
+    {
+      "path": "source/host/src/extensions/transcript/send_not_persisted_error.rs",
+      "blobSha": "b216dd1959e71c75ec9316af785d266236d3395d",
+      "size": 237
+    },
+    {
+      "path": "source/host/src/extensions/transcript/send_pipeline.rs",
+      "blobSha": "12f58e2923cd909b9564b99e0a6393955a0945e0",
+      "size": 10428
+    },
+    {
+      "path": "source/host/src/extensions/transcript/send_thread_stamping.rs",
+      "blobSha": "e0c37baf3c70eda870515e55edd980bf4eb82aa1",
+      "size": 2253
+    },
+    {
+      "path": "source/host/src/extensions/transcript/send_turn_dispatch.rs",
+      "blobSha": "3ebae343888e43406d0e1e077f486ebb062d63eb",
+      "size": 10254
+    },
+    {
+      "path": "source/host/src/extensions/transcript/session_runtime.rs",
+      "blobSha": "85993042d19f3816f23957ece2c92b9d734040c7",
+      "size": 12354
+    },
+    {
+      "path": "source/host/src/extensions/transcript/shared_rooms.rs",
+      "blobSha": "657a55ea77b814d03f05d7d307ac1819cda3870e",
+      "size": 23902
+    },
+    {
+      "path": "source/host/src/extensions/transcript/transcript_entry_ids.rs",
+      "blobSha": "65f08c3d39a3d86386e733570682d757b2911a96",
+      "size": 3270
+    },
+    {
+      "path": "source/host/src/extensions/transcript/transcript_hub.rs",
+      "blobSha": "0c4372cbc804e4182df59262c59750c8ccd34f3d",
+      "size": 1797
+    },
+    {
+      "path": "source/host/src/extensions/transcript/transcript_manager.rs",
+      "blobSha": "3d86d37255aebeff06707ed5888fb722b9760a73",
+      "size": 32970
+    },
+    {
+      "path": "source/host/src/extensions/transcript/transcript_store.rs",
+      "blobSha": "140976b7cbb8bce9650f41bd18a76e206a8cf18d",
+      "size": 1836
+    },
+    {
+      "path": "source/host/src/extensions/transcript/turn_runtime.rs",
+      "blobSha": "50272d988ed531632d970cf2904138f92f392172",
+      "size": 11915
+    },
+    {
+      "path": "source/host/src/extensions/transcript/upgrade_recreate_resume.rs",
+      "blobSha": "1d3c1007c6b29718902820030f3baa1819da81ba",
+      "size": 2138
+    },
+    {
+      "path": "source/host/src/extensions/transcript/widget_responses.rs",
+      "blobSha": "97b4b47b61b3c2cd18d381758ebec2640714f1d3",
+      "size": 26027
+    },
+    {
+      "path": "source/host/src/extensions/transcript/workflow_commands.rs",
+      "blobSha": "35d5863225b4de40e6f321873f33fba3e7a2e43d",
+      "size": 23389
+    },
+    {
+      "path": "source/host/src/extensions/trays/extension.rs",
+      "blobSha": "50020860eed6c09d22bacb708e0f92c1e8a8ffd0",
+      "size": 1157
+    },
+    {
+      "path": "source/host/src/extensions/trays/mod.rs",
+      "blobSha": "c6321360410507b653c720b15f99a2f8a66ecaa6",
+      "size": 42
+    },
+    {
+      "path": "source/host/src/extensions/trays/trays_service.rs",
+      "blobSha": "ab1731b4b2c9149ca1e89712088c2f0c6a678e08",
+      "size": 9258
+    },
+    {
+      "path": "source/host/src/extensions/turn_execution/extension.rs",
+      "blobSha": "bbcd36116e87c20b62ae213de3c2457fb8e5e5e8",
+      "size": 277
+    },
+    {
+      "path": "source/host/src/extensions/turn_execution/mod.rs",
+      "blobSha": "7f4b260943edb314e1e7c126140b7c4cc1ac3598",
+      "size": 247
+    },
+    {
+      "path": "source/host/src/extensions/turn_execution/turn_execution_service.rs",
+      "blobSha": "011be006dba71a251e70cf1dad2e3223a4f2b33d",
+      "size": 2293
+    },
+    {
+      "path": "source/host/src/extensions/wallpaper/box_wallpaper_commands.rs",
+      "blobSha": "a43a9b59e0e2cbe4e79355968d2e5b44c524a511",
+      "size": 9264
+    },
+    {
+      "path": "source/host/src/extensions/wallpaper/extension.rs",
+      "blobSha": "2b8ca062c08d74dd81c6f9b2048004bb505293e9",
+      "size": 2547
+    },
+    {
+      "path": "source/host/src/extensions/wallpaper/mod.rs",
+      "blobSha": "b814cb9a93472de7913769f6b7e30e92e9bcc5b9",
+      "size": 78
+    },
+    {
+      "path": "source/host/src/extensions/wallpaper/wallpaper_service.rs",
+      "blobSha": "591455ce7b665d8112ff0361a9bf76543b076b9a",
+      "size": 5937
+    },
+    {
+      "path": "source/host/src/extensions/webauthn_proxy/extension.rs",
+      "blobSha": "c3023aac5bb43651fa9ee5f4e76fcaa7d33cbb5e",
+      "size": 2043
+    },
+    {
+      "path": "source/host/src/extensions/webauthn_proxy/mod.rs",
+      "blobSha": "109c55a20e5b2317f12b3a71360ea4f54dfb5760",
+      "size": 81
+    },
+    {
+      "path": "source/host/src/extensions/webauthn_proxy/webauthn_proxy_bridge.rs",
+      "blobSha": "fd52784e73159ee1d0759394ad10b900be2105f1",
+      "size": 20418
+    },
+    {
+      "path": "source/host/src/extensions/webauthn_proxy/webauthn_proxy_marker.rs",
+      "blobSha": "30b336dd07b61027adedc31547f751b417f9f707",
+      "size": 1689
+    },
+    {
+      "path": "source/host/src/gateway_command_error.rs",
+      "blobSha": "a7827b29c7f53899b1f34e7c989849816f4090fb",
+      "size": 4924
+    },
+    {
+      "path": "source/host/src/gateway_config.rs",
+      "blobSha": "64af7f6354047fe18b3e94fe629236ee0ade1942",
+      "size": 4203
+    },
+    {
+      "path": "source/host/src/gateway_protocol.rs",
+      "blobSha": "13b6a5bad55c133ed67e39bc94b7e500808a82a5",
+      "size": 2832
+    },
+    {
+      "path": "source/host/src/gateway_server.rs",
+      "blobSha": "1ce506ae0bc75ee96418e55eb64a935dd7865ac0",
+      "size": 42604
+    },
+    {
+      "path": "source/host/src/groups/group_chat.rs",
+      "blobSha": "9645e9d831098200c4f423de595b7d2784f9e54b",
+      "size": 11873
+    },
+    {
+      "path": "source/host/src/groups/group_store.rs",
+      "blobSha": "b549d45b3fae8e69f32eb91f0e43df1fc8be9e97",
+      "size": 6147
+    },
+    {
+      "path": "source/host/src/groups/mod.rs",
+      "blobSha": "54944942c3a7ff05582a6e124dadd48bb64a4645",
+      "size": 83
+    },
+    {
+      "path": "source/host/src/groups/remote_room_store.rs",
+      "blobSha": "bcdaeaa030984729fbfd614835da6ef0d169cedd",
+      "size": 5846
+    },
+    {
+      "path": "source/host/src/groups/xuser.rs",
+      "blobSha": "d0c844a9a93e43b32c8c5686bcee37392b5df078",
+      "size": 5901
+    },
+    {
+      "path": "source/host/src/host_diagnostics.rs",
+      "blobSha": "9585418e747473b56bcb81ea01eba4ec1b50b214",
+      "size": 843
+    },
+    {
+      "path": "source/host/src/host_discovery.rs",
+      "blobSha": "05c727261b11552839f0d17f2c6f935cca94b27d",
+      "size": 2317
+    },
+    {
+      "path": "source/host/src/host_event_bus.rs",
+      "blobSha": "0ac14e8c95f12affdaab95e50fd925ef8a5d2148",
+      "size": 8223
+    },
+    {
+      "path": "source/host/src/host_gateway_api.rs",
+      "blobSha": "b983d0d112a1cc30c8ca2c1d4678704ddf88890f",
+      "size": 8200
+    },
+    {
+      "path": "source/host/src/host_initial_transcript_load.rs",
+      "blobSha": "06da15e7c17cc568c7eb2666c64c34c28ff704dd",
+      "size": 5027
+    },
+    {
+      "path": "source/host/src/host_invariant.rs",
+      "blobSha": "8f4f5b4ac03200a099d390e7d8e102041b67f768",
+      "size": 2133
+    },
+    {
+      "path": "source/host/src/host_lock.rs",
+      "blobSha": "0d5156b6d053ba1f0beeb5dd54d0e83671365e5d",
+      "size": 6962
+    },
+    {
+      "path": "source/host/src/host_paths.rs",
+      "blobSha": "255d75860956a4aedfa448bea06ce13017f1b1a0",
+      "size": 6728
+    },
+    {
+      "path": "source/host/src/host_production_extensions.rs",
+      "blobSha": "6294645234707fef8472aff85737c2550252fd0b",
+      "size": 53960
+    },
+    {
+      "path": "source/host/src/host_request_context.rs",
+      "blobSha": "3228d29b4fab111ddc46c6208e4e5532fd1d46dc",
+      "size": 4050
+    },
+    {
+      "path": "source/host/src/host_roster_bookkeeping.rs",
+      "blobSha": "754c4d556117d904f93aa800fa390f1aba61cae6",
+      "size": 3368
+    },
+    {
+      "path": "source/host/src/host_runner_composition.rs",
+      "blobSha": "f1729d4af9a9e3b18431a06e28510252b262f7cf",
+      "size": 23405
+    },
+    {
+      "path": "source/host/src/host_secret_store.rs",
+      "blobSha": "7f20790cf4c29e20de214468a82fd93d3aeb0daa",
+      "size": 2181
+    },
+    {
+      "path": "source/host/src/lib.rs",
+      "blobSha": "3181a3dcca61bd00d0f9784d34cce9cce6fc3a26",
+      "size": 2635
+    },
+    {
+      "path": "source/host/src/mcp_auth/host_mcp_auth_completion.rs",
+      "blobSha": "6efccc02bb03705dc38cf77da1cdcfc9cb365f52",
+      "size": 2649
+    },
+    {
+      "path": "source/host/src/mcp_auth/mcp_auth_wait_registry.rs",
+      "blobSha": "36511aaaaf5be61414c18b7a9bd63b0ec50bcd4e",
+      "size": 2958
+    },
+    {
+      "path": "source/host/src/mcp_auth/mod.rs",
+      "blobSha": "c5f2cc9afe42b50bd4b12a5b6f690220180fca8c",
+      "size": 66
+    },
+    {
+      "path": "source/host/src/media_mime.rs",
+      "blobSha": "20f47798376971d53ecab97f888669f46f1b87df",
+      "size": 3016
+    },
+    {
+      "path": "source/host/src/notify_drain_gate.rs",
+      "blobSha": "854a94830eab0ee214b418f67ca5e8ad920acc13",
+      "size": 1548
+    },
+    {
+      "path": "source/host/src/ports/box.rs",
+      "blobSha": "068e13c68951ff062726771df05c04ddb36b69c2",
+      "size": 2975
+    },
+    {
+      "path": "source/host/src/ports/mcp_state_executor.rs",
+      "blobSha": "a10ca73079bfbb8bee93f8b82211285ded01c4c1",
+      "size": 9539
+    },
+    {
+      "path": "source/host/src/ports/mod.rs",
+      "blobSha": "c01cd91c2996b6e63bda09cd6cdf344644d9e3c4",
+      "size": 163
+    },
+    {
+      "path": "source/host/src/ports/product_analytics.rs",
+      "blobSha": "e1a8a0df883fdeecc8f3693bdaf64a1334f84512",
+      "size": 522
+    },
+    {
+      "path": "source/host/src/ports/sand_analytics_types.rs",
+      "blobSha": "7d4b068299faf5ed0ca9f2628c7d022698823f2f",
+      "size": 891
+    },
+    {
+      "path": "source/host/src/ports/telemetry.rs",
+      "blobSha": "c5f13495719a1c8722bae78ceb86d2e5529605c3",
+      "size": 5182
+    },
+    {
+      "path": "source/host/src/ports/transport.rs",
+      "blobSha": "a45e7f1e75725d4afebd041dbfcd329ab2549bbe",
+      "size": 1040
+    },
+    {
+      "path": "source/host/src/ports/user_computer.rs",
+      "blobSha": "2ea88be60ef5c2184d88e37b73025633ab783e53",
+      "size": 1486
+    },
+    {
+      "path": "source/host/src/process_crash_guard.rs",
+      "blobSha": "7f962c4985b1631d45bd8a84f68407d9616354f9",
+      "size": 2964
+    },
+    {
+      "path": "source/host/src/production_binding_providers.rs",
+      "blobSha": "49a475ddcdedc81faaff1b477f633936023c03af",
+      "size": 2854
+    },
+    {
+      "path": "source/host/src/runner/agent_adapters.rs",
+      "blobSha": "1e2d03a4f21addc06cf0e3aef9d62ec416ad9d0d",
+      "size": 10451
+    },
+    {
+      "path": "source/host/src/runner/agent_state.rs",
+      "blobSha": "946a343845bbf16129347f71e6f0592d69a3db27",
+      "size": 364
+    },
+    {
+      "path": "source/host/src/runner/agent_v1_wire.rs",
+      "blobSha": "69819604644fd76c3b0ff9222a104b0b08019e56",
+      "size": 4710
+    },
+    {
+      "path": "source/host/src/runner/auto_review_gate.rs",
+      "blobSha": "19a639f62547506744a15dad21fae2c0de348d36",
+      "size": 5004
+    },
+    {
+      "path": "source/host/src/runner/background_work.rs",
+      "blobSha": "85df5a9b8636e77e08678dac1de4756073b4da91",
+      "size": 30671
+    },
+    {
+      "path": "source/host/src/runner/bot_block_detection.rs",
+      "blobSha": "05a566eff8b87b7f69be39a3eded8ae6d914af07",
+      "size": 9752
+    },
+    {
+      "path": "source/host/src/runner/box_reference_docs.rs",
+      "blobSha": "f7514d86f1c1a4c7158e3b6b52963eae29a1355b",
+      "size": 9838
+    },
+    {
+      "path": "source/host/src/runner/box_tool_access.rs",
+      "blobSha": "9a84091770cd1c23debbdf5fbf6eb33a953158f7",
+      "size": 12309
+    },
+    {
+      "path": "source/host/src/runner/checkpoint.rs",
+      "blobSha": "c5346a7c14dd7ad3ee5fb8c889f2909bbd25c685",
+      "size": 585
+    },
+    {
+      "path": "source/host/src/runner/clock_skew_guard.rs",
+      "blobSha": "be366b427d31de0aa0700c804c463599e67ef2e4",
+      "size": 1319
+    },
+    {
+      "path": "source/host/src/runner/computer_use.rs",
+      "blobSha": "c12158da88ce53a0d1d3b2d49ac7faabe4d9db67",
+      "size": 10039
+    },
+    {
+      "path": "source/host/src/runner/conversation_outline.rs",
+      "blobSha": "7cfca5ae5806de679614006a6d21a24dc58534d4",
+      "size": 9426
+    },
+    {
+      "path": "source/host/src/runner/conversation_state.rs",
+      "blobSha": "585f6b817ac9a39d29d4133a26518ce3f5ac3c0f",
+      "size": 12490
+    },
+    {
+      "path": "source/host/src/runner/coordinator_tool_relay.rs",
+      "blobSha": "2ceac9be37d6e48f3241fe6c0882b5b70f1abaa9",
+      "size": 6472
+    },
+    {
+      "path": "source/host/src/runner/generated_agent_turn_stream.rs",
+      "blobSha": "f0692b7d101626b6399c0ae59ec591ab881ee05f",
+      "size": 18766
+    },
+    {
+      "path": "source/host/src/runner/host_computer_tool_dependencies.rs",
+      "blobSha": "8e95fa8b06810a56c265d81fd68fd1d92b2b9814",
+      "size": 23692
+    },
+    {
+      "path": "source/host/src/runner/host_external_machine_dependencies.rs",
+      "blobSha": "fda16620fb5099b08564786383222ff5d532c927",
+      "size": 5722
+    },
+    {
+      "path": "source/host/src/runner/host_file_transfer_dependencies.rs",
+      "blobSha": "9aef047dc7611f1f3de3400650f3e1c93c6a69e9",
+      "size": 4281
+    },
+    {
+      "path": "source/host/src/runner/host_generate_image_dependencies.rs",
+      "blobSha": "2d2ec7c6d0437fd2ef56d9c47229455f023d539a",
+      "size": 1412
+    },
+    {
+      "path": "source/host/src/runner/host_web_dependencies.rs",
+      "blobSha": "b99ad5c1ae88a4b77b4bdb620e6a0395c2049ce9",
+      "size": 2129
+    },
+    {
+      "path": "source/host/src/runner/inactive_turn_agent_stream.rs",
+      "blobSha": "5093a0c5219300fd0086e99e252f29585b0eaeda",
+      "size": 7310
+    },
+    {
+      "path": "source/host/src/runner/large_output_spill.rs",
+      "blobSha": "f33b9a2964e3c4ee9ca75be847aa2354930261f8",
+      "size": 3268
+    },
+    {
+      "path": "source/host/src/runner/mod.rs",
+      "blobSha": "8b8d514a7c3e420b74bc4b23a48ec9163740a773",
+      "size": 3875
+    },
+    {
+      "path": "source/host/src/runner/production_agent_checkpoint.rs",
+      "blobSha": "1280b916b6e89d640735b5f94732b39774180d4f",
+      "size": 18833
+    },
+    {
+      "path": "source/host/src/runner/production_turn_agent_owner.rs",
+      "blobSha": "ace2a22bd5e540f210ba263a8a1ea2b46cf54502",
+      "size": 23283
+    },
+    {
+      "path": "source/host/src/runner/production_turn_input_projection.rs",
+      "blobSha": "aafecc44789664e698cac3259b59347a70ec0ed6",
+      "size": 5621
+    },
+    {
+      "path": "source/host/src/runner/production_turn_run_shell_adapter.rs",
+      "blobSha": "80933dfa443cd8a529cb971deb5a3f2607254149",
+      "size": 27212
+    },
+    {
+      "path": "source/host/src/runner/prompt_collector_glue.rs",
+      "blobSha": "ae84322c9c4e9bdb2deb6585a61b9fce4b72c122",
+      "size": 28114
+    },
+    {
+      "path": "source/host/src/runner/remote_box_resources.rs",
+      "blobSha": "fdcde82da1714113fd19442ec85cd826e3244232",
+      "size": 10033
+    },
+    {
+      "path": "source/host/src/runner/routed_provider_runtime.rs",
+      "blobSha": "b9d03063bf15a8182396d18036116ffa15484dc3",
+      "size": 28924
+    },
+    {
+      "path": "source/host/src/runner/runner_prompt_glue.rs",
+      "blobSha": "fed229ea2c4226eba00466bd5413ec9b85c6aee5",
+      "size": 8519
+    },
+    {
+      "path": "source/host/src/runner/sand_action_audit.rs",
+      "blobSha": "ad4986cc8f6cfdf93029730503d31f6fb03241c2",
+      "size": 8022
+    },
+    {
+      "path": "source/host/src/runner/sand_agent_profile_prompt.rs",
+      "blobSha": "9d3fa043fea5b1f527b745e8077730af95a948fb",
+      "size": 4494
+    },
+    {
+      "path": "source/host/src/runner/sand_agent_runner.rs",
+      "blobSha": "a7441d7900ec82decea7890e2df9d7a8413254ba",
+      "size": 15955
+    },
+    {
+      "path": "source/host/src/runner/sand_auto_review.rs",
+      "blobSha": "b1d3ecf702e1bca6c92dbfa4876ef9e187d8d56a",
+      "size": 24871
+    },
+    {
+      "path": "source/host/src/runner/sand_auto_review_classifier_run.rs",
+      "blobSha": "51df23ec6dfb4f4a08cc0345d320aa070055be68",
+      "size": 11804
+    },
+    {
+      "path": "source/host/src/runner/sand_auto_review_summaries.rs",
+      "blobSha": "5ffbd9c3ad0900917e21204450e084b74d5fb18d",
+      "size": 22370
+    },
+    {
+      "path": "source/host/src/runner/sand_auto_review_tool_escalations.rs",
+      "blobSha": "5d7219b7ec4cf502d0ab63616b9a4dfee96c6005",
+      "size": 3911
+    },
+    {
+      "path": "source/host/src/runner/sand_automation_auto_review.rs",
+      "blobSha": "6b33465519565a59fe9996e058e5c875f3309030",
+      "size": 8178
+    },
+    {
+      "path": "source/host/src/runner/sand_browser_auto_review.rs",
+      "blobSha": "a401113a1ea569ba49ed15d0393a675fdb3a93f2",
+      "size": 11678
+    },
+    {
+      "path": "source/host/src/runner/sand_cloud_agent_auto_review.rs",
+      "blobSha": "6a6186d74c2bdcb4cef125f1d1d0b2751380523c",
+      "size": 10125
+    },
+    {
+      "path": "source/host/src/runner/sand_computer_auto_review.rs",
+      "blobSha": "fe5525c0249a9527b7231b1fd9a161901c78abdf",
+      "size": 16312
+    },
+    {
+      "path": "source/host/src/runner/sand_memory.rs",
+      "blobSha": "996257a915eddf3fe40494e85f84c40ba18114e3",
+      "size": 24313
+    },
+    {
+      "path": "source/host/src/runner/sand_prompt_markers.rs",
+      "blobSha": "6ce8976e19a9b33a13602c0419ba2352bb601518",
+      "size": 160
+    },
+    {
+      "path": "source/host/src/runner/sand_shell_auto_review_enrichment.rs",
+      "blobSha": "900453b6dec6c8db4b00aa57004ea7698135d373",
+      "size": 15378
+    },
+    {
+      "path": "source/host/src/runner/sand_subagent_auto_review.rs",
+      "blobSha": "d7a4221a18c0a9f88f664bd54cac7987561d9c48",
+      "size": 5242
+    },
+    {
+      "path": "source/host/src/runner/send_message_reminder_middleware.rs",
+      "blobSha": "00206293e492c7d3cc59d740cadbf440104b93ca",
+      "size": 11240
+    },
+    {
+      "path": "source/host/src/runner/shell_terminal_watch.rs",
+      "blobSha": "3de34d17610414a286d2a556daae6dff22ec145e",
+      "size": 13450
+    },
+    {
+      "path": "source/host/src/runner/site_visit_tracking.rs",
+      "blobSha": "914dc6e63607a49cd0fbe1d477f25e80cc8312a9",
+      "size": 1294
+    },
+    {
+      "path": "source/host/src/runner/start_of_turn_ack_reminder_middleware.rs",
+      "blobSha": "8313640fd25e01f3841e72bbfce2e2c25a63fbd9",
+      "size": 4546
+    },
+    {
+      "path": "source/host/src/runner/stream_attempt.rs",
+      "blobSha": "fc3d6da65d8b7aa2c435670fb0fb9fdf47129fac",
+      "size": 12328
+    },
+    {
+      "path": "source/host/src/runner/subagent_runtime.rs",
+      "blobSha": "72d4400eabe8a59643a8861f30feb5578202b01b",
+      "size": 18584
+    },
+    {
+      "path": "source/host/src/runner/system_prompt.rs",
+      "blobSha": "8090c7a1282ae043a63ec9b40d28520542cc8fb0",
+      "size": 121908
+    },
+    {
+      "path": "source/host/src/runner/system_prompt_assembly.rs",
+      "blobSha": "6d592794b835994a81a214049b9c5907df0cb4ff",
+      "size": 46296
+    },
+    {
+      "path": "source/host/src/runner/tool_call_identity.rs",
+      "blobSha": "0965dcdbb40b1a38cf31e1d49177c1786a1e14ad",
+      "size": 2687
+    },
+    {
+      "path": "source/host/src/runner/tools/box_help_tool.rs",
+      "blobSha": "dfeace58f0eb96efd9d8f37bcd258d766157767c",
+      "size": 5857
+    },
+    {
+      "path": "source/host/src/runner/tools/communicate_tool.rs",
+      "blobSha": "a0a6e7df68016566e4e91e2d8d317bab337ca3e2",
+      "size": 11192
+    },
+    {
+      "path": "source/host/src/runner/tools/listener_connect_cards.rs",
+      "blobSha": "ce9b75207459d364e5b6e68d04b5cfacb96036f9",
+      "size": 2106
+    },
+    {
+      "path": "source/host/src/runner/tools/mcp_host_service_management_sink.rs",
+      "blobSha": "a59ff2d19419315cdf325a8c99e515ed3aac5496",
+      "size": 12222
+    },
+    {
+      "path": "source/host/src/runner/tools/mcp_meta_tools.rs",
+      "blobSha": "6a23f51cfbe549801d9a8cd48be82d646d76932b",
+      "size": 16817
+    },
+    {
+      "path": "source/host/src/runner/tools/mcp_server_resolution.rs",
+      "blobSha": "77e1d11f23061de0f13bde2e74829d626159824a",
+      "size": 1234
+    },
+    {
+      "path": "source/host/src/runner/tools/mod.rs",
+      "blobSha": "acee2ce49c26b5e18d26d58e97e6cc26e543a91d",
+      "size": 971
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_agent_management_tools.rs",
+      "blobSha": "17e728d052b7c9c9d0eab05c54037fadaf59cb83",
+      "size": 7917
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_await_shell_tool.rs",
+      "blobSha": "747731dd978ea276708179448bcfb992c4c0cc97",
+      "size": 12512
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
+      "blobSha": "bd0eb4240b05ac582fc2f2d9ea4d3b75ece1e5eb",
+      "size": 36709
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_browser_tools.rs",
+      "blobSha": "f546880cdb67c6f61ec785c9d15d51f93dad8fd0",
+      "size": 33283
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_browser_use_subagent.rs",
+      "blobSha": "d26e1f8a1fcd04e5f2ecc8290cd0cd520ec9ca1d",
+      "size": 2821
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_computer_tool.rs",
+      "blobSha": "4e0e2fb83ee078b9378969641462b447f0648020",
+      "size": 25444
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_computer_use_subagent.rs",
+      "blobSha": "261cab857a84440afe2e7bb3f60385b41f7bf962",
+      "size": 3453
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_external_machine_tools.rs",
+      "blobSha": "11a1bcdbaa18b3f7c4ac67793c96c897dc6f3051",
+      "size": 6697
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_file_transfer_tools.rs",
+      "blobSha": "ae5d0e9242f035501c5a96d8dee2f4ebe4267167",
+      "size": 12661
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_generate_image_tool.rs",
+      "blobSha": "4a8827a3374f83501724e5628bd752b64dfe4506",
+      "size": 8877
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_mcp_management_tools.rs",
+      "blobSha": "db6f0355c9fc29caf966abadacb8ed90cebfe35a",
+      "size": 43307
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_multitask_todo_tool.rs",
+      "blobSha": "0c8bccc32cfa8cabb9059795e2915090eba4a6e7",
+      "size": 10996
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_permission_request.rs",
+      "blobSha": "1415c717e488c96b672fc374dd321522c24c78af",
+      "size": 163
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_reaction_tool.rs",
+      "blobSha": "ed3800c9e65283bd5dda7606124337c49c4b0b35",
+      "size": 6387
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_secret_request.rs",
+      "blobSha": "0f3567e6cfc6b65c8f60937bebb813fea26969a8",
+      "size": 1062
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_spotlight_tools.rs",
+      "blobSha": "7b9976a7670a872d9f37497eb4a1f8cbe1880098",
+      "size": 5187
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_state_tool.rs",
+      "blobSha": "f80613c17f6494b96a4bd9a49354de14ce1adffd",
+      "size": 24781
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_subagent_management_tools.rs",
+      "blobSha": "42c1a0bced05eccfdfc9584389aa7c20d4eb522f",
+      "size": 11360
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_task_subagent_tool.rs",
+      "blobSha": "1e0c000f6c116e63f6efd164c09dbdc2c295200c",
+      "size": 5322
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_web_tools.rs",
+      "blobSha": "93818181532db4e6be68b465e8ae0a4da2d74bc1",
+      "size": 8487
+    },
+    {
+      "path": "source/host/src/runner/tools/send_message_encoding.rs",
+      "blobSha": "22e2700f4ea2f894b92f3233d0a399a296f6fa5b",
+      "size": 10922
+    },
+    {
+      "path": "source/host/src/runner/tools/send_message_schema.rs",
+      "blobSha": "0e11c27ace3ae51888fdef4089cd11b09271ea7d",
+      "size": 16507
+    },
+    {
+      "path": "source/host/src/runner/tools/send_message_tool.rs",
+      "blobSha": "2ae0c6d1bac8f8cd93b9a4ed52f1f8da423c76de",
+      "size": 16077
+    },
+    {
+      "path": "source/host/src/runner/tools/tool_input_error.rs",
+      "blobSha": "120c4bd574da7448a486598e820c9eb4e6a875a8",
+      "size": 350
+    },
+    {
+      "path": "source/host/src/runner/tools/turn_toolset.rs",
+      "blobSha": "018cd2b6906c6b9b18b7912602139dbba46bdec4",
+      "size": 32250
+    },
+    {
+      "path": "source/host/src/runner/transient_stream_error.rs",
+      "blobSha": "21397c0e1d36abb95e0a0ad070432fea5d407ff7",
+      "size": 3043
+    },
+    {
+      "path": "source/host/src/runner/turn_agent_composition.rs",
+      "blobSha": "eefde7f77856070e62e4f8dbca7cfb7f28da0a17",
+      "size": 36145
+    },
+    {
+      "path": "source/host/src/runner/turn_memory.rs",
+      "blobSha": "855d570764b0b939cde41ac5ad0248e5a3627efb",
+      "size": 6125
+    },
+    {
+      "path": "source/host/src/runner/turn_observation.rs",
+      "blobSha": "dc7a5cf1459a11297ffde859376aba3e6fcbe896",
+      "size": 31117
+    },
+    {
+      "path": "source/host/src/runner/turn_run_shell.rs",
+      "blobSha": "045813f301510e4e6f06804675b32a79d5bb34a6",
+      "size": 9979
+    },
+    {
+      "path": "source/host/src/runner/turn_settle.rs",
+      "blobSha": "14c05d725ea0a4c4e547cd2b21a78b62780c1884",
+      "size": 6714
+    },
+    {
+      "path": "source/host/src/runner/turn_shape.rs",
+      "blobSha": "4bc362f27b2b2e846f570a20db7761586364533e",
+      "size": 18043
+    },
+    {
+      "path": "source/host/src/runner/turn_tool_session_reminders.rs",
+      "blobSha": "a6916fc3acb7587f7e179ed73ca4f5db42389941",
+      "size": 2489
+    },
+    {
+      "path": "source/host/src/runner/turn_usage.rs",
+      "blobSha": "f53608773496ec0c6677f88ae5970e4a7c45ff0a",
+      "size": 2473
+    },
+    {
+      "path": "source/host/src/runner/video_container.rs",
+      "blobSha": "3c5c756cfe3d6146245b058d3f7ab4856e65634a",
+      "size": 630
+    },
+    {
+      "path": "source/host/src/runner_context_production_provider.rs",
+      "blobSha": "39359e83c8c17fe4fb6ab172b6763118d8f65050",
+      "size": 2209
+    },
+    {
+      "path": "source/host/src/runner_production_bridge.rs",
+      "blobSha": "56b1af467b70d7f2ac8f1f156e1e497441928801",
+      "size": 12747
+    },
+    {
+      "path": "source/host/src/sand_activity.rs",
+      "blobSha": "0ed9ecc610ac283e14c456da9df7219f9d03c414",
+      "size": 12181
+    },
+    {
+      "path": "source/host/src/sand_host.rs",
+      "blobSha": "f4d2e0e18f0a651769cf09763a58b0819da1917a",
+      "size": 1914
+    },
+    {
+      "path": "source/host/src/sand_multitask.rs",
+      "blobSha": "45e570098583a21e058e91b40d57ef45335caed3",
+      "size": 7208
+    },
+    {
+      "path": "source/host/src/sand_quiet_work_origin.rs",
+      "blobSha": "533cda8f599f62a2b910cd737b240c342ece0cb0",
+      "size": 71
+    },
+    {
+      "path": "source/host/src/sand_user_identity.rs",
+      "blobSha": "67eeb1da3c89a7d0e0740e44d7eabcb272f7b9b2",
+      "size": 680
+    },
+    {
+      "path": "source/host/src/selected_image_inputs.rs",
+      "blobSha": "395d7446a31bcc6e5a93dbbea6d2779d8666e6d4",
+      "size": 13275
+    },
+    {
+      "path": "source/host/src/send_trace_host.rs",
+      "blobSha": "6598c3d40fbf24307317e28d8893f9f18fa572df",
+      "size": 13883
+    },
+    {
+      "path": "source/host/src/sha256.rs",
+      "blobSha": "38cf3256967686f99463cd1c4f6d996df99632ae",
+      "size": 159
+    },
+    {
+      "path": "source/host/src/storage/agent_paths.rs",
+      "blobSha": "5b023b86317d7f726945522d456ef1c2537c21b4",
+      "size": 1574
+    },
+    {
+      "path": "source/host/src/storage/folder_id.rs",
+      "blobSha": "5753acbecef182e3198dc7a5397cff4d29b6889e",
+      "size": 198
+    },
+    {
+      "path": "source/host/src/storage/mod.rs",
+      "blobSha": "143678764371f47bc78ee71c22b97a32c0f84e23",
+      "size": 104
+    },
+    {
+      "path": "source/host/src/storage/sqlite_busy.rs",
+      "blobSha": "859867fb4ed02cba298cefcbf02c20492cb036a0",
+      "size": 3220
+    },
+    {
+      "path": "source/host/src/storage/sqlite_recovery.rs",
+      "blobSha": "74b8a652ca29c8394ad760a9cf04248c2a341d63",
+      "size": 6338
+    },
+    {
+      "path": "source/host/src/storage/store_db.rs",
+      "blobSha": "f52eddab95fcccec3b9c0e232ddf25b5f0fc27ce",
+      "size": 3890
+    },
+    {
+      "path": "source/host/src/transcript_mirror/conversation_state_binary.rs",
+      "blobSha": "d0cd9c66557514073bdc0e6ada670e52038df70b",
+      "size": 20177
+    },
+    {
+      "path": "source/host/src/transcript_mirror/generated_occurrence_codec.rs",
+      "blobSha": "94b30e7dd5d09a6857151bd162c4fda338fd7f14",
+      "size": 40313
+    },
+    {
+      "path": "source/host/src/transcript_mirror/legacy_transcript_mirror.rs",
+      "blobSha": "0f7dde22781fc0925a7c98f2470f45c83a65c09b",
+      "size": 16560
+    },
+    {
+      "path": "source/host/src/transcript_mirror/mod.rs",
+      "blobSha": "c660ac78649d9d3af102eb578cb4eae03d00b5ae",
+      "size": 268
+    },
+    {
+      "path": "source/host/src/transcript_mirror/production_provider.rs",
+      "blobSha": "50634d124d62af2a1b54e269330189aa80f5de27",
+      "size": 13214
+    },
+    {
+      "path": "source/host/src/transcript_mirror/transcript_journal_codec.rs",
+      "blobSha": "a869af65ef4992bfeac21b6915dda6f9d482d1ff",
+      "size": 10671
+    },
+    {
+      "path": "source/host/src/transcript_mirror/transcript_mirror.rs",
+      "blobSha": "49228f41095077bad1b28a64cf9f0fbda0e369d7",
+      "size": 30969
+    },
+    {
+      "path": "source/host/src/transcript_mirror/transcript_mirror_router.rs",
+      "blobSha": "418be73c77f2b2a1d793def4d674299740fa18b4",
+      "size": 11089
+    },
+    {
+      "path": "source/host/src/transcript_mirror/transcript_occurrence_deriver.rs",
+      "blobSha": "dc14ee0ef5377530b1e64eb6354e05439871522e",
+      "size": 17108
+    },
+    {
+      "path": "source/host/src/transcript_mutation_events.rs",
+      "blobSha": "842d4d06d8f0d788b0b730ea3aef942d75f673a2",
+      "size": 1785
+    },
+    {
+      "path": "source/host/src/watched_directory.rs",
+      "blobSha": "eb7bb0106966e9a8b5adb7205667ff81678dce80",
+      "size": 6498
+    },
+    {
+      "path": "source/host/src/workflows/mod.rs",
+      "blobSha": "fcb148c03aeeb1591c53a30305dfcee215471df0",
+      "size": 82
+    },
+    {
+      "path": "source/host/src/workflows/stat_keyed_parse_cache.rs",
+      "blobSha": "2d01892ae5167bb0c06a7c509c7d1044cb5399d7",
+      "size": 4454
+    },
+    {
+      "path": "source/host/src/workflows/workflow_library.rs",
+      "blobSha": "807e99e6168aa0575336ecbcb821287979f64f1c",
+      "size": 12259
+    },
+    {
+      "path": "source/host/src/workflows/workflow_store.rs",
+      "blobSha": "5132f6889bfa31372b3f1a9faf604d5874f2e1d4",
+      "size": 29549
+    },
+    {
+      "path": "source/host/tests/ack_obligations_contract.rs",
+      "blobSha": "6907207574dbed2cf8712c80c24b5955a47672d8",
+      "size": 12354
+    },
+    {
+      "path": "source/host/tests/ack_redrive_production_contract.rs",
+      "blobSha": "6758130d71d35c5a5b3bc3b64a58ae7db9364866",
+      "size": 2678
+    },
+    {
+      "path": "source/host/tests/action_audit_backend_contract.rs",
+      "blobSha": "3896ec1838161e8272ccfc77823e24002cd3b2f3",
+      "size": 3238
+    },
+    {
+      "path": "source/host/tests/action_audit_extension_ownership_contract.rs",
+      "blobSha": "d6c3f9a3a06ce964f9bd9782a155e8c851c8cbd9",
+      "size": 826
+    },
+    {
+      "path": "source/host/tests/action_audit_service_contract.rs",
+      "blobSha": "91745861235fe74a9c2e8705f7c02b7ce9d5c51d",
+      "size": 2366
+    },
+    {
+      "path": "source/host/tests/agent_avatar_contract.rs",
+      "blobSha": "626cc6383e766380cb684f5e2314ce627273b437",
+      "size": 2594
+    },
+    {
+      "path": "source/host/tests/agent_clone_contract.rs",
+      "blobSha": "e991706c232a27be5f458ae19433645c68bbcae5",
+      "size": 6526
+    },
+    {
+      "path": "source/host/tests/agent_content_search_contract.rs",
+      "blobSha": "37e59b0349fccc1a79176091708781f5ac95cc92",
+      "size": 4119
+    },
+    {
+      "path": "source/host/tests/agent_db_metadata_contract.rs",
+      "blobSha": "fc4939ddee7747acfe3023459b71f0d76499721b",
+      "size": 3316
+    },
+    {
+      "path": "source/host/tests/agent_db_mutation_production_contract.rs",
+      "blobSha": "6c068b974b29ad80fc991900894d8b84ff759fe9",
+      "size": 11164
+    },
+    {
+      "path": "source/host/tests/agent_db_owner_contract.rs",
+      "blobSha": "16da702ff7854bb82c037213b867d848cb6fa67e",
+      "size": 19896
+    },
+    {
+      "path": "source/host/tests/agent_db_recovery_contract.rs",
+      "blobSha": "dcb6aef2382bddd5ad246134ca0f00ab37dd76d8",
+      "size": 4242
+    },
+    {
+      "path": "source/host/tests/agent_db_schema_contract.rs",
+      "blobSha": "beeea461ac81130549a136a8749694f772b9b158",
+      "size": 8400
+    },
+    {
+      "path": "source/host/tests/agent_db_serde_contract.rs",
+      "blobSha": "19e76269147ecf8aa14191f575813b870566e6ee",
+      "size": 5425
+    },
+    {
+      "path": "source/host/tests/agent_db_transcript_pages_contract.rs",
+      "blobSha": "c47423fc4a4d0e20b3771dc8d6638a86e9679541",
+      "size": 6128
+    },
+    {
+      "path": "source/host/tests/agent_error_telemetry_contract.rs",
+      "blobSha": "f543ebfbf605dbc57e87366270412f5d0dbd21d7",
+      "size": 3792
+    },
+    {
+      "path": "source/host/tests/agent_lifecycle_contract.rs",
+      "blobSha": "405cffce0d1d0364228b7eb17ed60fe8c5f7e6fc",
+      "size": 23401
+    },
+    {
+      "path": "source/host/tests/agent_lifecycle_kickstart_production_contract.rs",
+      "blobSha": "3bb75d53a91279a5b788410593c46051b7048bb1",
+      "size": 16115
+    },
+    {
+      "path": "source/host/tests/agent_messaging_contract.rs",
+      "blobSha": "beb8e299a536a61224f1bd1dec664b7364a6d303",
+      "size": 2198
+    },
+    {
+      "path": "source/host/tests/agent_open_production_wiring_contract.rs",
+      "blobSha": "3ab55bde63bca9270ff34bf443c3436b811c0dd4",
+      "size": 4658
+    },
+    {
+      "path": "source/host/tests/agent_open_telemetry_contract.rs",
+      "blobSha": "e90a6e79010787abd920f02c90bf5d72cbd6d5a2",
+      "size": 2463
+    },
+    {
+      "path": "source/host/tests/agent_profile_contract.rs",
+      "blobSha": "a96d435cefddbc872ab0aea523c710e031ee51c5",
+      "size": 2773
+    },
+    {
+      "path": "source/host/tests/agent_run_error_contract.rs",
+      "blobSha": "d9374f554c5968339236389ddc6d81da4d493b42",
+      "size": 7352
+    },
+    {
+      "path": "source/host/tests/agent_session_contract.rs",
+      "blobSha": "93e45c1a8a536726b1a52265cef98590e4012e92",
+      "size": 22162
+    },
+    {
+      "path": "source/host/tests/agent_state_contract.rs",
+      "blobSha": "52a4e0c19d0382a22a4fcc2aa90c10d6bb61ca32",
+      "size": 6388
+    },
+    {
+      "path": "source/host/tests/agent_to_agent_messaging_contract.rs",
+      "blobSha": "7292a8b53882c5533db97da7e3c87626df963c57",
+      "size": 16816
+    },
+    {
+      "path": "source/host/tests/agent_worker_pool_lifecycle_contract.rs",
+      "blobSha": "3dadcca76cfce5b74c36c6e460eae531fd363259",
+      "size": 8938
+    },
+    {
+      "path": "source/host/tests/agent_workflow_enablement_contract.rs",
+      "blobSha": "4234fb5979ae70c136be0e2b6434c65d2f7a40c4",
+      "size": 1846
+    },
+    {
+      "path": "source/host/tests/analytics_service_parity_contract.rs",
+      "blobSha": "d198ad1017eb353a9f74012a2cc2252669356208",
+      "size": 6725
+    },
+    {
+      "path": "source/host/tests/async_task_union_contract.rs",
+      "blobSha": "6aed898ce9356fad76247aafbce065da7936a272",
+      "size": 6075
+    },
+    {
+      "path": "source/host/tests/attachments_helpers_contract.rs",
+      "blobSha": "6fd3a80d01704513358f6cdd9f3b972182cfbdf0",
+      "size": 5198
+    },
+    {
+      "path": "source/host/tests/attachments_service_contract.rs",
+      "blobSha": "1cfcf453ef562cf13f05efca66b59d3ded981a51",
+      "size": 7619
+    },
+    {
+      "path": "source/host/tests/auto_review_expire_sweep_production_wiring_contract.rs",
+      "blobSha": "f2f214b43e300b6a1456f3578e9871342487d826",
+      "size": 2249
+    },
+    {
+      "path": "source/host/tests/auto_review_expire_sweep_telemetry_contract.rs",
+      "blobSha": "343c144746a7d9824b60122fb36cb0d2263721ff",
+      "size": 1478
+    },
+    {
+      "path": "source/host/tests/auto_review_gate_contract.rs",
+      "blobSha": "b8d9fd2e9a21c74b84fdebcd03f4296ca1d9be4b",
+      "size": 9369
+    },
+    {
+      "path": "source/host/tests/auto_review_production_wiring_contract.rs",
+      "blobSha": "dae1b320e4eb9094840bab0ee2bfb71379bd7fc3",
+      "size": 2055
+    },
+    {
+      "path": "source/host/tests/auto_review_service_contract.rs",
+      "blobSha": "9245b2b865ab2aa4e310ea2452a567e041185714",
+      "size": 5287
+    },
+    {
+      "path": "source/host/tests/automation_event_fires_contract.rs",
+      "blobSha": "423b4648995a7beec39bfb7e8ff48456aa42b305",
+      "size": 6924
+    },
+    {
+      "path": "source/host/tests/automation_lifecycle_production_wiring_contract.rs",
+      "blobSha": "f313d7cd756cad035c86e231f58bf27bddc588d8",
+      "size": 13784
+    },
+    {
+      "path": "source/host/tests/automation_lifecycle_telemetry_contract.rs",
+      "blobSha": "ff229680df3028fe40c6ae9376bf7f535294cd0c",
+      "size": 4012
+    },
+    {
+      "path": "source/host/tests/automation_prompt_contract.rs",
+      "blobSha": "532bc13b05167de8d5150246346914c2b478e73c",
+      "size": 3806
+    },
+    {
+      "path": "source/host/tests/automation_run_path_contract.rs",
+      "blobSha": "e520c56702d4f700c85600fd53d4b7d3edbd4195",
+      "size": 10385
+    },
+    {
+      "path": "source/host/tests/automation_run_production_wiring_contract.rs",
+      "blobSha": "4ff3615cef1bac5192737904f0dd70eb6d7d5131",
+      "size": 3976
+    },
+    {
+      "path": "source/host/tests/automation_run_telemetry_contract.rs",
+      "blobSha": "2eed3bbc65a8de277393f3355daaf8c26ec64614",
+      "size": 3153
+    },
+    {
+      "path": "source/host/tests/automation_runtime_contract.rs",
+      "blobSha": "5014903fec093fc3169fefb366c7032153189f23",
+      "size": 9416
+    },
+    {
+      "path": "source/host/tests/automation_schedule_contract.rs",
+      "blobSha": "af9500f714b4e9a1a8bc51c93eb4c9bd41822bcd",
+      "size": 1343
+    },
+    {
+      "path": "source/host/tests/automation_snapshot_contract.rs",
+      "blobSha": "eaea3e924ade5c87e2cfbd47866508e2b379ebf4",
+      "size": 3471
+    },
+    {
+      "path": "source/host/tests/automation_spend_guard_runtime_contract.rs",
+      "blobSha": "2b2cfc7f5193acb1e5095c7f7bb3cd8a673ba39d",
+      "size": 7524
+    },
+    {
+      "path": "source/host/tests/automation_status_reminder_contract.rs",
+      "blobSha": "40df5d7b27e84d61e83b9fe53bb8c072559a9916",
+      "size": 2900
+    },
+    {
+      "path": "source/host/tests/automation_store_contract.rs",
+      "blobSha": "7d9c8c752bf0389be19eba234e506cda113004a4",
+      "size": 5865
+    },
+    {
+      "path": "source/host/tests/automation_trigger_matching_contract.rs",
+      "blobSha": "9de01c02739318fc048ed3997591f8297f142611",
+      "size": 3311
+    },
+    {
+      "path": "source/host/tests/automations_backend_contract.rs",
+      "blobSha": "509811be8b51c230b850ca28cbcd038ef0d5585a",
+      "size": 14554
+    },
+    {
+      "path": "source/host/tests/automations_cloud_sync_contract.rs",
+      "blobSha": "bbacbf8e22af015c77f6126b99d5719c1809a0cd",
+      "size": 12557
+    },
+    {
+      "path": "source/host/tests/automations_extension_runtime_contract.rs",
+      "blobSha": "fe8b2c3f56a2ec2877d7eb0e6186d3cd2d01b3a4",
+      "size": 8159
+    },
+    {
+      "path": "source/host/tests/automations_fire_delivery_contract.rs",
+      "blobSha": "2c15c263d9b9bbaa3005536d4a3b890a631dd1cd",
+      "size": 6916
+    },
+    {
+      "path": "source/host/tests/automations_listener_cloud_sync_contract.rs",
+      "blobSha": "23025d5dc20c40b4bb979500b032c38efa3f8adb",
+      "size": 4147
+    },
+    {
+      "path": "source/host/tests/automations_listener_watcher_production_contract.rs",
+      "blobSha": "6b10a4c9ec270da975335abdd15c33da40ca1908",
+      "size": 2676
+    },
+    {
+      "path": "source/host/tests/automations_trigger_foundations_contract.rs",
+      "blobSha": "1006fb612aa823c6e317def7ac911ad370fda0f9",
+      "size": 3478
+    },
+    {
+      "path": "source/host/tests/background_wakes_production_contract.rs",
+      "blobSha": "fccb102632895449c487ef45e9b5969de7746e91",
+      "size": 7521
+    },
+    {
+      "path": "source/host/tests/background_work_contract.rs",
+      "blobSha": "65ef5b331f43d8523f21b7b42c62669abee84518",
+      "size": 17992
+    },
+    {
+      "path": "source/host/tests/bootstrap_contract.rs",
+      "blobSha": "3b98f32a75479e5cc3fe13f4c482ba8750f6674c",
+      "size": 6991
+    },
+    {
+      "path": "source/host/tests/bot_block_production_wiring_contract.rs",
+      "blobSha": "297fc99a445eaaf7dbd0c24c08604297ea5c0928",
+      "size": 6573
+    },
+    {
+      "path": "source/host/tests/bot_block_telemetry_contract.rs",
+      "blobSha": "9c7beac20597237c6b8e38def93f190304a6b38f",
+      "size": 3992
+    },
+    {
+      "path": "source/host/tests/box_capabilities_contract.rs",
+      "blobSha": "1fa77a4ae3d3e7e2e75e1e5c532eb757ab862490",
+      "size": 4408
+    },
+    {
+      "path": "source/host/tests/box_copy_in_frozen_parity_contract.rs",
+      "blobSha": "7774eefcd59fed68780d6a6e7c00b76a36f140a2",
+      "size": 9365
+    },
+    {
+      "path": "source/host/tests/box_copy_in_pack_contract.rs",
+      "blobSha": "686716a896c7267421771599d2ca9dd3b0c2efdf",
+      "size": 10885
+    },
+    {
+      "path": "source/host/tests/box_copy_in_production_wiring_contract.rs",
+      "blobSha": "f884a05754de39f0fbfd334a377f1c8324a6a3a4",
+      "size": 3399
+    },
+    {
+      "path": "source/host/tests/box_copy_in_telemetry_contract.rs",
+      "blobSha": "637e409cdf72ca4f158270cfafe9e525d235df47",
+      "size": 6195
+    },
+    {
+      "path": "source/host/tests/box_exec_daemon_process_contract.rs",
+      "blobSha": "06506be3ce37c43ff02dff1da820859cab86eb3b",
+      "size": 4086
+    },
+    {
+      "path": "source/host/tests/box_file_transfer_contract.rs",
+      "blobSha": "800bd031bf575b1121269e06a0cdf0ff61f2478b",
+      "size": 4955
+    },
+    {
+      "path": "source/host/tests/box_foundation_contract.rs",
+      "blobSha": "7f6822c2cd96d19a44d785d064e023bd84287915",
+      "size": 8276
+    },
+    {
+      "path": "source/host/tests/box_generated_production_contract.rs",
+      "blobSha": "13787b4f3e30c399b99eeb0ec8169ffff8479526",
+      "size": 38214
+    },
+    {
+      "path": "source/host/tests/box_handoff_resume_contract.rs",
+      "blobSha": "b69f4b6c1fca1a7330e8d45c60eafbaa2f6be8fb",
+      "size": 11368
+    },
+    {
+      "path": "source/host/tests/box_handoff_service_contract.rs",
+      "blobSha": "26841ca36881c6ca17b4652c08956b58e5de0a42",
+      "size": 7916
+    },
+    {
+      "path": "source/host/tests/box_help_tool_contract.rs",
+      "blobSha": "f61bb070f2e52b5b84aaffa455c13629baebc8b9",
+      "size": 4976
+    },
+    {
+      "path": "source/host/tests/box_log_shipper_production_contract.rs",
+      "blobSha": "003998288e7fa40a4b1f1939bb7e49c0fa7a6fdf",
+      "size": 7866
+    },
+    {
+      "path": "source/host/tests/box_mcp_exec_contract.rs",
+      "blobSha": "e33c0ae60b6a51fc89df7d21127cc8f2dcd1f8c1",
+      "size": 3401
+    },
+    {
+      "path": "source/host/tests/box_recreate_decided_production_wiring_contract.rs",
+      "blobSha": "e1d6aa0908ba8121509bc415ec1c47e51fab2a88",
+      "size": 9301
+    },
+    {
+      "path": "source/host/tests/box_recreate_decided_telemetry_contract.rs",
+      "blobSha": "d0add23b0ddf6c465950c1744acf7f403917934d",
+      "size": 2551
+    },
+    {
+      "path": "source/host/tests/box_reference_docs_contract.rs",
+      "blobSha": "5900758694e262e24b55251eeee20298884e53a7",
+      "size": 3260
+    },
+    {
+      "path": "source/host/tests/box_remote_accessor_contract.rs",
+      "blobSha": "1831b82f99d145500dd2cd509b580b8ea26b1c51",
+      "size": 6581
+    },
+    {
+      "path": "source/host/tests/box_request_entries_contract.rs",
+      "blobSha": "2dd537139d19771c6972addc751f274791ac1557",
+      "size": 6037
+    },
+    {
+      "path": "source/host/tests/box_store_download_frozen_parity_contract.rs",
+      "blobSha": "8b7cf1efc54109c4b1d68836a69c8b9c45077d2b",
+      "size": 17803
+    },
+    {
+      "path": "source/host/tests/box_store_hydration_contract.rs",
+      "blobSha": "18e67486a0228a0ac7477d371e8ec2774d3cfd37",
+      "size": 2727
+    },
+    {
+      "path": "source/host/tests/box_store_manifest_format_contract.rs",
+      "blobSha": "b25814365d7ce173a134bf362e8d0be4a3b74ef9",
+      "size": 3005
+    },
+    {
+      "path": "source/host/tests/box_store_manifest_frozen_parity_contract.rs",
+      "blobSha": "334814172f7d4e312d87c2a196bc7c4725ac50ea",
+      "size": 10683
+    },
+    {
+      "path": "source/host/tests/box_store_pack_contract.rs",
+      "blobSha": "a37dee3b6e3dec327afdea58bc9f6a9af09cb48d",
+      "size": 7335
+    },
+    {
+      "path": "source/host/tests/box_store_sync_extension_contract.rs",
+      "blobSha": "e174ff90e8180efa4c136b1621f081bf82291f80",
+      "size": 6119
+    },
+    {
+      "path": "source/host/tests/box_store_sync_planned_contract.rs",
+      "blobSha": "11588b6b09673dfc2e87f3f8748974b5965ad715",
+      "size": 20736
+    },
+    {
+      "path": "source/host/tests/box_store_sync_production_wiring_contract.rs",
+      "blobSha": "20c04f09a982b450cbd7ab7125f2bf8d3763bcc2",
+      "size": 24251
+    },
+    {
+      "path": "source/host/tests/box_store_sync_service_frozen_parity_contract.rs",
+      "blobSha": "d8b3cfcb6a883b7dc08a1cdd38a0b64302983c08",
+      "size": 6666
+    },
+    {
+      "path": "source/host/tests/box_store_transfer_frozen_parity_contract.rs",
+      "blobSha": "b4389d7892809f990dc6fe08b1d0d4ba6c1c0dcf",
+      "size": 6873
+    },
+    {
+      "path": "source/host/tests/box_transfer_contract.rs",
+      "blobSha": "0db2b8a650ef38ef061ade6b973995a1d32327a1",
+      "size": 6750
+    },
+    {
+      "path": "source/host/tests/box_windows_contract.rs",
+      "blobSha": "2ea941ff3c453659820f1e914e8e025c99fdc04b",
+      "size": 5888
+    },
+    {
+      "path": "source/host/tests/browser_driver_source_contract.rs",
+      "blobSha": "c943fb9e9b5ffa0126f260be92d2ba8f5b9cbdf1",
+      "size": 1470
+    },
+    {
+      "path": "source/host/tests/channel_attachment_contract.rs",
+      "blobSha": "85fd507cc4a63401c879ab2b7ae95b9887016f55",
+      "size": 4725
+    },
+    {
+      "path": "source/host/tests/channel_store_contract.rs",
+      "blobSha": "fd453b6d1bf2ebb7ab05760a35e0e464aa66b474",
+      "size": 7305
+    },
+    {
+      "path": "source/host/tests/chrome_session_stage_contract.rs",
+      "blobSha": "dbc18b6404510d5cfe92c8743a34876ebaefc50e",
+      "size": 7746
+    },
+    {
+      "path": "source/host/tests/chrome_session_watcher_contract.rs",
+      "blobSha": "1da2630d849fe026278a064966aa68abd801c68a",
+      "size": 4322
+    },
+    {
+      "path": "source/host/tests/client_side_tool_v2_inventory_contract.rs",
+      "blobSha": "03d013f0f1690f90dc393af567288301116d7434",
+      "size": 2028
+    },
+    {
+      "path": "source/host/tests/client_side_tool_v2_producer_contract.rs",
+      "blobSha": "425a4c74b7db1d177d1cc024b8653e9c49e21543",
+      "size": 3731
+    },
+    {
+      "path": "source/host/tests/client_side_tool_v2_projection_contract.rs",
+      "blobSha": "8cbedcda7223b898b0d519088f612fcf494df476",
+      "size": 21345
+    },
+    {
+      "path": "source/host/tests/cloud_agent_background_revival_production_contract.rs",
+      "blobSha": "6b49a1e4d1a3e86b3c776e092a4fd85f96c76056",
+      "size": 1495
+    },
+    {
+      "path": "source/host/tests/cloud_agent_images_contract.rs",
+      "blobSha": "858465686152abaa89fb5cb77af4905c7117c863",
+      "size": 4652
+    },
+    {
+      "path": "source/host/tests/cloud_agent_model_catalog_contract.rs",
+      "blobSha": "3b70582b572994ce5352eeaf5720b7ab167abd61",
+      "size": 4399
+    },
+    {
+      "path": "source/host/tests/cloud_agent_pending_wake_rearm_production_contract.rs",
+      "blobSha": "8e79206f5da1a70a6a0bdf42dd17be190eeb575c",
+      "size": 3550
+    },
+    {
+      "path": "source/host/tests/cloud_agent_poll_loop_contract.rs",
+      "blobSha": "c3d7440cf09a61177d081aadafa6f28d1b8fb742",
+      "size": 7735
+    },
+    {
+      "path": "source/host/tests/cloud_agent_quiet_origin_production_contract.rs",
+      "blobSha": "72344ca71a727bb530a2a7a38f97b4b9ef285ace",
+      "size": 1788
+    },
+    {
+      "path": "source/host/tests/cloud_agent_request_composition_contract.rs",
+      "blobSha": "147a4d1b26981c02f3c5a1bc9544e117d49c8fdc",
+      "size": 6033
+    },
+    {
+      "path": "source/host/tests/cloud_agent_tool_contract.rs",
+      "blobSha": "f7166d83580004a35a55bb4cc25acd5766c5f082",
+      "size": 1411
+    },
+    {
+      "path": "source/host/tests/cloud_agent_trace_production_contract.rs",
+      "blobSha": "8ff629dc41c85aa167e6825764c937d14f40b1f4",
+      "size": 10252
+    },
+    {
+      "path": "source/host/tests/cloud_agent_wire_contract.rs",
+      "blobSha": "ba7aba671da314126e47ede1182823b93a843480",
+      "size": 3942
+    },
+    {
+      "path": "source/host/tests/cloud_agents_extension_lifecycle_contract.rs",
+      "blobSha": "f92ad143e2fd2ce2e2732d52b8e6c901158a86f1",
+      "size": 6279
+    },
+    {
+      "path": "source/host/tests/cloud_agents_service_contract.rs",
+      "blobSha": "0a98f93bec0c9143f0a29dacbce112ea3eb3f3db",
+      "size": 18949
+    },
+    {
+      "path": "source/host/tests/codebase_snapshot_trigger_contract.rs",
+      "blobSha": "b1e1ffb239aa4c6ad503e3f1c2d27f7ae6ae2312",
+      "size": 2002
+    },
+    {
+      "path": "source/host/tests/codebase_telemetry_adapter_contract.rs",
+      "blobSha": "93ee75ba9c0a6919a2382d71dd0cc988ff508f59",
+      "size": 5819
+    },
+    {
+      "path": "source/host/tests/codebase_telemetry_extension_contract.rs",
+      "blobSha": "8337d21b4e1fac687d48a1f92fb477344b767622",
+      "size": 2255
+    },
+    {
+      "path": "source/host/tests/codebase_telemetry_host_contract.rs",
+      "blobSha": "ac315a0d8d7f41185b026c4ec52e7c7ec3adc171",
+      "size": 1997
+    },
+    {
+      "path": "source/host/tests/codebase_telemetry_privacy_mode_contract.rs",
+      "blobSha": "0240e4b5d48a8314a638e078c49b6bec359484bd",
+      "size": 3461
+    },
+    {
+      "path": "source/host/tests/codebase_telemetry_service_contract.rs",
+      "blobSha": "8405f79b8aa3444782c2bf85e2a45ac3b28a93d1",
+      "size": 6379
+    },
+    {
+      "path": "source/host/tests/completion_revivals_contract.rs",
+      "blobSha": "1bba0f06bda1c8346077ff1e7fc9937d8a57eb6e",
+      "size": 8075
+    },
+    {
+      "path": "source/host/tests/computer_tool_projection_contract.rs",
+      "blobSha": "f8a56e4f969fcb20ca4f0a8f1b70d17bdf7fa472",
+      "size": 16989
+    },
+    {
+      "path": "source/host/tests/computer_use_coordination_contract.rs",
+      "blobSha": "3ff72265f085c2469ffae3856eaba8bf75a9fbea",
+      "size": 5717
+    },
+    {
+      "path": "source/host/tests/connector_auth_production_wiring_contract.rs",
+      "blobSha": "a9622e8993c02b901052c5e6e792d8f5e6cc6e62",
+      "size": 3035
+    },
+    {
+      "path": "source/host/tests/connector_auth_telemetry_contract.rs",
+      "blobSha": "610efb418beac62baacc68b8de530173b215d132",
+      "size": 7215
+    },
+    {
+      "path": "source/host/tests/connector_secret_store_contract.rs",
+      "blobSha": "b709c6359ed59d3316513644b9139664ac950748",
+      "size": 3479
+    },
+    {
+      "path": "source/host/tests/content_search_extension_contract.rs",
+      "blobSha": "ad8e709f0d8f5c61b82fd791b71e0fb0df4bdd78",
+      "size": 4987
+    },
+    {
+      "path": "source/host/tests/content_search_production_extension_contract.rs",
+      "blobSha": "cec93707de30f8b84bb4ceb01c98ff6a78835645",
+      "size": 4147
+    },
+    {
+      "path": "source/host/tests/conversation_blob_db_recovery_contract.rs",
+      "blobSha": "99ec10a88fcebcaa96eb2744f9a301c172806310",
+      "size": 8502
+    },
+    {
+      "path": "source/host/tests/conversation_blob_store_contract.rs",
+      "blobSha": "5dfa5d056b3247ea105da0f8cb2daa6defdfbc9f",
+      "size": 13243
+    },
+    {
+      "path": "source/host/tests/conversation_outline_contract.rs",
+      "blobSha": "620301a444344c2741f77d78575ce460be0b1174",
+      "size": 4350
+    },
+    {
+      "path": "source/host/tests/conversation_recovery_contract.rs",
+      "blobSha": "dd74b5d9bc5f096433e5cdde3ee9daa3d4c9f2ea",
+      "size": 6245
+    },
+    {
+      "path": "source/host/tests/conversation_size_limits_contract.rs",
+      "blobSha": "be2d525505b45df1a96a73a93956825785b9ff6b",
+      "size": 6757
+    },
+    {
+      "path": "source/host/tests/csnaps_capability_contract.rs",
+      "blobSha": "01a950539509f5448e2ed68a2a875f84f752a796",
+      "size": 2844
+    },
+    {
+      "path": "source/host/tests/csnaps_process_contract.rs",
+      "blobSha": "7d863b90e0e613a9945b4b78609b8ca285ce24c6",
+      "size": 5034
+    },
+    {
+      "path": "source/host/tests/csnaps_protocol_contract.rs",
+      "blobSha": "508040b7de5cadaa7245b186f00d721c0a45058b",
+      "size": 5303
+    },
+    {
+      "path": "source/host/tests/cursor_backend_contract.rs",
+      "blobSha": "ab3f31e130ad87de5cefcdd322ff4952f170106f",
+      "size": 5902
+    },
+    {
+      "path": "source/host/tests/cursor_inference_transport_contract.rs",
+      "blobSha": "0504397f2d0dd119d68863ddc61fa373562e495a",
+      "size": 13265
+    },
+    {
+      "path": "source/host/tests/cursor_web_tools_backend_contract.rs",
+      "blobSha": "f6a30f2e0785f918cf0c34e0ef08ffddf079b02b",
+      "size": 9342
+    },
+    {
+      "path": "source/host/tests/desktop_health_forwarder_contract.rs",
+      "blobSha": "6b3a39b56dc62c7473db424113493f91e7e325b0",
+      "size": 5197
+    },
+    {
+      "path": "source/host/tests/durable_recovery_stores_contract.rs",
+      "blobSha": "1d84bbadfbb101424aaede4903636e5165b02c50",
+      "size": 5406
+    },
+    {
+      "path": "source/host/tests/event_loop_telemetry_contract.rs",
+      "blobSha": "a5079aee88d6ab962f86785c219e01f7b691f7e4",
+      "size": 3922
+    },
+    {
+      "path": "source/host/tests/experiments_extension_lifecycle_contract.rs",
+      "blobSha": "a7cddcaf33f73f17ad00968955fe52f099922d8d",
+      "size": 6891
+    },
+    {
+      "path": "source/host/tests/extensions_auth_credential_renewer_contract.rs",
+      "blobSha": "e4f11a1cd0f247a55e970cea96d242716f6b1482",
+      "size": 7378
+    },
+    {
+      "path": "source/host/tests/extensions_auth_extension_contract.rs",
+      "blobSha": "feec0539b9ec4ce56d71d0fd783e3d6e063c8db9",
+      "size": 4382
+    },
+    {
+      "path": "source/host/tests/extensions_auth_service_contract.rs",
+      "blobSha": "f1dfaa235fb943d4bc0389f65df07795a611fbd1",
+      "size": 5909
+    },
+    {
+      "path": "source/host/tests/extensions_box_lifecycle_contract.rs",
+      "blobSha": "dd46a1188776b8dc6d7cf2feda2ed0341eb4a0cb",
+      "size": 3819
+    },
+    {
+      "path": "source/host/tests/extensions_box_lifecycle_production_contract.rs",
+      "blobSha": "a1a47caffba2b1acd55997571c3bf863bf6e8889",
+      "size": 6164
+    },
+    {
+      "path": "source/host/tests/extensions_browser_ua_contract.rs",
+      "blobSha": "9c912f03defd4ee5e57c51b50c218f3641acef46",
+      "size": 5080
+    },
+    {
+      "path": "source/host/tests/extensions_error_telemetry_contract.rs",
+      "blobSha": "6af4484c680f8ffcd0f6a9fe82d78485bcec2297",
+      "size": 5491
+    },
+    {
+      "path": "source/host/tests/extensions_experiments_contract.rs",
+      "blobSha": "c33e8aac796873368f1a2cb80bdc42b93d236f5b",
+      "size": 6408
+    },
+    {
+      "path": "source/host/tests/extensions_forever_box_contract.rs",
+      "blobSha": "8e41e0ac3844f7d02e22141b6ad273e09c31cc97",
+      "size": 9674
+    },
+    {
+      "path": "source/host/tests/extensions_forever_box_disk_pressure_contract.rs",
+      "blobSha": "372e42e6e1b11be4206d3a9d7fd3362f3deed845",
+      "size": 6432
+    },
+    {
+      "path": "source/host/tests/extensions_local_exec_contract.rs",
+      "blobSha": "fd778d334a3346175209bf61a93538cbcacf5f30",
+      "size": 9811
+    },
+    {
+      "path": "source/host/tests/extensions_operational_telemetry_contract.rs",
+      "blobSha": "7c87ffb096257fe6256565ffb516256e5badd7a6",
+      "size": 8697
+    },
+    {
+      "path": "source/host/tests/extensions_small_parity_contract.rs",
+      "blobSha": "c62fa5dfe6ba72ebf2ec46682fb9ccd4490c156c",
+      "size": 13556
+    },
+    {
+      "path": "source/host/tests/extensions_telemetry_parity_contract.rs",
+      "blobSha": "66dd6777bf52df2475afcbdb098604d50ca9fed7",
+      "size": 6993
+    },
+    {
+      "path": "source/host/tests/extensions_turn_execution_contract.rs",
+      "blobSha": "117e927bf4949bbd36215ee67b7cc733d7363d20",
+      "size": 4529
+    },
+    {
+      "path": "source/host/tests/extensions_webauthn_proxy_contract.rs",
+      "blobSha": "99b592a8681ab4a41b014451acc10ce153c82d6e",
+      "size": 7998
+    },
+    {
+      "path": "source/host/tests/external_machine_shipping_contract.rs",
+      "blobSha": "7105c8af9c59319d0acf04925d9d2baae499c30d",
+      "size": 614
+    },
+    {
+      "path": "source/host/tests/external_machine_tool_contract.rs",
+      "blobSha": "e36b2359e0731f3a68f1dae6ac1726ed1177a7ed",
+      "size": 5230
+    },
+    {
+      "path": "source/host/tests/gateway_command_error_contract.rs",
+      "blobSha": "539b543c40d6b0ee849ffe63c4a2c7035825d196",
+      "size": 2955
+    },
+    {
+      "path": "source/host/tests/gateway_command_telemetry_contract.rs",
+      "blobSha": "70b953631a95165311c9756d27d4c6e49bce5816",
+      "size": 4191
+    },
+    {
+      "path": "source/host/tests/gateway_local_exec_sand_box_contract.rs",
+      "blobSha": "7933a26d0adae71b8aa1ecbba1e9761809894ce8",
+      "size": 12587
+    },
+    {
+      "path": "source/host/tests/gateway_protocol_contract.rs",
+      "blobSha": "9d98a34267d19246cdf049a9607681b117a57f67",
+      "size": 3304
+    },
+    {
+      "path": "source/host/tests/gateway_server_contract.rs",
+      "blobSha": "63972a0123e2f51288d0615993c0795b155a770b",
+      "size": 31945
+    },
+    {
+      "path": "source/host/tests/generate_image_cursor_backend_contract.rs",
+      "blobSha": "3081eb23c2716c4be8b1c9997718c88a21109193",
+      "size": 8487
+    },
+    {
+      "path": "source/host/tests/generate_image_service_contract.rs",
+      "blobSha": "fe8d9734fc7f4d7522c889ea729e96b89498890d",
+      "size": 2176
+    },
+    {
+      "path": "source/host/tests/generated_occurrence_codec_contract.rs",
+      "blobSha": "ec21d874b177e235ac50a1eedb910238e8293def",
+      "size": 7363
+    },
+    {
+      "path": "source/host/tests/generated_subagent_production_cutover_contract.rs",
+      "blobSha": "09c09a8990b554a7b2631a1759222502971ff39e",
+      "size": 11639
+    },
+    {
+      "path": "source/host/tests/grok_small_foundation_parity_contract.rs",
+      "blobSha": "eca32e4de494bfc1cfba3b4cab245d86549700c3",
+      "size": 5395
+    },
+    {
+      "path": "source/host/tests/group_chat_contract.rs",
+      "blobSha": "b65baf18af9e23acb4f80b430aa238e39a629bcf",
+      "size": 3507
+    },
+    {
+      "path": "source/host/tests/group_chat_glue_owner_contract.rs",
+      "blobSha": "63b7b45d643bf8a14622b810eef04d233da3262e",
+      "size": 6860
+    },
+    {
+      "path": "source/host/tests/group_chat_orchestrator_contract.rs",
+      "blobSha": "43b8355107156461c8a40448c69730904407d1de",
+      "size": 4104
+    },
+    {
+      "path": "source/host/tests/group_member_runner_deletion_production_contract.rs",
+      "blobSha": "21bbd00897ba36c7f9266f71c212b05d622f921e",
+      "size": 5266
+    },
+    {
+      "path": "source/host/tests/groups_store_contract.rs",
+      "blobSha": "e5019044abe0d8eaee0d2b836d7840932c5176b6",
+      "size": 5523
+    },
+    {
+      "path": "source/host/tests/host_bundle_and_plugin_cache_contract.rs",
+      "blobSha": "82d50eb60213f20619c2f6951cd51161c3f54b20",
+      "size": 4428
+    },
+    {
+      "path": "source/host/tests/host_bundle_upgrade_contract.rs",
+      "blobSha": "aeeebcd7ae9fe54c5359f72a5964aed2062f2db3",
+      "size": 4863
+    },
+    {
+      "path": "source/host/tests/host_crash_marker_contract.rs",
+      "blobSha": "4f0aebc151266b24e86612ef93e60268e246eab3",
+      "size": 11220
+    },
+    {
+      "path": "source/host/tests/host_event_bus_contract.rs",
+      "blobSha": "397039abc0ed58cb49c9aae4c292db38fed8840d",
+      "size": 4547
+    },
+    {
+      "path": "source/host/tests/host_foundation_contract.rs",
+      "blobSha": "1ad943b6dec7475c63964b43feb49638ab9d20ed",
+      "size": 3778
+    },
+    {
+      "path": "source/host/tests/host_initial_transcript_load_contract.rs",
+      "blobSha": "7ebe49f3a1d9f8a764aa51e7d3ffbd42a7757571",
+      "size": 3645
+    },
+    {
+      "path": "source/host/tests/host_lifecycle_progress_contract.rs",
+      "blobSha": "3a301970c3506cbe24dfe9fdad3e5b5c2b1d5d98",
+      "size": 2251
+    },
+    {
+      "path": "source/host/tests/host_mcp_auth_completion_contract.rs",
+      "blobSha": "2e018ea07b7967dc4526d8b5977aa71cc6af785d",
+      "size": 2345
+    },
+    {
+      "path": "source/host/tests/host_production_extensions_contract.rs",
+      "blobSha": "cfdd72dfc5b4e2960c2da5a443826937f922512b",
+      "size": 21221
+    },
+    {
+      "path": "source/host/tests/host_runner_composition_local_permission_contract.rs",
+      "blobSha": "65341e5c9520f55ddeae6fda9182c25be3b21484",
+      "size": 4959
+    },
+    {
+      "path": "source/host/tests/host_runner_composition_production_wiring_contract.rs",
+      "blobSha": "118e22bd4ad3f80f2fe679b5f63d9b65821ea376",
+      "size": 14908
+    },
+    {
+      "path": "source/host/tests/host_secret_store_contract.rs",
+      "blobSha": "9979ac2b28aa14824580f0cd1a7edfce0e184104",
+      "size": 2376
+    },
+    {
+      "path": "source/host/tests/host_small_parity_contract.rs",
+      "blobSha": "e2e74e0daca67a5f69edf2438251d00ebdd13a7a",
+      "size": 7165
+    },
+    {
+      "path": "source/host/tests/host_small_ports_contract.rs",
+      "blobSha": "f2ea959c998c1d7ee98932027ec924e444c661d3",
+      "size": 16050
+    },
+    {
+      "path": "source/host/tests/host_storage_contract.rs",
+      "blobSha": "6fc05d811ff77618bf6afc76c663d2710ada2cc5",
+      "size": 9539
+    },
+    {
+      "path": "source/host/tests/host_telemetry_service_contract.rs",
+      "blobSha": "70039459f74b9ec2a044402c0aff927d5939bf6f",
+      "size": 47053
+    },
+    {
+      "path": "source/host/tests/host_tracing_contract.rs",
+      "blobSha": "697c10933ad8ecf67fc85d782ac4ba1589faf28f",
+      "size": 12184
+    },
+    {
+      "path": "source/host/tests/host_upgrade_extension_contract.rs",
+      "blobSha": "f01ccca2ec4cb6af70a9cfb66864462dc872f5b9",
+      "size": 7164
+    },
+    {
+      "path": "source/host/tests/host_upgrade_production_contract.rs",
+      "blobSha": "6d569365baa4c452abd9db31a7eddea73385b102",
+      "size": 6993
+    },
+    {
+      "path": "source/host/tests/host_upgrade_service_contract.rs",
+      "blobSha": "5c2f98c39baa4b451438563ea9bc53420584e6dd",
+      "size": 5954
+    },
+    {
+      "path": "source/host/tests/inactive_turn_agent_stream_contract.rs",
+      "blobSha": "06138f9845c881599603b580a42dd1d6121484aa",
+      "size": 6045
+    },
+    {
+      "path": "source/host/tests/inference_codex_direct_contract.rs",
+      "blobSha": "78b6e7b5b639747096f4dd3b652381210e87bd77",
+      "size": 15029
+    },
+    {
+      "path": "source/host/tests/inference_extension_composition_contract.rs",
+      "blobSha": "da5e2339839bc4c85192b2765ea38c6600dbcb51",
+      "size": 9031
+    },
+    {
+      "path": "source/host/tests/inference_provider_session_contract.rs",
+      "blobSha": "18f622a2d44e6faa10b1df7b767cfca4c96de405",
+      "size": 11860
+    },
+    {
+      "path": "source/host/tests/inference_session_labeling_contract.rs",
+      "blobSha": "7f212263d65b36dd4614b4398b66360f303ff97d",
+      "size": 10967
+    },
+    {
+      "path": "source/host/tests/inline_image_materialization_contract.rs",
+      "blobSha": "4e88958604ca47235dce69705eedd0de79b5c253",
+      "size": 2649
+    },
+    {
+      "path": "source/host/tests/invariant_violation_production_wiring_contract.rs",
+      "blobSha": "a719e3f8975f369c58078f06231105564fece8b4",
+      "size": 3137
+    },
+    {
+      "path": "source/host/tests/invariant_violation_telemetry_contract.rs",
+      "blobSha": "8c2b23dd9045b94c7ef7fd41eb16695257f41e04",
+      "size": 2418
+    },
+    {
+      "path": "source/host/tests/journal_outcome_production_wiring_contract.rs",
+      "blobSha": "e590d4c379d9ff2afebc7ea345b2cbe4f8907d83",
+      "size": 1429
+    },
+    {
+      "path": "source/host/tests/large_output_spill_contract.rs",
+      "blobSha": "a68a4d716fe0c7b5111a28be58346e64dc477e79",
+      "size": 4568
+    },
+    {
+      "path": "source/host/tests/legacy_live_references_contract.rs",
+      "blobSha": "31af45196d4c6d6c8ab9955dc06d6bda6c57058a",
+      "size": 3127
+    },
+    {
+      "path": "source/host/tests/legacy_transcript_mirror_contract.rs",
+      "blobSha": "b3ffafd89d07423026f398d6072c22b3bedb8b0a",
+      "size": 4526
+    },
+    {
+      "path": "source/host/tests/lifecycle_telemetry_contract.rs",
+      "blobSha": "8d692e9362605a78d55f7875918eba52887d8e47",
+      "size": 5623
+    },
+    {
+      "path": "source/host/tests/link_preview_image_bounds_contract.rs",
+      "blobSha": "9870e760f11309e7f013c334aab0a6bdcd1fb248",
+      "size": 2346
+    },
+    {
+      "path": "source/host/tests/local_exec_bridge_contract.rs",
+      "blobSha": "0ead37ea19d1e1d046eaadb0766de16dc59c3b8a",
+      "size": 11488
+    },
+    {
+      "path": "source/host/tests/local_exec_production_codec_contract.rs",
+      "blobSha": "a30af8123fa98c84ac1e6838cee1ea1cf01f1a4c",
+      "size": 10230
+    },
+    {
+      "path": "source/host/tests/local_tool_permission_controller_contract.rs",
+      "blobSha": "b2dfc05f64f541dc18ed5016a0097370cf9f2ce0",
+      "size": 15789
+    },
+    {
+      "path": "source/host/tests/local_tool_permission_resolution_contract.rs",
+      "blobSha": "8fef441625960984a2d876179ddbedc9974c7f3d",
+      "size": 2713
+    },
+    {
+      "path": "source/host/tests/managed_setup_team_rules_contract.rs",
+      "blobSha": "dc276a108848b63c18ec5ba1b936bad5acda083b",
+      "size": 6691
+    },
+    {
+      "path": "source/host/tests/managed_skills_contract.rs",
+      "blobSha": "01b2721d229285986473db116888c5b3e45369b6",
+      "size": 3947
+    },
+    {
+      "path": "source/host/tests/managed_skills_runtime_contract.rs",
+      "blobSha": "121716c2c35ad49720e046c26036d3cbe3f9aa9a",
+      "size": 5608
+    },
+    {
+      "path": "source/host/tests/mcp_auth_wait_registry_contract.rs",
+      "blobSha": "246708fb64ca94b3c193b37f351c5e0de8e90ee1",
+      "size": 1383
+    },
+    {
+      "path": "source/host/tests/mcp_coordinator_relay_contract.rs",
+      "blobSha": "60efe7c980da519472c702964b83f3967e420ef7",
+      "size": 7390
+    },
+    {
+      "path": "source/host/tests/mcp_discovery_production_wiring_contract.rs",
+      "blobSha": "b3cdfc94e4a00cfdb1beae27bda2204c43770581",
+      "size": 2942
+    },
+    {
+      "path": "source/host/tests/mcp_discovery_telemetry_contract.rs",
+      "blobSha": "7cfecdc81a44acbff123a9004765f77c247e5611",
+      "size": 4034
+    },
+    {
+      "path": "source/host/tests/mcp_extension_contract.rs",
+      "blobSha": "8698dbf7b8cc64b1d020130560dfda4b35915bd4",
+      "size": 14612
+    },
+    {
+      "path": "source/host/tests/mcp_meta_tools_contract.rs",
+      "blobSha": "6b09d4cfd11152952dda775a49ba21c67c0e8192",
+      "size": 5709
+    },
+    {
+      "path": "source/host/tests/mcp_production_contract.rs",
+      "blobSha": "553f3a00e012282518af946f74df2767d67a9025",
+      "size": 3348
+    },
+    {
+      "path": "source/host/tests/mcp_service_contract.rs",
+      "blobSha": "6661f003699df0128cfa968eeed2f89bcc7e71e3",
+      "size": 10861
+    },
+    {
+      "path": "source/host/tests/mcp_state_executor_contract.rs",
+      "blobSha": "c36d4f6c5b0314d6832962ad689a501e65bb1a99",
+      "size": 5746
+    },
+    {
+      "path": "source/host/tests/media_mime_contract.rs",
+      "blobSha": "8f2ec26b01b38bc2f16ef563a8b6c9da39855e16",
+      "size": 1616
+    },
+    {
+      "path": "source/host/tests/memory_extension_contract.rs",
+      "blobSha": "6d7ab8055180f1a6099766f557a02531614a2c92",
+      "size": 2400
+    },
+    {
+      "path": "source/host/tests/memory_service_contract.rs",
+      "blobSha": "026f5be68414bb22f32b472767d52d8664fc39f5",
+      "size": 20517
+    },
+    {
+      "path": "source/host/tests/memory_synthesis_service_contract.rs",
+      "blobSha": "44fbdf57458e82051d5f1fdc3e97217e08d87bb0",
+      "size": 11138
+    },
+    {
+      "path": "source/host/tests/memory_synthesis_store_contract.rs",
+      "blobSha": "127581a9a8f40534ff64ba7541c3a2ada416046a",
+      "size": 4726
+    },
+    {
+      "path": "source/host/tests/mobile_push_notifier_contract.rs",
+      "blobSha": "a4c6938f769f07cdfaa8cfdbd78b7d3ebb9accb9",
+      "size": 3034
+    },
+    {
+      "path": "source/host/tests/model_experiment_exposure_contract.rs",
+      "blobSha": "6f11ff412e439a40db3058b2471c600e71e38294",
+      "size": 3043
+    },
+    {
+      "path": "source/host/tests/notifications_extension_contract.rs",
+      "blobSha": "ef66d6cb3335c300bcd73c236477d91d0766d6dd",
+      "size": 10201
+    },
+    {
+      "path": "source/host/tests/notify_bus_client_contract.rs",
+      "blobSha": "8e24042a979b918e6f2f4fabcdeaadabae9c176c",
+      "size": 3395
+    },
+    {
+      "path": "source/host/tests/notify_bus_extension_contract.rs",
+      "blobSha": "0f962488c2688ad00f3638e99410267f2805044d",
+      "size": 6169
+    },
+    {
+      "path": "source/host/tests/pending_card_sweeps_contract.rs",
+      "blobSha": "9a9b6f4b46bd1f8de0429354e60b679e8d940371",
+      "size": 5299
+    },
+    {
+      "path": "source/host/tests/pending_wake_rearm_contract.rs",
+      "blobSha": "05f6a1e21882f6a5eab4037d609613cc6bd30402",
+      "size": 10957
+    },
+    {
+      "path": "source/host/tests/plugin_skills_contract.rs",
+      "blobSha": "cc4b057b66f8b3c0211036f007d532d9b920537d",
+      "size": 6134
+    },
+    {
+      "path": "source/host/tests/ports_telemetry_contract.rs",
+      "blobSha": "535f1c3ec4f8b95139602fd8ec94d7f77a3c3688",
+      "size": 2065
+    },
+    {
+      "path": "source/host/tests/pressure_cpu_profiler_contract.rs",
+      "blobSha": "d4872114daf4b47760df8ea3495327cad72f00d9",
+      "size": 12715
+    },
+    {
+      "path": "source/host/tests/process_crash_guard_contract.rs",
+      "blobSha": "8b7c45ef1691c70edd87e8bb5e19232a1f788c12",
+      "size": 1514
+    },
+    {
+      "path": "source/host/tests/production_agent_checkpoint_contract.rs",
+      "blobSha": "0469b2ca1d937fe627603825637243bb39b68236",
+      "size": 19466
+    },
+    {
+      "path": "source/host/tests/production_agent_store_contract.rs",
+      "blobSha": "7560f0bbd6f6b82eb9ea1a6c0467d1e4220df7e9",
+      "size": 11624
+    },
+    {
+      "path": "source/host/tests/production_binding_providers_contract.rs",
+      "blobSha": "26c301e8868f7601cf2764f0faa171ab3b6a26f0",
+      "size": 2779
+    },
+    {
+      "path": "source/host/tests/production_settings_single_owner_contract.rs",
+      "blobSha": "10fea344501a2376f0dd4a110d1cdf3711f30511",
+      "size": 2688
+    },
+    {
+      "path": "source/host/tests/production_turn_agent_owner_contract.rs",
+      "blobSha": "d05fbe51194265f2a63ac3771f4f106bb81f594c",
+      "size": 19486
+    },
+    {
+      "path": "source/host/tests/production_turn_input_projection_contract.rs",
+      "blobSha": "51527a072ef69a5b205b1d2fcf0e149bb02b4594",
+      "size": 11440
+    },
+    {
+      "path": "source/host/tests/production_turn_run_shell_adapter_contract.rs",
+      "blobSha": "5f7287288e4ac36ccd66259e6a71509e0ff7184e",
+      "size": 20147
+    },
+    {
+      "path": "source/host/tests/profile_watch_contract.rs",
+      "blobSha": "6ffdf305a136e044045f5c7f4722d4f3f76e2070",
+      "size": 7613
+    },
+    {
+      "path": "source/host/tests/project_membership_contract.rs",
+      "blobSha": "76fdbbaad2e48df6ca57865853212a33bc9232e2",
+      "size": 2689
+    },
+    {
+      "path": "source/host/tests/prompt_collector_glue_contract.rs",
+      "blobSha": "27716961c3ef587bfeed6223012d31ea6e995c0a",
+      "size": 15874
+    },
+    {
+      "path": "source/host/tests/remaining_planned_contract.rs",
+      "blobSha": "e2b2f6577ed5eb2c9e86e33c6fec76de5ae52cb6",
+      "size": 15965
+    },
+    {
+      "path": "source/host/tests/remote_box_resources_contract.rs",
+      "blobSha": "84d73a72f592a8f8e892bd78f6b327cdc05fcc37",
+      "size": 9981
+    },
+    {
+      "path": "source/host/tests/request_coalescer_contract.rs",
+      "blobSha": "eac27dea70124d63dd838d111d5d216a1c7b05b8",
+      "size": 5708
+    },
+    {
+      "path": "source/host/tests/roster_emit_contract.rs",
+      "blobSha": "82c66fe9270c30d57469c9a61a6adff28026e36e",
+      "size": 9752
+    },
+    {
+      "path": "source/host/tests/roster_search_contract.rs",
+      "blobSha": "d0b5720c71846ebc3ef42a040bd8375fc1be91ce",
+      "size": 7778
+    },
+    {
+      "path": "source/host/tests/routed_send_acceptance_contract.rs",
+      "blobSha": "5e601b84bca483cbb30739edeae9c296ca8116e6",
+      "size": 11179
+    },
+    {
+      "path": "source/host/tests/run_lifecycle_activity_production_contract.rs",
+      "blobSha": "934785860bf9607b2a300badc14987e26e2a7bae",
+      "size": 6159
+    },
+    {
+      "path": "source/host/tests/runner_box_tool_composition_contract.rs",
+      "blobSha": "a07ddea6f17dfca1081a91755ab1c291901baf12",
+      "size": 9408
+    },
+    {
+      "path": "source/host/tests/runner_communicate_listener_contract.rs",
+      "blobSha": "0565a047746441e317be598f7fb8ab5767128384",
+      "size": 11256
+    },
+    {
+      "path": "source/host/tests/runner_context_production_provider_contract.rs",
+      "blobSha": "665237d1186465c9e164d7d8549238c7b3d2f5eb",
+      "size": 1169
+    },
+    {
+      "path": "source/host/tests/runner_contract.rs",
+      "blobSha": "de2c00c4c5a9355607b93492c0e8400cee3d0122",
+      "size": 17322
+    },
+    {
+      "path": "source/host/tests/runner_coordinator_tool_relay_contract.rs",
+      "blobSha": "0545ddbca825f6417cb5f6bc4c5b0c969ee4dcd4",
+      "size": 4010
+    },
+    {
+      "path": "source/host/tests/runner_delivery_parity_contract.rs",
+      "blobSha": "c699fa96fa810708249c5e567347fafd67fe9fe1",
+      "size": 13179
+    },
+    {
+      "path": "source/host/tests/runner_production_bridge_contract.rs",
+      "blobSha": "76a720b1e55da84b3e55dc201a839a4e49e3836f",
+      "size": 22159
+    },
+    {
+      "path": "source/host/tests/runner_prompt_glue_contract.rs",
+      "blobSha": "f87f84dbf27343706a5d01ca0f4907fd7dfd7dbc",
+      "size": 12256
+    },
+    {
+      "path": "source/host/tests/runner_pure_parity_contract.rs",
+      "blobSha": "251b34d86fc4693ab006100225e9c622959fa0ec",
+      "size": 7515
+    },
+    {
+      "path": "source/host/tests/runner_request_context_contract.rs",
+      "blobSha": "26fedbd5855991bc88775aac98b5149d53c19837",
+      "size": 2318
+    },
+    {
+      "path": "source/host/tests/runner_routed_provider_contract.rs",
+      "blobSha": "f206a83c7a58bcfc6dd13359b749a4dd60f4d1dc",
+      "size": 13670
+    },
+    {
+      "path": "source/host/tests/runner_small_modules_contract.rs",
+      "blobSha": "4ae0c6d5c3a8c9e58340081cb0cac3ba41e1ef13",
+      "size": 4109
+    },
+    {
+      "path": "source/host/tests/safe_link_preview_fetch_contract.rs",
+      "blobSha": "e8092c7f50b09db5fb587f10aa838d91b423a194",
+      "size": 5010
+    },
+    {
+      "path": "source/host/tests/sand_ack_obligation_store_contract.rs",
+      "blobSha": "b444bb78e0661382bdeedd61427287f5681b6357",
+      "size": 2726
+    },
+    {
+      "path": "source/host/tests/sand_action_audit_contract.rs",
+      "blobSha": "e74e322922cbbf9ba6173ee8300c94cc84c492cf",
+      "size": 5400
+    },
+    {
+      "path": "source/host/tests/sand_activity_contract.rs",
+      "blobSha": "f83c7f23a31fa959af1481d0dcca8d180b19f0ab",
+      "size": 3226
+    },
+    {
+      "path": "source/host/tests/sand_agent_management_tools_contract.rs",
+      "blobSha": "5e54aa00dfcc6527dea68ad804b21f0f9cacdf16",
+      "size": 4196
+    },
+    {
+      "path": "source/host/tests/sand_auto_review_awaiting_contract.rs",
+      "blobSha": "1b5850f294f5905109fc76e0a3cf22be63734009",
+      "size": 5527
+    },
+    {
+      "path": "source/host/tests/sand_auto_review_classifier_contract.rs",
+      "blobSha": "b1aba6b4b3161f098f1b6041eda126fa0f994ac1",
+      "size": 12713
+    },
+    {
+      "path": "source/host/tests/sand_auto_review_contract.rs",
+      "blobSha": "00faed593b5f6df164bad1b5b85054e59edd5786",
+      "size": 11656
+    },
+    {
+      "path": "source/host/tests/sand_auto_review_specialized_contract.rs",
+      "blobSha": "566cfb0aec4f95a96e12de283c621baf5823750d",
+      "size": 16576
+    },
+    {
+      "path": "source/host/tests/sand_auto_review_summaries_contract.rs",
+      "blobSha": "0e62a8d25f32686a619ac0d387377bd494f4a61a",
+      "size": 5278
+    },
+    {
+      "path": "source/host/tests/sand_backend_smart_mode_classifier_exec_contract.rs",
+      "blobSha": "697b815ac6c0cc7a61a83e56d55bcf5ca79e3313",
+      "size": 13407
+    },
+    {
+      "path": "source/host/tests/sand_browser_tools_contract.rs",
+      "blobSha": "a9aba3fff477efc49fe1e37a2c86794ddea74adb",
+      "size": 14616
+    },
+    {
+      "path": "source/host/tests/sand_file_transfer_tools_contract.rs",
+      "blobSha": "ddfcab3bc6533fc728059d2664a1badb1923aae7",
+      "size": 9496
+    },
+    {
+      "path": "source/host/tests/sand_generate_image_tool_contract.rs",
+      "blobSha": "6e92d9ec482370a2528716b341736b93adc5f83b",
+      "size": 4533
+    },
+    {
+      "path": "source/host/tests/sand_host_production_wiring_contract.rs",
+      "blobSha": "82146f2a2a15d197ca4a42537cdd796deac2ac3c",
+      "size": 11639
+    },
+    {
+      "path": "source/host/tests/sand_mcp_management_tools_contract.rs",
+      "blobSha": "d70b2b7e510926d9d2fb734b23b0f2baf5442cc6",
+      "size": 14178
+    },
+    {
+      "path": "source/host/tests/sand_memory_contract.rs",
+      "blobSha": "d2158c8f3c17aef854faaafc4c44bd0c74b86a18",
+      "size": 12698
+    },
+    {
+      "path": "source/host/tests/sand_model_experiment_contract.rs",
+      "blobSha": "1b73ee0aeafbc8a409f4f399e56f625119695788",
+      "size": 5310
+    },
+    {
+      "path": "source/host/tests/sand_multitask_contract.rs",
+      "blobSha": "fae2857bb79bf3c2936f2566ce421325b928c67e",
+      "size": 1604
+    },
+    {
+      "path": "source/host/tests/sand_multitask_todo_tool_contract.rs",
+      "blobSha": "b6beec0dce7bc7167bd2121ff631bd877585df0d",
+      "size": 6585
+    },
+    {
+      "path": "source/host/tests/sand_reaction_tool_contract.rs",
+      "blobSha": "5a5da6c0cbd27502d18597fbb0a4d55eb5b6c0cd",
+      "size": 5125
+    },
+    {
+      "path": "source/host/tests/sand_spotlight_tools_contract.rs",
+      "blobSha": "3e4af86f6e4bc864259b28ee6253924f69eaccbf",
+      "size": 3540
+    },
+    {
+      "path": "source/host/tests/sand_state_tool_contract.rs",
+      "blobSha": "061432560d5ff7f042e340dd778fa1905830da3d",
+      "size": 14932
+    },
+    {
+      "path": "source/host/tests/sand_subagent_management_tools_contract.rs",
+      "blobSha": "ebc5c484bb122fe0432f7a18ac7ec6377b9ec5b4",
+      "size": 10315
+    },
+    {
+      "path": "source/host/tests/sand_web_tools_contract.rs",
+      "blobSha": "e7196c35f05e2b79a1900d300c5c170207cd1dbf",
+      "size": 3063
+    },
+    {
+      "path": "source/host/tests/search_index_db_contract.rs",
+      "blobSha": "ee5566d885d1ae883f8397ccca5ef17fb9dd516d",
+      "size": 5483
+    },
+    {
+      "path": "source/host/tests/search_index_service_contract.rs",
+      "blobSha": "a2ccb0ce264eba8551629651d367c2b8007ddd91",
+      "size": 7065
+    },
+    {
+      "path": "source/host/tests/search_index_worker_contract.rs",
+      "blobSha": "bf7d15ceb621c8c4423c05341c3f5f7e1216c565",
+      "size": 3305
+    },
+    {
+      "path": "source/host/tests/search_index_writer_contract.rs",
+      "blobSha": "ab329b05bd05747aee1712c9379c4cbd8d6a0bf7",
+      "size": 8273
+    },
+    {
+      "path": "source/host/tests/secrets_extension_contract.rs",
+      "blobSha": "6073b227a7159fbfe942cb86deccf6068f13500d",
+      "size": 7747
+    },
+    {
+      "path": "source/host/tests/send_acceptance_production_wiring_contract.rs",
+      "blobSha": "a894ff810ed6cbc1d4e8e8b7b8c4248672799a5d",
+      "size": 3147
+    },
+    {
+      "path": "source/host/tests/send_group_fanout_contract.rs",
+      "blobSha": "6cab81eafc4c104f5e9411ff4e90a315d6265092",
+      "size": 16905
+    },
+    {
+      "path": "source/host/tests/send_message_tool_contract.rs",
+      "blobSha": "84efaed7bf499b516923bf4435da45be830a85cd",
+      "size": 23396
+    },
+    {
+      "path": "source/host/tests/send_trace_host_contract.rs",
+      "blobSha": "9fd7198138715b5055dcca803032871a127f257c",
+      "size": 8285
+    },
+    {
+      "path": "source/host/tests/session_conversation_state_contract.rs",
+      "blobSha": "b559fd4e3e97e646a4700ce5b73c50aa479608d4",
+      "size": 13199
+    },
+    {
+      "path": "source/host/tests/session_extension_contract.rs",
+      "blobSha": "1125e92e25a32d84a97ae31899adcd2ea809f3ee",
+      "size": 3837
+    },
+    {
+      "path": "source/host/tests/session_gateway_contract.rs",
+      "blobSha": "97dcd3542a0e73a5a0b2f2e0487f69810eb92784",
+      "size": 85893
+    },
+    {
+      "path": "source/host/tests/session_maintenance_contract.rs",
+      "blobSha": "95dd5e89abbfae8f718a2df6484f7685a8bc3608",
+      "size": 14976
+    },
+    {
+      "path": "source/host/tests/session_materialization_contract.rs",
+      "blobSha": "455bd4de669cfab31cc5ed2ef755b2d7aa84d1bc",
+      "size": 16406
+    },
+    {
+      "path": "source/host/tests/session_paths_contract.rs",
+      "blobSha": "c03746ad143c9a598c1b4ec7fd3af336d79f9cd0",
+      "size": 3352
+    },
+    {
+      "path": "source/host/tests/session_production_contract.rs",
+      "blobSha": "56c12b15acde8dc5fbe309dc446369c2965462a2",
+      "size": 12797
+    },
+    {
+      "path": "source/host/tests/session_profile_mutations_contract.rs",
+      "blobSha": "ddf0d27ecca31fe3444904a17c1c24e12befdf6e",
+      "size": 6924
+    },
+    {
+      "path": "source/host/tests/session_projection_contract.rs",
+      "blobSha": "90b0a6079382213ff75ccb79bcdc65f35e05cd67",
+      "size": 2636
+    },
+    {
+      "path": "source/host/tests/session_recovery_contract.rs",
+      "blobSha": "6201705c6a4d0da8d126b551d423a8bf4104f5ff",
+      "size": 5367
+    },
+    {
+      "path": "source/host/tests/session_store_factories_contract.rs",
+      "blobSha": "7f0c1a34ad4ed3470cb107cb347a34d5199eb07e",
+      "size": 2587
+    },
+    {
+      "path": "source/host/tests/session_summaries_roster_contract.rs",
+      "blobSha": "7d29d3d19eef877404cfb17d0a05c3cb2aac04bd",
+      "size": 12710
+    },
+    {
+      "path": "source/host/tests/settings_extension_contract.rs",
+      "blobSha": "024d5d49996e3c4d9d5f4ec6b200910b0273572c",
+      "size": 745
+    },
+    {
+      "path": "source/host/tests/settings_service_contract.rs",
+      "blobSha": "c05d50a8b07667ca1fd532ea36d7ec0854139141",
+      "size": 11864
+    },
+    {
+      "path": "source/host/tests/shared_desktop_box_contract.rs",
+      "blobSha": "a8037a15431a6b55c0a9a3e468570117e9bf1c94",
+      "size": 2916
+    },
+    {
+      "path": "source/host/tests/shared_rooms_production_contract.rs",
+      "blobSha": "2753f49a439b864b1cb54fbf4bcc3f687678529b",
+      "size": 10813
+    },
+    {
+      "path": "source/host/tests/shell_terminal_watch_contract.rs",
+      "blobSha": "85cf0d73ff86b35d2e046eae9a0ee3ab70c46c4b",
+      "size": 11499
+    },
+    {
+      "path": "source/host/tests/skill_publish_contract.rs",
+      "blobSha": "c6ea55bf02ad9eafaece2a547eec3c9d52487fde",
+      "size": 10060
+    },
+    {
+      "path": "source/host/tests/source_map_contract.rs",
+      "blobSha": "5b15d9cb29ef413863abbc1bd8ba4a61c7555caf",
+      "size": 4041
+    },
+    {
+      "path": "source/host/tests/sqlite_snapshot_contract.rs",
+      "blobSha": "bab799e28f9eda4872773446254e4d682745f009",
+      "size": 4491
+    },
+    {
+      "path": "source/host/tests/state_backstop_contract.rs",
+      "blobSha": "31951ab69cdf9255bbdc234417942ae7fb4f073a",
+      "size": 7518
+    },
+    {
+      "path": "source/host/tests/store_db_snapshot_upload_contract.rs",
+      "blobSha": "2ce942b3598919f7d8182ca6855b2f6e8bbf8386",
+      "size": 8097
+    },
+    {
+      "path": "source/host/tests/stream_attempt_outer_lifecycle_contract.rs",
+      "blobSha": "e87038891c5ba02f85f9ec797507247cebf27188",
+      "size": 6918
+    },
+    {
+      "path": "source/host/tests/structured_log_lifecycle_facade_contract.rs",
+      "blobSha": "b824b1c8bab24b2bde8367690b5a3e9632549913",
+      "size": 3086
+    },
+    {
+      "path": "source/host/tests/structured_log_telemetry_contract.rs",
+      "blobSha": "f96f353a6426d5c8a73b070b5809ecb72393e603",
+      "size": 5961
+    },
+    {
+      "path": "source/host/tests/subagent_runtime_adapter_contract.rs",
+      "blobSha": "9d6eb44830c6822dad9aee7af88a1d47eae03b2e",
+      "size": 12915
+    },
+    {
+      "path": "source/host/tests/system_prompt_contract.rs",
+      "blobSha": "1f523d492e666e74116d96a0044bf35200ea88bb",
+      "size": 14923
+    },
+    {
+      "path": "source/host/tests/system_prompt_dynamic_sections_production_contract.rs",
+      "blobSha": "5b0dc9320e0f70b3080a932d4fcb3687f6d831b4",
+      "size": 4996
+    },
+    {
+      "path": "source/host/tests/system_prompt_shipping_wiring_contract.rs",
+      "blobSha": "a018a798e1571d1c2efc2e9f433efe349f8d6dd3",
+      "size": 7193
+    },
+    {
+      "path": "source/host/tests/teach_recording_extension_contract.rs",
+      "blobSha": "fa46dc9d358cc320a52b33f7ddd24e0544e8a97b",
+      "size": 6842
+    },
+    {
+      "path": "source/host/tests/teach_recording_service_contract.rs",
+      "blobSha": "31bbc894ef7e3e68e317f1f9c2e980371d665bf4",
+      "size": 10010
+    },
+    {
+      "path": "source/host/tests/telemetry_extension_parity_contract.rs",
+      "blobSha": "7fed2729bc2cbafdc44ff207b67eacf80bc17ac9",
+      "size": 12807
+    },
+    {
+      "path": "source/host/tests/tool_call_telemetry_production_wiring_contract.rs",
+      "blobSha": "6fb703d0ac6258ddca0fee262cf3ac77e4dbdbe4",
+      "size": 1591
+    },
+    {
+      "path": "source/host/tests/transcript_contract.rs",
+      "blobSha": "2c8b89b6edef412384ba921286481184e77cf834",
+      "size": 15410
+    },
+    {
+      "path": "source/host/tests/transcript_extension_contract.rs",
+      "blobSha": "3330f4f87732664838ae70ae43985ccb39813153",
+      "size": 9321
+    },
+    {
+      "path": "source/host/tests/transcript_journal_codec_contract.rs",
+      "blobSha": "56262a8d56b5dcfd303689eca2ce9f76b48555b7",
+      "size": 3249
+    },
+    {
+      "path": "source/host/tests/transcript_manager_contract.rs",
+      "blobSha": "7097f86175e506bc16b2b6de9b29269e44faf6c3",
+      "size": 29322
+    },
+    {
+      "path": "source/host/tests/transcript_mirror_contract.rs",
+      "blobSha": "10b504ec6c3d2195e633cfdcc04a89d48ccfd696",
+      "size": 8445
+    },
+    {
+      "path": "source/host/tests/transcript_mirror_conversation_state_binary_contract.rs",
+      "blobSha": "61aeddcfed419b3b70f574278f6a5d9b8a1ee179",
+      "size": 4121
+    },
+    {
+      "path": "source/host/tests/transcript_mirror_offload_contract.rs",
+      "blobSha": "e297f4f653a85c9c5106c7a52efa9603bf20be06",
+      "size": 11272
+    },
+    {
+      "path": "source/host/tests/transcript_mirror_production_provider_contract.rs",
+      "blobSha": "aa1b901789ca70ad85628133d4b38c4556d93372",
+      "size": 11557
+    },
+    {
+      "path": "source/host/tests/transcript_mirror_router_contract.rs",
+      "blobSha": "2a9e7653437ab8119222570765a1a762d970eed9",
+      "size": 8012
+    },
+    {
+      "path": "source/host/tests/transcript_mirror_worker_contract.rs",
+      "blobSha": "2ec1bd7a6a47ee04b30f0d99f361b88a024b87aa",
+      "size": 3084
+    },
+    {
+      "path": "source/host/tests/transcript_occurrence_deriver_contract.rs",
+      "blobSha": "e46c59316e6b64090bcdeeb53c3f01a58c32b701",
+      "size": 10882
+    },
+    {
+      "path": "source/host/tests/transcript_production_composition_contract.rs",
+      "blobSha": "2e34c8669063c7ce84ddc586e90afc7810ba059a",
+      "size": 33207
+    },
+    {
+      "path": "source/host/tests/transcript_replica_writer_contract.rs",
+      "blobSha": "221fb3876a0e40ed937dd9b474828a51064592ca",
+      "size": 1460
+    },
+    {
+      "path": "source/host/tests/transcript_send_acceptance_contract.rs",
+      "blobSha": "ef13eb172c5eee2902d18135102ae84d5b1af667",
+      "size": 7706
+    },
+    {
+      "path": "source/host/tests/transcript_send_echo_contract.rs",
+      "blobSha": "02c37e22fb6cd76f541778cd793f0545eff9f6ba",
+      "size": 11546
+    },
+    {
+      "path": "source/host/tests/transcript_session_runtime_contract.rs",
+      "blobSha": "54464477fd6264744617b613f33066ea5c5d49d0",
+      "size": 14968
+    },
+    {
+      "path": "source/host/tests/transcript_store_contract.rs",
+      "blobSha": "cb7766115a40670502cec4557c47bc21370c309e",
+      "size": 2481
+    },
+    {
+      "path": "source/host/tests/trays_contract.rs",
+      "blobSha": "c5f60bd940639c2c2c79c5d2bbb45275adf353e0",
+      "size": 4935
+    },
+    {
+      "path": "source/host/tests/turn_memory_contract.rs",
+      "blobSha": "69670c51887e10a676d9cbe949ed0899daf4d1b6",
+      "size": 4883
+    },
+    {
+      "path": "source/host/tests/turn_observation_contract.rs",
+      "blobSha": "28648bdebf02840d46956479f352db0df4d45992",
+      "size": 23345
+    },
+    {
+      "path": "source/host/tests/turn_runtime_recovery_contract.rs",
+      "blobSha": "49778612dfe89fd6247d5461e2b8b5c944a4306a",
+      "size": 11320
+    },
+    {
+      "path": "source/host/tests/turn_settle_checkpoint_contract.rs",
+      "blobSha": "732c0d56530ecf3c5dd63a5b805fb165e416af76",
+      "size": 6935
+    },
+    {
+      "path": "source/host/tests/turn_telemetry_mappers_contract.rs",
+      "blobSha": "935da390a1b63f7180cf2187ab6ac7c52670efa4",
+      "size": 8598
+    },
+    {
+      "path": "source/host/tests/turn_telemetry_production_wiring_contract.rs",
+      "blobSha": "ad72a0a9e0a8c03c85f128de38a2f2a1c64f3364",
+      "size": 7194
+    },
+    {
+      "path": "source/host/tests/turn_tool_session_reminder_contract.rs",
+      "blobSha": "e47ad331cb2d0c319d58cfc17a8e53f8e18ff10c",
+      "size": 1775
+    },
+    {
+      "path": "source/host/tests/turn_toolset_await_mcp_contract.rs",
+      "blobSha": "f09ab4839e4d2e6ab33aadab5b1e8000b2d9e2ce",
+      "size": 7314
+    },
+    {
+      "path": "source/host/tests/turn_toolset_contract.rs",
+      "blobSha": "53089dc76cf5f53d5be0cf4b427881d4ae9c8799",
+      "size": 11445
+    },
+    {
+      "path": "source/host/tests/upgrade_recreate_resume_contract.rs",
+      "blobSha": "a2b69e040851119a288c93df3d21324ddd5b4cc0",
+      "size": 1276
+    },
+    {
+      "path": "source/host/tests/video_playback_rendition_contract.rs",
+      "blobSha": "fc244c34156b79bc6faeff69d302e725cbd4df77",
+      "size": 5076
+    },
+    {
+      "path": "source/host/tests/wallpaper_contract.rs",
+      "blobSha": "239dbf8442cb21ae38be891965c592fbe1383dd0",
+      "size": 5788
+    },
+    {
+      "path": "source/host/tests/watched_directory_contract.rs",
+      "blobSha": "a9148560812208490785b069b2b2e48cfee5ae99",
+      "size": 1771
+    },
+    {
+      "path": "source/host/tests/widget_responses_full_contract.rs",
+      "blobSha": "5da37252899000c22f939207c9c93198890f2698",
+      "size": 11740
+    },
+    {
+      "path": "source/host/tests/widget_responses_local_tool_permission_contract.rs",
+      "blobSha": "0a6b6d0853f054cbd906f55dd1b12fa33fd7b47d",
+      "size": 6971
+    },
+    {
+      "path": "source/host/tests/worker_blob_store_contract.rs",
+      "blobSha": "25a7002223e5a8a58036c86fa6068190f976e7a9",
+      "size": 6683
+    },
+    {
+      "path": "source/host/tests/workflow_commands_contract.rs",
+      "blobSha": "3b0ef29df8a0e46a39bd1fc3d5aa1bc9b656106a",
+      "size": 11743
+    },
+    {
+      "path": "source/host/tests/workflow_store_contract.rs",
+      "blobSha": "18e978ad73ed3e0437c2674733c66e1418b1e2a2",
+      "size": 19030
+    },
+    {
+      "path": "source/host/tests/workspace_ignore_contract.rs",
+      "blobSha": "c27bc2a8edd9b7542608c08f027e7554cb10a932",
+      "size": 2880
+    },
+    {
+      "path": "source/host/tests/xuser_contract.rs",
+      "blobSha": "cf8bec97069ae541bdc1c5fef56ac9eaad722432",
+      "size": 5503
+    },
+    {
+      "path": "source/host/tests/xuser_durable_stores_contract.rs",
+      "blobSha": "0baafd26d9a3bad83d70a1ed42d9d81edc6a68cb",
+      "size": 2116
+    },
+    {
+      "path": "source/host/tests/xuser_relay_runtime_contract.rs",
+      "blobSha": "4d3918594c09f136ed57c63d8bd7a879e81a9e67",
+      "size": 9106
+    },
+    {
+      "path": "source/host/tests/xuser_remote_turns_contract.rs",
+      "blobSha": "cc49d36d64ed4c41b3d0bc7185b54bab9e496b39",
+      "size": 8469
+    },
+    {
+      "path": "source/host/tests/xuser_service_contract.rs",
+      "blobSha": "51e26cda481c995357e11dd33059d5a297e071c8",
+      "size": 23091
+    },
+    {
+      "path": "source/host/tests/xuser_sharing_environment_contract.rs",
+      "blobSha": "c076b2b949e15cbdbb7d40b7cb31a6284a78c140",
+      "size": 2229
+    },
+    {
+      "path": "source/host/tests/xuser_wire_normalization_contract.rs",
+      "blobSha": "983004325321213e2dd4565df9d8b34c60f510f2",
+      "size": 1393
+    }
+  ]
+}
