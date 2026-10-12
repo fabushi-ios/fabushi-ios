@@ -11,13 +11,15 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Access/paywall/team-policy UI is driven by the current authenticated account only; stale access responses from a replaced/login-in-progress account cannot overwrite the visible gate.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "frontend/src/recovered/features/access/cover/model.swift",
+      "ios_target_path": "source/ios-main/account/access.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "Native AccessCoverModel preserves the exact state/reason wire mapping. GrokMobileShell refreshAccessRoster owns the account-scoped access fetch lifecycle and fences completions by accessRosterGeneration, mobileAccountScopeKey and reconnectGeneration rather than an Electron reader closure.",
+      "ios_platform_delta": "Native IOSCursorSandAccessReader mirrors Desktop readSandAccessOnce/createSandAccessReader over the single IOSCursorAuthService and IOSCursorDashboardClient owners: logging-in/logged-out/missing-identity projection, exact authId ?? email slot identity, a 10-second GetSandAccessStatus fetch, backend-failure unknown, and generation fencing for stale overlapping cached reads. GrokMobileShell retains the additional presentation-level account/reconnect/accessRosterGeneration fence; no second auth or access store is introduced.",
       "implementation_status": "implemented",
-      "production_evidence": "frontend/src/recovered/features/access/cover/model.swift (exact wire projection/checking/unknown/copy) is the concrete shipping target required by the ledger; frontend/src/production/GrokMobileShell+Bots.swift additionally owns account/reconnect/generation-fenced access+roster refresh, and GrokMobileShell.swift remains the single access state owner.",
-      "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift and current-head architecture/build/protected acceptance; current exact-head Actions required before verified.",
-      "notes": "Exact Desktop access.ts@94f20c2ef465d57329d6b57558ca4954454fe66e reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. No second auth/access store introduced; native lifecycle uses the existing roster/account owner."
+      "production_evidence": "source/ios-main/account/access.swift owns wire projection/read lifecycle; source/ios-main/account/cursor-auth.swift exposes pending-login versus settled auth state from the canonical credential owner; source/ios-main/account/cursor-dashboard-client.swift performs GetSandAccessStatus with the Desktop 10s bound; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift wires getSandAccess/getSandAccessFresh to that reader; frontend/src/production/GrokMobileShell+Bots.swift keeps account/reconnect/presentation stale-result fencing.",
+      "test_evidence": "mobile/ios/FabushiTests/CursorAccessParityTests.swift covers enum projection, exact Dashboard route/10s deadline, logging-in/logged-out/missing identity, authId precedence, backend failure, and stale overlapping generation settlement; AccessCoverParityTests.swift covers visible projection. Current resulting exact-head GitHub Actions remain required before verified.",
+      "notes": "Current-main review bound to Desktop 371b72f1cd20de03dc4dff9a15ed761054968093: access.ts@94f20c2ef465d57329d6b57558ca4954454fe66e direct caller chain is cursor-auth-wiring.ts (single settled Cursor auth/runtime owner, createSandAccessReader/readSandAccessOnce) -> main-edge.ts getSandAccess/getSandAccessFresh. The prior iOS row overclaimed this runtime because the RPC ABI names existed without native handlers; this repair adds the missing shipping owner and focused tests rather than treating the ABI table as implementation evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/account-authorization.ts",

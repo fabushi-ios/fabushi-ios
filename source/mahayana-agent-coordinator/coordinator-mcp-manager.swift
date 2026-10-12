@@ -837,6 +837,7 @@ final class CoordinatorMcpSurface {
     private let port: CoordinatorMcpHostPort
     private let cursorAuth: IOSCursorAuthService
     private let dashboard: IOSCursorDashboardClient
+    private let sandAccessReader: IOSCursorSandAccessReader
     private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
@@ -890,6 +891,7 @@ final class CoordinatorMcpSurface {
         port: CoordinatorMcpHostPort,
         cursorAuth: IOSCursorAuthService,
         dashboard: IOSCursorDashboardClient,
+        sandAccessReader: IOSCursorSandAccessReader,
         feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
         localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer,
@@ -899,6 +901,7 @@ final class CoordinatorMcpSurface {
         self.port = port
         self.cursorAuth = cursorAuth
         self.dashboard = dashboard
+        self.sandAccessReader = sandAccessReader
         self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
         self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
@@ -970,6 +973,14 @@ final class CoordinatorMcpSurface {
             }
         )
         let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        let sandAccessReader = IOSCursorSandAccessReader(
+            getAuthState: {
+                await cursorAuth.sandAccessAuthState()
+            },
+            readAccess: {
+                try await dashboard.getSandAccessStatus()
+            }
+        )
         let feedbackClient = IOSFeedbackReportClient(
             getAccessToken: { backendURL in
                 try await cursorAuth.getValidAccessToken(backendURL: backendURL)
@@ -1091,6 +1102,7 @@ final class CoordinatorMcpSurface {
             port: port,
             cursorAuth: cursorAuth,
             dashboard: dashboard,
+            sandAccessReader: sandAccessReader,
             feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
             localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
@@ -1774,6 +1786,12 @@ final class CoordinatorMcpSurface {
 
         case "coordinator.mcp.cursorAuth.status":
             return .handled(projectCursorAuthStatus(await cursorAuth.status()))
+
+        case "getSandAccess":
+            return .handled(iosSandAccessFoundationValue(await sandAccessReader.read()))
+
+        case "getSandAccessFresh":
+            return .handled(iosSandAccessFoundationValue(await sandAccessReader.readFresh()))
 
         case "updateCursorAccountName":
             guard (await cursorAuth.status()).loggedIn else {

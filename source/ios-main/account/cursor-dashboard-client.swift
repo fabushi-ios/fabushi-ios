@@ -1099,6 +1099,30 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return try IOSCursorDashboardProto.decodeBackgroundComposerInfo(response)
     }
 
+    func getSandAccessStatus(
+        timeoutMs: Int = IOS_SAND_ACCESS_REQUEST_TIMEOUT_MS
+    ) async throws -> SandAccessState {
+        let response = try await rpc(
+            "GetSandAccessStatus",
+            body: [:],
+            timeoutMs: timeoutMs
+        )
+        func wireInt(_ value: Any?) -> Int {
+            if let number = value as? NSNumber,
+               CFGetTypeID(number) != CFBooleanGetTypeID() {
+                return number.intValue
+            }
+            if let value = value as? String, let parsed = Int(value) {
+                return parsed
+            }
+            return 0
+        }
+        return iosSandAccessFromWire(
+            state: wireInt(response["state"]),
+            blockReason: wireInt(response["blockReason"])
+        )
+    }
+
     func isAnysphereUser(timeoutMs: Int = 10_000) async throws -> Bool {
         let response = try await rpc("GetTeams", body: [:], timeoutMs: timeoutMs)
         let teams = response["teams"] as? [[String: Any]] ?? []

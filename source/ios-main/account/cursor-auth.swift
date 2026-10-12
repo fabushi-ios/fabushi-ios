@@ -215,6 +215,17 @@ final class IOSCursorAuthService {
         )
     }
 
+    func sandAccessAuthState() async -> IOSCursorSandAccessAuthState {
+        if !pending.isEmpty {
+            return .loggingIn
+        }
+        let current = await status()
+        guard current.loggedIn else {
+            return .loggedOut
+        }
+        return .loggedIn(authId: current.authId, email: current.email)
+    }
+
     func beginLogin() throws -> IOSCursorLoginStart {
         let verifierBytes = try secureRandomBytes(count: 32)
         let verifier = base64URL(verifierBytes)

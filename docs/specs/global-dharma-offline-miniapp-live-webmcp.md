@@ -2,7 +2,7 @@
 
 Status: active; implementation and exact-HEAD acceptance required  
 Owner: fabushi-ios/fabushi-ios native Marketplace / Mini App / Host integration  
-Last updated: 2026-10-11  
+Last updated: 2026-10-12  
 Related: PR #3; Desktop FPM-001; Desktop OMA-001; iOS full-parity spec
 
 ## 1. Context / problem
@@ -20,13 +20,16 @@ Therefore existing strings such as “WebMCP 已连接” or “Bot / Web UI 同
 
 Live authorities re-read for this task:
 - iOS main: `8b0e7236d75f8e16b868332e51cde41b6ee415fc`
-- iOS PR #3 pre-evidence HEAD for the 2026-10-12 rebaseline: `49c566a9c37373f4040c8624db2ef07e2171ce75` (the evidence/source commit produced by this review is newer; only its exact-head CI may be current evidence)
+- iOS PR #3 pre-evidence HEAD for the current 2026-10-12 rebaseline: `580687d941578af2289453a4ea9485cf703e2abe` (the repair commit produced by this review is newer; only its own exact-head CI may be current evidence)
 - Desktop main: `371b72f1cd20de03dc4dff9a15ed761054968093`
 - Backend main: `9c56a77cbe02dfceebf574236a703b53cd257cb9`
 - Platform Core main: `c301820b93274bda586fbb82be982afc3c2ee4d4`
 - Canonical Fabushi server/payment main: `c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52`
+- Marketplace main: `1971f2a93197cfb79d1e8f0856345f36776f3ca3`
 
 The original discovery HEAD was `1f1deb151cb2c137ba5f7f1470a14be263661b28`; it and all earlier workflow runs are historical diagnostics only. Final acceptance must bind to the latest exact PR HEAD.
+
+Current-main account-access audit (2026-10-12): Desktop `source/electron-main/account/access.ts@94f20c2ef465d57329d6b57558ca4954454fe66e` was re-read with `cursor-auth-wiring.ts` and `main-edge.ts`. The native ABI table already named `getSandAccess` / `getSandAccessFresh`, but the shipping Coordinator surface had no handler. This review adds the missing native reader/network owner (10 second `GetSandAccessStatus`, settled `authId ?? email`, logging-in/logged-out/missing-identity projection, backend-failure fallback and stale-overlap generation fencing) plus focused tests. This is source implementation only until the resulting exact HEAD passes GitHub Actions; `104bce47`, `da7feb0a`, `66a94cd9`, `580687d9` and their runs/jobs are predecessor evidence only.
 
 ## 2. Goal
 

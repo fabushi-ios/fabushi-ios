@@ -10,7 +10,7 @@
   "directChanges": [],
   "dependencyReview": {
     "status": "pending",
-    "reason": "Aggregate shared-contract review remains pending. The previously-open Coordinator reachability/DNS/transport telemetry slice is now wired into the single durable iOS lifecycle owner, and the Desktop attachment Main-RPC production edge is now implemented through an account+Agent-scoped native staging adapter backed by the existing canonical FeatureHost attachment owner. Both slices remain mapped until replacement exact-head Actions execute their focused Rust/Swift/protected evidence; unrelated shared-contract and full responsibility closure remains open. Exact-head rebaseline keeps aggregate review fail-closed: f0d2b9ec and descendant Settings/Global-Dharma owner-documentation runs are predecessor-only; installed Global Dharma local execution is the verified .fabapp -> Marketplace/Host source -> MiniAppWebMcpSurface -> active WKWebView session path, while GlobalDharmaMiniAppBridge remains explicitly online compatibility/service only.",
+    "reason": "Aggregate shared-contract review remains pending. The previously-open Coordinator reachability/DNS/transport telemetry slice is now wired into the single durable iOS lifecycle owner, and the Desktop attachment Main-RPC production edge is now implemented through an account+Agent-scoped native staging adapter backed by the existing canonical FeatureHost attachment owner. Both slices remain mapped until replacement exact-head Actions execute their focused Rust/Swift/protected evidence; unrelated shared-contract and full responsibility closure remains open. Exact-head rebaseline keeps aggregate review fail-closed: f0d2b9ec and descendant Settings/Global-Dharma owner-documentation runs are predecessor-only; installed Global Dharma local execution is the verified .fabapp -> Marketplace/Host source -> MiniAppWebMcpSurface -> active WKWebView session path, while GlobalDharmaMiniAppBridge remains explicitly online compatibility/service only. Current-main account/access.ts has now been individually re-read and its missing native runtime owner repaired, but aggregate shared-contract/dependency review and remaining responsibility groups are still open; no full-review promotion is made.",
     "sameDirectoryReviewPaths": [
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0014_remote_computer_client_tokens.sql",
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0016_remote_computer_session_provider.sql",
@@ -2014,7 +2014,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
+    "preEvidenceIosHead": "580687d941578af2289453a4ea9485cf703e2abe",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2072,7 +2072,11 @@
       38205042929,
       38205042937,
       38206242108,
-      38206242109
+      38206242109,
+      38206192675,
+      38206193373,
+      38206476939,
+      38206477006
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2137,18 +2141,34 @@
       114670280166,
       114670280441,
       114670247340,
-      114670247403
+      114670247403,
+      114669160993,
+      114669160998,
+      114670173527,
+      114670224947,
+      114670225039,
+      114670225473,
+      114670962514,
+      114670999830,
+      114671175314,
+      114671175405
     ],
-    "status": "mcp-ledger-schema-repair-human-call-implemented-resulting-exact-head-ci-required",
+    "status": "account-access-runtime-repair-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
       "docs/parity/desktop-main-impact.json",
       "docs/parity/desktop-main-release-evidence.json",
-      "docs/parity/desktop-main-index.json"
+      "docs/parity/desktop-main-index.json",
+      "source/ios-main/account/access.swift",
+      "source/ios-main/account/cursor-auth.swift",
+      "source/ios-main/account/cursor-dashboard-client.swift",
+      "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
+      "mobile/ios/FabushiTests/CursorAccessParityTests.swift",
+      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md"
     ],
-    "conclusion": "Architecture failure 38206242108/job 114670245589 was a fail-closed ledger target-path schema error, not a validator weakening. MCP aggregate keeps one canonical source target while production participants remain in evidence. Human Call current-main production composition is implemented, including Broadcast Upload Extension and CallKit/PushKit wiring, but physical two-device/APNs evidence remains open.",
-    "currentImplementationHead": "66a94cd9e2d2c614aed6293254dcbb791de4a55f"
+    "conclusion": "Current-main access.ts was re-read with cursor-auth-wiring/main-edge callers. The iOS ABI declared getSandAccess/getSandAccessFresh but had no native handler; this descendant adds the missing 10-second Dashboard fetch, settled authId ?? email identity, generation-fenced reader, production routing and focused tests. All predecessor runs/jobs remain diagnostic only; full 7,951-row/dependency/GD/FPM closure remains open.",
+    "currentImplementationHead": "580687d941578af2289453a4ea9485cf703e2abe"
   }
 }

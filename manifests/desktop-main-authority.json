@@ -31,7 +31,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
+    "preEvidenceIosHead": "580687d941578af2289453a4ea9485cf703e2abe",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -95,7 +95,11 @@
       38205042929,
       38205042937,
       38206242108,
-      38206242109
+      38206242109,
+      38206192675,
+      38206193373,
+      38206476939,
+      38206477006
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -160,9 +164,19 @@
       114670280166,
       114670280441,
       114670247340,
-      114670247403
+      114670247403,
+      114669160993,
+      114669160998,
+      114670173527,
+      114670224947,
+      114670225039,
+      114670225473,
+      114670962514,
+      114670999830,
+      114671175314,
+      114671175405
     ],
-    "status": "mcp-ledger-schema-repair-human-call-implemented-resulting-exact-head-ci-required",
+    "status": "account-access-runtime-repair-resulting-exact-head-ci-required",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
@@ -173,6 +187,6 @@
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
     "promotion": "implemented-only-no-verification-promotion",
-    "currentImplementationHead": "66a94cd9e2d2c614aed6293254dcbb791de4a55f"
+    "currentImplementationHead": "580687d941578af2289453a4ea9485cf703e2abe"
   }
 }
