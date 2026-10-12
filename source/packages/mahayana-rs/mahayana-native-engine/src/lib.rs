@@ -4056,14 +4056,15 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn unavailable_process_execution_fails_closed_without_spawning() {
+    #[tokio::test]
+    async fn unavailable_process_execution_fails_closed_without_spawning() {
         let error = run_process(
             &ProcessExecution::Unavailable,
             Path::new("."),
             "definitely-must-not-run",
             &[],
         )
+        .await
         .expect_err("mobile process execution must fail closed");
         assert!(matches!(error, KernelError::CapabilityUnavailable(_)));
         assert!(error
