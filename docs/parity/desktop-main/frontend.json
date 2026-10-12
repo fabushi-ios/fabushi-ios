@@ -197,7 +197,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Mechanism-only row; no separate iOS runtime owner is appropriate."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob 6abc80ab5edc505a7d0790bb40fef93bf0c460fb. This remains a TypeScript barrel-export mechanism only; Swift module visibility is the platform replacement and adjacent responsibilities are audited independently.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/packages/shared/src/mahayana-host-features.ts",
@@ -227,7 +229,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/ios-dev-controls/IOSDevControls.swift; mobile/ios/Fabushi/FabushiAppAgentSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d. DevShell is reconstruction/development mechanism, not an iOS product capability; native diagnostics/semantic automation are the replacement."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob e90b7636fb0c7a051bd431a1162f01bf2c69cf11. This is the reconstruction-only developer laboratory (DOM inspection/control-server/fixture/live previews), not a shipping product capability; iOS native development controls/semantic inspection remain the concrete replacement.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/dev/dom-inspector.ts",
@@ -242,7 +246,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/FabushiAppAgentSurface.swift",
       "test_evidence": "mobile/ios/FabushiTests/FabushiAppAgentSurfaceTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d. DOM inspection is platform mechanism only; native semantic/accessibility identity is the correct replacement."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob c0ea0dde8c2198c59508173488420e59b315b9ef. This is browser DOM/CSS-selector reconstruction tooling; SwiftUI has no DOM identity and the bounded native semantic/accessibility surface is the concrete platform replacement.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/env.d.ts",
@@ -257,7 +263,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/production/ProductionRenderer.view.swift; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d. This row is compile-time browser typing only."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob d5acaeb34b4c2cb056afb6c11dda9b372779f10d. This file only declares Electron renderer globals at TypeScript compile time; native Swift types/dependency injection replace the mechanism and no independent runtime responsibility exists.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/main.tsx",
