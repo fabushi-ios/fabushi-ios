@@ -20,6 +20,7 @@ final class IOSAppStoreUpdateService {
     private let metadataProvider: @MainActor () -> IOSReleaseMetadata?
     private let policyFetcher: PolicyFetcher
     private(set) var policyLoadState: IOSAppVersionPolicyLoadState = .idle
+    private(set) var backendRequiresUpdate = false
     private var refreshGeneration: UInt64 = 0
 
     init(
@@ -91,9 +92,9 @@ final class IOSAppStoreUpdateService {
             ])
         }
 
-        let isBelowMinimumVersion = retainedPolicy.map { policy in
+        let isBelowMinimumVersion = backendRequiresUpdate || (retainedPolicy.map { policy in
             policy.isRequired || (currentBuild.map { $0 < policy.minSupportedBuildNumber } ?? false)
-        } ?? false
+        } ?? false)
 
         var result: [String: CoordinatorPayload] = [
             "state": state,
@@ -118,6 +119,13 @@ final class IOSAppStoreUpdateService {
             result["rolloutPercentage"] = .number(Double(policy.rolloutPercentage))
         }
         return .object(result)
+    }
+
+    @discardableResult
+    func noteBackendUpdateRequirement(_ required: Bool) -> Bool {
+        guard backendRequiresUpdate != required else { return false }
+        backendRequiresUpdate = required
+        return true
     }
 
     func checkForUpdates() async throws -> CoordinatorPayload {
