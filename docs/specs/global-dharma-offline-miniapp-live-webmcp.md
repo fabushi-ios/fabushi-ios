@@ -397,3 +397,10 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - Desktop emoji catalog/picker was re-read against `371b72f1cd20de03dc4dff9a15ed761054968093`. iOS does not depend on the system keyboard for the product catalog: it bundles an `emojibase-data@17.0.0` native catalog with 3,944 entries / 2,030 skin variants, bounded search, categories, aliases, recents ranking, reacted-state accessibility and navigation semantics. The catalog row is therefore `ios-adapted/implemented`; the picker moves from mapped to implemented. Fixed web CSS remains a native-layout replacement.
 - Frame/index/listener/message-actions/mount/protocol/reaction-actions were individually re-read against their shipping native owners. No verified promotion is made.
 - Strict inventory continues with reaction-feed / reaction-picker handoff / registry-resolver and later rows. Global Dharma artifact provenance, strict completeness, signer, StoreKit, signed archive/device/distribution and independent acceptance remain open.
+
+
+## 2026-10-12 strict architecture Computer blob repair
+
+- `d1501b80123ff6dfece5d757c85e6b9ed6d5210f` architecture run `38201916948` / job `114656978655` failed the strict source gate on stale ledger Git blob hashes; authority-only passed and rust-host/build-and-test/device-archive were skipped.
+- Descendant `31897c0b6cf51f531530c1f85e268e2accd87bb0` corrects the exact Desktop `371b72f1cd20de03dc4dff9a15ed761054968093` blobs: overlay entrypoint `d8f739e4f7f22d85df6815bd86a5af86ad2b9321`, overlay view `e83c5e37a282d06855a11c78e39c9327905a807f`, rebuild banner `eaf9324f9f8eef3a264ba80da124f4ab52752282`. No gate or validator changed.
+- All d1501b80 and pre-evidence descendant runs/jobs are predecessor-only. Fresh resulting exact-head Actions are required before any evidence promotion.
