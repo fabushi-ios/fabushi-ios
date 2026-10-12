@@ -1103,11 +1103,11 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/account/session/menu.view.swift (native account menu and iOS self-reference disposition); App Store update lifecycle",
       "test_evidence": "account/menu native UI coverage plus final App Store/TestFlight acceptance remains separately gated",
-      "notes": "Current-main exact diff deletes experimentsSnapshot/onOpenIos/labels.ios/isIosLinkEnabled and the conditional iOS menu item. On the target iOS platform that Desktop-only entry is intrinsically non-applicable; native settings already documents the self-reference replacement. This disposition is only for the removed `Get iOS` entry, not the broader account menu. Validator run 37836845827 confirmed every direct-changed source must remain behind the current-main re-review fence while aggregate review is incomplete; retain the audited disposition/evidence but do not mark authority review closed yet.",
+      "notes": "Re-read exact Desktop blob d7f2fe093ad210eee719441ea54f725222970391 at current Desktop main 371b72f1. The current-main responsibility is removal of the Desktop-only experimental Get iOS entry; that self-reference is intrinsically non-applicable on iOS. The broader native account menu remains independently implemented. This closes only the bounded source review and does not imply release verification.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/account/session/sign-in-status.tsx",
@@ -1122,11 +1122,13 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/account/session/sign-in-status.view.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/ios-main/account/cursor-auth.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccountSessionFrontendParityTests.swift covers active-attempt/busy phase priority; current descendant exact-head ordinary/protected Actions are required for the retry-error reset shipping change.",
-      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native ASWebAuthenticationSession replaces the browser surface without moving credential truth into SwiftUI. Start/reopen/cancel remain canonical bridge operations; reopen/cancel now clear stale presentation errors before a new action, matching Desktop run() semantics. Keep implemented until descendant exact-head ordinary/protected evidence succeeds.",
+      "notes": "Re-read exact Desktop blob 27baf91b25ff168f06220d673f94f2b1120e24cd at current Desktop main 371b72f1. AccountSignInStatusView preserves start/reopen/cancel/error semantics while MarketplaceModel -> IOSPreloadBridge -> Coordinator/Host retains canonical login attempt and credential truth. Keep implemented pending same-final-SHA Actions/artifact/independent evidence.",
       "ios_symbol": "AccountSignInStatusView; MarketplaceModel.beginBrowserLogin/reopenBrowserLogin/cancelBrowserLogin; IOSCursorAuthService",
       "ios_owner": "MarketplaceModel owns native sign-in presentation state; IOSCursorAuthService owns credential/login-attempt authority behind the typed preload/Coordinator boundary.",
       "ios_runtime_entrypoint": "ContentView+HomeAuth -> AccountSignInStatusView -> MarketplaceModel -> IOSPreloadBridge feature.auth.browserStart/browserReopen/browserCancel -> IOSMainRuntime/Coordinator -> IOSCursorAuthService",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions after account-session retry-state repair"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after account-session retry-state repair",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/account/session/sign-out.tsx",
@@ -1141,11 +1143,13 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/account/session/sign-out.view.swift; frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift; mobile/ios/Fabushi/MarketplaceModel.swift; source/ios-main/account/cursor-auth.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccountSessionFrontendParityTests.swift covers close-only-after-logged-out projection; session settlement/credential durability remain covered by the iOS auth/session contract suite; current descendant exact-head Actions pending.",
-      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Native sheet replaces OverlayDialog: interactive dismiss/cancel/confirm are disabled while busy, errors keep the sheet open, and closure occurs only after the canonical logged-out projection. IOSCursorAuthService freezes the departing token, attempts both Keychain deletions, publishes logged-out state and ships terminal settlement without creating renderer-owned auth truth. Keep implemented until descendant exact-head evidence succeeds.",
+      "notes": "Re-read exact Desktop blob adac949f01e36ade242c9118089305f70309bce5 at current Desktop main 371b72f1. Native sign-out disables dismiss/cancel/confirm while busy, keeps failures visible, and closes only after canonical logged-out projection; renderer does not fabricate auth state. Keep implemented pending same-final-SHA evidence.",
       "ios_symbol": "AccountSignOutDialogView.confirmSignOut; MarketplaceModel.logout; IOSCursorAuthService.logout/clearCredentials",
       "ios_owner": "AccountSignOutDialogView owns only busy/error presentation; MarketplaceModel and IOSCursorAuthService retain canonical account/logout authority.",
       "ios_runtime_entrypoint": "ContentView+HomeAuth -> AccountSignOutDialogView -> MarketplaceModel.logout -> IOSPreloadBridge feature.auth.logout -> IOSMainRuntime/Coordinator -> IOSCursorAuthService.clearCredentials",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions after account-session dependency review"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after account-session dependency review",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info-members.contract.test.ts",
@@ -1179,11 +1183,13 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift",
       "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers request-scope fencing and Desktop-equivalent age buckets.",
-      "notes": "Re-reviewed against Desktop main. A real native formatting defect that rendered literal placeholder text was repaired; one panel-scoped 30-second structured-concurrency loop replaces Desktop's shared observable clock without per-row timers.",
+      "notes": "Re-read exact Desktop blob 3ed6cb3e84695c017c63ab81322d68625912024d at current Desktop main 371b72f1. Shipping MobileAsyncTasksPanel/Host path preserves one panel-scoped 30-second clock, strict running-task decoding, Agent+reconnect+generation fencing, last-known rows on transient failure and native refresh/close presentation. Keep implemented pending same-final-SHA evidence.",
       "ios_symbol": "MobileAsyncTasksPanel task lifetime; mobileAsyncTaskRelativeTime",
       "ios_owner": "One SwiftUI panel task owns the 30-second age/refresh clock and is cancelled by view/Agent/reconnect identity replacement.",
       "ios_runtime_entrypoint": "MobileBotChat -> MobileAsyncTasksPanel.task(id: agentId:reconnectGeneration)",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions after async-task visible-time repair"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after async-task visible-time repair",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/provider.ts",
@@ -1198,11 +1204,13 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift; source/packages/mahayana-rs/mahayana-app-host/src/lib.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers strict task decoding, request identity fencing and visible formatting; descendant exact-head Actions pending.",
-      "notes": "Current native owner strictly decodes running subagent/shell/cloud-agent rows, retains last known rows on transient failure, polls at 30s/pull-to-refresh, and fences stale Agent/reconnect/generation completions. Capability-specific unavailable UI remains platform-adapted to a generic native unavailable/error state; final exact-head evidence remains required.",
+      "notes": "Re-read exact Desktop blob ec3ade25819916697a0a30b4aedf806a6d93cd70 at current Desktop main 371b72f1. Shipping MobileAsyncTasksPanel/Host path preserves one panel-scoped 30-second clock, strict running-task decoding, Agent+reconnect+generation fencing, last-known rows on transient failure and native refresh/close presentation. Keep implemented pending same-final-SHA evidence.",
       "ios_symbol": "MobileAsyncTask.init; MobileAsyncTasksRequestScope; MobileAsyncTasksPanel.refresh",
       "ios_owner": "MobileAsyncTasksPanel is the native presentation/provider owner over canonical IOSPreloadBridge getAsyncTasks; Rust Host remains task truth.",
       "ios_runtime_entrypoint": "MobileBotChat -> MobileAsyncTasksPanel -> IOSPreloadBridge.getAsyncTasks -> Coordinator/AppHost/FeatureHost",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/async-tasks/view.tsx",
@@ -1217,11 +1225,13 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/agent-info/MobileAsyncTasksPanel.swift; frontend/src/recovered/features/conversation/MobileBotChat.swift",
       "test_evidence": "mobile/ios/FabushiTests/AsyncTasksParityTests.swift covers strict decoding, kind/detail label projection and age buckets.",
-      "notes": "Native sheet replaces movable DOM geometry while preserving running task kind/detail/age, empty/loading/error-with-previous, close and refresh effects. This descendant repairs literal '(kind)'/'(minutes)' placeholder output so shipping text now matches Desktop semantics.",
+      "notes": "Re-read exact Desktop blob f6403a06f44725bf320a01166a2b8e5253f7dab5 at current Desktop main 371b72f1. Shipping MobileAsyncTasksPanel/Host path preserves one panel-scoped 30-second clock, strict running-task decoding, Agent+reconnect+generation fencing, last-known rows on transient failure and native refresh/close presentation. Keep implemented pending same-final-SHA evidence.",
       "ios_symbol": "MobileAsyncTasksPanel; mobileAsyncTaskMetadata; mobileAsyncTaskRelativeTime",
       "ios_owner": "SwiftUI Agent Info async-tasks surface backed by the canonical Host task snapshot.",
       "ios_runtime_entrypoint": "MobileBotChat Agent header -> MobileAsyncTasksPanel",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions after UI interpolation repair"
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after UI interpolation repair",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/avatar-editor/controller.ts",
@@ -1506,10 +1516,12 @@
       "ios_target_path": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "iOS adapts the Electron/Coordinator bridge to dedicated AppHost RPC backed by Rust-owned MahayanaProductClient; generic platform.request remains unable to access /sand.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs (closed Host-owned sharing RPC surface and request validation); source/packages/mahayana-rs/mahayana-product/src/lib.rs (Host-owned bearer path plus strict fail-closed /sand share-state projection).",
       "test_evidence": "Focused Rust shared-room projection contract tests in source/packages/mahayana-rs/mahayana-product/src/lib.rs; exact-HEAD ordinary/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
+      "notes": "Re-read exact Desktop blob 52bdec870823f24b27f2f8bf24362857c298b439 at current Desktop main 371b72f1 against MobileBotSharedRoom/GrokMobileSharedRoomModel and canonical AppHost sharing owner. Typed sharing state, invite/join/member operations and lifecycle/account fencing remain shipping-composed. Historical verified evidence is not bound to the current iOS final SHA, so this row is deliberately demoted to implemented; no workflow/artifact/reviewer fields are fabricated.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/controller.ts",
@@ -1521,10 +1533,12 @@
       "ios_target_path": "frontend/src/production/MobileBotSharedRoom.swift",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "SwiftUI Task cancellation plus account/agent/generation fences replace React provider subscriptions while preserving Host-as-authority mutation semantics.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotSharedRoom.swift (account/agent/generation fences plus per-key pending mutation set; distinct keys no longer globally cancel/block each other); frontend/src/production/GrokMobileSharedRoomModel.swift (strict native shared-room state/lifecycle projection used by the shipping view).",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileSharedRoomModelTests.swift covers lifecycle fencing and per-key duplicate/concurrency policy; exact-HEAD ordinary/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
+      "notes": "Re-read exact Desktop blob e0ccc2adf36551e7fbb8429476720748a0b9b9ca at current Desktop main 371b72f1 against MobileBotSharedRoom/GrokMobileSharedRoomModel and canonical AppHost sharing owner. Typed sharing state, invite/join/member operations and lifecycle/account fencing remain shipping-composed. Historical verified evidence is not bound to the current iOS final SHA, so this row is deliberately demoted to implemented; no workflow/artifact/reviewer fields are fabricated.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/model.ts",
@@ -1536,10 +1550,12 @@
       "ios_target_path": "frontend/src/production/GrokMobileSharedRoomModel.swift",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "Native Swift value types replace TypeScript projections while retaining strict all-or-nothing member/room/request validation.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileSharedRoomModel.swift plus source/packages/mahayana-rs/mahayana-product/src/lib.rs; both boundaries fail closed on malformed shared-room state.",
       "test_evidence": "Focused Swift malformed top-level/nested projection tests and Rust all-or-nothing shared-room contract tests; exact-HEAD ordinary/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
+      "notes": "Re-read exact Desktop blob 8c47431d155534fa9932360d5d61d36c564614ff at current Desktop main 371b72f1 against MobileBotSharedRoom/GrokMobileSharedRoomModel and canonical AppHost sharing owner. Typed sharing state, invite/join/member operations and lifecycle/account fencing remain shipping-composed. Historical verified evidence is not bound to the current iOS final SHA, so this row is deliberately demoted to implemented; no workflow/artifact/reviewer fields are fabricated.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/trigger.tsx",
@@ -1551,10 +1567,12 @@
       "ios_target_path": "frontend/src/production/MobileBotSharedRoom.swift",
       "ios_language": "Swift + Rust",
       "ios_platform_delta": "SwiftUI conditional Section/sheet replaces the React header button; no local room is synthesized when Host state has no roomId.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotSharedRoom.swift (shipping shared-room sheet/entry composition); frontend/src/production/MobileBotAgentSettings.swift (Agent Settings trigger conditioned on Host-projected sharing enabled plus a real room).",
       "test_evidence": "GrokMobileSharedRoomModelTests cover deterministic room/snapshot projection; exact-HEAD shipping UI/protected Actions still required before verified. Verified against exact production/code HEAD 4e98060aa7052e8761c221ae129b40e9b483a6af: ordinary run 37378557605 completed/success for architecture, rust-host, build-and-test, and device-archive; device archive artifact 11372729184 digest sha256:9a1e0c5b0c0bca54f1bc70a435cdac27a2d9591e7c63b9c34a4f524b4225493e. Protected run 37378557599 completed/success including the real Global Dharma journey; protected artifact 11374012309 digest sha256:b19f163477a203dde5e463cb2fae2f8ea615f159eac020e72081e52ce755ab10.",
-      "notes": "Shared-room parity repair is implemented on the shipping iOS path. Keep this row at implemented until focused parity tests and both ordinary and protected exact-HEAD gates succeed; separate Host CrossUserSharing transcript/relay/remote-turn responsibilities remain independently gated. Promoted to verified only after both exact-HEAD ordinary and protected acceptance gates completed successfully."
+      "notes": "Re-read current exact trigger source at current Desktop main 371b72f1 against MobileBotSharedRoom/GrokMobileSharedRoomModel and canonical AppHost sharing owner. Typed sharing state, invite/join/member operations and lifecycle/account fencing remain shipping-composed. Historical verified evidence is not bound to the current iOS final SHA, so this row is deliberately demoted to implemented; no workflow/artifact/reviewer fields are fabricated.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/agent-info/shared-room/view.tsx",
