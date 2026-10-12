@@ -210,6 +210,39 @@ final class MarketplaceModelLifecycleTests: XCTestCase {
     }
 
 
+    func testMarketplacePluginAccountIdentityRequiresCompleteStrictHostIdentity() throws {
+        let identity = try XCTUnwrap(MarketplaceModel.marketplacePluginAccountIdentity(from: [
+            "protocol": "fabushi.plugin-account-identity.v1",
+            "accountScope": String(repeating: "a", count: 64),
+            "accountGeneration": String(repeating: "b", count: 64),
+        ]))
+        XCTAssertEqual(identity.accountScope, String(repeating: "a", count: 64))
+        XCTAssertEqual(identity.accountGeneration, String(repeating: "b", count: 64))
+
+        let params = MarketplaceModel.accountBoundParams(
+            ["pluginId": "global-dharma"],
+            identity: identity
+        )
+        XCTAssertEqual(params["pluginId"] as? String, "global-dharma")
+        XCTAssertEqual(
+            params["expectedAccountScope"] as? String,
+            String(repeating: "a", count: 64)
+        )
+        XCTAssertEqual(
+            params["expectedAccountGeneration"] as? String,
+            String(repeating: "b", count: 64)
+        )
+        XCTAssertNil(MarketplaceModel.marketplacePluginAccountIdentity(from: [
+            "protocol": "fabushi.plugin-account-identity.v1",
+            "accountScope": String(repeating: "A", count: 64),
+            "accountGeneration": String(repeating: "b", count: 64),
+        ]))
+        XCTAssertNil(MarketplaceModel.marketplacePluginAccountIdentity(from: [
+            "protocol": "fabushi.plugin-account-identity.v1",
+            "accountScope": String(repeating: "a", count: 64),
+        ]))
+    }
+
     func testMarketplaceInstalledProjectionMergesLocalAndCanonicalAccountTruth() {
         let ids = MarketplaceModel.projectInstalledMiniAppIds(
             localRows: [

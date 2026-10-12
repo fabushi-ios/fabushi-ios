@@ -1886,6 +1886,18 @@ struct AccountFeedbackError: LocalizedError, Equatable {
     var errorDescription: String? { code.localizedMessage }
 }
 
+struct MarketplacePluginAccountIdentity: Equatable, Sendable {
+    let accountScope: String
+    let accountGeneration: String
+
+    var expectedParams: [String: Any] {
+        [
+            "expectedAccountScope": accountScope,
+            "expectedAccountGeneration": accountGeneration,
+        ]
+    }
+}
+
 @MainActor
 @Observable
 final class MarketplaceModel {
@@ -2000,6 +2012,57 @@ final class MarketplaceModel {
         onboardingStep = MobileSignedInOnboardingStep.meet.rawValue
         toolResultRendererObserver = bridge.addRendererEventObserver { [weak self] family, payload in
             self?.consumeRendererEvent(family: family, payload: payload)
+        }
+    }
+
+    nonisolated static func marketplacePluginAccountIdentity(
+        from value: Any?
+    ) -> MarketplacePluginAccountIdentity? {
+        guard let object = value as? [String: Any],
+              object["protocol"] as? String == "fabushi.plugin-account-identity.v1",
+              let accountScope = object["accountScope"] as? String,
+              let accountGeneration = object["accountGeneration"] as? String,
+              accountScope.range(
+                of: #"^[0-9a-f]{64}$"#,
+                options: .regularExpression
+              ) != nil,
+              accountGeneration.range(
+                of: #"^[0-9a-f]{64}$"#,
+                options: .regularExpression
+              ) != nil
+        else { return nil }
+        return MarketplacePluginAccountIdentity(
+            accountScope: accountScope,
+            accountGeneration: accountGeneration
+        )
+    }
+
+    nonisolated static func accountBoundParams(
+        _ params: [String: Any],
+        identity: MarketplacePluginAccountIdentity
+    ) -> [String: Any] {
+        var result = params
+        for (key, value) in identity.expectedParams {
+            result[key] = value
+        }
+        return result
+    }
+
+    private func pluginAccountIdentity() async throws -> MarketplacePluginAccountIdentity {
+        let response = try await bridge.request(method: "feature.plugin.accountIdentity")
+        guard let identity = Self.marketplacePluginAccountIdentity(from: response.value) else {
+            throw MahayanaCoordinator.CoordinatorError.invalidResponse
+        }
+        return identity
+    }
+
+    private func ensurePluginAccountIdentity(
+        _ expected: MarketplacePluginAccountIdentity
+    ) async throws {
+        guard try await pluginAccountIdentity() == expected else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Account generation changed while Marketplace operation was in flight"
+            )
         }
     }
 
@@ -5260,23 +5323,41 @@ final class MarketplaceModel {
         loading = true
         defer { loading = false }
         do {
+            let identity = loggedIn ? try await pluginAccountIdentity() : nil
+            let browseParams: [String: Any] = [
+                "query": query.isEmpty ? NSNull() : query,
+                "platform": "ios",
+            ]
             let result = try await bridge.request(
                 method: "feature.marketplace.browse",
-                params: ["query": query.isEmpty ? NSNull() : query, "platform": "ios"]
+                params: identity.map {
+                    Self.accountBoundParams(browseParams, identity: $0)
+                } ?? browseParams
             )
             let object = result.value as? [String: Any]
             let rows = object?["plugins"] as? [[String: Any]] ?? []
-            plugins = rows.compactMap(Self.marketplacePlugin(from:))
-            if loggedIn {
-                let localInstalled = try await bridge.request(method: "feature.plugin.listInstalled")
-                let localRows = (localInstalled.value as? [String: Any])?["plugins"] as? [[String: Any]] ?? []
-                let accountInstalled = try await bridge.request(method: "feature.marketplace.added")
-                let accountRows = (accountInstalled.value as? [String: Any])?["apps"] as? [[String: Any]] ?? []
+            let nextPlugins = rows.compactMap(Self.marketplacePlugin(from:))
+            if let identity {
+                let localInstalled = try await bridge.request(
+                    method: "feature.plugin.listInstalled",
+                    params: identity.expectedParams
+                )
+                let localRows = (localInstalled.value as? [String: Any])?["plugins"]
+                    as? [[String: Any]] ?? []
+                let accountInstalled = try await bridge.request(
+                    method: "feature.marketplace.added",
+                    params: identity.expectedParams
+                )
+                let accountRows = (accountInstalled.value as? [String: Any])?["apps"]
+                    as? [[String: Any]] ?? []
+                try await ensurePluginAccountIdentity(identity)
+                plugins = nextPlugins
                 installedPluginIds = Self.projectInstalledMiniAppIds(
                     localRows: localRows,
                     accountRows: accountRows
                 )
             } else {
+                plugins = nextPlugins
                 installedPluginIds = []
             }
             message = "原生 iOS · Rust Host 已连接"
@@ -5298,9 +5379,13 @@ final class MarketplaceModel {
         installingPluginId = plugin.pluginId
         message = "正在安装 \(plugin.pluginId)@\(version)…"
         do {
+            let identity = try await pluginAccountIdentity()
             let metadata = try await bridge.request(
                 method: "feature.marketplace.release",
-                params: ["pluginId": plugin.pluginId, "version": version, "platform": "ios"]
+                params: Self.accountBoundParams(
+                    ["pluginId": plugin.pluginId, "version": version, "platform": "ios"],
+                    identity: identity
+                )
             )
             guard let release = (metadata.value as? [String: Any])?["releaseManifest"] as? [String: Any] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
@@ -5316,7 +5401,10 @@ final class MarketplaceModel {
             else { throw MahayanaCoordinator.CoordinatorError.invalidResponse }
             let installed = try await bridge.request(
                 method: "feature.plugin.install",
-                params: ["release": release, "platform": "ios"]
+                params: Self.accountBoundParams(
+                    ["release": release, "platform": "ios"],
+                    identity: identity
+                )
             )
             guard let object = installed.value as? [String: Any] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
@@ -5326,7 +5414,10 @@ final class MarketplaceModel {
             let permissions = object["requestedPermissions"] as? [String] ?? []
             let accountInstall = try await bridge.request(
                 method: "feature.marketplace.add",
-                params: ["pluginId": pluginId, "platform": "ios"]
+                params: Self.accountBoundParams(
+                    ["pluginId": pluginId, "platform": "ios"],
+                    identity: identity
+                )
             )
             guard let accountObject = accountInstall.value as? [String: Any],
                   accountObject["accountSynchronized"] as? Bool == true,
@@ -5336,6 +5427,7 @@ final class MarketplaceModel {
             else {
                 throw MahayanaCoordinator.CoordinatorError.requestFailed("Mini App 已本地安装，但 Fabushi 账号/Bot 同步未完成")
             }
+            try await ensurePluginAccountIdentity(identity)
             accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installedPluginIds.insert(pluginId)
             installingPluginId = nil
@@ -5375,19 +5467,27 @@ final class MarketplaceModel {
         installingPluginId = pluginId
         message = "正在移除 \(pluginId)…"
         do {
+            let identity = try await pluginAccountIdentity()
             _ = try await bridge.request(
                 method: "feature.plugin.uninstall",
-                params: ["pluginId": pluginId]
+                params: Self.accountBoundParams(
+                    ["pluginId": pluginId],
+                    identity: identity
+                )
             )
             let accountRemoval = try await bridge.request(
                 method: "feature.marketplace.remove",
-                params: ["pluginId": pluginId]
+                params: Self.accountBoundParams(
+                    ["pluginId": pluginId],
+                    identity: identity
+                )
             )
             guard let object = accountRemoval.value as? [String: Any],
                   object["removed"] != nil || object["miniAppId"] as? String == pluginId
             else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
+            try await ensurePluginAccountIdentity(identity)
             installedPluginIds.remove(pluginId)
             accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil
@@ -5473,11 +5573,15 @@ final class MarketplaceModel {
         return plugin
     }
 
-    private func reconcileLocalMiniAppInstall(_ plugin: MarketplacePlugin) async throws {
+    private func reconcileLocalMiniAppInstall(
+        _ plugin: MarketplacePlugin,
+        identity: MarketplacePluginAccountIdentity
+    ) async throws {
         let active = try await bridge.request(
             method: "feature.plugin.active",
             params: ["pluginId": plugin.pluginId]
         )
+        try await ensurePluginAccountIdentity(identity)
         if Self.activeLocalInstallSatisfies(
             plugin: plugin,
             pointer: active.value as? [String: Any]
@@ -5492,7 +5596,10 @@ final class MarketplaceModel {
         }
         let metadata = try await bridge.request(
             method: "feature.marketplace.release",
-            params: ["pluginId": plugin.pluginId, "version": version, "platform": "ios"]
+            params: Self.accountBoundParams(
+                ["pluginId": plugin.pluginId, "version": version, "platform": "ios"],
+                identity: identity
+            )
         )
         guard let metadataObject = metadata.value as? [String: Any],
               let release = metadataObject["releaseManifest"] as? [String: Any]
@@ -5512,13 +5619,17 @@ final class MarketplaceModel {
         }
         let installed = try await bridge.request(
             method: "feature.plugin.install",
-            params: ["release": release, "platform": "ios"]
+            params: Self.accountBoundParams(
+                ["release": release, "platform": "ios"],
+                identity: identity
+            )
         )
         guard let pointer = installed.value as? [String: Any],
               Self.activeLocalInstallSatisfies(plugin: plugin, pointer: pointer)
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
+        try await ensurePluginAccountIdentity(identity)
     }
 
     nonisolated static func canonicalGeneratedMiniAppArtifactPath(_ raw: String) -> String? {
@@ -5870,14 +5981,27 @@ final class MarketplaceModel {
         else {
             throw MahayanaCoordinator.CoordinatorError.invalidResponse
         }
-        return try await localMiniAppSource(pluginId: approval.reservedAppId)
+        let identity = try await pluginAccountIdentity()
+        guard identity.accountScope == approval.accountScope else {
+            throw MahayanaCoordinator.CoordinatorError.requestFailed(
+                "Account changed after local Mini App installation"
+            )
+        }
+        return try await localMiniAppSource(
+            pluginId: approval.reservedAppId,
+            identity: identity
+        )
     }
 
-    private func localMiniAppSource(pluginId: String) async throws -> LocalMiniAppSource {
+    private func localMiniAppSource(
+        pluginId: String,
+        identity: MarketplacePluginAccountIdentity
+    ) async throws -> LocalMiniAppSource {
         let result = try await bridge.request(
             method: "feature.plugin.uiDocument",
             params: ["pluginId": pluginId]
         )
+        try await ensurePluginAccountIdentity(identity)
         guard let object = result.value as? [String: Any],
               object["pluginId"] as? String == pluginId,
               let version = object["version"] as? String, !version.isEmpty,
@@ -5910,17 +6034,24 @@ final class MarketplaceModel {
 
     func loadLocalMiniAppSource(plugin: MarketplacePlugin) async -> LocalMiniAppSource? {
         do {
-            return try await localMiniAppSource(pluginId: plugin.pluginId)
-        } catch {
+            let identity = try await pluginAccountIdentity()
             do {
-                try await reconcileLocalMiniAppInstall(plugin)
-                return try await localMiniAppSource(pluginId: plugin.pluginId)
+                return try await localMiniAppSource(
+                    pluginId: plugin.pluginId,
+                    identity: identity
+                )
             } catch {
-                message = Self.requiresVerifiedLocalMiniAppPackage(pluginId: plugin.pluginId)
-                    ? "本地 Mini App 包不可用；该应用禁止 Hosted WebMCP 回退：\(error.localizedDescription)"
-                    : "本地 Mini App 包不可用，转 Hosted WebMCP：\(error.localizedDescription)"
-                return nil
+                try await reconcileLocalMiniAppInstall(plugin, identity: identity)
+                return try await localMiniAppSource(
+                    pluginId: plugin.pluginId,
+                    identity: identity
+                )
             }
+        } catch {
+            message = Self.requiresVerifiedLocalMiniAppPackage(pluginId: plugin.pluginId)
+                ? "本地 Mini App 包不可用；该应用禁止 Hosted WebMCP 回退：\(error.localizedDescription)"
+                : "本地 Mini App 包不可用，转 Hosted WebMCP：\(error.localizedDescription)"
+            return nil
         }
     }
 
