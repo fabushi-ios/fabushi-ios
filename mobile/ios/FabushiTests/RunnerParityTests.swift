@@ -332,4 +332,171 @@ final class RunnerParityTests: XCTestCase {
         )
     }
 
+    func testRemoteExecDaemonShellUsesCanonicalBearerConnectWire() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "network",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        var observed: URLRequest?
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                observed = request
+
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)])
+                        + payload
+                }
+
+                let stdout = field(1, bytes: Data("ok\n".utf8))
+                let stdoutEvent = field(1, bytes: stdout)
+                let stdoutClient = field(14, bytes: stdoutEvent)
+                let stdoutElement = field(1, bytes: stdoutClient)
+
+                let exitBody = vfield(1, value: 0) + field(2, bytes: Data("/workspace".utf8))
+                let exitEvent = field(3, bytes: exitBody)
+                let exitClient = field(14, bytes: exitEvent)
+                let exitElement = field(1, bytes: exitClient)
+
+                let body = frame(stdoutElement) + frame(exitElement) + frame(Data("{}".utf8), flags: 0x02)
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/connect+proto"]
+                )!
+                return (body, response)
+            }
+        )
+        let result = try await client.dispatch(
+            method: "local-exec.shell.exec",
+            params: .object([
+                "command": .string("pwd"),
+                "workingDirectory": .string("/workspace"),
+                "toolCallId": .string("tool-shell"),
+            ])
+        )
+        XCTAssertEqual(observed?.url?.path, "/agent.v1.ExecService/Exec")
+        XCTAssertEqual(observed?.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
+        XCTAssertEqual(observed?.value(forHTTPHeaderField: "Content-Type"), "application/proto")
+        XCTAssertEqual(observed?.value(forHTTPHeaderField: "Connect-Protocol-Version"), "1")
+        guard let body = observed?.httpBody else { return XCTFail("missing ExecServerMessage body") }
+        XCTAssertTrue(body.contains(Data("pwd".utf8)))
+        XCTAssertTrue(body.contains(Data("/workspace".utf8)))
+        guard case .object(let value) = result else { return XCTFail("expected shell result") }
+        XCTAssertEqual(value["success"], .bool(true))
+        XCTAssertEqual(value["code"], .number(0))
+        XCTAssertEqual(value["stdout"], .string("ok\n"))
+        XCTAssertEqual(value["cwd"], .string("/workspace"))
+    }
+
+    func testRemoteExecDaemonReadAndProcessFailClosedSemantics() async throws {
+        let descriptor = IOSCursorSandBoxConnection(
+            networkToken: "",
+            execDaemonAuthToken: "secret",
+            execDaemonURL: "https://exec.example.test",
+            vncURL: "",
+            gatewayURL: "",
+            gatewayToken: "",
+            forkVNCBaseURL: ""
+        )
+        let client = IOSRemoteExecDaemonClient(
+            descriptor: descriptor,
+            requestExecutor: { request in
+                func varint(_ value: UInt64) -> Data {
+                    var value = value
+                    var data = Data()
+                    repeat {
+                        var byte = UInt8(value & 0x7f)
+                        value >>= 7
+                        if value != 0 { byte |= 0x80 }
+                        data.append(byte)
+                    } while value != 0
+                    return data
+                }
+                func field(_ number: UInt64, bytes: Data) -> Data {
+                    varint((number << 3) | 2) + varint(UInt64(bytes.count)) + bytes
+                }
+                func vfield(_ number: UInt64, value: UInt64) -> Data {
+                    varint(number << 3) + varint(value)
+                }
+                func frame(_ payload: Data, flags: UInt8 = 0) -> Data {
+                    let n = UInt32(payload.count)
+                    return Data([flags, UInt8(n >> 24), UInt8(n >> 16), UInt8(n >> 8), UInt8(n)])
+                        + payload
+                }
+
+                let success =
+                    field(1, bytes: Data("/workspace/README.md".utf8))
+                    + field(2, bytes: Data("hello".utf8))
+                    + vfield(3, value: 1)
+                    + vfield(4, value: 5)
+                let readResult = field(1, bytes: success)
+                let clientMessage = field(7, bytes: readResult)
+                let element = field(1, bytes: clientMessage)
+                let data = frame(element) + frame(Data("{}".utf8), flags: 0x02)
+                return (
+                    data,
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/connect+proto"]
+                    )!
+                )
+            }
+        )
+
+        let read = try await client.dispatch(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("readArgs"),
+                "args": .object([
+                    "path": .string("/workspace/README.md"),
+                    "toolCallId": .string("tool-read"),
+                ]),
+            ])
+        )
+        guard case .object(let value) = read else { return XCTFail("expected read result") }
+        XCTAssertEqual(value["content"], .string("hello"))
+        XCTAssertEqual(value["success"], .bool(true))
+
+        do {
+            _ = try await client.dispatch(
+                method: "local-exec.process.exec",
+                params: .object([
+                    "program": .string("git"),
+                    "args": .array([.string("status")]),
+                ])
+            )
+            XCTFail("argv process execution must remain fail-closed without a canonical daemon branch")
+        } catch let error as IOSRemoteExecDaemonError {
+            XCTAssertEqual(error, .unsupported("local-exec.process.exec"))
+        }
+    }
+
+
 }
