@@ -96,6 +96,17 @@ final class IOSMainRuntime {
         )
         self.passkeyProvider = passkeyProvider
 
+        let updateWiring = IOSUpdateServiceWiring(
+            telemetry: { projection in
+                reporter.report(
+                    .update,
+                    level: IOSLifecycleTelemetryLevel(rawValue: projection.level) ?? .info,
+                    metadata: projection.metadata
+                )
+            }
+        )
+        self.updateWiring = updateWiring
+
         let coordinator = try MahayanaCoordinator.make(
             appDataDirectory: appDataDirectory,
             featureHostTest: featureHostTest,
@@ -125,6 +136,9 @@ final class IOSMainRuntime {
                     level: IOSLifecycleTelemetryLevel(rawValue: projection.level) ?? .info,
                     metadata: projection.metadata
                 )
+            },
+            backendUpdateRequirementSink: { required in
+                updateWiring.noteBackendUpdateRequirement(required)
             },
             experimentDiagnosticReporter: { diagnostic in
                 var metadata = diagnostic.metadata
@@ -224,16 +238,6 @@ final class IOSMainRuntime {
                 return authorization
             }
         )
-        updateWiring = IOSUpdateServiceWiring(
-            telemetry: { projection in
-                reporter.report(
-                    .update,
-                    level: IOSLifecycleTelemetryLevel(rawValue: projection.level) ?? .info,
-                    metadata: projection.metadata
-                )
-            }
-        )
-
         lifecycleReporter.report(
             .startup,
             metadata: [
