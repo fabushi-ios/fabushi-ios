@@ -3979,7 +3979,9 @@
       "implementation_status": "mapped",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift wires both onOpenURL and NSUserActivityTypeBrowsingWeb into FabushiRuntime.handleOpenURL; source/ios-main/deep-link/deep-link-controller.swift provides fail-closed parse acceptance, bounded pre-ready queuing, canonical dedupe, activation, and ordered dispatch.",
       "test_evidence": "mobile/ios/FabushiTests/DeepLinkProjectionParityTests.swift covers custom-scheme and universal-link canonicalization, info(topic=deep-links), fail-closed untrusted/ambiguous URLs, renderer-ready queue ordering, dedupe, and queue bounds.",
-      "notes": "Current Desktop exact blobs 467090c6e1a65058391e3460f1e625338dd5d5ce / 20919f3c0e81d954604f2306f9f5e9d8aa8415c7 read during dependency review. Mapped only; exact-head CI and aggregate dependency review remain required before verified."
+      "notes": "IOS-MAIN-DEP-DEEP-LINK-MODEL-20261012: current-main protocol/HTTPS source labeling and canonical route projection were re-read against the iOS deep-link controller. Native route parsing/projection exists, but the aggregate deep-link row remains mapped pending exhaustive supported-route and lifecycle acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/deep-links/overlay/view.tsx",
@@ -3994,7 +3996,9 @@
       "implementation_status": "mapped",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift wires both onOpenURL and NSUserActivityTypeBrowsingWeb into FabushiRuntime.handleOpenURL; source/ios-main/deep-link/deep-link-controller.swift provides fail-closed parse acceptance, bounded pre-ready queuing, canonical dedupe, activation, and ordered dispatch.",
       "test_evidence": "mobile/ios/FabushiTests/DeepLinkProjectionParityTests.swift covers custom-scheme and universal-link canonicalization, info(topic=deep-links), fail-closed untrusted/ambiguous URLs, renderer-ready queue ordering, dedupe, and queue bounds.",
-      "notes": "Current Desktop exact blobs 467090c6e1a65058391e3460f1e625338dd5d5ce / 20919f3c0e81d954604f2306f9f5e9d8aa8415c7 read during dependency review. Mapped only; exact-head CI and aggregate dependency review remain required before verified."
+      "notes": "IOS-MAIN-DEP-DEEP-LINK-VIEW-20261012: Desktop informational overlay was re-read against FabushiSceneRoot native deep-link presentation. iOS has native routing/error presentation, but the aggregate overlay row remains mapped until all visible route/source states are independently accepted. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/error-boundary/view.tsx",
@@ -4009,7 +4013,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/FabushiSceneRoot.swift defines FabushiRuntimeLifecycle, FabushiRootFailure, the native full-screen error surface, stable accessibility identifiers/labels, retry, and fail-contained diagnostics copy; source/ios-main/FabushiRuntime.swift exposes throwing initialization and no longer terminates the process with fatalError.",
       "test_evidence": "mobile/ios/FabushiTests/ErrorBoundaryParityTests.swift covers construction failure, retry factory ownership, diagnostics copy success/failure, root failure remaining outside ProductionRenderer, and accessibility identifiers/labels.",
-      "notes": "Reviewed against Desktop main exact blob b86ed73f0c4b2e932cbcd7f923ea8cd09a08181c. Implemented only; do not promote to verified until the same exact iOS HEAD completes current-head architecture/protected acceptance evidence."
+      "notes": "IOS-MAIN-DEP-ERROR-BOUNDARY-20261012: root error detail/retry/copy-diagnostics and clipboard-failure-stays-visible semantics were re-read. FabushiSceneRoot ships the native failed lifecycle surface with matching retry/copy accessibility. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/feedback/overlay/view.tsx",
@@ -4024,7 +4030,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/account/session/menu.view.swift: AccountMenuView/AccountSettingsView pass the current optional conversationId into AccountFeedbackView; AccountFeedbackView and AccountFeedbackViewState own the shipping native form, opt-in conversation context, sending dismissal fence, sent/Done lifecycle, and recoverable failed surface. frontend/src/recovered/features/onboarding/ContentView+HomeAuth.swift binds selectedConversation?.id into the account menu. mobile/ios/Fabushi/MarketplaceModel.swift: AccountFeedbackCode, AccountFeedbackError, and submitAccountFeedback(_:conversationId:) preserve the existing IOSPreloadBridge submitFeedback transport while adding exact code normalization and optional conversationId payload.",
       "test_evidence": "mobile/ios/FabushiTests/FeedbackOverlayParityTests.swift covers the exact Desktop feedback-code set, unknown/nil fail-closed normalization, user-facing recoverable errors, and distinct idle/sending/sent/failed lifecycle states.",
-      "notes": "Reviewed and implemented against Desktop main exact blob 01697164300f3db199fce8e72cc1187441b4ada0. Active selected-conversation context is now wired into the existing account/settings feedback entrypoints. Keep implemented until ordinary CI, protected acceptance, and evidence artifacts all succeed on the same exact iOS HEAD and the focused tests are observed executing."
+      "notes": "IOS-MAIN-DEP-FEEDBACK-20261012: idle/sending/sent/failed state, close-disable while sending, optional conversation ID, standard error codes and retry semantics were re-read. AccountFeedbackView/MarketplaceModel remain the native shipping owner. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/hidden-chats/overlay/entrypoint.ts",
@@ -4039,7 +4047,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift owns one MobileHiddenChatsMutationController scoped by account and active Agent; frontend/src/production/GrokMobileShell+Bots.swift projects optimistic hide/unhide into the existing canonical bots roster, rolls back deterministic failures, holds transport failures, retries on reconnect, ingests authoritative roster updates, and generation-fences scope changes; frontend/src/production/GrokMobileShell+Home.swift owns the native Hidden Bots modal/open/unhide/focus-accessibility surface; frontend/src/production/GrokMobileBotService.swift reuses the existing bot.setHidden transport without creating another store; frontend/src/production/MobileHiddenChatsMutationController.swift owns pending/held/reset/dispose semantics.",
       "test_evidence": "mobile/ios/FabushiTests/HiddenChatsParityTests.swift covers optimistic confirmation, deterministic rollback, transport-failure hold, reconnect retry, account/active-agent scope generation fencing, and dispose/reset; existing GrokMobileBotServiceTests.swift continues to cover canonical Bot command/service behavior.",
-      "notes": "Reviewed and implemented against Desktop main exact Hidden Chats blobs on 3bc92400826cc4ca7ac665b467708e22261edc61. Keep implemented until ordinary CI, protected acceptance, focused tests, and artifacts succeed on the same exact iOS HEAD."
+      "notes": "IOS-MAIN-DEP-HIDDEN-ENTRYPOINT-20261012: Desktop modal entrypoint was re-read. iOS exposes Hidden Bots from the canonical home navigation/sheet rather than a separate renderer entrypoint, preserving reachability without a second hidden-chat store. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/hidden-chats/overlay/model.ts",
@@ -4054,7 +4064,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift owns one MobileHiddenChatsMutationController scoped by account and active Agent; frontend/src/production/GrokMobileShell+Bots.swift projects optimistic hide/unhide into the existing canonical bots roster, rolls back deterministic failures, holds transport failures, retries on reconnect, ingests authoritative roster updates, and generation-fences scope changes; frontend/src/production/GrokMobileShell+Home.swift owns the native Hidden Bots modal/open/unhide/focus-accessibility surface; frontend/src/production/GrokMobileBotService.swift reuses the existing bot.setHidden transport without creating another store; frontend/src/production/MobileHiddenChatsMutationController.swift owns pending/held/reset/dispose semantics.",
       "test_evidence": "mobile/ios/FabushiTests/HiddenChatsParityTests.swift covers optimistic confirmation, deterministic rollback, transport-failure hold, reconnect retry, account/active-agent scope generation fencing, and dispose/reset; existing GrokMobileBotServiceTests.swift continues to cover canonical Bot command/service behavior.",
-      "notes": "Reviewed and implemented against Desktop main exact Hidden Chats blobs on 3bc92400826cc4ca7ac665b467708e22261edc61. Keep implemented until ordinary CI, protected acceptance, focused tests, and artifacts succeed on the same exact iOS HEAD."
+      "notes": "IOS-MAIN-DEP-HIDDEN-MODEL-20261012: hidden roster/empty/open semantics were re-read. GrokMobileShell+Home derives hidden bots from the canonical roster and opens the same Agent owner; history/runtime remain active. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/hidden-chats/overlay/mutation-controller.ts",
@@ -4069,7 +4081,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift owns one MobileHiddenChatsMutationController scoped by account and active Agent; frontend/src/production/GrokMobileShell+Bots.swift projects optimistic hide/unhide into the existing canonical bots roster, rolls back deterministic failures, holds transport failures, retries on reconnect, ingests authoritative roster updates, and generation-fences scope changes; frontend/src/production/GrokMobileShell+Home.swift owns the native Hidden Bots modal/open/unhide/focus-accessibility surface; frontend/src/production/GrokMobileBotService.swift reuses the existing bot.setHidden transport without creating another store; frontend/src/production/MobileHiddenChatsMutationController.swift owns pending/held/reset/dispose semantics.",
       "test_evidence": "mobile/ios/FabushiTests/HiddenChatsParityTests.swift covers optimistic confirmation, deterministic rollback, transport-failure hold, reconnect retry, account/active-agent scope generation fencing, and dispose/reset; existing GrokMobileBotServiceTests.swift continues to cover canonical Bot command/service behavior.",
-      "notes": "Reviewed and implemented against Desktop main exact Hidden Chats blobs on 3bc92400826cc4ca7ac665b467708e22261edc61. Keep implemented until ordinary CI, protected acceptance, focused tests, and artifacts succeed on the same exact iOS HEAD."
+      "notes": "IOS-MAIN-DEP-HIDDEN-MUTATION-20261012: account+active-agent scope fencing, optimistic mutation, transport hold/retry, rollback, generation and dispose semantics were re-read. MobileHiddenChatsMutationController preserves the same single-owner lifecycle. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/hidden-chats/overlay/view.css",
@@ -4099,7 +4113,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift owns one MobileHiddenChatsMutationController scoped by account and active Agent; frontend/src/production/GrokMobileShell+Bots.swift projects optimistic hide/unhide into the existing canonical bots roster, rolls back deterministic failures, holds transport failures, retries on reconnect, ingests authoritative roster updates, and generation-fences scope changes; frontend/src/production/GrokMobileShell+Home.swift owns the native Hidden Bots modal/open/unhide/focus-accessibility surface; frontend/src/production/GrokMobileBotService.swift reuses the existing bot.setHidden transport without creating another store; frontend/src/production/MobileHiddenChatsMutationController.swift owns pending/held/reset/dispose semantics.",
       "test_evidence": "mobile/ios/FabushiTests/HiddenChatsParityTests.swift covers optimistic confirmation, deterministic rollback, transport-failure hold, reconnect retry, account/active-agent scope generation fencing, and dispose/reset; existing GrokMobileBotServiceTests.swift continues to cover canonical Bot command/service behavior.",
-      "notes": "Reviewed and implemented against Desktop main exact Hidden Chats blobs on 3bc92400826cc4ca7ac665b467708e22261edc61. Keep implemented until ordinary CI, protected acceptance, focused tests, and artifacts succeed on the same exact iOS HEAD."
+      "notes": "IOS-MAIN-DEP-HIDDEN-VIEW-20261012: modal list/empty/open/unhide/disabled-pending/accessibility behavior was re-read against the native Hidden Bots sheet. Touch-native focus/navigation replaces browser focus trapping. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/onboarding/signed-in/character.tsx",
