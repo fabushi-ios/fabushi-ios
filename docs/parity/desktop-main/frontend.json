@@ -4412,7 +4412,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/local-exec-daemon/LocalCapabilityRunner.swift; source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/ios-main/adapters/ios-native-local-capability-backend.swift; source/host/box/box-shell-command.rs; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to the Desktop renderer/global local-computer approval surface. iOS must continue to fail closed for unsupported local capabilities and route shell/process/box work through the remote-computer path; it does not treat Mini App approval or the retired permission-request transcript leaf as equivalent."
+      "notes": "IOS-MAIN-DEP-LOCAL-TOOL-20261012: Desktop renderer permission snapshot/ceiling/prompt behavior was re-read. iOS replaces the renderer store/view with canonical Coordinator/settings permission state plus native transcript permission cards; always/ask/never ceiling and account fencing stay outside SwiftUI ownership. Disposition/status remains not-applicable; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/permissions/local-tool/view.css",
@@ -4427,7 +4429,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/local-exec-daemon/LocalCapabilityRunner.swift; source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/ios-main/adapters/ios-native-local-capability-backend.swift; source/host/box/box-shell-command.rs; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to the Desktop renderer/global local-computer approval surface. iOS must continue to fail closed for unsupported local capabilities and route shell/process/box work through the remote-computer path; it does not treat Mini App approval or the retired permission-request transcript leaf as equivalent."
+      "notes": "IOS-MAIN-DEP-LOCAL-TOOL-20261012: Desktop renderer permission snapshot/ceiling/prompt behavior was re-read. iOS replaces the renderer store/view with canonical Coordinator/settings permission state plus native transcript permission cards; always/ask/never ceiling and account fencing stay outside SwiftUI ownership. Disposition/status remains not-applicable; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/permissions/local-tool/view.tsx",
@@ -4442,7 +4446,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/local-exec-daemon/LocalCapabilityRunner.swift; source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/ios-main/adapters/ios-native-local-capability-backend.swift; source/host/box/box-shell-command.rs; source/ios-main/FabushiRuntime.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to the Desktop renderer/global local-computer approval surface. iOS must continue to fail closed for unsupported local capabilities and route shell/process/box work through the remote-computer path; it does not treat Mini App approval or the retired permission-request transcript leaf as equivalent."
+      "notes": "IOS-MAIN-DEP-LOCAL-TOOL-20261012: Desktop renderer permission snapshot/ceiling/prompt behavior was re-read. iOS replaces the renderer store/view with canonical Coordinator/settings permission state plus native transcript permission cards; always/ask/never ceiling and account fencing stay outside SwiftUI ownership. Disposition/status remains not-applicable; no verified promotion. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/browser.css",
@@ -4457,7 +4463,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Platform/mechanism-only disposition does not waive behavior tracked on adjacent applicable Plugins rows."
+      "notes": "IOS-MAIN-DEP-PLUGIN-PRESENTATION-20261012: Desktop-only browser/preview/overlay entry presentation was re-read. SwiftUI marketplace routing and controlled MiniApp WebMCP full-screen surface replace Electron window/CSS mechanics. Status remains not-applicable. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/browser.tsx",
@@ -4472,7 +4480,9 @@
       "implementation_status": "mapped",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift; mobile/ios/Fabushi/MiniAppWebMcpSurface.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS ships Marketplace/Yours surfaces and binds private workflow skill list/edit/enable-disable/delete to the explicit current Agent from Agent Settings, with scope-generation fencing and authoritative Host re-read after mutations. Keep this composite row mapped: real team publish/resync/unpublish, full team policy projection/actions and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in browser.tsx were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop-preview.tsx",
@@ -4487,7 +4497,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Platform/mechanism-only disposition does not waive behavior tracked on adjacent applicable Plugins rows."
+      "notes": "IOS-MAIN-DEP-PLUGIN-PRESENTATION-20261012: Desktop-only browser/preview/overlay entry presentation was re-read. SwiftUI marketplace routing and controlled MiniApp WebMCP full-screen surface replace Electron window/CSS mechanics. Status remains not-applicable. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop-surface.tsx",
@@ -4502,7 +4514,9 @@
       "implementation_status": "mapped",
       "production_evidence": "source/ios-main/FabushiRuntime.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS ships Marketplace/Yours surfaces and binds private workflow skill list/edit/enable-disable/delete to the explicit current Agent from Agent Settings, with scope-generation fencing and authoritative Host re-read after mutations. Keep this composite row mapped: real team publish/resync/unpublish, full team policy projection/actions and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in desktop-surface.tsx were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/desktop.ts",
@@ -4517,7 +4531,9 @@
       "implementation_status": "mapped",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS ships Marketplace/Yours surfaces and binds private workflow skill list/edit/enable-disable/delete to the explicit current Agent from Agent Settings, with scope-generation fencing and authoritative Host re-read after mutations. Keep this composite row mapped: real team publish/resync/unpublish, full team policy projection/actions and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in desktop.ts were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/entrypoint.ts",
@@ -4532,7 +4548,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/app-shell/ContentView+Root.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Platform/mechanism-only disposition does not waive behavior tracked on adjacent applicable Plugins rows."
+      "notes": "IOS-MAIN-DEP-PLUGIN-PRESENTATION-20261012: Desktop-only browser/preview/overlay entry presentation was re-read. SwiftUI marketplace routing and controlled MiniApp WebMCP full-screen surface replace Electron window/CSS mechanics. Status remains not-applicable. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/github-auth-banner.tsx",
@@ -4547,7 +4565,9 @@
       "implementation_status": "mapped",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-GITHUB-AUTH-20261012: Desktop auth-block detection/setup-agent banner/controller was re-read. iOS has native marketplace/auth surfaces and account-scoped service state, but the full Desktop GitHub-computer auth workflow is not yet independently proven equivalent; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/github-auth.ts",
@@ -4562,7 +4582,9 @@
       "implementation_status": "mapped",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-GITHUB-AUTH-20261012: Desktop auth-block detection/setup-agent banner/controller was re-read. iOS has native marketplace/auth surfaces and account-scoped service state, but the full Desktop GitHub-computer auth workflow is not yet independently proven equivalent; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/model.ts",
@@ -4577,7 +4599,9 @@
       "implementation_status": "mapped",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift; frontend/src/production/MobileBotAgentSettings.swift; frontend/src/production/GrokMobileShell.swift",
       "test_evidence": "mobile/ios/FabushiTests/GlobalDharmaMiniAppParityTests.swift; mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. iOS ships Marketplace/Yours surfaces and binds private workflow skill list/edit/enable-disable/delete to the explicit current Agent from Agent Settings, with scope-generation fencing and authoritative Host re-read after mutations. Keep this composite row mapped: real team publish/resync/unpublish, full team policy projection/actions and authenticated/private GitHub source repair still require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in model.ts were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/production-adapter.ts",
@@ -4592,7 +4616,9 @@
       "implementation_status": "mapped",
       "production_evidence": "source/ios-main/IOSMainRuntime.swift; mobile/ios/Fabushi/MarketplaceModel.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in production-adapter.ts were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/server-tools.ts",
@@ -4607,7 +4633,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/MarketplaceModel.swift; source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift; source/shared/node/mcp/mcp-manager.swift; frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "mobile/ios/FabushiTests/SharedMcpCatalogMarketplaceParityTests.swift; mobile/ios/FabushiTests/SharedMcpManagerParityTests.swift; mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift; current exact-HEAD Actions required before verified",
-      "notes": "Re-reviewed against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61 and server-tools.ts@0077e0cb2f30b0cfd9f98e191018d1fddadb5ad6. Source-level implementation now includes the Desktop optimistic visible-state effect; exact-head acceptance remains pending."
+      "notes": "IOS-MAIN-DEP-PLUGIN-SERVER-TOOLS-20261012: current-main installed-server/tool disable projection was re-read against MarketplaceModel's account-scoped MCP server/tool state. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/plugins/overlay/view.tsx",
@@ -4622,7 +4650,9 @@
       "implementation_status": "mapped",
       "production_evidence": "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift",
       "test_evidence": "",
-      "notes": "Reviewed against Desktop final HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Partial shipping overlap is not completion; the listed missing behaviors require production wiring and exact-head evidence."
+      "notes": "IOS-MAIN-DEP-PLUGIN-OVERLAY-20261012: current-main plugin selection, install/setup/account/auth/tool/private-skill and lifecycle responsibilities in view.tsx were re-read against MarketplaceModel + ContentView+ChatMarketplace + controlled MiniApp WebMCP routing. Existing native implementation is retained, but broad Marketplace/WebMCP parity remains incomplete; keep mapped. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/reaction-system.contract.test.ts",
