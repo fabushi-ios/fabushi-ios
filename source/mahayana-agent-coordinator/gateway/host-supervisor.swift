@@ -1,6 +1,93 @@
 import Foundation
 
 @MainActor
+final class IOSGatewayDescriptorKeychainCache {
+    static let maxAgeMilliseconds: Int64 = 7 * 24 * 60 * 60 * 1_000
+
+    private struct Envelope: Codable {
+        let version: Int
+        let accountScope: String
+        let savedAtMilliseconds: Int64
+        let connection: IOSCursorSandBoxConnection
+    }
+
+    typealias FailureReporter = @MainActor (_ operation: String, _ error: Error) -> Void
+
+    private static let secretKey = "gateway-descriptor-v1"
+    private let store: any IOSCursorCredentialStoring
+    private let nowMilliseconds: () -> Int64
+    private let reportFailure: FailureReporter
+    private var lastWrittenScope: String?
+    private var lastWrittenConnection: IOSCursorSandBoxConnection?
+
+    init(
+        store: any IOSCursorCredentialStoring = IOSCursorCredentialStore(
+            service: "com.ombhrum.fabushi.gateway-descriptor"
+        ),
+        nowMilliseconds: @escaping () -> Int64 = {
+            Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        },
+        reportFailure: @escaping FailureReporter = { _, _ in }
+    ) {
+        self.store = store
+        self.nowMilliseconds = nowMilliseconds
+        self.reportFailure = reportFailure
+    }
+
+    func read(accountScope: String) async -> IOSCursorSandBoxConnection? {
+        do {
+            guard let raw = try await store.readSecret(Self.secretKey),
+                  let data = raw.data(using: .utf8)
+            else { return nil }
+            let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+            guard envelope.version == 1,
+                  envelope.accountScope == accountScope,
+                  nowMilliseconds() - envelope.savedAtMilliseconds <= Self.maxAgeMilliseconds
+            else { return nil }
+            return envelope.connection
+        } catch {
+            reportFailure("read", error)
+            return nil
+        }
+    }
+
+    func write(
+        accountScope: String,
+        connection: IOSCursorSandBoxConnection
+    ) async {
+        if lastWrittenScope == accountScope, lastWrittenConnection == connection {
+            return
+        }
+        do {
+            let data = try JSONEncoder().encode(Envelope(
+                version: 1,
+                accountScope: accountScope,
+                savedAtMilliseconds: nowMilliseconds(),
+                connection: connection
+            ))
+            guard let raw = String(data: data, encoding: .utf8) else {
+                throw IOSCursorAuthError.invalidLoginResponse
+            }
+            try await store.writeSecret(Self.secretKey, value: raw)
+            lastWrittenScope = accountScope
+            lastWrittenConnection = connection
+        } catch {
+            reportFailure("write", error)
+        }
+    }
+
+    func clear() async {
+        lastWrittenScope = nil
+        lastWrittenConnection = nil
+        do {
+            try await store.deleteSecret(Self.secretKey)
+        } catch {
+            reportFailure("clear", error)
+        }
+    }
+}
+
+@MainActor
 final class CoordinatorHostSupervisor {
     static let healthTimeoutMilliseconds = 1_500
     static let healthProbeTTLMilliseconds = 5_000
