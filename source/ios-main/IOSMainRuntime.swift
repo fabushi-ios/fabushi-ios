@@ -131,6 +131,33 @@ final class IOSMainRuntime {
         )
         self.coordinator = coordinator
 
+        lifecycleTelemetrySink.configureRemoteShipping { accountSlot in
+            { [weak coordinator] logs in
+                guard let coordinator else {
+                    throw CoordinatorError.unavailable
+                }
+                let backendURLString = getConfiguredBackendUrl()
+                guard let backendURL = URL(string: backendURLString),
+                      let scheme = backendURL.scheme?.lowercased(),
+                      (scheme == "http" || scheme == "https"),
+                      backendURL.host != nil
+                else {
+                    throw URLError(.badURL)
+                }
+                let credentials = try await coordinator.structuredLogCredentials(
+                    backendURL: backendURLString,
+                    accountSlot: accountSlot
+                )
+                return try await IOSCursorStructuredLogBackend(
+                    backendURL: backendURL
+                ).submit(
+                    accessToken: credentials.accessToken,
+                    machineID: credentials.machineID,
+                    logs: logs
+                )
+            }
+        }
+
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: {

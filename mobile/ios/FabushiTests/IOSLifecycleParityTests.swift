@@ -251,4 +251,26 @@ final class IOSLifecycleParityTests: XCTestCase {
         )
     }
 
+    func testShippingLifecycleTelemetryComposesAccountScopedSubmitLogsBackend() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/IOSMainRuntime.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("lifecycleTelemetrySink.configureRemoteShipping"))
+        XCTAssertTrue(source.contains("coordinator.structuredLogCredentials("))
+        XCTAssertTrue(source.contains("IOSCursorStructuredLogBackend("))
+        XCTAssertTrue(source.contains(".submit("))
+        XCTAssertTrue(source.contains("accessToken: credentials.accessToken"))
+        XCTAssertTrue(source.contains("machineID: credentials.machineID"))
+        XCTAssertTrue(source.contains("lifecycleTelemetrySink.rotate(accountSlot: slot)"))
+        XCTAssertTrue(source.contains("lifecycleTelemetrySink.rotate(accountSlot: nil)"))
+    }
+
+
 }
