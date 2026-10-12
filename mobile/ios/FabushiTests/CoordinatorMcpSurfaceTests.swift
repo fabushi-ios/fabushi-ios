@@ -311,6 +311,9 @@ extension CoordinatorMcpSurfaceTests {
             #"guard let name = params["name"] as? String, name.count <= 200 else {"#
         ))
         XCTAssertTrue(source.contains("cursorAuth.updateDisplayName(name)"))
+        XCTAssertTrue(source.contains("cursorAuth.setProfileFetcher"))
+        XCTAssertTrue(source.contains(#""profilePictureUrl": status.profilePictureUrl ?? NSNull()"#))
+        XCTAssertTrue(source.contains(#""isAnysphereUser": status.isAnysphereUser.map"#))
         XCTAssertTrue(source.contains(#""displayName": status.displayName ?? NSNull()"#))
     }
 }
