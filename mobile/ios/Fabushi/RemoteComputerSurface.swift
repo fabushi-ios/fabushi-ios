@@ -31,6 +31,7 @@ enum RemoteComputerRebuildTeardown: String, Equatable, Sendable {
 
 enum RemoteComputerRebuildResolution: String, Equatable, Sendable {
     case settled
+    case blocked
     case failed
     case cancelled
 }
@@ -123,6 +124,7 @@ enum RemoteComputerRebuildEvent: Equatable, Sendable {
         at: Int64
     )
     case connection(isConnected: Bool, at: Int64)
+    case blocked(at: Int64)
     case error(at: Int64)
     case deactivate(at: Int64)
     case tick(at: Int64)
@@ -418,6 +420,11 @@ enum RemoteComputerRebuildReducer {
                 next.readySince = nil
             }
             return next
+
+        case .blocked:
+            return state.kind == nil
+                ? state
+                : clearOperation(state, resolution: .blocked)
 
         case .error:
             return state.kind == nil
@@ -775,6 +782,7 @@ final class RemoteComputerRebuildOwner: ObservableObject {
     @Published private(set) var migrationSnapshot = RemoteComputerMigrationSnapshot.empty
     @Published private(set) var isHydrating = false
     @Published private(set) var requestError: String?
+    @Published private(set) var requestBlockedMessage: String?
     @Published private(set) var reloadRevision = 0
 
     private let source: any RemoteComputerRebuildSource
@@ -840,6 +848,7 @@ final class RemoteComputerRebuildOwner: ObservableObject {
         guard !disposed else { return }
         requestGeneration &+= 1
         requestError = nil
+        requestBlockedMessage = nil
         reloadRevision &+= 1
         ingest(.request(
             kind: .reconnecting,
@@ -921,6 +930,7 @@ final class RemoteComputerRebuildOwner: ObservableObject {
         requestGeneration &+= 1
         connected = false
         isHydrating = false
+        requestBlockedMessage = nil
         if state.kind != nil {
             ingest(.deactivate(at: now()))
         }
@@ -941,6 +951,7 @@ final class RemoteComputerRebuildOwner: ObservableObject {
         requestGeneration &+= 1
         let attempt = requestGeneration
         requestError = nil
+        requestBlockedMessage = nil
         let at = now()
         ingest(.request(
             kind: kind,
@@ -982,12 +993,18 @@ final class RemoteComputerRebuildOwner: ObservableObject {
                 ))
             }
 
-            if let responseStatus = Self.responseStatus(from: response),
-               responseStatus.status == "rejected"
-            {
-                requestError = responseStatus.reason ?? "电脑操作被拒绝。"
-                ingest(.error(at: now()))
-                return
+            if let responseStatus = Self.responseStatus(from: response) {
+                if responseStatus.status == "started-untrackable" {
+                    requestBlockedMessage =
+                        "电脑更新已经开始，但 Fabushi 当前无法追踪进度。电脑恢复可用后，请重新启动 Fabushi。"
+                    ingest(.blocked(at: now()))
+                    return
+                }
+                if responseStatus.status == "rejected" {
+                    requestError = responseStatus.reason ?? "电脑操作被拒绝。"
+                    ingest(.error(at: now()))
+                    return
+                }
             }
 
             await hydrateMigration()
@@ -1634,14 +1651,37 @@ struct RemoteComputerSurface: View {
             .padding(.bottom, 8)
         }
 
-        if let requestError = rebuildOwner.requestError {
-            Text(requestError)
+        if let requestBlockedMessage = rebuildOwner.requestBlockedMessage {
+            Text(requestBlockedMessage)
                 .font(.caption)
-                .foregroundStyle(.red)
+                .foregroundStyle(.orange)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
-                .accessibilityIdentifier("remote-computer-rebuild-error")
+                .accessibilityIdentifier("remote-computer-rebuild-blocked")
+        }
+
+        if let requestError = rebuildOwner.requestError {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(requestError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                if rebuildOwner.state.lastResolution == .failed,
+                   rebuildOwner.state.lastResolutionKind == .update,
+                   rebuildOwner.state.imageUpdateAvailable == true
+                {
+                    Button("重试更新") {
+                        Task { await prepareUpdateConfirmation() }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("remote-computer-update-retry")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+            .accessibilityIdentifier("remote-computer-rebuild-error")
         }
 
         if updateQueued {

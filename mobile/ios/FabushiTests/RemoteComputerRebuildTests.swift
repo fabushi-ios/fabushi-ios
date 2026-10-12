@@ -1079,6 +1079,38 @@ final class RemoteComputerRebuildTests: XCTestCase {
         owner.dispose()
     }
 
+    func testStartedUntrackableUpdateBlocksWithoutHydratingFakeProgress() async {
+        let source = FakeSource()
+        source.nextUpdateValue = [
+            "status": "started-untrackable",
+        ]
+        let owner = RemoteComputerRebuildOwner(
+            source: source,
+            now: { 250 }
+        )
+
+        await owner.connect()
+        XCTAssertEqual(source.migrationReads, 1)
+
+        await owner.requestUpdate(force: false)
+
+        XCTAssertEqual(source.updateForces, [false])
+        XCTAssertEqual(
+            source.migrationReads,
+            1,
+            "an untrackable started update must not invent a follow-up migration read"
+        )
+        XCTAssertNil(owner.state.kind)
+        XCTAssertEqual(owner.state.lastResolution, .blocked)
+        XCTAssertEqual(owner.state.lastResolutionKind, .update)
+        XCTAssertNil(owner.requestError)
+        XCTAssertTrue(
+            owner.requestBlockedMessage?.contains("无法追踪进度") == true
+        )
+
+        owner.dispose()
+    }
+
     func testUnavailableManagedLifecycleFailsClosedWithoutCallingBackend() async {
         let source = FakeSource()
         source.supportsManagedLifecycle = false
