@@ -28,6 +28,8 @@ final class IOSCoordinatorPortClient {
     }
 
     private let port: InProcessCoordinatorPort
+    private let failureTelemetry: IOSCoordinatorFailureTelemetryTracker?
+    private let telemetryGeneration: UInt64
     private var pending: [String: CheckedContinuation<CoordinatorPayload, Error>] = [:]
     private var nextRequestID = 0
     private var eventHandler: ((String, CoordinatorPayload) -> Void)?
@@ -36,8 +38,14 @@ final class IOSCoordinatorPortClient {
     private(set) var readyObserved = false
     private(set) var settlement: Settlement?
 
-    init(port: InProcessCoordinatorPort) {
+    init(
+        port: InProcessCoordinatorPort,
+        failureTelemetry: IOSCoordinatorFailureTelemetryTracker? = nil,
+        telemetryGeneration: UInt64 = 0
+    ) {
         self.port = port
+        self.failureTelemetry = failureTelemetry
+        self.telemetryGeneration = telemetryGeneration
         port.onFrame = { [weak self] frame in
             self?.receive(frame)
         }
@@ -58,19 +66,30 @@ final class IOSCoordinatorPortClient {
         nextRequestID += 1
         let requestID = "r-\(nextRequestID)"
 
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                if Task.isCancelled {
-                    continuation.resume(throwing: CancellationError())
-                    return
+        do {
+            let value = try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    if Task.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    pending[requestID] = continuation
+                    port.post(.request(requestId: requestID, method: method, args: args))
                 }
-                pending[requestID] = continuation
-                port.post(.request(requestId: requestID, method: method, args: args))
+            } onCancel: {
+                Task { @MainActor [weak self] in
+                    self?.cancel(requestID)
+                }
             }
-        } onCancel: {
-            Task { @MainActor [weak self] in
-                self?.cancel(requestID)
-            }
+            failureTelemetry?.noteSuccess(method: method, generation: telemetryGeneration)
+            return value
+        } catch let error as PortError {
+            failureTelemetry?.noteFailure(
+                method: method,
+                error: error,
+                generation: telemetryGeneration
+            )
+            throw error
         }
     }
 

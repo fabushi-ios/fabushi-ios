@@ -269,6 +269,7 @@ final class IOSPreloadBridge: IOSRPCEdgeTransport {
     private var server: RendererPortServer
     private var client: IOSCoordinatorPortClient
     private let transportRecovery: IOSCoordinatorTransportRecoveryController
+    private let failureTelemetryTracker: IOSCoordinatorFailureTelemetryTracker
     private var transportRecoveryTask: Task<Void, Never>?
     private var disposed = false
     private var featureEventBroker: IOSFeatureEventBroker?
@@ -279,7 +280,19 @@ final class IOSPreloadBridge: IOSRPCEdgeTransport {
     init(main: IOSMainRuntime) {
         self.main = main
         transportRecovery = IOSCoordinatorTransportRecoveryController()
-        let transport = Self.makeTransport(main: main)
+        failureTelemetryTracker = IOSCoordinatorFailureTelemetryTracker { [weak main] projection in
+            main?.lifecycleReporter.report(
+                .coordinatorHandoff,
+                level: projection.state == .failed ? .warn : .info,
+                metadata: projection.metadata
+            )
+        }
+        failureTelemetryTracker.activate(generation: transportRecovery.generation)
+        let transport = Self.makeTransport(
+            main: main,
+            failureTelemetry: failureTelemetryTracker,
+            generation: transportRecovery.generation
+        )
         server = transport.server
         client = transport.client
         bindCurrentTransport()
@@ -294,12 +307,23 @@ final class IOSPreloadBridge: IOSRPCEdgeTransport {
         }
     }
 
-    private static func makeTransport(main: IOSMainRuntime) -> Transport {
+    private static func makeTransport(
+        main: IOSMainRuntime,
+        failureTelemetry: IOSCoordinatorFailureTelemetryTracker,
+        generation: UInt64
+    ) -> Transport {
         let pair = InProcessCoordinatorPort.makePair(bootstrap: main.coordinatorBootstrap)
         let server = main.makeRendererPortServer(port: pair.server)
         pair.server.onFrame = { [weak server] frame in server?.receive(frame) }
         pair.server.onClose = { [weak server] in server?.portClosed() }
-        return Transport(server: server, client: IOSCoordinatorPortClient(port: pair.client))
+        return Transport(
+            server: server,
+            client: IOSCoordinatorPortClient(
+                port: pair.client,
+                failureTelemetry: failureTelemetry,
+                telemetryGeneration: generation
+            )
+        )
     }
 
     private func bindCurrentTransport() {
@@ -380,7 +404,12 @@ final class IOSPreloadBridge: IOSRPCEdgeTransport {
 
     private func installFreshTransport(generation: UInt64) {
         guard !disposed, transportRecovery.shouldRelaunch(generation: generation) else { return }
-        let transport = Self.makeTransport(main: main)
+        failureTelemetryTracker.activate(generation: generation)
+        let transport = Self.makeTransport(
+            main: main,
+            failureTelemetry: failureTelemetryTracker,
+            generation: generation
+        )
         server = transport.server
         client = transport.client
         bindCurrentTransport()

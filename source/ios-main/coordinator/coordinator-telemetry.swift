@@ -37,6 +37,201 @@ enum CoordinatorTelemetry {
 }
 
 
+
+struct IOSCoordinatorFailureTelemetryProjection: Equatable, Sendable {
+    enum State: String, Equatable, Sendable {
+        case failed
+        case recovered
+    }
+
+    let domain: String
+    let operation: String
+    let failureCode: String
+    let boundary: String
+    let retryOwner: String
+    let transportKind: String?
+    let state: State
+    let failedMilliseconds: Int?
+
+    var metadata: [String: String] {
+        var value = [
+            "domain": domain,
+            "operation": operation,
+            "failure_code": failureCode,
+            "boundary": boundary,
+            "retry_owner": retryOwner,
+            "state": state.rawValue,
+        ]
+        if let transportKind {
+            value["transport_kind"] = transportKind
+        }
+        if let failedMilliseconds {
+            value["failed_ms"] = String(failedMilliseconds)
+        }
+        return value
+    }
+}
+
+@MainActor
+final class IOSCoordinatorFailureTelemetryTracker {
+    typealias Reporter = @MainActor (IOSCoordinatorFailureTelemetryProjection) -> Void
+    typealias NowMilliseconds = @MainActor () -> Int
+
+    private struct Episode {
+        let failureCode: String
+        let boundary: String
+        let retryOwner: String
+        let transportKind: String?
+        let failedAtMilliseconds: Int
+    }
+
+    private let reporter: Reporter
+    private let nowMilliseconds: NowMilliseconds
+    private var episodes: [String: Episode] = [:]
+    private var activeGeneration: UInt64 = 0
+
+    init(
+        nowMilliseconds: @escaping NowMilliseconds = {
+            Int(ProcessInfo.processInfo.systemUptime * 1_000)
+        },
+        reporter: @escaping Reporter
+    ) {
+        self.nowMilliseconds = nowMilliseconds
+        self.reporter = reporter
+    }
+
+    func activate(generation: UInt64) {
+        activeGeneration = generation
+    }
+
+    func noteSuccess(method: String, generation: UInt64) {
+        guard generation == activeGeneration else { return }
+        let domain = Self.domain(for: method)
+        let key = "\(domain)|\(method)"
+        guard let episode = episodes.removeValue(forKey: key) else { return }
+        reporter(.init(
+            domain: domain,
+            operation: method,
+            failureCode: episode.failureCode,
+            boundary: episode.boundary,
+            retryOwner: episode.retryOwner,
+            transportKind: episode.transportKind,
+            state: .recovered,
+            failedMilliseconds: max(0, nowMilliseconds() - episode.failedAtMilliseconds)
+        ))
+    }
+
+    func noteFailure(
+        method: String,
+        error: IOSCoordinatorPortClient.PortError,
+        generation: UInt64
+    ) {
+        guard generation == activeGeneration, Self.shouldTrack(error) else { return }
+        let domain = Self.domain(for: method)
+        let key = "\(domain)|\(method)"
+        let previous = episodes[key]
+        if previous?.failureCode == error.code { return }
+
+        let boundary = error.code.hasPrefix("port-") ? "client" : "host"
+        let retryOwner = (
+            error.transportKind != nil
+                || error.code.contains("transport")
+                || error.code.contains("unreachable")
+                || error.code.hasPrefix("port-")
+        ) ? "client" : "none"
+        let episode = Episode(
+            failureCode: error.code,
+            boundary: boundary,
+            retryOwner: retryOwner,
+            transportKind: error.transportKind,
+            failedAtMilliseconds: previous?.failedAtMilliseconds ?? nowMilliseconds()
+        )
+        episodes[key] = episode
+        reporter(.init(
+            domain: domain,
+            operation: method,
+            failureCode: episode.failureCode,
+            boundary: episode.boundary,
+            retryOwner: episode.retryOwner,
+            transportKind: episode.transportKind,
+            state: .failed,
+            failedMilliseconds: nil
+        ))
+    }
+
+    private static func shouldTrack(_ error: IOSCoordinatorPortClient.PortError) -> Bool {
+        if error.code == "source/cancelled"
+            || error.code == "source/capability-unavailable"
+            || error.code == "coordinator-cancelled"
+            || error.transportKind == "pre_port_settle"
+        {
+            return false
+        }
+        return true
+    }
+
+    static func domain(for method: String) -> String {
+        switch method {
+        case "getAgentTranscriptWindow", "getAgentThread", "getAgentTranscriptTail",
+             "openAgentTail", "getConversationOutline":
+            return "transcript"
+        case "sendPrompt", "interruptAgent", "promptAcceptanceStatus", "reactToMessage":
+            return "send"
+        case "listRoutedMcpTools", "executeRoutedMcpTool":
+            return "plugins"
+        case "respondToWidget", "dismissWidget", "submitSecret":
+            return "widgets"
+        case "resolveAutoReviewApproval", "resolveLocalToolPermission":
+            return "approvals"
+        case "listAgents", "countAgents", "searchAgents", "createAgent", "createGroup",
+             "setGroupMembers", "updateAgent", "deleteAgents", "duplicateAgent",
+             "kickstartAgent", "requestDiskSaverAudit", "broadcastToAgents",
+             "setAgentUnread", "setAgentHiddenFromSidebar", "setAgentNotificationsEnabled",
+             "setAgentNotifyOnUpdates", "setAgentAvatarBytes", "getAgentAvatar":
+            return "roster"
+        case "searchMedia":
+            return "search"
+        case "getCloudAgentInfo":
+            return "cloud_agents"
+        case "getListenerIntegrations", "getListenerConnectUrl":
+            return "listeners"
+        case "getAgentWorkflows", "createAgentWorkflow", "updateAgentWorkflow",
+             "setAgentWorkflowEnabled", "deleteAgentWorkflow", "runAgentWorkflowNow",
+             "importAgentWorkflowText", "importAgentWorkflowUrl", "portAgentLocalSkills":
+            return "workflows"
+        case "skillsCatalog", "syncPluginSkills", "getPluginSyncStatus",
+             "getSkillPublishTargets", "publishSkill", "resyncPublishedSkill", "unpublishSkill":
+            return "skills"
+        case "getSubagents", "getAsyncTasks":
+            return "subagents"
+        case "getForeverBoxStatus", "ensureForeverBox", "handBackForeverBox",
+             "isEgressTunnelAvailable":
+            return "computer"
+        case "startTeachRecording", "stopTeachRecording", "getTeachRecordingStatus":
+            return "teach"
+        case "getTrays", "dismissTray", "clearTrays":
+            return "trays"
+        case "getAgentChannels", "connectChannel", "disconnectChannel", "refreshChannel":
+            return "channels"
+        case "getBoxSecretsStatus":
+            return "secrets"
+        case "getAgentAutomations", "listAllAutomations", "setAgentAutomationEnabled",
+             "createAgentAutomation", "updateAgentAutomation", "deleteAgentAutomation",
+             "runAgentAutomationNow":
+            return "automations"
+        case "isAgentNetworkEnabled", "isGlobalSearchEnabled":
+            return "capabilities"
+        case "getSharingState", "createRoomFromAgent", "createRoomInvite", "joinSharedRoom",
+             "respondToRoomJoinRequest", "createSharedRoom", "addOwnAgentToSharedRoom",
+             "removeOwnAgentFromSharedRoom", "setSharedRoomTyping", "leaveSharedRoom":
+            return "sharing"
+        default:
+            return "coordinator"
+        }
+    }
+}
+
+
 enum IOSAuthTelemetryStream: String, Equatable, Sendable {
     case session
     case signin
