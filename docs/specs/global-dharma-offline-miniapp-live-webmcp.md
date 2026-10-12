@@ -404,3 +404,11 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - `d1501b80123ff6dfece5d757c85e6b9ed6d5210f` architecture run `38201916948` / job `114656978655` failed the strict source gate on stale ledger Git blob hashes; authority-only passed and rust-host/build-and-test/device-archive were skipped.
 - Descendant `31897c0b6cf51f531530c1f85e268e2accd87bb0` corrects the exact Desktop `371b72f1cd20de03dc4dff9a15ed761054968093` blobs: overlay entrypoint `d8f739e4f7f22d85df6815bd86a5af86ad2b9321`, overlay view `e83c5e37a282d06855a11c78e39c9327905a807f`, rebuild banner `eaf9324f9f8eef3a264ba80da124f4ab52752282`. No gate or validator changed.
 - All d1501b80 and pre-evidence descendant runs/jobs are predecessor-only. Fresh resulting exact-head Actions are required before any evidence promotion.
+
+
+## Current exact-head rebaseline — 2026-10-12 transcript-card resolver/feed
+
+- Pre-evidence head `156138d26cd9da11b33f473df563451871b50364` and runs `38202077424` / `38202077314` are predecessor evidence after this ledger correction.
+- Strict inventory advanced through reaction feed/picker/workspace/registry/root, secret request, text projection, thread affordance/loader/summary, transcript feed source, URL card, CSS replacement and attachment view against Desktop current main `371b72f1cd20de03dc4dff9a15ed761054968093`.
+- Resolver is now `implemented/current-main-reviewed`: unknown cards with canonical identity render the exact Fabushi continuity notice; malformed identity-less events fail closed. Transcript feed source is also `implemented/current-main-reviewed`: `IOSFeatureEventBroker` owns one receive pump, bounded buffering, ordered predicate waiters, timeout/cancellation/retry/disposal, while `MobileBotChat` stays the sole transcript collection.
+- No row is promoted to verified. Fresh resulting exact-head architecture/Rust/Swift/protected/offline/archive evidence remains required.

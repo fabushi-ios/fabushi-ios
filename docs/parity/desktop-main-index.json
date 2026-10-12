@@ -99,7 +99,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "31897c0b6cf51f531530c1f85e268e2accd87bb0",
+    "preEvidenceIosHead": "156138d26cd9da11b33f473df563451871b50364",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -134,7 +134,9 @@
       38201916944,
       38201916948,
       38201996058,
-      38201996276
+      38201996276,
+      38202077424,
+      38202077314
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -166,9 +168,11 @@
       114657022022,
       114657022335,
       114657213187,
-      114657256751
+      114657256751,
+      114657503819,
+      114657541867
     ],
-    "status": "computer-blob-mismatch-repaired-resulting-exact-head-ci-required",
+    "status": "transcript-card-resolver-feed-current-main-reviewed-resulting-exact-head-ci-required",
     "rowCount": 7951
   }
 }

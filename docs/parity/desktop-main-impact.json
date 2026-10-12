@@ -52,7 +52,8 @@
       "2026-10-12 Computer update audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 / iOS pre-repair 28d252ccd74ee70bd75e3a34dceb4dbc25be6957: Desktop ProductionRenderer only exposes update for an available image update and actionable active-Agent scope; confirmation projects ready vs busy-override from running Agent names, queues normal update until idle, and sends force=true only for explicit destructive override. iOS account menu previously called requestUpdate() directly. The production surface now probes canonical bot.list strictly, fails closed on unknown activity, hides update when no image update exists, queues non-force update until all individual Agents are idle, and requires explicit destructive confirmation for force=true. Rebuild banner was also re-read and mapped to the existing native reducer/presentation. No verified/full-review promotion occurs before replacement exact-head Actions.",
       "2026-10-12 conversation-card current-main audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093: individually re-read notice, retired permission-request, timeline automation/registry/resolver/card, attachment-data, auto-review actions, cloud-agent provider and connector actions against their native shipping owners/focused tests. Unknown/malformed events fail closed; retired permission cards stay read-only; live approvals are separate operation-scoped state; attachments are strict; Always is redacted/bounded with safe fallback; cloud-agent/connectors are account/generation scoped. Review only, no verified promotion.",
       "2026-10-12 emoji/transcript-card audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093: corrected emoji-catalog from stale N/A/system-keyboard description to the real bundled emojibase-data@17.0.0 native catalog (3,944 entries, 2,030 skin variants); promoted native picker from mapped to implemented after verifying bounded search/categories/recents/accessibility/navigation tests. CSS remains a platform replacement. Frame/index/listener/message-actions/mount/protocol/reaction-actions were re-read with current native owners and no new gap. No verified promotion.",
-      "2026-10-12 d1501b80 architecture run 38201916948 failed because Computer overlay entrypoint/view and rebuild banner ledger blob hashes did not match current Desktop main. Descendant 31897c0b6cf51f531530c1f85e268e2accd87bb0 corrects them to d8f739e4f7f22d85df6815bd86a5af86ad2b9321 / e83c5e37a282d06855a11c78e39c9327905a807f / eaf9324f9f8eef3a264ba80da124f4ab52752282. Validator unchanged."
+      "2026-10-12 d1501b80 architecture run 38201916948 failed because Computer overlay entrypoint/view and rebuild banner ledger blob hashes did not match current Desktop main. Descendant 31897c0b6cf51f531530c1f85e268e2accd87bb0 corrects them to d8f739e4f7f22d85df6815bd86a5af86ad2b9321 / e83c5e37a282d06855a11c78e39c9327905a807f / eaf9324f9f8eef3a264ba80da124f4ab52752282. Validator unchanged.",
+      "2026-10-12 transcript-card continuation audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093: reaction feed/picker/workspace/registry/root, secret, send-message text, thread affordance/loader/summary, URL card, CSS replacement and attachment leaf were re-read. Resolver is now implemented because canonical-id unknown cards preserve the exact Fabushi fallback while malformed identity-less input fails closed. transcript-feed-source is now implemented because IOSFeatureEventBroker owns single-pump buffering, ordered predicate waiters, timeout/cancel/retry/disposal while MobileBotChat remains the sole transcript collection. No verified promotion."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -2013,7 +2014,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
-    "preEvidenceIosHead": "31897c0b6cf51f531530c1f85e268e2accd87bb0",
+    "preEvidenceIosHead": "156138d26cd9da11b33f473df563451871b50364",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2048,7 +2049,9 @@
       38201916944,
       38201916948,
       38201996058,
-      38201996276
+      38201996276,
+      38202077424,
+      38202077314
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2080,9 +2083,11 @@
       114657022022,
       114657022335,
       114657213187,
-      114657256751
+      114657256751,
+      114657503819,
+      114657541867
     ],
-    "status": "computer-blob-mismatch-repaired-resulting-exact-head-ci-required",
+    "status": "transcript-card-resolver-feed-review-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
@@ -2093,6 +2098,6 @@
       "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift"
     ],
-    "conclusion": "Strict source blob mismatch repaired in ledger evidence; no validator weakening or acceptance promotion."
+    "conclusion": "Strict inventory advanced through attachment view with resolver/feed stale mapped states corrected. Aggregate strict completeness/final acceptance remain open."
   }
 }
