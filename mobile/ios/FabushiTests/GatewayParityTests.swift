@@ -20,6 +20,23 @@ private final class GatewayAsyncGate {
 }
 
 @MainActor
+private final class GatewayDescriptorTestStore: IOSCursorCredentialStoring {
+    var values: [String: String] = [:]
+    private(set) var writeCount = 0
+    private(set) var deleteCount = 0
+    func readSecret(_ key: String) async throws -> String? { values[key] }
+    func writeSecret(_ key: String, value: String) async throws {
+        writeCount += 1
+        values[key] = value
+    }
+    func deleteSecret(_ key: String) async throws {
+        deleteCount += 1
+        values.removeValue(forKey: key)
+    }
+    func waitForEncryptedStorage() async throws {}
+}
+
+@MainActor
 private final class GatewayFailureHost: MahayanaHostRequesting, @unchecked Sendable {
     let error: Error
     private(set) var requestCount = 0
@@ -657,6 +674,110 @@ final class GatewayParityTests: XCTestCase {
         XCTAssertEqual(refreshedConnection, second)
         XCTAssertEqual(probes, 2)
         XCTAssertEqual(resolves, 2)
+    }
+
+
+    func testGatewayDescriptorCacheScopesTTLAndDeduplicatesWrites() async {
+        var now: Int64 = 1_000
+        let store = GatewayDescriptorTestStore()
+        let cache = IOSGatewayDescriptorKeychainCache(store: store, nowMilliseconds: { now })
+        let value = IOSCursorSandBoxConnection(
+            networkToken: "n", execDaemonAuthToken: "e",
+            execDaemonURL: "https://exec.example", vncURL: "",
+            gatewayURL: "https://gateway.example", gatewayToken: "g",
+            forkVNCBaseURL: ""
+        )
+        await cache.write(accountScope: "a", connection: value)
+        XCTAssertEqual(await cache.read(accountScope: "a"), value)
+        XCTAssertNil(await cache.read(accountScope: "b"))
+        await cache.write(accountScope: "a", connection: value)
+        XCTAssertEqual(store.writeCount, 1)
+        now += IOSGatewayDescriptorKeychainCache.maxAgeMilliseconds + 1
+        XCTAssertNil(await cache.read(accountScope: "a"))
+    }
+
+    func testGatewayDescriptorFastPathReturnsCacheWhileSingleflightRefreshes() async throws {
+        let store = GatewayDescriptorTestStore()
+        let cache = IOSGatewayDescriptorKeychainCache(store: store)
+        let cached = IOSCursorSandBoxConnection(
+            networkToken: "cached", execDaemonAuthToken: "cached",
+            execDaemonURL: "https://cached.example", vncURL: "",
+            gatewayURL: "", gatewayToken: "", forkVNCBaseURL: ""
+        )
+        let live = IOSCursorSandBoxConnection(
+            networkToken: "live", execDaemonAuthToken: "live",
+            execDaemonURL: "https://live.example", vncURL: "",
+            gatewayURL: "", gatewayToken: "", forkVNCBaseURL: ""
+        )
+        await cache.write(accountScope: "a", connection: cached)
+        let gate = GatewayAsyncGate()
+        var resolves = 0
+        let fastPath = IOSGatewayDescriptorFastPath(
+            cache: cache,
+            getAccountScope: { "a" },
+            resolveLive: {
+                resolves += 1
+                if resolves == 1 { await gate.wait() }
+                return live
+            }
+        )
+        XCTAssertEqual(try await fastPath.resolve(), cached)
+        await waitForGate(gate)
+        XCTAssertEqual(try await fastPath.resolve(), cached)
+        XCTAssertEqual(resolves, 1)
+        gate.open()
+        for _ in 0..<64 {
+            if store.writeCount >= 2 { break }
+            await Task.yield()
+        }
+        XCTAssertEqual(store.writeCount, 2)
+        XCTAssertEqual(try await fastPath.resolve(), live)
+    }
+
+    func testGatewayDescriptorFastPathFencesStaleRefreshAndClearsDenial() async throws {
+        let store = GatewayDescriptorTestStore()
+        let cache = IOSGatewayDescriptorKeychainCache(store: store)
+        let cached = IOSCursorSandBoxConnection(
+            networkToken: "cached", execDaemonAuthToken: "cached",
+            execDaemonURL: "https://cached.example", vncURL: "",
+            gatewayURL: "", gatewayToken: "", forkVNCBaseURL: ""
+        )
+        let replacement = IOSCursorSandBoxConnection(
+            networkToken: "replacement", execDaemonAuthToken: "replacement",
+            execDaemonURL: "https://replacement.example", vncURL: "",
+            gatewayURL: "", gatewayToken: "", forkVNCBaseURL: ""
+        )
+        await cache.write(accountScope: "a", connection: cached)
+        var scope: String? = "a"
+        let gate = GatewayAsyncGate()
+        let fastPath = IOSGatewayDescriptorFastPath(
+            cache: cache,
+            getAccountScope: { scope },
+            resolveLive: { await gate.wait(); return replacement }
+        )
+        XCTAssertEqual(try await fastPath.resolve(), cached)
+        await waitForGate(gate)
+        scope = "b"
+        gate.open()
+        for _ in 0..<64 { await Task.yield() }
+        XCTAssertEqual(await cache.read(accountScope: "a"), cached)
+        XCTAssertNil(await cache.read(accountScope: "b"))
+
+        let denialStore = GatewayDescriptorTestStore()
+        let denied = IOSGatewayDescriptorFastPath(
+            cache: IOSGatewayDescriptorKeychainCache(store: denialStore),
+            getAccountScope: { "a" },
+            resolveLive: {
+                throw NSError(domain: "gateway", code: 403, userInfo: [
+                    NSLocalizedDescriptionKey: "EnsureSandBox failed with HTTP 403"
+                ])
+            }
+        )
+        do {
+            _ = try await denied.resolve()
+            XCTFail("denial must fail")
+        } catch {}
+        XCTAssertEqual(denialStore.deleteCount, 1)
     }
 
 }
