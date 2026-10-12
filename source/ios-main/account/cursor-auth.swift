@@ -285,6 +285,22 @@ final class IOSCursorAuthService {
         return .loggedIn(authId: current.authId, email: current.email)
     }
 
+    func hasPendingLogin() -> Bool {
+        !pending.isEmpty
+    }
+
+    func cancelPendingLogins() {
+        guard !pending.isEmpty else { return }
+        let invalidatesCurrentOperation = pending.values.contains {
+            isCurrentAuthOperation($0.operationEpoch)
+        }
+        pending.removeAll()
+        if invalidatesCurrentOperation {
+            _ = advanceAuthOperationEpoch()
+        }
+        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: "forced")))
+    }
+
     func beginLogin() throws -> IOSCursorLoginStart {
         pending.removeAll()
         let operationEpoch = advanceAuthOperationEpoch()
@@ -393,11 +409,8 @@ final class IOSCursorAuthService {
     }
 
     func cancelLogin(attemptId: String) {
-        guard let login = pending.removeValue(forKey: attemptId) else { return }
-        if isCurrentAuthOperation(login.operationEpoch) {
-            _ = advanceAuthOperationEpoch()
-        }
-        authTelemetry.report(iosCursorSigninTelemetry(.signedOut(cause: "forced")))
+        guard pending[attemptId] != nil else { return }
+        cancelPendingLogins()
     }
 
     func logout() async throws {

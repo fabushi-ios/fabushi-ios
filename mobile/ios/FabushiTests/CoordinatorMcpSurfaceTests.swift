@@ -312,3 +312,85 @@ extension CoordinatorMcpSurfaceTests {
         ))
     }
 }
+
+
+@MainActor
+final class IOSCursorAuthMainRpcCompatibilityTests: XCTestCase {
+    func testStatusProjectsPendingLoginAsDesktopLoggingIn() async {
+        var pending = true
+        let runtime = IOSCursorAuthMainRpcCompatibility(
+            dependencies: .init(
+                readStatus: { .init(loggedIn: false, freshness: 7) },
+                isLoginPending: { pending },
+                beginLogin: { .init(attemptId: "a", loginURL: URL(string: "https://cursor.com/login")!) },
+                pollLogin: { _ in nil },
+                cancelPendingLogins: { pending = false },
+                logout: {},
+                openExternal: { _ in },
+                reloadAuthoritativeMcp: {},
+                invalidateMcp: {},
+                sleepBeforePoll: {}
+            )
+        )
+        let value = await runtime.getStatus()
+        XCTAssertEqual(value["kind"] as? String, "logging-in")
+        XCTAssertEqual((value["freshness"] as? NSNumber)?.uint64Value, 7)
+    }
+
+    func testLoginPollsThenReloadsAuthoritativeMcpBeforeReturning() async throws {
+        var pending = false
+        var polls = 0
+        var events: [String] = []
+        let runtime = IOSCursorAuthMainRpcCompatibility(
+            dependencies: .init(
+                readStatus: { .init(loggedIn: false, freshness: 3) },
+                isLoginPending: { pending },
+                beginLogin: {
+                    pending = true
+                    return .init(attemptId: "attempt-1", loginURL: URL(string: "https://cursor.com/login")!)
+                },
+                pollLogin: { attemptId in
+                    XCTAssertEqual(attemptId, "attempt-1")
+                    polls += 1
+                    if polls == 1 { return nil }
+                    pending = false
+                    return .init(loggedIn: true, authId: "auth-1", email: "person@example.test", expiresAtMs: 9_999, freshness: 4)
+                },
+                cancelPendingLogins: { pending = false; events.append("cancel") },
+                logout: { events.append("logout") },
+                openExternal: { _ in events.append("open") },
+                reloadAuthoritativeMcp: { events.append("reload-authoritative") },
+                invalidateMcp: { events.append("invalidate") },
+                sleepBeforePoll: { events.append("sleep") }
+            )
+        )
+        let value = try await runtime.login()
+        XCTAssertEqual(value["kind"] as? String, "logged-in")
+        XCTAssertEqual(value["authId"] as? String, "auth-1")
+        XCTAssertEqual((value["expiresAt"] as? NSNumber)?.int64Value, 9_999)
+        XCTAssertEqual(events, ["open", "sleep", "reload-authoritative"])
+    }
+
+    func testCancelLoginRevokesCanonicalCredentialsAndInvalidatesMcp() async throws {
+        var pending = true
+        var loggedIn = true
+        var events: [String] = []
+        let runtime = IOSCursorAuthMainRpcCompatibility(
+            dependencies: .init(
+                readStatus: { .init(loggedIn: loggedIn, freshness: 5) },
+                isLoginPending: { pending },
+                beginLogin: { .init(attemptId: "a", loginURL: URL(string: "https://cursor.com/login")!) },
+                pollLogin: { _ in nil },
+                cancelPendingLogins: { pending = false; events.append("cancel") },
+                logout: { loggedIn = false; events.append("logout") },
+                openExternal: { _ in },
+                reloadAuthoritativeMcp: { events.append("reload-authoritative") },
+                invalidateMcp: { events.append("invalidate") },
+                sleepBeforePoll: {}
+            )
+        )
+        let value = try await runtime.cancelLogin()
+        XCTAssertEqual(value["kind"] as? String, "logged-out")
+        XCTAssertEqual(events, ["cancel", "logout", "invalidate"])
+    }
+}

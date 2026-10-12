@@ -44,6 +44,9 @@ private func accountDisplayConfig(from fetched: AccountMcpFetchResult) -> Accoun
 }
 
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 func projectSkillPublishTargets(_ teams: [IOSCursorSkillPublishTeam]) -> [[String: Any]] {
     teams
@@ -831,11 +834,118 @@ final class IOSFeedbackReportClient {
     }
 }
 
+
+@MainActor
+final class IOSCursorAuthMainRpcCompatibility {
+    struct Dependencies {
+        let readStatus: @MainActor () async -> IOSCursorAuthStatus
+        let isLoginPending: @MainActor () -> Bool
+        let beginLogin: @MainActor () throws -> IOSCursorLoginStart
+        let pollLogin: @MainActor (_ attemptId: String) async throws -> IOSCursorAuthStatus?
+        let cancelPendingLogins: @MainActor () -> Void
+        let logout: @MainActor () async throws -> Void
+        let openExternal: @MainActor (_ url: URL) async throws -> Void
+        let reloadAuthoritativeMcp: @MainActor () async throws -> Void
+        let invalidateMcp: @MainActor () async -> Void
+        let sleepBeforePoll: @MainActor () async throws -> Void
+    }
+
+    private let dependencies: Dependencies
+    private var activeAttemptId: String?
+
+    init(dependencies: Dependencies) {
+        self.dependencies = dependencies
+    }
+
+    func getStatus() async -> [String: Any] {
+        Self.project(
+            await dependencies.readStatus(),
+            loggingIn: dependencies.isLoginPending()
+        )
+    }
+
+    func login() async throws -> [String: Any] {
+        if activeAttemptId != nil {
+            dependencies.cancelPendingLogins()
+            activeAttemptId = nil
+        }
+        let start = try dependencies.beginLogin()
+        activeAttemptId = start.attemptId
+        do {
+            try await dependencies.openExternal(start.loginURL)
+            for _ in 0..<150 {
+                guard activeAttemptId == start.attemptId else {
+                    return await getStatus()
+                }
+                if let status = try await dependencies.pollLogin(start.attemptId) {
+                    guard activeAttemptId == start.attemptId else {
+                        return await getStatus()
+                    }
+                    activeAttemptId = nil
+                    try await dependencies.reloadAuthoritativeMcp()
+                    return Self.project(status, loggingIn: false)
+                }
+                try await dependencies.sleepBeforePoll()
+            }
+            if activeAttemptId == start.attemptId {
+                dependencies.cancelPendingLogins()
+                activeAttemptId = nil
+            }
+            throw SandMcpConfigError("Cursor sign-in did not finish. Try again.")
+        } catch is CancellationError {
+            if activeAttemptId == start.attemptId {
+                dependencies.cancelPendingLogins()
+                activeAttemptId = nil
+            }
+            return await getStatus()
+        } catch {
+            if activeAttemptId == start.attemptId {
+                dependencies.cancelPendingLogins()
+                activeAttemptId = nil
+            }
+            throw error
+        }
+    }
+
+    func cancelLogin() async throws -> [String: Any] {
+        dependencies.cancelPendingLogins()
+        activeAttemptId = nil
+        try await dependencies.logout()
+        await dependencies.invalidateMcp()
+        return await getStatus()
+    }
+
+    func logout() async throws -> [String: Any] {
+        dependencies.cancelPendingLogins()
+        activeAttemptId = nil
+        try await dependencies.logout()
+        await dependencies.invalidateMcp()
+        return await getStatus()
+    }
+
+    static func project(_ status: IOSCursorAuthStatus, loggingIn: Bool) -> [String: Any] {
+        if loggingIn {
+            return ["kind": "logging-in", "freshness": NSNumber(value: status.freshness)]
+        }
+        guard status.loggedIn else {
+            return ["kind": "logged-out", "freshness": NSNumber(value: status.freshness)]
+        }
+        return [
+            "kind": "logged-in",
+            "authId": status.authId ?? NSNull(),
+            "email": status.email ?? NSNull(),
+            "expiresAt": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
+            "freshness": NSNumber(value: status.freshness),
+        ]
+    }
+}
+
 @MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
     private let cursorAuth: IOSCursorAuthService
+    private let mainRpcCursorAuth: IOSCursorAuthMainRpcCompatibility
     private let dashboard: IOSCursorDashboardClient
     private let sandAccessReader: IOSCursorSandAccessReader
     private let feedbackClient: IOSFeedbackReportClient
@@ -890,6 +1000,7 @@ final class CoordinatorMcpSurface {
         manager: SandMcpManager,
         port: CoordinatorMcpHostPort,
         cursorAuth: IOSCursorAuthService,
+        mainRpcCursorAuth: IOSCursorAuthMainRpcCompatibility,
         dashboard: IOSCursorDashboardClient,
         sandAccessReader: IOSCursorSandAccessReader,
         feedbackClient: IOSFeedbackReportClient,
@@ -900,6 +1011,7 @@ final class CoordinatorMcpSurface {
         self.manager = manager
         self.port = port
         self.cursorAuth = cursorAuth
+        self.mainRpcCursorAuth = mainRpcCursorAuth
         self.dashboard = dashboard
         self.sandAccessReader = sandAccessReader
         self.feedbackClient = feedbackClient
@@ -1097,10 +1209,35 @@ final class CoordinatorMcpSurface {
         dependencies.effectivePluginsProvider = {
             try await fetchEffectiveUserPlugins(accountDependencies)
         }
+        let manager = SandMcpManager(deps: dependencies)
+        let mainRpcCursorAuth = IOSCursorAuthMainRpcCompatibility(
+            dependencies: .init(
+                readStatus: { await cursorAuth.status() },
+                isLoginPending: { cursorAuth.hasPendingLogin() },
+                beginLogin: { try cursorAuth.beginLogin() },
+                pollLogin: { attemptId in try await cursorAuth.pollLogin(attemptId: attemptId) },
+                cancelPendingLogins: { cursorAuth.cancelPendingLogins() },
+                logout: { try await cursorAuth.logout() },
+                openExternal: { url in
+#if canImport(UIKit)
+                    let opened = await UIApplication.shared.open(url)
+                    guard opened else {
+                        throw SandMcpConfigError("Unable to open the Cursor sign-in page.")
+                    }
+#else
+                    throw SandMcpConfigError("Cursor sign-in requires iOS URL presentation.")
+#endif
+                },
+                reloadAuthoritativeMcp: { _ = try await manager.reloadServers() },
+                invalidateMcp: { await manager.reload() },
+                sleepBeforePoll: { try await Task.sleep(for: .seconds(1)) }
+            )
+        )
         let surface = CoordinatorMcpSurface(
-            manager: SandMcpManager(deps: dependencies),
+            manager: manager,
             port: port,
             cursorAuth: cursorAuth,
+            mainRpcCursorAuth: mainRpcCursorAuth,
             dashboard: dashboard,
             sandAccessReader: sandAccessReader,
             feedbackClient: feedbackClient,
@@ -1783,6 +1920,18 @@ final class CoordinatorMcpSurface {
                 scope: scope
             )
             return .handled(result.foundationValue)
+
+        case "getCursorAuthStatus":
+            return .handled(await mainRpcCursorAuth.getStatus())
+
+        case "loginCursor":
+            return .handled(try await mainRpcCursorAuth.login())
+
+        case "cancelCursorLogin":
+            return .handled(try await mainRpcCursorAuth.cancelLogin())
+
+        case "logoutCursor":
+            return .handled(try await mainRpcCursorAuth.logout())
 
         case "coordinator.mcp.cursorAuth.status":
             return .handled(projectCursorAuthStatus(await cursorAuth.status()))
