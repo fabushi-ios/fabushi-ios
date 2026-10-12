@@ -934,6 +934,7 @@ final class IOSCursorAuthMainRpcCompatibility {
             "kind": "logged-in",
             "authId": status.authId ?? NSNull(),
             "email": status.email ?? NSNull(),
+            "displayName": status.displayName ?? NSNull(),
             "expiresAt": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
             "freshness": NSNumber(value: status.freshness),
         ]
@@ -1951,8 +1952,10 @@ final class CoordinatorMcpSurface {
                     "updateCursorAccountName requires a bounded name string."
                 )
             }
-            try await dashboard.updateCursorAccountName(name)
-            return .handled([:])
+            let status = try await cursorAuth.updateDisplayName(name) { normalizedName in
+                try await dashboard.updateCursorAccountName(normalizedName)
+            }
+            return .handled(projectCursorAuthStatus(status))
 
         case "getCursorAvatar":
             let auth = await cursorAuth.status()
@@ -2183,6 +2186,7 @@ final class CoordinatorMcpSurface {
             "loggedIn": status.loggedIn,
             "authId": status.authId ?? NSNull(),
             "email": status.email ?? NSNull(),
+            "displayName": status.displayName ?? NSNull(),
             "expiresAtMs": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
             "freshness": NSNumber(value: status.freshness),
         ]
