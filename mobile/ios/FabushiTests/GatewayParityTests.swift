@@ -826,7 +826,8 @@ final class GatewayParityTests: XCTestCase {
             XCTFail("active hold must fail without another broker request")
         } catch let error as IOSCursorSandBoxBrokerError {
             guard case .blocked(let retry) = error.kind else {
-                return XCTFail("expected blocked hold")
+                XCTFail("expected blocked hold")
+                return
             }
             XCTAssertEqual(retry, 6_000)
         }
