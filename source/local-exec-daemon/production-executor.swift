@@ -417,8 +417,8 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                 execID: execID,
                 path: path,
                 toolCallID: args["toolCallId"] as? String ?? "",
-                offset: args["offset"] as? Int,
-                limit: args["limit"] as? Int,
+                offset: Self.integer(args["offset"]),
+                limit: Self.integer(args["limit"]),
                 encodingHint: args["encodingHint"] as? String,
                 redacted: caseName == "redactedReadArgs"
             )
@@ -510,6 +510,30 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             "cwd": exit.cwd,
             "aborted": exit.aborted,
         ])
+    }
+
+    private static func integer(_ value: Any?) -> Int? {
+        switch value {
+        case let value as Int:
+            return value
+        case let value as NSNumber:
+            let double = value.doubleValue
+            guard double.isFinite,
+                  double.rounded(.towardZero) == double,
+                  double >= Double(Int.min),
+                  double <= Double(Int.max)
+            else { return nil }
+            return Int(double)
+        case let value as Double:
+            guard value.isFinite,
+                  value.rounded(.towardZero) == value,
+                  value >= Double(Int.min),
+                  value <= Double(Int.max)
+            else { return nil }
+            return Int(value)
+        default:
+            return nil
+        }
     }
 
     private static func validate(_ response: URLResponse) throws {

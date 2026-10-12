@@ -404,8 +404,8 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(observed?.value(forHTTPHeaderField: "Content-Type"), "application/proto")
         XCTAssertEqual(observed?.value(forHTTPHeaderField: "Connect-Protocol-Version"), "1")
         guard let body = observed?.httpBody else { return XCTFail("missing ExecServerMessage body") }
-        XCTAssertTrue(body.contains(Data("pwd".utf8)))
-        XCTAssertTrue(body.contains(Data("/workspace".utf8)))
+        XCTAssertNotNil(body.range(of: Data("pwd".utf8)))
+        XCTAssertNotNil(body.range(of: Data("/workspace".utf8)))
         guard case .object(let value) = result else { return XCTFail("expected shell result") }
         XCTAssertEqual(value["success"], .bool(true))
         XCTAssertEqual(value["code"], .number(0))
