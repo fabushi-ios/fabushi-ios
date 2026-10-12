@@ -290,6 +290,15 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - The new production change is release/update plumbing, not a second Marketplace/Mini App/WebMCP owner. It makes `checkForUpdates` fetch App Store version policy asynchronously, retains a prior offer on refresh error, enforces stable App Store/TestFlight track semantics, and fails closed for desktop-only nightly/idle-apply controls. It does not alter the single Host/Marketplace install state, Local WebMCP registry, Global Dharma local state, entitlement boundary, Skills lifecycle, MCP Connector owner, or AI-created Mini App pipeline recorded above.
 - New exact-head workflows are required after this evidence update. No GD-OFF, GD-WEBMCP, FPM-IOS, archive, payment, signer, or release requirement is promoted by this documentation commit.
 
+### 2026-10-12 exact-head rebaseline after 54832f40
+
+- The requested checkpoint `54832f40583009aa963d31573e7c502cc7700ce1` is predecessor evidence only. PR #3 advanced to pre-evidence-update HEAD `b6ae32fed4ea822ab82864a8858d2137cbc69c31`, tree `b68ac57e5b7ccc82e38be419648c4845efe8135f`; base main remains `f098639ab178a839690b9dece60fa0d11c5d2e25`.
+- Since that checkpoint, the production delta is bounded to Marketplace/plugin account-generation and native-engine/runtime fencing; a concurrent documentation commit also closes current-main review for macOS application placement and Windows user-data migration as iOS platform replacements. This does not create a second Marketplace, Mini App, WebMCP, Skills, Connector, or Global Dharma state owner.
+- Desktop authority remains `371b72f1cd20de03dc4dff9a15ed761054968093` / tree `3116c54a1e36da95189c740bdc789ad543ce2d20`; Backend remains `9c56a77cbe02dfceebf574236a703b53cd257cb9`, Platform Core `c301820b93274bda586fbb82be982afc3c2ee4d4`, canonical Fabushi server `c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52`, and Marketplace `1971f2a93197cfb79d1e8f0856345f36776f3ca3`. The 7,951-row Desktop source index and direct-impact denominator therefore stay unchanged.
+- Runs `38188168213`, `38188168239`, `38189392211`, and `38189392169` are predecessor diagnostics only. This evidence update creates a newer exact iOS HEAD, so no step from those runs is promoted to GD/FPM/IOS-MAIN acceptance; replacement exact-head architecture, Rust Host, Swift/UI, archive, offline/protected and completeness/release evidence is mandatory.
+- Signer thread `1a12b70942632c11` and Apple/provider thread `1a12bc3ea0b5880b` were re-read and still contain no configuration-complete reply. No duplicate reminder was sent. The five managed signer settings and real Apple product/provider/test eligibility remain external blockers.
+- No GD-OFF, GD-WEBMCP, GD-MKT, GD-PAY, FPM-IOS, signed-device, TestFlight/App Store, IOS-MAIN or final acceptance status is promoted by this rebaseline.
+
 ## 16. Spec compliance record
 
 | Requirement / AC | Status | Evidence / reason |

@@ -325,5 +325,28 @@
       "notes": "Must use real exact-HEAD GitHub Actions/source-backed/native release evidence; do not infer pass from an old PR artifact."
     }
   },
-  "note": "Authority remains Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 / tree 3116c54a1e36da95189c740bdc789ad543ce2d20. PR #3 advanced from predecessor evidence candidate 292cee1bb1e38f4b8dce78cba16504df209b905d to pre-evidence-update 73ee80da13988206552db2586a1c89c87e472ec3 / tree d3214cbfa8cf8ad93f12c7ef0f45df7b5c8cc92d by App Store update-policy wiring. 292cee runs 38180270382/38180270380 are predecessor only: architecture and rust-host succeeded, while build-and-test/device-archive/protected/offline were still running at drift time. The new update wiring is release plumbing and does not change canonical Marketplace, Global Dharma, Local WebMCP, Skills, Connector, or generated Mini App owners. Fresh exact-head Actions are required after this evidence commit. Production Global Dharma managed signer, real Apple commerce, signed-device/TestFlight/App Store acceptance, and real external-provider MCP production acceptance remain unproven/blocked as separately recorded."
+  "note": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / tree 3116c54a1e36da95189c740bdc789ad543ce2d20. The requested iOS checkpoint 54832f40583009aa963d31573e7c502cc7700ce1 and runs 38188168213/38188168239 are predecessor only. PR #3 subsequently reached b6ae32fed4ea822ab82864a8858d2137cbc69c31 / tree b68ac57e5b7ccc82e38be419648c4845efe8135f; runs 38189392211/38189392169 are also predecessor diagnostics because this evidence update creates a newer exact HEAD. Their partial/green steps cannot satisfy current-head acceptance. The current iOS delta tightens Marketplace/plugin account-generation and embedded runtime fencing and records two platform-specific startup responsibility replacements; it does not prove production signer, real StoreKit commerce, signed physical-device install/upgrade, TestFlight/App Store, or independent acceptance. finalAcceptance remains false; IOS-MAIN-AC-01..21 and all release gates remain pending until same-final-SHA evidence exists.",
+  "currentHeadRebaseline": {
+    "observedAt": "2026-10-12",
+    "requestedCheckpoint": "54832f40583009aa963d31573e7c502cc7700ce1",
+    "preEvidenceIosHead": "b6ae32fed4ea822ab82864a8858d2137cbc69c31",
+    "preEvidenceIosTree": "b68ac57e5b7ccc82e38be419648c4845efe8135f",
+    "baseMain": "f098639ab178a839690b9dece60fa0d11c5d2e25",
+    "predecessorWorkflowRuns": [
+      38188168213,
+      38188168239,
+      38189392211,
+      38189392169
+    ],
+    "desktopAuthority": {
+      "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20"
+    },
+    "backendAuthority": "9c56a77cbe02dfceebf574236a703b53cd257cb9",
+    "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
+    "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
+    "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
+    "promotion": "none",
+    "status": "fresh-exact-head-actions-required-after-this-evidence-commit"
+  }
 }

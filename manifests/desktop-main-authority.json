@@ -5,7 +5,7 @@
   "branch": "main",
   "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
   "rootTreeSha": "3116c54a1e36da95189c740bdc789ad543ce2d20",
-  "observedAt": "2026-10-11",
+  "observedAt": "2026-10-12",
   "previousSourceCommit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
   "inventory": {
     "selectedRoots": [
@@ -27,5 +27,28 @@
   "dependenciesReviewed": false,
   "completenessAccepted": false,
   "acceptanceAccepted": false,
-  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20 with selected frontend/** + source/** identities unchanged at 7,951. FPM-OWN-016 is production-reachable through the shipping Agent attachment card -> canonical Feature Host attachment resolver -> local-generated draft -> zero-privilege Mini App preview -> exact-digest approval -> local-author signing -> normal .fabapp installer path; account/session generation, cancellation and final installer commit fences fail closed. FPM-OWN-013 has local package digest/trust/network/Host-API checks plus cold installer recreation, interrupted-staging recovery and upgrade/rollback tests, and this commit adds explicit GitHub Actions focused gates for the previously unexecuted app-host/plugin-runtime tests. The source-mahayana denominator remains 5,330 rows; 5,283 have byte-identical iOS-owned path-shift counterparts, which proves source presence only and is not responsibility closure. Replacement exact-head Actions, real iPhone/iPad airplane-mode cold launch, Apple signing/device/TestFlight/App Store, rights review, full 7,951 responsibility/dependency closure and independent acceptance remain pending; baselineReady/dependenciesReviewed/completenessAccepted/acceptanceAccepted stay false."
+  "notes": "Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20 with 7,951 selected source identities. The requested iOS checkpoint 54832f40583009aa963d31573e7c502cc7700ce1 is predecessor only. PR #3 advanced through Marketplace/plugin account-generation fencing and a current-main startup responsibility review to pre-evidence-update b6ae32fed4ea822ab82864a8858d2137cbc69c31 / tree b68ac57e5b7ccc82e38be419648c4845efe8135f. Runs 38188168213/38188168239 and 38189392211/38189392169 are predecessor diagnostics only. This evidence update itself creates a newer iOS HEAD, so fresh exact-head architecture/rust-host/build/archive/offline/protected/completeness evidence is mandatory. No GD/FPM/IOS-MAIN status is promoted. Production signer, real Apple commerce, signed physical-device/TestFlight/App Store evidence, full responsibility/dependency closure and independent acceptance remain pending; baselineReady/dependenciesReviewed/completenessAccepted/acceptanceAccepted stay false.",
+  "iosVerificationRebaseline": {
+    "observedAt": "2026-10-12",
+    "requestedCheckpoint": "54832f40583009aa963d31573e7c502cc7700ce1",
+    "preEvidenceIosHead": "b6ae32fed4ea822ab82864a8858d2137cbc69c31",
+    "preEvidenceIosTree": "b68ac57e5b7ccc82e38be419648c4845efe8135f",
+    "baseMain": "f098639ab178a839690b9dece60fa0d11c5d2e25",
+    "predecessorWorkflowRuns": [
+      38188168213,
+      38188168239,
+      38189392211,
+      38189392169
+    ],
+    "desktopAuthority": {
+      "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20"
+    },
+    "backendAuthority": "9c56a77cbe02dfceebf574236a703b53cd257cb9",
+    "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
+    "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
+    "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
+    "promotion": "none",
+    "status": "fresh-exact-head-actions-required-after-this-evidence-commit"
+  }
 }

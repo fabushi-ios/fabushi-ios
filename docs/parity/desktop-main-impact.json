@@ -35,7 +35,8 @@
       "FPM-OWN-016 is no longer production-unreachable: shipping MobileBotChat Agent attachment cards invoke MarketplaceModel.materializeGeneratedMiniAppArtifact, which reaches the canonical Feature Host attachment resolver and then the existing local-generated draft/preview/exact-digest approval/local-author signing/normal installer path. Cancellation, account/session generation and final installer commit fences fail closed. This commit adds explicit exact-head Actions coverage for the app-host commit-fence test and plugin-runtime cold-relaunch/staging-recovery/upgrade-rollback tests that existed before but were not executed by the workflow. Promotion remains bounded by replacement-head CI and global closure.",
       "Source-mahayana accounting was re-read without truncating the denominator: 5,330 canonical rows remain in scope. Git tree/blob reconciliation found 5,283 byte-identical iOS-owned path-shift counterparts under source/packages, proving source presence but not production responsibility closure; those rows are not bulk-promoted.",
       "OAuth parity audit found a shipping drift: Desktop pending callback ownership expires at 11 minutes and removes pending state when the server owner disappears, while the iOS shipping lifecycle used a 16-minute window and retained server pending state. This commit changes the canonical SandMcpOAuthCallbackLifecycle to the Desktop 11-minute TTL, adds per-server pending cancellation on server/plugin removal, and removes the uncomposed duplicate Coordinator OAuth registry/listener/forwarder implementation.",
-      "docs/specs/remote-computer-mobile-session-reconciliation.md re-read at Desktop 371b72f1: RCS-01..09 are server/mobile-control-session invariants and RCS-10 explicitly defines Android compatibility. iOS shipping does not adopt this RCS credential/session topology, so its documented Host/VNC replacement does not require a local requestId/clientToken/mobileToken authority."
+      "docs/specs/remote-computer-mobile-session-reconciliation.md re-read at Desktop 371b72f1: RCS-01..09 are server/mobile-control-session invariants and RCS-10 explicitly defines Android compatibility. iOS shipping does not adopt this RCS credential/session topology, so its documented Host/VNC replacement does not require a local requestId/clientToken/mobileToken authority.",
+      "2026-10-12 current-head rebaseline: requested checkpoint 54832f40583009aa963d31573e7c502cc7700ce1 advanced to pre-evidence-update b6ae32fed4ea822ab82864a8858d2137cbc69c31 / tree b68ac57e5b7ccc82e38be419648c4845efe8135f. Desktop authority remains 371b72f1cd20de03dc4dff9a15ed761054968093 / 3116c54a1e36da95189c740bdc789ad543ce2d20. The iOS delta is Marketplace/plugin account-generation/native-engine fencing plus current-main review of macOS application placement and Windows user-data migration as iOS platform replacements. No direct Desktop source identity changed and no aggregate status is promoted. All predecessor runs require replacement exact-head evidence after this commit."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -1979,5 +1980,21 @@
       "previousSize": null,
       "size": 65637
     }
-  ]
+  ],
+  "iosVerificationRebaseline": {
+    "observedAt": "2026-10-12",
+    "requestedCheckpoint": "54832f40583009aa963d31573e7c502cc7700ce1",
+    "preEvidenceIosHead": "b6ae32fed4ea822ab82864a8858d2137cbc69c31",
+    "preEvidenceIosTree": "b68ac57e5b7ccc82e38be419648c4845efe8135f",
+    "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+    "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
+    "changedIosPathsSinceRequestedCheckpoint": [
+      "mobile/ios/Fabushi/MarketplaceModel.swift",
+      "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
+      "source/packages/mahayana-rs/mahayana-app-host/src/lib.rs",
+      "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
+      "docs/parity/desktop-main/source-electron-main.json"
+    ],
+    "conclusion": "Desktop direct impact remains unchanged. The iOS delta tightens account/runtime fencing and closes two platform-specific startup responsibility reviews; it requires replacement exact-head CI and does not promote aggregate review or release acceptance."
+  }
 }
