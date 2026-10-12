@@ -90,6 +90,7 @@ struct IOSCursorAuthStatus: Equatable, Sendable {
     let loggedIn: Bool
     var authId: String? = nil
     var email: String? = nil
+    var displayName: String? = nil
     var expiresAtMs: Int64? = nil
     var freshness: UInt64 = 0
 }
@@ -201,6 +202,7 @@ final class IOSCursorCredentialStore: IOSCursorCredentialStoring {
 @MainActor
 final class IOSCursorAuthService {
     typealias StatusObserver = @MainActor (IOSCursorAuthStatus) -> Void
+    typealias DisplayNameWriter = @MainActor (String) async throws -> Void
 
     private struct PendingLogin {
         let uuid: String
@@ -227,6 +229,7 @@ final class IOSCursorAuthService {
     private var statusObserverGeneration: UInt64 = 0
     private var statusFreshness: UInt64 = 0
     private var authOperationEpoch: UInt64 = 0
+    private var displayNameByAuthId: [String: String] = [:]
     private var credentialMutationActive = false
     private var credentialMutationWaiters: [CheckedContinuation<Void, Never>] = []
     private var refreshFlights: [String: RefreshFlight] = [:]
@@ -348,13 +351,48 @@ final class IOSCursorAuthService {
             return .init(loggedIn: false, freshness: statusFreshness)
         }
         let payload = parseJwtPayload(token)
+        let authId = payload?.sub
         return .init(
             loggedIn: true,
-            authId: payload?.sub,
+            authId: authId,
             email: payload?.email,
+            displayName: authId.flatMap { displayNameByAuthId[$0] },
             expiresAtMs: getAccessTokenExpiryMs(token),
             freshness: statusFreshness
         )
+    }
+
+    func updateDisplayName(
+        _ rawName: String,
+        writer: DisplayNameWriter
+    ) async throws -> IOSCursorAuthStatus {
+        let operationEpoch = authOperationEpoch
+        let current = await status()
+        guard isCurrentAuthOperation(operationEpoch),
+              current.loggedIn,
+              let authId = current.authId
+        else {
+            return current
+        }
+        let normalized = rawName
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        try Task.checkCancellation()
+        try await writer(normalized)
+        try Task.checkCancellation()
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        let settled = await status()
+        guard settled.loggedIn, settled.authId == authId else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        if normalized.isEmpty {
+            displayNameByAuthId.removeValue(forKey: authId)
+        } else {
+            displayNameByAuthId[authId] = normalized
+        }
+        return publishStatus(await status())
     }
 
     func sandAccessAuthState() async -> IOSCursorSandAccessAuthState {
@@ -740,6 +778,7 @@ final class IOSCursorAuthService {
         let logoutOperationEpoch = advanceAuthOperationEpoch()
         pending.removeAll()
         credentialsRevoked = true
+        displayNameByAuthId.removeAll()
 
         // Credential mutation is serialized with login writes so an older poll
         // cannot recreate a deleted token after logout/new-login supersedes it.
