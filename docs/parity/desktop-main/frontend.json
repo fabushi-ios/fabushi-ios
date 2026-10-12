@@ -3765,8 +3765,9 @@
       "implementation_status": "mapped",
       "production_evidence": "GrokMobileShell+Home.swift is the shipping mobile roster composition; GrokMobileShell+Bots.swift owns mutations; MobileAgentSidebarSections owns normalized section state; GrokMobileBotService owns Host-backed pin/unread/hide operations.",
       "test_evidence": "Existing Bot service/sidebar/settings tests cover current native composition; remaining bulk/collapse/full-conversation parity must close before implemented.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-ROOT-20261009: exact Desktop sidebar.tsx reviewed; broad native coverage exists with explicit remaining deltas.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-ROOT-20261012: current-main sidebar composition, status/action/section/search/selection responsibilities were re-read against GrokMobileShell+Home and MobileAgentSidebarSections. Broad native shipping coverage exists, but the aggregate sidebar row remains mapped because full multi-select/broadcast/collapsed-rail/pointer-specific parity is not yet exhaustively closed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/spreadsheet-viewer-model.ts",
@@ -3781,8 +3782,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/NativeSpreadsheetPreview.swift is reached from MediaViewer.swift for table attachments; source/packages/mahayana-rs/mahayana-app-host-mobile/src/spreadsheet.rs parses XLSX ZIP/XML and legacy XLS CFB/BIFF8 offline with independent byte/resource limits; source/host/include/mahayana_app_host.h exposes only the bounded parser FFI. MediaViewer generation-fences blob loading and removes its temporary file on replacement/disappear.",
       "test_evidence": "NativeSpreadsheetPreviewTests covers CSV/TSV quoting/count/bounds, structured workbook envelope decoding, malformed input and Rust FFI fail-closed byte caps. Rust spreadsheet tests cover real multi-sheet XLSX projection, BIFF8 shared strings/numbers for legacy XLS, and malformed/oversize rejection. Current exact-head GitHub Actions Xcode/device evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-SPREADSHEET-STRUCTURED-20261011: production implementation submitted on the current iOS PR branch; status is implemented, not verified, until same-head Rust/Xcode/UI/device evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SPREADSHEET-MODEL-20261012: current-main 25 MB cap, CSV/TSV/XLSX workbook projection, sheet selection, row truncation, loading/missing/too-large/error and stale-request fencing were re-read against NativeSpreadsheetPreview. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/spreadsheet-viewer-provider.ts",
@@ -3797,8 +3799,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/NativeSpreadsheetPreview.swift is reached from MediaViewer.swift for table attachments; source/packages/mahayana-rs/mahayana-app-host-mobile/src/spreadsheet.rs parses XLSX ZIP/XML and legacy XLS CFB/BIFF8 offline with independent byte/resource limits; source/host/include/mahayana_app_host.h exposes only the bounded parser FFI. MediaViewer generation-fences blob loading and removes its temporary file on replacement/disappear.",
       "test_evidence": "NativeSpreadsheetPreviewTests covers CSV/TSV quoting/count/bounds, structured workbook envelope decoding, malformed input and Rust FFI fail-closed byte caps. Rust spreadsheet tests cover real multi-sheet XLSX projection, BIFF8 shared strings/numbers for legacy XLS, and malformed/oversize rejection. Current exact-head GitHub Actions Xcode/device evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-SPREADSHEET-STRUCTURED-20261011: production implementation submitted on the current iOS PR branch; status is implemented, not verified, until same-head Rust/Xcode/UI/device evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SPREADSHEET-PROVIDER-20261012: attachment-kind routing, byte resolution and download/open handoff were re-read against the native media/spreadsheet path. The canonical attachment owner remains shared; no second byte store was added. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/spreadsheet-viewer.tsx",
@@ -3813,8 +3816,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/NativeSpreadsheetPreview.swift is reached from MediaViewer.swift for table attachments; source/packages/mahayana-rs/mahayana-app-host-mobile/src/spreadsheet.rs parses XLSX ZIP/XML and legacy XLS CFB/BIFF8 offline with independent byte/resource limits; source/host/include/mahayana_app_host.h exposes only the bounded parser FFI. MediaViewer generation-fences blob loading and removes its temporary file on replacement/disappear.",
       "test_evidence": "NativeSpreadsheetPreviewTests covers CSV/TSV quoting/count/bounds, structured workbook envelope decoding, malformed input and Rust FFI fail-closed byte caps. Rust spreadsheet tests cover real multi-sheet XLSX projection, BIFF8 shared strings/numbers for legacy XLS, and malformed/oversize rejection. Current exact-head GitHub Actions Xcode/device evidence remains pending.",
-      "notes": "IOS-MAIN-DEP-SPREADSHEET-STRUCTURED-20261011: production implementation submitted on the current iOS PR branch; status is implemented, not verified, until same-head Rust/Xcode/UI/device evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SPREADSHEET-VIEW-20261012: sheet chooser/table preview/loading/error/too-large user effects were re-read. NativeSpreadsheetPreview is the shipping SwiftUI replacement and keeps the same bounded preview semantics. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/submission.ts",
@@ -3829,8 +3833,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/shared/node/settings/sand-settings-store.swift (SandStoredComposerSubmission, enqueue/list/remove, atomic account-scoped persistence and deterministic createdAt/nonce order); source/mahayana-agent-coordinator/MahayanaCoordinator.swift (native.composerQueue enqueue/list/remove/cancel under the single Coordinator/settings owner); frontend/src/recovered/features/conversation/MobileBotChat.swift (restoreDurableQueuedRows, flushDurableComposerQueue, cancelQueuedSend, retryFailedSend, durable richText/attachments/reply/fork/MCP payload and account+Agent fencing); acknowledgement.ts parity row covers exact durable echo/retry lineage.",
       "test_evidence": "mobile/ios/FabushiTests/SharedSettingsParityTests.swift covers queue restart persistence, deterministic order, nonce dedupe, account replacement isolation, bridge round-trip/cancel, cancel/remove not clearing approvals; mobile/ios/FabushiTests/SharedWorkflowTranscriptParityTests.swift covers fresh retry/logical nonce duplicate suppression and exact durable echo reconciliation. Same-final-HEAD GitHub Actions remain required before verified.",
-      "notes": "IOS-MAIN-DEP-SUBMISSION-20261011: exact Desktop submission.ts re-read at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Canonical behavior is offline queue + reconnect flush + one active send per Agent + explicit failed retry/discard; there is no automatic exponential backoff in this owner. iOS durable queue is shipping-composed without a second message owner. Keep implemented until same-head ordinary/protected/device evidence permits verified.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SUBMISSION-20261012: current-main queue/send/retry/cancel lifecycle was re-read against MobileBotChat's canonical native.composerQueue owner, optimistic echo, nonce fencing and retry/remove/cancel path. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/transcript-adjacency.ts",
@@ -3845,8 +3850,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat.projectMobileTranscriptAdjacency is computed once over mobileMainTranscriptEntries, receives threadChipEntryIDs from mobileThreadReplyCounts, and every shipping transcript row consumes adjacency[index]. Continued-from-prev changes native row spacing, while the six-field projection remains available to the one transcript owner. mobileTranscriptAdjacencySemantics rejects non-message and fromAgent/toAgent special variants, so no second presentation owner or invented grouping identity is introduced.",
       "test_evidence": "SharedWorkflowTranscriptParityTests.testNativeTranscriptAdjacencyProjectsSixFieldGroupingContract covers all six fields for user/assistant runs; testNativeTranscriptAdjacencyThreadChipAndSpecialRowsBreakSeams covers thread/reaction/special-row boundaries; testNativeTranscriptAdjacencyExcludesNonBubbleMessageVariants covers standalone emoji, attachment, send-card/URL-card and image-only markdown. Same-final-HEAD Xcode/UI/device evidence is still required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-ADJACENCY-20261011: source, shipping composition and focused tests are now closed at implementation level. Desktop author grouping cannot be copied because the canonical iOS conversation-window contract does not expose an ordinary author field; special Agent identity is preserved as a seam-breaking variant rather than synthesized. Keep implemented until exact-head ordinary/UI/device evidence succeeds.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TRANSCRIPT-ADJACENCY-20261012: current-main transcript grouping/adjacency user effect was re-read against native transcript row projection. iOS computes the presentation from canonical ordered entries without creating a second transcript state owner. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/transcript-load-error.tsx",
@@ -3861,8 +3867,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileBotChat transcriptBaselineError + mobile-bot-transcript-load-error surface + Retry Task calling loadInitialConversationTail; stale bot/generation results remain fenced by the existing loader.",
       "test_evidence": "SharedWorkflowTranscriptParityTests.testTranscriptLoadRetrySurfaceUsesCanonicalCopy covers the canonical user-facing contract; same-head SwiftUI build/UI acceptance still required before verified.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-LOAD-ERROR-20261009: exact Desktop source reviewed and native retry surface implemented.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TRANSCRIPT-LOAD-ERROR-20261012: current-main load failure title/detail/retry contract was re-read. MobileBotChat ships the equivalent native error surface and retry action. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/transcript-utility-parity.css",
@@ -3877,8 +3884,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "MobileBotChat uses native SwiftUI layout/typography/control modifiers rather than shipping the Web utility stylesheet.",
       "test_evidence": "Native build/UI/accessibility acceptance replaces immutable CSS parity tests.",
-      "notes": "IOS-MAIN-DEP-TRANSCRIPT-CSS-20261009: Web stylesheet replaced by native platform presentation.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-TRANSCRIPT-CSS-20261012: browser utility/layout CSS has no direct iOS runtime responsibility; SwiftUI/native controls replace it while preserving the user-visible transcript states. Disposition remains not-applicable-with-replacement. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/transcript.tsx",
@@ -3912,11 +3920,11 @@
       "implementation_status": "not-applicable",
       "production_evidence": "MobileBotChat uses native navigation/safe-area geometry and MobileComposerUITextView applies system Dynamic Type/font fallback plus natural writing direction; macOS traffic-light CSS has no iOS runtime equivalent.",
       "test_evidence": "MobileComposerImeAcceptanceTests covers natural bidi direction at the replacement UIKit owner; FabushiUITests.testNativeAgentComposerIsShippingTextViewAndAcceptsBidiCommittedText reaches the shipping composer. Final iPhone/iPad safe-area/accessibility/device acceptance remains required.",
-      "notes": "IOS-MAIN-CONVERSATION-WORKSPACE-PRESENTATION-001: exact Desktop current-main view.css blob 9e45e4ffdbd1669817bbdd1def33c25c8312b644 was diffed against 7f8a2522fa9817e4d6708080420e0eb180f71492. The delta is only Darwin traffic-light spacing plus prompt unicode-bidi/font fallback. iOS correctly keeps not-applicable-with-replacement for CSS mechanics; user-visible bidi behavior is owned/tested by the native composer and safe-area/device evidence remains a release gate.",
+      "notes": "IOS-MAIN-DEP-WORKSPACE-CSS-20261012: Desktop workspace CSS/window geometry is platform presentation. Native SwiftUI navigation, typography, safe-area and adaptive iPhone/iPad layout replace it; no web CSS is shipped. Disposition remains not-applicable-with-replacement. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "responsibility_id": "IOS-MAIN-CONVERSATION-WORKSPACE-PRESENTATION-001",
       "desktop_runtime_entrypoint": "ProductionRenderer conversation workspace -> view.css presentation rules",
       "desktop_state_machine": "presentation-only: Darwin platform attribute selects traffic-light inset; prompt element applies plaintext bidi/font fallback with no durable or protocol state",
@@ -3937,8 +3945,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "GrokMobileShell selectedBotContent mounts MobileBotChat as the actual native workspace; no parallel preview view exists.",
       "test_evidence": "Native shell/chat acceptance proves the shipping route; a null React preview test is not applicable.",
-      "notes": "IOS-MAIN-DEP-WORKSPACE-VIEW-20261009: exact Desktop no-op boundary reviewed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-WORKSPACE-VIEW-20261012: Desktop's recovered standalone preview is a non-shipping null shell while the production renderer owns the route. iOS composes the real native conversation route through MobileBotChat/ContentView; no standalone web preview replacement is required. Disposition remains not-applicable-with-replacement. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/voice.tsx",
@@ -3953,8 +3962,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/VoiceRecorder.swift is the single capture/meter/error/resource owner; MobileBotChat voiceStatusBanner renders the recorder's rolling meter samples, propagates stop failures, and routes the 300 s ceiling through the existing offline-transcription finish path; OfflineSpeechTranscriber.swift requires on-device recognition. start/finish/cancel plus Bot/account/onDisappear generation fencing prevent stale draft writes and release temporary recordings.",
       "test_evidence": "VoiceRecorderParityTests covers 500 ms/300 s boundaries, dB normalization, bounded rolling meter history and Desktop-aligned permission/device/recording error classes. OfflineSpeechTranscriberTests verifies requiresOnDeviceRecognition and no partial results. Exact-head GitHub Actions Xcode/UI/device microphone acceptance remains required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-VOICE-20261011: production semantics for timing, rolling waveform, typed recorder failures, resource cleanup and stale-transcript fencing are implemented in the one native owner. Status is implemented, not verified, pending same-head Xcode/UI plus physical-device microphone/permission acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-VOICE-20261012: current-main voice capture/cancel/error/transcription user effect was re-read. VoiceRecorder owns AVAudioSession/permission/recording/cancel and OfflineSpeechTranscriber requires on-device recognition with cancellation/generation fencing. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/deep-links/overlay/model.ts",
