@@ -142,7 +142,7 @@ final class IOSMainRuntime {
             appDataDirectory: appDataDirectory,
             currentAccountScope: { coordinatorLocalHumanIdentity.value },
             hostRequest: { [weak coordinator] method, params in
-                guard let coordinator else { throw CoordinatorError.unavailable }
+                guard let coordinator else { throw MahayanaCoordinator.CoordinatorError.unavailable }
                 return try await coordinator.request(method: method, params: params).value
             }
         )
@@ -150,7 +150,7 @@ final class IOSMainRuntime {
         lifecycleTelemetrySink.configureRemoteShipping { accountSlot in
             { [weak coordinator] logs in
                 guard let coordinator else {
-                    throw CoordinatorError.unavailable
+                    throw MahayanaCoordinator.CoordinatorError.unavailable
                 }
                 let backendURLString = getConfiguredBackendUrl()
                 guard let backendURL = URL(string: backendURLString),
