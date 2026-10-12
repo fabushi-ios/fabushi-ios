@@ -256,6 +256,12 @@ private struct FabushiProductionSceneRoot: View {
             .contrast(runtime.uiPreferencesStore.preferences.highContrast ? 1.15 : 1)
             .environment(\.mobileUiPreferencesStore, runtime.uiPreferencesStore)
             .environment(\.humanCallMediaPort, runtime.humanCallMediaPort)
+            .environment(
+                \.fabushiRuntimeReloadAction,
+                FabushiRuntimeReloadAction {
+                    await runtime.retryConnection()
+                }
+            )
             .task {
                 await runtime.start()
             }
