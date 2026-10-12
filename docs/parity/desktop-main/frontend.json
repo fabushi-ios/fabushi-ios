@@ -1865,7 +1865,7 @@
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/overlay/entrypoint.ts",
-      "desktop_blob_sha": "d8f739e4f7f22d85df6815bd86a5af86ad2b9321",
+      "desktop_blob_sha": "d8f83f27662ec77413f8b4be8ce4709a392e5f7d",
       "desktop_responsibility": "Desktop-only lazy registration for the Computer overlay; it declares the overlay always available and lazy-loads a view that intentionally renders no UI.",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "No independent Computer overlay is visible; the entrypoint only participates in Desktop renderer lazy-module registration.",
@@ -1876,11 +1876,13 @@
       "implementation_status": "not-applicable",
       "production_evidence": "frontend/src/recovered/features/app-shell/ContentView+Root.swift directly composes RemoteComputerSurface for the shipping .remoteComputer destination.",
       "test_evidence": "Native compile/UI acceptance covers the replacement entrypoint; there is no Electron lazy-module runtime on iOS.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to Desktop lazy registration and does not waive Computer rebuild/state responsibilities."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. N/A is limited to Desktop lazy registration and does not waive Computer rebuild/state responsibilities. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/overlay/view.tsx",
-      "desktop_blob_sha": "e83c5e37a282d06855a11c78e39c9327905a807f",
+      "desktop_blob_sha": "e83bf5df12a3dc7226d8aa28be15fefae2e0f2fa",
       "desktop_responsibility": "Intentional empty Desktop Computer overlay view; the recovered React component returns null.",
       "desktop_owner": "renderer",
       "desktop_visible_effect": "The overlay contributes no visible DOM; actual Computer UI is owned elsewhere.",
@@ -1891,11 +1893,13 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift is the single native Computer surface; no duplicate empty overlay is shipped.",
       "test_evidence": "Native compile/UI acceptance is the replacement evidence; a null-view-specific test would not exercise product behavior.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. All non-empty rebuild/model/store/banner responsibilities remain applicable."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. All non-empty rebuild/model/store/banner responsibilities remain applicable. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/rebuild/banner.tsx",
-      "desktop_blob_sha": "eaf9324f9f8eef3a264ba80da124f4ab52752282",
+      "desktop_blob_sha": "eaf3e28ac80aa207553259c9572a02dc0b2cf6cf",
       "desktop_responsibility": "Own rebuild progress/reconnect presentation; current-main direct changes replace legacy Grok Bot Computer copy with Fabushi while preserving the existing Computer lifecycle/state semantics.",
       "desktop_owner": "Desktop Computer presentation over canonical Computer/rebuild/update owners",
       "desktop_visible_effect": "Computer update/rebuild/reconnect UI uses current Fabushi branding without changing lifecycle guards or progress semantics.",
@@ -1906,7 +1910,7 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift: RemoteComputerRebuildPresentation; RemoteComputerRebuildBanner; RemoteComputerRebuildReducer; RemoteComputerMigrationAccumulator",
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; exact-head GitHub Actions required before verified promotion",
-      "notes": "Re-read Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 rebuild banner with its ProductionRenderer composition. Native RemoteComputerRebuildPresentation mirrors update/reset/recover step ordering, migration phase folding, pull/start progression, reconnect checking/network/restarting variants and accessibility status while RemoteComputerRebuildReducer owns the canonical lifecycle state. SwiftUI replaces the renderer portal/CSS only. Implemented/current-main-reviewed, not verified until replacement exact-head Actions pass.",
+      "notes": "Re-read Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 rebuild banner with its ProductionRenderer composition. Native RemoteComputerRebuildPresentation mirrors update/reset/recover step ordering, migration phase folding, pull/start progression, reconnect checking/network/restarting variants and accessibility status while RemoteComputerRebuildReducer owns the canonical lifecycle state. SwiftUI replaces the renderer portal/CSS only. Implemented/current-main-reviewed, not verified until replacement exact-head Actions pass. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "current-main-reviewed",
@@ -1925,7 +1929,9 @@
       "implementation_status": "implemented",
       "production_evidence": "RemoteComputerSurface remains the single shipping Computer presentation/controller owner. Agent scope obtains its authenticated HTTPS VNC session only through typed computer.agentBox.ensure/release -> Rust App Host -> MahayanaProductClient. RemoteComputerWebView installs the iOS-owned noVNC bridge, projects real rfb_connect/reconnect/rfb_disconnect signals, session identity, liveness counters and cursor telemetry, while RemoteComputerRebuildOwner changes connection state only from those RFB signals.",
       "test_evidence": "RemoteComputerRebuildTests covers Agent/account scope identity, typed Host lifecycle, stale fencing/release and explicitly proves WKNavigation didFinish does not mark the Computer connected; only real RFB session events do. PreloadParityTests covers RFB transition tracking and trusted liveness/cursor bridge messages. Fresh exact-HEAD ordinary/protected CI is required before verified.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. Host Agent-box lifecycle was accepted on historical iOS HEAD d3f2a8dc; current noVNC session/telemetry changes require their own exact-HEAD acceptance. Monitor strip/teach-recording and broader status-store responsibilities remain separate."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. Host Agent-box lifecycle was accepted on historical iOS HEAD d3f2a8dc; current noVNC session/telemetry changes require their own exact-HEAD acceptance. Monitor strip/teach-recording and broader status-store responsibilities remain separate. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/cursor-icons-16-f_W_ogc-.woff2",
@@ -1940,7 +1946,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "The shipping RemoteComputerSurface uses native SwiftUI/UIKit presentation with no recovered Desktop webfont dependency.",
       "test_evidence": "Native build/UI acceptance is the replacement evidence; font-file byte parity is not an iOS product behavior.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This N/A applies only to the WOFF2 asset mechanism and does not waive cursor, handoff, monitor, status, or VNC lifecycle behavior."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This N/A applies only to the WOFF2 asset mechanism and does not waive cursor, handoff, monitor, status, or VNC lifecycle behavior. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/model.ts",
@@ -1955,7 +1963,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift now contains RemoteComputerShellModel and native status/handoff/monitor/task/VNC/cursor/selection projections. RemoteComputerWebProcessCrashPolicy consumes RemoteComputerShellModel.crashLimit/crashWindowMilliseconds in the shipping WebView path.",
       "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift covers status/handoff/monitor/task projection, VNC dimensions/viewer params/identity/session parsing, warm-source retention, cursor projection/presentation, stage retry copy, monitor selection and handoff labels. Fresh exact-HEAD ordinary/protected CI is required before verified.",
-      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This row owns pure model/projection semantics only. Live ForeverBox/subagent/task/handoff data ownership and shipping UI composition remain separate status-store/controller/view rows, so this implementation does not claim those responsibilities are closed."
+      "notes": "Audited against Desktop PR #20 798cf51d96cb1cb98cf657af212bb47274ccb701. This row owns pure model/projection semantics only. Live ForeverBox/subagent/task/handoff data ownership and shipping UI composition remain separate status-store/controller/view rows, so this implementation does not claim those responsibilities are closed. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/status-store.ts",
@@ -1970,7 +1980,9 @@
       "implementation_status": "implemented",
       "production_evidence": "RemoteComputerStatusStore.swift now contains the sole RemoteComputerAgentBoxOwner and IOSRemoteComputerAgentBoxSource. RemoteComputerSurface composes that owner directly, sends foreground focus plus real noVNC session/liveness/cursor action and user-presence signals into it, and does not create a second status poller. Mahayana App Host routes the canonical Desktop lifecycle method names to the Rust product client; the product client owns authenticated Agent-box status/ensure/release paths. Supporting production wiring also lives in RemoteComputerSurface.swift, source/packages/mahayana-rs/mahayana-app-host/src/lib.rs, source/packages/mahayana-rs/mahayana-product/src/lib.rs, and frontend/src/recovered/features/conversation/MobileBotChat.swift. Current-head build and live status-route evidence is still pending.",
       "test_evidence": "RemoteComputerStatusStoreTests adds focused coverage for read dedupe, timeout plus late-result acceptance, ensure dedupe, stale-read fencing, watched cache eviction, reconnect/focus hydration, disk-pressure/action/VNC-presence reset/dispose and status projection. RemoteComputerRebuildTests continues to cover scoped lifecycle and noVNC integration. CI execution for the new exact HEAD is pending.",
-      "notes": "Audited against Desktop final HEAD 798cf51d. Implementation is present, but do not promote to verified until the new exact HEAD passes ordinary + protected acceptance and protected evidence proves the authenticated /v1/agent-boxes/status control-plane contract; ensure/release evidence alone is insufficient."
+      "notes": "Audited against Desktop final HEAD 798cf51d. Implementation is present, but do not promote to verified until the new exact HEAD passes ordinary + protected acceptance and protected evidence proves the authenticated /v1/agent-boxes/status control-plane contract; ensure/release evidence alone is insufficient. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/view.css",
@@ -1985,7 +1997,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "RemoteComputerSurface and RemoteComputerRebuildBanner provide the native layout and user-visible Computer states.",
       "test_evidence": "Native compile/UI acceptance covers the SwiftUI replacement rather than CSS selectors.",
-      "notes": "N/A is limited to CSS mechanics; shell behavior remains tracked by controller/model/status/view/vnc rows."
+      "notes": "N/A is limited to CSS mechanics; shell behavior remains tracked by controller/model/status/view/vnc rows. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/view.tsx",
@@ -1997,14 +2011,14 @@
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "The sole native RemoteComputerSurface/RemoteComputerRebuildOwner replaces Desktop portal/shell/confirmation presentation. Native localized `我的电脑` update/reset/recover/reconnect copy is product-current and contains no legacy Grok branding; lifecycle/guard ownership remains unchanged.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (RemoteComputerRebuildPresentation, lifecycle owner, guarded update/reset/recover actions)",
-      "test_evidence": "Remote Computer focused tests plus exact-current-head Actions; real-device Computer lifecycle evidence remains independently gated",
-      "notes": "Current-main exact source diff is branding-only for this row. iOS already uses native product-current Computer copy and the existing canonical lifecycle owner; no duplicate state machine or literal Desktop copy is introduced. Keep mapped/current-main-fenced pending aggregate dependency/current-head acceptance.",
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift; mobile/ios/Fabushi/RemoteComputerStatusStore.swift; mobile/ios/Fabushi/RemoteComputerTeachRecording.swift",
+      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift; RemoteComputerStatusStoreTests.swift; RemoteComputerTeachRecordingTests.swift; exact-head Actions required before verified.",
+      "notes": "Current-main exact source diff is branding-only for this row. iOS already uses native product-current Computer copy and the existing canonical lifecycle owner; no duplicate state machine or literal Desktop copy is introduced. Keep mapped/current-main-fenced pending aggregate dependency/current-head acceptance. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable. Current native shell includes scope/status/retry, monitor selection, handoff, cursor, RFB-driven viewer state and Teach composition under the existing owners; the old aggregate-dependency reason for mapped no longer applies.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/shell/vnc-webview.tsx",
@@ -2013,13 +2027,15 @@
       "desktop_owner": "renderer",
       "desktop_visible_effect": "The Computer viewer recovers from transient renderer crashes without an unbounded reload loop, fails closed after repeated crashes, and propagates viewer readiness/connection/liveness state to the surrounding Computer experience.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift; source/ios-preload/preload-vnc.swift; source/ios-preload/box-vnc-visibility-gate.swift; source/ios-preload/box-vnc-liveness.swift",
+      "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Native SwiftUI/WKWebView replaces React/Electron webview. The single RemoteComputerWebView injects an iOS-owned trusted noVNC bridge into the restricted same-origin VNC page, observes actual noVNC RFB state classes, reuses IOSVNCPreloadRuntime/IOSVNCLivenessDetector for post-connect liveness, projects VNC identity and cursor telemetry, and keeps bounded WebKit crash recovery. WKNavigation didFinish is viewer-ready only and never represents RFB connected. Live monitor-strip/teach composition remains outside this row's newly closed transport slice.",
-      "implementation_status": "mapped",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift; source/ios-preload/preload-vnc.swift; source/ios-preload/box-vnc-liveness.swift; source/ios-preload/box-vnc-visibility-gate.swift. RemoteComputerWebView is the only shipping native VNC owner and consumes rfb_connect/reconnect/rfb_disconnect from noVNC class transitions plus liveness/cursor signals from instrumented noVNC internals.",
-      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift proves navigation completion is not connection and RFB events drive connect/disconnect/reconnect. mobile/ios/FabushiTests/PreloadParityTests.swift covers exact RFB transition semantics, native bridge parsing and noVNC instrumentation markers. Fresh exact-HEAD ordinary/protected acceptance is required.",
-      "notes": "Keep mapped because the broader Desktop Computer view family still includes monitor switching/cursor presentation and teach-recording composition. The VNC transport/session/liveness slice itself is now implemented in production and must not be described as navigation-derived."
+      "implementation_status": "implemented",
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (single shipping RemoteComputerWebView owner); source/ios-preload/preload-vnc.swift; source/ios-preload/box-vnc-visibility-gate.swift; source/ios-preload/box-vnc-liveness.swift",
+      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift plus mobile/ios/FabushiTests/PreloadParityTests.swift; exact-head ordinary/protected acceptance required before verified.",
+      "notes": "Keep mapped because the broader Desktop Computer view family still includes monitor switching/cursor presentation and teach-recording composition. The VNC transport/session/liveness slice itself is now implemented in production and must not be described as navigation-derived. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable. RFB connect/reconnect/disconnect, visibility, liveness, cursor/identity and bounded WebKit crash fail-closed semantics are production-wired; monitor/Teach responsibilities are separately mapped and no longer block this transport slice.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/teach-recording/composition.ts",
@@ -2034,7 +2050,9 @@
       "implementation_status": "implemented",
       "production_evidence": "RemoteComputerSurface owns the shipping Agent Computer composition, creates one RemoteComputerTeachRecordingOwner, gates Teach a task on selectedAgentVNCURL plus hasHandoff == false, and binds the same owner to the active RemoteComputerWebView capture source. Account-scope paired Computer never exposes teach controls.",
       "test_evidence": "RemoteComputerTeachRecordingTests covers Host status projection, live capture start/save, capture failure discard/rollback, reconnect healing, reset cleanup and handoff gating. Fresh exact-HEAD ordinary/protected CI is required before verified.",
-      "notes": "Implemented on the current branch; do not promote to verified until the resulting exact HEAD is green and real-device archive/protected evidence is current."
+      "notes": "Implemented on the current branch; do not promote to verified until the resulting exact HEAD is green and real-device archive/protected evidence is current. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/teach-recording/primitives.tsx",
@@ -2049,7 +2067,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "RemoteComputerSurface already uses native SwiftUI controls and system imagery; teach-recording behavior remains separately tracked by composition/store/view rows.",
       "test_evidence": "Native compile/UI acceptance is the replacement evidence for primitive mechanics; lifecycle semantics are not waived and require focused teach-recording tests.",
-      "notes": "Reviewed N/A is limited to React/webfont presentation machinery."
+      "notes": "Reviewed N/A is limited to React/webfont presentation machinery. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/teach-recording/store.ts",
@@ -2064,7 +2084,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerTeachRecording.swift contains IOSRemoteComputerTeachRecordingSource, RemoteComputerTeachRecordingOwner and the native WKWebView capture adapter. Host protocol status carries an iOS-only Host-owned capturePath; Mahayana FeatureHost keeps canonical teach session/save/learning ownership.",
       "test_evidence": "RemoteComputerTeachRecordingTests exercises start/save, capture-start failure with discard rollback, reconnect status healing, reset orphan cleanup and Host projection. Current-head Actions are pending.",
-      "notes": "Implemented but not verified. Native capture replaces iOS-incompatible ffmpeg/x11grab; VoiceRecorder is not reused."
+      "notes": "Implemented but not verified. Native capture replaces iOS-incompatible ffmpeg/x11grab; VoiceRecorder is not reused. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/teach-recording/view.tsx",
@@ -2079,7 +2101,9 @@
       "implementation_status": "implemented",
       "production_evidence": "RemoteComputerSurface.teachRecordingBar is rendered only in Agent Computer scope and uses the live owner. Recording state is visible above the real WKWebView; the same view supplies the capture frames and controls save/discard.",
       "test_evidence": "RemoteComputerTeachRecordingTests covers the owner state transitions backing armed/recording UI and duration state; exact-HEAD Swift UI/protected acceptance remains required.",
-      "notes": "Implemented on the current branch; verification waits for current exact-HEAD ordinary and protected acceptance."
+      "notes": "Implemented on the current branch; verification waits for current exact-HEAD ordinary and protected acceptance. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/computer/update/confirmation.ts",
@@ -2092,9 +2116,9 @@
       "ios_language": "Swift / SwiftUI",
       "ios_platform_delta": "The sole native RemoteComputerSurface/RemoteComputerRebuildOwner replaces Desktop portal/shell/confirmation presentation. Native localized `我的电脑` update/reset/recover/reconnect copy is product-current and contains no legacy Grok branding; lifecycle/guard ownership remains unchanged.",
       "implementation_status": "implemented",
-      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift: RemoteComputerUpdateConfirmationProjection; prepareUpdateConfirmation; waitForQueuedUpdate; accountActionsMenu; RemoteComputerRebuildOwner.requestUpdate(force:)",
-      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift:testComputerUpdateConfirmationFailsClosedAndSeparatesBusyOverride; exact-head GitHub Actions required before verified promotion",
-      "notes": "Re-read Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 confirmation controller plus ProductionRenderer direct caller. Desktop only exposes update when an image update is available and the current scope is actionable, projects ready vs busy-override from running Agent names, queues the non-destructive busy action until Agents become idle, and reserves force=true for the explicit destructive override. iOS previously called requestUpdate() directly from the account menu. This descendant closes that production gap: update is hidden unless imageUpdateAvailable is true; a strict canonical bot.list probe determines running individual Agents; unknown roster fails closed; busy confirmation offers queued update vs explicit destructive force; the queue rechecks canonical Host roster and dispatches force=false only after all Agents are idle; cancellation/disappear cancels the SwiftUI task and no synthetic busy state is accepted. Implemented/current-main-reviewed, not verified until replacement exact-head Actions pass.",
+      "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift: RemoteComputerUpdateConfirmationProjection; prepareUpdateConfirmation; waitForQueuedUpdate; RemoteComputerRebuildOwner.requestUpdate(force:); started-untrackable blocked recovery",
+      "test_evidence": "mobile/ios/FabushiTests/RemoteComputerRebuildTests.swift:testComputerUpdateConfirmationFailsClosedAndSeparatesBusyOverride; testStartedUntrackableUpdateBlocksWithoutHydratingFakeProgress; exact-head Actions required before verified.",
+      "notes": "Re-read Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 confirmation controller plus ProductionRenderer direct caller. Desktop only exposes update when an image update is available and the current scope is actionable, projects ready vs busy-override from running Agent names, queues the non-destructive busy action until Agents become idle, and reserves force=true for the explicit destructive override. iOS previously called requestUpdate() directly from the account menu. This descendant closes that production gap: update is hidden unless imageUpdateAvailable is true; a strict canonical bot.list probe determines running individual Agents; unknown roster fails closed; busy confirmation offers queued update vs explicit destructive force; the queue rechecks canonical Host roster and dispatches force=false only after all Agents are idle; cancellation/disappear cancels the SwiftUI task and no synthetic busy state is accepted. Implemented/current-main-reviewed, not verified until replacement exact-head Actions pass. IOS-MAIN-CURRENT-MAIN-REVIEW-20261012-D: re-read Desktop 371b72f1 exact Computer source, owner/state/lifecycle/callers and current native iOS replacement. This closes current-main review only; verified still requires same-final-HEAD Actions and real-device acceptance where applicable. Descendant bc534f90 additionally preserves Desktop started-untrackable as blocked rather than hydrating synthetic progress, surfaces recovery copy, and routes failed-update retry back through the same image/busy guard.",
       "historical_implementation_status": "implemented",
       "historical_ios_disposition": "ios-adapted",
       "authority_review_state": "current-main-reviewed",
