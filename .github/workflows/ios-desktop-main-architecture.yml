@@ -85,6 +85,8 @@ jobs:
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-feature-host --all-targets --profile ci
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host-mobile --lib --profile ci
           cargo test --manifest-path source/packages/mahayana-messaging/Cargo.toml
+      - name: Test canonical attachment Host direct boundary
+        run: cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host --lib --profile ci direct_attachment_host_methods_are_owner_scoped_and_bounded
       - name: Test generated Mini App install fences and offline recovery
         run: |
           cargo test --manifest-path source/packages/mahayana-rs/Cargo.toml -p mahayana-app-host --lib --profile ci local_fabapp_commit_records_fail_closed_after_cancel_or_stale_generation
