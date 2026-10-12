@@ -689,14 +689,15 @@
       "desktop_owner": "Electron main remote gateway descriptor fast-path cache",
       "desktop_visible_effect": "Desktop can reconnect quickly to its external Host gateway without reusing another account's stale token or retaining a broker-denied descriptor.",
       "ios_disposition": "not-applicable-with-replacement",
-      "ios_target_path": "source/mahayana-agent-coordinator/local-host-supervisor.swift; source/mahayana-agent-coordinator/gateway/host-supervisor.swift; source/ios-main/coordinator/coordinator-account-runtime.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/gateway/host-supervisor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Shipping iOS does not persist an Electron remote-Host gateway descriptor/token file. Coordinator requests terminate in the app-owned MahayanaLocalHostSupervisor; remote-computer lifecycle remains account-authorized through the native Coordinator/MCP surface. Generation invalidation and account cleanup replace the Desktop descriptor cache topology.",
-      "implementation_status": "mapped",
-      "production_evidence": "MahayanaLocalHostSupervisor owns one replaceable Host generation; CoordinatorHostSupervisor fences health generations and pending connection work; CoordinatorAccountRuntime/production cleanup clears account scope before replacement. No gateway-descriptor.json or reusable remote gateway token is created on iOS.",
-      "test_evidence": "Current architecture/Rust Host tests cover single Host ownership and protected account contracts; exact-head aggregate acceptance remains required.",
-      "notes": "Reviewed exact Desktop blob 5720b185a80b1313e6ab4a42646dfe435d7f8b6f. Do not port Electron safeStorage file caching into iOS because that would introduce a second, inapplicable remote-Host connection owner.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "implemented",
+      "production_evidence": "IOSGatewayDescriptorKeychainCache persists the full IOSCursorSandBoxConnection in ThisDeviceOnly Keychain storage with version/account/7-day TTL validation and duplicate-write suppression. IOSGatewayDescriptorFastPath is composed by CoordinatorMcpSurface dispatchRemoteExecution: first use returns a same-account cached descriptor while one live dashboard.ensureSandBox refresh runs, successful current-scope refresh overwrites the cache, 401/403/no_storage denial clears it, and stale-account refreshes cannot write back.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift covers account/TTL isolation, duplicate writes, cached fast return, live-refresh singleflight, live revalidation, stale-refresh fencing and broker-denial clearing. Exact-head GitHub Actions remain required before verified.",
+      "notes": "Reviewed exact Desktop blob 5720b185a80b1313e6ab4a42646dfe435d7f8b6f. Do not port Electron safeStorage file caching into iOS because that would introduce a second, inapplicable remote-Host connection owner. 2026-10-12 current-main descriptor-cache review closes the source-level iOS production gap without introducing a second remote-execution owner; implemented only, not verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/box/gateway-descriptor-store.ts",
@@ -705,14 +706,15 @@
       "desktop_owner": "Electron main safeStorage gateway descriptor composition",
       "desktop_visible_effect": "Cached Desktop gateway credentials are encrypted at rest and scoped to the active account.",
       "ios_disposition": "not-applicable-with-replacement",
-      "ios_target_path": "source/mahayana-agent-coordinator/local-host-supervisor.swift; source/ios-main/coordinator/coordinator-account-runtime.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/gateway/host-supervisor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS has no Electron userData/safeStorage gateway-descriptor file because its canonical Mahayana Host is app-owned. Sensitive Cursor credentials use the existing native Keychain-backed account owner; no parallel gateway credential store is introduced.",
-      "implementation_status": "mapped",
-      "production_evidence": "The iOS Host connection path is constructed in MahayanaLocalHostSupervisor and account transitions are fenced by CoordinatorAccountRuntime; there is no shipping persisted remote gateway descriptor requiring an Electron safeStorage analogue.",
-      "test_evidence": "Architecture/protected-account gates cover owner and account boundaries; current-head final acceptance remains required.",
-      "notes": "Reviewed exact Desktop blob aa7eea31390a6276f0b181a6a1831c82c6b32f0b as a thin Electron-only composition wrapper over gateway-descriptor-cache.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "implementation_status": "implemented",
+      "production_evidence": "Desktop userData+safeStorage is replaced by IOSGatewayDescriptorKeychainCache using IOSCursorCredentialStore service com.ombhrum.fabushi.gateway-descriptor; Keychain is the native encrypted durable store and accountScope stays inside the versioned envelope consumed by the single remote-execution fast path.",
+      "test_evidence": "mobile/ios/FabushiTests/GatewayParityTests.swift exercises the native encrypted-store adapter through an IOSCursorCredentialStoring test double, including scope isolation, TTL, dedup and clearing. Exact-head Actions remain required before verified.",
+      "notes": "Reviewed exact Desktop blob aa7eea31390a6276f0b181a6a1831c82c6b32f0b as a thin Electron-only composition wrapper over gateway-descriptor-cache. 2026-10-12 current-main review confirms Keychain as the iOS safeStorage/userData replacement; no plaintext descriptor store.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/box/local-docker-host-connector.ts",
