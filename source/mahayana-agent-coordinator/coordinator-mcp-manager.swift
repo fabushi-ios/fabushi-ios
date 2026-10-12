@@ -935,6 +935,8 @@ final class IOSCursorAuthMainRpcCompatibility {
             "authId": status.authId ?? NSNull(),
             "email": status.email ?? NSNull(),
             "displayName": status.displayName ?? NSNull(),
+            "profilePictureUrl": status.profilePictureUrl ?? NSNull(),
+            "isAnysphereUser": status.isAnysphereUser.map { NSNumber(value: $0) } ?? NSNull(),
             "expiresAt": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
             "freshness": NSNumber(value: status.freshness),
         ]
@@ -1086,6 +1088,9 @@ final class CoordinatorMcpSurface {
             }
         )
         let dashboard = IOSCursorDashboardClient(credentials: credentials)
+        cursorAuth.setProfileFetcher { [weak dashboard] in
+            await dashboard?.getCursorAuthProfile()
+        }
         let sandAccessReader = IOSCursorSandAccessReader(
             getAuthState: {
                 await cursorAuth.sandAccessAuthState()
@@ -2187,6 +2192,8 @@ final class CoordinatorMcpSurface {
             "authId": status.authId ?? NSNull(),
             "email": status.email ?? NSNull(),
             "displayName": status.displayName ?? NSNull(),
+            "profilePictureUrl": status.profilePictureUrl ?? NSNull(),
+            "isAnysphereUser": status.isAnysphereUser.map { NSNumber(value: $0) } ?? NSNull(),
             "expiresAtMs": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
             "freshness": NSNumber(value: status.freshness),
         ]
