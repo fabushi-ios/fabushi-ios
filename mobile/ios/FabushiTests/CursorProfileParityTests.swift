@@ -402,7 +402,8 @@ final class CursorAuthFreshnessParityTests: XCTestCase {
         var observed: [IOSCursorAuthStatus] = []
         service.setStatusObserver { observed.append($0) }
         await Task.yield()
-        XCTAssertEqual((await service.status()).freshness, 0)
+        let before = await service.status()
+        XCTAssertEqual(before.freshness, 0)
         try await service.logout()
         let after = await service.status()
         XCTAssertFalse(after.loggedIn)

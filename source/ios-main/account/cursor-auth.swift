@@ -125,6 +125,11 @@ final class IOSCursorAuthService {
         let operationEpoch: UInt64
     }
 
+    private struct RefreshFlight {
+        let id: UUID
+        let task: Task<String, Error>
+    }
+
     private let store: any IOSCursorCredentialStoring
     private let session: URLSession
     private let backendURL: URL
@@ -141,6 +146,7 @@ final class IOSCursorAuthService {
     private var authOperationEpoch: UInt64 = 0
     private var credentialMutationActive = false
     private var credentialMutationWaiters: [CheckedContinuation<Void, Never>] = []
+    private var refreshFlights: [String: RefreshFlight] = [:]
     private var credentialsRevoked = false
     private var signoutSettled = false
     private var keychainUnavailableSettled = false
@@ -409,6 +415,7 @@ final class IOSCursorAuthService {
         guard !credentialsRevoked else {
             throw IOSCursorAuthError.signInRequired
         }
+        let operationEpoch = authOperationEpoch
         let resolved = requestedBackendURL.flatMap(URL.init(string:)) ?? backendURL
         let access: String?
         do {
@@ -428,13 +435,52 @@ final class IOSCursorAuthService {
             }
             throw error
         }
-        guard let access, !access.isEmpty, let refresh, !refresh.isEmpty else {
+        guard isCurrentAuthOperation(operationEpoch),
+              !credentialsRevoked,
+              let access, !access.isEmpty,
+              let refresh, !refresh.isEmpty
+        else {
             throw IOSCursorAuthError.signInRequired
         }
         if !shouldRefreshAccessToken(resolved.absoluteString, accessToken: access) {
             return access
         }
 
+        if let active = refreshFlights[refresh] {
+            return try await active.task.value
+        }
+        let flightID = UUID()
+        let task = Task { @MainActor [weak self] () throws -> String in
+            guard let self else { throw IOSCursorAuthError.signInRequired }
+            return try await self.runRefreshAccessToken(
+                resolved: resolved,
+                refresh: refresh,
+                operationEpoch: operationEpoch
+            )
+        }
+        refreshFlights[refresh] = .init(id: flightID, task: task)
+        do {
+            let value = try await task.value
+            if refreshFlights[refresh]?.id == flightID {
+                refreshFlights.removeValue(forKey: refresh)
+            }
+            return value
+        } catch {
+            if refreshFlights[refresh]?.id == flightID {
+                refreshFlights.removeValue(forKey: refresh)
+            }
+            throw error
+        }
+    }
+
+    private func runRefreshAccessToken(
+        resolved: URL,
+        refresh: String,
+        operationEpoch: UInt64
+    ) async throws -> String {
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
+        }
         var request = URLRequest(url: resolved.appendingPathComponent("oauth/token"))
         request.httpMethod = "POST"
         request.timeoutInterval = 20
@@ -444,14 +490,20 @@ final class IOSCursorAuthService {
             "grant_type": "refresh_token",
             "refresh_token": refresh,
         ])
+
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            let nsError = error as NSError
-            noteRefreshFailure(.network(String(nsError.code)))
+            if isCurrentAuthOperation(operationEpoch) {
+                let nsError = error as NSError
+                noteRefreshFailure(.network(String(nsError.code)))
+            }
             throw error
+        }
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
         }
         guard let http = response as? HTTPURLResponse else {
             noteRefreshFailure(.badPayload)
@@ -459,10 +511,12 @@ final class IOSCursorAuthService {
         }
         guard (200..<300).contains(http.statusCode) else {
             noteRefreshFailure(.httpStatus(http.statusCode))
-            try? await clearCredentials(
-                sessionCause: .sessionRevoked,
-                signinCause: "session_expired"
-            )
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .sessionRevoked,
+                    signinCause: "session_expired"
+                )
+            }
             throw IOSCursorAuthError.tokenRefreshFailed(http.statusCode)
         }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -471,10 +525,12 @@ final class IOSCursorAuthService {
               !nextAccess.isEmpty
         else {
             noteRefreshFailure(.badPayload)
-            try? await clearCredentials(
-                sessionCause: .unparseable,
-                signinCause: "session_expired"
-            )
+            if isCurrentAuthOperation(operationEpoch) {
+                try? await clearCredentials(
+                    sessionCause: .unparseable,
+                    signinCause: "session_expired"
+                )
+            }
             throw IOSCursorAuthError.invalidLoginResponse
         }
         let nextRefresh: String
@@ -483,13 +539,42 @@ final class IOSCursorAuthService {
         } else {
             nextRefresh = refresh
         }
+
+        let stored: Bool
         do {
-            try await store.writeSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY, value: nextAccess)
-            try await store.writeSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY, value: nextRefresh)
+            stored = try await mutateCredentials { () -> Bool in
+                guard self.isCurrentAuthOperation(operationEpoch),
+                      !self.credentialsRevoked
+                else { return false }
+                try await self.store.writeSecret(
+                    IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+                    value: nextAccess
+                )
+                guard self.isCurrentAuthOperation(operationEpoch),
+                      !self.credentialsRevoked
+                else {
+                    await self.rollbackSupersededAuthentication()
+                    return false
+                }
+                try await self.store.writeSecret(
+                    IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY,
+                    value: nextRefresh
+                )
+                guard self.isCurrentAuthOperation(operationEpoch),
+                      !self.credentialsRevoked
+                else {
+                    await self.rollbackSupersededAuthentication()
+                    return false
+                }
+                return true
+            }
         } catch {
             authTelemetry.report(iosCursorSessionTelemetry(.keychainUnavailable))
             await shipKeychainUnavailableOnce(accessToken: nextAccess)
             throw error
+        }
+        guard stored, isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            throw IOSCursorAuthError.signInRequired
         }
         credentialsRevoked = false
         signoutSettled = false
