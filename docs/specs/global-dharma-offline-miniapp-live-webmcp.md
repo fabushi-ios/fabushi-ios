@@ -19,8 +19,8 @@ At discovery source `fabushi-ios/fabushi-ios` PR #3 `1f1deb151cb2c137ba5f7f1470a
 Therefore existing strings such as “WebMCP 已连接” or “Bot / Web UI 同一共享状态” do not prove Bot -> current WKWebView execution.
 
 Live authorities re-read for this task:
-- iOS main: `f098639ab178a839690b9dece60fa0d11c5d2e25`
-- iOS PR #3 pre-document implementation HEAD: `5feaa90ae769a114d0194c9114601aeabe3a8d5b` (final evidence must use the resulting newer exact HEAD)
+- iOS main: `8b0e7236d75f8e16b868332e51cde41b6ee415fc`
+- iOS PR #3 pre-evidence HEAD for the 2026-10-12 rebaseline: `49c566a9c37373f4040c8624db2ef07e2171ce75` (the evidence/source commit produced by this review is newer; only its exact-head CI may be current evidence)
 - Desktop main: `371b72f1cd20de03dc4dff9a15ed761054968093`
 - Backend main: `9c56a77cbe02dfceebf574236a703b53cd257cb9`
 - Platform Core main: `c301820b93274bda586fbb82be982afc3c2ee4d4`
@@ -357,3 +357,11 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - Current-main source owners were re-read for `command-palette-link-provider.ts`, `command-palette-message-provider.ts`, `command-palette-model.ts`, `command-palette-provider.ts`, `command-palette-root-commands.ts`, and `command-palette-search-provider.ts`, together with shipping `GrokMobileCommandPaletteModel.swift`, `GrokMobileShell+CommandPalette.swift`, and focused tests.
 - The four historical provider rows are demoted from stale `verified` to `implemented`; their old Actions/artifacts are predecessor evidence and are not rebound synthetically. `command-palette-model.ts` and `command-palette-root-commands.ts` are corrected from `mapped` to `implemented` because current shipping owners and tests exist. No row is promoted to `verified`.
 - This commit supersedes runs `38195681012` / `38195680859` and `38195693072`; replacement exact-head Actions and strict completeness are required.
+
+
+## Current exact-head rebaseline — 2026-10-12 local-tool permission scope
+
+- Requested checkpoint `e9070d368902c65f669464ccdcd9ea1bcbfe3d91`, runs `38200123560` / `38200123558`, and jobs `114651452123`, `114651495111`, `114651618109`, `114651618294` are predecessor evidence after PR #3 advanced to pre-evidence head `49c566a9c37373f4040c8624db2ef07e2171ce75`. The pending `38200626640` / `38200626642` runs are likewise superseded by this source/evidence change.
+- Desktop `frontend/src/production/local-tool-permission-scope.ts@4bfbc19e23c8b4b4eacd049d38ab47e021d732cf` was re-read with its shipping `ProductionRenderer` caller. Its security effect is account/revision fencing: same-scope stability, strictly newer revision on account re-entry, stale revision rejection, reset on account/logout replacement, and permanent disposal.
+- The native iOS replacement is the single canonical `MahayanaCoordinator` permission lifecycle, not a second renderer store. `IOSLocalToolApprovalScopeFence` now owns normalized account scope and monotonic revision; persistent and temporary decisions remain in the existing account-scoped settings owner. Scope+revision is checked before persistence, before Host permission dispatch, and after dispatch; RemoteRunner additionally binds Host generation.
+- Focused unit coverage exercises account A → B → A re-entry, stale token rejection, reset, post-reset newer revision, and dispose inertness. This moves only the source row to implemented/current-main-reviewed; it does not promote verified, strict completeness, GD-OFF/GD-WEBMCP, payment, release, device, TestFlight/App Store, independent acceptance, or final acceptance.

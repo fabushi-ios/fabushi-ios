@@ -98,8 +98,8 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "d705013a1ae4be5c36057b7ff1444f1a5b1aeb19",
-    "preEvidenceIosHead": "b12c1016e80fc937f6a3181a381983cc329c9559",
+    "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
+    "preEvidenceIosHead": "49c566a9c37373f4040c8624db2ef07e2171ce75",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -112,9 +112,19 @@
       38195278457,
       38195681012,
       38195680859,
-      38195693072
+      38195693072,
+      38200123560,
+      38200123558,
+      38200626640,
+      38200626642
     ],
-    "status": "command-palette-provider-batch-current-main-reviewed-no-verification-promotion-fresh-exact-head-ci-required",
+    "predecessorWorkflowJobs": [
+      114651452123,
+      114651495111,
+      114651618109,
+      114651618294
+    ],
+    "status": "local-tool-permission-scope-current-main-reviewed-implemented-not-verified-fresh-exact-head-ci-required",
     "rowCount": 7951
   }
 }

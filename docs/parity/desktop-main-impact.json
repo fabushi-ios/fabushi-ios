@@ -46,7 +46,8 @@
       "2026-10-12 attachment/current-head audit: Desktop attachment-gateway.ts@cbd9411d, attachment-manager.ts@0d055b7d, attachments.ts@764654b8 were re-read at Desktop 371b72f1. iOS Main-RPC names are ABI declarations only; canonical app Host has no seven attachment handlers. Separate Human messaging FileBlobStore is not substituted as proof. Rows remain mapped.",
       "2026-10-12 coordinator telemetry: per-domain+operation failure episodes plus reportAgentsUnreachable/reportRecoveryAction/reportRebuildLifecycle/reportReconciliation/reportResyncCompleted now route into native durable IOSLifecycleReporter. Native reachability/DNS/transport-stream cause stamping is still open; broad row remains mapped.",
       "2026-10-12 attachment production closure delta: IOSAttachmentMainRPCAdapter now owns native staging/download semantics and delegates durable upload/read to canonical FeatureHost direct APIs. app-host focused Rust execution was added to ios-desktop-main-architecture.yml. No ledger status promotion occurs before replacement exact-head Actions.",
-      "2026-10-12 coordinator telemetry delta: native gateway reachability, DNS episode and transport-stage projections now flow through MahayanaCoordinator to the existing IOSLifecycleReporter, closing the low-level cause-stamping gap while preserving one telemetry owner. Aggregate dependency review remains pending."
+      "2026-10-12 coordinator telemetry delta: native gateway reachability, DNS episode and transport-stage projections now flow through MahayanaCoordinator to the existing IOSLifecycleReporter, closing the low-level cause-stamping gap while preserving one telemetry owner. Aggregate dependency review remains pending.",
+      "2026-10-12 local-tool permission scope audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093 and pre-evidence iOS 49c566a9c37373f4040c8624db2ef07e2171ce75: Desktop ProductionRenderer owns one createLocalToolPermissionScopeGate instance, enters current transcript account, accepts only current scope/revision, preserves a per-account re-entry floor across reset, and disposes with renderer lifecycle. The prior iOS ledger N/A claim was stale because MahayanaCoordinator already owns Always/Never/allow-once permission persistence and scope+revision checks. This delta adds IOSLocalToolApprovalScopeFence as that canonical native fence, binds same-scope stability/account re-entry/reset/dispose semantics, retains pre-persist/pre-dispatch/post-dispatch stale checks plus Host-generation RemoteRunner fencing, and adds focused behavioral coverage. No verified/full-review promotion occurs before replacement exact-head Actions."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -2006,8 +2007,8 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "d705013a1ae4be5c36057b7ff1444f1a5b1aeb19",
-    "preEvidenceIosHead": "b12c1016e80fc937f6a3181a381983cc329c9559",
+    "requestedCheckpoint": "e9070d368902c65f669464ccdcd9ea1bcbfe3d91",
+    "preEvidenceIosHead": "49c566a9c37373f4040c8624db2ef07e2171ce75",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2020,21 +2021,29 @@
       38195278457,
       38195681012,
       38195680859,
-      38195693072
+      38195693072,
+      38200123560,
+      38200123558,
+      38200626640,
+      38200626642
     ],
-    "status": "command-palette-provider-batch-current-main-reviewed-no-verification-promotion-fresh-exact-head-ci-required",
+    "predecessorWorkflowJobs": [
+      114651452123,
+      114651495111,
+      114651618109,
+      114651618294
+    ],
+    "status": "local-tool-permission-scope-native-fence-added-no-verification-promotion-fresh-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
+      "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
+      "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift",
       "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
       "docs/parity/desktop-main-index.json",
       "docs/parity/desktop-main-impact.json",
       "docs/parity/desktop-main-release-evidence.json",
-      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md",
-      "mobile/ios/FabushiTests/CoordinatorFailureTelemetryParityTests.swift",
-      "source/ios-main/coordinator/coordinator-telemetry.swift",
-      "source/ios-preload/coordinator-port-bridge.swift",
-      "source/ios-preload/preload.swift"
+      "docs/specs/global-dharma-offline-miniapp-live-webmcp.md"
     ],
-    "conclusion": "Six command-palette provider/model/root rows were re-read at Desktop current main. Four stale verified rows are now implemented; command-palette-model and root-commands move mapped->implemented because real shipping iOS owners and focused tests exist. No row is promoted to verified; strict completeness still fails closed."
+    "conclusion": "Desktop local-tool permission scope responsibility is now current-main-reviewed against its direct ProductionRenderer caller and mapped to the canonical native Coordinator owner with focused re-entry/stale/reset/dispose coverage. Aggregate dependency review, strict completeness, release acceptance, production signer, StoreKit/device/distribution evidence and independent acceptance remain open."
   }
 }

@@ -105,6 +105,42 @@ final class SharedPermissionsAndNotificationsParityTests: XCTestCase {
         ))
     }
 
+    func testIOSLocalToolApprovalScopeFenceRejectsStaleRevisionAcrossReentryResetAndDispose() {
+        var fence = IOSLocalToolApprovalScopeFence()
+
+        fence.enter("account-a")
+        let first = fence.token()
+        XCTAssertEqual(first?.accountScope, "account-a")
+        XCTAssertTrue(first.map(fence.accepts) ?? false)
+
+        fence.enter("account-b")
+        let second = fence.token()
+        XCTAssertEqual(second?.accountScope, "account-b")
+        XCTAssertFalse(first.map(fence.accepts) ?? true)
+
+        fence.enter("account-a")
+        let reentered = fence.token()
+        XCTAssertEqual(reentered?.accountScope, "account-a")
+        XCTAssertGreaterThan(reentered?.revision ?? 0, first?.revision ?? 0)
+        XCTAssertFalse(first.map(fence.accepts) ?? true)
+        XCTAssertTrue(reentered.map(fence.accepts) ?? false)
+
+        fence.reset()
+        XCTAssertNil(fence.token())
+        XCTAssertFalse(reentered.map(fence.accepts) ?? true)
+
+        fence.enter("account-a")
+        let afterReset = fence.token()
+        XCTAssertGreaterThan(afterReset?.revision ?? 0, reentered?.revision ?? 0)
+        XCTAssertTrue(afterReset.map(fence.accepts) ?? false)
+
+        fence.dispose()
+        XCTAssertNil(fence.token())
+        XCTAssertFalse(afterReset.map(fence.accepts) ?? true)
+        fence.enter("account-a")
+        XCTAssertNil(fence.token(), "disposed fence must never reactivate")
+    }
+
     func testLocalToolPermissionCeilingAndResourceCoverage() {
         XCTAssertTrue(isSandLocalToolAction("read-file"))
         XCTAssertFalse(isSandLocalToolAction("spawn-daemon"))

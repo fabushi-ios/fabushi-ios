@@ -329,6 +329,88 @@ final class IOSHostSettingsReconciler {
     }
 }
 
+struct IOSLocalToolApprovalScopeFence {
+    struct Token: Equatable, Sendable {
+        let accountScope: String
+        let revision: UInt64
+    }
+
+    private(set) var accountScope: String?
+    private(set) var revision: UInt64 = 0
+    private(set) var isDisposed = false
+    private var highestRevisionByScope: [String: UInt64] = [:]
+
+    mutating func enter(_ rawScope: String?) {
+        guard !isDisposed else { return }
+        let trimmed = rawScope?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nextScope: String? = trimmed?.isEmpty == false ? trimmed : nil
+        guard nextScope != accountScope else { return }
+
+        rememberActiveRevision()
+        accountScope = nextScope
+        guard let nextScope else {
+            _ = advanceRevision()
+            return
+        }
+
+        let reentryFloor = highestRevisionByScope[nextScope] ?? 0
+        guard advanceRevision(minimumExclusive: reentryFloor) else { return }
+        highestRevisionByScope[nextScope] = max(
+            highestRevisionByScope[nextScope] ?? 0,
+            revision
+        )
+    }
+
+    mutating func reset() {
+        guard !isDisposed, accountScope != nil else { return }
+        rememberActiveRevision()
+        accountScope = nil
+        _ = advanceRevision()
+    }
+
+    mutating func dispose() {
+        guard !isDisposed else { return }
+        isDisposed = true
+        accountScope = nil
+        if revision < UInt64.max {
+            revision += 1
+        }
+        highestRevisionByScope.removeAll()
+    }
+
+    func token() -> Token? {
+        guard !isDisposed, let accountScope else { return nil }
+        return .init(accountScope: accountScope, revision: revision)
+    }
+
+    func accepts(_ token: Token) -> Bool {
+        !isDisposed
+            && accountScope == token.accountScope
+            && revision == token.revision
+    }
+
+    private mutating func rememberActiveRevision() {
+        guard let accountScope else { return }
+        highestRevisionByScope[accountScope] = max(
+            highestRevisionByScope[accountScope] ?? 0,
+            revision
+        )
+    }
+
+    @discardableResult
+    private mutating func advanceRevision(minimumExclusive floor: UInt64 = 0) -> Bool {
+        let base = max(revision, floor)
+        guard base < UInt64.max else {
+            isDisposed = true
+            accountScope = nil
+            highestRevisionByScope.removeAll()
+            return false
+        }
+        revision = base + 1
+        return true
+    }
+}
+
 @MainActor
 final class MahayanaCoordinator {
     struct JSONResult: @unchecked Sendable {
@@ -399,8 +481,13 @@ final class MahayanaCoordinator {
     private var experimentMembershipGeneration: UInt64 = 0
     private var experimentOverrideGeneration: UInt64 = 0
     private var lastProjectedExperimentOverrides: [String: Bool]?
-    private var localToolApprovalAccountScope: String?
-    private var localToolApprovalScopeRevision: UInt64 = 0
+    private var localToolApprovalScopeFence = IOSLocalToolApprovalScopeFence()
+    private var localToolApprovalAccountScope: String? {
+        localToolApprovalScopeFence.accountScope
+    }
+    private var localToolApprovalScopeRevision: UInt64 {
+        localToolApprovalScopeFence.revision
+    }
     private var localToolApprovalCleanupStatus = "idle"
     private var localToolApprovalCleanupFailure: String?
     private(set) var lifecycleState: LifecycleState = .starting
@@ -970,15 +1057,11 @@ final class MahayanaCoordinator {
 
     func updateAccountSettingsScope(_ accountScope: String?) {
         let previousExperimentScope = localToolApprovalAccountScope
-        localToolApprovalScopeRevision &+= 1
-        localToolApprovalAccountScope = accountScope?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if localToolApprovalAccountScope?.isEmpty == true {
-            localToolApprovalAccountScope = nil
-        }
+        localToolApprovalScopeFence.enter(accountScope)
+        let normalizedAccountScope = localToolApprovalAccountScope
         localToolApprovalCleanupStatus = "idle"
         localToolApprovalCleanupFailure = nil
-        if previousExperimentScope != localToolApprovalAccountScope {
+        if previousExperimentScope != normalizedAccountScope {
             experimentMembershipGeneration = experimentMembershipGeneration == UInt64.max
                 ? 1
                 : experimentMembershipGeneration + 1
@@ -991,16 +1074,16 @@ final class MahayanaCoordinator {
             experimentService?.setIsAnysphereUser(false)
             experimentService?.resetFeatureFlagOverridesForAccountTransition()
         }
-        if let accountScope {
-            settingsStore?.scopeToAccount(accountScope)
-            hostSettingsReconciler?.scopeToAccount(accountScope)
+        if let normalizedAccountScope {
+            settingsStore?.scopeToAccount(normalizedAccountScope)
+            hostSettingsReconciler?.scopeToAccount(normalizedAccountScope)
         } else {
             hostSettingsReconciler?.accountDeparted()
             settingsStore?.clearAccountScope()
         }
         autoReviewHostSyncNeeded = true
-        mcpSurface?.updateAccountScope(accountScope)
-        if let experimentService, localToolApprovalAccountScope != nil {
+        mcpSurface?.updateAccountScope(normalizedAccountScope)
+        if let experimentService, normalizedAccountScope != nil {
             handleExperimentSnapshot(experimentService.getSnapshot())
         }
     }
@@ -1682,6 +1765,9 @@ final class MahayanaCoordinator {
     func beginShutdown() {
         hostSettingsTransportDown()
         lifecycleState = .shuttingDown
+        localToolApprovalScopeFence.dispose()
+        localToolApprovalCleanupStatus = "idle"
+        localToolApprovalCleanupFailure = nil
         inFlight.removeAll()
         clientSideToolV2Relay.clear()
         rendererEventSink = nil
