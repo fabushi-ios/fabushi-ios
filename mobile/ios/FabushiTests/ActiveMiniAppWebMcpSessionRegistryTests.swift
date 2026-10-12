@@ -343,6 +343,95 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual(current.artifactSha256, String(repeating: "b", count: 64))
     }
 
+    func testAccountRevocationRejectsPendingResultAndPreservesOtherAccounts() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+        var pendingContinuation: CheckedContinuation<String, Never>?
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            version: "1.2.0",
+            artifactSha256: String(repeating: "e", count: 64),
+            pluginInstanceId: "account-a-instance",
+            nonce: "account-a-nonce",
+            generation: 4,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { continuation in
+                pendingContinuation = continuation
+            }
+        }
+        registry.register(
+            accountKey: "account-b",
+            pluginId: "other-app",
+            version: "2.0.0",
+            artifactSha256: String(repeating: "f", count: 64),
+            pluginInstanceId: "account-b-instance",
+            nonce: "account-b-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in "account-b" }
+
+        let pending = Task {
+            try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "global-dharma",
+                name: "offline.state.read",
+                arguments: [:]
+            )
+        }
+        for _ in 0..<100 where pendingContinuation == nil {
+            await Task.yield()
+        }
+        let continuation = try XCTUnwrap(pendingContinuation)
+
+        registry.revokeSessions(accountKey: "account-a")
+        XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "global-dharma"))
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-b", pluginId: "other-app"))
+
+        continuation.resume(returning: "stale")
+        do {
+            _ = try await pending.value
+            XCTFail("Revoked-account result must not commit")
+        } catch is CancellationError {
+            // Expected: account revocation invalidates the in-flight page result.
+        }
+
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-a", pluginId: "global-dharma").last?.outcome,
+            "stale-session"
+        )
+    }
+
+    func testMiniAppSourceGenerationKeyIsAccountScoped() {
+        let preview = String(repeating: "a", count: 64)
+        let installedA = miniAppSourceGenerationKey(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            previewDigest: nil
+        )
+        let installedB = miniAppSourceGenerationKey(
+            accountKey: "account-b",
+            pluginId: "global-dharma",
+            previewDigest: nil
+        )
+        let previewA = miniAppSourceGenerationKey(
+            accountKey: "account-a",
+            pluginId: "global-dharma",
+            previewDigest: preview
+        )
+
+        XCTAssertNotEqual(installedA, installedB)
+        XCTAssertNotEqual(installedA, previewA)
+        XCTAssertFalse(installedA.contains("account-a"))
+        XCTAssertFalse(installedB.contains("account-b"))
+    }
+
     func testReRegistrationImmediatelyDisablesRemovedTool() async throws {
         let registry = ActiveMiniAppWebMcpSessionRegistry.shared
         let status = MiniAppToolContract(

@@ -2568,6 +2568,7 @@ final class MarketplaceModel {
     }
 
     private func applyAuth(_ object: [String: Any]?, defaultLoggedIn: Bool = false) {
+        let previousWebMcpAccountKey = settingsNoticeAccountKey
         let previousMcpScope = globalDharmaAccountScope
         let auth = (object?["auth"] as? [String: Any]) ?? object
         loggedIn = auth?["loggedIn"] as? Bool ?? defaultLoggedIn
@@ -2588,6 +2589,9 @@ final class MarketplaceModel {
         }
 
         if previousMcpScope != globalDharmaAccountScope || !loggedIn {
+            ActiveMiniAppWebMcpSessionRegistry.shared.revokeSessions(
+                accountKey: previousWebMcpAccountKey
+            )
             experimentPresentationRequestSerial = experimentPresentationRequestSerial == Int.max
                 ? 1
                 : experimentPresentationRequestSerial + 1

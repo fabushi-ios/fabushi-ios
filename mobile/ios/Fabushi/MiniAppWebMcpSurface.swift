@@ -16,6 +16,20 @@ func generatedMiniAppPreviewDigest(_ html: String) -> String {
         .joined()
 }
 
+func miniAppSourceGenerationKey(
+    accountKey: String,
+    pluginId: String,
+    previewDigest: String?
+) -> String {
+    let accountDigest = SHA256.hash(data: Data(accountKey.utf8))
+        .map { String(format: "%02x", $0) }
+        .joined()
+    if let previewDigest {
+        return "preview:\(accountDigest):\(pluginId):\(previewDigest)"
+    }
+    return "installed:\(accountDigest):\(pluginId)"
+}
+
 func generatedMiniAppReviewMatchesPreview(
     _ review: LocalMiniAppDraftReview,
     html: String
@@ -666,10 +680,11 @@ struct MiniAppWebMcpSurface: View {
     }
 
     private var sourceGenerationKey: String {
-        if let previewDigest {
-            return "preview:\(plugin.pluginId):\(previewDigest)"
-        }
-        return "installed:\(plugin.pluginId)"
+        miniAppSourceGenerationKey(
+            accountKey: model.settingsNoticeAccountKey,
+            pluginId: plugin.pluginId,
+            previewDigest: previewDigest
+        )
     }
 
     var body: some View {
