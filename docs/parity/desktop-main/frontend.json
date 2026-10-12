@@ -295,7 +295,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
-      "notes": "Implemented on the shipping home. Delete confirmation remains visible and non-dismissible while the canonical delete mutation is pending; success closes it, failure stays visible with an error. Same-head Actions required before verified."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob e74a5820da0ac2a76cae5e1f8f21daed4176533e. Contract remains destructive group/agent-specific confirmation, pending-state close fencing and visible retryable failure; iOS shipping owner remains the existing SwiftUI delete-confirmation path and canonical delete mutation owner. No verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/AgentNameEditor.tsx",
@@ -310,7 +312,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
-      "notes": "Shipping rename behavior uses committedMobileBotName and canonical GrokMobileBotService.renameBot. Same-head Actions required before verified."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob 0767d63e50df9865f4e8a3ed6666c3df18d6fde8. Contract remains trimmed non-empty changed-name commit, Escape cancel, blur/Enter completion and single-finish semantics; iOS shipping rename sheet/service owner remains the platform replacement. No verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/AgentRowActions.tsx",
@@ -325,7 +329,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/MobileAgentSidebarSections.swift; source/ios-preload/main-rpc-runtime.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Implemented against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Pin and sidebar-section ownership now match canonical Host persistence; local section bytes are account-scoped fallback only. Keep below verified until current exact-head acceptance and artifact provenance."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob cfb53200425dd496846a986e1c16c28bfcfffaa8. Contract remains canonical row action orchestration for profile/full conversation/async tasks/sections/pin/unread/duplicate/copy/hide/delete with pinned/hidden move fencing; iOS keeps lifecycle truth in existing Host/Bot owners. No verification promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/CommandPalette.tsx",
@@ -340,7 +346,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+CommandPalette.swift; frontend/src/production/GrokMobileCommandPaletteModel.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileCommandPaletteTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. DOM focus/keyboard/virtual-list mechanics are Desktop-specific interaction mechanisms; canonical searchable identities and actions remain owned by existing iOS product/runtime stores. Keep below verified until current exact-head acceptance."
+      "notes": "Re-read at Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093, exact blob d28deb2f4d7749812272c787e210650d6ba88a8b. Contract remains keyboard/focus-safe multi-tab/nested command palette composition over canonical provider/model owners, with messages/files/links/routines/actions availability gating and virtualized selection. Existing iOS command palette replacement remains implemented only pending full owner-by-owner equivalence and exact-head evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/ForwardMessageDialog.tsx",
