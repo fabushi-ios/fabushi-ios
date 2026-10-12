@@ -273,4 +273,23 @@ final class IOSLifecycleParityTests: XCTestCase {
     }
 
 
+    func testShippingShutdownFlushesRemoteTelemetryBeforeAccountReset() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/IOSMainRuntime.swift"),
+            encoding: .utf8
+        )
+        let flush = try XCTUnwrap(source.range(of: "lifecycleTelemetrySink.flushRemoteNow()"))
+        let settle = try XCTUnwrap(source.range(of: "lifecycleTelemetrySink.settleLoggedOutIfNeeded()"))
+        let reset = try XCTUnwrap(source.range(of: "accountRuntime.reset()"))
+        XCTAssertLessThan(flush.lowerBound, settle.lowerBound)
+        XCTAssertLessThan(settle.lowerBound, reset.lowerBound)
+    }
+
+
 }

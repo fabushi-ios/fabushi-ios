@@ -496,6 +496,7 @@ final class IOSMainRuntime {
             .rendererLifecycle,
             metadata: ["phase": "shutting-down"]
         )
+        lifecycleTelemetrySink.flushRemoteNow()
         lifecycleTelemetrySink.settleLoggedOutIfNeeded()
         accountRuntime.reset()
         boxVisibilityTracker.abandonAll()
