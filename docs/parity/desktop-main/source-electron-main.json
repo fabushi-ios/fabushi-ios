@@ -206,8 +206,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/coordinator/coordinator-telemetry.swift implements SAND-E0214..0219 auth-session projections, capped failure/degraded buckets, signout causes and a 16-event pre-attach relay; source/ios-main/account/cursor-auth.swift emits refresh failure/recovery/rotation/keychain/signout events from the shipping Cursor auth owner; IOSMainRuntime routes them through the existing lifecycle telemetry owner as desktopSession.",
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift covers auth error taxonomy, retryability, caps/buckets, canonical signin phases/causes, and exact 16-event relay behavior. Current exact-head Actions are still required before verified.",
-      "notes": "Exact Desktop source reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop source reviewed at Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions. Current-main exact blob identity was re-confirmed; implementation remains bounded to the existing iOS telemetry/auth owner and exact-head Actions are still required before verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/session-settlement-shipper.ts",
@@ -222,8 +223,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/account/session-settlement-shipper.swift owns the terminal structured-log backend adapter and metadata projection; source/ios-main/account/cursor-auth.swift freezes departing credentials, preserves one-shot settlement state and retained-after-failed-logout semantics without creating a second auth store; source/shared/observability/structured-log-transport.swift supplies the canonical log entry/receipt/deadline contract; source/shared/node/sand-client-metadata.swift and source/shared/node/cursor-backend/cursor-inference.swift supply canonical Sand client/checksum headers.",
       "test_evidence": "mobile/ios/FabushiTests/SessionSettlementParityTests.swift covers signed_out metadata/token-after-delete semantics, keychain_unavailable WARN projection, 15 second timeout, valid/invalid receipts, network failure, durable true/false, both-delete attempts, retained credential revocation, one-shot dedupe and no credential body leakage. Current exact-head GitHub Actions must succeed before verified promotion.",
-      "notes": "Exact Desktop session-settlement-shipper.ts@0e11f2e395475e244608ac44e868eb369a0b4de2 and cursor-auth.ts@c2e4c95306f8822adb22176d594b488e9717b28f were re-read at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Shipping composition now exists on the existing iOS auth/machine-id/telemetry/backend owners; status is implemented only, not verified, until the new exact-head Actions complete successfully.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop session-settlement-shipper.ts@0e11f2e395475e244608ac44e868eb369a0b4de2 and cursor-auth.ts@c2e4c95306f8822adb22176d594b488e9717b28f were re-read at Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. Shipping composition now exists on the existing iOS auth/machine-id/telemetry/backend owners; status is implemented only, not verified, until the new exact-head Actions complete successfully. Current-main exact blob identity was re-confirmed; implementation remains bounded to the existing iOS telemetry/auth owner and exact-head Actions are still required before verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/account/signin-funnel-telemetry.ts",
@@ -238,8 +240,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/coordinator/coordinator-telemetry.swift implements canonical signin phases, signed-out causes, boot-gate/account-consult projections and a 16-event pre-attach relay; source/ios-main/account/cursor-auth.swift emits login start/completion/failure/cancel/logout/session-expiry events; IOSMainRuntime routes them through the existing lifecycle telemetry owner as desktopSignin.",
       "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift covers auth error taxonomy, retryability, caps/buckets, canonical signin phases/causes, and exact 16-event relay behavior. Current exact-head Actions are still required before verified.",
-      "notes": "Exact Desktop source reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Exact Desktop source reviewed at Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093; no equivalence inferred from telemetry filenames alone. Native shipping telemetry is now emitted by the existing Cursor auth owner and routed through IOSLifecycleReporter; no credential values are included. verified remains pending same-head Actions. Current-main exact blob identity was re-confirmed; implementation remains bounded to the existing iOS telemetry/auth owner and exact-head Actions are still required before verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/adapters/account-edge.ts",
