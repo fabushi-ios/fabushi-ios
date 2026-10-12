@@ -13,6 +13,7 @@ import Foundation
 final class ProductionAccountTransitionCleanup {
     struct Dependencies {
         let clearAccountScope: @MainActor () -> Void
+        let clearCoordinatorAccountState: @MainActor () async -> Void
         let didClearAccountScope: @MainActor (_ previousSlot: String, _ nextSlot: String?) -> Void
     }
 
@@ -25,6 +26,7 @@ final class ProductionAccountTransitionCleanup {
     func prepare(previousSlot: String?, nextSlot: String?) async {
         guard let previousSlot else { return }
         dependencies.clearAccountScope()
+        await dependencies.clearCoordinatorAccountState()
         dependencies.didClearAccountScope(previousSlot, nextSlot)
     }
 }

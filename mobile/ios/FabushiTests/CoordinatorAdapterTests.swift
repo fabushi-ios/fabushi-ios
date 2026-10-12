@@ -98,12 +98,14 @@ final class CoordinatorAdapterTests: XCTestCase {
     @MainActor
     func testCoordinatorAccountRuntimeFollowsSettledRustAuthReplies() async {
         var clearCount = 0
+        var coordinatorClearCount = 0
         var transitions: [(String, String?)] = []
         var adopted: [String?] = []
 
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: { clearCount += 1 },
+                clearCoordinatorAccountState: { coordinatorClearCount += 1 },
                 didClearAccountScope: { previous, next in
                     transitions.append((previous, next))
                 }
@@ -140,6 +142,7 @@ final class CoordinatorAdapterTests: XCTestCase {
         )
         XCTAssertEqual(runtime.activeSlot, "account-2")
         XCTAssertEqual(clearCount, 1)
+        XCTAssertEqual(coordinatorClearCount, 1)
         XCTAssertEqual(transitions.count, 1)
         XCTAssertEqual(transitions.first?.0, "account-1")
         XCTAssertEqual(transitions.first?.1, "account-2")
@@ -150,16 +153,19 @@ final class CoordinatorAdapterTests: XCTestCase {
         )
         XCTAssertNil(runtime.activeSlot)
         XCTAssertEqual(clearCount, 2)
+        XCTAssertEqual(coordinatorClearCount, 2)
         XCTAssertEqual(adopted, ["account-1", "account-2", nil])
     }
 
     @MainActor
     func testCoordinatorAccountRuntimeFailsClosedOnLoggedInReplyWithoutStableIdentity() async {
         var clearCount = 0
+        var coordinatorClearCount = 0
         var adopted: [String?] = []
         let cleanup = ProductionAccountTransitionCleanup(
             dependencies: .init(
                 clearAccountScope: { clearCount += 1 },
+                clearCoordinatorAccountState: { coordinatorClearCount += 1 },
                 didClearAccountScope: { _, _ in }
             )
         )
@@ -187,6 +193,7 @@ final class CoordinatorAdapterTests: XCTestCase {
         XCTAssertTrue(reason.contains("stable account slot"))
         XCTAssertNil(runtime.activeSlot)
         XCTAssertEqual(clearCount, 1)
+        XCTAssertEqual(coordinatorClearCount, 1)
         XCTAssertEqual(adopted.count, 1)
         XCTAssertNil(adopted[0])
     }

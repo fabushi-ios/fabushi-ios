@@ -943,6 +943,27 @@ final class IOSCursorAuthMainRpcCompatibility {
     }
 }
 
+let IOS_COMPUTER_MIGRATION_STALL_SECONDS = 30
+let IOS_COMPUTER_MIGRATION_MAX_STALL_REATTACHES = 20
+
+struct IOSComputerMigrationStallBudget: Equatable, Sendable {
+    let limit: Int
+    private(set) var remaining: Int
+
+    init(limit: Int = IOS_COMPUTER_MIGRATION_MAX_STALL_REATTACHES) {
+        self.limit = max(0, limit)
+        self.remaining = max(0, limit)
+    }
+
+    mutating func reset() { remaining = limit }
+
+    mutating func consumeReattach() -> Bool {
+        guard remaining > 0 else { return false }
+        remaining -= 1
+        return true
+    }
+}
+
 @MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
@@ -956,9 +977,14 @@ final class CoordinatorMcpSurface {
     private let localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer
     private let gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache
     private let gatewayDescriptorFailureReporter: IOSGatewayDescriptorFastPath.FailureReporter
+    private let reportMigrationWatchTelemetry: @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void
     private let isClientPaused: @MainActor () -> Bool
     private var experimentAuthObserver: ((IOSCursorAuthStatus) -> Void)?
     private var computerMigrationWatchTask: Task<Void, Never>?
+    private var computerMigrationStallTask: Task<Void, Never>?
+    private var computerMigrationStallBudget = IOSComputerMigrationStallBudget()
+    private var computerMigrationStallArmed = false
+    private var computerMigrationConsecutiveFailures = 0
     private var computerMigrationResumeOffsetKey = ""
     private var computerMigrationStatus: [String: Any]?
     private var computerMigrationLastTerminal: [String: Any]?
@@ -1025,6 +1051,7 @@ final class CoordinatorMcpSurface {
         localToolPermissionCeilingSynchronizer: IOSCursorLocalToolPermissionCeilingSynchronizer,
         gatewayDescriptorCache: IOSGatewayDescriptorKeychainCache,
         gatewayDescriptorFailureReporter: @escaping IOSGatewayDescriptorFastPath.FailureReporter,
+        reportMigrationWatchTelemetry: @escaping @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void,
         isClientPaused: @escaping @MainActor () -> Bool
     ) {
         self.manager = manager
@@ -1038,6 +1065,7 @@ final class CoordinatorMcpSurface {
         self.localToolPermissionCeilingSynchronizer = localToolPermissionCeilingSynchronizer
         self.gatewayDescriptorCache = gatewayDescriptorCache
         self.gatewayDescriptorFailureReporter = gatewayDescriptorFailureReporter
+        self.reportMigrationWatchTelemetry = reportMigrationWatchTelemetry
         self.isClientPaused = isClientPaused
     }
 
@@ -1088,6 +1116,7 @@ final class CoordinatorMcpSurface {
         settingsStore: SandSettingsStore,
         reportFailure: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         reportAuthTelemetry: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
+        reportMigrationWatchTelemetry: @escaping @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void = { _, _, _ in },
         isClientPaused: @escaping @MainActor () -> Bool = { false }
     ) -> CoordinatorMcpSurface {
         let port = CoordinatorMcpHostPort(
@@ -1277,6 +1306,7 @@ final class CoordinatorMcpSurface {
             localToolPermissionCeilingSynchronizer: localToolPermissionCeilingSynchronizer,
             gatewayDescriptorCache: gatewayDescriptorCache,
             gatewayDescriptorFailureReporter: gatewayDescriptorFailureReporter,
+            reportMigrationWatchTelemetry: reportMigrationWatchTelemetry,
             isClientPaused: isClientPaused
         )
         cursorAuth.setStatusObserver { [weak surface] status in
@@ -1311,6 +1341,12 @@ final class CoordinatorMcpSurface {
         let status = await cursorAuth.status()
         guard status.loggedIn else { return false }
         return try await dashboard.isAnysphereUser()
+    }
+
+    func prepareAccountTransition() async {
+        stopComputerMigrationWatch(clearState: true)
+        await gatewayDescriptorCache.clear()
+        await manager.reload()
     }
 
     func updateAccountScope(_ scope: String?) {
@@ -1352,7 +1388,12 @@ final class CoordinatorMcpSurface {
     private func stopComputerMigrationWatch(clearState: Bool) {
         computerMigrationGeneration &+= 1
         computerMigrationWatchTask?.cancel()
+        computerMigrationStallTask?.cancel()
         computerMigrationWatchTask = nil
+        computerMigrationStallTask = nil
+        computerMigrationStallArmed = false
+        computerMigrationStallBudget.reset()
+        computerMigrationConsecutiveFailures = 0
         if clearState {
             computerMigrationResumeOffsetKey = ""
             computerMigrationStatus = nil
@@ -1361,10 +1402,82 @@ final class CoordinatorMcpSurface {
         }
     }
 
+    private func disarmComputerMigrationStallWatch(clearOwedOperation: Bool) {
+        computerMigrationStallTask?.cancel()
+        computerMigrationStallTask = nil
+        computerMigrationStallArmed = false
+        computerMigrationStallBudget.reset()
+        if clearOwedOperation { computerMigrationOwedOperationId = nil }
+    }
+
+    private func scheduleComputerMigrationStallDeadline(generation: UInt64) {
+        computerMigrationStallTask?.cancel()
+        computerMigrationStallTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(IOS_COMPUTER_MIGRATION_STALL_SECONDS))
+            } catch {
+                return
+            }
+            guard let self,
+                  self.computerMigrationGeneration == generation,
+                  self.computerMigrationStallArmed,
+                  self.computerMigrationWatchTask != nil
+            else { return }
+            guard self.computerMigrationStallBudget.consumeReattach() else {
+                self.reportMigrationWatchTelemetry(
+                    "watch_exhausted",
+                    self.computerMigrationConsecutiveFailures,
+                    nil
+                )
+                self.disarmComputerMigrationStallWatch(clearOwedOperation: true)
+                return
+            }
+            self.reattachComputerMigrationWatchAfterStall(expectedGeneration: generation)
+        }
+    }
+
+    private func armComputerMigrationStallWatch(
+        operationId: String?,
+        generation: UInt64
+    ) {
+        if !computerMigrationStallArmed {
+            computerMigrationStallArmed = true
+            computerMigrationStallBudget.reset()
+        }
+        if computerMigrationOwedOperationId == nil {
+            computerMigrationOwedOperationId = operationId
+        }
+        scheduleComputerMigrationStallDeadline(generation: generation)
+    }
+
+    private func kickComputerMigrationStallWatch(generation: UInt64) {
+        guard computerMigrationStallArmed else { return }
+        scheduleComputerMigrationStallDeadline(generation: generation)
+    }
+
+    private func reattachComputerMigrationWatchAfterStall(expectedGeneration: UInt64) {
+        guard computerMigrationGeneration == expectedGeneration,
+              computerMigrationStallArmed
+        else { return }
+        computerMigrationWatchTask?.cancel()
+        computerMigrationWatchTask = nil
+        computerMigrationStallTask?.cancel()
+        computerMigrationStallTask = nil
+        startComputerMigrationWatch()
+    }
+
     private func ensureComputerMigrationWatch() {
+        guard computerMigrationWatchTask == nil else { return }
+        startComputerMigrationWatch()
+    }
+
+    private func startComputerMigrationWatch() {
         guard computerMigrationWatchTask == nil else { return }
         computerMigrationGeneration &+= 1
         let generation = computerMigrationGeneration
+        if computerMigrationStallArmed {
+            scheduleComputerMigrationStallDeadline(generation: generation)
+        }
         computerMigrationWatchTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
@@ -1384,9 +1497,22 @@ final class CoordinatorMcpSurface {
                               self.computerMigrationGeneration == generation
                         else { return }
                         received = true
-                        self.ingestComputerMigration(event)
+                        if self.computerMigrationConsecutiveFailures > 0 {
+                            self.computerMigrationConsecutiveFailures = 0
+                            self.reportMigrationWatchTelemetry("attached", 0, nil)
+                        }
+                        self.ingestComputerMigration(event, generation: generation)
                     }
                 } catch {
+                    if !Task.isCancelled,
+                       self.computerMigrationGeneration == generation {
+                        self.computerMigrationConsecutiveFailures += 1
+                        self.reportMigrationWatchTelemetry(
+                            "dropped",
+                            self.computerMigrationConsecutiveFailures,
+                            String(describing: type(of: error))
+                        )
+                    }
                     if !received && !fromOffset.isEmpty {
                         self.computerMigrationResumeOffsetKey = ""
                     }
@@ -1404,7 +1530,10 @@ final class CoordinatorMcpSurface {
         }
     }
 
-    private func ingestComputerMigration(_ event: IOSCursorSandBoxMigrationEvent) {
+    private func ingestComputerMigration(
+        _ event: IOSCursorSandBoxMigrationEvent,
+        generation: UInt64
+    ) {
         guard let phase = event.phaseName else { return }
         if !event.offsetKey.isEmpty {
             computerMigrationResumeOffsetKey = event.offsetKey
@@ -1421,14 +1550,21 @@ final class CoordinatorMcpSurface {
             if let owed = computerMigrationOwedOperationId,
                !event.operationId.isEmpty,
                event.operationId != owed {
+                kickComputerMigrationStallWatch(generation: generation)
                 return
             }
             computerMigrationLastTerminal = projected
-            computerMigrationOwedOperationId = nil
-        } else if let terminalOperation = computerMigrationLastTerminal?["operationId"] as? String,
-                  !event.operationId.isEmpty,
-                  terminalOperation != event.operationId {
-            computerMigrationLastTerminal = nil
+            disarmComputerMigrationStallWatch(clearOwedOperation: true)
+        } else {
+            armComputerMigrationStallWatch(
+                operationId: event.operationId.isEmpty ? nil : event.operationId,
+                generation: generation
+            )
+            if let terminalOperation = computerMigrationLastTerminal?["operationId"] as? String,
+               !event.operationId.isEmpty,
+               terminalOperation != event.operationId {
+                computerMigrationLastTerminal = nil
+            }
         }
     }
 
@@ -1443,14 +1579,16 @@ final class CoordinatorMcpSurface {
                     : result.reason,
             ]
         }
+        armComputerMigrationStallWatch(
+            operationId: result.operationId.isEmpty ? nil : result.operationId,
+            generation: computerMigrationGeneration
+        )
         if !result.operationId.isEmpty {
-            computerMigrationOwedOperationId = result.operationId
             return [
                 "status": "started",
                 "operationId": result.operationId,
             ]
         }
-        computerMigrationOwedOperationId = nil
         return ["status": "started-untrackable"]
     }
 

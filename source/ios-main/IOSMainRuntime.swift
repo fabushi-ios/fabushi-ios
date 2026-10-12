@@ -182,6 +182,9 @@ final class IOSMainRuntime {
                     lifecycleTelemetrySink.rotate(accountSlot: nil)
                     coordinator.updateAccountSettingsScope(nil)
                 },
+                clearCoordinatorAccountState: {
+                    await coordinator.prepareAccountTransition()
+                },
                 didClearAccountScope: { _, nextSlot in
                     reporter.report(
                         .coordinatorHandoff,

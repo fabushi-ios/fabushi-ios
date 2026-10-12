@@ -586,6 +586,21 @@ final class MahayanaCoordinator {
                 settingsStore: settingsStore,
                 reportFailure: mcpFailureReporter,
                 reportAuthTelemetry: mcpAuthTelemetryReporter,
+                reportMigrationWatchTelemetry: { phase, failures, errorClass in
+                    var metadata = [
+                        "event": "box_migration_watch",
+                        "phase": phase,
+                        "consecutive_failures": String(failures),
+                    ]
+                    if let errorClass {
+                        metadata["error_class"] = String(errorClass.prefix(128))
+                    }
+                    gatewayTelemetryReporter(.init(
+                        event: "box_migration_watch",
+                        level: phase == "attached" ? "info" : "warn",
+                        metadata: metadata
+                    ))
+                },
                 isClientPaused: isClientPaused
             )
         } else {
@@ -1053,6 +1068,10 @@ final class MahayanaCoordinator {
             nowEpochMilliseconds: coordinatorTransportEpochMilliseconds(),
             nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
         )
+    }
+
+    func prepareAccountTransition() async {
+        await mcpSurface?.prepareAccountTransition()
     }
 
     func updateAccountSettingsScope(_ accountScope: String?) {

@@ -399,3 +399,48 @@ final class IOSCursorAuthMainRpcCompatibilityTests: XCTestCase {
         XCTAssertEqual(events, ["cancel", "logout", "invalidate"])
     }
 }
+
+
+extension CoordinatorMcpSurfaceTests {
+    func testComputerMigrationStallBudgetMatchesDesktopWatchdogLimit() {
+        var budget = IOSComputerMigrationStallBudget()
+        XCTAssertEqual(budget.remaining, IOS_COMPUTER_MIGRATION_MAX_STALL_REATTACHES)
+
+        for expected in stride(
+            from: IOS_COMPUTER_MIGRATION_MAX_STALL_REATTACHES - 1,
+            through: 0,
+            by: -1
+        ) {
+            XCTAssertTrue(budget.consumeReattach())
+            XCTAssertEqual(budget.remaining, expected)
+        }
+        XCTAssertFalse(budget.consumeReattach())
+        budget.reset()
+        XCTAssertEqual(budget.remaining, IOS_COMPUTER_MIGRATION_MAX_STALL_REATTACHES)
+    }
+
+    func testComputerMigrationWatchProductionContainsIdleReattachTelemetryAndDepartureCleanup() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("IOS_COMPUTER_MIGRATION_STALL_SECONDS = 30"))
+        XCTAssertTrue(source.contains("IOS_COMPUTER_MIGRATION_MAX_STALL_REATTACHES = 20"))
+        XCTAssertTrue(source.contains("reattachComputerMigrationWatchAfterStall"))
+        XCTAssertTrue(source.contains("computerMigrationStallBudget.consumeReattach()"))
+        XCTAssertTrue(source.contains("\"watch_exhausted\""))
+        XCTAssertTrue(source.contains("\"dropped\""))
+        XCTAssertTrue(source.contains("\"attached\""))
+        XCTAssertTrue(source.contains("await gatewayDescriptorCache.clear()"))
+        XCTAssertTrue(source.contains("await manager.reload()"))
+    }
+}
