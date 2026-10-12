@@ -949,7 +949,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/composition.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Home.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift",
-      "notes": "Production root wiring exists. Fresh exact-HEAD Actions are required before verified promotion."
+      "notes": "Re-read exact Desktop blob 4ad5c57db6e8db481427c2157932b500ad143d3b at current Desktop main 371b72f1. AccessCoverComposition.project preserves access/roster loading+error projection and the cover visibility gate over first-box/restored-roster/computer-rebuild state. Keep implemented pending same-final-SHA code/test/artifact/independent evidence; this review does not infer verified closure.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/computer-rebuild-box-store.ts",
@@ -1024,7 +1026,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/first-box-gate.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; fresh exact-head GitHub Actions required before verified promotion.",
-      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. The shipping GrokMobileShell roster owner feeds canonical load/failure/restored state into FirstBoxGate and AccessCoverComposition; sticky ready and restored/access/network/DNS suppressors are covered by native tests. Keep implemented until current exact-head acceptance succeeds."
+      "notes": "Re-read exact Desktop blob d60ae61cf01a7f9ba88c4ceea886b9e0a5675388 at current Desktop main 371b72f1. FirstBoxGate.project preserves sticky hasReachedBox plus restored-roster/access-blocked/network/dns suppression and reset semantics. Keep implemented pending same-final-SHA code/test/artifact/independent evidence; this review does not infer verified closure.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/model.ts",
@@ -1039,7 +1043,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/model.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift; fresh exact-head GitHub Actions required before verified promotion.",
-      "notes": "Revalidated against Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Current iOS roster refresh now reads fresh Sand access on load failure, classifies structured sand-access-blocked/network/dns failures, feeds AccessRosterSnapshot.fail, preserves restored rows, and drives the shipping AccessCoverComposition. Keep implemented until current exact-head acceptance succeeds."
+      "notes": "Re-read exact Desktop blob 7edc31a92b80139d580ba74a9a7b7e09cdaa9d05 at current Desktop main 371b72f1. AccessCoverModel preserves strict access state/reason projection, Fabushi copy/actions, exact cover gate and onboarding URL while trusted Host remains the fresh access authority. Keep implemented pending same-final-SHA code/test/artifact/independent evidence; this review does not infer verified closure.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/rebuild-signal.ts",
@@ -1069,7 +1075,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/access/cover/roster-snapshot-store.swift; frontend/src/production/GrokMobileBotService.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Bots.swift",
       "test_evidence": "mobile/ios/FabushiTests/AccessCoverParityTests.swift",
-      "notes": "Structured failure preserves sand-access-blocked separately from network/DNS and restored rows remain visible while a fresh fetch is pending. Fresh exact-HEAD Actions are required before verified promotion."
+      "notes": "Re-read exact Desktop blob 3db97f247e96e2d480a4b664c0dc35528eb4500f at current Desktop main 371b72f1. AccessRosterSnapshot/Persistence preserve account-scoped restored roster, complete/live replacement, strict duplicate fencing, transport failure retention and selection/readiness projection without a second Host roster owner. Keep implemented pending same-final-SHA code/test/artifact/independent evidence; this review does not infer verified closure.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/access/cover/view.tsx",
