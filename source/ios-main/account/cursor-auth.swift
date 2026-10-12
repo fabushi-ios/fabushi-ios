@@ -86,6 +86,13 @@ func iosCursorIsSignInPolicyViolationPayload(_ data: Data) -> Bool {
     return object["error"] as? String == IOS_CURSOR_SIGN_IN_POLICY_VIOLATION_ERROR
 }
 
+struct IOSCursorAuthProfile: Equatable, Sendable {
+    var displayName: String? = nil
+    var email: String? = nil
+    var profilePictureUrl: String? = nil
+    var isAnysphereUser: Bool = false
+}
+
 struct IOSCursorAuthStatus: Equatable, Sendable {
     let loggedIn: Bool
     var authId: String? = nil
@@ -203,6 +210,7 @@ final class IOSCursorCredentialStore: IOSCursorCredentialStoring {
 final class IOSCursorAuthService {
     typealias StatusObserver = @MainActor (IOSCursorAuthStatus) -> Void
     typealias DisplayNameWriter = @MainActor (String) async throws -> Void
+    typealias ProfileFetcher = @MainActor () async -> IOSCursorAuthProfile?
 
     private struct PendingLogin {
         let uuid: String
@@ -229,7 +237,8 @@ final class IOSCursorAuthService {
     private var statusObserverGeneration: UInt64 = 0
     private var statusFreshness: UInt64 = 0
     private var authOperationEpoch: UInt64 = 0
-    private var displayNameByAuthId: [String: String] = [:]
+    private var profileFetcher: ProfileFetcher?
+    private var profileByAuthId: [String: IOSCursorAuthProfile] = [:]
     private var credentialMutationActive = false
     private var credentialMutationWaiters: [CheckedContinuation<Void, Never>] = []
     private var refreshFlights: [String: RefreshFlight] = [:]
@@ -271,6 +280,11 @@ final class IOSCursorAuthService {
                 ))
             }
         )
+    }
+
+    func setProfileFetcher(_ fetcher: ProfileFetcher?) {
+        profileFetcher = fetcher
+        profileByAuthId.removeAll()
     }
 
     func setStatusObserver(_ observer: StatusObserver?) {
@@ -350,13 +364,34 @@ final class IOSCursorAuthService {
         else {
             return .init(loggedIn: false, freshness: statusFreshness)
         }
+        let operationEpoch = authOperationEpoch
         let payload = parseJwtPayload(token)
         let authId = payload?.sub
+        if let authId,
+           profileByAuthId[authId] == nil,
+           let profileFetcher {
+            let fetched = await profileFetcher()
+            if let fetched,
+               isCurrentAuthOperation(operationEpoch),
+               !credentialsRevoked {
+                let latestToken = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY)
+                if let latestToken,
+                   parseJwtPayload(latestToken)?.sub == authId {
+                    profileByAuthId[authId] = fetched
+                }
+            }
+        }
+        guard isCurrentAuthOperation(operationEpoch), !credentialsRevoked else {
+            return await status()
+        }
+        let profile = authId.flatMap { profileByAuthId[$0] }
         return .init(
             loggedIn: true,
             authId: authId,
-            email: payload?.email,
-            displayName: authId.flatMap { displayNameByAuthId[$0] },
+            email: payload?.email ?? profile?.email,
+            displayName: profile?.displayName,
+            profilePictureUrl: profile?.profilePictureUrl,
+            isAnysphereUser: profile.map(\.isAnysphereUser),
             expiresAtMs: getAccessTokenExpiryMs(token),
             freshness: statusFreshness
         )
@@ -387,11 +422,12 @@ final class IOSCursorAuthService {
         guard settled.loggedIn, settled.authId == authId else {
             throw IOSCursorAuthError.signInRequired
         }
-        if normalized.isEmpty {
-            displayNameByAuthId.removeValue(forKey: authId)
-        } else {
-            displayNameByAuthId[authId] = normalized
-        }
+        var profile = profileByAuthId[authId] ?? .init(
+            email: settled.email,
+            isAnysphereUser: settled.isAnysphereUser ?? false
+        )
+        profile.displayName = normalized.isEmpty ? nil : normalized
+        profileByAuthId[authId] = profile
         return publishStatus(await status())
     }
 
@@ -778,7 +814,7 @@ final class IOSCursorAuthService {
         let logoutOperationEpoch = advanceAuthOperationEpoch()
         pending.removeAll()
         credentialsRevoked = true
-        displayNameByAuthId.removeAll()
+        profileByAuthId.removeAll()
 
         // Credential mutation is serialized with login writes so an older poll
         // cannot recreate a deleted token after logout/new-login supersedes it.
