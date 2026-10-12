@@ -416,7 +416,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Bots.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift",
-      "notes": "The pure trim/non-empty/changed-name rule matches Desktop PR #20; same-head Actions required before verified."
+      "notes": "Re-read exact Desktop owner at current Desktop main 371b72f1. committedMobileBotName preserves trim/non-empty/changed-name semantics and focused GrokMobileBotServiceTests cover the rule. Keep implemented pending same-final-SHA CI/artifact/independent evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/agent-row-actions-model.ts",
@@ -431,7 +433,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift; frontend/src/production/GrokMobileBotService.swift; source/ios-preload/main-rpc-runtime.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "All applicable Desktop row-action values now use their canonical native owner; keep below verified until current exact-head acceptance."
+      "notes": "Re-read exact Desktop owner at current Desktop main 371b72f1. GrokMobileShell+Home projects state-dependent pin/unpin, copy conversation ID, read/unread, duplicate, hide and delete actions; GrokMobileShell+Bots routes mutations through canonical Host-backed owners with account/generation fencing. Keep implemented pending same-final-SHA evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/bootstrap.tsx",
@@ -446,7 +450,9 @@
       "implementation_status": "implemented",
       "production_evidence": "mobile/ios/Fabushi/FabushiApp.swift; mobile/ios/Fabushi/FabushiAppDelegate.swift; source/ios-main/FabushiRuntime.swift; source/ios-main/main.swift",
       "test_evidence": ".github/workflows/ios-desktop-pr20-architecture.yml; mobile/ios/FabushiTests/CoordinatorContractTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed as a platform bootstrap responsibility, not a React/DOM file-name port. Keep below verified until current exact-head acceptance."
+      "notes": "Re-read exact Desktop owner at current Desktop main 371b72f1. Native @main/WindowGroup -> FabushiSceneRoot -> FabushiRuntime is the fail-closed iOS bootstrap replacement; invalid protected runtime composition does not fall back to a mock bridge. Keep implemented pending same-final-SHA evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/command-palette-link-provider.ts",
@@ -567,7 +573,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "source/ios-main/update/update-wiring.swift; source/ios-main/update/sand-update-service.swift",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/PreloadParityTests.swift",
-      "notes": "Legal platform replacement: binary installation/update ownership belongs to App Store/TestFlight on iOS, rather than Desktop self-update."
+      "notes": "Re-read exact Desktop owner at current Desktop main 371b72f1. App Store/TestFlight owns iOS binary installation; IOSUpdateServiceWiring exposes native status/check and explicitly rejects Desktop-only track/quit-and-install actions. Retain not-applicable-with-replacement without a verification claim.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/coordinator-client.ts",
@@ -582,7 +590,9 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-preload/coordinator-port-bridge.swift; source/mahayana-agent-coordinator/control-port-client.swift; source/ios-main/coordinator/coordinator-runtime.swift; source/ios-main/coordinator/coordinator-launcher.swift; source/ios-main/coordinator/coordinator-main-port-client.swift",
       "test_evidence": "mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Native lifecycle replacement is generation-fenced and now has an explicit restart/old-port test. Keep below verified until current exact-head ordinary/protected acceptance and release evidence complete."
+      "notes": "Re-read exact Desktop owner at current Desktop main 371b72f1. IOSCoordinatorPortClient/CoordinatorControlPortClient and IOSCoordinatorRuntime preserve readiness/handshake, request correlation, cancellation, event delivery, replacement settlement and stale-generation fencing without Electron MessagePort transfer. Keep implemented pending same-final-SHA evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/production/evidence.ts",
@@ -597,11 +607,11 @@
       "implementation_status": "not-applicable",
       "production_evidence": "MIGRATION_SOURCE.md; manifests/desktop-main-authority.json; docs/parity/desktop-main-impact.json; docs/parity/desktop-main/**; .github/workflows/ios-desktop-pr20-parity.yml; .github/workflows/ios-protected-session.yml",
       "test_evidence": "scripts/check-desktop-main-ios-architecture.py fail-closed authority/ledger checks; exact-source architecture workflow; protected native UI acceptance; archive provenance checks",
-      "notes": "Current-main exact diff 798cf51d96cb1cb98cf657af212bb47274ccb701 -> 3bc92400826cc4ca7ac665b467708e22261edc61 is only the explicit distinction between immutable PRODUCTION_UI_EVIDENCE anchors and active Fabushi copy plus four branding substitutions (copyright, feedback introduction, sign-out description, title). That strengthens rather than changes the iOS replacement: native iOS must not reproduce Electron reconstruction anchors. This source responsibility is therefore current-main reviewed as not-applicable-with-replacement; aggregate dependency/shared-contract/main-active-spec gates remain independently open. Validator run 37836845827 confirmed every direct-changed source must remain behind the current-main re-review fence while aggregate review is incomplete; retain the audited disposition/evidence but do not mark authority review closed yet.",
+      "notes": "Re-read exact Desktop owner at current Desktop main 371b72f1. Electron reconstruction byte/line anchors are not copied into iOS runtime; the platform replacement is the live authority lock, per-blob ledger, exact-source Actions and release provenance. Aggregate dependency/release gates remain open.",
       "historical_implementation_status": "not-applicable",
       "historical_ios_disposition": "not-applicable-with-replacement",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "frontend/src/production/forward-recipient-navigation.ts",
@@ -630,10 +640,13 @@
       "ios_target_path": "frontend/src/production/MobileBotGroupMembers.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "SwiftUI composition projects the canonical Host roster and owns only native interaction state.",
-      "implementation_status": "verified",
+      "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileBotGroupMembers.swift; frontend/src/production/GrokMobileBotService.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileGroupMembersModelTests.swift; mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
-      "notes": "Uses the existing canonical Rust Host GroupList/GroupUpdate owner and account-scoped group persistence; no second iOS group store or nested-group owner is introduced. Mutation completion is fenced by both iOS account scope and local lifecycle generation. Verified on iOS exact HEAD 14591c35b01791e543afd4c428277a17e900cb3e: ordinary 37342780119 completed/success through architecture, rust-host, simulator Unit/UI, post steps and physical-device archive artifact 11360316223 (sha256:563534ef75fd8b5f7a74ed88d97d7e446e9e4b9c5ef6cd9c3aaea123f43fc0d7); protected 37342779941 completed/success through the real Global Dharma journey, complete-state assertion, evidence/session cleanup and Simulator erase, artifact 11360478901 (sha256:ba86af553b16805a0f73ff8df7a6123e17c6f2294861734b523e997277a218c0)."
+      "notes": "Re-read exact Desktop owner at current Desktop main 371b72f1. MobileBotGroupMembers composes canonical native group roster, account/reconnect route fencing, mutation cancellation, add/remove cardinality bounds and exact member-chat routing; GrokMobileGroupMembersModelTests cover scope drift, nested/shared-room rejection and routing. Historical verified artifacts belong to predecessor iOS HEAD 14591c35, so current status is implemented rather than fabricated verified.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "historical_implementation_status": "verified"
     },
     {
       "desktop_path": "frontend/src/production/human-call-media.tsx",
