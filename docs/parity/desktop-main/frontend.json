@@ -3142,8 +3142,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (composer, attachment strip/button, paste-provider staging, stageImportedComposerAttachments, reply/voice/send/stop and reconnect gating); frontend/src/recovered/features/conversation/MobileComposerTextView.swift (IME-safe editor, suggestion keyboard navigation, non-text paste interception); mobile/ios/Fabushi/OfflineSpeechTranscriber.swift and canonical attachment.upload Host store.",
       "test_evidence": "mobile/ios/FabushiTests/MobileComposerParityTests.swift covers attachment limits/staging helpers, account-scoped suggestions/recents, paste type filtering and transport availability; existing voice/reply/draft tests cover on-device transcription, scope fencing and recovery. Current exact-head ordinary/protected Actions remain required before verified.",
-      "notes": "IOS-MAIN-DEP-COMPOSER-20261011: native composer responsibility is implemented. Browser drag/drop is replaced by fileImporter; non-text clipboard providers are materialized only temporarily, staged through the canonical Host store, then cleaned. Keep below verified pending exact-head CI/protected evidence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-COMPOSER-20261011: native composer responsibility is implemented. Browser drag/drop is replaced by fileImporter; non-text clipboard providers are materialized only temporarily, staged through the canonical Host store, then cleaned. Keep below verified pending exact-head CI/protected evidence. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; existing canonical iOS owner, lifecycle, scope fencing, failure/cancellation behavior and visible effect remain consistent. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/conversation-outline-provider.ts",
@@ -3158,8 +3159,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (MobileConversationOutlinePanel; historicalSubagents: bot.subagents; strict outline decoder; getAsyncTasks live overlay; scope fencing) through the shipping MobileBotChat sheet.",
       "test_evidence": "mobile/ios/FabushiTests/MobileConversationOutlineParityTests.swift covers strict item decoding, retained running/done/error/aborted subagent history, live-over-history merge, account/parent/selected/reconnect/request-generation fencing. Same-final-HEAD Actions remain required before verified promotion.",
-      "notes": "Current-main outline provider responsibility is implemented in the shipping native conversation surface without a second transcript owner. Keep below verified until exact-head ordinary/protected CI and completeness evidence succeed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Current-main outline provider responsibility is implemented in the shipping native conversation surface without a second transcript owner. Keep below verified until exact-head ordinary/protected CI and completeness evidence succeed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; existing canonical iOS owner, lifecycle, scope fencing, failure/cancellation behavior and visible effect remain consistent. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/conversation-outline-view.tsx",
@@ -3174,8 +3176,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift mounts MobileConversationOutlinePanel from the shipping chat header and passes the canonical account, Agent, reconnect scope and bot.subagents history.",
       "test_evidence": "mobile/ios/FabushiTests/MobileConversationOutlineParityTests.swift covers history/tab projection and scope replacement; same-final-HEAD Swift/UI/protected evidence remains required before verified promotion.",
-      "notes": "Current-main outline presentation responsibility is implemented as a native sheet; browser drag mechanics are platform-replaced, not copied. Keep below verified until exact-head CI and protected UI evidence succeed.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "Current-main outline presentation responsibility is implemented as a native sheet; browser drag mechanics are platform-replaced, not copied. Keep below verified until exact-head CI and protected UI evidence succeed. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; existing canonical iOS owner, lifecycle, scope fencing, failure/cancellation behavior and visible effect remain consistent. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/conversation-workspace-controller.ts",
@@ -3190,8 +3193,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/recovered/features/conversation/MobileBotChat.swift (transcriptList, loadOlderConversationEntries, reply/thread lifecycle, find bar/search navigation, draft/recovery/send lifecycle, reconnect/account/Bot resets) over the existing canonical Host/MarketplaceModel owners.",
       "test_evidence": "mobile/ios/FabushiTests/MobileConversationPaginationParityTests.swift, ChatSearchModelTests.swift, SharedWorkflowTranscriptParityTests.swift and MobileComposerDraftPersistenceTests.swift cover paging/anchor merge, search, reply/thread and scoped draft/recovery pieces. Current exact-head ordinary/protected CI remains required before verified.",
-      "notes": "IOS-MAIN-DEP-WORKSPACE-CONTROLLER-20261011: aggregate shipping controller responsibility is implemented on descendant of 242627c5888b8c4cc43215793735a4fa973e8034; keep below verified pending same-final-HEAD acceptance.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-WORKSPACE-CONTROLLER-20261011: aggregate shipping controller responsibility is implemented on descendant of 242627c5888b8c4cc43215793735a4fa973e8034; keep below verified pending same-final-HEAD acceptance. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; existing canonical iOS owner, lifecycle, scope fencing, failure/cancellation behavior and visible effect remain consistent. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/cursor-icon.tsx",
@@ -3206,8 +3210,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "MobileBotChat workspace controls use native SF Symbols/Labels; retaining a DOM icon wrapper would create an invalid parallel presentation abstraction.",
       "test_evidence": "SwiftUI compile/UI acceptance covers the replacement; no DOM primitive test is applicable.",
-      "notes": "IOS-MAIN-DEP-CURSOR-ICON-20261009: platform primitive replaced by native icon rendering.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-CURSOR-ICON-20261009: platform primitive replaced by native icon rendering. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; existing canonical iOS owner, lifecycle, scope fencing, failure/cancellation behavior and visible effect remain consistent. Current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/desktop.ts",
