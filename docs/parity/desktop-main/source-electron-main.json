@@ -2398,13 +2398,13 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Lifecycle failures and recovery transitions are diagnosable across startup, active use and shutdown.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/telemetry/desktop-lifecycle-telemetry.swift; source/ios-main/IOSMainRuntime.swift",
+      "ios_target_path": "source/ios-main/telemetry/desktop-lifecycle-telemetry.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Electron process/window signals are replaced by iOS Scene/protected-data/memory-pressure/runtime lifecycle signals.",
-      "implementation_status": "mapped",
-      "production_evidence": "IOSLifecycleReporter is shipping-attached to IOSLifecycleTelemetryDurableSink and IOSMainRuntime records scene/recovery/coordinator/local-exec lifecycle families.",
-      "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "Lifecycle production producers exist, but the attached durable sink currently persists locally only; remote AnalyticsService/SubmitLogs delivery is not production-wired, so this row stays mapped."
+      "implementation_status": "implemented",
+      "production_evidence": "IOSLifecycleReporter is shipping-attached in IOSMainRuntime to IOSLifecycleTelemetryDurableSink. The sink now configures an account-scoped StructuredLogSubmitter using MahayanaCoordinator.structuredLogCredentials and IOSCursorStructuredLogBackend/AnalyticsService SubmitLogs, while account login/logout rotates the transport and shutdown initiates remote flush before reset.",
+      "test_evidence": "IOSLifecycleParityTests covers lifecycle producers, durable spill and shipping remote-sink composition; SessionSettlementParityTests covers the shared SubmitLogs backend contract. Exact-head Actions remain required.",
+      "notes": "IOS-MAIN-LIFECYCLE-TELEMETRY-20261012: production producer plus durable account-scoped remote shipping are composed. iOS Scene/runtime signals replace Electron process/window signals. Implemented, not verified."
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-process-crash-telemetry.ts",
@@ -2443,13 +2443,13 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Cold-start and startup-recovery failures are measurable.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/telemetry/desktop-lifecycle-telemetry.swift; source/ios-main/IOSMainRuntime.swift",
+      "ios_target_path": "source/ios-main/telemetry/desktop-lifecycle-telemetry.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS startup phases are native runtime/Scene phases rather than Electron process phases.",
-      "implementation_status": "mapped",
-      "production_evidence": "IOSLifecycleReporter.startup is invoked from shipping iOS runtime lifecycle.",
-      "test_evidence": "mobile/ios/FabushiTests/IOSLifecycleParityTests.swift",
-      "notes": "Producer exists; downstream remote structured-log shipping remains the blocker."
+      "implementation_status": "implemented",
+      "production_evidence": "IOSLifecycleReporter.startup is invoked from shipping IOSMainRuntime and flows through IOSLifecycleTelemetryDurableSink to the account-scoped AnalyticsService/SubmitLogs submitter configured by IOSMainRuntime.",
+      "test_evidence": "IOSLifecycleParityTests covers startup/lifecycle reporting and shipping sink composition; exact-head Actions remain required.",
+      "notes": "IOS-MAIN-STARTUP-TELEMETRY-20261012: native startup phases are production-routed to canonical structured logging. Implemented, not verified."
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-structured-log-spill.ts",
@@ -2473,13 +2473,13 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Production diagnostics are durably and account-safely delivered to the canonical telemetry backend.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/observability/structured-log-transport.swift; source/shared/observability/structured-log-spill.swift",
+      "ios_target_path": "source/shared/observability/structured-log-transport.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Swift actor transport preserves bounded buffering/generation fencing/receipt/drop semantics; production AnalyticsService/SubmitLogs client still needs wiring.",
-      "implementation_status": "mapped",
-      "production_evidence": "StructuredLogTransport implements batching, 15s deadline constant, receipt validation, delivery generation, retries/drop counters and identity tags; lifecycle sink currently uses spill only.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedObservabilityParityTests.swift",
-      "notes": "Blocking gap: no shipping Swift AnalyticsService/SubmitLogs submitter with auth+machine identity headers is composed into IOSLifecycleTelemetryDurableSink. Do not mark implemented."
+      "implementation_status": "implemented",
+      "production_evidence": "StructuredLogTransport owns bounded buffering, receipts, retries/drop accounting and generation fencing. IOSLifecycleTelemetryDurableSink composes it with account-scoped spill and IOSMainRuntime now supplies a real MahayanaCoordinator credential/machine-id backed IOSCursorStructuredLogBackend submitter to AnalyticsService/SubmitLogs.",
+      "test_evidence": "SharedObservabilityParityTests covers transport/spill batching, receipts, replay, stale-generation fencing and drop accounting; IOSLifecycleParityTests asserts shipping composition. Exact-head Actions remain required.",
+      "notes": "IOS-MAIN-STRUCTURED-LOG-TELEMETRY-20261012: the prior no-production-SubmitLogs blocker is closed using the existing auth/machine-id/backend owners. Implemented, not verified."
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-unclean-exit-telemetry.ts",
@@ -2563,13 +2563,13 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Quit does not hang indefinitely and pending diagnostics are not silently lost.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/observability/structured-log-transport.swift; source/shared/observability/structured-log-spill.swift; source/ios-main/IOSMainRuntime.swift",
+      "ios_target_path": "source/shared/observability/structured-log-transport.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS structured transport has flush/dispose retention primitives, but the lifecycle sink is not yet composed with a production shipper/quit flush owner.",
-      "implementation_status": "mapped",
-      "production_evidence": "StructuredLogTransport.flushNow/dispose and spill retention primitives exist; IOSMainRuntime shutdown currently waits durable spill, not remote AnalyticsService delivery.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedObservabilityParityTests.swift",
-      "notes": "Need shipping remote submitter plus bounded shutdown flush before implemented."
+      "implementation_status": "implemented",
+      "production_evidence": "IOSMainRuntime.shutdown now invokes IOSLifecycleTelemetryDurableSink.flushRemoteNow before logged-out settlement/account reset. The sink serializes flush before subsequent rotation, uses StructuredLogTransport's bounded submit deadline, and persists remaining pending records through the account-scoped spill.",
+      "test_evidence": "IOSLifecycleParityTests asserts flush-before-settle-before-reset shipping order; SharedObservabilityParityTests covers flush/dispose pending retention and submission semantics. Exact-head Actions remain required.",
+      "notes": "IOS-MAIN-QUIT-TELEMETRY-20261012: iOS uses bounded best-effort shutdown flush plus durable spill rather than Electron before-quit blocking. Implemented, not verified."
     },
     {
       "desktop_path": "source/electron-main/telemetry/reaction-ack-telemetry.ts",
@@ -2728,13 +2728,13 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Renderer/host telemetry reaches the correct production sink without malformed payloads escaping boundaries.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/observability/telemetry.swift; source/shared/observability/structured-log-transport.swift; source/ios-main/coordinator/coordinator-telemetry.swift",
+      "ios_target_path": "source/shared/observability/telemetry.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Typed Swift/Rust producers replace Electron IPC report pipes.",
-      "implementation_status": "mapped",
-      "production_evidence": "Typed observability projections and StructuredLogTransport exist, but the lifecycle path is not connected to a production SubmitLogs client.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedObservabilityParityTests.swift",
-      "notes": "Keep mapped until end-to-end production sink is composed."
+      "implementation_status": "implemented",
+      "production_evidence": "Typed native Swift/Rust producers route through IOSLifecycleReporter/other typed telemetry projections into the canonical StructuredLogTransport path; IOSMainRuntime now composes the production AnalyticsService/SubmitLogs sink, so approved native producers reach a real backend without renderer IPC.",
+      "test_evidence": "SharedObservabilityParityTests and IOSLifecycleParityTests cover typed projection and shipping sink composition; exact-head Actions remain required.",
+      "notes": "IOS-MAIN-TELEMETRY-PIPES-20261012: native typed ownership replaces Electron IPC report pipes and now terminates in a production remote sink. Implemented, not verified."
     },
     {
       "desktop_path": "source/electron-main/telemetry/telemetry-report-sinks.ts",
@@ -2743,13 +2743,13 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Only approved runtime producers can submit diagnostics into production telemetry.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/observability/structured-log-transport.swift; source/ios-main/IOSMainRuntime.swift",
+      "ios_target_path": "source/shared/observability/structured-log-transport.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "Typed native ownership replaces Electron ipcMain sender validation.",
-      "implementation_status": "mapped",
-      "production_evidence": "Native typed call boundaries avoid renderer ipcMain spoofing; production AnalyticsService/SubmitLogs sink composition is still absent.",
-      "test_evidence": "mobile/ios/FabushiTests/SharedObservabilityParityTests.swift",
-      "notes": "Do not promote until the real network sink is attached."
+      "implementation_status": "implemented",
+      "production_evidence": "IOSMainRuntime registers the native telemetry sink by attaching IOSLifecycleReporter to IOSLifecycleTelemetryDurableSink and configuring account-scoped remote StructuredLogSubmitter composition. Typed native call boundaries replace ipcMain sender validation and account rotation fences the sink.",
+      "test_evidence": "IOSLifecycleParityTests asserts shipping sink composition/account rotation; SharedObservabilityParityTests covers canonical transport behavior. Exact-head Actions remain required.",
+      "notes": "IOS-MAIN-TELEMETRY-SINKS-20261012: real AnalyticsService/SubmitLogs composition is now attached to the unique native sink. Implemented, not verified."
     },
     {
       "desktop_path": "source/electron-main/telemetry/transport-stream-telemetry.ts",
@@ -2923,13 +2923,13 @@
       "desktop_owner": "platform-main",
       "desktop_visible_effect": "Update failures and user-visible update transitions are diagnosable without exposing unsafe raw state.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/ios-main/update/update-telemetry.swift; source/shared/observability/structured-log-transport.swift",
+      "ios_target_path": "source/ios-main/update/update-telemetry.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS projects App Store-managed action/direction metadata; binary apply events do not exist in-app.",
-      "implementation_status": "mapped",
-      "production_evidence": "IOSUpdateTelemetry provides store-managed projection, but no shipping caller currently routes these projections into the canonical structured-log transport.",
-      "test_evidence": "",
-      "notes": "Do not promote to implemented until a real update producer calls the unique telemetry owner and downstream AnalyticsService/SubmitLogs shipping is production-wired."
+      "implementation_status": "implemented",
+      "production_evidence": "IOSUpdateServiceWiring is the shipping update RPC owner. checkForUpdates/runtime policy refresh and store-managed actions now project IOSUpdateTelemetry into IOSLifecycleReporter.update; IOSMainRuntime's reporter feeds IOSLifecycleTelemetryDurableSink and the account-scoped AnalyticsService/SubmitLogs backend.",
+      "test_evidence": "UpdateParityTests covers real check/store-managed projections, version direction and privacy-safe fixed error classification; IOSLifecycleParityTests covers the downstream shipping sink. Exact-head Actions remain required.",
+      "notes": "IOS-MAIN-UPDATE-TELEMETRY-20261012: App Store-managed iOS update states are now produced by the real update service and sent through the canonical structured-log path; in-app binary apply telemetry remains intentionally not applicable. Implemented, not verified."
     },
     {
       "desktop_path": "source/electron-main/update/update-version.ts",

@@ -2160,10 +2160,10 @@
       "ios_target_path": "source/shared/observability/structured-log-spill.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "No platform delta beyond Swift constant syntax.",
-      "implementation_status": "mapped",
-      "production_evidence": "Existing source/shared/observability/structured-log-spill.swift@1edb255f32ad30ffe43e8c5ce9629ae12125190a defines DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES = 1_000 exactly.",
-      "test_evidence": "SharedObservabilityParityTests.testStructuredLogHelpersValidateReceiptsAndMetadata asserts the spill cap is 1,000; same-head CI pending.",
-      "notes": "IOS-MAIN-SHARED-OBS-SPILL-20261009: exact Desktop blob f87e1441364e278d92c7d1284c5400c1c033f041 reviewed. Keep mapped/current-main-fenced."
+      "implementation_status": "implemented",
+      "production_evidence": "source/shared/observability/structured-log-spill.swift supplies the 1,000-entry bounded account-scoped spill used by IOSLifecycleTelemetryDurableSink. Shipping IOSMainRuntime now configures the sink with an account-scoped AnalyticsService/SubmitLogs submitter, so the spill is part of the live remote-delivery/replay path rather than a dormant helper.",
+      "test_evidence": "SharedObservabilityParityTests and IOSLifecycleParityTests cover the spill cap, account rotation and durable replay primitives; replacement exact-head GitHub Actions are required before verified promotion.",
+      "notes": "IOS-MAIN-SHARED-OBS-SPILL-20261012: exact Desktop responsibility remains bounded spill retention. The existing Swift spill is now shipping-composed with the remote StructuredLogTransport path; status is implemented only, not verified."
     },
     {
       "desktop_path": "source/shared/observability/structured-log-transport.ts",
