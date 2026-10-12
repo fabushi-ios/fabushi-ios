@@ -389,6 +389,7 @@ final class MahayanaCoordinator {
         )
     }()
     private let transportStageRecorder: TransportStageRecorder
+    private let gatewayTelemetryReporter: CoordinatorGatewayClient.TelemetrySink
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
     private var autoReviewHostSyncNeeded = true
     private var experimentSnapshotUnsubscribe: (() -> Void)?
@@ -424,6 +425,7 @@ final class MahayanaCoordinator {
         let gatewayClient = CoordinatorGatewayClient(
             supervisor: gatewaySupervisor,
             transportStageRecorder: transportStageRecorder,
+            telemetrySink: gatewayTelemetryReporter,
             tracedTransport: { [weak self] _, method, args, _ in
                 guard let self else { throw CoordinatorError.unavailable }
                 guard case .object = args,
@@ -455,11 +457,13 @@ final class MahayanaCoordinator {
         transportStageRecorder: TransportStageRecorder = .init(),
         remoteExecutionProvider: (any IOSRemoteExecutionProviding)? = nil,
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
-        mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
+        mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
+        gatewayTelemetryReporter: @escaping CoordinatorGatewayClient.TelemetrySink = { _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
         self.transportStageRecorder = transportStageRecorder
+        self.gatewayTelemetryReporter = gatewayTelemetryReporter
         self.hostSettingsReconciler = settingsStore.map { store in
             IOSHostSettingsReconciler(
                 readLocal: { store.getHasSeenOnboarding() },
@@ -668,6 +672,7 @@ final class MahayanaCoordinator {
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
+        gatewayTelemetryReporter: @escaping CoordinatorGatewayClient.TelemetrySink = { _ in },
         experimentDiagnosticReporter: ((ExperimentDiagnostic) -> Void)? = nil
     ) throws -> MahayanaCoordinator {
         if let experimentDiagnosticReporter {
@@ -693,7 +698,8 @@ final class MahayanaCoordinator {
             experimentService: experimentService,
             devControlAdapter: devControlAdapter,
             mcpFailureReporter: mcpFailureReporter,
-            mcpAuthTelemetryReporter: mcpAuthTelemetryReporter
+            mcpAuthTelemetryReporter: mcpAuthTelemetryReporter,
+            gatewayTelemetryReporter: gatewayTelemetryReporter
         )
         coordinator.startExperimentRuntime()
         return coordinator

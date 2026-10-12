@@ -1,5 +1,72 @@
 import Foundation
 
+
+struct GatewayTelemetryProjection: Equatable, Sendable {
+    let event: String
+    let level: String
+    let metadata: [String: String]
+
+    static func reachability(
+        url: URL,
+        outcome: GatewayReachabilityOutcome,
+        requestId: String,
+        attempt: Int
+    ) -> GatewayTelemetryProjection {
+        let diagnostic = GatewayDNSDiagnostics.inspect(url)
+        var metadata: [String: String] = [
+            "event": "gateway_reachability",
+            "outcome": outcome.transportKind,
+            "request_id": requestId,
+            "attempt": String(attempt),
+            "base_url_kind": GatewayReachability.classifyBaseURL(url).rawValue,
+            "secure_transport": diagnostic.isSecureTransport ? "true" : "false",
+        ]
+        if let host = diagnostic.host {
+            metadata["host_kind"] = diagnostic.kind.rawValue
+            metadata["host"] = String(host.prefix(256))
+        }
+        return .init(
+            event: "gateway_reachability",
+            level: outcome == .reachable ? "info" : "warn",
+            metadata: metadata
+        )
+    }
+
+    static func dns(_ episode: GatewayDNSFailureEpisode) -> GatewayTelemetryProjection {
+        var metadata: [String: String] = [
+            "event": "gateway_dns_diagnostic",
+            "request_id": episode.requestId,
+            "episode": String(episode.episode),
+            "host": String(episode.host.prefix(256)),
+            "host_kind": episode.diagnostic.kind.rawValue,
+            "secure_transport": episode.diagnostic.isSecureTransport ? "true" : "false",
+        ]
+        metadata["diagnostic_owner"] = "ios_native"
+        return .init(event: "gateway_dns_diagnostic", level: "warn", metadata: metadata)
+    }
+
+    static func transport(_ report: CoordinatorTransportStageReport) -> GatewayTelemetryProjection {
+        var metadata: [String: String] = [
+            "event": "coordinator_transport_stage",
+            "account_slot": String(report.accountSlot.prefix(128)),
+            "client_nonce": String(report.clientNonce.prefix(256)),
+            "stage": String(report.stage.prefix(128)),
+            "attempt": String(report.attempt),
+            "start_epoch_ms": String(report.startEpochMilliseconds),
+            "duration_ms": String(report.durationMilliseconds),
+            "is_error": report.isError ? "true" : "false",
+        ]
+        if let traceparent = report.traceparent {
+            metadata["traceparent"] = String(traceparent.prefix(128))
+        }
+        return .init(
+            event: "coordinator_transport_stage",
+            level: report.isError ? "warn" : "info",
+            metadata: metadata
+        )
+    }
+}
+
 struct GatewayTraceContext: Equatable, Sendable {
     let requestId: String
     let attempt: Int
@@ -92,6 +159,7 @@ final class CoordinatorGatewayClient {
     typealias CommandTransport = @MainActor (_ connection: Connection, _ method: String, _ args: CoordinatorPayload) async throws -> CoordinatorPayload
     typealias TracedCommandTransport = @MainActor (_ connection: Connection, _ method: String, _ args: CoordinatorPayload, _ trace: GatewayTraceContext) async throws -> CoordinatorPayload
     typealias TraceRootFactory = @MainActor () -> String
+    typealias TelemetrySink = @MainActor (GatewayTelemetryProjection) -> Void
 
     private struct InFlightRequest {
         let token: String
@@ -104,6 +172,7 @@ final class CoordinatorGatewayClient {
     private let dnsDiagnostics: GatewayDNSDiagnosticTracker
     private let traceRootFactory: TraceRootFactory
     private let transportStageRecorder: TransportStageRecorder?
+    private let telemetrySink: TelemetrySink
     private var inFlight: [String: InFlightRequest] = [:]
 
     init(
@@ -111,12 +180,14 @@ final class CoordinatorGatewayClient {
         dnsDiagnostics: GatewayDNSDiagnosticTracker = .init(),
         traceRootFactory: @escaping TraceRootFactory = { GatewayTraceParent.makeRoot() },
         transportStageRecorder: TransportStageRecorder? = nil,
+        telemetrySink: @escaping TelemetrySink = { _ in },
         transport: @escaping CommandTransport
     ) {
         self.supervisor = supervisor
         self.dnsDiagnostics = dnsDiagnostics
         self.traceRootFactory = traceRootFactory
         self.transportStageRecorder = transportStageRecorder
+        self.telemetrySink = telemetrySink
         self.transport = { connection, method, args, _ in
             try await transport(connection, method, args)
         }
@@ -127,12 +198,14 @@ final class CoordinatorGatewayClient {
         dnsDiagnostics: GatewayDNSDiagnosticTracker = .init(),
         traceRootFactory: @escaping TraceRootFactory = { GatewayTraceParent.makeRoot() },
         transportStageRecorder: TransportStageRecorder? = nil,
+        telemetrySink: @escaping TelemetrySink = { _ in },
         tracedTransport: @escaping TracedCommandTransport
     ) {
         self.supervisor = supervisor
         self.dnsDiagnostics = dnsDiagnostics
         self.traceRootFactory = traceRootFactory
         self.transportStageRecorder = transportStageRecorder
+        self.telemetrySink = telemetrySink
         self.transport = tracedTransport
     }
 
@@ -203,8 +276,8 @@ final class CoordinatorGatewayClient {
                     if let pinnedBaseURL, pinnedBaseURL != connection.baseURL {
                         if let report = connectStage?.fail(
                             nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
-                        ), let recorder = self.transportStageRecorder {
-                            await recorder.record(report: report)
+                        ) {
+                            await self.recordTransportStage(report)
                         }
                         throw GatewayUnreachableError(
                             transportKind: "coordinator",
@@ -216,8 +289,8 @@ final class CoordinatorGatewayClient {
                     }
                     if let report = connectStage?.complete(
                         nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
-                    ), let recorder = self.transportStageRecorder {
-                        await recorder.record(report: report)
+                    ) {
+                        await self.recordTransportStage(report)
                     }
                 } catch {
                     if let report = connectStage?.fail(
@@ -256,31 +329,47 @@ final class CoordinatorGatewayClient {
                     )
                     if let report = postStage?.complete(
                         nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
-                    ), let recorder = self.transportStageRecorder {
-                        await recorder.record(report: report)
+                    ) {
+                        await self.recordTransportStage(report)
                     }
                     try Task.checkCancellation()
                     self.dnsDiagnostics.recordSuccess(url: connection.baseURL)
+                    self.telemetrySink(.reachability(
+                        url: connection.baseURL,
+                        outcome: .reachable,
+                        requestId: normalizedRequestId,
+                        attempt: attemptIndex
+                    ))
                     return value
                 } catch is CancellationError {
                     if let report = postStage?.fail(
                         nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
-                    ), let recorder = self.transportStageRecorder {
-                        await recorder.record(report: report)
+                    ) {
+                        await self.recordTransportStage(report)
                     }
                     throw CancellationError()
                 } catch {
                     if let report = postStage?.fail(
                         nowMonotonicMilliseconds: coordinatorTransportMonotonicMilliseconds()
-                    ), let recorder = self.transportStageRecorder {
-                        await recorder.record(report: report)
+                    ) {
+                        await self.recordTransportStage(report)
                     }
                     lastError = error
                     self.supervisor.invalidateHealthCache()
-                    _ = self.dnsDiagnostics.recordFailure(
+                    let reachability = GatewayReachability.classifyOutcome(error)
+                        ?? GatewayReachabilityOutcome.network
+                    self.telemetrySink(.reachability(
+                        url: connection.baseURL,
+                        outcome: reachability,
+                        requestId: normalizedRequestId,
+                        attempt: attemptIndex
+                    ))
+                    if let episode = self.dnsDiagnostics.recordFailure(
                         url: connection.baseURL,
                         requestId: normalizedRequestId
-                    )
+                    ) {
+                        self.telemetrySink(.dns(episode))
+                    }
                     if attempt >= GatewayRetryPolicy.maxAttempts
                         || !GatewayRetryPolicy.shouldRetry(method: method, error: error) {
                         throw error
@@ -308,6 +397,13 @@ final class CoordinatorGatewayClient {
             settleInFlight(requestId: normalizedRequestId, token: token)
             throw error
         }
+    }
+
+    private func recordTransportStage(_ report: CoordinatorTransportStageReport) async {
+        if let recorder = transportStageRecorder {
+            await recorder.record(report: report)
+        }
+        telemetrySink(.transport(report))
     }
 
     func cancel(requestId: String) {

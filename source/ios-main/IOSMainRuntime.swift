@@ -118,6 +118,13 @@ final class IOSMainRuntime {
                     metadata: projection.metadata
                 )
             },
+            gatewayTelemetryReporter: { projection in
+                reporter.report(
+                    .coordinatorHandoff,
+                    level: IOSLifecycleTelemetryLevel(rawValue: projection.level) ?? .info,
+                    metadata: projection.metadata
+                )
+            },
             experimentDiagnosticReporter: { diagnostic in
                 var metadata = diagnostic.metadata
                 metadata["area"] = "experiments"
