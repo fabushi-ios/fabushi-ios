@@ -2014,7 +2014,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "f0d2b9ec1cc98dee8403cdb0b47262610d30dbd1",
-    "preEvidenceIosHead": "14fbb93edd5b4fd576ee07a52f35614211c35582",
+    "preEvidenceIosHead": "57d7d3e6c457a41ebe5d1019f01e67bea4fc7e0f",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2061,7 +2061,14 @@
       38204559438,
       38204559466,
       38204598214,
-      38204598215
+      38204598215,
+      38203708438,
+      38204651347,
+      38204651375,
+      38204797115,
+      38204797055,
+      38204921287,
+      38204921448
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2113,9 +2120,12 @@
       114665221095,
       114665221151,
       114665221490,
-      114665271426
+      114665271426,
+      114662443099,
+      114664846107,
+      114664894265
     ],
-    "status": "global-dharma-owner-and-settings-rebaseline-resulting-exact-head-ci-required",
+    "status": "runtime-source-closure-advanced-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/frontend.json",
       "manifests/desktop-main-authority.json",
@@ -2126,6 +2136,7 @@
       "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "mobile/ios/FabushiTests/SharedPermissionsAndNotificationsParityTests.swift"
     ],
-    "conclusion": "Global Dharma installed local execution is now recorded under the unified Marketplace/Host local package + active WKWebView WebMCP owner; the old special SwiftUI owner is absent. Settings rows remain current-main-reviewed without verified promotion. Aggregate dependency/full/new-and-changed responsibility review and final acceptance remain open."
+    "conclusion": "Frontend current-main review is closed; source-boundary structured failure propagation and primary preload current-main responsibility are implemented. Full 7,951-row responsibility closure remains open, including 819 unreviewed source-packages rows and broad shared/electron-main mapped debt.",
+    "currentImplementationHead": "57d7d3e6c457a41ebe5d1019f01e67bea4fc7e0f"
   }
 }

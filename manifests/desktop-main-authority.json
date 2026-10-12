@@ -31,7 +31,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "f0d2b9ec1cc98dee8403cdb0b47262610d30dbd1",
-    "preEvidenceIosHead": "0e394f9c3775da712d753fc1f6aee8f10895a6f6",
+    "preEvidenceIosHead": "57d7d3e6c457a41ebe5d1019f01e67bea4fc7e0f",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -84,7 +84,14 @@
       38204559438,
       38204559466,
       38204598214,
-      38204598215
+      38204598215,
+      38203708438,
+      38204651347,
+      38204651375,
+      38204797115,
+      38204797055,
+      38204921287,
+      38204921448
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -136,9 +143,12 @@
       114665221095,
       114665221151,
       114665221490,
-      114665271426
+      114665271426,
+      114662443099,
+      114664846107,
+      114664894265
     ],
-    "status": "global-dharma-owner-and-settings-rebaseline-resulting-exact-head-actions-required",
+    "status": "runtime-source-closure-advanced-resulting-exact-head-ci-required",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
@@ -148,7 +158,7 @@
     "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
-    "promotion": "current-main-review-only-no-verification-promotion",
-    "currentImplementationHead": "0e394f9c3775da712d753fc1f6aee8f10895a6f6"
+    "promotion": "implemented-only-no-verification-promotion",
+    "currentImplementationHead": "57d7d3e6c457a41ebe5d1019f01e67bea4fc7e0f"
   }
 }
