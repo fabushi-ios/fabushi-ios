@@ -274,10 +274,12 @@
       "ios_language": "Swift / Rust",
       "ios_platform_delta": "iOS does not reproduce Electron BrowserWindow/dialog/nativeImage composition. The typed Main RPC surface exposes attachment read/stage/download methods, MahayanaCoordinator preserves the Host boundary, native/shared Swift media policy replaces Electron MIME/nativeImage helpers, and SwiftUI/UIKit own preview/download presentation. Method-specific Host serving and staging/download ownership still require focused end-to-end review before implementation promotion.",
       "implementation_status": "mapped",
-      "production_evidence": "source/ios-preload/main-rpc-runtime.swift exposes resolveAttachmentMedia/readAttachmentText/readAttachmentBytes/stageAttachmentBytes/downloadAttachment/commitStagedAttachments/discardStagedAttachment; MahayanaCoordinator forwards non-native requests through the canonical Host supervisor; shared media Swift policy and MarketplaceModel/MediaViewer consume the native projections.",
-      "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift; mobile/ios/FabushiTests/SharedMediaParityTests.swift; current-head Swift/UI and protected acceptance required before implementation/verification promotion.",
-      "notes": "Reviewed exact Desktop blob cbd9411d15f6659eef5490790dedc6e948642dca at current Desktop main. Mapping is conservative: the iOS method surface and consumers exist, but this row stays mapped until attachment Host serving, staging/download error/cancel/restart behavior and shipping entrypoints are proven end to end.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Current audit correction: source/ios-preload/main-rpc-runtime.swift declares the seven Desktop attachment Main-RPC method names, but declaration alone is not Host serving. IOSPreloadBridge -> IOSCoordinatorPortClient -> IOSMainRuntime -> MahayanaCoordinator is a real shipping path and unknown methods fall through to the canonical Host supervisor; however the canonical app Host currently has no resolveAttachmentMedia/readAttachmentText/readAttachmentBytes/stageAttachmentBytes/downloadAttachment/commitStagedAttachments/discardStagedAttachment handlers. Separate Human messaging blob serving does prove durable account-scoped FileBlobStore staging/atomic finish/delete-partial cleanup and bounded Host reads, but is not counted as this Desktop attachment edge. Therefore this row remains mapped.",
+      "test_evidence": "SharedMediaParityTests proves the native 25 MiB preview policy and MessagingModel/Host tests prove separate Human blob bounded transfer semantics. This Desktop attachment Main-RPC row still requires real Host serving plus shipping tests for staging containment, 4 MiB edge reads, remote fallback, commit/discard, cancellation/restart and partial-download cleanup.",
+      "notes": "Re-read exact Desktop blob cbd9411d15f6659eef5490790dedc6e948642dca at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. Previous wording that IOSMainRPCRuntime \"exposes ... through canonical Coordinator/Host boundary\" was too strong: it exposes ABI names, while Host handlers are still missing. No implementation promotion is made.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending real attachment Main-RPC Host serving and exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/electron-main/adapters/avatar-images.ts",
@@ -485,10 +487,12 @@
       "ios_language": "Swift / Rust Host",
       "ios_platform_delta": "iOS replaces Electron nativeImage/filesystem staging presentation with native media policy and the typed Main/Coordinator/Host attachment methods. The 25 MiB native preview cap is present, but exact staging containment/remote-fallback ownership is still under focused review.",
       "implementation_status": "mapped",
-      "production_evidence": "AttachmentLimits fixes the ordinary attachment limit at 25 MiB; MediaViewer enforces a 25 MiB PDF preview cap; IOSMainRPCRuntime exposes resolve/read/stage/download/commit/discard attachment methods through the canonical Coordinator/Host boundary.",
-      "test_evidence": "SharedMediaParityTests covers the native 25 MiB policy and preview classification. Current-head attachment staging/Host edge acceptance remains required before implementation promotion.",
-      "notes": "Reviewed exact Desktop blob 0d055b7d65c49911deb18ff08af2caa1639d93f7. Do not claim staging containment or remote fallback verified until the native Host serving path and abnormal/cancel cases are proven.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Current audit correction: source/ios-preload/main-rpc-runtime.swift declares the seven Desktop attachment Main-RPC method names, but declaration alone is not Host serving. IOSPreloadBridge -> IOSCoordinatorPortClient -> IOSMainRuntime -> MahayanaCoordinator is a real shipping path and unknown methods fall through to the canonical Host supervisor; however the canonical app Host currently has no resolveAttachmentMedia/readAttachmentText/readAttachmentBytes/stageAttachmentBytes/downloadAttachment/commitStagedAttachments/discardStagedAttachment handlers. Separate Human messaging blob serving does prove durable account-scoped FileBlobStore staging/atomic finish/delete-partial cleanup and bounded Host reads, but is not counted as this Desktop attachment edge. Therefore this row remains mapped.",
+      "test_evidence": "SharedMediaParityTests proves the native 25 MiB preview policy and MessagingModel/Host tests prove separate Human blob bounded transfer semantics. This Desktop attachment Main-RPC row still requires real Host serving plus shipping tests for staging containment, 4 MiB edge reads, remote fallback, commit/discard, cancellation/restart and partial-download cleanup.",
+      "notes": "Re-read exact Desktop blob 0d055b7d65c49911deb18ff08af2caa1639d93f7 at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. Previous wording that IOSMainRPCRuntime \"exposes ... through canonical Coordinator/Host boundary\" was too strong: it exposes ABI names, while Host handlers are still missing. No implementation promotion is made.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending real attachment Main-RPC Host serving and exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/electron-main/attachments/attachments.ts",
@@ -501,10 +505,12 @@
       "ios_language": "Swift / Rust Host",
       "ios_platform_delta": "iOS exposes the same attachment operations through the typed Main/Coordinator/Host boundary and native preview/share UI instead of Electron dialogs/nativeImage. The exact 4 MiB chunk, safe-filename, commit/discard and cancelled-download partial cleanup contracts still need focused shipping-path proof.",
       "implementation_status": "mapped",
-      "production_evidence": "IOSMainRPCRuntime contains resolveAttachmentMedia/readAttachmentText/readAttachmentBytes/stageAttachmentBytes/downloadAttachment/commitStagedAttachments/discardStagedAttachment; native media policy and MediaViewer consume the bounded preview projections.",
-      "test_evidence": "SharedMediaParityTests covers native limits/preview kinds. Focused abnormal/cancellation tests for staging, 4 MiB reads and partial-download cleanup remain required.",
-      "notes": "Reviewed exact Desktop blob 764654b8f97b94215a015168c6ba82ae5e80aa45. This row intentionally stays mapped until all attachment edge invariants are proven in the current shipping owner.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Current audit correction: source/ios-preload/main-rpc-runtime.swift declares the seven Desktop attachment Main-RPC method names, but declaration alone is not Host serving. IOSPreloadBridge -> IOSCoordinatorPortClient -> IOSMainRuntime -> MahayanaCoordinator is a real shipping path and unknown methods fall through to the canonical Host supervisor; however the canonical app Host currently has no resolveAttachmentMedia/readAttachmentText/readAttachmentBytes/stageAttachmentBytes/downloadAttachment/commitStagedAttachments/discardStagedAttachment handlers. Separate Human messaging blob serving does prove durable account-scoped FileBlobStore staging/atomic finish/delete-partial cleanup and bounded Host reads, but is not counted as this Desktop attachment edge. Therefore this row remains mapped.",
+      "test_evidence": "SharedMediaParityTests proves the native 25 MiB preview policy and MessagingModel/Host tests prove separate Human blob bounded transfer semantics. This Desktop attachment Main-RPC row still requires real Host serving plus shipping tests for staging containment, 4 MiB edge reads, remote fallback, commit/discard, cancellation/restart and partial-download cleanup.",
+      "notes": "Re-read exact Desktop blob 764654b8f97b94215a015168c6ba82ae5e80aa45 at current Desktop main 371b72f1cd20de03dc4dff9a15ed761054968093. Previous wording that IOSMainRPCRuntime \"exposes ... through canonical Coordinator/Host boundary\" was too strong: it exposes ABI names, while Host handlers are still missing. No implementation promotion is made.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed",
+      "exact_head_evidence": "pending real attachment Main-RPC Host serving and exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/electron-main/auth/auth-callback-registration.ts",
@@ -993,12 +999,12 @@
       "ios_language": "Swift",
       "ios_platform_delta": "iOS implements native lifecycle/auth telemetry projections and the same 30s healthy window / 250ms-to-10s bounded relaunch policy, but the complete Desktop multi-sink telemetry fanout is split across IOSLifecycleReporter and native service owners.",
       "implementation_status": "mapped",
-      "production_evidence": "CoordinatorTelemetry retains the Desktop 30s healthy window and 250ms-to-10s bounded relaunch policy. The shipping IOSPreloadBridge now emits coordinatorHandoff exited/relaunched telemetry with exit class, uptime, relaunch sequence, delay and transport generation. Other reachability/rebuild/reconciliation/agents-unreachable telemetry remains split across IOSLifecycleReporter/native owners and is still under aggregate review.",
-      "test_evidence": "IOSCoordinatorArchitectureTests covers backoff and the shipping recovery controller lifecycle. Full Desktop multi-sink telemetry parity remains open; therefore this row remains mapped.",
-      "notes": "Current-main re-review against Desktop blob 2b434b870aacc2ccf8683bec26bd1fc34f37a30d. Runtime crash/relaunch telemetry is now wired, but this broader telemetry-sink row is intentionally not promoted until remaining sink families are closed.",
+      "production_evidence": "CoordinatorTelemetry retains the Desktop 30s healthy window and 250ms-to-10s bounded relaunch policy. Shipping IOSPreloadBridge emits exited/relaunched lifecycle telemetry and per-domain+operation failure episodes with same-code dedupe/recovered failedMs. IOSMainRuntime now natively intercepts reportAgentsUnreachable/reportRecoveryAction/reportRebuildLifecycle/reportReconciliation/reportResyncCompleted into the durable IOSLifecycleReporter and closes the cold-start resync checkpoint on resync completion. Low-level reachability/DNS/transport-stream cause stamping is still under native-service review, so this aggregate row remains mapped.",
+      "test_evidence": "IOSCoordinatorArchitectureTests plus CoordinatorFailureTelemetryParityTests and CoordinatorBroadTelemetryParityTests cover backoff, failure episode dedupe/recovery/cancellation/stale-generation fencing, bounded broad telemetry projection and shipping IOSMainRuntime interception. Fresh exact-head GitHub Actions are required; low-level reachability/DNS/transport parity remains open.",
+      "notes": "Current-main review against Desktop blob 2b434b870aacc2ccf8683bec26bd1fc34f37a30d. Operation failure episodes and five renderer-facing recovery/rebuild/reconciliation/resync/unreachable reports are now wired to the native durable lifecycle owner. Keep mapped until iOS-native reachability/DNS/transport-stream cause context is closed and exact-head CI succeeds.",
       "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "authority_review_state": "current-main-reviewed",
-      "exact_head_evidence": "pending aggregate telemetry review and current exact-head GitHub Actions"
+      "exact_head_evidence": "pending native reachability/DNS/transport closure and current exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/electron-main/coordinator/desktop-connectivity.ts",

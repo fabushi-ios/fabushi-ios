@@ -30,7 +30,7 @@
   "notes": "Desktop/Backend/Platform Core/Fabushi/Marketplace authorities remain unchanged. PR #3 advanced past d705013a; predecessor runs now include 38195681012/38195680859 and exact-input strict completeness 38195693072 on b12c1016. Six command-palette provider/model/root responsibilities were re-read against Desktop 371b72f1 and current iOS shipping owners; stale verified rows were demoted to implemented and mapped rows with real production owners were corrected to implemented. No verified evidence fields were fabricated.",
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "d705013a1ae4be5c36057b7ff1444f1a5b1aeb19",
+    "requestedCheckpoint": "177fc994e2554ddc2f3213766d41909853b1a40c",
     "preEvidenceIosHead": "b12c1016e80fc937f6a3181a381983cc329c9559",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
@@ -44,9 +44,13 @@
       38195278457,
       38195681012,
       38195680859,
-      38195693072
+      38195693072,
+      38194466221,
+      38194466227,
+      38194755369,
+      38194755382
     ],
-    "status": "command-palette-provider-batch-current-main-reviewed-no-verification-promotion-fresh-exact-head-ci-required",
+    "status": "coordinator-telemetry-advanced-attachment-host-gap-corrected-fresh-exact-head-actions-required",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
@@ -56,6 +60,7 @@
     "platformCoreAuthority": "c301820b93274bda586fbb82be982afc3c2ee4d4",
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
-    "promotion": "command-palette-owner-review-and-status-correction-no-verification-promotion"
+    "promotion": "command-palette-owner-review-and-status-correction-no-verification-promotion",
+    "currentImplementationHead": "011cd3a7542fc484770ed6538bd626091ce96889"
   }
 }

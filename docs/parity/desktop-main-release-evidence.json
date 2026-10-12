@@ -328,7 +328,7 @@
   "note": "All runs through 38190289874/38190289840/38192173184/38192173175/38192487666/38192487704/38192567443/38192567432/38192646437/38192646349/38192850135/38192850173/38193218500/38193218520 are predecessor only after this evidence commit. 38193218500 is a deterministic strict-architecture failure caused by stale authority-review metadata on the implemented os-notification row; current Desktop main preserves the exact source blob and this commit repairs only the authority binding, not the validator. finalAcceptance remains false and finalIosCommit null. Production signer, real StoreKit, signed archive/device install/upgrade, TestFlight/App Store, completeness and independent acceptance are still required on one final SHA. Requested checkpoint 177fc994e2554ddc2f3213766d41909853b1a40c and runs 38194466221/38194466227/38194755369/38194755382 are predecessor only after live-main synchronization; none count toward final acceptance. Requested checkpoint d705013a1ae4be5c36057b7ff1444f1a5b1aeb19 and runs 38194840503/38194840499/38194881441 are predecessor only after PR advancement. e8e22c1f runs 38195149103/38195149107 and 8a53722d runs 38195278502/38195278457 also become predecessor when this evidence commit lands. No predecessor green step/artifact is accepted for final promotion. Strict completeness run 38195693072/job 114637704813 checked exact iOS b12c1016 and Desktop 371b72f1, then failed closed with 15,938 additional errors after displayed errors. This command-palette evidence commit supersedes b12c1016 runs and requires replacement exact-head CI.",
   "currentHeadRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "d705013a1ae4be5c36057b7ff1444f1a5b1aeb19",
+    "requestedCheckpoint": "177fc994e2554ddc2f3213766d41909853b1a40c",
     "preEvidenceIosHead": "b12c1016e80fc937f6a3181a381983cc329c9559",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
@@ -342,14 +342,19 @@
       38195278457,
       38195681012,
       38195680859,
-      38195693072
+      38195693072,
+      38194466221,
+      38194466227,
+      38194755369,
+      38194755382
     ],
-    "status": "command-palette-provider-batch-current-main-reviewed-no-verification-promotion-fresh-exact-head-ci-required",
+    "status": "coordinator-telemetry-advanced-attachment-host-gap-corrected-fresh-exact-head-actions-and-release-evidence-required",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
       "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20"
     },
-    "promotion": "none"
+    "promotion": "none",
+    "currentImplementationHead": "011cd3a7542fc484770ed6538bd626091ce96889"
   }
 }
