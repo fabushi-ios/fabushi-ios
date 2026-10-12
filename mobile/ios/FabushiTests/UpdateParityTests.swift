@@ -245,4 +245,22 @@ final class UpdateParityTests: XCTestCase {
     }
 
 
+
+    func testBackendUpdateRequirementImmediatelyProjectsMinimumVersionGate() throws {
+        let service = IOSAppStoreUpdateService(
+            metadataProvider: { self.metadata() }
+        )
+
+        XCTAssertTrue(service.noteBackendUpdateRequirement(true))
+        let required = try service.statusPayload()
+        let requiredObject = try XCTUnwrap(required.foundationValue as? [String: Any])
+        XCTAssertEqual(requiredObject["isBelowMinimumVersion"] as? Bool, true)
+
+        XCTAssertFalse(service.noteBackendUpdateRequirement(true))
+        XCTAssertTrue(service.noteBackendUpdateRequirement(false))
+        let cleared = try service.statusPayload()
+        let clearedObject = try XCTUnwrap(cleared.foundationValue as? [String: Any])
+        XCTAssertEqual(clearedObject["isBelowMinimumVersion"] as? Bool, false)
+    }
+
 }
