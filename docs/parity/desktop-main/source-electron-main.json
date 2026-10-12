@@ -474,12 +474,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/shared/observability/structured-log-transport.swift; source/ios-main/account/session-settlement-shipper.swift; source/ios-main/account/session-funnel-telemetry.swift; source/ios-main/account/cursor-auth.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS uses the native structured-log transport and auth telemetry owners instead of Electron app.getPath/process lifecycle. IOSCursorAuthService supplies the sole credential/account session, and terminal session settlement has its own 15-second AnalyticsService shipper while broader structured-log lifecycle remains a shared native responsibility.",
+      "ios_platform_delta": "Desktop AnalyticsService/spill ownership is adapted to the native iOS lifecycle telemetry sink. The iOS app owns a sandbox durable spill file, rotates the account slot at canonical account transitions, obtains authenticated structured-log credentials only inside Coordinator, and ships via the backend adapter; renderer/SwiftUI surfaces never receive the access token. iOS lifecycle/background constraints replace desktop polling/quit semantics with durable submission and lifecycle flush/recovery.",
       "implementation_status": "mapped",
-      "production_evidence": "The shared structured-log transport defines entries/receipts/deadlines; session-funnel telemetry projects auth lifecycle; session-settlement-shipper sends terminal records through AnalyticsService with machine/client/app/platform metadata and departing-token semantics.",
-      "test_evidence": "mobile/ios/FabushiTests/SessionSettlementParityTests.swift plus auth/telemetry focused tests and current-head Actions; spill/anonymous-client/pre-quit lifecycle equivalence still requires dedicated evidence before promotion.",
-      "notes": "Reviewed exact Desktop blob dbc2083fb09ca5ef6c85a78473a67a02d8b66f72. The terminal settlement subset is implemented separately, but this broader Desktop telemetry adapter row stays mapped until durable spill, anonymous mode, account-slot changes and shutdown flushing are proven in the native shipping graph.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Desktop telemetry.ts@dbc2083fb09ca5ef6c85a78473a67a02d8b66f72 was re-read for machine/client version, authenticated+anonymous clients, account-slot subscription, spill, flush-before-quit and disposal. iOS IOSMainRuntime constructs IOSLifecycleTelemetryDurableSink under app data, attaches IOSLifecycleReporter before Coordinator startup, configures remote shipping through coordinator.structuredLogCredentials(accountSlot:) and IOSCursorStructuredLogBackend, and rotates the sink together with CoordinatorAccountRuntime account adoption/cleanup. MCP auth, gateway, experiments, update and lifecycle diagnostics all feed this shipping reporter. Durable spill is retained across transient upload failure rather than discarded.",
+      "test_evidence": "CoordinatorBroadTelemetryParityTests/CoordinatorFailureTelemetryParityTests/GatewayTelemetryParityTests/BoxVisibilityTelemetryParityTests and lifecycle telemetry tests cover event families, account transitions, failure reporting and durable behavior. Same-head GitHub Actions remain required before status promotion.",
+      "notes": "Current-main review complete; no N/A denominator reduction and no token projection to renderer. Keep mapped until exact-head CI and release/fault-recovery acceptance provide final evidence.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/application-menu.ts",
