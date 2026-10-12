@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 
-@MainActor
 struct FabushiRuntimeReloadAction {
     let run: @MainActor () async -> Void
 }
