@@ -328,3 +328,12 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - Strict architecture evidence note: predecessor run `38192567443` rejected a multi-path `ios_target_path` in the implemented local-exec ledger. The canonical owner is now singularly `source/mahayana-agent-coordinator/local-exec/supervisor.swift`; the production executor and process-identity files remain supporting composition evidence. The validator was not relaxed.
 
 - Current-head rebaseline after `b13b769f`: runs `38190289874`, `38190289840`, `38192173184`, `38192173175`, `38192487666`, `38192487704`, `38192567443`, `38192567432`, `38192646437`, `38192646349`, `38192850135`, `38192850173`, `38193218500`, `38193218520` are predecessor only. Strict architecture run `38193218500` found stale current-main review metadata for `source/shared/os-notification.ts`; Desktop `371b72f1cd20de03dc4dff9a15ed761054968093` retains exact blob `ffaf599dada09e938f362d75aa202327eed3a4ad`, so the row is rebound to current-main-reviewed without any verified/release promotion. Fresh exact-head Actions are mandatory.
+
+
+## Live rebaseline — 2026-10-12 current PR #3
+
+- Requested checkpoint `c408673139a8ebb92a6e94aeb73727de01124ac1` is predecessor-only.
+- Desktop authority remains `371b72f1cd20de03dc4dff9a15ed761054968093` / tree `3116c54a1e36da95189c740bdc789ad543ce2d20`; Backend `9c56a77cbe02dfceebf574236a703b53cd257cb9`; Platform Core `c301820b93274bda586fbb82be982afc3c2ee4d4`; Fabushi server `c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52`; Marketplace `1971f2a93197cfb79d1e8f0856345f36776f3ca3`.
+- Runs `38193384215`, `38193384217`, `38193596582`, and later `38194466221` / `38194466227` are predecessor evidence only after PR-head advancement. Their green steps and artifacts cannot promote GD/FPM/IOS-MAIN acceptance.
+- Current responsibility work re-read four platform-only Desktop rows at exact current-main blobs and retained them as concrete iOS platform replacements; no implemented row was mechanically promoted to verified.
+- Production signer, real StoreKit/provider binding, signed Global Dharma 1.1.0 .fabapp, physical-device install/upgrade, TestFlight/App Store, strict completeness, and independent acceptance remain blocked/pending until same-final-SHA evidence exists.
