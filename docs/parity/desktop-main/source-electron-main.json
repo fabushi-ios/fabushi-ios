@@ -388,12 +388,13 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "source/ios-preload/coordinator-port-bridge.swift; source/ios-preload/main-rpc-runtime.swift; source/ios-preload/rpc-edge-runtime.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS has no Electron ipcMain. Typed in-process Coordinator/Main RPC ports replace named process IPC handlers, with handshake/cancellation/disconnect settlement and native lifecycle ownership instead of listener removal. Settings/experiments/MCP/secrets remain behind their canonical service owners.",
+      "ios_platform_delta": "Electron ipcMain process channels are replaced by the typed iOS Coordinator/Preload edge. Channel trust is expressed as active-scene identity rather than WebContents identity; lifecycle/settlement owns cleanup instead of process-global removeHandler/removeListener; settings/secrets/MCP/experiments are exposed only through typed production request surfaces rather than a generic renderer-accessible native IPC object.",
       "implementation_status": "mapped",
-      "production_evidence": "main-rpc-runtime.swift defines the method/argument surface; rpc-edge-runtime.swift owns reply/failure envelopes; coordinator-port-bridge.swift and MahayanaCoordinator provide the serving transport and Host/service routing.",
-      "test_evidence": "mobile/ios/FabushiTests/PreloadParityTests.swift; mobile/ios/FabushiTests/CoordinatorContractTests.swift; mobile/ios/FabushiTests/IOSCoordinatorArchitectureTests.swift; current-head Actions required before implementation/verification promotion.",
-      "notes": "Reviewed exact Desktop blob 830325397a7b7d54b0858ef9dece3c8b9318ba2f. Native cancellation/disconnect/restart ordering is covered at the typed-port layer; service-specific permission and disposal semantics remain tracked by their dedicated rows.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "production_evidence": "Desktop ipc.ts@830325397a7b7d54b0858ef9dece3c8b9318ba2 was re-read for ordered registration, duplicate-channel rejection, rollback, disposal and trusted secrets boundaries. iOS CoordinatorPortAccessGuard allows only the active trusted Fabushi scene; IOSCoordinatorPortBridge/InProcessCoordinatorPort implement hello/ready protocol validation, request/reply/event/cancel frames, Task cancellation propagation, one-shot close/protocol-breach settlement and pending continuation rejection; IOSRPCEdgeRuntime provides namespaced typed method/event channels and structured unknown/handler failures. The production Main/Coordinator owners expose settings, auth/MCP, experiments and other services through these typed routes instead of exporting a generic IPC carrier.",
+      "test_evidence": "CoordinatorContractTests/CoordinatorAdapterTests/IOSCoordinatorArchitectureTests cover protocol/channel/lifecycle composition; protected-account acceptance exercises trusted shipping UI surfaces. Same-head required CI is still pending, so no status promotion is made.",
+      "notes": "Current-main IPC carrier review complete. This is an ios-adapted process-boundary replacement, not N/A. Aggregate Main RPC parity is tracked separately and remains open.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "source/electron-main/adapters/main-rpc.ts",
@@ -408,11 +409,11 @@
       "implementation_status": "mapped",
       "production_evidence": "Desktop current-main injects createDesktopCallMediaPort exactly once into MainEdge. On iOS, HumanCallsView constructs the sole HumanCallMediaPort used by the shipping Calls UI for permission requests, device selection and screen-share capability; IOSPreloadBridge/MahayanaCoordinator contain no second call-media owner.",
       "test_evidence": "mobile/ios/FabushiTests/HumanCallMediaPortTests.swift covers permission wire mapping/device preference behavior; mobile/ios/FabushiTests/PreloadParityTests.swift fences the single raw preload receive owner; current-head build/UI acceptance remains required.",
-      "notes": "Re-read current Desktop main blob 2ae92ffde6e817c146a272f21ceee0e448ad6297. The current-main functional delta is exactly the createDesktopCallMediaPort import/injection. iOS already composes this natively through HumanCallMediaPort -> HumanCallsView; the user-supplied coordinator.swift path does not exist, and the actual Coordinator root is MahayanaCoordinator.swift. Row stays mapped and re-review-fenced until aggregate direct-change/dependency review closes.",
+      "notes": "Current-main aggregate review is in progress/completed at the adapter boundary but cannot be promoted from mapped merely because the typed iOS RPC carrier exists. Desktop main-rpc.ts@2ae92ffde6e817c146a272f21ceee0e448ad6297 aggregates settings/prefs/box recovery/window behavior/attachments/avatar/Cursor account/transcription/models/local-tool approvals/experiments/host-settings sync/broadcast/call-media/egress/WebAuthn plus the generated method table. iOS has canonical owners for many of these, but constituent rows still include explicit gaps such as Desktop global image context actions and remaining source closure; aggregate promotion must wait for those responsibilities and exact-head CI.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
     },
     {
       "desktop_path": "source/electron-main/adapters/mcp-oauth.ts",
