@@ -99,11 +99,11 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "a93626a8f60dcc36dc229f0980a3cee9ea552a82",
-    "preEvidenceIosHead": "c9a3a8e3effa05de568cb2ee536f7bc3394f7cf3",
-    "preEvidenceIosTree": "df089aa97be6d5514753c46f322d23be06fbf62a",
+    "preEvidenceIosHead": "9a94335f94ab2a71984080f965783bf36040824a",
+    "preEvidenceIosTree": "09ef8189a31e9b180bd9da14c08ca9198bc43ac5",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "rowCount": 7951,
-    "status": "source-identities-unchanged-local-exec-provider-and-fencing-tests-composed-no-row-verification-promotion-fresh-exact-head-ci-required"
+    "status": "source-identities-unchanged-local-exec-single-owner-ledger-normalized-no-row-verification-promotion-fresh-exact-head-ci-required"
   }
 }

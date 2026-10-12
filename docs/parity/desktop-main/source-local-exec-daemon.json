@@ -26,13 +26,13 @@
       "desktop_owner": "local-runner",
       "desktop_visible_effect": "The Desktop daemon cannot start without a generation-bound entry identity; it shuts down predictably, clears lifecycle state and reports fatal/invariant failures.",
       "ios_disposition": "not-applicable-with-replacement",
-      "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift; source/local-exec-daemon/production-executor.swift; source/shared/local-exec-process-identity.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/local-exec/supervisor.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS does not spawn a standalone Node daemon. Coordinator actor lifetime replaces process lifetime, process identity remains a shared contract for remote/local-runner evidence, and execution uses the native/RemoteRunner split.",
       "implementation_status": "implemented",
       "production_evidence": "Shipping MahayanaCoordinator owns IOSProductionLocalExecutor and IOSGenerationFencedRemoteRunnerTransport. Its resolved CoordinatorMcpSurface supplies IOSClosureRemoteExecutionProvider, which calls dispatchRemoteExecution -> dashboard.ensureSandBox() -> IOSRemoteExecDaemonClient. The final provider uses the account-scoped execDaemonURL/bearer token and does not re-enter MahayanaHostRuntime. Account revision, Host generation and routed scope token are rechecked before/after dispatch; Task cancellation is honored.",
       "test_evidence": "RunnerParityTests plus native-engine focused tests cover exact shell/process/box namespaces, real Agent ExternalShell→shell.exec, process_exec→process.exec and ExternalRead→box.exec broker requests, missing/stale account-generation fencing, unknown-method fail-closed behavior, canonical ExecService wire translation and provider routing. Fresh exact-head Actions remain required before verification promotion. Focused RunnerParityTests independently exercise provider failure, Task cancellation, account-switch stale result, Host-generation stale result, and unknown-method rejection.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: final transport composition is now implemented through the existing account-scoped Cursor sandbox exec-daemon. No second runtime and no Host request re-entry are introduced. Keep acceptance unverified until replacement exact-head architecture/rust-host/build/archive Actions pass."
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: final transport composition is now implemented through the existing account-scoped Cursor sandbox exec-daemon. No second runtime and no Host request re-entry are introduced. Keep acceptance unverified until replacement exact-head architecture/rust-host/build/archive Actions pass. Strict-ledger canonical owner is the single supervisor.swift path; production-executor.swift and local-exec-process-identity.swift remain supporting composition/identity evidence, not additional ios_target_path owners."
     },
     {
       "desktop_path": "source/local-exec-daemon/production-executor.ts",

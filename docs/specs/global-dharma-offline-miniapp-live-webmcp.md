@@ -324,3 +324,5 @@ This execution round is intentionally fail-closed. It does **not** convert pendi
 - Account scope/account revision/Host generation and routed scope-token fencing remain mandatory before and after dispatch; cancellation and late results cannot promote stale state. This implementation statement does **not** promote any GD-OFF/GD-WEBMCP/GD-MKT/GD-PAY/IOS-MAIN release gate. Fresh exact-head GitHub Actions and the artifact field audit remain required.
 
 - Focused remote-provider acceptance additionally requires independent provider-failure, Task-cancellation, account-switch late-result, Host-generation late-result and unknown-method rejection tests; these are present in the post-c9a3a8e3 evidence/test commit and still require exact-head Actions before promotion.
+
+- Strict architecture evidence note: predecessor run `38192567443` rejected a multi-path `ios_target_path` in the implemented local-exec ledger. The canonical owner is now singularly `source/mahayana-agent-coordinator/local-exec/supervisor.swift`; the production executor and process-identity files remain supporting composition evidence. The validator was not relaxed.
