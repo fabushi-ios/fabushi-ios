@@ -10,7 +10,7 @@
   "directChanges": [],
   "dependencyReview": {
     "status": "pending",
-    "reason": "Aggregate shared-contract review remains pending. The previously-open Coordinator reachability/DNS/transport telemetry slice is now wired into the single durable iOS lifecycle owner, and the Desktop attachment Main-RPC production edge is now implemented through an account+Agent-scoped native staging adapter backed by the existing canonical FeatureHost attachment owner. Both slices remain mapped until replacement exact-head Actions execute their focused Rust/Swift/protected evidence; unrelated shared-contract and full responsibility closure remains open. Exact-head rebaseline keeps aggregate review fail-closed: f0d2b9ec and descendant Settings/Global-Dharma owner-documentation runs are predecessor-only; installed Global Dharma local execution is the verified .fabapp -> Marketplace/Host source -> MiniAppWebMcpSurface -> active WKWebView session path, while GlobalDharmaMiniAppBridge remains explicitly online compatibility/service only. Current-main account/access.ts has now been individually re-read and its missing native runtime owner repaired, but aggregate shared-contract/dependency review and remaining responsibility groups are still open; no full-review promotion is made.",
+    "reason": "Aggregate shared-contract review remains pending. The previously-open Coordinator reachability/DNS/transport telemetry slice is now wired into the single durable iOS lifecycle owner, and the Desktop attachment Main-RPC production edge is now implemented through an account+Agent-scoped native staging adapter backed by the existing canonical FeatureHost attachment owner. Both slices remain mapped until replacement exact-head Actions execute their focused Rust/Swift/protected evidence; unrelated shared-contract and full responsibility closure remains open. Exact-head rebaseline keeps aggregate review fail-closed: f0d2b9ec and descendant Settings/Global-Dharma owner-documentation runs are predecessor-only; installed Global Dharma local execution is the verified .fabapp -> Marketplace/Host source -> MiniAppWebMcpSurface -> active WKWebView session path, while GlobalDharmaMiniAppBridge remains explicitly online compatibility/service only. Current-main account/access.ts has now been individually re-read and its missing native runtime owner repaired, but aggregate shared-contract/dependency review and remaining responsibility groups are still open; no full-review promotion is made. Plugin GitHub-auth repair is now production-wired through canonical coordinator listAgents/createAgent/sendPrompt/getPluginSyncStatus with account/request fencing and native banner/retry UX; these rows are implemented only pending exact-head Actions and aggregate Plugins/release closure.",
     "sameDirectoryReviewPaths": [
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0014_remote_computer_client_tokens.sql",
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0016_remote_computer_session_provider.sql",
@@ -58,7 +58,8 @@
       "2026-10-12 application-menu current-main closure: About/Help/Feedback and native OS roles were already present; the missing normal-state Reload action now uses a narrow SceneRoot environment capability bound to FabushiRuntime.retryConnection(), which restarts the typed transport and resyncs lifecycle state without constructing a second runtime. Focused tests bind the menu, SceneRoot, runtime recovery and localized copy. Status remains mapped pending descendant exact-head CI.",
       "2026-10-12 Desktop gateway-descriptor-cache/store and box-host-connector were re-read at 371b72f1. iOS now has Keychain-scoped descriptor durability, cached-first live-refresh singleflight, stale-account fencing, denial clearing, typed no_storage/blocked/retry-after/update-required/access-denied failures, and canonical recreate/force-recreate/migration paths. Descriptor rows are implemented; box-host remains mapped for update-required product projection and blocked-hold parity.",
       "2026-10-12 blocked-hold continuation at Desktop 371b72f1 / iOS ef9f14dc: IOSGatewayDescriptorFastPath now honors SAND_BOX_BLOCKED retry-after with a 60s fallback and 15m cap, returns same-account cache during the hold, suppresses repeated broker calls, and clears the hold after a successful live connection. Focused GatewayParityTests cover expiry/retry. box-host remains mapped solely for SAND_CLIENT_UPDATE_REQUIRED product-state projection.",
-      "2026-10-12 box-host closure at Desktop 371b72f1 / iOS 1a2c8013: SAND_CLIENT_UPDATE_REQUIRED is correctly owned by IOSAppStoreUpdateService rather than RemoteComputerRebuildOwner; EnsureSandBox sets/clears the backend update requirement, the updater immediately projects isBelowMinimumVersion and refreshes App Store version policy, blocked retry hold matches Desktop bounds, and Desktop-only local-daemon credential minting is replaced by iOS in-process LocalCapabilityRunner while remote exec uses the broker execDaemonAuthToken."
+      "2026-10-12 box-host closure at Desktop 371b72f1 / iOS 1a2c8013: SAND_CLIENT_UPDATE_REQUIRED is correctly owned by IOSAppStoreUpdateService rather than RemoteComputerRebuildOwner; EnsureSandBox sets/clears the backend update requirement, the updater immediately projects isBelowMinimumVersion and refreshes App Store version policy, blocked retry hold matches Desktop bounds, and Desktop-only local-daemon credential minting is replaced by iOS in-process LocalCapabilityRunner while remote exec uses the broker execDaemonAuthToken.",
+      "2026-10-13 Plugin GitHub-auth production closure: iOS projects authBlocked from authoritative getPluginSyncStatus, uses the existing plugin-auth purpose and canonical Agent RPCs, verifies durable purpose by Host roster re-read, sends the Desktop-equivalent Plugin Setup prompt, and fences account/scope/request/reset/dispose/retry behavior. The native Marketplace banner exposes Fix/Retry with accessibility identifiers. Rows are implemented, not verified; replacement exact-head Actions and aggregate/release acceptance remain open."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -2019,7 +2020,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "947bfd722d9c97f60d869663b5488aa852a49f78",
+    "preEvidenceIosHead": "4bf50b3f571484b4fad255c3e3fdabd3de43e163",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2240,7 +2241,7 @@
       114688807759,
       114688866359
     ],
-    "status": "box-host-implemented-resulting-exact-head-ci-required",
+    "status": "plugin-github-auth-implemented-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -2263,7 +2264,7 @@
       "mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift"
     ],
     "conclusion": "Gateway descriptor cache/store and Desktop box-host connector responsibilities are current-main-reviewed and implemented through canonical iOS owners: encrypted account-scoped descriptor fast path, typed broker failures, blocked hold/backoff, App Store backend-update requirement projection, recreate/force-recreate/migration, inference auth ownership, and in-process local-exec platform replacement. This is implemented only; exact-head CI and aggregate migration acceptance remain open.",
-    "currentImplementationHead": "947bfd722d9c97f60d869663b5488aa852a49f78",
+    "currentImplementationHead": "4bf50b3f571484b4fad255c3e3fdabd3de43e163",
     "promotion": "none"
   }
 }
