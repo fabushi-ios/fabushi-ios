@@ -2033,6 +2033,7 @@ final class CoordinatorMcpSurface {
             "authId": status.authId ?? NSNull(),
             "email": status.email ?? NSNull(),
             "expiresAtMs": status.expiresAtMs.map(NSNumber.init(value:)) ?? NSNull(),
+            "freshness": NSNumber(value: status.freshness),
         ]
     }
 

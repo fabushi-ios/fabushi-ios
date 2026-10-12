@@ -2010,6 +2010,8 @@ final class MarketplaceModel {
     @ObservationIgnored private var listenerRequestSerial = 0
     @ObservationIgnored private var mcpOAuthGeneration = 0
     @ObservationIgnored private var mcpAccountEpoch = 0
+    @ObservationIgnored private var mcpBackendStatusRequestSerial = 0
+    @ObservationIgnored private var mcpBackendStatusFreshness: UInt64 = 0
     @ObservationIgnored private var mcpServerRequestSerial = 0
     @ObservationIgnored private var connectorCardGeneration = 0
     @ObservationIgnored private var connectorCardRequestSerial = 0
@@ -2513,6 +2515,13 @@ final class MarketplaceModel {
         connectorCardAuthorizationURLByKey = [:]
         connectorCardActiveOAuthKey = nil
         mcpAccountEpoch = mcpAccountEpoch == Int.max ? 1 : mcpAccountEpoch + 1
+        mcpBackendStatusRequestSerial = mcpBackendStatusRequestSerial == Int.max ? 1 : mcpBackendStatusRequestSerial + 1
+        mcpBackendStatusFreshness = 0
+        mcpBackendLoginAttemptId = nil
+        mcpBackendLoggedIn = false
+        mcpBackendEmail = ""
+        mcpBackendAccountKey = ""
+        mcpBackendBusy = false
         mcpServerRequestSerial = mcpServerRequestSerial == Int.max ? 1 : mcpServerRequestSerial + 1
         listenerRequestSerial = listenerRequestSerial == Int.max ? 1 : listenerRequestSerial + 1
         mcpOAuthGeneration = mcpOAuthGeneration == Int.max ? 1 : mcpOAuthGeneration + 1
@@ -4494,11 +4503,28 @@ final class MarketplaceModel {
         presentMcpOAuth(url, connectorActionKey: key)
     }
 
+    nonisolated static func acceptsMcpBackendStatusUpdate(
+        requestEpoch: Int,
+        currentEpoch: Int,
+        requestSerial: Int,
+        currentSerial: Int,
+        incomingFreshness: UInt64,
+        currentFreshness: UInt64
+    ) -> Bool {
+        requestEpoch == currentEpoch
+            && requestSerial == currentSerial
+            && incomingFreshness >= currentFreshness
+    }
+
     func refreshMcpBackendStatus() async {
+        let epoch = mcpAccountEpoch
+        mcpBackendStatusRequestSerial = mcpBackendStatusRequestSerial == Int.max ? 1 : mcpBackendStatusRequestSerial + 1
+        let serial = mcpBackendStatusRequestSerial
         guard loggedIn else {
             mcpBackendLoggedIn = false
             mcpBackendEmail = ""
             mcpBackendAccountKey = ""
+            mcpBackendStatusFreshness = 0
             return
         }
         do {
@@ -4506,13 +4532,21 @@ final class MarketplaceModel {
             guard let auth = response.value as? [String: Any] else {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
-            let loggedIn = auth["loggedIn"] as? Bool ?? false
+            let freshness = (auth["freshness"] as? NSNumber)?.uint64Value ?? 0
+            guard Self.acceptsMcpBackendStatusUpdate(
+                requestEpoch: epoch, currentEpoch: mcpAccountEpoch,
+                requestSerial: serial, currentSerial: mcpBackendStatusRequestSerial,
+                incomingFreshness: freshness, currentFreshness: mcpBackendStatusFreshness
+            ) else { return }
+            let backendLoggedIn = auth["loggedIn"] as? Bool ?? false
             let authId = (auth["authId"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let email = (auth["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            mcpBackendLoggedIn = loggedIn
-            mcpBackendEmail = loggedIn ? email : ""
-            mcpBackendAccountKey = loggedIn ? (!authId.isEmpty ? authId : email) : ""
+            mcpBackendStatusFreshness = freshness
+            mcpBackendLoggedIn = backendLoggedIn
+            mcpBackendEmail = backendLoggedIn ? email : ""
+            mcpBackendAccountKey = backendLoggedIn ? (!authId.isEmpty ? authId : email) : ""
         } catch {
+            guard epoch == mcpAccountEpoch, serial == mcpBackendStatusRequestSerial else { return }
             mcpBackendLoggedIn = false
             mcpBackendEmail = ""
             mcpBackendAccountKey = ""
@@ -4522,67 +4556,71 @@ final class MarketplaceModel {
 
     func beginMcpBackendLogin() async {
         guard loggedIn, !mcpBackendBusy else { return }
+        let epoch = mcpAccountEpoch
+        var startedAttemptId: String?
         mcpBackendBusy = true
         mcpError = nil
+        defer { if epoch == mcpAccountEpoch { mcpBackendBusy = false } }
         do {
             let response = try await bridge.request(method: "coordinator.mcp.cursorAuth.start")
             guard let object = response.value as? [String: Any],
                   let attemptId = object["attemptId"] as? String,
                   let rawURL = object["loginUrl"] as? String,
                   let url = URL(string: rawURL)
-            else {
-                throw MahayanaCoordinator.CoordinatorError.invalidResponse
+            else { throw MahayanaCoordinator.CoordinatorError.invalidResponse }
+            startedAttemptId = attemptId
+            guard epoch == mcpAccountEpoch, loggedIn else {
+                _ = try? await bridge.request(method: "coordinator.mcp.cursorAuth.cancel", params: ["attemptId": attemptId])
+                return
             }
             mcpBackendLoginAttemptId = attemptId
             await UIApplication.shared.open(url)
             for _ in 0..<150 {
-                try? await Task.sleep(for: .seconds(1))
-                guard mcpBackendLoginAttemptId == attemptId else {
-                    mcpBackendBusy = false
+                try await Task.sleep(for: .seconds(1))
+                guard epoch == mcpAccountEpoch, loggedIn, mcpBackendLoginAttemptId == attemptId else {
+                    _ = try? await bridge.request(method: "coordinator.mcp.cursorAuth.cancel", params: ["attemptId": attemptId])
                     return
                 }
-                let poll = try await bridge.request(
-                    method: "coordinator.mcp.cursorAuth.poll",
-                    params: ["attemptId": attemptId]
-                )
+                let poll = try await bridge.request(method: "coordinator.mcp.cursorAuth.poll", params: ["attemptId": attemptId])
+                guard epoch == mcpAccountEpoch, loggedIn, mcpBackendLoginAttemptId == attemptId else {
+                    _ = try? await bridge.request(method: "coordinator.mcp.cursorAuth.cancel", params: ["attemptId": attemptId])
+                    return
+                }
                 guard let value = poll.value as? [String: Any] else {
                     throw MahayanaCoordinator.CoordinatorError.invalidResponse
                 }
                 if value["completed"] as? Bool == true {
                     mcpBackendLoginAttemptId = nil
-                    mcpBackendBusy = false
                     await refreshMcpBackendStatus()
+                    guard epoch == mcpAccountEpoch, loggedIn else { return }
                     await refreshMcpServers()
                     return
                 }
             }
-            throw MahayanaCoordinator.CoordinatorError.requestFailed(
-                "MCP backend sign-in timed out."
-            )
+            throw MahayanaCoordinator.CoordinatorError.requestFailed("MCP backend sign-in timed out.")
         } catch {
-            if let attemptId = mcpBackendLoginAttemptId {
-                _ = try? await bridge.request(
-                    method: "coordinator.mcp.cursorAuth.cancel",
-                    params: ["attemptId": attemptId]
-                )
+            if let attemptId = startedAttemptId {
+                _ = try? await bridge.request(method: "coordinator.mcp.cursorAuth.cancel", params: ["attemptId": attemptId])
             }
-            mcpBackendLoginAttemptId = nil
-            mcpBackendBusy = false
+            guard epoch == mcpAccountEpoch else { return }
+            if mcpBackendLoginAttemptId == startedAttemptId { mcpBackendLoginAttemptId = nil }
             mcpError = error.localizedDescription
         }
     }
 
     func logoutMcpBackend() async {
         guard !mcpBackendBusy else { return }
+        let epoch = mcpAccountEpoch
         mcpBackendBusy = true
-        defer { mcpBackendBusy = false }
+        defer { if epoch == mcpAccountEpoch { mcpBackendBusy = false } }
         do {
             _ = try await bridge.request(method: "coordinator.mcp.cursorAuth.logout")
-            mcpBackendLoggedIn = false
-            mcpBackendEmail = ""
-            mcpBackendAccountKey = ""
+            guard epoch == mcpAccountEpoch, loggedIn else { return }
+            await refreshMcpBackendStatus()
+            guard epoch == mcpAccountEpoch, loggedIn else { return }
             await refreshMcpServers()
         } catch {
+            guard epoch == mcpAccountEpoch else { return }
             mcpError = error.localizedDescription
         }
     }

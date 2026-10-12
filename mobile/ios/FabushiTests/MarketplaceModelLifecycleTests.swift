@@ -499,3 +499,24 @@ final class MarketplaceMcpPluginUpdateShippingTests: XCTestCase {
         XCTAssertTrue(surfaceSource.contains("await model.loadConnectorCardData()"))
     }
 }
+
+extension MarketplaceModelLifecycleTests {
+    func testMcpBackendStatusUpdateRejectsStaleAccountRequestAndFreshness() {
+        XCTAssertTrue(MarketplaceModel.acceptsMcpBackendStatusUpdate(
+            requestEpoch: 7, currentEpoch: 7, requestSerial: 11, currentSerial: 11,
+            incomingFreshness: 4, currentFreshness: 4
+        ))
+        XCTAssertFalse(MarketplaceModel.acceptsMcpBackendStatusUpdate(
+            requestEpoch: 6, currentEpoch: 7, requestSerial: 11, currentSerial: 11,
+            incomingFreshness: 5, currentFreshness: 4
+        ))
+        XCTAssertFalse(MarketplaceModel.acceptsMcpBackendStatusUpdate(
+            requestEpoch: 7, currentEpoch: 7, requestSerial: 10, currentSerial: 11,
+            incomingFreshness: 5, currentFreshness: 4
+        ))
+        XCTAssertFalse(MarketplaceModel.acceptsMcpBackendStatusUpdate(
+            requestEpoch: 7, currentEpoch: 7, requestSerial: 11, currentSerial: 11,
+            incomingFreshness: 3, currentFreshness: 4
+        ))
+    }
+}

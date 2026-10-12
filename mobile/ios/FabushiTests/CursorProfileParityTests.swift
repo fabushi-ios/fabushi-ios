@@ -374,3 +374,39 @@ final class CursorLocalToolPermissionCeilingParityTests: XCTestCase {
         XCTAssertEqual(failures, ["host-settings:local-tool-ceiling"])
     }
 }
+
+@MainActor
+private final class CursorAuthFreshnessCredentialStore: IOSCursorCredentialStoring {
+    private var values: [String: String] = [
+        IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY: "freshness-access",
+        IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY: "freshness-refresh",
+        iosMachineIDSecretKey: "freshness-machine",
+    ]
+    func readSecret(_ key: String) async throws -> String? { values[key] }
+    func writeSecret(_ key: String, value: String) async throws { values[key] = value }
+    func deleteSecret(_ key: String) async throws { values.removeValue(forKey: key) }
+    func waitForEncryptedStorage() async throws {}
+}
+
+@MainActor
+final class CursorAuthFreshnessParityTests: XCTestCase {
+    func testPublishedLogoutAdvancesFreshnessAndStatusRetainsLatestGeneration() async throws {
+        let service = IOSCursorAuthService(
+            store: CursorAuthFreshnessCredentialStore(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            websiteURL: URL(string: "https://cursor.example.test")!,
+            structuredLogRequestExecutor: { request in
+                (Data(), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/2", headerFields: [:])!)
+            }
+        )
+        var observed: [IOSCursorAuthStatus] = []
+        service.setStatusObserver { observed.append($0) }
+        await Task.yield()
+        XCTAssertEqual((await service.status()).freshness, 0)
+        try await service.logout()
+        let after = await service.status()
+        XCTAssertFalse(after.loggedIn)
+        XCTAssertEqual(after.freshness, 1)
+        XCTAssertEqual(observed.last?.freshness, 1)
+    }
+}

@@ -11,6 +11,7 @@ struct IOSCursorAuthStatus: Equatable, Sendable {
     var authId: String? = nil
     var email: String? = nil
     var expiresAtMs: Int64? = nil
+    var freshness: UInt64 = 0
 }
 
 struct IOSCursorLoginStart: Equatable, Sendable {
@@ -135,6 +136,7 @@ final class IOSCursorAuthService {
     private var refreshDegradedSinceMs: Int64?
     private var statusObserver: StatusObserver?
     private var statusObserverGeneration: UInt64 = 0
+    private var statusFreshness: UInt64 = 0
     private var credentialsRevoked = false
     private var signoutSettled = false
     private var keychainUnavailableSettled = false
@@ -191,27 +193,33 @@ final class IOSCursorAuthService {
         }
     }
 
-    private func publishStatus(_ status: IOSCursorAuthStatus) {
-        statusObserver?(status)
+    @discardableResult
+    private func publishStatus(_ status: IOSCursorAuthStatus) -> IOSCursorAuthStatus {
+        statusFreshness = statusFreshness == UInt64.max ? 1 : statusFreshness + 1
+        var published = status
+        published.freshness = statusFreshness
+        statusObserver?(published)
+        return published
     }
 
     func status() async -> IOSCursorAuthStatus {
         guard !credentialsRevoked else {
-            return .init(loggedIn: false)
+            return .init(loggedIn: false, freshness: statusFreshness)
         }
         guard let token = try? await store.readSecret(IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY),
               !token.isEmpty,
               let refreshToken = try? await store.readSecret(IOS_CURSOR_REFRESH_TOKEN_SECRET_KEY),
               !refreshToken.isEmpty
         else {
-            return .init(loggedIn: false)
+            return .init(loggedIn: false, freshness: statusFreshness)
         }
         let payload = parseJwtPayload(token)
         return .init(
             loggedIn: true,
             authId: payload?.sub,
             email: payload?.email,
-            expiresAtMs: getAccessTokenExpiryMs(token)
+            expiresAtMs: getAccessTokenExpiryMs(token),
+            freshness: statusFreshness
         )
     }
 
@@ -301,8 +309,7 @@ final class IOSCursorAuthService {
         signoutSettled = false
         keychainUnavailableSettled = false
         pending.removeValue(forKey: attemptId)
-        let settled = await status()
-        publishStatus(settled)
+        let settled = publishStatus(await status())
         authTelemetry.report(iosCursorSigninTelemetry(.loginCompleted))
         return settled
     }
