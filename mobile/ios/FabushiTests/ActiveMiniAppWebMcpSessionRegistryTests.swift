@@ -343,6 +343,78 @@ final class ActiveMiniAppWebMcpSessionRegistryTests: XCTestCase {
         XCTAssertEqual(current.artifactSha256, String(repeating: "b", count: 64))
     }
 
+    func testPluginRevocationRejectsPendingResultAndPreservesSiblingSession() async throws {
+        let registry = ActiveMiniAppWebMcpSessionRegistry.shared
+        let tool = MiniAppToolContract(
+            name: "offline.state.read",
+            description: "read local state",
+            approval: "none"
+        )
+        var continuation: CheckedContinuation<String, Never>?
+
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "plugin-a",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "1", count: 64),
+            pluginInstanceId: "plugin-a-instance",
+            nonce: "plugin-a-nonce",
+            generation: 3,
+            tools: [tool]
+        ) { _, _ in
+            await withCheckedContinuation { pending in
+                continuation = pending
+            }
+        }
+        registry.register(
+            accountKey: "account-a",
+            pluginId: "plugin-b",
+            version: "1.0.0",
+            artifactSha256: String(repeating: "2", count: 64),
+            pluginInstanceId: "plugin-b-instance",
+            nonce: "plugin-b-nonce",
+            generation: 1,
+            tools: [tool]
+        ) { _, _ in "plugin-b" }
+
+        let pending = Task {
+            try await registry.callIfActive(
+                accountKey: "account-a",
+                pluginId: "plugin-a",
+                name: "offline.state.read",
+                arguments: [:]
+            )
+        }
+        for _ in 0..<100 where continuation == nil {
+            await Task.yield()
+        }
+        let held = try XCTUnwrap(continuation)
+
+        registry.revokeSession(accountKey: "account-a", pluginId: "plugin-a")
+        XCTAssertNil(registry.snapshot(accountKey: "account-a", pluginId: "plugin-a"))
+        XCTAssertNotNil(registry.snapshot(accountKey: "account-a", pluginId: "plugin-b"))
+
+        held.resume(returning: "stale")
+        do {
+            _ = try await pending.value
+            XCTFail("A result from an uninstalled plugin session must not commit")
+        } catch is CancellationError {
+            // Expected: registry removal invalidates the captured session identity.
+        }
+
+        XCTAssertEqual(
+            registry.traces(accountKey: "account-a", pluginId: "plugin-a").last?.outcome,
+            "stale-session"
+        )
+        let sibling = try await registry.callIfActive(
+            accountKey: "account-a",
+            pluginId: "plugin-b",
+            name: "offline.state.read",
+            arguments: [:]
+        )
+        XCTAssertEqual(sibling?.value as? String, "plugin-b")
+    }
+
     func testAccountRevocationRejectsPendingResultAndPreservesOtherAccounts() async throws {
         let registry = ActiveMiniAppWebMcpSessionRegistry.shared
         let tool = MiniAppToolContract(

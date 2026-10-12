@@ -141,6 +141,25 @@ final class ActiveMiniAppWebMcpSessionRegistry {
         entriesByPluginId.removeValue(forKey: pluginId)
     }
 
+    func revokeSession(accountKey: String, pluginId: String) {
+        let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPluginId = pluginId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedAccount.isEmpty,
+              !normalizedPluginId.isEmpty,
+              let entry = entriesByPluginId[normalizedPluginId],
+              entry.snapshot.accountKey == normalizedAccount
+        else { return }
+
+        entriesByPluginId.removeValue(forKey: normalizedPluginId)
+        let sessionEvidence = [
+            "FABUSHI_WEBMCP_SESSION_REVOKE_PLUGIN",
+            "account_id=\(Self.accountIdentifier(normalizedAccount))",
+            "plugin_id=\(normalizedPluginId)",
+            "generation=\(entry.snapshot.generation)",
+        ].joined(separator: " ")
+        Self.logger.notice("\(sessionEvidence, privacy: .public)")
+    }
+
     func revokeSessions(accountKey: String) {
         let normalizedAccount = accountKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedAccount.isEmpty else { return }

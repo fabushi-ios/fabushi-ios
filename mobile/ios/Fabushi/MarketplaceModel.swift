@@ -5700,6 +5700,10 @@ final class MarketplaceModel {
                 throw MahayanaCoordinator.CoordinatorError.invalidResponse
             }
             try await ensurePluginAccountIdentity(identity)
+            ActiveMiniAppWebMcpSessionRegistry.shared.revokeSession(
+                accountKey: settingsNoticeAccountKey,
+                pluginId: pluginId
+            )
             installedPluginIds.remove(pluginId)
             accountRosterRevision = accountRosterRevision == Int.max ? 1 : accountRosterRevision + 1
             installingPluginId = nil
