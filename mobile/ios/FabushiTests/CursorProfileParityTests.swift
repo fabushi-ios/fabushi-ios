@@ -426,6 +426,85 @@ final class CursorAuthFreshnessParityTests: XCTestCase {
         XCTAssertEqual(observed.last?.freshness, 1)
     }
 
+    func testAuthStatusEnrichesAndCachesCanonicalProfile() async throws {
+        let store = CursorAuthFreshnessCredentialStore()
+        try await store.writeSecret(
+            IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+            value: try cursorAuthProfileTestToken()
+        )
+        let service = IOSCursorAuthService(
+            store: store,
+            backendURL: URL(string: "https://backend.example.test")!,
+            websiteURL: URL(string: "https://cursor.example.test")!
+        )
+        var fetchCount = 0
+        service.setProfileFetcher {
+            fetchCount += 1
+            return .init(
+                displayName: "Ada Lovelace",
+                email: "profile@example.test",
+                profilePictureUrl: "https://images.example.test/ada.png",
+                isAnysphereUser: true
+            )
+        }
+
+        let first = await service.status()
+        XCTAssertTrue(first.loggedIn)
+        XCTAssertEqual(first.authId, "github|42")
+        XCTAssertEqual(first.email, "ada@example.test")
+        XCTAssertEqual(first.displayName, "Ada Lovelace")
+        XCTAssertEqual(first.profilePictureUrl, "https://images.example.test/ada.png")
+        XCTAssertEqual(first.isAnysphereUser, true)
+        XCTAssertEqual(fetchCount, 1)
+
+        let second = await service.status()
+        XCTAssertEqual(second.displayName, "Ada Lovelace")
+        XCTAssertEqual(fetchCount, 1)
+    }
+
+    func testLateProfileFetchCannotCrossNewAuthOperation() async throws {
+        let store = CursorAuthFreshnessCredentialStore()
+        try await store.writeSecret(
+            IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+            value: try cursorAuthProfileTestToken()
+        )
+        let service = IOSCursorAuthService(
+            store: store,
+            backendURL: URL(string: "https://backend.example.test")!,
+            websiteURL: URL(string: "https://cursor.example.test")!
+        )
+        var firstContinuation: CheckedContinuation<IOSCursorAuthProfile?, Never>?
+        var fetchCount = 0
+        service.setProfileFetcher {
+            fetchCount += 1
+            if fetchCount == 1 {
+                return await withCheckedContinuation { continuation in
+                    firstContinuation = continuation
+                }
+            }
+            return nil
+        }
+
+        let read = Task { @MainActor in await service.status() }
+        while firstContinuation == nil {
+            await Task.yield()
+        }
+        let replacement = try service.beginLogin()
+        firstContinuation?.resume(returning: .init(
+            displayName: "Stale Name",
+            email: "stale@example.test",
+            profilePictureUrl: "https://images.example.test/stale.png",
+            isAnysphereUser: true
+        ))
+
+        let status = await read.value
+        XCTAssertNil(status.displayName)
+        XCTAssertNil(status.profilePictureUrl)
+        XCTAssertNil(status.isAnysphereUser)
+        XCTAssertGreaterThanOrEqual(fetchCount, 2)
+        service.cancelLogin(attemptId: replacement.attemptId)
+    }
+
     func testDisplayNameMutationSettlesThroughAuthOwnerAndClearsOnLogout() async throws {
         let store = CursorAuthFreshnessCredentialStore()
         try await store.writeSecret(
