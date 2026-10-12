@@ -70,6 +70,24 @@ internal func clampedMediaAttachmentIndex(_ index: Int, count: Int) -> Int {
     return min(max(0, index), count - 1)
 }
 
+
+@MainActor
+internal enum NativeImageContextActions {
+    static func copy(_ image: UIImage) {
+        UIPasteboard.general.image = image
+    }
+
+    static func canExposeSourceAddress(_ raw: String?) -> URL? {
+        guard let raw,
+              let url = URL(string: raw),
+              let scheme = url.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              url.host != nil
+        else { return nil }
+        return url
+    }
+}
+
 let nativeMediaRemoteChunkBytes = 4 * 1024 * 1024
 
 internal struct NativeMediaLoadingRange: Equatable, Sendable {
@@ -400,8 +418,20 @@ struct MediaViewer: View {
                     .onTapGesture(count: 2) {
                         resetImageTransform()
                     }
+                    .contextMenu {
+                        Button {
+                            NativeImageContextActions.copy(image)
+                        } label: {
+                            Label("复制图片", systemImage: "doc.on.doc")
+                        }
+                        if let localURL {
+                            ShareLink(item: localURL) {
+                                Label("保存或分享图片", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                    }
                     .accessibilityLabel(selectedAttachment?.fileName ?? "Image preview")
-                    .accessibilityHint("Pinch to zoom, drag to pan, double tap to fit")
+                    .accessibilityHint("Pinch to zoom, drag to pan, double tap to fit. Long press for image actions.")
             }
         } else if selectedAttachment?.contentType == "video", let videoPlayer {
             VideoPlayer(player: videoPlayer).ignoresSafeArea(edges: .bottom)
