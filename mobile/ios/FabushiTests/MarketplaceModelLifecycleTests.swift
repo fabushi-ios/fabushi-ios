@@ -545,3 +545,91 @@ final class AccountDisplayNameMutationShippingTests: XCTestCase {
         XCTAssertTrue(source.contains("accountName = settledDisplayName"))
     }
 }
+
+
+final class MarketplacePluginGitHubAuthParityTests: XCTestCase {
+    func testAuthBlockedProjectionFiltersMalformedRowsAndPreservesMarketplaceName() throws {
+        let blocks = MarketplaceModel.pluginAuthBlocks(from: [
+            "authBlocked": [
+                [
+                    "pluginId": "private-a",
+                    "pluginName": "Private A",
+                    "marketplaceName": "team",
+                ],
+                [
+                    "pluginId": "private-b",
+                    "pluginName": "Private B",
+                ],
+                [
+                    "pluginId": "",
+                    "pluginName": "invalid",
+                ],
+                [
+                    "pluginName": "missing-id",
+                ],
+            ],
+        ])
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertEqual(blocks[0].pluginId, "private-a")
+        XCTAssertEqual(blocks[0].marketplaceName, "team")
+        XCTAssertEqual(blocks[1].pluginName, "Private B")
+        XCTAssertEqual(
+            MarketplaceModel.pluginAuthBlockedDetail(blocks),
+            "Private A, Private B are installed, but their content can't be fetched until Grok Bot's computer can read the source repository."
+        )
+    }
+
+    func testAuthBlockedDetailFallsBackToCountBeyondThreeNames() {
+        let blocks = (1...4).map {
+            MarketplacePluginAuthBlock(
+                pluginId: "plugin-\($0)",
+                pluginName: "Plugin \($0)",
+                marketplaceName: nil
+            )
+        }
+        XCTAssertEqual(
+            MarketplaceModel.pluginAuthBlockedDetail(blocks),
+            "4 installed plugins can't be fetched until Grok Bot's computer can read their source repository."
+        )
+    }
+
+    func testShippingMarketplaceWiresPluginAuthBannerRepairRetryAndDisposal() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let modelSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("mobile/ios/Fabushi/MarketplaceModel.swift"),
+            encoding: .utf8
+        )
+        let surfaceSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "frontend/src/recovered/features/conversation/ContentView+ChatMarketplace.swift"
+            ),
+            encoding: .utf8
+        )
+        let serviceSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "frontend/src/production/GrokMobileBotService.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(modelSource.contains(#"bridge.request(method: "getPluginSyncStatus")"#))
+        XCTAssertTrue(modelSource.contains("pluginAuthScopeGeneration"))
+        XCTAssertTrue(modelSource.contains("pluginAuthRequestGeneration"))
+        XCTAssertTrue(modelSource.contains("ensurePluginAccountIdentity(identity)"))
+        XCTAssertTrue(modelSource.contains("resetPluginAuthState()"))
+        XCTAssertTrue(serviceSource.contains(#"method: "createAgent""#))
+        XCTAssertTrue(serviceSource.contains(#""purpose": Self.pluginAuthAgentPurpose"#))
+        XCTAssertTrue(serviceSource.contains(#"method: "listAgents""#))
+        XCTAssertTrue(serviceSource.contains("Host did not persist the Plugin Setup Agent purpose."))
+        XCTAssertTrue(serviceSource.contains(#"method: "sendPrompt""#))
+        XCTAssertTrue(surfaceSource.contains("plugin-github-auth-banner"))
+        XCTAssertTrue(surfaceSource.contains("plugin-github-auth-fix"))
+        XCTAssertTrue(surfaceSource.contains("plugin-github-auth-retry"))
+        XCTAssertTrue(surfaceSource.contains("model.disposePluginAuthScope()"))
+    }
+}
