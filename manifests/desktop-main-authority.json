@@ -31,7 +31,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "4a88e397c9fadb173ace5783b4e4b1bad1baf0a0",
+    "preEvidenceIosHead": "df6028e7f21860c5ed2a7784adae5000d92562e4",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -105,7 +105,9 @@
       38207653717,
       38207653739,
       38207704363,
-      38207704479
+      38207704479,
+      38207928531,
+      38207928443
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -188,9 +190,11 @@
       114674797333,
       114674847647,
       114674833330,
-      114674833521
+      114674833521,
+      114675486749,
+      114675540915
     ],
-    "status": "cursor-auth-operation-epoch-credential-mutation-fence-resulting-exact-head-ci-required",
+    "status": "cursor-auth-refresh-singleflight-resulting-exact-head-ci-required",
     "baseMain": "8b0e7236d75f8e16b868332e51cde41b6ee415fc",
     "desktopAuthority": {
       "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
@@ -201,6 +205,6 @@
     "fabushiServerAuthority": "c4fd9ca7aa1346fe8e4a07e2461a70f4b9f16b52",
     "marketplaceAuthority": "1971f2a93197cfb79d1e8f0856345f36776f3ca3",
     "promotion": "none",
-    "currentImplementationHead": "4a88e397c9fadb173ace5783b4e4b1bad1baf0a0"
+    "currentImplementationHead": "df6028e7f21860c5ed2a7784adae5000d92562e4"
   }
 }

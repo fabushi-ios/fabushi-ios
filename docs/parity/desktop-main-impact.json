@@ -2014,7 +2014,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "4a88e397c9fadb173ace5783b4e4b1bad1baf0a0",
+    "preEvidenceIosHead": "df6028e7f21860c5ed2a7784adae5000d92562e4",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2082,7 +2082,9 @@
       38207653717,
       38207653739,
       38207704363,
-      38207704479
+      38207704479,
+      38207928531,
+      38207928443
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2165,9 +2167,11 @@
       114674797333,
       114674847647,
       114674833330,
-      114674833521
+      114674833521,
+      114675486749,
+      114675540915
     ],
-    "status": "cursor-auth-operation-epoch-credential-mutation-fence-resulting-exact-head-ci-required",
+    "status": "cursor-auth-refresh-singleflight-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -2185,8 +2189,8 @@
       "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
       "mobile/ios/FabushiTests/CursorProfileParityTests.swift"
     ],
-    "conclusion": "CursorAuthService current-main parity review found the UI/account fence was insufficient: superseded login polls could still mutate Keychain. 4a88e397 adds auth operation epochs plus serialized credential mutation/rollback so new login/cancel/logout supersede older attempts at the canonical credential owner. Previous exact-head runs are predecessor-only; refresh singleflight/full source/release/device closure remains open.",
-    "currentImplementationHead": "4a88e397c9fadb173ace5783b4e4b1bad1baf0a0",
+    "conclusion": "CursorAuthService review now also closes the Desktop refresh-token singleflight responsibility: one in-flight Task is reused per refresh token, operation epoch is checked after network return and during serialized Keychain writes, and superseded refreshes cannot restore an old session. The async XCTest assertion was repaired before CI. Full aggregate/source/release/device closure remains open.",
+    "currentImplementationHead": "df6028e7f21860c5ed2a7784adae5000d92562e4",
     "promotion": "none"
   }
 }
