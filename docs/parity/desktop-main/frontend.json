@@ -3629,8 +3629,9 @@
       "implementation_status": "implemented",
       "production_evidence": "MobileAgentSidebarSections.swift + GrokMobileShell keep Host-authoritative section/collapse/pin behavior. MobileUiAgentRefsPersistence.swift owns only the account-level client recents slice. MobileBotChat restores it on account replacement, keeps it across Agent changes, projects actual emoji back to catalog IDs only at UI ranking time, and records composer selections plus all reaction entry points through one persistence helper.",
       "test_evidence": "MobileAgentSidebarSectionsTests covers collapse round-trip/account fallback. MobileUiAgentRefsPersistenceTests covers relaunch restore, account isolation, same-account Agent reuse, 20/50 caps, actual-emoji storage, corrupt/wrong-schema cleanup and invalid-category rejection. MobileComposerParityTests now asserts account-scoped recents rather than the former incorrect per-Agent contract. Exact-head Actions remain required before verified promotion.",
-      "notes": "IOS-MAIN-DEP-UI-AGENT-REFS-20261011: durable recents now match Desktop account scope and actual-emoji semantics without becoming a second sidebar authority. Keep implemented until same-head ordinary/UI/device evidence permits verified. Primary ios_target_path intentionally names one concrete source owner because the strict architecture checker validates path existence; supporting Host/sidebar composition remains in production_evidence. Architecture checker requires ios_target_path to name one concrete iOS source file; Host-authoritative MobileAgentSidebarSections and MobileBotChat shipping composition remain recorded in production_evidence rather than being concatenated into this path field.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-COLLAPSE-20261012: current-main account-sensitive ui-agent-refs restore/write queue/generation fencing and collapsed-section semantics were re-read. iOS keeps account-scoped recents in MobileUiAgentRefsPersistence and canonical section collapsed state in MobileAgentSidebarSections/Host-backed shell composition; no second sidebar authority is introduced. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-layout-state.ts",
@@ -3645,8 +3646,9 @@
       "implementation_status": "not-applicable",
       "production_evidence": "GrokMobileShell Home/selectedBot native navigation replaces the resizable desktop pane composition.",
       "test_evidence": "Native layout/build/UI acceptance replaces desktop pixel-width persistence tests.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-LAYOUT-20261009: desktop window layout state replaced by native mobile navigation.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-LAYOUT-20261012: Desktop persisted pixel widths/collapsed window-pane geometry is desktop-only. iOS replaces it with native adaptive navigation/layout; the user capability remains available without persisting meaningless Electron pane widths. Disposition remains not-applicable-with-replacement. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-profile-action.ts",
@@ -3661,8 +3663,9 @@
       "implementation_status": "implemented",
       "production_evidence": "GrokMobileShell+Home.swift botRow Menu sets botSettingsTarget; GrokMobileShell.swift mounts MobileBotAgentSettings for that exact target.",
       "test_evidence": "Existing Mobile Bot settings UI/model tests cover target-specific settings entry; same-head CI required before any verified promotion.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-PROFILE-20261009: exact Desktop action reviewed and mapped to native settings route; implemented fence.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-PROFILE-20261012: current-main Edit Profile action remains a simple navigation dispatch; canonical iOS home row routes into the existing native Agent profile/settings surface. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-search-trigger.ts",
@@ -3677,8 +3680,9 @@
       "implementation_status": "implemented",
       "production_evidence": "GrokMobileShell+Home.swift top-bar magnifyingglass button calls toggleCommandPalette and exposes accessibility identifier grok-mobile-search; commandPaletteContent owns the live search surface.",
       "test_evidence": "Existing command-palette/mobile shell acceptance covers the native search route; same-head CI required before verified.",
-      "notes": "IOS-MAIN-DEP-SIDEBAR-SEARCH-TRIGGER-20261009: exact Desktop source reviewed; native touch search implemented.",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "notes": "IOS-MAIN-DEP-SIDEBAR-SEARCH-20261012: current-main Search action/keyboard semantics were re-read. iOS exposes the shipping touch search field and native keyboard focus path in GrokMobileShell+Home without a duplicate search owner. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-section-delete-confirmation.tsx",
@@ -3693,7 +3697,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Bots.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; current-head UI acceptance required before verified",
-      "notes": "Platform focus-restoration mechanics are Desktop-specific; destructive semantics are preserved through the canonical Host-backed state path."
+      "notes": "IOS-MAIN-DEP-SIDEBAR-SECTION-DELETE-20261012: destructive section deletion is confirmed in the native sheet and mutates the one Host-backed section state; browser focus-restoration mechanics are platform-specific. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-section-header.tsx",
@@ -3708,7 +3714,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/GrokMobileShell+Bots.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; current-head UI acceptance required before verified",
-      "notes": "Current iOS does not create a second section owner; header actions all mutate the Host-backed section state."
+      "notes": "IOS-MAIN-DEP-SIDEBAR-SECTION-HEADER-20261012: collapse/rename/move/delete header actions and accessibility labels were re-read against the native section header/menu. All mutations flow through canonical section operations. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-section-projection.ts",
@@ -3723,7 +3731,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/GrokMobileShell+Home.swift; frontend/src/production/MobileAgentSidebarSections.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected acceptance required before verified",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD; synthetic Unassigned is presentation-only and is never written back to Host."
+      "notes": "IOS-MAIN-DEP-SIDEBAR-SECTION-PROJECTION-20261012: current-main pinned/custom/unassigned projection and synthetic-section non-persistence were re-read. MobileAgentSidebarSections preserves those projection semantics and expands custom sections while searching. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar-sections-state.ts",
@@ -3738,7 +3748,9 @@
       "implementation_status": "implemented",
       "production_evidence": "frontend/src/production/MobileAgentSidebarSections.swift; frontend/src/production/GrokMobileShell.swift; frontend/src/production/GrokMobileShell+Bots.swift; source/ios-preload/main-rpc-runtime.swift",
       "test_evidence": "mobile/ios/FabushiTests/GrokMobileBotServiceTests.swift; same-head ordinary/protected GitHub Actions required before verified promotion",
-      "notes": "Reviewed against Desktop PR #20 exact HEAD 798cf51d96cb1cb98cf657af212bb47274ccb701. Host is canonical; local persistence is fallback only. Keep below verified pending current-head acceptance."
+      "notes": "IOS-MAIN-DEP-SIDEBAR-SECTIONS-STATE-20261012: normalize/assign/create/rename/remove/move/collapse state transitions were re-read. MobileAgentSidebarSections and GrokMobileShell+Home remain the sole native state/projection surface, with reserved synthetic IDs and normalized membership. Remains implemented, not verified. Re-read against Desktop current main 371b72f1cd20de03dc4dff9a15ed761054968093; current-main review only; no verified promotion.",
+      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+      "authority_review_state": "current-main-reviewed"
     },
     {
       "desktop_path": "frontend/src/recovered/features/conversation/workspace/sidebar.tsx",
