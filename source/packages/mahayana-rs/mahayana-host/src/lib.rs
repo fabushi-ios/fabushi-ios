@@ -403,7 +403,11 @@ fn effective_process_execution(
 ) -> ProcessExecution {
     match profile {
         BuildProfile::DesktopFull => requested,
-        BuildProfile::MobileEmbedded | BuildProfile::WebWasm => ProcessExecution::Unavailable,
+        BuildProfile::MobileEmbedded => match requested {
+            ProcessExecution::Remote(broker) => ProcessExecution::Remote(broker),
+            _ => ProcessExecution::Unavailable,
+        },
+        BuildProfile::WebWasm => ProcessExecution::Unavailable,
     }
 }
 
@@ -596,6 +600,8 @@ fn build_runtime(
         };
         engine_config.process_execution =
             effective_process_execution(runtime_config.build_profile, create.process_execution.clone());
+        engine_config.enable_process_tools =
+            !matches!(engine_config.process_execution, ProcessExecution::Unavailable);
         engine_config.session_state_path = runtime_config
             .data_dir
             .as_ref()

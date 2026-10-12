@@ -42,7 +42,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot};
 use uuid::Uuid;
 
+mod platform_exec;
 mod web_research;
+pub use platform_exec::{PlatformExecBroker, PlatformExecBrokerError, PlatformExecRequest};
 use web_research::{WebResearchClient, WebResearchConfig};
 
 const MAIN_ASSISTANT_CONVERSATION_ID: &str = "mahayana-ai:agent:assistant";
@@ -63,6 +65,9 @@ pub enum ProcessExecution {
     /// Their user-visible shell/process capability is supplied by a platform
     /// Remote Runner outside this native engine boundary.
     Unavailable,
+    /// Bounded mobile bridge to the Coordinator-owned platform Runner.
+    /// This variant never spawns a process in the application sandbox.
+    Remote(Arc<PlatformExecBroker>),
     LocalDocker {
         docker_path: PathBuf,
         image: String,
@@ -348,6 +353,11 @@ impl NativeEngine {
             .lock()
             .map_err(|_| KernelError::Backend("native operation registry poisoned".into()))?
             .clear();
+        if let ProcessExecution::Remote(broker) = &self.config.process_execution {
+            broker
+                .cancel_all("native session reset")
+                .map_err(|error| KernelError::Backend(error.to_string()))?;
+        }
         self.tool_decision_gates
             .lock()
             .map_err(|_| KernelError::Backend("tool decision gate registry poisoned".into()))?
@@ -1698,7 +1708,7 @@ impl NativeEngine {
                         .filter_map(Value::as_str)
                         .map(str::to_owned)
                         .collect::<Vec<_>>();
-                    run_process(&self.config.process_execution, root, program, &args)
+                    run_process(&self.config.process_execution, root, program, &args).await
                 }
                 "git_status" => {
                     if !self.config.enable_process_tools || !policy.allow_process {
@@ -1712,6 +1722,7 @@ impl NativeEngine {
                         "git",
                         &["status".into(), "--short".into()],
                     )
+                    .await
                 }
                 "git_diff" => {
                     if !self.config.enable_process_tools || !policy.allow_process {
@@ -1725,6 +1736,7 @@ impl NativeEngine {
                         "git",
                         &["diff".into(), "--".into()],
                     )
+                    .await
                 }
                 other => Err(KernelError::CapabilityUnavailable(format!(
                     "native tool {other} is not registered"
@@ -3123,7 +3135,7 @@ fn native_bootstrap_history(metadata: &Value) -> Vec<Value> {
         .collect()
 }
 
-fn run_process(
+async fn run_process(
     execution: &ProcessExecution,
     root: &Path,
     program: &str,
@@ -3138,6 +3150,19 @@ fn run_process(
                 "process execution is unavailable in this native engine; use the platform Remote Runner"
                     .into(),
             ));
+        }
+        ProcessExecution::Remote(broker) => {
+            return broker
+                .execute(
+                    "process.exec",
+                    json!({
+                        "program": program,
+                        "args": args,
+                        "workingDirectory": root.to_string_lossy(),
+                    }),
+                )
+                .await
+                .map_err(KernelError::Backend);
         }
         ProcessExecution::Host => Command::new(program).args(args).current_dir(root).output(),
         ProcessExecution::LocalDocker { docker_path, image } => {
@@ -3621,6 +3646,33 @@ fn default_system_instructions() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn remote_process_execution_reaches_platform_broker_without_local_spawn() {
+        let broker = Arc::new(PlatformExecBroker::new(4));
+        let execution = ProcessExecution::Remote(Arc::clone(&broker));
+        let root = std::env::temp_dir();
+        let caller = tokio::spawn(async move {
+            run_process(
+                &execution,
+                &root,
+                "git",
+                &["status".into(), "--short".into()],
+            )
+            .await
+        });
+        tokio::task::yield_now().await;
+        let request = broker.next_request().unwrap().expect("platform request");
+        assert_eq!(request.method, "process.exec");
+        assert_eq!(request.params["program"], "git");
+        broker
+            .resolve(
+                &request.request_id,
+                json!({"success":true,"code":0,"stdout":"","stderr":""}),
+            )
+            .unwrap();
+        assert_eq!(caller.await.unwrap().unwrap()["success"], true);
+    }
     use mahayana_model::ModelProviderMode;
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};

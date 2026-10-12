@@ -7,7 +7,7 @@ use mahayana_host_protocol::{
     SurfacePlatform,
 };
 use mahayana_js_runtime::{DeepSeekJsHost, scan_package_compatibility};
-use mahayana_native_engine::ProcessExecution;
+use mahayana_native_engine::{PlatformExecBroker, ProcessExecution};
 use mahayana_plugin_runtime::{
     build_fabapp_package, compute_fabapp_draft_digest, fabapp_signing_payload,
     prepare_local_generated_fabapp_manifest, ExternalReleaseManifest, FabappLocalAuthorBinding,
@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -228,6 +228,7 @@ pub struct AppHost {
     js: Mutex<DeepSeekJsHost>,
     runtime_accounts: Mutex<BTreeMap<String, PluginRuntimeAccountBinding>>,
     feature: FeatureHostController,
+    platform_exec: Option<Arc<PlatformExecBroker>>,
 }
 
 impl AppHost {
@@ -252,7 +253,8 @@ impl AppHost {
         std::fs::create_dir_all(&app_data_dir)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         let feature_root = feature_host_root(&app_data_dir);
-        let feature = create_feature_host(&app_data_dir, feature_mode, storage_passphrase.clone())?;
+        let (feature, platform_exec) =
+            create_feature_host(&app_data_dir, feature_mode, storage_passphrase.clone())?;
         let product = match storage_passphrase {
             Some(passphrase) => {
                 MahayanaProductClient::new_with_default_api_base_url_and_storage_passphrase(
@@ -283,6 +285,7 @@ impl AppHost {
             ),
             runtime_accounts: Mutex::new(BTreeMap::new()),
             feature,
+            platform_exec,
         })
     }
 
@@ -722,6 +725,10 @@ impl AppHost {
     fn handle(&self, method: &str, params: Value) -> Result<Value, AppHostError> {
         match method {
             "host.platform" => Ok(json!({"platform": host_platform()})),
+            "platformExec.next" => self.platform_exec_next(),
+            "platformExec.resolve" => self.platform_exec_resolve(&params),
+            "platformExec.reject" => self.platform_exec_reject(&params),
+            "platformExec.cancel" => self.platform_exec_cancel(&params),
             method if method.starts_with("feature.") => self.handle_feature(method, params),
             "platform.request" => self
                 .product
@@ -2969,6 +2976,58 @@ impl AppHost {
         serde_json::to_value(tools).map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
+    fn platform_exec_broker(&self) -> Result<&Arc<PlatformExecBroker>, AppHostError> {
+        self.platform_exec.as_ref().ok_or_else(|| {
+            AppHostError::Operation("platform execution broker is unavailable".into())
+        })
+    }
+
+    fn platform_exec_next(&self) -> Result<Value, AppHostError> {
+        let request = self
+            .platform_exec_broker()?
+            .next_request()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        serde_json::to_value(request)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn platform_exec_resolve(&self, params: &Value) -> Result<Value, AppHostError> {
+        let request_id = string_param(params, "requestId")?;
+        let result = params.get("result").cloned().unwrap_or(Value::Null);
+        self.platform_exec_broker()?
+            .resolve(request_id, result)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        Ok(json!({"settled": true}))
+    }
+
+    fn platform_exec_reject(&self, params: &Value) -> Result<Value, AppHostError> {
+        let request_id = string_param(params, "requestId")?;
+        let code = params
+            .get("code")
+            .and_then(Value::as_str)
+            .unwrap_or("platform_execution_failed");
+        let message = params
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("platform execution failed");
+        self.platform_exec_broker()?
+            .reject(request_id, code, message)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        Ok(json!({"settled": true}))
+    }
+
+    fn platform_exec_cancel(&self, params: &Value) -> Result<Value, AppHostError> {
+        let request_id = string_param(params, "requestId")?;
+        let reason = params
+            .get("reason")
+            .and_then(Value::as_str)
+            .unwrap_or("platform execution cancelled");
+        self.platform_exec_broker()?
+            .cancel(request_id, reason)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        Ok(json!({"settled": true}))
+    }
+
     /// Deterministically settle the canonical feature Host before the process-local
     /// app-host owner is released. Plugin runtimes are torn down first so no
     /// account-scoped JavaScript task survives the owner that supplied its grants.
@@ -2986,6 +3045,11 @@ impl AppHost {
                 let _ = host.disable_plugin(plugin_id);
             }
             bindings.clear();
+        }
+        if let Some(broker) = &self.platform_exec {
+            broker
+                .close("app host closed")
+                .map_err(|error| AppHostError::Operation(error.to_string()))?;
         }
         self.feature
             .close()
@@ -3230,7 +3294,7 @@ fn create_feature_host(
     app_data_dir: &Path,
     feature_mode: AppHostFeatureMode,
     storage_passphrase: Option<String>,
-) -> Result<FeatureHostController, AppHostError> {
+) -> Result<(FeatureHostController, Option<Arc<PlatformExecBroker>>), AppHostError> {
     let root = feature_host_root(app_data_dir);
     std::fs::create_dir_all(&root).map_err(|error| AppHostError::Operation(error.to_string()))?;
     let platform = surface_platform();
@@ -3260,6 +3324,16 @@ fn create_feature_host(
             std::env::var("MAHAYANA_CLAUDE_MODEL").unwrap_or_else(|_| "claude-sonnet-4-6".into());
         runtime.model.credential_key = Some("inference/claude/api-key".into());
     }
+    let platform_exec = match platform {
+        SurfacePlatform::Ios | SurfacePlatform::Android => {
+            Some(Arc::new(PlatformExecBroker::new(64)))
+        }
+        _ => None,
+    };
+    let process_execution = platform_exec
+        .as_ref()
+        .map(|broker| ProcessExecution::Remote(Arc::clone(broker)))
+        .unwrap_or_else(|| process_execution_for_surface(platform));
     let host_config = HostCreateConfig {
         runtime,
         product_session_path: Some(root.join("account-session.json")),
@@ -3277,10 +3351,10 @@ fn create_feature_host(
             _ => mahayana_model::responses::ResponsesWireApi::Responses,
         },
         inherit_installed_plugins: Some(false),
-        process_execution: process_execution_for_surface(platform),
+        process_execution,
         ..HostCreateConfig::default()
     };
-    FeatureHostController::create_with_host_config(
+    let feature = FeatureHostController::create_with_host_config(
         HostConfig {
             profile_id: "default".to_string(),
             mode: feature_mode.into(),
@@ -3290,7 +3364,8 @@ fn create_feature_host(
     )
     .map_err(|error| {
         AppHostError::Operation(format!("feature host initialization failed: {error}"))
-    })
+    })?;
+    Ok((feature, platform_exec))
 }
 
 fn safe_ui_relative_path(value: &str) -> Result<PathBuf, AppHostError> {
