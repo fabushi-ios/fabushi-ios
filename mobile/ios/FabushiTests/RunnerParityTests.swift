@@ -286,4 +286,50 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertEqual(IOSMimeTypes.lookup(path: "image.png"), "image/png")
         XCTAssertNil(IOSMimeTypes.lookup(path: "README"))
     }
+    func testEnsureSandBoxDescriptorDecodesExecDaemonAuthorityFields() throws {
+        var payload = Data()
+        func appendVarint(_ value: UInt64, to data: inout Data) {
+            var value = value
+            repeat {
+                var byte = UInt8(value & 0x7f)
+                value >>= 7
+                if value != 0 { byte |= 0x80 }
+                data.append(byte)
+            } while value != 0
+        }
+        func appendBytes(_ field: UInt64, _ value: String, to data: inout Data) {
+            let bytes = Data(value.utf8)
+            appendVarint((field << 3) | 2, to: &data)
+            appendVarint(UInt64(bytes.count), to: &data)
+            data.append(bytes)
+        }
+
+        appendBytes(4, "network-token", to: &payload)
+        appendBytes(5, "exec-auth", to: &payload)
+        appendBytes(6, "https://exec.example.test", to: &payload)
+        appendBytes(7, "https://vnc.example.test", to: &payload)
+        appendBytes(10, "https://gateway.example.test", to: &payload)
+        appendBytes(11, "gateway-token", to: &payload)
+        appendBytes(12, "https://fork-vnc.example.test", to: &payload)
+
+        let descriptor = try IOSCursorDashboardClient.decodeEnsureSandBoxConnectionForTests(payload)
+        XCTAssertEqual(descriptor.networkToken, "network-token")
+        XCTAssertEqual(descriptor.execDaemonAuthToken, "exec-auth")
+        XCTAssertEqual(descriptor.execDaemonURL, "https://exec.example.test")
+        XCTAssertEqual(descriptor.vncURL, "https://vnc.example.test")
+        XCTAssertEqual(descriptor.gatewayURL, "https://gateway.example.test")
+        XCTAssertEqual(descriptor.gatewayToken, "gateway-token")
+        XCTAssertEqual(descriptor.forkVNCBaseURL, "https://fork-vnc.example.test")
+        XCTAssertTrue(IOSCursorDashboardClient.ensureSandBoxRequestForTests().isEmpty)
+    }
+
+    func testEnsureSandBoxDescriptorFailsClosedWithoutExecutableAuthority() {
+        var payload = Data()
+        payload.append(0x2a) // field 5, bytes
+        payload.append(0x00) // empty exec-daemon auth token
+        XCTAssertThrowsError(
+            try IOSCursorDashboardClient.decodeEnsureSandBoxConnectionForTests(payload)
+        )
+    }
+
 }

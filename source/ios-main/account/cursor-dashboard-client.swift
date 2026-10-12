@@ -92,6 +92,10 @@ private enum IOSCursorDashboardProto {
         Data()
     }
 
+    static func ensureSandBoxRequest() -> Data {
+        Data()
+    }
+
     static func watchSandBoxMigrationRequest(
         fromOffsetKey: String,
         includeFinished: Bool
@@ -122,6 +126,53 @@ private enum IOSCursorDashboardProto {
             }
         }
         return .init(started: started, reason: reason, operationId: operationId)
+    }
+
+    static func decodeEnsureSandBoxResponse(_ data: Data) throws -> IOSCursorSandBoxConnection {
+        var reader = Reader(data)
+        var networkToken = ""
+        var execDaemonAuthToken = ""
+        var execDaemonURL = ""
+        var vncURL = ""
+        var gatewayURL = ""
+        var gatewayToken = ""
+        var forkVNCBaseURL = ""
+
+        for (field, value) in try reader.readFields() {
+            guard case .bytes(let bytes) = value else { continue }
+            let decoded = String(data: bytes, encoding: .utf8) ?? ""
+            switch field {
+            case 4: networkToken = decoded
+            case 5: execDaemonAuthToken = decoded
+            case 6: execDaemonURL = decoded
+            case 7: vncURL = decoded
+            case 10: gatewayURL = decoded
+            case 11: gatewayToken = decoded
+            case 12: forkVNCBaseURL = decoded
+            default: break
+            }
+        }
+
+        guard !execDaemonAuthToken.isEmpty else {
+            throw IOSCursorDashboardError(message: "EnsureSandBox response was missing exec daemon auth token.")
+        }
+        guard let daemonURL = URL(string: execDaemonURL),
+              let scheme = daemonURL.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              daemonURL.host != nil
+        else {
+            throw IOSCursorDashboardError(message: "EnsureSandBox response contained an invalid exec daemon URL.")
+        }
+
+        return .init(
+            networkToken: networkToken,
+            execDaemonAuthToken: execDaemonAuthToken,
+            execDaemonURL: daemonURL.absoluteString,
+            vncURL: vncURL,
+            gatewayURL: gatewayURL,
+            gatewayToken: gatewayToken,
+            forkVNCBaseURL: forkVNCBaseURL
+        )
     }
 
     static func decodeSandBoxMigrationEvent(_ data: Data) throws -> IOSCursorSandBoxMigrationEvent {
@@ -622,6 +673,16 @@ struct IOSCursorSandBoxRecreateResult: Equatable, Sendable {
     let operationId: String
 }
 
+struct IOSCursorSandBoxConnection: Equatable, Sendable {
+    let networkToken: String
+    let execDaemonAuthToken: String
+    let execDaemonURL: String
+    let vncURL: String
+    let gatewayURL: String
+    let gatewayToken: String
+    let forkVNCBaseURL: String
+}
+
 struct IOSCursorSandBoxMigrationEvent: Equatable, Sendable {
     let phase: Int32
     let detail: String
@@ -703,6 +764,14 @@ struct IOSCursorDashboardJSON: @unchecked Sendable {
 }
 
 final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, DashboardMcpExecClient, SandMarketplaceListingClient {
+    static func decodeEnsureSandBoxConnectionForTests(_ data: Data) throws -> IOSCursorSandBoxConnection {
+        try IOSCursorDashboardProto.decodeEnsureSandBoxResponse(data)
+    }
+
+    static func ensureSandBoxRequestForTests() -> Data {
+        IOSCursorDashboardProto.ensureSandBoxRequest()
+    }
+
     static func decodePrReviewUserDestinationForTests(_ data: Data) throws -> SandPrReviewDestination? {
         try IOSCursorDashboardProto.decodePrReviewUserDestination(data)
     }
@@ -909,6 +978,20 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         }
         continuation.yield(try IOSCursorDashboardProto.decodeSandBoxMigrationEvent(envelope.payload))
         return false
+    }
+
+    func ensureSandBox(
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCursorSandBoxConnection {
+        let request = try await grokBotRequest(
+            method: "EnsureSandBox",
+            body: IOSCursorDashboardProto.ensureSandBoxRequest(),
+            contentType: "application/proto",
+            timeoutMs: timeoutMs
+        )
+        let (data, response) = try await perform(request)
+        try validateConnectHTTP(response, method: "EnsureSandBox")
+        return try IOSCursorDashboardProto.decodeEnsureSandBoxResponse(data)
     }
 
     func recreateSandBox(
