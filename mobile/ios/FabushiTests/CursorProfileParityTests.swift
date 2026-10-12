@@ -388,6 +388,21 @@ private final class CursorAuthFreshnessCredentialStore: IOSCursorCredentialStori
     func waitForEncryptedStorage() async throws {}
 }
 
+private func cursorAuthProfileTestToken(
+    authId: String = "github|42",
+    email: String = "ada@example.test"
+) throws -> String {
+    let payload = try JSONSerialization.data(withJSONObject: [
+        "sub": authId,
+        "email": email,
+    ])
+    let encoded = payload.base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
+    return "e30.\(encoded).signature"
+}
+
 @MainActor
 final class CursorAuthFreshnessParityTests: XCTestCase {
     func testPublishedLogoutAdvancesFreshnessAndStatusRetainsLatestGeneration() async throws {
@@ -409,6 +424,86 @@ final class CursorAuthFreshnessParityTests: XCTestCase {
         XCTAssertFalse(after.loggedIn)
         XCTAssertEqual(after.freshness, 1)
         XCTAssertEqual(observed.last?.freshness, 1)
+    }
+
+    func testDisplayNameMutationSettlesThroughAuthOwnerAndClearsOnLogout() async throws {
+        let store = CursorAuthFreshnessCredentialStore()
+        try await store.writeSecret(
+            IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+            value: try cursorAuthProfileTestToken()
+        )
+        let service = IOSCursorAuthService(
+            store: store,
+            backendURL: URL(string: "https://backend.example.test")!,
+            websiteURL: URL(string: "https://cursor.example.test")!,
+            structuredLogRequestExecutor: { request in
+                (
+                    Data(),
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/2",
+                        headerFields: [:]
+                    )!
+                )
+            }
+        )
+        var writes: [String] = []
+        var observed: [IOSCursorAuthStatus] = []
+        service.setStatusObserver { observed.append($0) }
+        await Task.yield()
+
+        let updated = try await service.updateDisplayName("  Ada   Lovelace  ") { name in
+            writes.append(name)
+        }
+        XCTAssertEqual(writes, ["Ada Lovelace"])
+        XCTAssertEqual(updated.displayName, "Ada Lovelace")
+        XCTAssertEqual(updated.freshness, 1)
+        XCTAssertEqual(observed.last?.displayName, "Ada Lovelace")
+
+        let settled = await service.status()
+        XCTAssertEqual(settled.displayName, "Ada Lovelace")
+        try await service.logout()
+        let loggedOut = await service.status()
+        XCTAssertFalse(loggedOut.loggedIn)
+        XCTAssertNil(loggedOut.displayName)
+        XCTAssertEqual(loggedOut.freshness, 2)
+    }
+
+    func testDisplayNameLateResultCannotPublishAcrossNewAuthOperation() async throws {
+        let store = CursorAuthFreshnessCredentialStore()
+        try await store.writeSecret(
+            IOS_CURSOR_ACCESS_TOKEN_SECRET_KEY,
+            value: try cursorAuthProfileTestToken()
+        )
+        let service = IOSCursorAuthService(
+            store: store,
+            backendURL: URL(string: "https://backend.example.test")!,
+            websiteURL: URL(string: "https://cursor.example.test")!
+        )
+        var releaseWriter: CheckedContinuation<Void, Never>?
+        let update = Task { @MainActor in
+            try await service.updateDisplayName("Old Account Name") { _ in
+                await withCheckedContinuation { continuation in
+                    releaseWriter = continuation
+                }
+            }
+        }
+        while releaseWriter == nil {
+            await Task.yield()
+        }
+        let replacement = try service.beginLogin()
+        releaseWriter?.resume()
+
+        do {
+            _ = try await update.value
+            XCTFail("stale display-name result must not publish into a newer auth operation")
+        } catch let error as IOSCursorAuthError {
+            XCTAssertEqual(error, .signInRequired)
+        }
+        let status = await service.status()
+        XCTAssertNil(status.displayName)
+        service.cancelLogin(attemptId: replacement.attemptId)
     }
 }
 
