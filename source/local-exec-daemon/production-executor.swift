@@ -24,6 +24,26 @@ struct IOSUnavailableRemoteExecutionProvider: IOSRemoteExecutionProviding {
     }
 }
 
+struct IOSClosureRemoteExecutionProvider: @unchecked Sendable, IOSRemoteExecutionProviding {
+    typealias Dispatch = @MainActor (
+        _ method: String,
+        _ params: CoordinatorPayload
+    ) async throws -> CoordinatorPayload
+
+    private let dispatchImpl: Dispatch
+
+    init(dispatch: @escaping Dispatch) {
+        dispatchImpl = dispatch
+    }
+
+    func dispatch(
+        method: String,
+        params: CoordinatorPayload
+    ) async throws -> CoordinatorPayload {
+        try await dispatchImpl(method, params)
+    }
+}
+
 
 enum IOSRemoteExecDaemonError: LocalizedError, Equatable, Sendable {
     case unsupported(String)

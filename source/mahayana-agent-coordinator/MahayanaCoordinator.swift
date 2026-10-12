@@ -453,14 +453,13 @@ final class MahayanaCoordinator {
         devControlAdapter: (any CoordinatorDevControlAdapting)? = nil,
         mcpSurface: CoordinatorMcpSurface? = nil,
         transportStageRecorder: TransportStageRecorder = .init(),
-        remoteExecutionProvider: any IOSRemoteExecutionProviding = IOSUnavailableRemoteExecutionProvider(),
+        remoteExecutionProvider: (any IOSRemoteExecutionProviding)? = nil,
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
         self.transportStageRecorder = transportStageRecorder
-        self.remoteExecutionProvider = remoteExecutionProvider
         self.hostSettingsReconciler = settingsStore.map { store in
             IOSHostSettingsReconciler(
                 readLocal: { store.getHasSeenOnboarding() },
@@ -500,6 +499,21 @@ final class MahayanaCoordinator {
             )
         } else {
             resolvedMcpSurface = nil
+        }
+        if let remoteExecutionProvider {
+            self.remoteExecutionProvider = remoteExecutionProvider
+        } else if let surface = resolvedMcpSurface {
+            self.remoteExecutionProvider = IOSClosureRemoteExecutionProvider(
+                dispatch: { [weak surface] method, params in
+                    guard let surface else { throw CoordinatorError.unavailable }
+                    return try await surface.dispatchRemoteExecution(
+                        method: method,
+                        params: params
+                    )
+                }
+            )
+        } else {
+            self.remoteExecutionProvider = IOSUnavailableRemoteExecutionProvider()
         }
         self.mcpSurface = resolvedMcpSurface
         self.devControlAdapter = devControlAdapter

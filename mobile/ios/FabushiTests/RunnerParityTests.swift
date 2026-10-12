@@ -224,6 +224,8 @@ final class RunnerParityTests: XCTestCase {
         XCTAssertTrue(source.contains("hostGeneration: hostSupervisor.generation"))
         XCTAssertTrue(source.contains("servicePendingPlatformExecution("))
         XCTAssertTrue(source.contains("self.remoteExecutionProvider.dispatch("))
+        XCTAssertTrue(source.contains("surface.dispatchRemoteExecution("))
+        XCTAssertTrue(source.contains("IOSClosureRemoteExecutionProvider("))
         XCTAssertFalse(source.contains("let result = try await self.request(method: method, params: object)"))
         XCTAssertFalse(source.contains("remoteTransport: IOSFailClosedRemoteRunnerTransport()"))
     }
@@ -496,6 +498,32 @@ final class RunnerParityTests: XCTestCase {
         } catch let error as IOSRemoteExecDaemonError {
             XCTAssertEqual(error, .unsupported("local-exec.process.exec"))
         }
+    }
+
+
+    func testShippingRemoteProviderReusesAccountScopedMcpSurface() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceRoot = iosRoot
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("source")
+        let coordinator = try String(
+            contentsOf: sourceRoot
+                .appendingPathComponent("mahayana-agent-coordinator/MahayanaCoordinator.swift"),
+            encoding: .utf8
+        )
+        let mcp = try String(
+            contentsOf: sourceRoot
+                .appendingPathComponent("mahayana-agent-coordinator/coordinator-mcp-manager.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(coordinator.contains("surface.dispatchRemoteExecution("))
+        XCTAssertTrue(mcp.contains("let descriptor = try await dashboard.ensureSandBox()"))
+        XCTAssertTrue(mcp.contains("IOSRemoteExecDaemonClient("))
+        XCTAssertTrue(mcp.contains("guard routedScopeToken() == token"))
+        XCTAssertTrue(mcp.contains("try refuseComputerConnectionWhileClientPaused()"))
     }
 
 

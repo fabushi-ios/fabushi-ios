@@ -905,6 +905,33 @@ final class CoordinatorMcpSurface {
         self.isClientPaused = isClientPaused
     }
 
+    func dispatchRemoteExecution(
+        method: String,
+        params: CoordinatorPayload
+    ) async throws -> CoordinatorPayload {
+        try refuseComputerConnectionWhileClientPaused()
+        guard let token = routedScopeToken() else {
+            throw IOSRemoteRunnerFenceError.unavailable
+        }
+        try Task.checkCancellation()
+        let descriptor = try await dashboard.ensureSandBox()
+        try Task.checkCancellation()
+        guard routedScopeToken() == token else {
+            throw IOSRemoteRunnerFenceError.stale
+        }
+        let result = try await IOSRemoteExecDaemonClient(
+            descriptor: descriptor
+        ).dispatch(
+            method: method,
+            params: params
+        )
+        try Task.checkCancellation()
+        guard routedScopeToken() == token else {
+            throw IOSRemoteRunnerFenceError.stale
+        }
+        return result
+    }
+
     func structuredLogCredentials(
         backendURL: String,
         accountSlot: String
