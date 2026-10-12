@@ -49,6 +49,7 @@ final class IOSMainRuntime {
     private let accountRuntime: CoordinatorAccountRuntime
     private let userTimeZoneProjectionFence = IOSUserTimeZoneProjectionFence()
     private let updateWiring: IOSUpdateServiceWiring
+    private let attachmentMainRPC: IOSAttachmentMainRPCAdapter
     let devCapability: IOSDevCapability
     private let devControlAdapter: IOSNativeDevControlAdapter
 
@@ -137,6 +138,14 @@ final class IOSMainRuntime {
             }
         )
         self.coordinator = coordinator
+        attachmentMainRPC = try IOSAttachmentMainRPCAdapter(
+            appDataDirectory: appDataDirectory,
+            currentAccountScope: { coordinatorLocalHumanIdentity.value },
+            hostRequest: { [weak coordinator] method, params in
+                guard let coordinator else { throw CoordinatorError.unavailable }
+                return try await coordinator.request(method: method, params: params).value
+            }
+        )
 
         lifecycleTelemetrySink.configureRemoteShipping { accountSlot in
             { [weak coordinator] logs in
@@ -387,6 +396,24 @@ final class IOSMainRuntime {
         }
         if let updateOutcome = await updateWiring.route(method: method, args: args) {
             return updateOutcome
+        }
+        do {
+            if let attachmentOutcome = try await attachmentMainRPC.route(method: method, args: args) {
+                return attachmentOutcome
+            }
+        } catch is CancellationError {
+            return .failed(.init(code: "coordinator-cancelled", message: "attachment request cancelled"))
+        } catch {
+            lifecycleReporter.report(
+                .coordinatorHandoff,
+                level: .warn,
+                metadata: [
+                    "area": "attachment-main-rpc",
+                    "method": method,
+                    "error": String(error.localizedDescription.prefix(512)),
+                ]
+            )
+            return .failed(.init(code: "attachment-failed", message: error.localizedDescription))
         }
         let outcome = await coordinator.dispatchTransport(
             requestId: requestId,
