@@ -98,12 +98,11 @@
   ],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
-    "requestedCheckpoint": "dda74a64c9d14c5c04e225e0cad57b11446f4ce1",
-    "preEvidenceIosHead": "c408673139a8ebb92a6e94aeb73727de01124ac1",
-    "preEvidenceIosTree": "deb1f353389e9e435a99ac6906b3d6c6d22e4db5",
+    "requestedCheckpoint": "c408673139a8ebb92a6e94aeb73727de01124ac1",
+    "preEvidenceIosHead": "8ef28eee7dce561f3dc8e577e70d839b78663d8a",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "rowCount": 7951,
-    "status": "source-identities-unchanged-root-notification-implemented-not-verified-live-ios-main-8b0e7236-fresh-exact-head-ci-required"
+    "status": "source-identities-unchanged-platform-only-frontend-revalidated-no-verification-promotion-fresh-exact-head-ci-required"
   }
 }
