@@ -673,7 +673,7 @@ struct IOSCursorSandBoxRecreateResult: Equatable, Sendable {
     let operationId: String
 }
 
-struct IOSCursorSandBoxConnection: Equatable, Sendable {
+struct IOSCursorSandBoxConnection: Codable, Equatable, Sendable {
     let networkToken: String
     let execDaemonAuthToken: String
     let execDaemonURL: String
