@@ -99,7 +99,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "df6028e7f21860c5ed2a7784adae5000d92562e4",
+    "preEvidenceIosHead": "39c73ea502aa849a7b371af82f3cb197f606ab12",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -148,7 +148,13 @@
       38207704363,
       38207704479,
       38207928531,
-      38207928443
+      38207928443,
+      38208051053,
+      38208051046,
+      38208232577,
+      38208232571,
+      38208577414,
+      38208577300
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -202,10 +208,23 @@
       114674833330,
       114674833521,
       114675486749,
-      114675540915
+      114675540915,
+      114675348599,
+      114675348672,
+      114675861873,
+      114675914291,
+      114675841039,
+      114675841255,
+      114676458343,
+      114676516462,
+      114676795450,
+      114676795532,
+      114677510162,
+      114677559665
     ],
-    "status": "cursor-auth-refresh-singleflight-resulting-exact-head-ci-required",
+    "status": "cursor-main-rpc-auth-compatibility-resulting-exact-head-ci-required",
     "rowCount": 7951,
-    "currentImplementationHead": "df6028e7f21860c5ed2a7784adae5000d92562e4"
+    "currentImplementationHead": "39c73ea502aa849a7b371af82f3cb197f606ab12",
+    "promotion": "none"
   }
 }
