@@ -99,7 +99,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "9a5dd92561467de7e344afdd5431c2fd38d6f28b",
+    "preEvidenceIosHead": "d9dbcc567fc0bb2509f59244f3b4f6ad9d5efd16",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -166,7 +166,9 @@
       38210445699,
       38210445669,
       38211182945,
-      38211182835
+      38211182835,
+      38211502223,
+      38211502256
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -250,11 +252,15 @@
       114685518773,
       114685558177,
       114685570433,
-      114685570595
+      114685570595,
+      114686482283,
+      114686539219,
+      114686938082,
+      114686938441
     ],
-    "status": "box-host-broker-contract-resulting-exact-head-ci-required",
+    "status": "box-host-update-projection-only-gap-exact-head-ci-required",
     "rowCount": 7951,
-    "currentImplementationHead": "9a5dd92561467de7e344afdd5431c2fd38d6f28b",
+    "currentImplementationHead": "d9dbcc567fc0bb2509f59244f3b4f6ad9d5efd16",
     "promotion": "none"
   }
 }
