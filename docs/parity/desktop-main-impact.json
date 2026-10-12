@@ -55,7 +55,8 @@
       "2026-10-12 d1501b80 architecture run 38201916948 failed because Computer overlay entrypoint/view and rebuild banner ledger blob hashes did not match current Desktop main. Descendant 31897c0b6cf51f531530c1f85e268e2accd87bb0 corrects them to d8f739e4f7f22d85df6815bd86a5af86ad2b9321 / e83c5e37a282d06855a11c78e39c9327905a807f / eaf9324f9f8eef3a264ba80da124f4ab52752282. Validator unchanged.",
       "2026-10-12 transcript-card continuation audit at Desktop 371b72f1cd20de03dc4dff9a15ed761054968093: reaction feed/picker/workspace/registry/root, secret, send-message text, thread affordance/loader/summary, URL card, CSS replacement and attachment leaf were re-read. Resolver is now implemented because canonical-id unknown cards preserve the exact Fabushi fallback while malformed identity-less input fails closed. transcript-feed-source is now implemented because IOSFeatureEventBroker owns single-pump buffering, ordered predicate waiters, timeout/cancel/retry/disposal while MobileBotChat remains the sole transcript collection. No verified promotion.",
       "2026-10-12 Cursor profile-name settlement: Desktop 371b72f1 cursor-auth-wiring.ts/cursor-auth.ts direct caller graph was re-read. iOS now routes UpdateUserName through the single IOSCursorAuthService, publishes displayName/freshness only after same auth operation/account identity survives the async writer, clears cached name on revocation, and fences MarketplaceModel visible-name commit by request serial + mcpAccountEpoch + account scope. Focused tests were added. No status promotion is accepted before replacement exact-head Actions.",
-      "2026-10-12 application-menu current-main closure: About/Help/Feedback and native OS roles were already present; the missing normal-state Reload action now uses a narrow SceneRoot environment capability bound to FabushiRuntime.retryConnection(), which restarts the typed transport and resyncs lifecycle state without constructing a second runtime. Focused tests bind the menu, SceneRoot, runtime recovery and localized copy. Status remains mapped pending descendant exact-head CI."
+      "2026-10-12 application-menu current-main closure: About/Help/Feedback and native OS roles were already present; the missing normal-state Reload action now uses a narrow SceneRoot environment capability bound to FabushiRuntime.retryConnection(), which restarts the typed transport and resyncs lifecycle state without constructing a second runtime. Focused tests bind the menu, SceneRoot, runtime recovery and localized copy. Status remains mapped pending descendant exact-head CI.",
+      "2026-10-12 Desktop gateway-descriptor-cache/store and box-host-connector were re-read at 371b72f1. iOS now has Keychain-scoped descriptor durability, cached-first live-refresh singleflight, stale-account fencing, denial clearing, typed no_storage/blocked/retry-after/update-required/access-denied failures, and canonical recreate/force-recreate/migration paths. Descriptor rows are implemented; box-host remains mapped for update-required product projection and blocked-hold parity."
     ],
     "sharedContractReviewEvidence": [
       "No native iOS RCS control-session create/reconcile caller was found; bridge/Coordinator/Host and separate RemoteDeviceGateway credential boundaries were inspected. Aggregate service/shared-contract review remains pending.",
@@ -2016,7 +2017,7 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-12",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "b52591079409dcb84465e9ae1ba1cf5b774802a8",
+    "preEvidenceIosHead": "e185e5abaac315f27a5db8c46e667583848cca83",
     "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
     "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
     "predecessorWorkflowRuns": [
@@ -2100,7 +2101,11 @@
       38209221884,
       38209221880,
       38209909251,
-      38209909254
+      38209909254,
+      38210445699,
+      38210445669,
+      38211182945,
+      38211182835
     ],
     "predecessorWorkflowJobs": [
       114651452123,
@@ -2207,9 +2212,17 @@
       114678247239,
       114678300876,
       114678379750,
-      114678379878
+      114678379878,
+      114683201404,
+      114683257968,
+      114683315361,
+      114683315591,
+      114685518773,
+      114685558177,
+      114685570433,
+      114685570595
     ],
-    "status": "application-menu-reload-resulting-exact-head-ci-required",
+    "status": "box-host-broker-contract-resulting-exact-head-ci-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -2226,10 +2239,13 @@
       "mobile/ios/Fabushi/MarketplaceModel.swift",
       "mobile/ios/FabushiTests/MarketplaceModelLifecycleTests.swift",
       "mobile/ios/FabushiTests/CursorProfileParityTests.swift",
-      "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift"
+      "mobile/ios/FabushiTests/CoordinatorMcpSurfaceTests.swift",
+      "source/mahayana-agent-coordinator/gateway/host-supervisor.swift",
+      "mobile/ios/FabushiTests/GatewayParityTests.swift",
+      "mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift"
     ],
-    "conclusion": "Cursor current-main review now has canonical Main-RPC auth composition, managed sign-in-policy handling and auth-owner display-name settlement with account/request fences. cursor-auth-wiring remains mapped pending replacement exact-head CI; cursor-auth.ts remains mapped for broader profile enrichment ownership. Aggregate review is still open.",
-    "currentImplementationHead": "b52591079409dcb84465e9ae1ba1cf5b774802a8",
+    "conclusion": "Gateway descriptor cache/store are current-main-reviewed and implemented through the existing CoordinatorMcpSurface remote-execution owner. Box-host broker failure semantics are typed and tested, but the broader box-host row remains mapped until update-required availability is projected into the canonical Computer owner and blocked hold/backoff parity is closed. Aggregate review remains open.",
+    "currentImplementationHead": "e185e5abaac315f27a5db8c46e667583848cca83",
     "promotion": "none"
   }
 }
