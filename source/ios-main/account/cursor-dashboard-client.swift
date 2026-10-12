@@ -1123,6 +1123,33 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         )
     }
 
+    func getCursorAuthProfile(timeoutMs: Int = 10_000) async -> IOSCursorAuthProfile? {
+        do {
+            async let meTask = rpc("GetMe", body: [:], timeoutMs: timeoutMs)
+            async let membershipTask = isAnysphereUser(timeoutMs: timeoutMs)
+            let (me, isAnysphereUser) = try await (meTask, membershipTask)
+            func nonEmpty(_ value: Any?) -> String? {
+                guard let value = value as? String else { return nil }
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+            let displayName = [
+                nonEmpty(me["firstName"]),
+                nonEmpty(me["lastName"]),
+            ]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            return .init(
+                displayName: displayName.isEmpty ? nil : displayName,
+                email: nonEmpty(me["email"]),
+                profilePictureUrl: nonEmpty(me["profilePictureUrl"]),
+                isAnysphereUser: isAnysphereUser
+            )
+        } catch {
+            return nil
+        }
+    }
+
     func isAnysphereUser(timeoutMs: Int = 10_000) async throws -> Bool {
         let response = try await rpc("GetTeams", body: [:], timeoutMs: timeoutMs)
         let teams = response["teams"] as? [[String: Any]] ?? []
