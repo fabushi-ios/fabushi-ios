@@ -839,3 +839,37 @@ final class GatewayParityTests: XCTestCase {
     }
 
 }
+
+
+final class GatewayDescriptorFastPathOwnershipRegressionTests: XCTestCase {
+    func testCoordinatorRetainsFastPathWithoutLazyMainActorInitializer() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(
+            source.contains(
+                "private var retainedGatewayDescriptorFastPath: IOSGatewayDescriptorFastPath?"
+            )
+        )
+        XCTAssertTrue(
+            source.contains(
+                "private var gatewayDescriptorFastPath: IOSGatewayDescriptorFastPath {"
+            )
+        )
+        XCTAssertFalse(
+            source.contains(
+                "private lazy var gatewayDescriptorFastPath: IOSGatewayDescriptorFastPath"
+            )
+        )
+    }
+}
