@@ -285,6 +285,10 @@ pub struct BotSummary {
     pub unread: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
+    #[serde(rename = "isIntroductionSuppressed", default)]
+    pub is_introduction_suppressed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1449,6 +1453,10 @@ pub enum FeatureCommand {
             skip_serializing_if = "Option::is_none"
         )]
         avatar_color: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        purpose: Option<String>,
+        #[serde(rename = "isIntroductionSuppressed", default)]
+        is_introduction_suppressed: bool,
     },
     #[serde(rename = "bot.update")]
     BotUpdate {
