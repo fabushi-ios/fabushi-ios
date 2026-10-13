@@ -136,6 +136,17 @@ struct LegacyPluginOwnerProof {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PluginGitAuthBlock {
+    plugin_id: String,
+    plugin_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    marketplace_name: Option<String>,
+    release: Value,
+    platform: String,
+}
+
 struct LegacyPluginMigrationJournal {
     schema_version: u32,
     account_scope: String,
@@ -796,6 +807,7 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string())),
             "createAgent" => self.create_agent(params),
             "sendPrompt" => self.send_agent_prompt(params),
+            "getPluginSyncStatus" => self.plugin_sync_status(),
             "getHostSettings" => {
                 let has_seen_onboarding = self
                     .feature
@@ -1997,6 +2009,59 @@ impl AppHost {
         Ok(self.plugin_root()?.join("permissions.json"))
     }
 
+    fn plugin_git_auth_blocks_path(&self) -> Result<PathBuf, AppHostError> {
+        Ok(self.plugin_root()?.join("git-auth-blocked.json"))
+    }
+
+    fn plugin_sync_status(&self) -> Result<Value, AppHostError> {
+        let path = self.plugin_git_auth_blocks_path()?;
+        let blocks = load_plugin_git_auth_blocks(&path);
+        for block in blocks {
+            let _ = self.install_plugin(json!({
+                "release": block.release,
+                "platform": block.platform,
+            }));
+        }
+        let blocks = load_plugin_git_auth_blocks(&path);
+        Ok(json!({
+            "authBlocked": blocks.into_iter().map(|block| json!({
+                "pluginId": block.plugin_id,
+                "pluginName": block.plugin_name,
+                "marketplaceName": block.marketplace_name,
+            })).collect::<Vec<_>>()
+        }))
+    }
+
+    fn record_plugin_git_auth_block(
+        &self,
+        release: &ExternalReleaseManifest,
+        release_value: &Value,
+        platform: &str,
+    ) -> Result<(), AppHostError> {
+        let path = self.plugin_git_auth_blocks_path()?;
+        let mut blocks = load_plugin_git_auth_blocks(&path);
+        blocks.retain(|block| block.plugin_id != release.plugin_id);
+        blocks.push(PluginGitAuthBlock {
+            plugin_id: release.plugin_id.clone(),
+            plugin_name: release.plugin_id.clone(),
+            marketplace_name: None,
+            release: release_value.clone(),
+            platform: platform.to_string(),
+        });
+        persist_plugin_git_auth_blocks(&path, &blocks)
+    }
+
+    fn clear_plugin_git_auth_block(&self, plugin_id: &str) -> Result<(), AppHostError> {
+        let path = self.plugin_git_auth_blocks_path()?;
+        let mut blocks = load_plugin_git_auth_blocks(&path);
+        let before = blocks.len();
+        blocks.retain(|block| block.plugin_id != plugin_id);
+        if blocks.len() != before {
+            persist_plugin_git_auth_blocks(&path, &blocks)?;
+        }
+        Ok(())
+    }
+
     fn installer(&self) -> Result<PluginInstaller, AppHostError> {
         PluginInstaller::new(self.plugin_root()?)
             .map_err(|error| AppHostError::Operation(error.to_string()))
@@ -2008,7 +2073,7 @@ impl AppHost {
             .get("release")
             .cloned()
             .ok_or_else(|| AppHostError::InvalidRequest("release is required".into()))?;
-        let release: ExternalReleaseManifest = serde_json::from_value(release_value)
+        let release: ExternalReleaseManifest = serde_json::from_value(release_value.clone())
             .map_err(|error| AppHostError::InvalidRequest(error.to_string()))?;
         let platform = params
             .get("platform")
@@ -2086,7 +2151,7 @@ impl AppHost {
         let installer = PluginInstaller::new(&account.root)
             .map_err(|error| AppHostError::Operation(error.to_string()))?;
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
-        let pointer = installer
+        let pointer_result = installer
             .install_with_commit_guard(&release, platform, preferred, || {
                 self.current_plugin_account_identity().is_ok_and(|(scope, generation)| {
                     scope == account.scope && generation == account.generation
@@ -2102,8 +2167,24 @@ impl AppHost {
                 } else {
                     Err(error)
                 }
-            })
-            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+            });
+        let pointer = match pointer_result {
+            Ok(pointer) => {
+                self.clear_plugin_git_auth_block(&release.plugin_id)?;
+                pointer
+            }
+            Err(error) => {
+                let message = error.to_string();
+                if is_git_authentication_failure(&message) {
+                    self.record_plugin_git_auth_block(
+                        &release,
+                        &release_value,
+                        platform,
+                    )?;
+                }
+                return Err(AppHostError::Operation(message));
+            }
+        };
         self.ensure_plugin_account_current(&account.scope, &account.generation)?;
         self.ensure_expected_plugin_account_identity_current(expected_account.as_ref())?;
         serde_json::to_value(pointer).map_err(|error| AppHostError::Operation(error.to_string()))
@@ -4130,6 +4211,48 @@ fn migrate_legacy_plugin_root_if_proven(
     }
     journal.state = "completed".into();
     atomic_write_json(&journal_path, &journal)
+}
+
+fn load_plugin_git_auth_blocks(path: &Path) -> Vec<PluginGitAuthBlock> {
+    let Ok(bytes) = std::fs::read(path) else {
+        return Vec::new();
+    };
+    serde_json::from_slice::<Vec<PluginGitAuthBlock>>(&bytes).unwrap_or_default()
+}
+
+fn persist_plugin_git_auth_blocks(
+    path: &Path,
+    blocks: &[PluginGitAuthBlock],
+) -> Result<(), AppHostError> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    }
+    let temp = path.with_extension("json.tmp");
+    let bytes = serde_json::to_vec_pretty(blocks)
+        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    std::fs::write(&temp, bytes)
+        .map_err(|error| AppHostError::Operation(error.to_string()))?;
+    std::fs::rename(&temp, path)
+        .map_err(|error| AppHostError::Operation(error.to_string()))
+}
+
+fn is_git_authentication_failure(message: &str) -> bool {
+    let message = message.to_ascii_lowercase();
+    [
+        "authentication failed",
+        "could not read username",
+        "permission denied",
+        "repository not found",
+        "authorization failed",
+        "authentication required",
+        "http 401",
+        "http 403",
+        "status 401",
+        "status 403",
+    ]
+    .iter()
+    .any(|needle| message.contains(needle))
 }
 
 fn string_param<'a>(params: &'a Value, name: &str) -> Result<&'a str, AppHostError> {
