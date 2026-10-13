@@ -1716,6 +1716,12 @@ impl FeatureHostController {
         Ok(true)
     }
 
+    pub fn agent_roster_direct(&self) -> Result<Vec<BotSummary>, FeatureHostError> {
+        let state = self.state()?;
+        ensure_open(&state)?;
+        Ok(state.bots.values().cloned().collect())
+    }
+
     pub fn async_tasks_for_agent(
         &self,
         agent_id: &str,
@@ -4561,6 +4567,8 @@ impl FeatureHostController {
             notify_on_updates: source.notify_on_updates,
             unread: false,
             conversation_id: Some(format!("codex:agent:{new_id}")),
+            purpose: None,
+            is_introduction_suppressed: false,
         };
 
         let target_dir = match clone_agent_known_durable_config(
@@ -4644,6 +4652,8 @@ impl FeatureHostController {
                 avatar,
                 avatar_shape,
                 avatar_color,
+                purpose,
+                is_introduction_suppressed,
                 ..
             } => {
                 let name = clamp_line(&name, 72);
@@ -4666,6 +4676,8 @@ impl FeatureHostController {
                     notify_on_updates: true,
                     unread: false,
                     conversation_id: Some(format!("codex:agent:{id}")),
+                    purpose: clean_optional_string(purpose),
+                    is_introduction_suppressed,
                 };
                 state.bots.insert(id, bot.clone());
                 ("created", bot)
@@ -15292,6 +15304,8 @@ fn default_bots() -> BTreeMap<String, BotSummary> {
             notify_on_updates: true,
             unread: false,
             conversation_id: Some(MAHAYANA_AI_CONVERSATION_ID.into()),
+            purpose: None,
+            is_introduction_suppressed: false,
         },
         BotSummary {
             id: "research-bot".into(),
@@ -15306,6 +15320,8 @@ fn default_bots() -> BTreeMap<String, BotSummary> {
             notify_on_updates: true,
             unread: false,
             conversation_id: Some("codex:agent:research".into()),
+            purpose: None,
+            is_introduction_suppressed: false,
         },
         BotSummary {
             id: "incident-bot".into(),
@@ -15320,6 +15336,8 @@ fn default_bots() -> BTreeMap<String, BotSummary> {
             notify_on_updates: true,
             unread: false,
             conversation_id: Some("codex:agent:incident".into()),
+            purpose: None,
+            is_introduction_suppressed: false,
         },
     ]
     .into_iter()
@@ -19206,6 +19224,8 @@ mod reserved_session_roster_tests {
             notify_on_updates: true,
             unread: false,
             conversation_id: Some("codex:agent:visible-agent".into()),
+            purpose: None,
+            is_introduction_suppressed: false,
         };
         persist_bots(&bot_path, &BTreeMap::from([(bot.id.clone(), bot.clone())]))
             .expect("persist canonical bot roster");
@@ -19992,6 +20012,8 @@ mod tests {
             notify_on_updates: true,
             unread: false,
             conversation_id: Some("codex:agent:research".into()),
+            purpose: None,
+            is_introduction_suppressed: false,
         };
         let context = render_native_turn_identity_context(Some(&user), Some(&bot))
             .expect("identity context");
@@ -20609,6 +20631,8 @@ mod tests {
                     notify_on_updates: true,
                     unread: false,
                     conversation_id: Some("codex:agent:research".into()),
+                    purpose: None,
+                    is_introduction_suppressed: false,
                 },
             ),
             (
@@ -20626,6 +20650,8 @@ mod tests {
                     notify_on_updates: true,
                     unread: false,
                     conversation_id: Some("codex:agent:incident".into()),
+                    purpose: None,
+                    is_introduction_suppressed: false,
                 },
             ),
         ]);
