@@ -4629,6 +4629,63 @@ mod fabushi_shipping_inference_tests {
     }
 
     #[test]
+    fn native_agent_create_and_list_preserve_plugin_auth_purpose() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-app-host-plugin-auth-agent-{}-{}",
+            std::process::id(),
+            app_host_now_ms()
+        ));
+        let host = AppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test)
+            .expect("create test app host");
+        let created = host.dispatch(HostRequest {
+            id: Some(json!(1)),
+            method: "createAgent".into(),
+            params: json!({
+                "name": "Plugin Setup",
+                "description": "Sets up git credentials.",
+                "purpose": "plugin-auth",
+                "isIntroductionSuppressed": true,
+            }),
+        });
+        assert!(created.ok, "{:?}", created.error);
+        let created = created.result.expect("create result");
+        let agent = created.get("agent").expect("created agent");
+        assert_eq!(agent["purpose"], "plugin-auth");
+        assert_eq!(agent["isIntroductionSuppressed"], true);
+
+        let listed = host.dispatch(HostRequest {
+            id: Some(json!(2)),
+            method: "listAgents".into(),
+            params: json!({}),
+        });
+        assert!(listed.ok, "{:?}", listed.error);
+        let agents = listed.result
+            .and_then(|value| value.get("agents").cloned())
+            .and_then(|value| value.as_array().cloned())
+            .expect("agent roster");
+        assert!(agents.iter().any(|candidate| {
+            candidate["id"] == agent["id"]
+                && candidate["purpose"] == "plugin-auth"
+                && candidate["isIntroductionSuppressed"] == true
+        }));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn git_authentication_failure_classifier_is_fail_closed() {
+        assert!(is_git_authentication_failure(
+            "fatal: Authentication failed for 'https://github.com/private/repo'"
+        ));
+        assert!(is_git_authentication_failure(
+            "fatal: could not read Username for 'https://github.com'"
+        ));
+        assert!(!is_git_authentication_failure(
+            "connection reset while downloading public release artifact"
+        ));
+        assert!(!is_git_authentication_failure("plugin archive checksum mismatch"));
+    }
+
+    #[test]
     fn plugin_account_scope_is_stable_irreversible_and_disjoint() {
         let a1 = stable_plugin_account_scope("account-a");
         let a2 = stable_plugin_account_scope(" account-a ");
