@@ -789,6 +789,13 @@ impl AppHost {
                     string_param(&params, "emoji")?,
                 )
                 .map_err(|error| AppHostError::Operation(error.to_string())),
+            "listAgents" => serde_json::to_value(json!({
+                "agents": self.feature.agent_roster_direct()
+                    .map_err(|error| AppHostError::Operation(error.to_string()))?
+            }))
+            .map_err(|error| AppHostError::Operation(error.to_string())),
+            "createAgent" => self.create_agent(params),
+            "sendPrompt" => self.send_agent_prompt(params),
             "getHostSettings" => {
                 let has_seen_onboarding = self
                     .feature
@@ -987,6 +994,75 @@ impl AppHost {
         }
     }
 
+
+    fn create_agent(&self, params: Value) -> Result<Value, AppHostError> {
+        let name = string_param(&params, "name")?.trim().to_string();
+        if name.is_empty() {
+            return Err(AppHostError::InvalidRequest("Agent name must not be empty".into()));
+        }
+        let description = params
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let purpose = params
+            .get("purpose")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let is_introduction_suppressed = params
+            .get("isIntroductionSuppressed")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let before = self
+            .feature
+            .agent_roster_direct()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let before_ids = before
+            .iter()
+            .map(|agent| agent.id.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        let request_id = format!("native-create-agent-{}", uuid::Uuid::new_v4().simple());
+        self.feature_execute(json!({
+            "command": {
+                "type": "bot.create",
+                "requestId": request_id,
+                "name": name,
+                "description": description,
+                "purpose": purpose,
+                "isIntroductionSuppressed": is_introduction_suppressed,
+            }
+        }))?;
+        let after = self
+            .feature
+            .agent_roster_direct()
+            .map_err(|error| AppHostError::Operation(error.to_string()))?;
+        let created = after
+            .into_iter()
+            .find(|agent| !before_ids.contains(&agent.id))
+            .ok_or_else(|| AppHostError::Operation("Agent creation did not produce a roster entry".into()))?;
+        serde_json::to_value(json!({"agent": created}))
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn send_agent_prompt(&self, params: Value) -> Result<Value, AppHostError> {
+        let agent_id = string_param(&params, "agentId")?.trim();
+        let prompt = string_param(&params, "prompt")?.trim();
+        if agent_id.is_empty() || prompt.is_empty() {
+            return Err(AppHostError::InvalidRequest(
+                "sendPrompt requires non-empty agentId and prompt".into(),
+            ));
+        }
+        self.feature_execute(json!({
+            "command": {
+                "type": "chat.send",
+                "requestId": format!("native-send-prompt-{}", uuid::Uuid::new_v4().simple()),
+                "agentId": agent_id,
+                "text": prompt,
+            }
+        }))
+    }
 
     fn handle_sharing(&self, method: &str, params: Value) -> Result<Value, AppHostError> {
         let rpc = sharing_rpc(method)?;
