@@ -1,135 +1,163 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+  "previousCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
   "currentCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
   "fullTree": "906b3f414b5ff343a5f0e627fa31b98778dfbf54",
-  "directCount": 9,
+  "directCount": 0,
   "metadataCorrections": [],
   "fullReviewAccepted": false,
-  "directChanges": [
-    {
-      "path": "source/box-exec-daemon/src/lib.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "419215b4a5cab74df928c3175f2269348fb2a9fa",
-      "blobSha": "441d1bd8c692c8db3548154f7bccbb1fa4f60082",
-      "previousSize": 56,
-      "size": 77
-    },
-    {
-      "path": "source/box-exec-daemon/src/server.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "af9a831539b10579066d9e2caf084ef9f1331074",
-      "blobSha": "a40dc3b5f78e414c3ac302137668f1d5be8dc73f",
-      "previousSize": 101248,
-      "size": 111209
-    },
-    {
-      "path": "source/box-exec-daemon/src/workspace_write.rs",
-      "change": "added",
-      "blobSha": "e91358cb84271251a8d271ef92a200f02be41c90",
-      "size": 3073
-    },
-    {
-      "path": "source/host/examples/fdn_browser_actions.rs",
-      "change": "added",
-      "blobSha": "266f3141699c54f09a465bbff1eb07c89327573a",
-      "size": 8411
-    },
-    {
-      "path": "source/host/src/box/generated_production.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "7affe6a1f54e906f42cc0185a078ce13ee7c1686",
-      "blobSha": "81f5a74dbf0ebc3700f177639bdd875f8c00eb56",
-      "previousSize": 65072,
-      "size": 65214
-    },
-    {
-      "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "1f8c795800334415b63c06669373aa66470fa074",
-      "blobSha": "7272eebd7587dbb1fbeb90bbadc3a83a13d3073d",
-      "previousSize": 47640,
-      "size": 47658
-    },
-    {
-      "path": "source/host/src/runner/tools/sand_browser_tools.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "792d30fd9db1e7c97f98386ca3f1531d91c63f58",
-      "blobSha": "efd8ac0157a3b74a61b7af903f3812d1089c3c45",
-      "previousSize": 37568,
-      "size": 37611
-    },
-    {
-      "path": "source/host/tests/browser_driver_source_contract.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "6cd2ee271bee681fd62b469115698a4420428ee8",
-      "blobSha": "4e3f4b9eca714768ba7d09680a5c6afab0f8416e",
-      "previousSize": 1524,
-      "size": 1536
-    },
-    {
-      "path": "source/host/tests/sand_browser_tools_contract.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "07ff9ce3b24c69623d1cbe0cbc01534afac09d6c",
-      "blobSha": "75583670000ebd0dd81c8c1b9fdc0686a8968af9",
-      "previousSize": 23492,
-      "size": 23516
-    }
-  ],
+  "directChanges": [],
   "dependencyReview": {
-    "status": "requires-current-main-review",
-    "reason": "Desktop main advanced from 8148bfb9e747d446dd3d97342c3cf04a0ed407a2 to c33a9495fc1e640557d65f3e2daedc1449be7fcb. Nine selected source changes and four outside-selected tracked changes must be reviewed against the canonical iOS owners before any prior implemented/verified evidence can be promoted.",
-    "newAndChangedResponsibilitiesReviewed": false
+    "status": "reviewed-checkpoint-accepted-ci-pending",
+    "reason": "Desktop 8148bfb9 -> c33a9495 G11 Box/browser selected and outside-selected delta completed current-main responsibility, owner, consumer and dependency review. Applicable iOS adaptations use the existing NativeEngine -> PlatformExecBroker -> generation-fenced RemoteRunner -> IOSRemoteExecDaemonClient path; remote Box daemon filesystem/Connect mechanics remain not-applicable-with-replacement inside the iOS sandbox. This closes only the incremental drift fence. Aggregate dependency/source completeness and descendant exact-head CI remain open.",
+    "acceptedDelta": {
+      "from": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "to": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+      "tree": "906b3f414b5ff343a5f0e627fa31b98778dfbf54",
+      "selectedDirectChanges": [
+        {
+          "path": "source/box-exec-daemon/src/lib.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "419215b4a5cab74df928c3175f2269348fb2a9fa",
+          "blobSha": "441d1bd8c692c8db3548154f7bccbb1fa4f60082",
+          "previousSize": 56,
+          "size": 77
+        },
+        {
+          "path": "source/box-exec-daemon/src/server.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "af9a831539b10579066d9e2caf084ef9f1331074",
+          "blobSha": "a40dc3b5f78e414c3ac302137668f1d5be8dc73f",
+          "previousSize": 101248,
+          "size": 111209
+        },
+        {
+          "path": "source/box-exec-daemon/src/workspace_write.rs",
+          "change": "added",
+          "blobSha": "e91358cb84271251a8d271ef92a200f02be41c90",
+          "size": 3073
+        },
+        {
+          "path": "source/host/examples/fdn_browser_actions.rs",
+          "change": "added",
+          "blobSha": "266f3141699c54f09a465bbff1eb07c89327573a",
+          "size": 8411
+        },
+        {
+          "path": "source/host/src/box/generated_production.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "7affe6a1f54e906f42cc0185a078ce13ee7c1686",
+          "blobSha": "81f5a74dbf0ebc3700f177639bdd875f8c00eb56",
+          "previousSize": 65072,
+          "size": 65214
+        },
+        {
+          "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "1f8c795800334415b63c06669373aa66470fa074",
+          "blobSha": "7272eebd7587dbb1fbeb90bbadc3a83a13d3073d",
+          "previousSize": 47640,
+          "size": 47658
+        },
+        {
+          "path": "source/host/src/runner/tools/sand_browser_tools.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "792d30fd9db1e7c97f98386ca3f1531d91c63f58",
+          "blobSha": "efd8ac0157a3b74a61b7af903f3812d1089c3c45",
+          "previousSize": 37568,
+          "size": 37611
+        },
+        {
+          "path": "source/host/tests/browser_driver_source_contract.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "6cd2ee271bee681fd62b469115698a4420428ee8",
+          "blobSha": "4e3f4b9eca714768ba7d09680a5c6afab0f8416e",
+          "previousSize": 1524,
+          "size": 1536
+        },
+        {
+          "path": "source/host/tests/sand_browser_tools_contract.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "07ff9ce3b24c69623d1cbe0cbc01534afac09d6c",
+          "blobSha": "75583670000ebd0dd81c8c1b9fdc0686a8968af9",
+          "previousSize": 23492,
+          "size": 23516
+        }
+      ],
+      "outsideSelectedChanges": [
+        {
+          "path": ".github/scripts/fdn-g11-real-browser.mjs",
+          "change": "blob-changed",
+          "previousMode": "100644",
+          "mode": "100644",
+          "previousType": "blob",
+          "type": "blob",
+          "previousSha": "a86c8329e1c3095f6b13e528f07d630876d5c46d",
+          "sha": "7ba6f0fbb2fc1645bb530629f0fb6a4b5ac9f468",
+          "previousSize": 13272,
+          "size": 14727
+        },
+        {
+          "path": ".github/workflows/fdn-g11-real-browser.yml",
+          "change": "blob-changed",
+          "previousMode": "100644",
+          "mode": "100644",
+          "previousType": "blob",
+          "type": "blob",
+          "previousSha": "c4d2532708e04fd8459120018950dbef86c5c48c",
+          "sha": "9f1c9dae2e4ed95e9719bbae848309e6f86d28c7",
+          "previousSize": 1906,
+          "size": 3620
+        },
+        {
+          "path": "docs/specs/fdn-g11-host-browser-actions.md",
+          "change": "added",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a2e98139c3817e2de9943edfe18c2ff7eef5c1da",
+          "size": 4227
+        },
+        {
+          "path": "docs/specs/g11-box-browser-wire-completion.md",
+          "change": "added",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a75ee8323202ab18af2c91a396b1d00139bb9fa6",
+          "size": 5238
+        }
+      ],
+      "acceptedByIosImplementationCommits": [
+        "4b57a8249191d43d9f2fa554fb09be3b793de358",
+        "bf60b482",
+        "6d1a0fe3dafb085b99af2da1cf994c6e4ba5d2db"
+      ],
+      "evidencePreparedFromIosHead": "136113acf11c44c91b996bf472d43416c1f33a4e",
+      "acceptedAt": "2026-10-15",
+      "conclusion": "Current Desktop G11 Box wire/browser resource delta was read end-to-end, mapped to the canonical iOS remote execution owner, and moved out of the re-review fence without promoting mapped rows or aggregate migration/release acceptance."
+    },
+    "sameDirectoryReviewPaths": [
+      "source/host/box/generated-production.rs",
+      "source/host/box/box-file-transfer.rs",
+      "source/packages/mahayana-rs/mahayana-native-engine/src/browser_driver_source.rs",
+      "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
+      "source/local-exec-daemon/production-executor.swift",
+      "source/box-exec-daemon/server.swift",
+      "source/box-exec-daemon/RemoteRunner.swift",
+      "source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
+      "mobile/ios/FabushiTests/RunnerParityTests.swift"
+    ],
+    "sharedContractReview": "reviewed-current-main-g11-box-browser-delta-checkpointed",
+    "mainActiveSpecsReview": "reviewed-fdn-g11-host-browser-actions-and-g11-box-browser-wire-completion",
+    "newAndChangedResponsibilitiesReviewed": true
   },
-  "historyPolicy": "Desktop 371b72f1 -> b6a66fd2 exact-head rebaseline. Prior acceptance for all changed source rows is predecessor-only. Desktop b6a66fd2 -> 8148bfb9 incremental G11 delta accepted as a source-review checkpoint after iOS production implementation; accepted delta retained in dependencyReview.acceptedDelta. This does not promote migration/release acceptance. Desktop 8148bfb9 -> c33a9495 supersedes the previous checkpoint; affected rows and 89f26c80 Actions are predecessor-only until current-main review closes.",
+  "historyPolicy": "Desktop 371b72f1 -> b6a66fd2 exact-head rebaseline. Prior acceptance for all changed source rows is predecessor-only. Desktop b6a66fd2 -> 8148bfb9 incremental G11 delta accepted as a source-review checkpoint after iOS production implementation; accepted delta retained in dependencyReview.acceptedDelta. This does not promote migration/release acceptance. Desktop 8148bfb9 -> c33a9495 supersedes the previous checkpoint; affected rows and 89f26c80 Actions are predecessor-only until current-main review closes. Desktop 8148bfb9 -> c33a9495 G11 Box/browser delta accepted as an incremental source-review checkpoint after canonical iOS replacement review; accepted delta retained in dependencyReview.acceptedDelta. Aggregate fullReviewAccepted remains false.",
   "groupSummary": {
     "source-box-exec-daemon": 3,
     "source-host": 6
   },
   "totalTrackedChangeCount": 13,
-  "outsideSelectedChanges": [
-    {
-      "path": ".github/scripts/fdn-g11-real-browser.mjs",
-      "change": "blob-changed",
-      "previousMode": "100644",
-      "mode": "100644",
-      "previousType": "blob",
-      "type": "blob",
-      "previousSha": "a86c8329e1c3095f6b13e528f07d630876d5c46d",
-      "sha": "7ba6f0fbb2fc1645bb530629f0fb6a4b5ac9f468",
-      "previousSize": 13272,
-      "size": 14727
-    },
-    {
-      "path": ".github/workflows/fdn-g11-real-browser.yml",
-      "change": "blob-changed",
-      "previousMode": "100644",
-      "mode": "100644",
-      "previousType": "blob",
-      "type": "blob",
-      "previousSha": "c4d2532708e04fd8459120018950dbef86c5c48c",
-      "sha": "9f1c9dae2e4ed95e9719bbae848309e6f86d28c7",
-      "previousSize": 1906,
-      "size": 3620
-    },
-    {
-      "path": "docs/specs/fdn-g11-host-browser-actions.md",
-      "change": "added",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "a2e98139c3817e2de9943edfe18c2ff7eef5c1da",
-      "size": 4227
-    },
-    {
-      "path": "docs/specs/g11-box-browser-wire-completion.md",
-      "change": "added",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "a75ee8323202ab18af2c91a396b1d00139bb9fa6",
-      "size": 5238
-    }
-  ],
+  "outsideSelectedChanges": [],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-15",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
