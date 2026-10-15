@@ -251,6 +251,11 @@ struct OperationControl {
 }
 
 #[async_trait]
+struct NullEventSink;
+impl KernelEventSink for NullEventSink {
+    fn emit(&self, _event: KernelEvent) -> Result<(), KernelError> { Ok(()) }
+}
+
 pub trait ToolDecisionGate: Send + Sync {
     async fn before_tool(
         &self,
@@ -434,8 +439,29 @@ impl NativeEngine {
                 prompt.metadata.clone(),
             )
             .map_err(|error| KernelError::Backend(error.to_string()))?;
+        let prompt = session
+            .prompt_queue
+            .take_next()
+            .ok_or_else(|| KernelError::Backend("async ask-question continuation queue unexpectedly empty".into()))?;
+        session.active_prompt = Some(prompt.clone());
+        let attempt_id = Self::start_attempt(session, operation_id, &prompt.id);
         session.updated_at_ms = now_ms();
         self.persist_session_state_if_configured(session_id, &session)?;
+        drop(session);
+
+        let session = self.session(session_id)?;
+        let mut session = session.lock().await;
+        self.execute_active_prompt(
+            session_id,
+            &mut session,
+            operation_id,
+            prompt,
+            Some(attempt_id),
+            false,
+            &ExecutionPolicy::mobile_default(),
+            control,
+            Arc::new(NullEventSink),
+        ).await?;
         Ok(AsyncAskQuestionCompletionOutcome::AppliedContinuation)
     }
 
