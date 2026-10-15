@@ -1624,6 +1624,12 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         try IOSCursorDashboardProto.decodeBackgroundComposerInfo(data)
     }
 
+    static func startBackgroundComposerRequestForTests(
+        _ input: IOSCloudAgentLaunchInput
+    ) throws -> Data {
+        try IOSCursorDashboardProto.startBackgroundComposerRequest(input)
+    }
+
     static func autoReviewClassifierRequestForTests(
         _ request: IOSCursorAutoReviewClassifierRequest
     ) throws -> Data {
