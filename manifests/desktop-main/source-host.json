@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+  "sourceCommit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
   "group": "source-host",
   "fileCount": 982,
   "files": [
@@ -2645,13 +2645,13 @@
     },
     {
       "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
-      "blobSha": "325a593e1e2d691f413186ddd90606441ff91f70",
-      "size": 45591
+      "blobSha": "1f8c795800334415b63c06669373aa66470fa074",
+      "size": 47640
     },
     {
       "path": "source/host/src/runner/tools/sand_browser_tools.rs",
-      "blobSha": "ae6c6b8e802bf7ff4855f0625fa2d06541c40df6",
-      "size": 36925
+      "blobSha": "792d30fd9db1e7c97f98386ca3f1531d91c63f58",
+      "size": 37568
     },
     {
       "path": "source/host/src/runner/tools/sand_browser_use_subagent.rs",
@@ -3430,8 +3430,8 @@
     },
     {
       "path": "source/host/tests/browser_driver_source_contract.rs",
-      "blobSha": "c943fb9e9b5ffa0126f260be92d2ba8f5b9cbdf1",
-      "size": 1470
+      "blobSha": "6cd2ee271bee681fd62b469115698a4420428ee8",
+      "size": 1524
     },
     {
       "path": "source/host/tests/channel_attachment_contract.rs",
@@ -4410,8 +4410,8 @@
     },
     {
       "path": "source/host/tests/sand_browser_tools_contract.rs",
-      "blobSha": "93aad62fb184f1f2c2e94a4b57001c00b1780d1e",
-      "size": 22056
+      "blobSha": "07ff9ce3b24c69623d1cbe0cbc01534afac09d6c",
+      "size": 23492
     },
     {
       "path": "source/host/tests/sand_file_transfer_tools_contract.rs",
