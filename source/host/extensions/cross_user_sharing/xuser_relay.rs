@@ -2,8 +2,8 @@ use serde_json::Value;
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
-pub const XUSER_RELAY_POLL_INTERVAL_MS: u64 = 5_000;
-pub const XUSER_RELAY_ERROR_BACKOFF_MS: u64 = 10_000;
+pub const XUSER_RELAY_POLL_INTERVAL_MS: u64 = 4_000;
+pub const XUSER_RELAY_ERROR_BACKOFF_MS: u64 = 30_000;
 
 pub trait XuserRelayHost: Send + Sync {
     fn poll(&self, ack_ids: &[String]) -> Result<Value, String>;
@@ -108,6 +108,12 @@ mod tests {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Err("offline".into())
         }
+    }
+
+    #[test]
+    fn relay_timing_constants_match_desktop_frozen_contract() {
+        assert_eq!(XUSER_RELAY_POLL_INTERVAL_MS, 4_000);
+        assert_eq!(XUSER_RELAY_ERROR_BACKOFF_MS, 30_000);
     }
 
     #[test]
