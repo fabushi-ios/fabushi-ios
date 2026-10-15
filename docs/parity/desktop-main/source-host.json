@@ -550,15 +550,19 @@
       "desktop_owner": "Host routine/automation runtime owner",
       "desktop_visible_effect": "Durable routines execute and surface status/listener behavior consistently while the user may be away.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; iOS Agent prompt/runtime projection",
-      "ios_language": "Rust/Swift",
-      "ios_platform_delta": "",
-      "implementation_status": "mapped",
-      "production_evidence": "Feature Host owns AutomationSummary next/last run state and emits AutomationChanged events, but current audit has not located an equivalent authoritative automation-status system reminder injected into the production Agent turn.",
-      "test_evidence": "Run-history and automation event tests exist; reminder-clearing/supersession/firing-run-filter/timezone formatting tests remain required.",
-      "notes": "Current-main reviewed. Do not infer prompt-status parity from having AutomationSummary state.",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
-      "authority_review_state": "current-main-reviewed"
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/automation_status_reminder.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "iOS projects the same canonical account-scoped FeatureState automation roster directly into Agent prompt composition. The renderer uses ProductHostSettings user time zone and adapts recent-run selection to iOS's append-ordered AutomationSummary.runs by scanning newest-first; no second automation store, scheduler, or runtime owner is introduced.",
+      "implementation_status": "implemented",
+      "production_evidence": "Canonical owner: automation_status_reminder.rs render_automation_cleared_status_reminder/render_automation_runtime_status_reminder/create_automation_status_reminder. Shipping entrypoints: implementation.rs normal chat RuntimeCommand::SendMessage and group-agent RuntimeCommand::SendMessage; automation_execution.rs dispatch_pending_routine injects the firing-aware snapshot before the existing recoverable routine dispatch.",
+      "test_evidence": "Focused Rust tests in automation_status_reminder.rs cover cleared supersession, AUTOMATION_UI_LIMIT, enabled-only next-run, never-run/running/succeeded/failed labels, firing routine running-run filtering, and user-timezone rendering.",
+      "notes": "Desktop blob a67331f1b0d01247a55213706013b2a291e18f18 reviewed. Status is implemented only; exact-head CI has not yet verified this implementation.",
+      "exact_head_evidence": "pending exact-head GitHub Actions for this implementation commit",
+      "authority_review_state": "current-main-reviewed",
+      "ios_related_paths": [
+        "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+        "source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs"
+      ]
     },
     {
       "desktop_path": "source/host/src/automations/automation_store.rs",

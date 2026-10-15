@@ -175,6 +175,7 @@ use std::time::UNIX_EPOCH;
 use uuid::Uuid;
 
 include!("automation_execution.rs");
+include!("automation_status_reminder.rs");
 include!("background_recovery.rs");
 
 #[derive(Debug, thiserror::Error)]
@@ -10687,7 +10688,11 @@ impl FeatureHostController {
                 runtime_text,
             )
         };
-        let (context, conversation_id, runtime_text) = prepared;
+        let (context, conversation_id, mut runtime_text) = prepared;
+        let automation_status_reminder = self.create_automation_status_reminder(None)?;
+        runtime_text = format!(
+            "{automation_status_reminder}\n\n{runtime_text}"
+        );
         let response = self.runtime()?.execute(RuntimeCommand::SendMessage {
             conversation_id: ConversationId(conversation_id),
             text: runtime_text,
@@ -13347,6 +13352,10 @@ impl FeatureHostController {
                 }
             }
         }
+        let automation_status_reminder = self.create_automation_status_reminder(None)?;
+        runtime_text = format!(
+            "{automation_status_reminder}\n\n[Current turn]\n{runtime_text}"
+        );
         let response = self.runtime()?.execute(RuntimeCommand::SendMessage {
             conversation_id,
             text: runtime_text,
