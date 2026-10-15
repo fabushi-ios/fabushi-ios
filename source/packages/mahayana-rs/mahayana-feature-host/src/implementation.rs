@@ -15557,18 +15557,6 @@ fn listener_summary(
 const LISTENER_INTEGRATIONS_DASHBOARD_URL: &str =
     "https://cursor.com/dashboard?tab=integrations";
 
-fn listener_platform_slug(platform: ListenerPlatform) -> &'static str {
-    match platform {
-        ListenerPlatform::Slack => "slack",
-        ListenerPlatform::Github => "github",
-        ListenerPlatform::Git => "git",
-        ListenerPlatform::Teams => "teams",
-        ListenerPlatform::Linear => "linear",
-        ListenerPlatform::Sentry => "sentry",
-        ListenerPlatform::Pagerduty => "pagerduty",
-    }
-}
-
 fn collect_listener_filter_views(
     trigger: &AutomationTrigger,
     output: &mut Vec<Value>,
@@ -20708,7 +20696,7 @@ mod tests {
                 is_connected: true,
                 account_label: Some("Workspace".into()),
                 error: Some(
-                    r#"{"issues":[{"kind":"bot-not-in-channel","scope":"#private"},{"kind":"not-found","scope":"#missing"}]}"#.into(),
+                    r##"{"issues":[{"kind":"bot-not-in-channel","scope":"#private"},{"kind":"not-found","scope":"#missing"}]}"##.into(),
                 ),
             },
         ];
