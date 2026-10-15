@@ -444,6 +444,8 @@ mod production;
 mod local_exec_error;
 #[path = "../../../../host/extensions/cloud-agents/cloud-agent-launch-error.rs"]
 mod cloud_agent_launch_error;
+#[path = "../../../../host/extensions/cloud-agents/cloud-agent-trace-format.rs"]
+mod cloud_agent_trace_format;
 #[path = "../../../../host/runner/tools/tool-input-error.rs"]
 mod tool_input_error;
 #[path = "../../../../host/runner/sand-prompt-markers.rs"]
@@ -2049,6 +2051,24 @@ pub unsafe extern "C" fn mahayana_app_host_dispatch_with_handle(
 /// # Safety
 /// path must be a live NUL-terminated UTF-8-compatible path for the duration of
 /// this call. The returned pointer must be released with mahayana_app_host_free_string.
+/// Converts one generated Cursor ConversationMessage protobuf into canonical no-preamble trace rows.
+///
+/// # Safety
+/// When len is non-zero, bytes must reference at least len readable bytes for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mahayana_cloud_agent_trace_rows(bytes: *const u8, len: usize) -> *mut c_char {
+    let response = if bytes.is_null() && len != 0 {
+        serde_json::json!({"ok":false,"error":"cloud agent trace bytes pointer is null"})
+    } else {
+        let message = if len == 0 { Vec::new() } else { unsafe { std::slice::from_raw_parts(bytes, len) }.to_vec() };
+        match cloud_agent_trace_format::convert_generated_conversation_messages_to_no_preamble_trace(&[message]) {
+            Ok(rows) => serde_json::json!({"ok":true,"rows":rows}),
+            Err(error) => serde_json::json!({"ok":false,"error":error}),
+        }
+    };
+    CString::new(response.to_string()).expect("serialized trace JSON cannot contain NUL").into_raw()
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mahayana_spreadsheet_parse_file(
     path: *const c_char,

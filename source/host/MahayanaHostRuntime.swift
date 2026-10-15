@@ -197,3 +197,46 @@ final class MahayanaHostRuntime: MahayanaHostRequesting, @unchecked Sendable {
         return response["result"] ?? NSNull()
     }
 }
+
+struct MahayanaCloudAgentTraceDump: Equatable, Sendable {
+    let jsonl: Data
+    let rowCount: Int
+}
+
+enum MahayanaCloudAgentTrace {
+    static func jsonLines(messages: [Data]) throws -> MahayanaCloudAgentTraceDump {
+        var jsonl = Data()
+        var rowCount = 0
+        for message in messages {
+            let pointer: UnsafeMutablePointer<CChar>? = message.withUnsafeBytes { raw in
+                mahayana_cloud_agent_trace_rows(raw.bindMemory(to: UInt8.self).baseAddress, raw.count)
+            }
+            guard let pointer else { throw MahayanaHostRuntime.HostError.invalidResponse }
+            defer { mahayana_app_host_free_string(pointer) }
+            guard let data = String(cString: pointer).data(using: .utf8),
+                  let response = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { throw MahayanaHostRuntime.HostError.invalidResponse }
+            guard response["ok"] as? Bool == true else {
+                throw MahayanaHostRuntime.HostError.requestFailed(
+                    response["error"] as? String ?? "Cloud Agent transcript conversion failed"
+                )
+            }
+            guard let rows = response["rows"] as? [Any] else {
+                throw MahayanaHostRuntime.HostError.invalidResponse
+            }
+            for row in rows {
+                guard JSONSerialization.isValidJSONObject(row) else {
+                    throw MahayanaHostRuntime.HostError.invalidResponse
+                }
+                jsonl.append(try JSONSerialization.data(
+                    withJSONObject: row,
+                    options: [.sortedKeys, .withoutEscapingSlashes]
+                ))
+                jsonl.append(0x0A)
+                rowCount += 1
+            }
+        }
+        return MahayanaCloudAgentTraceDump(jsonl: jsonl, rowCount: rowCount)
+    }
+}
+

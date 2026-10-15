@@ -3126,10 +3126,43 @@ final class CoordinatorMcpSurface {
                     "dump is limited to cloud agents you launched, watched, or replied to this session (not \(id)). Use action \"watch\" with \(id) first."
                 )
             }
-            _ = try await dashboard.getBackgroundComposerConversation(bcId: id)
+            let info = try await dashboard.getBackgroundComposerInfo(bcId: id)
+            try Task.checkCancellation()
+            let conversation = try await dashboard.getBackgroundComposerConversation(bcId: id)
+            try Task.checkCancellation()
+            let dump = try MahayanaCloudAgentTrace.jsonLines(messages: conversation)
+            let status = cloudAgentStatusName(info.status).lowercased()
+            let progress: String
+            if status == "running" || status == "creating" {
+                progress = "The run is still in progress, so this is the transcript so far."
+            } else if status == "finished" {
+                progress = "The run has finished, so this is the complete transcript."
+            } else {
+                progress = "The run has ended, so this is the transcript as left."
+            }
+            guard dump.rowCount > 0 else {
+                return cloudAgentTextResult("Cloud agent \(id) hasn't produced any transcript output yet. \(progress)")
+            }
+            let path = "cloud-agent-transcripts/\(id).jsonl"
+            let write = try await dispatchRemoteExecution(
+                method: "local-exec.box.exec",
+                params: .object([
+                    "case": .string("writeArgs"),
+                    "args": .object([
+                        "path": .string(path),
+                        "fileBytes": .string(dump.jsonl.base64EncodedString()),
+                        "toolCallId": .string("\(toolCallId):cloud-agent-dump"),
+                    ]),
+                ])
+            )
+            try Task.checkCancellation()
+            guard let object = write.foundationValue as? [String: Any],
+                  object["success"] as? Bool == true
+            else {
+                throw SandMcpConfigError("Cloud Agent transcript Box write did not return success.")
+            }
             return cloudAgentTextResult(
-                "Cloud agent transcript bytes are available, but canonical generated ConversationMessage trace conversion and Box JSONL persistence are not wired through this route yet.",
-                isError: true
+                "Wrote \(id)'s full transcript to \(path) (\(dump.jsonl.count) bytes, \(dump.rowCount) message lines).\n\(progress)\nFormat: JSONL, one JSON message per line — role, text, reasoning/thinking, tool calls with args, and tool results."
             )
 
         default:

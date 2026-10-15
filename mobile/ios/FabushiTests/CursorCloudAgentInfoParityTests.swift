@@ -137,4 +137,41 @@ final class CursorCloudAgentInfoParityTests: XCTestCase {
             )
         )
     }
+
+    func testCloudAgentTranscriptBridgeProducesCanonicalJSONLRows() throws {
+        var human = Data()
+        human.append(cloudAgentString(1, "hello"))
+        human.append(cloudAgentVarint(2, 1))
+        var tool = Data()
+        tool.append(cloudAgentString(1, "call-shell"))
+        tool.append(cloudAgentString(2, "Shell"))
+        tool.append(cloudAgentString(5, "{\"cmd\":\"pwd\"}"))
+        tool.append(cloudAgentString(7, "{\"stdout\":\"/workspace\"}"))
+        tool.append(cloudAgentVarint(13, 100))
+        tool.append(cloudAgentVarint(14, 160))
+        var thinking = Data()
+        thinking.append(cloudAgentString(1, "reasoning"))
+        var assistant = Data()
+        assistant.append(cloudAgentString(1, "done"))
+        assistant.append(cloudAgentVarint(2, 2))
+        assistant.append(cloudAgentBytes(18, tool))
+        assistant.append(cloudAgentBytes(45, thinking))
+
+        let dump = try MahayanaCloudAgentTrace.jsonLines(messages: [human, assistant])
+        XCTAssertEqual(dump.rowCount, 3)
+        let text = try XCTUnwrap(String(data: dump.jsonl, encoding: .utf8))
+        let rows = try text.split(separator: "\n").map {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any])
+        }
+        XCTAssertEqual(rows[0]["role"] as? String, "user")
+        XCTAssertEqual(rows[1]["role"] as? String, "assistant")
+        XCTAssertEqual(rows[1]["thinking"] as? String, "reasoning")
+        let calls = try XCTUnwrap(rows[1]["tool_calls"] as? [[String: Any]])
+        XCTAssertEqual(calls[0]["tool_call_id"] as? String, "call-shell")
+        XCTAssertEqual((calls[0]["tool_args"] as? [String: Any])?["cmd"] as? String, "pwd")
+        XCTAssertEqual((calls[0]["duration_ms"] as? NSNumber)?.intValue, 60)
+        XCTAssertEqual(rows[2]["role"] as? String, "tool")
+        XCTAssertEqual((rows[2]["tool_result"] as? [String: Any])?["stdout"] as? String, "/workspace")
+    }
+
 }

@@ -1,3 +1,5 @@
+mod build_cloud_agent_trace;
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -72,4 +74,6 @@ fn main() {
     json.ignore_unknown_fields();
     json.build(&[".agent.v1"])
         .expect("generate canonical agent.v1 local-exec protobuf JSON");
+
+    build_cloud_agent_trace::generate_cloud_agent_trace_schema(&manifest_dir);
 }
