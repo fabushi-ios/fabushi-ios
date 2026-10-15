@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "92fcc2b0f64b6b8f8f8829305b30874b558d6b35",
+  "sourceCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
   "group": "source-mahayana",
-  "rowCount": 5330,
+  "rowCount": 5332,
   "rows": [
     {
       "desktop_path": "source/mahayana/codex-rs/.cargo/audit.toml",
@@ -75966,7 +75966,7 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-computer/Cargo.toml",
-      "desktop_blob_sha": "6818720a810d48743033f167d1d1e29f6019824f",
+      "desktop_blob_sha": "6c655664d3cab8620e72f039dcb0b2597b96838a",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "mahayana-runtime",
       "desktop_visible_effect": "pending-review",
@@ -75977,11 +75977,15 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-computer/src/lib.rs",
-      "desktop_blob_sha": "cd8c3f695f9bd26e0d781b269423de300bad7a39",
+      "desktop_blob_sha": "f85efcd381bbf3000b43f773c1b63fa56a50e0e5",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "mahayana-runtime",
       "desktop_visible_effect": "pending-review",
@@ -75992,7 +75996,43 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
+    },
+    {
+      "desktop_path": "source/mahayana/mahayana-rs/mahayana-computer/src/linux_native.rs",
+      "desktop_blob_sha": "8fa237300654173f187e6cc7c9387e7148cefa14",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "mahayana",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
+    },
+    {
+      "desktop_path": "source/mahayana/mahayana-rs/mahayana-computer/src/windows_native.rs",
+      "desktop_blob_sha": "d67554bcaf7b62581d031a884a0f306ad249acf8",
+      "desktop_responsibility": "pending-review",
+      "desktop_owner": "mahayana",
+      "desktop_visible_effect": "pending-review",
+      "ios_disposition": "unreviewed",
+      "ios_target_path": "",
+      "ios_language": "",
+      "ios_platform_delta": "",
+      "implementation_status": "unreviewed",
+      "production_evidence": "",
+      "test_evidence": "",
+      "notes": "Added on Desktop main b6a66fd2; current-main responsibility/owner/iOS replacement review required.",
+      "authority_review_state": "requires-current-main-review"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-conversation/Cargo.toml",
@@ -76566,7 +76606,7 @@
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-host-protocol/src/lib.rs",
-      "desktop_blob_sha": "b0162f44c1b8cb8f906f44eb93cffb67133dc081",
+      "desktop_blob_sha": "0bdc09b25c9b97ca3dd42a3ba938237b8a686813",
       "desktop_responsibility": "pending-review",
       "desktop_owner": "mahayana-runtime",
       "desktop_visible_effect": "pending-review",
@@ -76577,7 +76617,11 @@
       "implementation_status": "unreviewed",
       "production_evidence": "",
       "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited. Exact-HEAD rebaseline 371b72f1 -> b6a66fd2 changed this upstream identity; prior acceptance evidence is historical until current-main review and descendant CI.",
+      "historical_implementation_status": "unreviewed",
+      "historical_ios_disposition": "unreviewed",
+      "authority_review_state": "requires-current-main-review",
+      "exact_head_evidence": "predecessor-only after Desktop b6a66fd2 rebaseline"
     },
     {
       "desktop_path": "source/mahayana/mahayana-rs/mahayana-host/Cargo.toml",
