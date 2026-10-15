@@ -2613,6 +2613,89 @@ mod mobile_turn_execution_composition_tests {
     }
 
     #[test]
+    fn mobile_experiment_projection_reaches_host_owned_runtime_consumers() {
+        let root = temp_dir();
+        let host = MobileAppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test).unwrap();
+
+        let apply = serde_json::json!({
+            "id": "experiments-1",
+            "method": "mobile.experiments.applyEffectiveFeatureGates",
+            "params": {
+                "featureGates": {
+                    codebase_telemetry::CODEBASE_TELEMETRY_FEATURE_GATE: true,
+                    notify_bus::SAND_NOTIFY_BUS_GATE: false,
+                    notify_bus::SAND_NOTIFY_SAFETY_POLL_GATE: true
+                }
+            }
+        });
+        let response: serde_json::Value =
+            serde_json::from_str(&host.dispatch_json(&apply.to_string())).unwrap();
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["applied"], true);
+
+        let telemetry_bridge = MobileCodebaseTelemetryBridge {
+            host: host.host.clone(),
+            experiments: Arc::clone(&host.experiment_projection),
+        };
+        let notify_bridge = MobileNotifyBusBridge {
+            host: host.host.clone(),
+            experiments: Arc::clone(&host.experiment_projection),
+        };
+        assert_eq!(
+            codebase_telemetry::CodebaseTelemetryHostBridge::feature_gate(
+                &telemetry_bridge,
+                codebase_telemetry::CODEBASE_TELEMETRY_FEATURE_GATE,
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            notify_bus::NotifyBusHostBridge::feature_gate(
+                &notify_bridge,
+                notify_bus::SAND_NOTIFY_BUS_GATE,
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            notify_bus::NotifyBusHostBridge::feature_gate(
+                &notify_bridge,
+                notify_bus::SAND_NOTIFY_SAFETY_POLL_GATE,
+            ),
+            Some(true)
+        );
+
+        let replace = serde_json::json!({
+            "id": "experiments-2",
+            "method": "mobile.experiments.applyEffectiveFeatureGates",
+            "params": {
+                "featureGates": {
+                    codebase_telemetry::CODEBASE_TELEMETRY_FEATURE_GATE: false
+                }
+            }
+        });
+        let response: serde_json::Value =
+            serde_json::from_str(&host.dispatch_json(&replace.to_string())).unwrap();
+        assert_eq!(response["ok"], true);
+        assert_eq!(
+            codebase_telemetry::CodebaseTelemetryHostBridge::feature_gate(
+                &telemetry_bridge,
+                codebase_telemetry::CODEBASE_TELEMETRY_FEATURE_GATE,
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            notify_bus::NotifyBusHostBridge::feature_gate(
+                &notify_bridge,
+                notify_bus::SAND_NOTIFY_SAFETY_POLL_GATE,
+            ),
+            None,
+            "runtime projection replacement must not preserve stale gates"
+        );
+
+        drop(host);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn shipping_mobile_host_starts_and_binds_turn_execution() {
         let root = temp_dir();
         let host = MobileAppHost::new_with_feature_mode(&root, AppHostFeatureMode::Test).unwrap();
