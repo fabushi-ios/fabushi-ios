@@ -5365,7 +5365,7 @@
     {
       "desktop_path": "source/host/src/extensions/telemetry/disk_pressure_telemetry.rs",
       "desktop_blob_sha": "d33f9a80ac477a6c3aa7d2076eb1985f40c1a762",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Project disk-pressure reports into canonical Host telemetry severity and metadata while preserving volume, trigger, capacity, available bytes, used percent, and pressure level.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Disk-pressure conditions are emitted with the correct telemetry severity and storage-pressure metadata so production diagnostics can distinguish hard, soft, and informational pressure states.",
       "ios_disposition": "direct-port",
@@ -5735,7 +5735,7 @@
     {
       "desktop_path": "source/host/src/extensions/telemetry/search_index_health_telemetry.rs",
       "desktop_blob_sha": "7b31c399b612b7ae1f766eda628d7ffa33806a53",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Project search-index lifecycle and recovery health reports into the canonical sand.search_index.health telemetry event with stable severity and optional recovery metadata.",
       "desktop_owner": "host",
       "desktop_visible_effect": "Search-index failures, retries, termination issues, and recovery stages become diagnosable production telemetry with stable event identity and metadata.",
       "ios_disposition": "direct-port",
