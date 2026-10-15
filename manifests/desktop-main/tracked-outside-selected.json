@@ -1863,9 +1863,10 @@
       "type": "blob",
       "sha": "d24f59cb4fec3cf8bb8b0acf2eb9fa0483ac8cb0",
       "size": 1603,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop marks this quality governance set active/normative and binds requirement→oracle→test→Actions evidence→independent acceptance. iOS final acceptance must preserve this evidence discipline; the document itself is not implementation evidence.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/TEST_STRATEGY.md",
@@ -1873,9 +1874,10 @@
       "type": "blob",
       "sha": "231b2e7b59e9abec0451447f0921d84b45617b93",
       "size": 2749,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires layered unit/property/contract/integration/packaged E2E/temporal/UI/a11y/fault/security/performance/soak and independent review, with blocked/skipped/flaky not counted as pass. These are applicable release-quality responsibilities for iOS and remain only partially evidenced.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/defect-regression-policy.md",
@@ -1883,9 +1885,10 @@
       "type": "blob",
       "sha": "b31ecd424cac2abf8a2322e2996bb1b53c561378",
       "size": 1061,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires reproducible defect records, escaped-defect gap analysis, regression at the earliest reasonable layer, and treats critical flakiness as blocking. iOS exact-head release evidence must obey the same closure semantics.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/evidence-contract.md",
@@ -1893,9 +1896,10 @@
       "type": "blob",
       "sha": "af4e5cee4c1ba887da90b8f2552970f0b928acd0",
       "size": 908,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop passing evidence requires exact target SHA plus workflow/run/job/case/environment/artifact ID+digest and demotes old evidence when source/spec changes. This directly matches iOS exact-head acceptance requirements and remains open until final artifacts are recorded.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/exploratory-test-plan.md",
@@ -1903,9 +1907,10 @@
       "type": "blob",
       "sha": "b5531c336f6a5fe23df467589267f845dac64b22",
       "size": 947,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires packaged temporal/product/security journeys with retained video/timeline/screens/logs and independent reviewer verdict. iOS has not yet closed equivalent final packaged/device exploratory acceptance.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/conversation-turn-oracle.md",
@@ -1913,9 +1918,10 @@
       "type": "blob",
       "sha": "600a1f32f5c2a558e48e0139f23a08763d61aac0",
       "size": 1069,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop turn invariants require exactly one terminal outcome, no terminal disappearance/regression across switch/reconnect/reload/restart, owner stability, cancellation fencing and semantic persistence. These are applicable messaging/Agent runtime oracles for iOS.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/reconciliation-oracle.md",
@@ -1923,9 +1929,10 @@
       "type": "blob",
       "sha": "938115d39e74233e45b6d86ab47902e202ad66bc",
       "size": 1080,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop reconciliation requires idempotent replay, reorder convergence, optimistic/authoritative merge, richer-text preservation, attachment merge and account/conversation isolation. These are applicable iOS sync/recovery invariants and need final exact-head evidence.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/share-forward-recipient-oracle.md",
@@ -1933,9 +1940,10 @@
       "type": "blob",
       "sha": "653e208507e2cda0ed9e67a3ab65c6e39d1e0d44",
       "size": 2080,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires forward privacy normalization in canonical state and recipient authorization before exposure, including media/poll/channel/community restrictions. Applicable messaging/privacy/search responsibility; renderer hiding is not authorization.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/oracles/transcript-ordering-oracle.md",
@@ -1943,9 +1951,10 @@
       "type": "blob",
       "sha": "91bd14506fcd7a774c34b8751f9aa839134c9bcc",
       "size": 909,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop canonical/presentation ordering, dedupe, optimistic merge, late-baseline handling, deterministic tool/final order, pagination and restart stability are applicable transcript invariants for iOS.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/functional-test-plan.md",
@@ -1953,9 +1962,10 @@
       "type": "blob",
       "sha": "7aba229cdacf75b944ec74c3ac07abc7f7019495",
       "size": 945,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop functional plan covers identity, conversations, messaging, Agent, resources, search, calls/media, MCP/Marketplace, computer, settings/notifications and commerce with positive/boundary/negative/persistence/permission cases. iOS final acceptance must cover applicable domains with real shipping paths.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/performance-soak-test-plan.md",
@@ -1963,9 +1973,10 @@
       "type": "blob",
       "sha": "0dc62e3c270cfbe040582fedfc153dcaaffce254",
       "size": 719,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires large-data and long-running workload measurements for latency, CPU/memory, disk/DB growth, idle resources and leak/duplication drift. iOS IOS-MAIN performance/soak acceptance remains pending.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/security-privacy-test-plan.md",
@@ -1973,9 +1984,10 @@
       "type": "blob",
       "sha": "f6d6672988d46c06152f4e2f5ff585fecc424141",
       "size": 756,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires cross-account, revoked-session, permission downgrade, stale nonce/session, duplicate request, cancel/dispose, secret-log and unsafe URL/file negatives with fail-closed cleanup. Applicable iOS P0/P1 security/privacy gate remains open.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/temporal-reliability-test-plan.md",
@@ -1983,9 +1995,10 @@
       "type": "blob",
       "sha": "776c2f07c450ccbd1bc6a3956d3c4c1622e491d0",
       "size": 1139,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires post-terminal settlement checkpoints through switch/reconnect/reload/restart plus seeded delay/drop/duplicate/reorder faults. Applicable iOS lifecycle/recovery acceptance remains pending.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/plans/ui-test-plan.md",
@@ -1993,9 +2006,10 @@
       "type": "blob",
       "sha": "8288b196ff57d36c254dc38178c3c808f59ae909",
       "size": 1227,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop separates UI functional and presentation/a11y pass axes and covers routes, states, responsive/locale/theme, temporal UI, keyboard/focus/screen reader and large data. iOS native UI must satisfy equivalent product effects on iPhone/iPad.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/release-acceptance-report-template.md",
@@ -2003,9 +2017,10 @@
       "type": "blob",
       "sha": "48e5c29f212a06dd371738bf4046a64273148a52",
       "size": 762,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop release verdict records exact candidate/upstream, RTM coverage, layered gate status, defects, artifact digests and independent verdict. Applicable structure for iOS final independent acceptance; no ACCEPT exists yet.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/release-entry-exit-criteria.md",
@@ -2013,9 +2028,10 @@
       "type": "blob",
       "sha": "40cd3550809beb5192a0392b899154baa3a1d5b8",
       "size": 732,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop exit requires 100% applicable RTM evidence, P0/P1/temporal/UI/recovery/perf/security pass, no blocker/flaky/skipped/not-run and independent acceptance. iOS is far from these exit conditions.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/quality/requirements-traceability-matrix.md",
@@ -2023,9 +2039,10 @@
       "type": "blob",
       "sha": "758f240fb8a6cd52152900f49fcdccff3f723b56",
       "size": 11544,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-normative-quality-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop RTM requires every applicable AC to trace bidirectionally to oracle/invariant/tests/exact evidence/reviewer/verdict; TBD cannot be verified. iOS selected/outside-selected/dependency and IOS-MAIN AC evidence remain incomplete.",
+      "notes": "Applicable verification/release responsibility. This review closes classification only, not the underlying iOS production or exact-head acceptance gap."
     },
     {
       "path": "projects/fabushi-communication-platform/telegram-capability-graph.md",
