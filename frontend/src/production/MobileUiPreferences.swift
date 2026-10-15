@@ -686,11 +686,7 @@ internal final class MobileUiPreferencesStore {
     }
 
     var preferredColorScheme: ColorScheme? {
-        switch themePreference {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
-        }
+        themePreference.mobilePreferredColorScheme
     }
 
     func setThemePreference(_ preference: FabushiThemePreference) {
@@ -760,7 +756,7 @@ extension EnvironmentValues {
 
 
 extension FabushiThemePreference {
-    internal var mobilePreferredColorSchemeForTests: ColorScheme? {
+    internal var mobilePreferredColorScheme: ColorScheme? {
         switch self {
         case .system: return nil
         case .light: return .light
