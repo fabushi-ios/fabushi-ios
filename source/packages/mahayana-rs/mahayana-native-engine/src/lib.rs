@@ -7013,4 +7013,75 @@ mod tests {
         assert!(matches!(error, KernelError::Backend(_)));
     }
 
+    #[tokio::test]
+    async fn async_ask_question_completion_rejects_non_terminal_and_dedupes_terminal_receipt() {
+        let model = Arc::new(FakeModel {
+            outputs: Mutex::new(VecDeque::new()),
+        });
+        let engine = NativeEngine::new(model, NativeEngineConfig::embedded("model")).expect("engine");
+        let session = engine
+            .open_session(OpenSessionRequest {
+                profile: mahayana_kernel::RuntimeProfile::MobileEmbedded,
+                workspace_root: None,
+                model: None,
+                metadata: Value::Null,
+            })
+            .await
+            .expect("session");
+        let operation_id = OperationId::new();
+        let control = OperationControl::default();
+        let events = Arc::new(Events::default());
+        let invalid = engine
+            .apply_async_ask_question_completion(
+                &session,
+                &operation_id,
+                "call-async-1",
+                &json!({"title":"Pick","questions":[]}),
+                &json!({"result":{"case":"async","value":{}}}),
+                0,
+                &control,
+                events.clone(),
+            )
+            .await
+            .expect("invalid result is dropped");
+        assert_eq!(invalid, AsyncAskQuestionCompletionOutcome::Invalid);
+
+        let result = json!({"result":{"case":"success","value":{"answers":[]}}});
+        let applied = engine
+            .apply_async_ask_question_completion(
+                &session,
+                &operation_id,
+                "call-async-1",
+                &json!({"title":"Pick","questions":[]}),
+                &result,
+                0,
+                &control,
+                events.clone(),
+            )
+            .await
+            .expect("terminal result applies");
+        assert_eq!(applied, AsyncAskQuestionCompletionOutcome::AppliedContinuation);
+
+        let duplicate = engine
+            .apply_async_ask_question_completion(
+                &session,
+                &operation_id,
+                "call-async-1",
+                &json!({"title":"Pick","questions":[]}),
+                &result,
+                0,
+                &control,
+                events,
+            )
+            .await
+            .expect("duplicate is suppressed");
+        assert_eq!(duplicate, AsyncAskQuestionCompletionOutcome::AlreadyApplied);
+
+        let state = engine.session(&session).expect("state").lock().await;
+        assert_eq!(state.completed_tool_results.len(), 1);
+        assert!(state.history.iter().any(|item| item["type"] == "function_call" && item["call_id"] == "call-async-1"));
+        assert!(state.history.iter().any(|item| item["type"] == "function_call_output"));
+    }
+
+
 }
