@@ -279,7 +279,11 @@ impl FeatureHostController {
             now,
             user_time_zone.as_deref(),
         );
-        item.runs.push(AutomationRunSummary { id: run_id.clone(), status: AutomationRunStatus::Running, started_at: now, detail: None, event: routine_event_label(&execution.trigger) });
+        item.runs.push(AutomationRunSummary { id: run_id.clone(), status: AutomationRunStatus::Running, started_at: now, detail: None, event: routine_event_label(&execution.trigger).and_then(|value| clamp_automation_run_detail(Some(&value))) });
+        if item.runs.len() > AUTOMATION_MAX_RUN_HISTORY {
+            let excess = item.runs.len() - AUTOMATION_MAX_RUN_HISTORY;
+            item.runs.drain(0..excess);
+        }
         let snapshot = item.clone();
         // Preserve the existing listener projection contract on this same,
         // durable admission. Manual Run now must never claim an event happened.
@@ -441,7 +445,14 @@ impl FeatureHostController {
         let current = state.routine_executions.get_mut(run_id).expect("owned routine"); current.phase = RoutinePhase::TerminalPending; current.terminal = Some(terminal.clone());
         self.persist_routine_executions(&state)?;
         let snapshot = if let Some(automation) = state.automations.get_mut(automation_id) {
-            if let Some(run) = automation.runs.iter_mut().find(|run| run.id == run_id) { run.status = terminal.status.clone(); run.detail = terminal.detail.clone(); }
+            if let Some(run) = automation.runs.iter_mut().find(|run| run.id == run_id) {
+                run.status = terminal.status.clone();
+                run.detail = clamp_automation_run_detail(terminal.detail.as_deref());
+            }
+            if automation.runs.len() > AUTOMATION_MAX_RUN_HISTORY {
+                let excess = automation.runs.len() - AUTOMATION_MAX_RUN_HISTORY;
+                automation.runs.drain(0..excess);
+            }
             Some(automation.clone())
         } else { None };
         self.persist_automations(&state.automations)?;
@@ -643,7 +654,13 @@ impl FeatureHostController {
                 });
             }
             if execution.phase == RoutinePhase::RecoveryRequired {
-                if let Some(run) = automation.runs.iter_mut().find(|run| run.id == execution.run_id) { run.detail = Some("Checkpoint recovery required after lifecycle interruption; not replayed".into()); }
+                if let Some(run) = automation.runs.iter_mut().find(|run| run.id == execution.run_id) {
+                    run.detail = clamp_automation_run_detail(Some("Checkpoint recovery required after lifecycle interruption; not replayed"));
+                }
+            }
+            if automation.runs.len() > AUTOMATION_MAX_RUN_HISTORY {
+                let excess = automation.runs.len() - AUTOMATION_MAX_RUN_HISTORY;
+                automation.runs.drain(0..excess);
             }
         }
         state.routine_executions = restored;
