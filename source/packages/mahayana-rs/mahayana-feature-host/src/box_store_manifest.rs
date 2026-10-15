@@ -202,6 +202,16 @@ fn manifest_entry_value(entry: &BoxStoreManifestEntry) -> Value {
     Value::Object(value)
 }
 
+pub fn manifest_entries_value(
+    entries: &BTreeMap<String, BoxStoreManifestEntry>,
+) -> Value {
+    let mut serialized_entries = Map::new();
+    for (path, entry) in entries {
+        serialized_entries.insert(path.clone(), manifest_entry_value(entry));
+    }
+    Value::Object(serialized_entries)
+}
+
 pub fn manifest_value(manifest: &BoxStoreManifest) -> Value {
     let mut serialized_entries = Map::new();
     for (path, entry) in &manifest.entries {

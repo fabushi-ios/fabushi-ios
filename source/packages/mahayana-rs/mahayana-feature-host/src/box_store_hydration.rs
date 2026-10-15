@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
@@ -190,6 +191,143 @@ pub fn restore_symlink_atomic(
     Ok(())
 }
 
+
+fn local_mode(metadata: &fs::Metadata) -> u32 {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        metadata.permissions().mode() & 0o777
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        0o600
+    }
+}
+
+fn rel_path_string(root: &Path, path: &Path) -> Result<String, String> {
+    let relative = path
+        .strip_prefix(root)
+        .map_err(|_| "snapshot path escaped Agent root".to_string())?;
+    let mut parts = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(value) => {
+                let value = value
+                    .to_str()
+                    .ok_or_else(|| "snapshot path is not valid UTF-8".to_string())?;
+                if value.is_empty() {
+                    return Err("snapshot path contains an empty component".into());
+                }
+                parts.push(value);
+            }
+            _ => return Err("snapshot path contains an unsafe component".into()),
+        }
+    }
+    if parts.is_empty() {
+        return Err("snapshot path must not resolve to Agent root".into());
+    }
+    Ok(parts.join("/"))
+}
+
+fn walk_snapshot_root(
+    root: &Path,
+    current: &Path,
+    out: &mut BTreeMap<String, BoxStoreManifestEntry>,
+) -> Result<(), String> {
+    let read_dir = match fs::read_dir(current) {
+        Ok(read_dir) => read_dir,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && current == root => {
+            return Ok(());
+        }
+        Err(error) => return Err(error.to_string()),
+    };
+    let mut children = read_dir
+        .map(|entry| entry.map_err(|error| error.to_string()))
+        .collect::<Result<Vec<_>, _>>()?;
+    children.sort_by_key(|entry| entry.file_name());
+
+    for child in children {
+        let path = child.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
+        let rel_path = rel_path_string(root, &path)?;
+        if resolve_restore_destination(root, &rel_path).is_none() {
+            return Err(format!("unsafe local snapshot path: {rel_path}"));
+        }
+        let file_type = metadata.file_type();
+        if file_type.is_symlink() {
+            let target = fs::read_link(&path).map_err(|error| error.to_string())?;
+            let target = target
+                .to_str()
+                .ok_or_else(|| format!("symlink target is not UTF-8: {rel_path}"))?;
+            if !symlink_target_stays_within_root(root, &path, target) {
+                return Err(format!("unsafe local snapshot symlink target: {rel_path}"));
+            }
+            out.insert(
+                rel_path,
+                BoxStoreManifestEntry::Symlink {
+                    target: target.to_string(),
+                },
+            );
+        } else if file_type.is_dir() {
+            walk_snapshot_root(root, &path, out)?;
+        } else if file_type.is_file() {
+            let bytes = fs::read(&path).map_err(|error| error.to_string())?;
+            let sha = format!("{:x}", Sha256::digest(&bytes));
+            out.insert(
+                rel_path,
+                BoxStoreManifestEntry::File {
+                    sha,
+                    size: bytes.len() as u64,
+                    mode: local_mode(&metadata),
+                },
+            );
+        } else {
+            return Err(format!("unsupported local snapshot node: {rel_path}"));
+        }
+    }
+    Ok(())
+}
+
+pub fn snapshot_local_agent_root(
+    target_root: &Path,
+) -> Result<BTreeMap<String, BoxStoreManifestEntry>, String> {
+    let mut entries = BTreeMap::new();
+    walk_snapshot_root(target_root, target_root, &mut entries)?;
+    Ok(entries)
+}
+
+pub fn read_snapshot_file(
+    target_root: &Path,
+    rel_path: &str,
+    entry: &BoxStoreManifestEntry,
+) -> Result<Vec<u8>, String> {
+    let destination = resolve_restore_destination(target_root, rel_path)
+        .ok_or_else(|| format!("unsafe local snapshot read path: {rel_path}"))?;
+    let metadata = fs::symlink_metadata(&destination).map_err(|error| error.to_string())?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(format!("local snapshot file changed type: {rel_path}"));
+    }
+    let bytes = fs::read(&destination).map_err(|error| error.to_string())?;
+    let (sha, size) = match entry {
+        BoxStoreManifestEntry::LegacyFile { sha, size }
+        | BoxStoreManifestEntry::File { sha, size, .. } => (sha.as_str(), *size),
+        BoxStoreManifestEntry::Symlink { .. } => {
+            return Err("symlink entry cannot be read as snapshot blob".into());
+        }
+    };
+    verify_blob(&bytes, sha, size)?;
+    Ok(bytes)
+}
+
+pub fn blob_rel_path(sha: &str) -> Result<String, String> {
+    let sha = sha.trim().to_ascii_lowercase();
+    if sha.len() != 64 || !sha.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("box store blob sha must be 64 lowercase-compatible hex characters".into());
+    }
+    Ok(format!("{BOX_STORE_BLOBS_PREFIX}/{sha}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,6 +368,44 @@ mod tests {
         assert_eq!(restored, bytes.len() as u64);
         assert_eq!(fs::read(root.join("memory/state.bin")).unwrap(), bytes);
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn local_snapshot_hashes_files_and_rejects_escaping_symlinks() {
+        let root = test_root();
+        fs::create_dir_all(root.join("memory")).unwrap();
+        fs::write(root.join("memory/state.bin"), b"durable-state").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("state.bin", root.join("memory/latest")).unwrap();
+
+        let entries = snapshot_local_agent_root(&root).expect("snapshot");
+        let state = entries.get("memory/state.bin").expect("file entry");
+        let bytes = read_snapshot_file(&root, "memory/state.bin", state).expect("snapshot read");
+        assert_eq!(bytes, b"durable-state");
+        #[cfg(unix)]
+        assert!(matches!(
+            entries.get("memory/latest"),
+            Some(BoxStoreManifestEntry::Symlink { target }) if target == "state.bin"
+        ));
+
+        #[cfg(unix)]
+        {
+            fs::remove_file(root.join("memory/latest")).unwrap();
+            std::os::unix::fs::symlink("../../../outside", root.join("memory/latest")).unwrap();
+            assert!(snapshot_local_agent_root(&root).is_err());
+        }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn blob_rel_path_requires_content_address_sha() {
+        assert_eq!(
+            blob_rel_path("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+                .expect("blob path"),
+            "blobs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+        assert!(blob_rel_path("deadbeef").is_err());
+        assert!(blob_rel_path(&"z".repeat(64)).is_err());
     }
 
     #[test]

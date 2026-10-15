@@ -8269,6 +8269,158 @@ impl FeatureHostController {
         }))
     }
 
+    pub fn agent_store_snapshot_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
+
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        if !is_safe_memory_agent_id(agent_id) {
+            return Err(FeatureHostError::Contract("unsafe Agent Store snapshot identity".into()));
+        }
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            if !state.bots.contains_key(agent_id) {
+                return Err(FeatureHostError::Contract(format!(
+                    "unknown Agent Store snapshot owner: {agent_id}"
+                )));
+            }
+        }
+
+        let account_scope = self.channel_account_id()?;
+        let account_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store local snapshot root is unavailable".into(),
+            ))?;
+        let target_root = account_root.join(agent_id);
+        let entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
+            .map_err(FeatureHostError::Contract)?;
+        let assert_scope = || -> Result<(), FeatureHostError> {
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store snapshot account scope changed".into(),
+                ));
+            }
+            Ok(())
+        };
+
+        let mut uploaded = 0_u64;
+        let mut reused = 0_u64;
+        let mut bytes_uploaded = 0_u64;
+        let mut uploaded_shas = BTreeSet::new();
+
+        for (rel_path, entry) in &entries {
+            let (sha, size) = match entry {
+                crate::box_store_manifest::BoxStoreManifestEntry::LegacyFile { sha, size }
+                | crate::box_store_manifest::BoxStoreManifestEntry::File { sha, size, .. } => {
+                    (sha.as_str(), *size)
+                }
+                crate::box_store_manifest::BoxStoreManifestEntry::Symlink { .. } => continue,
+            };
+            if !uploaded_shas.insert(sha.to_string()) {
+                continue;
+            }
+            if size > MAX_AGENT_STORE_OBJECT_BYTES as u64 {
+                return Err(FeatureHostError::Contract(format!(
+                    "Agent Store snapshot object exceeds 8 MiB transport limit: {rel_path}"
+                )));
+            }
+
+            assert_scope()?;
+            let bytes = crate::box_store_hydration::read_snapshot_file(
+                &target_root,
+                rel_path,
+                entry,
+            )
+            .map_err(FeatureHostError::Contract)?;
+            assert_scope()?;
+            let blob_path = crate::box_store_hydration::blob_rel_path(sha)
+                .map_err(FeatureHostError::Contract)?;
+            let existing = self.agent_store_read(agent_id, &blob_path)?;
+            if existing.get("found").and_then(Value::as_bool) == Some(true) {
+                let data_base64 = existing
+                    .get("dataBase64")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| FeatureHostError::Contract(format!(
+                        "Agent Store existing blob omitted dataBase64: {sha}"
+                    )))?;
+                let remote = base64::engine::general_purpose::STANDARD
+                    .decode(data_base64)
+                    .map_err(|_| FeatureHostError::Contract(format!(
+                        "Agent Store existing blob is invalid base64: {sha}"
+                    )))?;
+                if remote.len() as u64 != size
+                    || format!("{:x}", Sha256::digest(&remote)) != sha
+                {
+                    return Err(FeatureHostError::Contract(format!(
+                        "Agent Store content-addressed blob is corrupt: {sha}"
+                    )));
+                }
+                reused = reused.saturating_add(1);
+                continue;
+            }
+
+            let outcome = self.agent_store_write(
+                agent_id,
+                &blob_path,
+                &base64::engine::general_purpose::STANDARD.encode(&bytes),
+                None,
+                true,
+            )?;
+            if outcome.get("outcome").and_then(Value::as_str) == Some("conflict") {
+                let canonical = self.agent_store_read(agent_id, &blob_path)?;
+                let data_base64 = canonical
+                    .get("dataBase64")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| FeatureHostError::Contract(format!(
+                        "Agent Store concurrent blob write has no canonical object: {sha}"
+                    )))?;
+                let remote = base64::engine::general_purpose::STANDARD
+                    .decode(data_base64)
+                    .map_err(|_| FeatureHostError::Contract(format!(
+                        "Agent Store concurrent canonical blob is invalid base64: {sha}"
+                    )))?;
+                if remote.len() as u64 != size
+                    || format!("{:x}", Sha256::digest(&remote)) != sha
+                {
+                    return Err(FeatureHostError::Contract(format!(
+                        "Agent Store concurrent canonical blob does not match content address: {sha}"
+                    )));
+                }
+                reused = reused.saturating_add(1);
+            } else {
+                uploaded = uploaded.saturating_add(1);
+                bytes_uploaded = bytes_uploaded.saturating_add(size);
+            }
+            assert_scope()?;
+        }
+
+        let entries_value = crate::box_store_manifest::manifest_entries_value(&entries);
+        assert_scope()?;
+        let writer_window_id = format!("ios-{}", Uuid::new_v4().simple());
+        let manifest = self.agent_store_manifest_reconcile(
+            agent_id,
+            &entries_value,
+            Some(&writer_window_id),
+            Some(true),
+        )?;
+        assert_scope()?;
+
+        Ok(json!({
+            "outcome": "snapshotted",
+            "manifest": manifest,
+            "entries": entries.len(),
+            "uploadedBlobs": uploaded,
+            "reusedBlobs": reused,
+            "uploadedBytes": bytes_uploaded,
+        }))
+    }
+
     /// Native settings surfaces use a direct MCP snapshot so they never drain
     /// the renderer's shared HostEvent queue while waiting for settings data.
     pub fn mcp_servers_snapshot(&self) -> Result<Vec<Value>, FeatureHostError> {

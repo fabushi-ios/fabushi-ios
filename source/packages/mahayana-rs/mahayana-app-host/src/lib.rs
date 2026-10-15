@@ -1247,6 +1247,7 @@ impl AppHost {
             "feature.agentStore.manifestWrite" => self.feature_agent_store_manifest_write(params),
             "feature.agentStore.manifestReconcile" => self.feature_agent_store_manifest_reconcile(params),
             "feature.agentStore.hydrateAgent" => self.feature_agent_store_hydrate_agent(params),
+            "feature.agentStore.snapshotAgent" => self.feature_agent_store_snapshot_agent(params),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1628,6 +1629,12 @@ impl AppHost {
     fn feature_agent_store_hydrate_agent(&self, params: Value) -> Result<Value, AppHostError> {
         self.feature
             .agent_store_hydrate_agent(string_param(&params, "agentId")?)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_snapshot_agent(&self, params: Value) -> Result<Value, AppHostError> {
+        self.feature
+            .agent_store_snapshot_agent(string_param(&params, "agentId")?)
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
