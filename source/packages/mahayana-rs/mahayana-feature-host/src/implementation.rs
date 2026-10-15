@@ -14894,12 +14894,22 @@ fn normalize_automation_trigger(
             event,
             filter,
             filters,
-        } => Ok(AutomationTrigger::Event {
-            source,
-            event: required(event, "automation event")?,
-            filter: filter.filter(|value| !value.trim().is_empty()),
-            filters: filters.filter(|value| !value.is_empty()),
-        }),
+        } => {
+            let event = normalize_trigger_token(
+                &required(event, "automation event")?,
+                TRIGGER_MAX_ID_LENGTH,
+            );
+            let filter = filter
+                .map(|value| normalize_trigger_token(&value, TRIGGER_MAX_KEYWORD_LENGTH))
+                .filter(|value| !value.is_empty());
+            let filters = normalize_automation_event_filters(source, &event, filters)?;
+            Ok(AutomationTrigger::Event {
+                source,
+                event,
+                filter,
+                filters,
+            })
+        },
         AutomationTrigger::Group { listeners } => {
             if listeners.len() < 2 || listeners.len() > 8 {
                 return Err(FeatureHostError::Contract(
@@ -21555,12 +21565,15 @@ mod tests {
                     agent_id: None,
                     name: id.into(),
                     prompt: "Handle events.".into(),
-                    schedule: "event:github:push".into(),
+                    schedule: "event:github:pr-pushed".into(),
                     trigger: Some(AutomationTrigger::Event {
                         source: ListenerPlatform::Github,
-                        event: "push".into(),
+                        event: "pr-pushed".into(),
                         filter: None,
-                        filters: None,
+                        filters: Some(BTreeMap::from([
+                            ("repo".into(), json!("owner/repo")),
+                            ("events".into(), json!(["pr-pushed"])),
+                        ])),
                     }),
                     enabled: true,
                 })
