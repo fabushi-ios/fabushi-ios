@@ -2103,9 +2103,10 @@
       "type": "blob",
       "sha": "5d8d329e8ef7e97933d14a86d649d7847e2ca416",
       "size": 2054263,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-historical-architecture-mapping-authority",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop frozen-reference architecture manifest has 2,002 module rows and requires implemented mappings to have target plus separate behavioral/test evidence, with strict final-status policy. It is historical architecture/provenance authority, not proof that current iOS responsibilities are implemented.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
@@ -2388,9 +2389,10 @@
       "type": "blob",
       "sha": "5d71d7e2d79e05dc0260734c88d7e1538a15e767",
       "size": 4570,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable TDRP audit verifies exact Boost source archive URL/digest, build-log digest and classifies acquisition candidates fail-closed; it is recursive build/source provenance tooling.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/audit-tdrp-recursive-build-reachability.mjs",
@@ -2398,9 +2400,10 @@
       "type": "blob",
       "sha": "7ecbf14ff058ac3a161f501fd7d525ce17b3d85c",
       "size": 14866,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable TDRP audit merges recursive authority reports, builds parent/child reachability and enforces explicit excluded/reachable dispositions without dropping root authorities; it is source-closure tooling.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/check-grok-architecture.mjs",
@@ -2408,9 +2411,10 @@
       "type": "blob",
       "sha": "ffb1ee55e1b560d986fd7449aefacb488e4fcadc",
       "size": 15646,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable architecture gate validates manifest/semantic-adaptation structure, frozen blob identities, target evidence and strict status semantics. Current iOS has its own architecture gate, but this Desktop script remains provenance for owner/parity rules.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-external-child-authority.mjs",
@@ -2418,9 +2422,10 @@
       "type": "blob",
       "sha": "2338ecc27f3fb63bfce4bbfe02772f4dcda7ee47",
       "size": 14464,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable discovery scans exact external child repositories at pinned commits for gitlinks/acquisitions and records recursive authority; it supports dependency/source fixed-point closure.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-recursive-child-layer.mjs",
@@ -2428,9 +2433,10 @@
       "type": "blob",
       "sha": "1985b77947c073d5028d1853eb2f51cd6b260e62",
       "size": 9061,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable child-layer discovery resolves nested gitlinks, exact repository/commit identities, sharding and recursive reports. It is source-governance machinery, not product runtime.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-recursive-fixed-point.mjs",
@@ -2438,9 +2444,10 @@
       "type": "blob",
       "sha": "4c846c160e18181736465eeda7db0c9a756b2608",
       "size": 12798,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable fixed-point discovery rejects duplicate authority and iterates recursive child authorities until closure conditions are met. It is relevant to aggregate dependency/source completeness.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-recursive-next-layer.mjs",
@@ -2448,9 +2455,10 @@
       "type": "blob",
       "sha": "315983ae7894140fef7f58453ed9cb858c21a11e",
       "size": 9549,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable next-layer discovery derives additional recursive authorities from already scanned reports while preserving exact repository/commit identity. It is provenance/source-closure tooling.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-recursive-root-authority.mjs",
@@ -2458,9 +2466,10 @@
       "type": "blob",
       "sha": "6c9f95e98eb93e99afa1376dd76d205d64032191",
       "size": 10985,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable root-authority discovery collects exact root mutable/pinned/recursive child authorities into the recursive scan set. It is dependency-source governance tooling.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-root-open-authority.mjs",
@@ -2468,9 +2477,10 @@
       "type": "blob",
       "sha": "6d5cbc87a42eb792f3bbda06125d9f22b520a86c",
       "size": 13387,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable root-open-authority discovery resolves mutable tag/branch/tool/version-download candidates from the accepted upstream checkout and fails on drift. It supports fail-closed source provenance.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-root-source-archives.mjs",
@@ -2478,9 +2488,10 @@
       "type": "blob",
       "sha": "df5adf23cc343115fa23af474c6cd1adddb256b4",
       "size": 4532,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable source-archive discovery downloads only declared immutable archives, verifies SHA-256, rejects unsafe archive paths and scans nested acquisition/LFS inputs. It is supply-chain/source-closure evidence.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/discover-tdrp-root-tool-authority.mjs",
@@ -2488,9 +2499,10 @@
       "type": "blob",
       "sha": "668c06ef18678c8cef8128405fd9e80e756c19e7",
       "size": 8789,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Executable tool-authority discovery re-reads accepted upstream lines, hashes downloads/resolves refs and distinguishes tooling/source inputs. It supports build provenance rather than product runtime.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/finalize-rust-parity.mjs",
@@ -2498,9 +2510,10 @@
       "type": "blob",
       "sha": "79fb7da49fc4bf3001526de7025585f0288a99be",
       "size": 10139,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop parity finalization script mutates only known manifest rows based on explicit Rust target/test mappings and leaves manual-finalization rows open. It is migration bookkeeping tooling; its statuses cannot be inherited as iOS completion.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/import-grok-reference.mjs",
@@ -2508,9 +2521,10 @@
       "type": "blob",
       "sha": "5a387aa2e3ddc2ae2ec2abc719f2976b5db70520",
       "size": 3480,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop import tool verifies the exact frozen Grok commit and git blob SHA before copying eligible TypeScript reference files, then leaves them existing-needs-parity with architecture test evidence. It is historical reference migration tooling.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/report-grok-remaining.mjs",
@@ -2518,9 +2532,10 @@
       "type": "blob",
       "sha": "82e882529cfaff0bcece63aa336cc530668e18a3",
       "size": 1906,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop report tool computes non-final architecture rows by status/language/domain from the manifest. It is completeness reporting only and cannot establish iOS implementation.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     },
     {
       "path": "scripts/validate-tdrp-revision9-authority.mjs",
@@ -2528,9 +2543,10 @@
       "type": "blob",
       "sha": "978735cff237b47fd71d321995857725b008e994",
       "size": 58759,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-executable-source-governance-tooling",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop strict Revision 9 validator re-reads lock/schema/spec/inventory/recursive external authorities from exact network sources and supports require-accepted fail-closed validation. Equivalent iOS aggregate source/dependency completeness remains required before migration_complete.",
+      "notes": "Reviewed against Desktop c33a9495. Kept in the 241-entry denominator as provenance/completeness responsibility; not counted as iOS shipping implementation or verified evidence."
     }
   ],
   "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
