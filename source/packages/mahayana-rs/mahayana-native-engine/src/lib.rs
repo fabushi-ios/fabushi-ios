@@ -320,7 +320,7 @@ impl NativeEngine {
     /// The receipt is persisted only after the synthetic tool call/result has been
     /// committed, so a crash before commit can safely retry while a restart after
     /// commit cannot duplicate the completion.
-    pub async fn complete_async_ask_question(
+    async fn apply_async_ask_question_completion(
         &self,
         session_id: &SessionId,
         operation_id: &OperationId,
@@ -2519,7 +2519,7 @@ impl EngineBackend for NativeEngine {
         events: SharedKernelEventSink,
     ) -> Result<(), KernelError> {
         let control = self.register_operation(&request.operation_id)?;
-        match self.complete_async_ask_question(
+        match self.apply_async_ask_question_completion(
             &request.session_id,
             &request.operation_id,
             &request.original_tool_call_id,
