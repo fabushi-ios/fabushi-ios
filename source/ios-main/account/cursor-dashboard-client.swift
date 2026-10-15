@@ -1745,6 +1745,20 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return result
     }
 
+    func registerAutomationRelayJSON(
+        slackChannels: [String],
+        githubRepos: [String],
+        githubKinds: [String],
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCursorDashboardJSON {
+        IOSCursorDashboardJSON(value: try await registerAutomationRelay(
+            slackChannels: slackChannels,
+            githubRepos: githubRepos,
+            githubKinds: githubKinds,
+            timeoutMs: timeoutMs
+        ))
+    }
+
     func drainAutomationRelayEvents(
         ackIds: [String],
         timeoutMs: Int = 30_000
@@ -1759,6 +1773,16 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         return result
     }
 
+    func drainAutomationRelayEventsJSON(
+        ackIds: [String],
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCursorDashboardJSON {
+        IOSCursorDashboardJSON(value: try await drainAutomationRelayEvents(
+            ackIds: ackIds,
+            timeoutMs: timeoutMs
+        ))
+    }
+
     func pollAutomationFires(
         ackRunUuids: [String],
         timeoutMs: Int = 30_000
@@ -1771,6 +1795,16 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         )
         try Task.checkCancellation()
         return result
+    }
+
+    func pollAutomationFiresJSON(
+        ackRunUuids: [String],
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCursorDashboardJSON {
+        IOSCursorDashboardJSON(value: try await pollAutomationFires(
+            ackRunUuids: ackRunUuids,
+            timeoutMs: timeoutMs
+        ))
     }
 
     func completeAutomationRun(

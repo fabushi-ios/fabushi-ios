@@ -2468,14 +2468,16 @@ final class CoordinatorMcpSurface {
                 try await port.automationRelaySubscription()
             },
             register: { subscription in
-                try await dashboard.registerAutomationRelay(
+                let response = try await dashboard.registerAutomationRelayJSON(
                     slackChannels: subscription.slackChannels,
                     githubRepos: subscription.githubRepos,
                     githubKinds: subscription.githubKinds
                 )
+                return response.value
             },
             drain: { ackIds in
-                try await dashboard.drainAutomationRelayEvents(ackIds: ackIds)
+                let response = try await dashboard.drainAutomationRelayEventsJSON(ackIds: ackIds)
+                return response.value
             },
             sink: { event in
                 try await port.ingestAutomationRelayEvent(event)
@@ -2489,7 +2491,8 @@ final class CoordinatorMcpSurface {
                 try await port.backendAutomationFirePollState()
             },
             poll: { ackRunUuids in
-                try await dashboard.pollAutomationFires(ackRunUuids: ackRunUuids)
+                let response = try await dashboard.pollAutomationFiresJSON(ackRunUuids: ackRunUuids)
+                return response.value
             },
             complete: { runUuid, status, errorMessage in
                 try await dashboard.completeAutomationRun(
@@ -2586,13 +2589,13 @@ final class CoordinatorMcpSurface {
     }
 
 
-    private func isCloudAgentTool(_ tool: RoutedMCPTool) -> Bool {
+    private nonisolated func isCloudAgentTool(_ tool: RoutedMCPTool) -> Bool {
         tool.name == "CloudAgent"
             || tool.toolName == "CloudAgent"
             || tool.toolName == "CLOUD_AGENT"
     }
 
-    private func cloudAgentToolDefinition() -> RoutedMCPTool {
+    private nonisolated func cloudAgentToolDefinition() -> RoutedMCPTool {
         let schema: [String: Any] = [
             "type": "object",
             "additionalProperties": false,
@@ -2907,8 +2910,8 @@ final class CoordinatorMcpSurface {
 
         switch action {
         case "models":
-            let catalog = try await dashboard.getAvailableModels()
-            let data = try JSONSerialization.data(withJSONObject: catalog, options: [.sortedKeys])
+            let catalog = try await dashboard.getAvailableModelsJSON()
+            let data = try JSONSerialization.data(withJSONObject: catalog.value, options: [.sortedKeys])
             let text = String(data: data, encoding: .utf8) ?? "{}"
             return cloudAgentTextResult(text)
 
