@@ -1,6 +1,6 @@
 pub const SAND_BROWSER_DRIVER_VERSION: u32 = 2;
-pub const SAND_BROWSER_DRIVER_BOX_DIR: &str = "/tmp/.sand-browser";
-pub const SAND_BROWSER_DRIVER_BOX_PATH: &str = "/tmp/.sand-browser/driver-v2.mjs";
+pub const SAND_BROWSER_DRIVER_BOX_DIR: &str = "/workspace/.sand-browser";
+pub const SAND_BROWSER_DRIVER_BOX_PATH: &str = "/workspace/.sand-browser/driver-v2.mjs";
 pub const SAND_BROWSER_RESULT_MARKER: &str = "__SAND_BROWSER_RESULT__";
 
 /// Frozen Grok Bot 0.18 browser driver payload.
@@ -15,7 +15,7 @@ import { mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync
 import { isAbsolute, relative } from "node:path";
 
 const RESULT_MARKER = "__SAND_BROWSER_RESULT__";
-const STATE_DIR = "/tmp/.sand-browser";
+const STATE_DIR = "/workspace/.sand-browser";
 const ACTION_TIMEOUT_MS = 10000;
 const NAVIGATE_TIMEOUT_MS = 25000;
 const WORKSPACE_ROOT = "/workspace";

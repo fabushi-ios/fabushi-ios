@@ -507,9 +507,9 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             guard let driverVersion = Self.integer(object["driverVersion"]),
                   driverVersion == 2,
                   let driverPath = object["driverPath"] as? String,
-                  driverPath == "/tmp/.sand-browser/driver-v2.mjs",
+                  driverPath == "/workspace/.sand-browser/driver-v2.mjs",
                   let driverDirectory = object["driverDirectory"] as? String,
-                  driverDirectory == "/tmp/.sand-browser",
+                  driverDirectory == "/workspace/.sand-browser",
                   let driverSource = object["driverSource"] as? String,
                   !driverSource.isEmpty,
                   driverSource.utf8.count <= 128 * 1024,
@@ -518,7 +518,7 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
                   let requestObject = object["request"] as? [String: Any],
                   JSONSerialization.isValidJSONObject(requestObject),
                   let screenshotPath = object["screenshotPath"] as? String,
-                  screenshotPath.hasPrefix("/tmp/.sand-browser/shot-"),
+                  screenshotPath.hasPrefix("/workspace/.sand-browser/shot-"),
                   screenshotPath.hasSuffix(".png"),
                   screenshotPath.utf8.count <= 160
             else {
@@ -534,10 +534,10 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
             let requestToken = Self.shellQuotedArgument(requestBase64)
             let screenshotToken = Self.shellQuotedArgument(screenshotPath)
             let command = [
-                "mkdir -p /tmp/.sand-browser",
-                "printf %s \(sourceToken) | base64 -d > /tmp/.sand-browser/driver-v2.mjs",
+                "mkdir -p /workspace/.sand-browser && chmod 700 /workspace/.sand-browser",
+                "printf %s \(sourceToken) | base64 -d > /workspace/.sand-browser/driver-v2.mjs",
                 "rm -f \(screenshotToken)",
-                "node /tmp/.sand-browser/driver-v2.mjs \(requestToken)",
+                "node /workspace/.sand-browser/driver-v2.mjs \(requestToken)",
                 "if [ -f \(screenshotToken) ]; then printf '\\n__FABUSHI_BROWSER_SCREENSHOT__'; base64 < \(screenshotToken) | tr -d '\\n'; printf '\\n'; fi",
             ].joined(separator: " && ")
             body = try IOSRemoteExecDaemonWire.shellRequest(
@@ -598,6 +598,10 @@ struct IOSRemoteExecDaemonClient: @unchecked Sendable {
         request.setValue("application/proto", forHTTPHeaderField: "Content-Type")
         request.setValue("1", forHTTPHeaderField: "Connect-Protocol-Version")
         request.httpBody = body
+        if method == "local-exec.browser.exec" {
+            // Desktop c33a9495 gives ExecService enough time for bounded navigation/browser startup.
+            request.timeoutInterval = 120
+        }
 
         var stdout = ""
         var stderr = ""

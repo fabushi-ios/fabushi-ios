@@ -805,8 +805,8 @@ final class RunnerParityTests: XCTestCase {
             method: "local-exec.browser.exec",
             params: .object([
                 "driverVersion": .number(2),
-                "driverPath": .string("/tmp/.sand-browser/driver-v2.mjs"),
-                "driverDirectory": .string("/tmp/.sand-browser"),
+                "driverPath": .string("/workspace/.sand-browser/driver-v2.mjs"),
+                "driverDirectory": .string("/workspace/.sand-browser"),
                 "driverSource": .string(driver),
                 "resultMarker": .string("__SAND_BROWSER_RESULT__"),
                 "request": .object([
@@ -815,16 +815,18 @@ final class RunnerParityTests: XCTestCase {
                     "cdpPort": .number(9222),
                     "viewId": .string("main"),
                     "expectedGeneration": .string("generation-7"),
-                    "screenshotPath": .string("/tmp/.sand-browser/shot-browser-call-1.png"),
+                    "screenshotPath": .string("/workspace/.sand-browser/shot-browser-call-1.png"),
                 ]),
-                "screenshotPath": .string("/tmp/.sand-browser/shot-browser-call-1.png"),
+                "screenshotPath": .string("/workspace/.sand-browser/shot-browser-call-1.png"),
                 "toolCallId": .string("browser-call-1"),
             ])
         )
         guard let body = observed?.httpBody else {
             return XCTFail("missing browser ExecServerMessage body")
         }
-        XCTAssertNotNil(body.range(of: Data("/tmp/.sand-browser/driver-v2.mjs".utf8)))
+        XCTAssertEqual(observed?.timeoutInterval, 120)
+        XCTAssertNotNil(body.range(of: Data("/workspace/.sand-browser/driver-v2.mjs".utf8)))
+        XCTAssertNotNil(body.range(of: Data("chmod 700 /workspace/.sand-browser".utf8)))
         XCTAssertNotNil(body.range(of: Data("__FABUSHI_BROWSER_SCREENSHOT__".utf8)))
         guard case .object(let value) = result else {
             return XCTFail("expected browser result")
