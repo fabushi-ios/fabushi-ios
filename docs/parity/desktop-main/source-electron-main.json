@@ -1994,8 +1994,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSMainRuntime owns IOSLifecycleReporter/IOSLifecycleTelemetryDurableSink, reports processRecovery on native memory pressure, rotates telemetry by account slot, and flushes/settles on lifecycle transitions.",
       "test_evidence": "IOSLifecycleParityTests.swift and IOSMainPolicyParityTests.swift cover the native lifecycle/telemetry owner; exact-head Actions required for final promotion.",
-      "notes": "Reviewed against Desktop b6a66fd2 collector.ts. This is a platform-mechanism replacement, not an exemption from iOS diagnostics.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Reviewed against Desktop b6a66fd2 collector.ts. This is a platform-mechanism replacement, not an exemption from iOS diagnostics. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2011,8 +2011,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "StructuredLogTransport bounds the buffer at 1000, fences delivery generations, requeues failed batches, expires stale replay, and IOSMainRuntime obtains account-scoped credentials/machine ID for remote shipping.",
       "test_evidence": "IOSLifecycleParityTests.swift / PackageContextMetricsParityTests.swift plus structured-log contract tests in the source tree; final exact-head CI remains required.",
-      "notes": "No synthetic reportClientNumericMetrics call is added because the Desktop metric namespace is tied to the non-existent Electron renderer/process sampler. Generic iOS product telemetry remains owned by structured logs/package metrics.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "No synthetic reportClientNumericMetrics call is added because the Desktop metric namespace is tied to the non-existent Electron renderer/process sampler. Generic iOS product telemetry remains owned by structured logs/package metrics. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2028,8 +2028,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSMainRuntime constructs reporter + durable sink before Coordinator, wires experiment diagnostics, account-slot rotation, remote shipping credentials, lifecycle flush and memory-pressure recovery telemetry.",
       "test_evidence": "IOSCoordinatorArchitectureTests.swift, IOSLifecycleParityTests.swift, IOSMainPolicyParityTests.swift.",
-      "notes": "Reviewed as a composition responsibility; individual shared telemetry/experiment/account responsibilities remain independently mapped elsewhere.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Reviewed as a composition responsibility; individual shared telemetry/experiment/account responsibilities remain independently mapped elsewhere. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2045,8 +2045,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "parseHeapMetricsReport is retained in Swift for schema parity; IOSMainRuntime.memoryPressureReceived emits processRecovery telemetry through the shipping durable sink.",
       "test_evidence": "IOSLifecycleParityTests.swift / SharedPlatformContractsParityTests.swift; exact-head CI pending.",
-      "notes": "No unowned reportHeapMetrics surface is claimed. If a future iOS producer is introduced, this row must be re-opened and given a real shipping sink.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "No unowned reportHeapMetrics surface is claimed. If a future iOS producer is introduced, this row must be re-opened and given a real shipping sink. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2062,8 +2062,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSMainRuntime handles native Scene/process lifecycle and memoryPressureReceived; no cursor-proclist/native process enumeration dependency is shipped.",
       "test_evidence": "IOSMainPolicyParityTests.swift and IOSLifecycleParityTests.swift.",
-      "notes": "Desktop native-addon mechanism is intentionally not ported.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Desktop native-addon mechanism is intentionally not ported. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2079,11 +2079,11 @@
       "implementation_status": "implemented",
       "production_evidence": "source/ios-main/process-metrics/redaction.swift now accepts Fabushi/Fabushi Lab and legacy Grok Bot/Grok Bot Lab Helper GPU/Plugin/Renderer labels and hashes every original input.",
       "test_evidence": "IOSPlatformMainParityTests.testProcessNameRedactionPreservesOnlyKnownHelperLabels now asserts Fabushi helper preservation, legacy Grok preservation and unknown-process redaction/hash. Exact-head Actions pending.",
-      "notes": "IOS-MAIN-PROCESS-REDACTION-001 production gap is implemented in source/ios-main/process-metrics/redaction.swift with focused parity coverage. Desktop blob is unchanged at current main b6a66fd2; current-main responsibility review is complete, but verification remains gated on same-head Actions.",
+      "notes": "IOS-MAIN-PROCESS-REDACTION-001 production gap is implemented in source/ios-main/process-metrics/redaction.swift with focused parity coverage. Desktop blob is unchanged at current main b6a66fd2; current-main responsibility review is complete, but verification remains gated on same-head Actions. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending"
     },
     {
@@ -2099,8 +2099,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSLifecycleReporter + StructuredLogTransport provide bounded native diagnostic buffering and stale-delivery fencing.",
       "test_evidence": "IOSLifecycleParityTests.swift and structured-log parity tests.",
-      "notes": "Platform-specific process aggregation is not a user capability; its diagnostic effect is replaced natively.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Platform-specific process aggregation is not a user capability; its diagnostic effect is replaced natively. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2116,8 +2116,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "redaction.swift preserves only known helper labels and hashes originals; StructuredLogTransport and IOSCursorStructuredLogBackend own bounded authenticated iOS telemetry shipping.",
       "test_evidence": "IOSPlatformMainParityTests.testProcessNameRedactionPreservesOnlyKnownHelperLabels plus lifecycle/structured-log tests.",
-      "notes": "Redaction responsibility is separately mapped on redaction.ts; this row covers the Desktop process-sample wire transport.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Redaction responsibility is separately mapped on redaction.ts; this row covers the Desktop process-sample wire transport. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2133,8 +2133,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "ProductionCoordinatorRootProvider/IOSMainRuntime/MahayanaCoordinator are the native runtime owners; no local daemon discovery file or process PID contract is shipped.",
       "test_evidence": "IOSCoordinatorArchitectureTests.swift and IOSMainPolicyParityTests.swift.",
-      "notes": "Desktop PID-discovery mechanism is not portable and has no missing user-visible capability.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Desktop PID-discovery mechanism is not portable and has no missing user-visible capability. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2150,8 +2150,8 @@
       "implementation_status": "implemented",
       "production_evidence": "ProductionCoordinatorRootProvider.make -> IOSMainRuntime -> ProductionCoordinatorProvider is the shipping root; ProductionCoordinatorProvider owns one IOSCoordinatorRuntime and re-applies client-pause policy across start/restart.",
       "test_evidence": "IOSCoordinatorArchitectureTests.swift, CoordinatorAdapterTests.swift, IOSMainPolicyParityTests.swift. Exact-head Actions still required before verified.",
-      "notes": "Composition semantics are implemented; this row is not promoted to verified until same-head CI and aggregate source review close.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Composition semantics are implemented; this row is not promoted to verified until same-head CI and aggregate source review close. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2167,8 +2167,8 @@
       "implementation_status": "implemented",
       "production_evidence": "IOSMainRuntime constructs native auth/Keychain, update wiring, lifecycle telemetry, Coordinator, attachment RPC and account-scoped shipping; theme/update/notification responsibilities have dedicated native owners in the referenced paths.",
       "test_evidence": "IOSMainPolicyParityTests.swift, IOSCoordinatorArchitectureTests.swift, SharedPlatformContractsParityTests.swift and domain-focused tests. Exact-head CI pending.",
-      "notes": "This row records the provider composition responsibility; each product domain remains independently accountable in its own ledger rows.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "This row records the provider composition responsibility; each product domain remains independently accountable in its own ledger rows. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
@@ -2184,8 +2184,8 @@
       "implementation_status": "not-applicable",
       "production_evidence": "IOSMainRPCRuntime.desktopAuthorityMethodTable and eventDispositions are shipping contract tables; Coordinator port bridge/guard own the native port boundary.",
       "test_evidence": "CoordinatorContractTests.swift, CoordinatorAdapterTests.swift, IOSMainPolicyParityTests.swift and AttachmentMainRPCParityTests.swift.",
-      "notes": "Electron channel/resource mechanism is non-portable; underlying user/service responsibilities remain mapped to native owners and are not waived.",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "notes": "Electron channel/resource mechanism is non-portable; underlying user/service responsibilities remain mapped to native owners and are not waived. Current Desktop 8148bfb9 source was re-read at the exact ledger blob SHA; no responsibility/caller change invalidates the existing iOS disposition.",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
       "authority_review_state": "reviewed-current-main"
     },
     {
