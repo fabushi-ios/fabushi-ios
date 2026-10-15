@@ -323,9 +323,8 @@ mod automation_spend_guard_tests {
                 schedule: "@daily".into(),
                 trigger: Some(AutomationTrigger::Schedule { schedule: "@daily".into() }),
                 enabled: true,
-                created_at: 1,
-                updated_at_ms: 1,
-                next_run_at_ms: None,
+                created_at_ms: 1,
+                raised_notices: Vec::new(),
                 runs: vec![
                     AutomationRunSummary {
                         id: "old".into(),
@@ -344,6 +343,8 @@ mod automation_spend_guard_tests {
                         coalesced_run_ids: Vec::new(),
                     },
                 ],
+                last_run_at_ms: Some(12),
+                next_run_at_ms: None,
             },
         );
         assert_eq!(
