@@ -20413,6 +20413,7 @@ mod tests {
                 trigger: RoutineTrigger::Schedule,
                 name: "Daily".into(),
                 prompt: "continue".into(),
+                notice_ids: Vec::new(),
                 admitted_at_ms: 1,
                 phase: RoutinePhase::Suspended,
                 operation_id: Some("routine-operation".into()),
