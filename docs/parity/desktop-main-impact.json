@@ -42,18 +42,18 @@
     }
   ],
   "dependencyReview": {
-    "status": "pending",
-    "reason": "Desktop 8148bfb9 changes browser refresh/history navigation generation fencing in four selected Host source/test files; current-main responsibility and iOS native browser applicability review is required.",
+    "status": "reviewed-with-gaps",
+    "reason": "Desktop 8148bfb9 browser refresh/history generation fencing was reviewed against the current MobileEmbedded Rust Host. All four selected changes are understood, but iOS has no box-browser provider/tool surface, so implementation and focused test gaps remain.",
     "sameDirectoryReviewPaths": [
       "source/host/src/runner/tools/sand_browser_driver_source.rs",
       "source/host/src/runner/tools/sand_browser_tools.rs",
       "source/host/tests/browser_driver_source_contract.rs",
       "source/host/tests/sand_browser_tools_contract.rs",
-      "source/ios-main/IOSMainRuntime.swift"
+      "source/packages/mahayana-rs/mahayana-host/src/lib.rs"
     ],
-    "sharedContractReview": "pending-current-main-browser-navigation-review",
-    "mainActiveSpecsReview": "pending-fdn-g11-browser-navigation-review",
-    "newAndChangedResponsibilitiesReviewed": false
+    "sharedContractReview": "reviewed-applicable-mobile-host-browser-gap",
+    "mainActiveSpecsReview": "reviewed-fdn-g11-browser-navigation-gap",
+    "newAndChangedResponsibilitiesReviewed": true
   },
   "historyPolicy": "Desktop 371b72f1 -> b6a66fd2 exact-head rebaseline. Prior acceptance for all changed source rows is predecessor-only.",
   "groupSummary": {
@@ -312,7 +312,7 @@
       114688807759,
       114688866359
     ],
-    "status": "desktop-main-rebaseline-source-review-required",
+    "status": "desktop-main-rebaseline-reviewed-with-browser-implementation-gaps",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
