@@ -56,6 +56,7 @@ final class IOSMainRuntime {
     private let boxSecretsController: IOSBoxSecretsController
     private let boxSecretsMainRPC: IOSBoxSecretsMainRPCAdapter
     private let sentryController: IOSProductionSentryController
+    private let sentryPrivacySynchronizer: IOSProductionSentryPrivacySynchronizer
     let devCapability: IOSDevCapability
     private let devControlAdapter: IOSNativeDevControlAdapter
 
@@ -166,6 +167,11 @@ final class IOSMainRuntime {
             }
         )
         self.coordinator = coordinator
+        let sentryPrivacySynchronizer = IOSProductionSentryPrivacySynchronizer(
+            controller: sentryController,
+            readMode: { await coordinator.currentSentryPrivacyMode() }
+        )
+        self.sentryPrivacySynchronizer = sentryPrivacySynchronizer
         let cursorAccountRevoker = ProductionCoordinatorAccountRevoker(
             revoke: {
                 guard let result = await coordinator.revokeCursorAuthForAccountRefusal() else {
@@ -326,6 +332,9 @@ final class IOSMainRuntime {
                 return authorization
             }
         )
+        coordinator.setSentryAuthObserver { [weak sentryPrivacySynchronizer] status in
+            sentryPrivacySynchronizer?.refresh(loggedIn: status.loggedIn)
+        }
         lifecycleReporter.report(
             .startup,
             metadata: [
@@ -719,6 +728,7 @@ final class IOSMainRuntime {
         lifecycleTelemetrySink.flushRemoteNow()
         lifecycleTelemetrySink.settleLoggedOutIfNeeded()
         accountRuntime.reset()
+        sentryPrivacySynchronizer.cancel()
         sentryController.rotate(accountSlot: nil)
         sentryController.purge()
         _ = boxSecretsController.adoptAccount(nil)
