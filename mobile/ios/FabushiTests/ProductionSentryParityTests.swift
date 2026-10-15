@@ -1,0 +1,130 @@
+import XCTest
+@testable import Fabushi
+
+final class ProductionSentryParityTests: XCTestCase {
+    @MainActor
+    func testDefaultFatalMetadataFailsClosedAndDoesNotEmitConversationTag() {
+        var emitted: [[String: String]] = []
+        let controller = IOSProductionSentryController { _, metadata in
+            emitted.append(metadata)
+        }
+        controller.rotate(accountSlot: "account-a")
+        XCTAssertTrue(controller.setConversationReport(["agentId": "conversation-safe"]))
+        controller.captureFatal(
+            eventID: "0123456789abcdef0123456789abcdef",
+            origin: "client_failure",
+            failureCode: "SAND-E0703"
+        )
+
+        XCTAssertEqual(emitted.count, 1)
+        XCTAssertEqual(emitted[0]["privacy_tier"], "fatal-metadata")
+        XCTAssertEqual(emitted[0]["sentry_tag.sand.failure_code"], "SAND-E0703")
+        XCTAssertNil(emitted[0]["sentry_tag.\(SAND_SENTRY_CONVERSATION_TAG)"])
+        XCTAssertFalse(emitted[0].values.contains("account-a"))
+        XCTAssertEqual(controller.recentEventIDs, ["0123456789abcdef0123456789abcdef"])
+    }
+
+    @MainActor
+    func testScrubbedTierCanCarryBoundedConversationTag() {
+        var emitted: [[String: String]] = []
+        let controller = IOSProductionSentryController { _, metadata in
+            emitted.append(metadata)
+        }
+        controller.rotate(accountSlot: "account-a")
+        controller.setPrivacyMode(.noTraining)
+        XCTAssertTrue(controller.setConversationReport(["agentId": "agent_123"]))
+        controller.captureFatal(
+            eventID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            origin: "native_exception"
+        )
+
+        XCTAssertEqual(emitted.last?["privacy_tier"], "scrubbed")
+        XCTAssertEqual(
+            emitted.last?["sentry_tag.\(SAND_SENTRY_CONVERSATION_TAG)"],
+            "agent_123"
+        )
+    }
+
+    @MainActor
+    func testAccountMismatchIsRejectedBeforePrivacyProjection() {
+        var emitted = 0
+        let controller = IOSProductionSentryController { _, _ in emitted += 1 }
+        controller.rotate(accountSlot: "account-a")
+        controller.setPrivacyMode(.noTraining)
+
+        let envelope = SandSentryEnvelope(
+            header: ["event_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+            items: [
+                .init(
+                    header: ["type": "event"],
+                    payload: [
+                        "event_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                        "level": "fatal",
+                        "platform": "cocoa",
+                        "user": ["id": iosLifecycleTelemetryAccountScope("account-b")],
+                        "tags": ["event.process": "ios-main"],
+                    ]
+                )
+            ]
+        )
+        controller.accept(envelope)
+
+        XCTAssertEqual(emitted, 0)
+        XCTAssertTrue(controller.recentEventIDs.isEmpty)
+    }
+
+    @MainActor
+    func testAccountSwitchClearsConversationAndEventIdentity() {
+        let controller = IOSProductionSentryController { _, _ in }
+        controller.rotate(accountSlot: "account-a")
+        controller.setPrivacyMode(.noTraining)
+        XCTAssertTrue(controller.setConversationReport(["agentId": "agent_123"]))
+        controller.captureFatal(
+            eventID: "cccccccccccccccccccccccccccccccc",
+            origin: "native_exception"
+        )
+        XCTAssertFalse(controller.recentEventIDs.isEmpty)
+
+        controller.rotate(accountSlot: "account-b")
+        XCTAssertNil(controller.conversationID)
+        XCTAssertTrue(controller.recentEventIDs.isEmpty)
+        XCTAssertEqual(
+            controller.accountScopeHash,
+            iosLifecycleTelemetryAccountScope("account-b")
+        )
+        XCTAssertNotEqual(controller.accountScopeHash, "account-b")
+    }
+
+    func testShippingRuntimeRoutesConversationAndReusesLifecycleTransport() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let runtime = try String(
+            contentsOf: root.appendingPathComponent("source/ios-main/IOSMainRuntime.swift"),
+            encoding: .utf8
+        )
+        let registry = try String(
+            contentsOf: root.appendingPathComponent("source/shared/rpc/coordinator-main.swift"),
+            encoding: .utf8
+        )
+        let sentry = try String(
+            contentsOf: root.appendingPathComponent("source/ios-main/telemetry/production-sentry.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(registry.contains("\"reportSentryConversation\""))
+        XCTAssertTrue(runtime.contains("if method == \"reportSentryConversation\""))
+        XCTAssertTrue(runtime.contains("sentryController.setConversationReport(args.foundationValue)"))
+        XCTAssertTrue(runtime.contains("sentryController.rotate(accountSlot: slot)"))
+        XCTAssertTrue(runtime.contains("sentryController.rotate(accountSlot: nil)"))
+        XCTAssertTrue(runtime.contains("reporter.report(.processRecovery"))
+        XCTAssertTrue(runtime.contains("lifecycleTelemetrySink.submit(record)"))
+        XCTAssertTrue(sentry.contains("SandSentryPrivacyGate()"))
+        XCTAssertTrue(sentry.contains("SandSentryEventIDRing(capacity: 64)"))
+        XCTAssertTrue(sentry.contains("SandSentrySpoolStore()"))
+        XCTAssertFalse(sentry.contains("SentrySDK"))
+        XCTAssertFalse(sentry.contains("dsn"))
+    }
+}
