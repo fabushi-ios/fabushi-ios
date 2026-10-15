@@ -538,12 +538,12 @@
       "ios_disposition": "ios-adapted",
       "ios_target_path": "mobile/ios/Fabushi/RemoteComputerSurface.swift; mobile/ios/Fabushi/RemoteComputerStatusStore.swift; source/packages/mahayana-rs/mahayana-computer/src/lib.rs",
       "ios_language": "Swift; Rust",
-      "ios_platform_delta": "Direct local mouse/keyboard injection is not an iOS-native capability. iOS preserves the user capability through the account-scoped Remote Computer surface/service while mahayana-computer remains the canonical executor for the controlled remote machine. Exact action-summary and settle-delay equivalence still requires focused mapping.",
+      "ios_platform_delta": "Direct local mouse/keyboard injection is not an iOS-native capability. iOS preserves the user capability through the account-scoped Remote Computer surface/service while mahayana-computer remains the canonical controlled-machine executor. The Desktop 2000 ms post-action screenshot settle contract and supported-action summary/action-count semantics are now explicit; the remaining Desktop action vocabulary still requires closure before this row can leave mapped.",
       "implementation_status": "mapped",
-      "production_evidence": "RemoteComputerSurface and RemoteComputerStatusStore are shipping native owners for remote-machine lifecycle, while mahayana-computer enforces authorized action validation, AI preemption, execution serialization, and final snapshot capture on the controlled computer.",
-      "test_evidence": "RemoteComputerRebuildTests/RemoteComputerStatusStoreTests and mahayana-computer tests exist; focused mapping for Desktop summarizeComputerUseActions and the 2000 ms settle contract is still required.",
-      "notes": "Reviewed against Desktop c33a9495. This is a platform replacement, not N/A; do not promote until the remaining action-count/settle semantics are explicitly covered.",
-      "exact_head_evidence": "pending focused parity work and descendant exact-head GitHub Actions"
+      "production_evidence": "RemoteComputerSurface and RemoteComputerStatusStore remain the shipping native owners for remote-machine lifecycle. mahayana-computer now uses FINAL_SCREEN_SETTLE_MS=2000 before final snapshot capture and summarize_computer_use_actions in the shipping execute path to derive actions_executed and canonical per-kind counts for the currently represented protocol actions.",
+      "test_evidence": "mahayana-computer focused tests assert Desktop-style summary keys/counts and the exact 2000 ms settle constant, in addition to existing action-limit/preemption tests. Exact-head GitHub Actions remain required; unsupported Desktop action kinds still prevent status promotion.",
+      "notes": "Reviewed against Desktop c33a9495. This change closes the explicit action-count/summary and 2000 ms settle subcontracts, but the row intentionally remains mapped until the full Desktop action vocabulary and replacement semantics are proven.",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions and remaining action-vocabulary closure"
     },
     {
       "desktop_path": "source/packages/agent-exec/controlled.ts",
@@ -766,14 +766,14 @@
       "desktop_owner": "agent-exec MCP allowlist precheck executor resource",
       "desktop_visible_effect": "Unsafe or disallowed MCP actions can be rejected before execution rather than after a remote call is made.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/mahayana-agent-coordinator/routed-mcp-bridge.swift",
+      "ios_target_path": "source/shared/node/mcp/mcp-allowlist-precheck.swift",
       "ios_language": "Swift",
-      "ios_platform_delta": "iOS has canonical routed MCP scope/cancellation/disabled-tool enforcement, but no separately evidenced allowlist-precheck executor equivalent was found in the current shipping tree.",
-      "implementation_status": "mapped",
-      "production_evidence": "RoutedMCPBridge and Coordinator MCP manager fence account/generation scope and disabled-tool state; these are related controls, not proof of the Desktop precheck contract itself.",
-      "test_evidence": "Shared/Coordinator MCP tests cover routing and disabled tools; focused allowlist-precheck parity remains absent.",
-      "notes": "Reviewed against Desktop c33a9495. Real security responsibility remains open; do not collapse it into generic MCP routing.",
-      "exact_head_evidence": "pending production precheck mapping/implementation and exact-head GitHub Actions"
+      "ios_platform_delta": "iOS implements the Desktop precheck as an independent fail-closed shared MCP responsibility at the canonical SandMcpManager execution boundary before HTTP/SSE versus Remote Runner stdio dispatch. The check refreshes account display/tool discovery, rejects revoked/admin-disabled/disabled/unadvertised tools, and generation-fences account changes.",
+      "implementation_status": "implemented",
+      "production_evidence": "precheckMcpToolAllowlist owns the typed allow/deny decision. SandMcpManager.executeTool performs a forced-fresh account read, invalidates stale discovery, runs the precheck before SandMcpToolsDiscovery chooses HTTP/SSE or stdio, checks Task cancellation, and rejects stale scopeGeneration/lastScope before and after the real tool call.",
+      "test_evidence": "SharedMcpManagerParityTests contains focused pure-decision coverage plus a shipping manager test proving a disabled or revoked HTTP tool is denied before DashboardMcpExecClient execution. Exact-head GitHub Actions are still required before verified.",
+      "notes": "Reviewed against Desktop c33a9495 and implemented on the descendant iOS HEAD created by this change. Status is implemented, not verified, until descendant exact-head Swift/architecture/protected gates succeed.",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions"
     },
     {
       "desktop_path": "source/packages/agent-exec/mcp-disk-catalog.ts",

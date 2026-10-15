@@ -88,6 +88,7 @@ actor SandMcpManager {
     private var lastState: McpListedState?
     private var lastBackendTools: [NamedBackendTool] = []
     private var lastScope: String?
+    private var scopeGeneration: UInt64 = 0
 
     init(deps: SandMcpManagerDependencies) {
         self.deps = deps
@@ -209,6 +210,7 @@ actor SandMcpManager {
             } else {
                 deps.settingsStore.clearAccountScope()
             }
+            scopeGeneration = scopeGeneration == UInt64.max ? 1 : scopeGeneration + 1
             lastScope = display.cacheScope
             deps.onAccountScopeApplied?()
         }
@@ -373,7 +375,63 @@ actor SandMcpManager {
         _ request: McpToolExecutionRequest,
         auditIdentity: McpToolAuditIdentity? = nil
     ) async -> SandMcpResult {
-        await deps.toolsDiscovery.executeTool(request, auditIdentity: auditIdentity)
+        do {
+            try Task.checkCancellation()
+            guard let display = try await loadDisplay(requireFreshRead: true) else {
+                return generatedMcpResultFactory.error(
+                    "MCP allowlist precheck failed closed because account configuration is unavailable."
+                )
+            }
+            let expectedScope = lastScope
+            let expectedGeneration = scopeGeneration
+            guard expectedScope != nil else {
+                return generatedMcpResultFactory.error(
+                    "MCP allowlist precheck requires an authenticated account scope."
+                )
+            }
+
+            // Do not trust a stale discovery cache: the server or tool may have been
+            // revoked since the previous turn. HTTP/SSE and stdio Runner execution
+            // pass through this same refreshed allowlist boundary.
+            await deps.toolsDiscovery.invalidateToolsCache()
+            let discoveredTools = try await deps.toolsDiscovery.getToolsRaw()
+            try Task.checkCancellation()
+            guard expectedGeneration == scopeGeneration, expectedScope == lastScope else {
+                return generatedMcpResultFactory.error(
+                    "MCP allowlist precheck became stale because the account scope changed."
+                )
+            }
+
+            let decision = precheckMcpToolAllowlist(
+                request: request,
+                display: display,
+                discoveredTools: discoveredTools,
+                disabledToolsByServerId: deps.settingsStore.getMcpDisabledToolsByServerId()
+            )
+            guard decision.allowed else {
+                return generatedMcpResultFactory.error(decision.reason)
+            }
+
+            let result = await deps.toolsDiscovery.executeTool(
+                request,
+                auditIdentity: auditIdentity
+            )
+            if Task.isCancelled {
+                return generatedMcpResultFactory.error("MCP tool execution was cancelled.")
+            }
+            guard expectedGeneration == scopeGeneration, expectedScope == lastScope else {
+                return generatedMcpResultFactory.error(
+                    "MCP tool result became stale because the account scope changed."
+                )
+            }
+            return result
+        } catch is CancellationError {
+            return generatedMcpResultFactory.error("MCP tool execution was cancelled.")
+        } catch {
+            return generatedMcpResultFactory.error(
+                "MCP allowlist precheck failed closed: \(error.localizedDescription)"
+            )
+        }
     }
 
     func authenticateServer(

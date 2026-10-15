@@ -4,6 +4,7 @@ import XCTest
 private final class ManagerDashboardClient: @unchecked Sendable, DashboardMcpExecClient {
     var listToolsResponse: [BackendMcpToolServerWire] = []
     var authStatusCalls = 0
+    var executeToolCalls = 0
 
     func listSandMcpTools(
         serverIdentifiers: [String],
@@ -20,7 +21,8 @@ private final class ManagerDashboardClient: @unchecked Sendable, DashboardMcpExe
         agentId: String,
         timeoutMs: Int
     ) async throws -> McpExecResult? {
-        .init(
+        executeToolCalls += 1
+        return .init(
             caseName: "success",
             value: .object([
                 "content": .array([
@@ -209,6 +211,115 @@ final class SharedMcpManagerParityTests: XCTestCase {
 
         let connected = try await fixture.manager.listConnectedBackendTools()
         XCTAssertEqual(connected.map(\.toolName), ["search"])
+    }
+
+    func testAllowlistPrecheckDeniesDisabledRevokedAndUnadvertisedTools() {
+        let request = McpToolExecutionRequest(
+            providerIdentifier: "remote",
+            name: "search",
+            args: .object([:]),
+            toolCallId: "call-allowlist"
+        )
+        let row = DisplayServer(
+            id: "1",
+            name: "Remote",
+            serverIdentifier: "remote",
+            config: .http(url: "https://mcp.example.test"),
+            isTeamServer: false
+        )
+        let tool = McpDiscoveredTool(
+            providerIdentifier: "remote",
+            name: "search",
+            toolName: "search"
+        )
+
+        XCTAssertTrue(precheckMcpToolAllowlist(
+            request: request,
+            display: .init(servers: [row], cacheScope: "account-a"),
+            discoveredTools: [tool],
+            disabledToolsByServerId: [:]
+        ).allowed)
+        XCTAssertFalse(precheckMcpToolAllowlist(
+            request: request,
+            display: .init(servers: [row], cacheScope: "account-a"),
+            discoveredTools: [tool],
+            disabledToolsByServerId: ["1": ["search"]]
+        ).allowed)
+        XCTAssertFalse(precheckMcpToolAllowlist(
+            request: request,
+            display: .init(servers: [], cacheScope: "account-a"),
+            discoveredTools: [tool],
+            disabledToolsByServerId: [:]
+        ).allowed)
+        XCTAssertFalse(precheckMcpToolAllowlist(
+            request: request,
+            display: .init(servers: [row], cacheScope: "account-a"),
+            discoveredTools: [],
+            disabledToolsByServerId: [:]
+        ).allowed)
+    }
+
+    func testManagerExecutesHttpOnlyAfterFreshFailClosedAllowlistPrecheck() async throws {
+        let display = AccountDisplayConfig(
+            servers: [
+                .init(
+                    id: "1",
+                    name: "Remote",
+                    serverIdentifier: "remote",
+                    config: .http(url: "https://mcp.example.test"),
+                    isTeamServer: false
+                ),
+            ],
+            cacheScope: "account-a"
+        )
+        let provider = ManagerDisplayProvider(display)
+        let client = ManagerDashboardClient()
+        client.listToolsResponse = [
+            .init(
+                serverIdentifier: "remote",
+                status: "connected",
+                tools: [
+                    .init(
+                        name: "search",
+                        providerIdentifier: "remote",
+                        toolName: "search",
+                        description: "Search",
+                        inputSchema: nil
+                    ),
+                ],
+                accountLabel: "default",
+                rowServerIdentifier: "remote"
+            ),
+        ]
+        let fixture = makeManagerFixture(provider: provider, client: client)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        _ = try await fixture.manager.listServers()
+
+        let request = McpToolExecutionRequest(
+            providerIdentifier: "remote",
+            name: "search",
+            args: .object([:]),
+            toolCallId: "call-precheck"
+        )
+        fixture.settings.setMcpDisabledToolsByServerId(["1": ["search"]])
+        let disabled = await fixture.manager.executeTool(request)
+        guard case .error(let disabledMessage) = disabled.result else {
+            return XCTFail("disabled tool must fail closed before HTTP execution")
+        }
+        XCTAssertTrue(disabledMessage.contains("disabled"))
+        XCTAssertEqual(client.executeToolCalls, 0)
+
+        fixture.settings.setMcpDisabledToolsByServerId([:])
+        _ = await fixture.manager.executeTool(request)
+        XCTAssertEqual(client.executeToolCalls, 1)
+
+        await provider.set(.init(servers: [], cacheScope: "account-a"))
+        let revoked = await fixture.manager.executeTool(request)
+        guard case .error(let revokedMessage) = revoked.result else {
+            return XCTFail("revoked server must fail closed before HTTP execution")
+        }
+        XCTAssertTrue(revokedMessage.contains("allowlist"))
+        XCTAssertEqual(client.executeToolCalls, 1)
     }
 
     func testManagerNeverAuthenticatesOrExecutesStdioLocallyWithoutRunner() async throws {

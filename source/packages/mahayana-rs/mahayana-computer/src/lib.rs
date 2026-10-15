@@ -15,6 +15,7 @@ use mahayana_host_protocol::ComputerControlOrigin;
 use mahayana_host_protocol::ComputerSnapshot;
 use mahayana_host_protocol::ComputerStatus;
 use mahayana_host_protocol::LocalToolPermission;
+use std::collections::BTreeMap;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 use std::sync::RwLock;
@@ -24,7 +25,34 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-const FINAL_SCREEN_SETTLE_MS: u64 = 250;
+const FINAL_SCREEN_SETTLE_MS: u64 = 2_000;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComputerUseActionSummary {
+    pub action_count: usize,
+    pub counts: BTreeMap<&'static str, usize>,
+}
+
+pub fn summarize_computer_use_actions(actions: &[ComputerAction]) -> ComputerUseActionSummary {
+    let mut counts = BTreeMap::new();
+    for action in actions {
+        let key = match action.action {
+            ComputerActionKind::Screenshot => "screenshot",
+            ComputerActionKind::Click => "click",
+            ComputerActionKind::Move => "mouse_move",
+            ComputerActionKind::Drag => "drag",
+            ComputerActionKind::Type => "type",
+            ComputerActionKind::Key => "key",
+            ComputerActionKind::Scroll => "scroll",
+            ComputerActionKind::Wait => "wait",
+        };
+        *counts.entry(key).or_insert(0) += 1;
+    }
+    ComputerUseActionSummary {
+        action_count: actions.len(),
+        counts,
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ComputerControlPolicy {
@@ -185,6 +213,7 @@ pub fn execute(
 
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     {
+        let summary = summarize_computer_use_actions(actions);
         let ai_epoch = USER_OVERRIDE_EPOCH.load(Ordering::SeqCst);
         if origin != ComputerControlOrigin::Ai {
             USER_OVERRIDE_EPOCH.fetch_add(1, Ordering::SeqCst);
@@ -215,7 +244,7 @@ pub fn execute(
         let snapshot = portable::capture_screen()?;
         Ok(ComputerActionResult {
             origin,
-            actions_executed: actions.len(),
+            actions_executed: summary.action_count,
             snapshot,
         })
     }
@@ -1047,6 +1076,24 @@ mod tests {
             wait_ms: None,
             description: None,
         }
+    }
+
+    #[test]
+    fn action_summary_and_settle_contract_match_desktop() {
+        let actions = vec![
+            action(ComputerActionKind::Move),
+            action(ComputerActionKind::Click),
+            action(ComputerActionKind::Click),
+            action(ComputerActionKind::Scroll),
+            action(ComputerActionKind::Wait),
+        ];
+        let summary = summarize_computer_use_actions(&actions);
+        assert_eq!(summary.action_count, 5);
+        assert_eq!(summary.counts.get("mouse_move"), Some(&1));
+        assert_eq!(summary.counts.get("click"), Some(&2));
+        assert_eq!(summary.counts.get("scroll"), Some(&1));
+        assert_eq!(summary.counts.get("wait"), Some(&1));
+        assert_eq!(FINAL_SCREEN_SETTLE_MS, 2_000);
     }
 
     #[test]
