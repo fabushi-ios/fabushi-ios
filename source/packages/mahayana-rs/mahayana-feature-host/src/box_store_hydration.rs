@@ -328,6 +328,54 @@ pub fn blob_rel_path(sha: &str) -> Result<String, String> {
     Ok(format!("{BOX_STORE_BLOBS_PREFIX}/{sha}"))
 }
 
+fn prune_snapshot_walk(
+    root: &Path,
+    current: &Path,
+    desired: &BTreeMap<String, BoxStoreManifestEntry>,
+) -> Result<u64, String> {
+    let mut removed = 0_u64;
+    let read_dir = match fs::read_dir(current) {
+        Ok(read_dir) => read_dir,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(error) => return Err(error.to_string()),
+    };
+    let mut children = read_dir
+        .map(|entry| entry.map_err(|error| error.to_string()))
+        .collect::<Result<Vec<_>, _>>()?;
+    children.sort_by_key(|entry| entry.file_name());
+
+    for child in children {
+        let path = child.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
+        let rel_path = rel_path_string(root, &path)?;
+        if resolve_restore_destination(root, &rel_path).is_none() {
+            return Err(format!("unsafe local prune path: {rel_path}"));
+        }
+        if metadata.is_dir() && !metadata.file_type().is_symlink() {
+            removed = removed.saturating_add(prune_snapshot_walk(root, &path, desired)?);
+            let empty = fs::read_dir(&path)
+                .map_err(|error| error.to_string())?
+                .next()
+                .is_none();
+            if empty {
+                fs::remove_dir(&path).map_err(|error| error.to_string())?;
+                removed = removed.saturating_add(1);
+            }
+        } else if !desired.contains_key(&rel_path) {
+            fs::remove_file(&path).map_err(|error| error.to_string())?;
+            removed = removed.saturating_add(1);
+        }
+    }
+    Ok(removed)
+}
+
+pub fn prune_local_agent_root(
+    target_root: &Path,
+    desired: &BTreeMap<String, BoxStoreManifestEntry>,
+) -> Result<u64, String> {
+    prune_snapshot_walk(target_root, target_root, desired)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -406,6 +454,33 @@ mod tests {
         );
         assert!(blob_rel_path("deadbeef").is_err());
         assert!(blob_rel_path(&"z".repeat(64)).is_err());
+    }
+
+    #[test]
+    fn prune_removes_nodes_missing_from_remote_manifest_after_verified_restore() {
+        let root = test_root();
+        fs::create_dir_all(root.join("memory/stale-dir")).unwrap();
+        fs::write(root.join("memory/keep.bin"), b"keep").unwrap();
+        fs::write(root.join("memory/stale.bin"), b"stale").unwrap();
+        fs::write(root.join("memory/stale-dir/old.bin"), b"old").unwrap();
+
+        let keep = b"keep";
+        let mut desired = BTreeMap::new();
+        desired.insert(
+            "memory/keep.bin".into(),
+            BoxStoreManifestEntry::File {
+                sha: format!("{:x}", Sha256::digest(keep)),
+                size: keep.len() as u64,
+                mode: 0o600,
+            },
+        );
+
+        let removed = prune_local_agent_root(&root, &desired).expect("prune");
+        assert!(removed >= 3);
+        assert_eq!(fs::read(root.join("memory/keep.bin")).unwrap(), keep);
+        assert!(!root.join("memory/stale.bin").exists());
+        assert!(!root.join("memory/stale-dir").exists());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

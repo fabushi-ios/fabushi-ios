@@ -7995,6 +7995,41 @@ impl FeatureHostController {
         )
     }
 
+    fn load_agent_store_sync_base(
+        &self,
+        account_root: &Path,
+        agent_id: &str,
+    ) -> Result<Option<crate::box_store_sync_state::AgentStoreSyncBase>, FeatureHostError> {
+        crate::box_store_sync_state::load_sync_base(account_root, agent_id)
+            .map_err(FeatureHostError::Contract)
+    }
+
+    fn record_agent_store_sync_base(
+        &self,
+        account_root: &Path,
+        agent_id: &str,
+        remote: &Value,
+        manifest: &crate::box_store_manifest::BoxStoreManifest,
+    ) -> Result<(), FeatureHostError> {
+        let etag = remote
+            .get("etag")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store canonical manifest omitted ETag".into(),
+            ))?;
+        crate::box_store_sync_state::save_sync_base(
+            account_root,
+            agent_id,
+            &crate::box_store_sync_state::AgentStoreSyncBase {
+                etag: etag.to_string(),
+                entries: manifest.entries.clone(),
+                fully_hydrated: manifest.fully_hydrated,
+            },
+        )
+        .map_err(FeatureHostError::Contract)
+    }
+
     pub fn agent_store_manifest_read(
         &self,
         agent_id: &str,
@@ -8194,21 +8229,32 @@ impl FeatureHostController {
             ));
         }
 
+        let local_exists = std::fs::symlink_metadata(&target_root).is_ok();
         let local_entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
-        if !local_entries.is_empty() {
-            if local_entries == manifest.entries {
-                return Ok(json!({
-                    "outcome": "noop",
-                    "reason": "local already matches remote",
-                    "files": 0,
-                    "bytes": 0,
-                    "verified": local_entries.len(),
-                }));
+        let sync_base = self.load_agent_store_sync_base(&account_root, agent_id)?;
+        if local_entries == manifest.entries {
+            self.record_agent_store_sync_base(&account_root, agent_id, &remote, &manifest)?;
+            return Ok(json!({
+                "outcome": "noop",
+                "reason": "local already matches remote",
+                "files": 0,
+                "bytes": 0,
+                "verified": local_entries.len(),
+            }));
+        }
+        if local_exists {
+            let local_is_confirmed_base = sync_base
+                .as_ref()
+                .is_some_and(|base| {
+                    base.entries == local_entries
+                        && base.fully_hydrated != Some(false)
+                });
+            if !local_is_confirmed_base {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store local and remote state diverged without a matching local merge base; automatic hydrate is refused".into(),
+                ));
             }
-            return Err(FeatureHostError::Contract(
-                "Agent Store local and remote state diverged; automatic hydrate is refused until a merge base is available".into(),
-            ));
         }
 
         let assert_scope = || -> Result<(), FeatureHostError> {
@@ -8276,11 +8322,19 @@ impl FeatureHostController {
             }
         }
         assert_scope()?;
+        let pruned = crate::box_store_hydration::prune_local_agent_root(
+            &target_root,
+            &manifest.entries,
+        )
+        .map_err(FeatureHostError::Contract)?;
+        assert_scope()?;
+        self.record_agent_store_sync_base(&account_root, agent_id, &remote, &manifest)?;
         Ok(json!({
             "outcome": "hydrated",
             "files": files,
             "bytes": bytes_written,
             "verified": verified,
+            "pruned": pruned,
             "manifestEntries": manifest.entries.len(),
             "fullyHydrated": manifest.fully_hydrated,
         }))
@@ -8319,7 +8373,12 @@ impl FeatureHostController {
             .map_err(FeatureHostError::Contract)?;
 
         let current_remote = self.agent_store_manifest_read(agent_id)?;
-        if current_remote.get("found").and_then(Value::as_bool) == Some(true) {
+        let current_remote_found =
+            current_remote.get("found").and_then(Value::as_bool) == Some(true);
+        let sync_base = self.load_agent_store_sync_base(&account_root, agent_id)?;
+        let mut current_remote_etag: Option<String> = None;
+
+        if current_remote_found {
             let remote_manifest = current_remote
                 .get("manifest")
                 .and_then(crate::box_store_manifest::parse_box_store_manifest)
@@ -8331,7 +8390,23 @@ impl FeatureHostController {
                     "Agent Store snapshot refuses an explicitly incomplete remote manifest".into(),
                 ));
             }
+            current_remote_etag = Some(
+                current_remote
+                    .get("etag")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| FeatureHostError::Contract(
+                        "Agent Store snapshot remote manifest omitted ETag".into(),
+                    ))?
+                    .to_string(),
+            );
             if remote_manifest.entries == entries {
+                self.record_agent_store_sync_base(
+                    &account_root,
+                    agent_id,
+                    &current_remote,
+                    &remote_manifest,
+                )?;
                 return Ok(json!({
                     "outcome": "noop",
                     "reason": "remote already matches local",
@@ -8341,8 +8416,20 @@ impl FeatureHostController {
                     "uploadedBytes": 0,
                 }));
             }
+            let remote_is_confirmed_base = sync_base
+                .as_ref()
+                .is_some_and(|base| {
+                    base.entries == remote_manifest.entries
+                        && base.fully_hydrated == remote_manifest.fully_hydrated
+                });
+            if !remote_is_confirmed_base {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store local and remote state diverged without a matching remote merge base; automatic snapshot is refused".into(),
+                ));
+            }
+        } else if sync_base.is_some() {
             return Err(FeatureHostError::Contract(
-                "Agent Store local and remote state diverged; automatic snapshot is refused until a merge base is available".into(),
+                "Agent Store remote manifest disappeared after a confirmed merge base; automatic recreation is refused".into(),
             ));
         }
 
@@ -8454,31 +8541,53 @@ impl FeatureHostController {
             &entries_value,
             Some(&writer_window_id),
             Some(true),
-            None,
-            true,
+            current_remote_etag.as_deref(),
+            !current_remote_found,
         )?;
-        let manifest = if manifest.get("outcome").and_then(Value::as_str) == Some("conflict") {
+        let canonical = if manifest.get("outcome").and_then(Value::as_str) == Some("conflict") {
             let canonical = self.agent_store_manifest_read(agent_id)?;
             let canonical_manifest = canonical
                 .get("manifest")
                 .and_then(crate::box_store_manifest::parse_box_store_manifest)
                 .ok_or_else(|| FeatureHostError::Contract(
-                    "Agent Store concurrent manifest creation has no valid canonical manifest".into(),
+                    "Agent Store concurrent manifest write has no valid canonical manifest".into(),
                 ))?;
             if canonical_manifest.entries != entries || canonical_manifest.fully_hydrated == Some(false) {
                 return Err(FeatureHostError::Contract(
-                    "Agent Store concurrent manifest creation diverged; automatic overwrite is refused".into(),
+                    "Agent Store concurrent manifest write diverged; automatic overwrite is refused".into(),
                 ));
             }
-            json!({
-                "outcome": "unchanged",
-                "acceptedMatchingCanonical": true,
-                "etag": canonical.get("etag").cloned().unwrap_or(Value::Null),
-                "revision": canonical.get("revision").cloned().unwrap_or(Value::Null),
-            })
+            canonical
         } else {
-            manifest
+            self.agent_store_manifest_read(agent_id)?
         };
+        let canonical_manifest = canonical
+            .get("manifest")
+            .and_then(crate::box_store_manifest::parse_box_store_manifest)
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store snapshot could not confirm canonical manifest".into(),
+            ))?;
+        if canonical_manifest.entries != entries || canonical_manifest.fully_hydrated == Some(false) {
+            return Err(FeatureHostError::Contract(
+                "Agent Store snapshot canonical confirmation does not match local entries".into(),
+            ));
+        }
+        self.record_agent_store_sync_base(
+            &account_root,
+            agent_id,
+            &canonical,
+            &canonical_manifest,
+        )?;
+        let manifest = json!({
+            "outcome": if manifest.get("outcome").and_then(Value::as_str) == Some("conflict") {
+                "unchanged"
+            } else {
+                manifest.get("outcome").and_then(Value::as_str).unwrap_or("written")
+            },
+            "acceptedMatchingCanonical": manifest.get("outcome").and_then(Value::as_str) == Some("conflict"),
+            "etag": canonical.get("etag").cloned().unwrap_or(Value::Null),
+            "revision": canonical.get("revision").cloned().unwrap_or(Value::Null),
+        });
         assert_scope()?;
 
         Ok(json!({
@@ -8520,10 +8629,16 @@ impl FeatureHostController {
         let local_exists = std::fs::symlink_metadata(&target_root).is_ok();
         let local_entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
+        let sync_base = self.load_agent_store_sync_base(&account_root, agent_id)?;
         let remote = self.agent_store_manifest_read(agent_id)?;
         let remote_found = remote.get("found").and_then(Value::as_bool) == Some(true);
 
         if !remote_found {
+            if sync_base.is_some() {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store remote manifest disappeared after a confirmed merge base".into(),
+                ));
+            }
             if !local_exists || local_entries.is_empty() {
                 return Ok(json!({
                     "outcome": "noop",
@@ -8545,18 +8660,53 @@ impl FeatureHostController {
             ));
         }
         if remote_manifest.entries == local_entries {
+            self.record_agent_store_sync_base(
+                &account_root,
+                agent_id,
+                &remote,
+                &remote_manifest,
+            )?;
             return Ok(json!({
                 "outcome": "noop",
                 "reason": "local and remote are already equivalent",
                 "entries": local_entries.len(),
             }));
         }
-        if !local_exists {
+
+        if !local_exists && sync_base.is_none() {
             return self.agent_store_hydrate_agent(agent_id);
         }
 
+        if let Some(base) = sync_base {
+            let local_changed = local_entries != base.entries;
+            let remote_changed = remote_manifest.entries != base.entries
+                || remote_manifest.fully_hydrated != base.fully_hydrated;
+            match (local_changed, remote_changed) {
+                (false, true) => return self.agent_store_hydrate_agent(agent_id),
+                (true, false) => return self.agent_store_snapshot_agent(agent_id),
+                (false, false) => {
+                    self.record_agent_store_sync_base(
+                        &account_root,
+                        agent_id,
+                        &remote,
+                        &remote_manifest,
+                    )?;
+                    return Ok(json!({
+                        "outcome": "noop",
+                        "reason": "confirmed merge base remains canonical",
+                        "entries": local_entries.len(),
+                    }));
+                }
+                (true, true) => {
+                    return Err(FeatureHostError::Contract(
+                        "Agent Store local and remote both changed since the merge base; path-level merge is required".into(),
+                    ));
+                }
+            }
+        }
+
         Err(FeatureHostError::Contract(
-            "Agent Store local and remote state diverged; automatic reconciliation is refused until a persisted merge base is available".into(),
+            "Agent Store local and remote state diverged without a persisted merge base".into(),
         ))
     }
 
