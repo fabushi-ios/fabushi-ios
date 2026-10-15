@@ -8,7 +8,7 @@
     "mode": "live-main",
     "observedAt": "2026-10-15"
   },
-  "count": 239,
+  "count": 241,
   "gitlinkCount": 0,
   "fullSourceClosure": false,
   "entries": [
@@ -16,11 +16,12 @@
       "path": ".github/scripts/fdn-g11-real-browser.mjs",
       "mode": "100644",
       "type": "blob",
-      "sha": "a86c8329e1c3095f6b13e528f07d630876d5c46d",
-      "size": 13272,
+      "sha": "7ba6f0fbb2fc1645bb530629f0fb6a4b5ac9f468",
+      "size": 14727,
       "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Added on Desktop 8148bfb9; tracked outside selected roots and pending explicit build/spec disposition."
+      "coverage_status": "requires-current-main-review",
+      "reason": "Added on Desktop 8148bfb9; tracked outside selected roots and pending explicit build/spec disposition.",
+      "notes": "Desktop live-main drift 8148bfb9 -> c33a9495 changed this tracked item; prior evidence is predecessor-only."
     },
     {
       "path": ".github/workflows/desktop-chat-parity-ci.yml",
@@ -46,11 +47,12 @@
       "path": ".github/workflows/fdn-g11-real-browser.yml",
       "mode": "100644",
       "type": "blob",
-      "sha": "c4d2532708e04fd8459120018950dbef86c5c48c",
-      "size": 1906,
+      "sha": "9f1c9dae2e4ed95e9719bbae848309e6f86d28c7",
+      "size": 3620,
       "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Added on Desktop 8148bfb9; tracked outside selected roots and pending explicit build/spec disposition."
+      "coverage_status": "requires-current-main-review",
+      "reason": "Added on Desktop 8148bfb9; tracked outside selected roots and pending explicit build/spec disposition.",
+      "notes": "Desktop live-main drift 8148bfb9 -> c33a9495 changed this tracked item; prior evidence is predecessor-only."
     },
     {
       "path": ".github/workflows/fdn-tsnet-worker.yml",
@@ -803,6 +805,15 @@
       "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
     },
     {
+      "path": "docs/specs/fdn-g11-host-browser-actions.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a2e98139c3817e2de9943edfe18c2ff7eef5c1da",
+      "size": 4227,
+      "coverage_status": "requires-current-main-review",
+      "notes": "Added by Desktop live-main c33a9495fc1e640557d65f3e2daedc1449be7fcb; requires current-main disposition review."
+    },
+    {
       "path": "docs/specs/fdn-g11-real-browser-actions.md",
       "mode": "100644",
       "type": "blob",
@@ -831,6 +842,15 @@
       "classification": "unreviewed",
       "coverage_status": "unreviewed",
       "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+    },
+    {
+      "path": "docs/specs/g11-box-browser-wire-completion.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a75ee8323202ab18af2c91a396b1d00139bb9fa6",
+      "size": 5238,
+      "coverage_status": "requires-current-main-review",
+      "notes": "Added by Desktop live-main c33a9495fc1e640557d65f3e2daedc1449be7fcb; requires current-main disposition review."
     },
     {
       "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
@@ -2449,5 +2469,6 @@
       "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
     }
   ],
-  "sourceCommit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
+  "sourceCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+  "rootTreeSha": "906b3f414b5ff343a5f0e627fa31b98778dfbf54"
 }

@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-    "tree": "daa4cfbf6851e312e280050f81ef18915bca0c0c",
+    "commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+    "tree": "906b3f414b5ff343a5f0e627fa31b98778dfbf54",
     "mode": "live-main"
   },
-  "rowCount": 7974,
+  "rowCount": 7976,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "main-rebaseline-snapshot-not-responsibility-closure",
   "statusPolicy": {
@@ -23,7 +23,7 @@
     {
       "name": "source-box-exec-daemon",
       "path": "docs/parity/desktop-main/source-box-exec-daemon.json",
-      "rowCount": 5
+      "rowCount": 6
     },
     {
       "name": "source-electron-dev-controls",
@@ -48,7 +48,7 @@
     {
       "name": "source-host",
       "path": "docs/parity/desktop-main/source-host.json",
-      "rowCount": 982
+      "rowCount": 983
     },
     {
       "name": "source-internal",
@@ -104,9 +104,9 @@
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-15",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "454d13a4cb72ed5f4d6197d43f5661a5059a3064",
-    "desktopCommit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-    "desktopTree": "daa4cfbf6851e312e280050f81ef18915bca0c0c",
+    "preEvidenceIosHead": "89f26c80f5878cb3abd8517d6d3be5ebe9d208ef",
+    "desktopCommit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+    "desktopTree": "906b3f414b5ff343a5f0e627fa31b98778dfbf54",
     "predecessorWorkflowRuns": [
       38194840503,
       38194840499,
@@ -273,7 +273,7 @@
       114688807759,
       114688866359
     ],
-    "status": "aggregate-review-in-progress-descendant-exact-head-ci-required",
+    "status": "desktop-authority-drift-rebaseline-current-main-review-required",
     "rowCount": 7974,
     "currentImplementationHead": "3fc84f6545d03c507015730567e9b46b1a8fe9bd",
     "promotion": "none"

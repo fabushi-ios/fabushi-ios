@@ -3,8 +3,8 @@
   "authority": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
-    "tree": "daa4cfbf6851e312e280050f81ef18915bca0c0c",
+    "commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+    "tree": "906b3f414b5ff343a5f0e627fa31b98778dfbf54",
     "mode": "live-main",
     "observedAt": "2026-10-15"
   },
@@ -12,8 +12,8 @@
     "frontend/**",
     "source/**"
   ],
-  "fileCount": 7974,
-  "selectedTreeSha256": "caa05fed7cdad66ab8e291e6c135e24a4dbe23358a78776c6e89f55f262418c9",
+  "fileCount": 7976,
+  "selectedTreeSha256": "d4451d8964a7a2eeb1fd14e55ffbe089c387f886e2207564417c0849298cd632",
   "groups": [
     {
       "name": "frontend",
@@ -23,7 +23,7 @@
     {
       "name": "source-box-exec-daemon",
       "path": "manifests/desktop-main/source-box-exec-daemon.json",
-      "fileCount": 5
+      "fileCount": 6
     },
     {
       "name": "source-electron-dev-controls",
@@ -48,7 +48,7 @@
     {
       "name": "source-host",
       "path": "manifests/desktop-main/source-host.json",
-      "fileCount": 982
+      "fileCount": 983
     },
     {
       "name": "source-internal",
