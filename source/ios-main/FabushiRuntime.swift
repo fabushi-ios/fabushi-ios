@@ -5,6 +5,28 @@ import SwiftUI
 private let IOS_CLOUD_AGENT_POLL_INTERVAL_NS: UInt64 = 10_000_000_000
 private let IOS_CLOUD_AGENT_MAX_WAIT_MS: Int64 = 5 * 60 * 60 * 1_000
 private let IOS_CLOUD_AGENT_RESTART_GRACE_MS: Int64 = 3 * 60 * 1_000
+
+enum IOSCloudAgentPollRetryPolicy {
+    static let fallbackMilliseconds: Int64 = 60_000
+    static let jitterRatio: Double = 0.25
+
+    static func pauseMilliseconds(
+        retryAfterMilliseconds: Int?,
+        randomFraction: Double
+    ) -> Int64 {
+        let fallback = Int(fallbackMilliseconds)
+        let base = Int64(max(0, retryAfterMilliseconds ?? fallback))
+        let random = randomFraction.isFinite
+            ? min(max(randomFraction, 0), 1)
+            : 0
+        let jitterDouble = (Double(base) * random * jitterRatio).rounded()
+        let jitter = jitterDouble >= Double(Int64.max)
+            ? Int64.max
+            : Int64(max(0, jitterDouble))
+        return base.saturatingAdding(jitter)
+    }
+}
+
 let IOS_AGENT_STORE_RECONCILE_INTERVAL_NS: UInt64 = 120_000_000_000
 let IOS_AGENT_STORE_ERROR_BACKOFF_NS: UInt64 = 30_000_000_000
 
@@ -117,6 +139,7 @@ private final class IOSCloudAgentWakeWatcher {
         let deadline = startedAt.saturatingAdding(IOS_CLOUD_AGENT_MAX_WAIT_MS)
         let restartDeadline = startedAt.saturatingAdding(IOS_CLOUD_AGENT_RESTART_GRACE_MS)
         var awaitingRestart = waitForRestart
+        var pausedUntilMs: Int64 = 0
 
         while !Task.isCancelled {
             do {
@@ -131,10 +154,23 @@ private final class IOSCloudAgentWakeWatcher {
                 continue
             }
 
+            if now < pausedUntilMs {
+                continue
+            }
+
             let info: IOSCloudAgentComposerInfo
             do {
                 info = try await coordinator.cloudAgentInfo(bcId: wake.workId)
             } catch {
+                if let dashboardError = error as? IOSCursorDashboardError,
+                   dashboardError.httpStatus == 429
+                {
+                    let pauseMs = IOSCloudAgentPollRetryPolicy.pauseMilliseconds(
+                        retryAfterMilliseconds: dashboardError.retryAfterMilliseconds,
+                        randomFraction: Double.random(in: 0...1)
+                    )
+                    pausedUntilMs = now.saturatingAdding(pauseMs)
+                }
                 continue
             }
 

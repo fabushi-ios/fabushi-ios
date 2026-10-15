@@ -498,6 +498,59 @@ final class IOSLifecycleParityTests: XCTestCase {
     }
 
 
+    func testCloudAgentRateLimitPauseMatchesDesktopPolicy() {
+        XCTAssertEqual(
+            IOSCloudAgentPollRetryPolicy.pauseMilliseconds(
+                retryAfterMilliseconds: nil,
+                randomFraction: 0
+            ),
+            60_000
+        )
+        XCTAssertEqual(
+            IOSCloudAgentPollRetryPolicy.pauseMilliseconds(
+                retryAfterMilliseconds: nil,
+                randomFraction: 1
+            ),
+            75_000
+        )
+        XCTAssertEqual(
+            IOSCloudAgentPollRetryPolicy.pauseMilliseconds(
+                retryAfterMilliseconds: 2_000,
+                randomFraction: 0.5
+            ),
+            2_250
+        )
+        XCTAssertEqual(
+            IOSCloudAgentPollRetryPolicy.pauseMilliseconds(
+                retryAfterMilliseconds: 2_000,
+                randomFraction: .nan
+            ),
+            2_000
+        )
+        XCTAssertEqual(iosCursorRetryAfterMilliseconds("1.5"), 1_500)
+        XCTAssertEqual(iosCursorRetryAfterMilliseconds("0"), 0)
+        XCTAssertNil(iosCursorRetryAfterMilliseconds("-1"))
+        XCTAssertNil(iosCursorRetryAfterMilliseconds("n/a"))
+    }
+
+    func testCloudAgentWakeWatcherUsesRateLimitPauseFence() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/FabushiRuntime.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("dashboardError.httpStatus == 429"))
+        XCTAssertTrue(source.contains("dashboardError.retryAfterMilliseconds"))
+        XCTAssertTrue(source.contains("pausedUntilMs = now.saturatingAdding(pauseMs)"))
+        XCTAssertTrue(source.contains("if now < pausedUntilMs"))
+    }
+
+
     func testCloudAgentWakeCompletionBestEffortDumpsTranscriptBeforeSettlement() throws {
         let iosRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

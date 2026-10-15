@@ -3,13 +3,33 @@ import Foundation
 struct IOSCursorDashboardError: Error, LocalizedError, Sendable {
     let message: String
     let httpStatus: Int?
+    let retryAfterMilliseconds: Int?
 
-    init(message: String, httpStatus: Int? = nil) {
+    init(
+        message: String,
+        httpStatus: Int? = nil,
+        retryAfterMilliseconds: Int? = nil
+    ) {
         self.message = message
         self.httpStatus = httpStatus
+        self.retryAfterMilliseconds = retryAfterMilliseconds
     }
 
     var errorDescription: String? { message }
+}
+
+func iosCursorRetryAfterMilliseconds(_ value: String?) -> Int? {
+    guard let raw = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !raw.isEmpty,
+          let seconds = Double(raw),
+          seconds.isFinite,
+          seconds >= 0
+    else {
+        return nil
+    }
+    let milliseconds = seconds * 1_000
+    guard milliseconds < Double(Int.max) else { return Int.max }
+    return Int(milliseconds)
 }
 
 struct IOSCursorSandBoxBrokerError: Error, LocalizedError, Equatable, Sendable {
@@ -1900,7 +1920,11 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             throw IOSCursorDashboardError(
                 message: detail?.isEmpty == false
                     ? detail!
-                    : "Dashboard RPC \(method) failed with HTTP \(http.statusCode)."
+                    : "Dashboard RPC \(method) failed with HTTP \(http.statusCode).",
+                httpStatus: http.statusCode,
+                retryAfterMilliseconds: iosCursorRetryAfterMilliseconds(
+                    http.value(forHTTPHeaderField: "retry-after")
+                )
             )
         }
         if data.isEmpty { return [:] }
@@ -1948,7 +1972,11 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
                 .prefix(512)
             let suffix = detail.map { $0.isEmpty ? "" : ": \($0)" } ?? ""
             throw IOSCursorDashboardError(
-                message: "Dashboard Connect RPC \(method) failed with HTTP \(http.statusCode)\(suffix)"
+                message: "Dashboard Connect RPC \(method) failed with HTTP \(http.statusCode)\(suffix)",
+                httpStatus: http.statusCode,
+                retryAfterMilliseconds: iosCursorRetryAfterMilliseconds(
+                    http.value(forHTTPHeaderField: "retry-after")
+                )
             )
         }
         return data
