@@ -881,12 +881,9 @@ impl codebase_telemetry::CodebaseTelemetryHostBridge for MobileCodebaseTelemetry
 
     fn lookup_privacy_mode(
         &self,
-        _auth: codebase_telemetry::TelemetryAuth,
+        auth: codebase_telemetry::TelemetryAuth,
     ) -> Result<codebase_telemetry::PrivacyMode, codebase_telemetry::PrivacyLookupError> {
-        Err(codebase_telemetry::PrivacyLookupError::new(
-            "Cursor privacy backend transport has not been projected into the canonical Rust Host; fail closed",
-            false,
-        ))
+        codebase_telemetry::cursor_backend::fetch_privacy_mode(auth)
     }
 }
 

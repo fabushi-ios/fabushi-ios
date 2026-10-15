@@ -1,4 +1,5 @@
 mod csnaps_protocol;
+mod cursor_backend;
 mod privacy_mode;
 mod production;
 mod codebase_snapshot_trigger;
