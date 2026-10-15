@@ -1108,6 +1108,41 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         )
     }
 
+    func registerAutomationRelay(
+        slackChannels: [String],
+        githubRepos: [String],
+        githubKinds: [String],
+        timeoutMs: Int = 30_000
+    ) async throws -> [String: Any] {
+        try Task.checkCancellation()
+        let body: [String: Any] = [
+            "slackChannels": Array(Set(slackChannels)).sorted(),
+            "githubRepos": Array(Set(githubRepos.map { $0.lowercased() })).sorted(),
+            "githubKinds": Array(Set(githubKinds)).sorted(),
+        ]
+        let result = try await automationBackendPost(
+            path: "/sand/listener-subscriptions",
+            body: body,
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return result
+    }
+
+    func drainAutomationRelayEvents(
+        ackIds: [String],
+        timeoutMs: Int = 30_000
+    ) async throws -> [String: Any] {
+        try Task.checkCancellation()
+        let result = try await automationBackendPost(
+            path: "/sand/listener-events/poll",
+            body: ["ackIds": Array(Set(ackIds)).sorted()],
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return result
+    }
+
     static func productAnalyticsRequestBodyForTests(
         _ events: [ProductAnalyticsEvent]
     ) throws -> [String: Any] {
@@ -1153,6 +1188,46 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             return try await requestExecutor(request)
         }
         return try await session.data(for: request)
+    }
+
+    private func automationBackendPost(
+        path: String,
+        body: [String: Any],
+        timeoutMs: Int
+    ) async throws -> [String: Any] {
+        guard path.hasPrefix("/sand/") else {
+            throw IOSCursorDashboardError(message: "Automation backend path must remain inside /sand/.")
+        }
+        let headers = try await cursorHeaders()
+        guard let url = URL(string: path, relativeTo: backendURL)?.absoluteURL else {
+            throw IOSCursorDashboardError(message: "Automation backend URL was invalid.")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = TimeInterval(min(max(1, timeoutMs), 30_000)) / 1_000
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (name, value) in headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let (data, response) = try await perform(request)
+        guard let http = response as? HTTPURLResponse else {
+            throw IOSCursorDashboardError(message: "Automation backend returned no HTTP response.")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let detail = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw IOSCursorDashboardError(
+                message: detail?.isEmpty == false
+                    ? String(detail!.prefix(512))
+                    : "Automation backend \(path) failed with HTTP \(http.statusCode)."
+            )
+        }
+        if data.isEmpty { return [:] }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw IOSCursorDashboardError(message: "Automation backend \(path) returned invalid JSON.")
+        }
+        return object
     }
 
     private func rpc(
