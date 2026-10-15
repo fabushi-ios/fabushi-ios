@@ -189,16 +189,18 @@ pub fn ack(
     let conversation = conversation_key(conversation_id)?;
     let targets = event_ids.iter().cloned().collect::<HashSet<_>>();
     let events = read_conflict_events(account_root)?;
+    let live_ids = events
+        .iter()
+        .map(|event| event.event_id.clone())
+        .collect::<HashSet<_>>();
+    let removed = targets
+        .iter()
+        .filter(|event_id| live_ids.contains(*event_id))
+        .count();
     let kept = events
         .into_iter()
         .filter(|event| !targets.contains(&event.event_id))
         .collect::<Vec<_>>();
-    let removed = event_ids.len().saturating_sub(
-        event_ids
-            .iter()
-            .filter(|event_id| kept.iter().any(|event| &event.event_id == *event_id))
-            .count(),
-    );
     rewrite_conflict_events(account_root, &kept)?;
 
     let mut state = load_state(account_root)?;
