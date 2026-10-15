@@ -2073,14 +2073,15 @@
       "ios_target_path": "source/ios-main/process-metrics/redaction.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS already has the same sanitizer/hash owner. Current-main required extending its known-helper regex to Fabushi(?: Lab)? while retaining Grok Bot(?: Lab)? legacy names; unknown process labels remain first-token redacted.",
-      "implementation_status": "mapped",
+      "implementation_status": "implemented",
       "production_evidence": "source/ios-main/process-metrics/redaction.swift now accepts Fabushi/Fabushi Lab and legacy Grok Bot/Grok Bot Lab Helper GPU/Plugin/Renderer labels and hashes every original input.",
       "test_evidence": "IOSPlatformMainParityTests.testProcessNameRedactionPreservesOnlyKnownHelperLabels now asserts Fabushi helper preservation, legacy Grok preservation and unknown-process redaction/hash. Exact-head Actions pending.",
-      "notes": "IOS-MAIN-PROCESS-REDACTION-001 production gap fixed in commits 9cbebcbf85d5cc29e16d35fac6df41d95d42f40d and 300cd328693c1adc485018ff3f88f75e56dc0ee0. Keep mapped current-main fence until aggregate review permits promotion and same-head CI succeeds.",
+      "notes": "IOS-MAIN-PROCESS-REDACTION-001 production gap is implemented in source/ios-main/process-metrics/redaction.swift with focused parity coverage. Desktop blob is unchanged at current main b6a66fd2; current-main responsibility review is complete, but verification remains gated on same-head Actions.",
       "historical_implementation_status": "unreviewed",
       "historical_ios_disposition": "unreviewed",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "3bc92400826cc4ca7ac665b467708e22261edc61"
+      "authority_review_state": "reviewed-current-main",
+      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "exact_head_evidence": "implementation present on current PR branch; exact-head CI pending"
     },
     {
       "desktop_path": "source/electron-main/process-metrics/sampler.ts",
