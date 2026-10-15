@@ -452,10 +452,10 @@
       "ios_language": "Rust",
       "ios_platform_delta": "iOS Feature Host uses the same enabled-workflows.json filename under the Agent root and has WorkflowEnablementFile plus read/write helpers. Full preservation/default/forget/enable-all command semantics still need line-by-line contract verification.",
       "implementation_status": "mapped",
-      "production_evidence": "Shipping Feature Host derives workflow_enablement_path(agent_root, agent_id) and reads/writes per-Agent WorkflowEnablementFile used by workflow commands.",
-      "test_evidence": "Workflow command tests exist in the Feature Host; focused parity tests for explicit entries, preserved enabled list and idempotent enable/forget remain to be tied to this row.",
-      "notes": "Current-main reviewed against Desktop blob 62bf1142fda33f80def29655548b68cd5bbd4f24. Strong structural match, but keep mapped until exact command semantics and exact-head CI are evidenced.",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions after current-main review",
+      "production_evidence": "Shipping FeatureHost uses the same per-Agent enabled-workflows.json owner for WorkflowList/WorkflowSetEnabled/WorkflowDelete and workflow execution checks. The existing read/write path preserves the legacy enabled field while disabled remains authoritative/default-enabled. has_explicit_entries and enable_all helpers now mirror Desktop semantics without creating another store.",
+      "test_evidence": "workflow_enablement_contract_tests prove default-enabled behavior, explicit disabled/enabled entry detection, legacy enabled-field preservation, idempotent set/forget, and idempotent enable_all mutation. A distinct shipping caller for bulk enable_all is still not evidenced.",
+      "notes": "Current-main reviewed against Desktop blob 62bf1142fda33f80def29655548b68cd5bbd4f24. Persistence semantics are implemented and focused-tested, but keep mapped until the Desktop bulk enable_all product effect is tied to a real iOS shipping entrypoint rather than only a helper.",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
       "authority_review_state": "current-main-reviewed"
     },
     {
