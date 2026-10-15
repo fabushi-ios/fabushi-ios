@@ -6,7 +6,7 @@ enum CoordinatorMainMethodRegistry {
         "fetchLinkMetadata", "getHostSettings", "setHostSettings", "setBoxSecrets", "refreshMcp",
         "reportConnectorAuth", "reportMcpDiscoveryFailed", "loadBoxMcpServers", "listBoxMcpServers",
         "listBoxMcpToolsRaw", "executeBoxMcpToolRaw", "updateForeverBox", "setWindowFocused",
-        "getHostStatus", "listAgents", "createAgent",
+        "getHostStatus", "listAgents", "createAgent", "reportSentryConversation",
         "deleteAgents", "getConversationOutline", "getSubagents", "setDevGatewayOffline",
         "setGatewayPaused"
     ]
