@@ -42,17 +42,20 @@
     }
   ],
   "dependencyReview": {
-    "status": "reviewed-with-gaps",
-    "reason": "Desktop 8148bfb9 browser refresh/history generation fencing was reviewed against the current MobileEmbedded Rust Host. All four selected changes are understood, but iOS has no box-browser provider/tool surface, so implementation and focused test gaps remain.",
+    "status": "reviewed-implemented-pending-verification",
+    "reason": "Desktop 8148bfb9 browser refresh/history generation fencing and its four selected source/contract changes are now implemented through the existing iOS MobileEmbedded PlatformExecBroker -> Coordinator -> IOSProductionLocalExecutor -> account-scoped remote ExecService chain. Exact-head GitHub Actions are pending, so acceptance remains false.",
     "sameDirectoryReviewPaths": [
       "source/host/src/runner/tools/sand_browser_driver_source.rs",
       "source/host/src/runner/tools/sand_browser_tools.rs",
       "source/host/tests/browser_driver_source_contract.rs",
       "source/host/tests/sand_browser_tools_contract.rs",
-      "source/packages/mahayana-rs/mahayana-host/src/lib.rs"
+      "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
+      "source/packages/mahayana-rs/mahayana-native-engine/src/browser_driver_source.rs",
+      "source/local-exec-daemon/production-executor.swift",
+      "mobile/ios/FabushiTests/RunnerParityTests.swift"
     ],
-    "sharedContractReview": "reviewed-applicable-mobile-host-browser-gap",
-    "mainActiveSpecsReview": "reviewed-fdn-g11-browser-navigation-gap",
+    "sharedContractReview": "reviewed-applicable-mobile-host-browser-implemented-pending-exact-head-ci",
+    "mainActiveSpecsReview": "reviewed-fdn-g11-browser-navigation-implemented-pending-exact-head-ci",
     "newAndChangedResponsibilitiesReviewed": true
   },
   "historyPolicy": "Desktop 371b72f1 -> b6a66fd2 exact-head rebaseline. Prior acceptance for all changed source rows is predecessor-only.",
@@ -312,7 +315,7 @@
       114688807759,
       114688866359
     ],
-    "status": "desktop-main-rebaseline-reviewed-with-browser-implementation-gaps",
+    "status": "pending-successor-exact-head-ci",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -336,6 +339,7 @@
     ],
     "conclusion": "Gateway descriptor cache/store and Desktop box-host connector responsibilities are current-main-reviewed and implemented through canonical iOS owners: encrypted account-scoped descriptor fast path, typed broker failures, blocked hold/backoff, App Store backend-update requirement projection, recreate/force-recreate/migration, inference auth ownership, and in-process local-exec platform replacement. This is implemented only; exact-head CI and aggregate migration acceptance remain open.",
     "currentImplementationHead": "d85975c0e9d33d04127c402b718b69a5b4b50e2f",
-    "promotion": "none"
+    "promotion": "none",
+    "browserNavigationImplementationCommit": "fefbf67e46d064fb0c09a1c0c2586f7fcd314304"
   }
 }
