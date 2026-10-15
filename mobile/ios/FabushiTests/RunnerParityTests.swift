@@ -33,6 +33,50 @@ private actor TestLocalCapabilityBackend: IOSLocalCapabilityBackend {
 }
 
 final class RunnerParityTests: XCTestCase {
+    func testAgentToolsMaterializerKeepsSmallTextInline() {
+        XCTAssertNil(
+            IOSAgentToolsOutputMaterializer.prepare(
+                content: "small",
+                thresholdBytes: 5
+            )
+        )
+    }
+
+    func testAgentToolsMaterializerBuildsBoundedWorkspaceLocation() throws {
+        let prepared = try XCTUnwrap(
+            IOSAgentToolsOutputMaterializer.prepare(
+                content: "alpha\nbeta\ngamma",
+                thresholdBytes: 4,
+                maxSizeBytes: 10,
+                identifier: "fixed-id"
+            )
+        )
+        XCTAssertEqual(prepared.path, "/workspace/agent-tools/fixed-id.txt")
+        XCTAssertEqual(prepared.sizeBytes, 10)
+        XCTAssertEqual(prepared.lineCount, 2)
+        XCTAssertEqual(
+            String(
+                data: try XCTUnwrap(Data(base64Encoded: prepared.fileBytesBase64)),
+                encoding: .utf8
+            ),
+            "alpha\nbeta"
+        )
+    }
+
+    func testAgentToolsMaterializerDoesNotSplitUTF8AtBound() throws {
+        let prepared = try XCTUnwrap(
+            IOSAgentToolsOutputMaterializer.prepare(
+                content: "12345🙂tail",
+                thresholdBytes: 1,
+                maxSizeBytes: 7,
+                identifier: "utf8"
+            )
+        )
+        let data = try XCTUnwrap(Data(base64Encoded: prepared.fileBytesBase64))
+        XCTAssertEqual(String(data: data, encoding: .utf8), "12345")
+        XCTAssertEqual(prepared.sizeBytes, 5)
+    }
+
     func testBoxExecAlwaysUsesRemoteRunnerOnIOS() async throws {
         let transport = TestRemoteRunnerTransport()
         let server = IOSBoxExecEntrypoint.makeServer(transport: transport)

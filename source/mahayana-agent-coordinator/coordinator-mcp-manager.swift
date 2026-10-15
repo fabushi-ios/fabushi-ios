@@ -2252,16 +2252,18 @@ final class CoordinatorMcpSurface {
                         agentId: agentId
                     )
                 }
-                return routedCoordinatorPayload(
-                    await manager.executeTool(
-                        .init(
-                            providerIdentifier: tool.providerIdentifier,
-                            name: tool.toolName,
-                            args: McpJSONValue.from(arguments.foundationValue),
-                            toolCallId: toolCallId
-                        ),
-                        auditIdentity: .init(agentId: agentId)
-                    )
+                let result = await manager.executeTool(
+                    .init(
+                        providerIdentifier: tool.providerIdentifier,
+                        name: tool.toolName,
+                        args: McpJSONValue.from(arguments.foundationValue),
+                        toolCallId: toolCallId
+                    ),
+                    auditIdentity: .init(agentId: agentId)
+                )
+                return await self.routedMcpResultWithLargeTextSpill(
+                    result,
+                    toolCallId: toolCallId
                 )
             }
         )
@@ -2301,6 +2303,113 @@ final class CoordinatorMcpSurface {
         self.gatewayDescriptorFailureReporter = gatewayDescriptorFailureReporter
         self.reportMigrationWatchTelemetry = reportMigrationWatchTelemetry
         self.isClientPaused = isClientPaused
+    }
+
+    private func routedMcpResultWithLargeTextSpill(
+        _ result: SandMcpResult,
+        toolCallId: String
+    ) async -> CoordinatorPayload {
+        guard case .success(let success) = result.result else {
+            return routedCoordinatorPayload(result)
+        }
+
+        let aggregateText = success.content.compactMap { item -> String? in
+            guard case .text(let text) = item.content else { return nil }
+            return text.text
+        }.joined(separator: "\n\n")
+
+        guard let prepared = IOSAgentToolsOutputMaterializer.prepare(
+            content: aggregateText
+        ) else {
+            return routedCoordinatorPayload(result)
+        }
+
+        let response: CoordinatorPayload
+        do {
+            response = try await dispatchRemoteExecution(
+                method: "local-exec.box.exec",
+                params: .object([
+                    "case": .string("writeArgs"),
+                    "args": .object([
+                        "path": .string(prepared.path),
+                        "fileBytes": .string(prepared.fileBytesBase64),
+                        "toolCallId": .string(toolCallId),
+                    ]),
+                ])
+            )
+        } catch {
+            return .object([
+                "isError": .bool(true),
+                "content": .array([
+                    .object([
+                        "type": .string("text"),
+                        "text": .string(
+                            "Large MCP output could not be safely materialized on the controlled workspace."
+                        ),
+                    ]),
+                ]),
+            ])
+        }
+
+        guard case .object(let responseObject) = response,
+              responseObject["success"] == .bool(true),
+              case .string(let writtenPath)? = responseObject["path"],
+              !writtenPath.isEmpty
+        else {
+            return .object([
+                "isError": .bool(true),
+                "content": .array([
+                    .object([
+                        "type": .string("text"),
+                        "text": .string(
+                            "Large MCP output could not be safely materialized on the controlled workspace."
+                        ),
+                    ]),
+                ]),
+            ])
+        }
+
+        var routedContent: [CoordinatorPayload] = []
+        var emittedLocation = false
+        for item in success.content {
+            switch item.content {
+            case .text:
+                guard !emittedLocation else { continue }
+                routedContent.append(.object([
+                    "type": .string("text"),
+                    "text": .string(""),
+                    "outputLocation": .object([
+                        "filePath": .string(writtenPath),
+                        "sizeBytes": .number(Double(prepared.sizeBytes)),
+                        "lineCount": .number(Double(prepared.lineCount)),
+                    ]),
+                ]))
+                emittedLocation = true
+            case .image(let image):
+                routedContent.append(.object([
+                    "type": .string("image"),
+                    "data": .string(image.data),
+                    "mimeType": .string(image.mimeType),
+                ]))
+            case .other(let caseName, let value):
+                var object: [String: CoordinatorPayload] = [
+                    "type": .string(caseName),
+                ]
+                if let value {
+                    object["value"] = routedCoordinatorPayload(value)
+                }
+                routedContent.append(.object(object))
+            }
+        }
+
+        var routed: [String: CoordinatorPayload] = [
+            "isError": .bool(success.isError),
+            "content": .array(routedContent),
+        ]
+        if let structured = success.structuredContent {
+            routed["structuredContent"] = routedCoordinatorPayload(structured)
+        }
+        return .object(routed)
     }
 
     func dispatchRemoteExecution(
