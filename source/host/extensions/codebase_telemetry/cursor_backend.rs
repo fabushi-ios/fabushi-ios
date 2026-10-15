@@ -16,12 +16,21 @@ const PRIVACY_MODE_FETCH_TIMEOUT: Duration = Duration::from_secs(3);
 const SAND_CLIENT_TYPE: &str = "sand";
 const SAND_CLIENT_FALLBACK_BASE_VERSION: &str = "0.1.0";
 
-pub fn configured_backend_url() -> String {
-    env::var("SAND_BACKEND_URL")
-        .ok()
+fn configured_backend_url_from(
+    sand_backend_url: Option<String>,
+    cursor_api_base_url: Option<String>,
+) -> String {
+    sand_backend_url
         .filter(|value| !value.trim().is_empty())
-        .or_else(|| env::var("CURSOR_API_BASE_URL").ok().filter(|value| !value.trim().is_empty()))
+        .or_else(|| cursor_api_base_url.filter(|value| !value.trim().is_empty()))
         .unwrap_or_else(|| DEFAULT_CURSOR_BACKEND_URL.to_string())
+}
+
+pub fn configured_backend_url() -> String {
+    configured_backend_url_from(
+        env::var("SAND_BACKEND_URL").ok(),
+        env::var("CURSOR_API_BASE_URL").ok(),
+    )
 }
 
 fn sand_namespace() -> &'static str {
@@ -170,21 +179,21 @@ mod tests {
 
     #[test]
     fn configured_backend_matches_ios_production_default_and_overrides() {
-        let original_sand = env::var("SAND_BACKEND_URL").ok();
-        let original_cursor = env::var("CURSOR_API_BASE_URL").ok();
-        unsafe {
-            env::remove_var("SAND_BACKEND_URL");
-            env::remove_var("CURSOR_API_BASE_URL");
-        }
-        assert_eq!(configured_backend_url(), DEFAULT_CURSOR_BACKEND_URL);
-        unsafe { env::set_var("CURSOR_API_BASE_URL", "https://cursor.example.test"); }
-        assert_eq!(configured_backend_url(), "https://cursor.example.test");
-        unsafe { env::set_var("SAND_BACKEND_URL", "https://sand.example.test"); }
-        assert_eq!(configured_backend_url(), "https://sand.example.test");
-        unsafe {
-            match original_sand { Some(v) => env::set_var("SAND_BACKEND_URL", v), None => env::remove_var("SAND_BACKEND_URL") }
-            match original_cursor { Some(v) => env::set_var("CURSOR_API_BASE_URL", v), None => env::remove_var("CURSOR_API_BASE_URL") }
-        }
+        assert_eq!(
+            configured_backend_url_from(None, None),
+            DEFAULT_CURSOR_BACKEND_URL
+        );
+        assert_eq!(
+            configured_backend_url_from(None, Some("https://cursor.example.test".into())),
+            "https://cursor.example.test"
+        );
+        assert_eq!(
+            configured_backend_url_from(
+                Some("https://sand.example.test".into()),
+                Some("https://cursor.example.test".into()),
+            ),
+            "https://sand.example.test"
+        );
     }
 
     #[test]
