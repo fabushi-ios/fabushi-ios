@@ -31,6 +31,7 @@ struct RemoteAutomationShadow {
 struct RemoteAutomationSnapshot {
     shadows: BTreeMap<String, RemoteAutomationShadow>,
     all_ids: BTreeSet<String>,
+    enabled_ids: BTreeSet<String>,
 }
 
 fn cloud_message_base64<M: prost::Message>(message: &M) -> String {
@@ -116,6 +117,9 @@ fn remote_cloud_snapshot(
             continue;
         }
         snapshot.all_ids.insert(automation_id.clone());
+        if automation.enabled {
+            snapshot.enabled_ids.insert(automation_id.clone());
+        }
         let Some(marker) = automation.description else {
             continue;
         };
@@ -237,9 +241,10 @@ fn record_cloud_authority(
     state: &mut FeatureState,
     agent_id: &str,
     desired: &BTreeMap<String, AutomationCloudDefinition>,
-    remote: &BTreeMap<String, RemoteAutomationShadow>,
+    remote_shadows: &BTreeMap<String, RemoteAutomationShadow>,
+    enabled_remote_ids: &BTreeSet<String>,
 ) {
-    if desired.is_empty() && remote.is_empty() {
+    if desired.is_empty() && remote_shadows.is_empty() {
         state.automation_cloud_sync.known_agents.remove(agent_id);
         state.automation_cloud_sync.pending_agent_deletions.remove(agent_id);
         state.automation_cloud_sync.enabled_ids_by_agent.remove(agent_id);
@@ -249,15 +254,10 @@ fn record_cloud_authority(
     state.automation_cloud_sync.known_agents.insert(agent_id.to_string());
     state.automation_cloud_sync.pending_agent_deletions.remove(agent_id);
     state.automation_cloud_sync.failed_agents.remove(agent_id);
-    let enabled = remote
-        .values()
-        .filter(|shadow| shadow.enabled)
-        .map(|shadow| shadow.automation_id.clone())
-        .collect::<BTreeSet<_>>();
     state
         .automation_cloud_sync
         .enabled_ids_by_agent
-        .insert(agent_id.to_string(), enabled);
+        .insert(agent_id.to_string(), enabled_remote_ids.clone());
 }
 
 impl FeatureHostController {
@@ -344,7 +344,13 @@ impl FeatureHostController {
 
         if cloud_is_converged(&desired, &remote.shadows) {
             let mut state = self.state()?;
-            record_cloud_authority(&mut state, agent_id, &desired, &remote.shadows);
+            record_cloud_authority(
+                    &mut state,
+                    agent_id,
+                    &desired,
+                    &remote.shadows,
+                    &remote.enabled_ids,
+                );
             return Ok(json!({
                 "converged": true,
                 "mutations": [],
@@ -401,7 +407,13 @@ impl FeatureHostController {
             if deleting_agent {
                 record_deleted_agent_converged(&mut state, agent_id);
             } else {
-                record_cloud_authority(&mut state, agent_id, &desired, &remote.shadows);
+                record_cloud_authority(
+                    &mut state,
+                    agent_id,
+                    &desired,
+                    &remote.shadows,
+                    &remote.enabled_ids,
+                );
             }
         } else {
             state.automation_cloud_sync.enabled_ids_by_agent.remove(agent_id);
@@ -532,6 +544,26 @@ mod automation_cloud_sync_tests {
             .expect("shadow")
             .marker = "sand-shadow:stale".into();
         assert!(!cloud_is_converged(&desired, &stale));
+    }
+
+    #[test]
+    fn scheduling_evidence_uses_all_enabled_remote_ids_not_only_shadows() {
+        let response = ListAutomationsResponse {
+            workflows: vec![crate::automation_cloud_proto::AutomationWithOwner {
+                workflow: Some(crate::automation_cloud_proto::Automation {
+                    enabled: true,
+                    description: Some("external-owner".into()),
+                    automation_id: "aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa".into(),
+                }),
+            }],
+        };
+        let snapshot = remote_cloud_snapshot(&cloud_message_base64(&response))
+            .expect("decode remote snapshot");
+        assert!(snapshot.shadows.is_empty());
+        assert_eq!(
+            snapshot.enabled_ids,
+            BTreeSet::from(["aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa".to_string()])
+        );
     }
 
     #[test]
