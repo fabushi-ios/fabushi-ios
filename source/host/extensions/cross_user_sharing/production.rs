@@ -680,27 +680,36 @@ mod tests {
             uuid::Uuid::new_v4().simple()
         ));
         let host = Arc::new(Host {
-            state: Mutex::new(json!({"isEnabled":false,"selfAuthId":null,"rooms":[]})),
+            state: Mutex::new(json!({
+                "isEnabled":true,
+                "selfAuthId":"local-auth",
+                "rooms":[{
+                    "roomId":"room-1",
+                    "name":"Shared room",
+                    "hostAuthId":"local-auth",
+                    "members":[
+                        {"authId":"local-auth","agentId":"local-agent","name":"Local agent"},
+                        {"authId":"local-auth","name":"Local human"},
+                        {"authId":"remote-auth","agentId":"remote-agent","name":"Remote agent"}
+                    ]
+                }]
+            })),
             polls: AtomicUsize::new(0),
             sends: Mutex::new(Vec::new()),
             turns: AtomicUsize::new(0),
         });
         let owner = MobileCrossUserSharingOwner::start(&root, host.clone());
-        {
-            let mut snapshot = owner.snapshot.lock().unwrap();
-            snapshot.generation = 7;
-            snapshot.is_enabled = true;
-            snapshot.self_auth_id = Some("local-auth".into());
-            snapshot.rooms = vec![serde_json::from_value(json!({
-                "roomId":"room-1",
-                "name":"Shared room",
-                "hostAuthId":"local-auth",
-                "members":[
-                    {"authId":"local-auth","agentId":"local-agent","name":"Local agent"},
-                    {"authId":"local-auth","name":"Local human"},
-                    {"authId":"remote-auth","agentId":"remote-agent","name":"Remote agent"}
-                ]
-            })).unwrap()];
+        for _ in 0..100 {
+            let ready = {
+                let snapshot = owner.snapshot.lock().unwrap();
+                snapshot.is_enabled
+                    && snapshot.self_auth_id.as_deref() == Some("local-auth")
+                    && snapshot.rooms.iter().any(|room| room.room_id == "room-1")
+            };
+            if ready {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(2));
         }
         owner.observe_host_dispatch(
             &json!({
