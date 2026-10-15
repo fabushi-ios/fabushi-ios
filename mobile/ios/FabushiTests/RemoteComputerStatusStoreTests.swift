@@ -3,8 +3,16 @@ import XCTest
 
 @MainActor
 final class RemoteComputerStatusStoreTests: XCTestCase {
-    private enum FakeError: Error {
+    private enum FakeError: LocalizedError {
         case failed
+        case cleanupFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .failed: return "ensure failed"
+            case .cleanupFailed: return "cleanup failed closed"
+            }
+        }
     }
 
     @MainActor
@@ -19,6 +27,7 @@ final class RemoteComputerStatusStoreTests: XCTestCase {
         var suspendStatus = false
         var suspendEnsure = false
         var failEnsure = false
+        var failRelease = false
 
         func status(agentID: String) async throws -> RemoteComputerAgentBoxSnapshot? {
             statusCalls.append(agentID)
@@ -48,6 +57,9 @@ final class RemoteComputerStatusStoreTests: XCTestCase {
 
         func release(agentID: String, trigger: String) async throws {
             releaseCalls.append((agentID, trigger))
+            if failRelease {
+                throw FakeError.cleanupFailed
+            }
         }
     }
 
@@ -116,6 +128,43 @@ final class RemoteComputerStatusStoreTests: XCTestCase {
 
         XCTAssertEqual(owner.readState(for: "agent-a"), .known)
         XCTAssertEqual(owner.status(for: "agent-a")?.vncURL?.host, "late.agent.example")
+        owner.dispose()
+    }
+
+    func testEnsureFailureCleansOptionalRemoteTargetWithoutRetiringAccountScope() async {
+        let source = FakeSource()
+        source.failEnsure = true
+        let owner = RemoteComputerAgentBoxOwner(source: source)
+
+        await owner.connect(scope: scope("agent-a"))
+
+        XCTAssertEqual(source.ensureCalls, ["agent-a"])
+        XCTAssertEqual(source.releaseCalls.count, 1)
+        XCTAssertEqual(source.releaseCalls.first?.0, "agent-a")
+        XCTAssertEqual(source.releaseCalls.first?.1, "ensure-unavailable")
+        XCTAssertEqual(owner.readState(for: "agent-a"), .error)
+        XCTAssertNotNil(owner.errorMessage)
+
+        // The owner itself remains usable for the valid account scope; only
+        // the optional remote target was cleaned.
+        source.failEnsure = false
+        source.ensureValues["agent-a"] = snapshot("agent-a", host: "recovered.example")
+        await owner.ensure(agentID: "agent-a")
+        XCTAssertEqual(owner.status(for: "agent-a")?.vncURL?.host, "recovered.example")
+        owner.dispose()
+    }
+
+    func testEnsureCleanupFailureRemainsFailClosedAndVisible() async {
+        let source = FakeSource()
+        source.failEnsure = true
+        source.failRelease = true
+        let owner = RemoteComputerAgentBoxOwner(source: source)
+
+        await owner.connect(scope: scope("agent-a"))
+
+        XCTAssertEqual(source.releaseCalls.count, 1)
+        XCTAssertTrue(owner.errorMessage?.contains("cleanup failed closed") == true)
+        XCTAssertEqual(owner.readState(for: "agent-a"), .error)
         owner.dispose()
     }
 
