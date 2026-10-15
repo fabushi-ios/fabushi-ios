@@ -3,7 +3,7 @@ use mahayana_core::{BuildProfile, ModelProviderMode, RuntimeConfig};
 use mahayana_feature_host::FeatureHostController;
 use mahayana_host::HostCreateConfig;
 use mahayana_host_protocol::{
-    ApprovalResolution, AutomationSummary, AutomationTrigger, FeatureCommand, HostConfig, HostMode,
+    ApprovalResolution, AutomationSummary, AutomationTrigger, EventCard, FeatureCommand, HostConfig, HostMode,
     SurfacePlatform,
 };
 use mahayana_js_runtime::{DeepSeekJsHost, scan_package_compatibility};
@@ -1227,6 +1227,7 @@ impl AppHost {
             "feature.awaitOperation" => self.feature_await_operation(params),
             "feature.awaitOperation.cancel" => self.feature_cancel_await_operation(params),
             "feature.receive" => self.feature_receive(params),
+            "feature.automation.ingestListenerEvent" => self.feature_automation_ingest_listener_event(params),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1390,6 +1391,16 @@ impl AppHost {
                 "unknown feature method {other}"
             ))),
         }
+    }
+
+    fn feature_automation_ingest_listener_event(&self, params: Value) -> Result<Value, AppHostError> {
+        let event_value = params.get("event").cloned().unwrap_or(params);
+        let event: EventCard = serde_json::from_value(event_value)
+            .map_err(|error| AppHostError::InvalidRequest(format!("invalid listener event: {error}")))?;
+        self.feature
+            .ingest_listener_event(event)
+            .map(|matched| json!({"matchedAutomationCount": matched}))
+            .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
     fn feature_execute(&self, params: Value) -> Result<Value, AppHostError> {
