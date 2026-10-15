@@ -1132,6 +1132,15 @@ final class MahayanaCoordinator {
         )
     }
 
+    func setSentryAuthObserver(_ observer: ((IOSCursorAuthStatus) -> Void)?) {
+        mcpSurface?.setSentryAuthObserver(observer)
+    }
+
+    func currentSentryPrivacyMode() async -> SandPrivacyMode? {
+        guard let mcpSurface else { return nil }
+        return await mcpSurface.currentSentryPrivacyMode()
+    }
+
     func prepareAccountTransition() async {
         await productAnalytics?.resetForAccountTransition()
         productAnalyticsScopeRevision = 0
