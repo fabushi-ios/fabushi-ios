@@ -126,6 +126,7 @@ final class IOSBoxSecretsController {
     private let store: any IOSBoxSecretsStoring
     private let apply: Apply
     private let reporter: Reporter
+    private let pushTelemetry: IOSBoxSecretsPushTelemetryState
 
     private(set) var accountSlot: String?
     private(set) var generation: UInt64 = 0
@@ -135,12 +136,17 @@ final class IOSBoxSecretsController {
 
     init(
         store: any IOSBoxSecretsStoring = IOSBoxSecretsKeychainStore(),
+        telemetryStateURL: URL? = nil,
         apply: @escaping Apply,
         reporter: @escaping Reporter
     ) {
         self.store = store
         self.apply = apply
         self.reporter = reporter
+        pushTelemetry = IOSBoxSecretsPushTelemetryState(
+            stateURL: telemetryStateURL,
+            reporter: reporter
+        )
     }
 
     @discardableResult
@@ -196,7 +202,7 @@ final class IOSBoxSecretsController {
     }
 
     @discardableResult
-    func push(trigger: String) async throws -> Bool {
+    func push(trigger: String, departing: Bool = false) async throws -> Bool {
         try await withPushLock {
             guard !self.quiesced else { throw IOSBoxSecretsError.quiesced }
             let slot = self.accountSlot
@@ -228,17 +234,13 @@ final class IOSBoxSecretsController {
                 guard expectedGeneration == self.generation, slot == self.accountSlot else {
                     throw IOSBoxSecretsError.superseded
                 }
-                self.reporter(.init(
-                    level: .info,
-                    metadata: [
-                        "area": "box_secrets_push",
-                        "outcome": "ok",
-                        "trigger": String(trigger.prefix(64)),
-                        "key_count": String(min(secrets.count, 999)),
-                        "scope_present": String(slot != nil),
-                        "applied": String(applied),
-                    ]
-                ))
+                self.pushTelemetry.recordSuccess(
+                    trigger: trigger,
+                    accountSlot: slot,
+                    keyCount: secrets.count,
+                    applied: applied,
+                    departing: departing
+                )
                 return applied
             } catch {
                 self.reportFailure(trigger: trigger, error: error, keyCount: secrets.count)
@@ -250,7 +252,7 @@ final class IOSBoxSecretsController {
     func departAccount() async {
         _ = adoptAccount(nil)
         do {
-            _ = try await push(trigger: "account")
+            _ = try await push(trigger: "account", departing: true)
         } catch {
             // The account transition must continue even if Host is already down.
         }
@@ -290,17 +292,12 @@ final class IOSBoxSecretsController {
         } else {
             errorClass = "host_unreachable"
         }
-        var metadata = [
-            "area": "box_secrets_push",
-            "outcome": "failed",
-            "trigger": String(trigger.prefix(64)),
-            "scope_present": String(accountSlot != nil),
-            "error_class": errorClass,
-        ]
-        if let keyCount {
-            metadata["key_count"] = String(min(max(keyCount, 0), 999))
-        }
-        reporter(.init(level: .warn, metadata: metadata))
+        pushTelemetry.recordFailure(
+            trigger: trigger,
+            errorClass: errorClass,
+            scopePresent: accountSlot != nil,
+            keyCount: keyCount
+        )
     }
 
     private func acquirePush() async {
