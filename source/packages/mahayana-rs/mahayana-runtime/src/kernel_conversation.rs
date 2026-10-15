@@ -666,6 +666,35 @@ impl ConversationProvider for KernelConversationProvider {
         }
     }
 
+    async fn complete_async_ask_question(
+        &self,
+        request: mahayana_kernel::AsyncAskQuestionCompletionRequest,
+        events: SharedConversationEventSink,
+    ) -> Result<(), ConversationError> {
+        let conversation_id = ConversationId(request.conversation_id.clone());
+        if request.session_id.as_str().is_empty() {
+            return Err(ConversationError::Provider("async ask_question completion requires a session id".into()));
+        }
+        let bridge = Arc::new(RuntimeKernelEventBridge {
+            conversation_id,
+            operation_id: request.operation_id.clone(),
+            events,
+            state: Arc::clone(&self.state),
+            history_path: self.history_path.clone(),
+            hide_assistant_history: false,
+            suppress_assistant_events: false,
+            reply_to_message_id: None,
+            is_fork: false,
+            attachment_batch_id: None,
+            streaming_assistant: Mutex::new(None),
+            suspended: Arc::new(AtomicBool::new(false)),
+        });
+        self.backend
+            .complete_async_ask_question(request, bridge)
+            .await
+            .map_err(kernel_error)
+    }
+
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), ConversationError> {
         let kernel_operation_id = KernelOperationId::from_string(operation_id.as_str());
         self.interrupt_reasons.lock().await.insert(
