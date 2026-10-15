@@ -100,23 +100,57 @@ fn normalized_identity(value: &str, name: &'static str) -> Result<String> {
 }
 
 fn normalized_store_path(value: &str) -> Result<String> {
-    let value = value.trim().replace('\\', "/");
-    if value.is_empty()
-        || value.len() > 4096
-        || value.starts_with('/')
-        || value.contains('\0')
-        || value.split('/').any(|part| part == "..")
-    {
+    if value.is_empty() || value.len() > 4096 || value.contains('\0') {
         return Err(worker::Error::RustError("invalid Agent Store path".into()));
     }
-    let parts = value
-        .split('/')
-        .filter(|part| !part.is_empty() && *part != ".")
-        .collect::<Vec<_>>();
-    if parts.is_empty() || parts.iter().any(|part| part.len() > 255) {
+    let normalized = value.replace('\\', "/");
+    let bytes = normalized.as_bytes();
+    let windows_drive = bytes.len() >= 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':';
+    if normalized.starts_with('/') || normalized.starts_with("//") || windows_drive {
+        return Err(worker::Error::RustError("invalid Agent Store path".into()));
+    }
+
+    let mut parts = Vec::new();
+    for part in normalized.split('/') {
+        if part.is_empty() || part == "." {
+            continue;
+        }
+        if part == ".."
+            || part.len() > 255
+            || part.as_bytes().iter().any(|byte| *byte < 32 || *byte == 127)
+            || part.ends_with('.')
+            || part.ends_with(' ')
+        {
+            return Err(worker::Error::RustError("invalid Agent Store path".into()));
+        }
+        let stem = part
+            .split('.')
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if is_windows_reserved_agent_store_name(&stem) {
+            return Err(worker::Error::RustError("invalid Agent Store path".into()));
+        }
+        parts.push(part);
+    }
+    if parts.is_empty() {
         return Err(worker::Error::RustError("invalid Agent Store path".into()));
     }
     Ok(parts.join("/"))
+}
+
+fn is_windows_reserved_agent_store_name(stem: &str) -> bool {
+    matches!(stem, "con" | "prn" | "aux" | "nul")
+        || matches!(
+            stem.strip_prefix("com"),
+            Some(n) if matches!(n, "1"|"2"|"3"|"4"|"5"|"6"|"7"|"8"|"9")
+        )
+        || matches!(
+            stem.strip_prefix("lpt"),
+            Some(n) if matches!(n, "1"|"2"|"3"|"4"|"5"|"6"|"7"|"8"|"9")
+        )
 }
 
 fn json_object(value: Value) -> Value {
@@ -963,4 +997,34 @@ pub(super) async fn account_state_sync(
         },
         "events": event_values,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn agent_store_paths_match_desktop_cross_platform_fail_closed_rules() {
+        assert_eq!(
+            normalized_store_path("memory\\./daily//note.md").expect("normalized path"),
+            "memory/daily/note.md"
+        );
+        for invalid in [
+            "",
+            "../secret",
+            "/absolute",
+            "C:\\secret",
+            "memory/line\nfeed",
+            "memory/trailing.",
+            "memory/trailing ",
+            "memory/CON.txt",
+            "memory/com9.bin",
+            "memory/LPT1",
+        ] {
+            assert!(
+                normalized_store_path(invalid).is_err(),
+                "path should be rejected: {invalid:?}"
+            );
+        }
+    }
 }

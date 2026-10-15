@@ -2664,14 +2664,15 @@ impl MahayanaProductClient {
     fn agent_store_list(&self, request: &Value) -> Result<Value, ProductError> {
         let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
         let mut query = serde_json::Map::new();
-        if let Some(prefix) = optional_string(request, "prefix")
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            query.insert(
-                "prefix".into(),
-                Value::String(normalize_agent_store_rel_path(prefix)?),
-            );
+        match request.get("prefix") {
+            None | Some(Value::Null) | Some(Value::String(prefix)) if prefix.is_empty() => {}
+            Some(Value::String(prefix)) => {
+                query.insert(
+                    "prefix".into(),
+                    Value::String(normalize_agent_store_rel_path(prefix)?),
+                );
+            }
+            Some(_) => return Err(ProductError::InvalidParameter("prefix")),
         }
         let spec = agent_store_platform_request_spec(
             "GET",
@@ -2685,7 +2686,7 @@ impl MahayanaProductClient {
 
     fn agent_store_read(&self, request: &Value) -> Result<Value, ProductError> {
         let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
-        let path = normalize_agent_store_rel_path(required_string(request, "path")?)?;
+        let path = normalize_agent_store_rel_path(agent_store_path_param(request, "path")?)?;
         let spec = agent_store_platform_request_spec(
             "GET",
             agent_id,
@@ -2713,7 +2714,7 @@ impl MahayanaProductClient {
 
     fn agent_store_write(&self, request: &Value) -> Result<Value, ProductError> {
         let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
-        let path = normalize_agent_store_rel_path(required_string(request, "path")?)?;
+        let path = normalize_agent_store_rel_path(agent_store_path_param(request, "path")?)?;
         let data_base64 = request
             .get("dataBase64")
             .and_then(Value::as_str)
@@ -2749,7 +2750,7 @@ impl MahayanaProductClient {
 
     fn agent_store_delete(&self, request: &Value) -> Result<Value, ProductError> {
         let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
-        let path = normalize_agent_store_rel_path(required_string(request, "path")?)?;
+        let path = normalize_agent_store_rel_path(agent_store_path_param(request, "path")?)?;
         let base_etag = required_string(request, "baseEtag")?.trim();
         let spec = agent_store_platform_request_spec(
             "DELETE",
@@ -4022,24 +4023,68 @@ fn ensure_call_event_identity(
     Ok(())
 }
 
+fn agent_store_path_param<'a>(
+    request: &'a Value,
+    name: &'static str,
+) -> Result<&'a str, ProductError> {
+    match request.get(name) {
+        Some(Value::String(value)) if !value.is_empty() => Ok(value),
+        _ => Err(ProductError::InvalidParameter(name)),
+    }
+}
+
 fn normalize_agent_store_rel_path(value: &str) -> Result<String, ProductError> {
-    let value = value.trim().replace('\\', "/");
-    if value.is_empty()
-        || value.len() > 4096
-        || value.starts_with('/')
-        || value.contains('\0')
-        || value.split('/').any(|part| part == "..")
-    {
+    if value.is_empty() || value.len() > 4096 || value.contains('\0') {
         return Err(ProductError::InvalidParameter("path"));
     }
-    let parts = value
-        .split('/')
-        .filter(|part| !part.is_empty() && *part != ".")
-        .collect::<Vec<_>>();
-    if parts.is_empty() || parts.iter().any(|part| part.len() > 255) {
+    let normalized = value.replace('\\', "/");
+    let bytes = normalized.as_bytes();
+    let windows_drive = bytes.len() >= 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':';
+    if normalized.starts_with('/') || normalized.starts_with("//") || windows_drive {
+        return Err(ProductError::InvalidParameter("path"));
+    }
+
+    let mut parts = Vec::new();
+    for part in normalized.split('/') {
+        if part.is_empty() || part == "." {
+            continue;
+        }
+        if part == ".."
+            || part.len() > 255
+            || part.as_bytes().iter().any(|byte| *byte < 32 || *byte == 127)
+            || part.ends_with('.')
+            || part.ends_with(' ')
+        {
+            return Err(ProductError::InvalidParameter("path"));
+        }
+        let stem = part
+            .split('.')
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if is_windows_reserved_agent_store_name(&stem) {
+            return Err(ProductError::InvalidParameter("path"));
+        }
+        parts.push(part);
+    }
+    if parts.is_empty() {
         return Err(ProductError::InvalidParameter("path"));
     }
     Ok(parts.join("/"))
+}
+
+fn is_windows_reserved_agent_store_name(stem: &str) -> bool {
+    matches!(stem, "con" | "prn" | "aux" | "nul")
+        || matches!(
+            stem.strip_prefix("com"),
+            Some(n) if matches!(n, "1"|"2"|"3"|"4"|"5"|"6"|"7"|"8"|"9")
+        )
+        || matches!(
+            stem.strip_prefix("lpt"),
+            Some(n) if matches!(n, "1"|"2"|"3"|"4"|"5"|"6"|"7"|"8"|"9")
+        )
 }
 
 fn agent_store_platform_request_spec(
@@ -4500,12 +4545,19 @@ mod tests {
     #[test]
     fn agent_store_path_normalization_matches_account_worker_contract() {
         assert_eq!(
-            normalize_agent_store_rel_path(" memories\\./daily//note.md ")
+            normalize_agent_store_rel_path("memories\\./daily//note.md")
                 .expect("normalized path"),
             "memories/daily/note.md"
         );
         assert!(normalize_agent_store_rel_path("../secret").is_err());
         assert!(normalize_agent_store_rel_path("/absolute").is_err());
+        assert!(normalize_agent_store_rel_path("C:\\secret").is_err());
+        assert!(normalize_agent_store_rel_path("memory/line\nfeed").is_err());
+        assert!(normalize_agent_store_rel_path("memory/trailing.").is_err());
+        assert!(normalize_agent_store_rel_path("memory/trailing ").is_err());
+        assert!(normalize_agent_store_rel_path("memory/CON.txt").is_err());
+        assert!(normalize_agent_store_rel_path("memory/com9.bin").is_err());
+        assert!(normalize_agent_store_rel_path("memory/LPT1").is_err());
         assert!(normalize_agent_store_rel_path("a/../../b").is_err());
         assert!(normalize_agent_store_rel_path("").is_err());
     }

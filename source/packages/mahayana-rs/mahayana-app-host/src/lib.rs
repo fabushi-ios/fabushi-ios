@@ -1486,11 +1486,16 @@ impl AppHost {
     }
 
     fn feature_agent_store_list(&self, params: Value) -> Result<Value, AppHostError> {
-        let prefix = params
-            .get("prefix")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty());
+        let prefix = match params.get("prefix") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(value)) if value.is_empty() => None,
+            Some(Value::String(value)) => Some(value.as_str()),
+            Some(_) => {
+                return Err(AppHostError::InvalidRequest(
+                    "prefix must be a string when provided".into(),
+                ));
+            }
+        };
         self.feature
             .agent_store_list(string_param(&params, "agentId")?, prefix)
             .map_err(|error| AppHostError::Operation(error.to_string()))
@@ -1500,7 +1505,7 @@ impl AppHost {
         self.feature
             .agent_store_read(
                 string_param(&params, "agentId")?,
-                string_param(&params, "path")?,
+                agent_store_path_param(&params, "path")?,
             )
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
@@ -1522,7 +1527,7 @@ impl AppHost {
         self.feature
             .agent_store_write(
                 string_param(&params, "agentId")?,
-                string_param(&params, "path")?,
+                agent_store_path_param(&params, "path")?,
                 data_base64,
                 base_etag,
                 expect_absent,
@@ -1534,7 +1539,7 @@ impl AppHost {
         self.feature
             .agent_store_delete(
                 string_param(&params, "agentId")?,
-                string_param(&params, "path")?,
+                agent_store_path_param(&params, "path")?,
                 string_param(&params, "baseEtag")?,
             )
             .map_err(|error| AppHostError::Operation(error.to_string()))
@@ -4495,6 +4500,16 @@ fn is_git_authentication_failure(message: &str) -> bool {
     ]
     .iter()
     .any(|needle| message.contains(needle))
+}
+
+fn agent_store_path_param<'a>(
+    params: &'a Value,
+    name: &str,
+) -> Result<&'a str, AppHostError> {
+    match params.get(name) {
+        Some(Value::String(value)) if !value.is_empty() => Ok(value),
+        _ => Err(AppHostError::InvalidRequest(format!("{name} is required"))),
+    }
 }
 
 fn string_param<'a>(params: &'a Value, name: &str) -> Result<&'a str, AppHostError> {
