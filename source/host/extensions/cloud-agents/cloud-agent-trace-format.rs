@@ -36,7 +36,33 @@ struct CloudAgentProtoMessageDescriptor {
     fields: &'static [CloudAgentProtoFieldDescriptor],
 }
 
-include!(concat!(env!("OUT_DIR"), "/cloud_agent_trace_schema.rs"));
+const IOS_CONVERSATION_FIELDS: &[CloudAgentProtoFieldDescriptor] = &[
+    CloudAgentProtoFieldDescriptor { number: 1, proto_name: "text", json_name: "text", kind: CloudAgentProtoFieldKind::Scalar(9), repeated: false, optional: false, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 2, proto_name: "type", json_name: "type", kind: CloudAgentProtoFieldKind::Enum, repeated: false, optional: false, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 18, proto_name: "tool_results", json_name: "toolResults", kind: CloudAgentProtoFieldKind::Message("aiserver.v1.ConversationMessage.ToolResult"), repeated: true, optional: false, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 45, proto_name: "thinking", json_name: "thinking", kind: CloudAgentProtoFieldKind::Message("aiserver.v1.ConversationMessage.Thinking"), repeated: false, optional: true, oneof: None },
+];
+const IOS_THINKING_FIELDS: &[CloudAgentProtoFieldDescriptor] = &[
+    CloudAgentProtoFieldDescriptor { number: 1, proto_name: "text", json_name: "text", kind: CloudAgentProtoFieldKind::Scalar(9), repeated: false, optional: false, oneof: None },
+];
+const IOS_TOOL_RESULT_FIELDS: &[CloudAgentProtoFieldDescriptor] = &[
+    CloudAgentProtoFieldDescriptor { number: 1, proto_name: "tool_call_id", json_name: "toolCallId", kind: CloudAgentProtoFieldKind::Scalar(9), repeated: false, optional: false, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 2, proto_name: "tool_name", json_name: "toolName", kind: CloudAgentProtoFieldKind::Scalar(9), repeated: false, optional: false, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 4, proto_name: "args", json_name: "args", kind: CloudAgentProtoFieldKind::Scalar(9), repeated: false, optional: false, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 5, proto_name: "raw_args", json_name: "rawArgs", kind: CloudAgentProtoFieldKind::Scalar(9), repeated: false, optional: false, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 7, proto_name: "content", json_name: "content", kind: CloudAgentProtoFieldKind::Scalar(9), repeated: false, optional: true, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 13, proto_name: "started_at_ms", json_name: "startedAtMs", kind: CloudAgentProtoFieldKind::Scalar(4), repeated: false, optional: true, oneof: None },
+    CloudAgentProtoFieldDescriptor { number: 14, proto_name: "completed_at_ms", json_name: "completedAtMs", kind: CloudAgentProtoFieldKind::Scalar(4), repeated: false, optional: true, oneof: None },
+];
+
+fn cloud_agent_proto_message_descriptor(type_name: &str) -> Option<CloudAgentProtoMessageDescriptor> {
+    match type_name {
+        "aiserver.v1.ConversationMessage" => Some(CloudAgentProtoMessageDescriptor { fields: IOS_CONVERSATION_FIELDS }),
+        "aiserver.v1.ConversationMessage.Thinking" => Some(CloudAgentProtoMessageDescriptor { fields: IOS_THINKING_FIELDS }),
+        "aiserver.v1.ConversationMessage.ToolResult" => Some(CloudAgentProtoMessageDescriptor { fields: IOS_TOOL_RESULT_FIELDS }),
+        _ => None,
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CloudAgentProtoDecodeError {
