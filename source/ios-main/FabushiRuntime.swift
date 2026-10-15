@@ -296,6 +296,11 @@ final class FabushiRuntime {
         if loggedIn {
             main.coordinator.startAutomationRelay()
             main.coordinator.reconcileAutomationRelay()
+        } else {
+            // Fence account-scoped relay/fire polling immediately on logout.
+            // Account transition cleanup will also clear the durable scope, but
+            // transport work must not remain live during that handoff window.
+            main.coordinator.stopAutomationRelay()
         }
     }
 

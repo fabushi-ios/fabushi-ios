@@ -598,6 +598,16 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(source.contains("feature.automation.pollListenerReconnects"))
         XCTAssertTrue(source.contains("IOS_AUTOMATION_LISTENER_RECONNECT_INTERVAL_NS: UInt64 = 5_000_000_000"))
         XCTAssertTrue(source.contains("IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS: Int64 = 30_000"))
+
+        let runtimeSource = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/ios-main/FabushiRuntime.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(runtimeSource.contains("main.coordinator.startAutomationRelay()"))
+        XCTAssertTrue(runtimeSource.contains("main.coordinator.reconcileAutomationRelay()"))
+        XCTAssertTrue(runtimeSource.contains("main.coordinator.stopAutomationRelay()"))
     }
 
 
