@@ -167,3 +167,42 @@ final class IOSProductionSentryController {
         isSandSentryBoundedTagValue(value) ? value : fallback
     }
 }
+
+@MainActor
+final class IOSProductionSentryPrivacySynchronizer {
+    typealias ReadMode = @MainActor () async -> SandPrivacyMode?
+
+    private let controller: IOSProductionSentryController
+    private let readMode: ReadMode
+    private var generation: UInt64 = 0
+    private var task: Task<Void, Never>?
+
+    init(controller: IOSProductionSentryController, readMode: @escaping ReadMode) {
+        self.controller = controller
+        self.readMode = readMode
+    }
+
+    func refresh(loggedIn: Bool) {
+        generation = generation == UInt64.max ? 1 : generation + 1
+        let expectedGeneration = generation
+        task?.cancel()
+        task = nil
+        controller.setPrivacyMode(nil)
+        guard loggedIn, controller.accountScopeHash != nil else { return }
+
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let mode = await self.readMode()
+            guard !Task.isCancelled, self.generation == expectedGeneration else { return }
+            self.controller.setPrivacyMode(mode)
+            self.task = nil
+        }
+    }
+
+    func cancel() {
+        generation = generation == UInt64.max ? 1 : generation + 1
+        task?.cancel()
+        task = nil
+        controller.setPrivacyMode(nil)
+    }
+}
