@@ -5730,17 +5730,17 @@
     {
       "desktop_path": "source/host/src/extensions/transcript/automation_snapshot.rs",
       "desktop_blob_sha": "1adb51eeeda486b016b701afe81024cd9347fbc4",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Snapshot canonical automation definitions into stable identity/name/prompt/trigger/type/schedule/enabled/created/run-count fields and classify definition changes as Updated versus Enabled/Disabled while ignoring run-only mutations.",
       "desktop_owner": "host",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Rebaseline from Desktop PR #20; previous Grok-direct status is not inherited."
+      "desktop_visible_effect": "Automation lifecycle consumers receive deterministic create/update/enable/disable projections for real definition changes without noisy events from run-history-only mutations.",
+      "ios_disposition": "direct-port",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+      "ios_language": "Rust",
+      "ios_platform_delta": "The iOS-owned FeatureHost keeps the canonical automation map directly rather than materializing a separate snapshot struct; automation_definition_changed plus automation_lifecycle_action/push_automation_lifecycle_diff preserve the Desktop snapshot/diff semantics and additionally retain account/agent identity fencing.",
+      "implementation_status": "implemented",
+      "production_evidence": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs — automation_definition_changed, automation_lifecycle_action, push_automation_lifecycle_diff; called after AutomationUpsert/SetEnabled/Delete, external automation-store reconciliation, workflow changes and Spend Guard mutations.",
+      "test_evidence": "Focused Rust test automation_lifecycle_projection_uses_stable_ids_sources_and_ignores_run_only_mutations proves stable lifecycle identity/source, create/disable classification and run-only suppression; exact-HEAD GitHub Actions still required before verified.",
+      "notes": "Re-reviewed against Desktop main 8148bfb9e747d446dd3d97342c3cf04a0ed407a2 blob 1adb51eeeda486b016b701afe81024cd9347fbc4. Promoted only to implemented; no verified/release promotion."
     },
     {
       "desktop_path": "source/host/src/extensions/transcript/automation_spend_guard_runtime.rs",
