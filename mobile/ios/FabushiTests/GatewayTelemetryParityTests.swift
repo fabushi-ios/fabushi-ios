@@ -63,6 +63,71 @@ final class GatewayTelemetryParityTests: XCTestCase {
         XCTAssertEqual(projection.metadata["is_error"], "true")
     }
 
+    func testGatewayCommandSpanPreservesDesktopTraceIdentity() {
+        let trace = GatewayTraceContext(
+            requestId: "request-3",
+            attempt: 1,
+            rootTraceparent: "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01",
+            traceparent: "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-cccccccccccccccc-01"
+        )
+        let success = GatewayTelemetryProjection.commandSpan(
+            trace: trace,
+            method: "sendPrompt",
+            startEpochMilliseconds: 1_000,
+            durationMilliseconds: 250,
+            isError: false
+        )
+        XCTAssertEqual(success?.event, "gateway_command_span")
+        XCTAssertEqual(success?.level, "info")
+        XCTAssertEqual(success?.metadata["span_name"], "sand.gateway_post.sendPrompt")
+        XCTAssertEqual(success?.metadata["span_kind"], "client")
+        XCTAssertEqual(success?.metadata["trace_id"], "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        XCTAssertEqual(success?.metadata["parent_span_id"], "bbbbbbbbbbbbbbbb")
+        XCTAssertEqual(success?.metadata["span_id"], "cccccccccccccccc")
+        XCTAssertEqual(success?.metadata["duration_ms"], "250")
+        XCTAssertEqual(success?.metadata["status"], "ok")
+
+        let failed = GatewayTelemetryProjection.commandSpan(
+            trace: trace,
+            method: "sendPrompt",
+            startEpochMilliseconds: 1_000,
+            durationMilliseconds: 500,
+            isError: true
+        )
+        XCTAssertEqual(failed?.level, "warn")
+        XCTAssertEqual(failed?.metadata["status"], "error")
+
+        XCTAssertNil(GatewayTelemetryProjection.commandSpan(
+            trace: .init(
+                requestId: "request-4",
+                attempt: 1,
+                rootTraceparent: trace.rootTraceparent,
+                traceparent: "00-dddddddddddddddddddddddddddddddd-cccccccccccccccc-01"
+            ),
+            method: "sendPrompt",
+            startEpochMilliseconds: 1_000,
+            durationMilliseconds: 1,
+            isError: false
+        ))
+    }
+
+    func testGatewayClientShippingPathRecordsCommandSpanAroundRealTransport() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/gateway/gateway-client.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("let postStartedEpochMilliseconds"))
+        XCTAssertTrue(source.contains("self.recordGatewayCommandSpan("))
+        XCTAssertTrue(source.contains("GatewayTelemetryProjection.commandSpan("))
+    }
+
     func testShippingRuntimeRoutesGatewayTelemetryIntoDurableLifecycleOwner() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
