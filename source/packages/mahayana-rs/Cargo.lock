@@ -9236,6 +9236,7 @@ dependencies = [
  "fabushi-official-miniapps",
  "mahayana-agent",
  "mahayana-agent-codex",
+ "mahayana-agent-kernel-bridge",
  "mahayana-conversation",
  "mahayana-core",
  "mahayana-harness",

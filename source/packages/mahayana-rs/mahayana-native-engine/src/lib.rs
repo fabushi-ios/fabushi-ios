@@ -88,6 +88,9 @@ pub struct NativeEngineConfig {
     pub approval_timeout_ms: u64,
     pub process_execution: ProcessExecution,
     pub session_state_path: Option<PathBuf>,
+    /// Root used by Agent-scoped durable session paths supplied through
+    /// `sessionStateRelativePath`. Paths are validated to remain beneath it.
+    pub session_state_root: Option<PathBuf>,
 }
 
 impl NativeEngineConfig {
@@ -100,6 +103,7 @@ impl NativeEngineConfig {
             approval_timeout_ms: DEFAULT_APPROVAL_TIMEOUT_MS,
             process_execution: ProcessExecution::Host,
             session_state_path: None,
+            session_state_root: None,
         }
     }
 
@@ -112,6 +116,7 @@ impl NativeEngineConfig {
             approval_timeout_ms: DEFAULT_APPROVAL_TIMEOUT_MS,
             process_execution: ProcessExecution::Unavailable,
             session_state_path: None,
+            session_state_root: None,
         }
     }
 
@@ -2161,16 +2166,7 @@ impl EngineBackend for NativeEngine {
     }
 
     async fn open_session(&self, request: OpenSessionRequest) -> Result<SessionId, KernelError> {
-        let persisted_path = request
-            .metadata
-            .get("conversationId")
-            .and_then(Value::as_str)
-            .and_then(|conversation_id| {
-                self.config
-                    .session_state_path
-                    .as_deref()
-                    .map(|base| session_state_path_for_conversation(base, conversation_id))
-            });
+        let persisted_path = session_state_path_for_open_request(&self.config, &request.metadata)?;
         if let Some(path) = persisted_path.as_ref()
             && path.exists()
         {
@@ -3571,6 +3567,43 @@ fn remove_all_conversation_session_state_files(base: &Path) -> Result<(), Kernel
         }
     }
     Ok(())
+}
+
+fn session_state_path_for_open_request(
+    config: &NativeEngineConfig,
+    metadata: &Value,
+) -> Result<Option<PathBuf>, KernelError> {
+    if let Some(relative) = metadata
+        .get("sessionStateRelativePath")
+        .and_then(Value::as_str)
+    {
+        let root = config.session_state_root.as_deref().ok_or_else(|| {
+            KernelError::Backend(
+                "sessionStateRelativePath requires a configured session state root".into(),
+            )
+        })?;
+        let relative = Path::new(relative);
+        if relative.is_absolute()
+            || relative.components().any(|component| {
+                !matches!(component, Component::Normal(_) | Component::CurDir)
+            })
+        {
+            return Err(KernelError::PolicyDenied(
+                "Agent session persistence path must stay beneath the configured root".into(),
+            ));
+        }
+        return Ok(Some(root.join(relative)));
+    }
+
+    Ok(metadata
+        .get("conversationId")
+        .and_then(Value::as_str)
+        .and_then(|conversation_id| {
+            config
+                .session_state_path
+                .as_deref()
+                .map(|base| session_state_path_for_conversation(base, conversation_id))
+        }))
 }
 
 fn session_state_path_for_conversation(base: &Path, conversation_id: &str) -> PathBuf {
@@ -6222,4 +6255,54 @@ mod tests {
         assert!(metrics.session_replay_bytes_total > 0);
         std::fs::remove_dir_all(root).expect("cleanup");
     }
+
+    #[test]
+    fn agent_scoped_session_state_path_is_root_fenced_and_preserves_conversation_fallback() {
+        let root = std::env::temp_dir().join(format!(
+            "mahayana-session-root-{}",
+            Uuid::new_v4()
+        ));
+        let base = root.join("provider-neutral-assistant-session.json");
+        let mut config = NativeEngineConfig::embedded("model");
+        config.session_state_path = Some(base.clone());
+        config.session_state_root = Some(root.clone());
+
+        let explicit = session_state_path_for_open_request(
+            &config,
+            &json!({
+                "conversationId":"mahayana-ai:agent:alpha",
+                "sessionStateRelativePath":"agents/alpha/session.json"
+            }),
+        )
+        .expect("valid scoped path")
+        .expect("path");
+        assert_eq!(explicit, root.join("agents/alpha/session.json"));
+
+        let fallback = session_state_path_for_open_request(
+            &config,
+            &json!({"conversationId":"mahayana-ai:agent:alpha"}),
+        )
+        .expect("fallback path")
+        .expect("path");
+        assert_eq!(fallback, session_state_path_for_conversation(&base, "mahayana-ai:agent:alpha"));
+
+        for invalid in ["../escape.json", "/tmp/escape.json", "agents/../escape.json"] {
+            let error = session_state_path_for_open_request(
+                &config,
+                &json!({"sessionStateRelativePath":invalid}),
+            )
+            .expect_err("escaping session path must fail closed");
+            assert!(matches!(error, KernelError::PolicyDenied(_)));
+        }
+
+        let mut missing_root = config.clone();
+        missing_root.session_state_root = None;
+        let error = session_state_path_for_open_request(
+            &missing_root,
+            &json!({"sessionStateRelativePath":"agents/alpha/session.json"}),
+        )
+        .expect_err("explicit relative path requires root");
+        assert!(matches!(error, KernelError::Backend(_)));
+    }
+
 }

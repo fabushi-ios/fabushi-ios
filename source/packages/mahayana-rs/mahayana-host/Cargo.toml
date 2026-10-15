@@ -19,7 +19,7 @@ local-only = ["mahayana-runtime-core/local-only"]
 remote-model-provider = ["mahayana-runtime-core/remote-model-provider"]
 telemetry = ["mahayana-runtime-core/telemetry"]
 test-support = []
-codex-compat = ["dep:mahayana-agent-codex", "dep:codex-protocol"]
+codex-compat = ["dep:mahayana-agent-codex", "dep:mahayana-agent-kernel-bridge", "dep:codex-protocol"]
 
 [dependencies]
 async-trait.workspace = true
@@ -27,6 +27,7 @@ codex-protocol = { workspace = true, optional = true }
 fabushi-official-miniapps.workspace = true
 mahayana-agent.workspace = true
 mahayana-agent-codex = { path = "../mahayana-agent-codex", optional = true }
+mahayana-agent-kernel-bridge = { workspace = true, optional = true }
 mahayana-conversation.workspace = true
 mahayana-core.workspace = true
 mahayana-kernel.workspace = true

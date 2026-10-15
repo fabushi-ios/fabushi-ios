@@ -3,6 +3,15 @@
 //! Native shells such as Electron, Swift, and Kotlin should depend on this crate.
 //! The C/JSON ABI is the stable boundary used by native host adapters.
 
+mod provider_router;
+
+use provider_router::ProviderRoutingEngineBackend;
+use provider_router::PROVIDER_FABUSHI;
+#[cfg(feature = "codex-compat")]
+use provider_router::LazyCodexEngineBackend;
+#[cfg(feature = "codex-compat")]
+use provider_router::PROVIDER_CODEX;
+
 use fabushi_official_miniapps::OFFICIAL_PLUGIN_IDS;
 use fabushi_official_miniapps::app_definition;
 use mahayana_agent::UnavailableAgentBackend;
@@ -34,6 +43,7 @@ use mahayana_model::ModelCredentialResolver;
 use mahayana_model::ModelError;
 use mahayana_model::ResponsesModelConfig;
 use mahayana_model::ResponsesModelRuntime;
+use mahayana_model::ModelRuntime;
 use mahayana_native_agent::NativeAgentBackend;
 use mahayana_native_agent::NativeAgentConfig;
 use mahayana_native_engine::NativeEngine;
@@ -51,12 +61,24 @@ use mahayana_social::MahayanaSocialConversationProvider;
 use mahayana_telegram::TelegramConversationProvider;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+
+#[derive(Debug, Clone)]
+pub struct ModelRouteConfig {
+    pub key: String,
+    pub base_url: String,
+    pub default_model: String,
+    pub bearer_token: Option<String>,
+    pub provider_mode: ModelProviderMode,
+    pub wire_api: mahayana_model::responses::ResponsesWireApi,
+    pub use_product_session_token: bool,
+}
 
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -87,6 +109,13 @@ pub struct HostCreateConfig {
     pub product_storage_passphrase: Option<String>,
     #[serde(skip)]
     pub model_wire_api: mahayana_model::responses::ResponsesWireApi,
+    /// Additional model routes used by Agent-scoped inference selection.
+    /// Credentials remain process-memory only and are never serialized.
+    #[serde(skip)]
+    pub model_routes: Vec<ModelRouteConfig>,
+    /// Default route for conversations without an Agent override.
+    #[serde(skip)]
+    pub model_route_default: Option<String>,
     #[serde(skip)]
     pub process_execution: ProcessExecution,
     /// Tests and constrained hosts may opt out of inherited local plugins.
@@ -587,7 +616,7 @@ fn build_runtime(
                 ))),
             }
         });
-        let model_runtime = Arc::new(
+        let base_runtime: Arc<dyn ModelRuntime> = Arc::new(
             ResponsesModelRuntime::new(ResponsesModelConfig {
                 base_url,
                 default_model: runtime_config.model.model.clone(),
@@ -621,15 +650,103 @@ fn build_runtime(
             .data_dir
             .as_ref()
             .map(|root| root.join("provider-neutral-assistant-session.json"));
+        engine_config.session_state_root = runtime_config.data_dir.clone();
+
+        let native_engine = Arc::new(
+            NativeEngine::new(Arc::clone(&base_runtime), engine_config.clone())
+                .map_err(|error| HostError::new(error.to_string()))?,
+        );
+        let default_route = create
+            .model_route_default
+            .clone()
+            .unwrap_or_else(|| PROVIDER_FABUSHI.to_string());
+        let mut backends: HashMap<String, Arc<dyn EngineBackend>> = HashMap::new();
+        backends.insert(
+            PROVIDER_FABUSHI.to_string(),
+            Arc::clone(&native_engine) as Arc<dyn EngineBackend>,
+        );
+        for route in &create.model_routes {
+            let configured_token = route.bearer_token.clone();
+            let route_product_client = product_client.clone();
+            let resolver: ModelCredentialResolver = if route.use_product_session_token {
+                Arc::new(move || match route_product_client.session_token() {
+                    Ok(token) => Ok(Some(token)),
+                    Err(ProductError::NotLoggedIn | ProductError::SessionExpired) => Ok(None),
+                    Err(error) => Err(ModelError::Inference(format!(
+                        "unable to resolve Mahayana model credential: {error}"
+                    ))),
+                })
+            } else {
+                Arc::new(move || Ok(configured_token.clone()))
+            };
+            let route_runtime: Arc<dyn ModelRuntime> = Arc::new(
+                ResponsesModelRuntime::new(ResponsesModelConfig {
+                    base_url: route.base_url.clone(),
+                    default_model: route.default_model.clone(),
+                    bearer_token: route.bearer_token.clone(),
+                    provider_mode: route.provider_mode,
+                    wire_api: route.wire_api,
+                })
+                .map_err(|error| HostError::new(error.to_string()))?
+                .with_credential_resolver(resolver),
+            );
+            let mut route_engine_config = engine_config.clone();
+            route_engine_config.model = route.default_model.clone();
+            let route_engine: Arc<dyn EngineBackend> = Arc::new(
+                NativeEngine::new(route_runtime, route_engine_config)
+                    .map_err(|error| HostError::new(error.to_string()))?,
+            );
+            backends.insert(route.key.clone(), route_engine);
+        }
+        #[cfg(feature = "codex-compat")]
+        {
+            let codex_home = create
+                .codex_home
+                .clone()
+                .or_else(|| data_dir.clone().map(|path| path.join("codex")))
+                .or_else(default_codex_home_if_available)
+                .ok_or_else(|| HostError::new(
+                    "Codex Agent provider requires an application data directory",
+                ))?;
+            let responses_base_url = runtime_config
+                .model
+                .base_url
+                .clone()
+                .ok_or_else(|| HostError::new("Mahayana Responses base URL is required"))?;
+            let codex_config = CodexAgentConfig {
+                codex_home,
+                inherit_installed_plugins,
+                cwd: cwd.clone(),
+                workspace_roots: runtime_config.workspace_roots.clone(),
+                model: runtime_config.model.model.clone(),
+                responses_base_url,
+                use_codex_account: true,
+                product_session_token: session_token.clone(),
+                sandbox_mode: codex_protocol::config_types::SandboxMode::WorkspaceWrite,
+                approval_policy: codex_protocol::protocol::AskForApproval::OnRequest,
+                codex_executable_path: create.codex_executable_path.clone(),
+                conversation_providers: compatibility_conversation_providers.clone(),
+            };
+            backends.insert(
+                PROVIDER_CODEX.to_string(),
+                Arc::new(LazyCodexEngineBackend::new(codex_config)) as Arc<dyn EngineBackend>,
+            );
+        }
+        let engine_backend: Arc<dyn EngineBackend> = Arc::new(
+            ProviderRoutingEngineBackend::new(default_route, backends)
+                .map_err(|error| HostError::new(error.to_string()))?,
+        );
+
         let mcp_roots = runtime_config
             .workspace_roots
             .iter()
             .map(|root| root.join(".agents/plugins/plugins"))
             .collect::<Vec<_>>();
         let mcp_registry = NativeMcpRegistry::new(mcp_roots, session_token.clone());
-        let runner_composition = NativeRunnerComposition::compose(
-            model_runtime,
-            engine_config,
+        let allow_process = engine_config.enable_process_tools
+            && !matches!(engine_config.process_execution, ProcessExecution::Unavailable);
+        let mut runner_composition = NativeRunnerComposition::from_engine(
+            native_engine,
             match runtime_config.build_profile {
                 BuildProfile::DesktopFull => mahayana_kernel::RuntimeProfile::DesktopFull,
                 BuildProfile::MobileEmbedded => mahayana_kernel::RuntimeProfile::MobileEmbedded,
@@ -637,7 +754,9 @@ fn build_runtime(
             },
             cwd,
             mcp_registry,
-        )?;
+            allow_process,
+        );
+        runner_composition.engine_backend = engine_backend;
         let miniapp = MiniAppConversationProvider::new_for_platform_with_entitlements(
             Arc::clone(&runner_composition.agent_backend),
             mini_apps,
