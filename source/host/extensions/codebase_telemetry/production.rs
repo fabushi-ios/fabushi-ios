@@ -19,6 +19,7 @@ pub const CODEBASE_TELEMETRY_OPERATION_DEADLINE: Duration = Duration::from_secs(
 
 pub trait CodebaseTelemetryHostBridge: Send + Sync {
     fn request(&self, method: &str) -> Result<Value, String>;
+    fn feature_gate(&self, name: &str) -> Option<bool>;
     fn lookup_privacy_mode(&self, auth: TelemetryAuth) -> Result<PrivacyMode, PrivacyLookupError>;
 }
 
@@ -290,11 +291,14 @@ impl MobileCodebaseTelemetryOwner {
         }
     }
 
+    pub fn refresh_runtime_dependencies(&self) -> Result<(), String> {
+        self.sync(CODEBASE_TELEMETRY_UPLOAD_INTERVAL)
+    }
+
     fn sync(&self, upload_interval: Duration) -> Result<(), String> {
-        let settings = self.bridge.request("getHostSettings")?;
-        let gate_enabled = settings.get("featureFlagOverrides")
-            .and_then(|v| v.get(CODEBASE_TELEMETRY_FEATURE_GATE))
-            .and_then(Value::as_bool)
+        let gate_enabled = self
+            .bridge
+            .feature_gate(CODEBASE_TELEMETRY_FEATURE_GATE)
             .unwrap_or(false);
         if !gate_enabled {
             self.privacy.clear_auth();
@@ -387,12 +391,13 @@ mod tests {
     impl CodebaseTelemetryHostBridge for FakeBridge {
         fn request(&self, method: &str) -> Result<Value, String> {
             match method {
-                "getHostSettings" => Ok(json!({"featureFlagOverrides": {
-                    CODEBASE_TELEMETRY_FEATURE_GATE: self.gate.load(Ordering::SeqCst)
-                }})),
                 "feature.auth.deviceAgentSession" => self.session.lock().unwrap().clone().ok_or_else(|| "signed out".into()),
                 _ => Err("unsupported".into()),
             }
+        }
+        fn feature_gate(&self, name: &str) -> Option<bool> {
+            (name == CODEBASE_TELEMETRY_FEATURE_GATE)
+                .then(|| self.gate.load(Ordering::SeqCst))
         }
         fn lookup_privacy_mode(&self, _auth: TelemetryAuth) -> Result<PrivacyMode, PrivacyLookupError> {
             self.privacy_calls.fetch_add(1, Ordering::SeqCst);

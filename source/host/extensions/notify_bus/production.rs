@@ -16,6 +16,7 @@ const SAND_CLIENT_TYPE: &str = "sand";
 
 pub trait NotifyBusHostBridge: Send + Sync {
     fn request(&self, method: &str) -> Result<Value, String>;
+    fn feature_gate(&self, name: &str) -> Option<bool>;
 }
 
 pub type XuserNotifyHandler = Arc<dyn Fn() + Send + Sync>;
@@ -100,15 +101,10 @@ impl MobileNotifyBusOwner {
         if self.stopped.load(Ordering::Acquire) {
             return Ok(());
         }
-        let settings = self.bridge.request("getHostSettings")?;
-        let overrides = settings.get("featureFlagOverrides").and_then(Value::as_object);
-        let enabled = overrides
-            .and_then(|values| values.get(SAND_NOTIFY_BUS_GATE))
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let safety = overrides
-            .and_then(|values| values.get(SAND_NOTIFY_SAFETY_POLL_GATE))
-            .and_then(Value::as_bool)
+        let enabled = self.bridge.feature_gate(SAND_NOTIFY_BUS_GATE).unwrap_or(false);
+        let safety = self
+            .bridge
+            .feature_gate(SAND_NOTIFY_SAFETY_POLL_GATE)
             .unwrap_or(false);
         self.safety_poll_enabled.store(safety, Ordering::Release);
 
@@ -230,7 +226,6 @@ mod tests {
     impl NotifyBusHostBridge for FakeBridge {
         fn request(&self, method: &str) -> Result<Value, String> {
             match method {
-                "getHostSettings" => Ok(self.settings.lock().unwrap().clone()),
                 "feature.auth.deviceAgentSession" => self
                     .session
                     .lock()
@@ -240,13 +235,22 @@ mod tests {
                 _ => Err("unsupported".into()),
             }
         }
+
+        fn feature_gate(&self, name: &str) -> Option<bool> {
+            self.settings
+                .lock()
+                .unwrap()
+                .get("featureGates")
+                .and_then(|value| value.get(name))
+                .and_then(Value::as_bool)
+        }
     }
 
     #[test]
     fn disabled_notify_bus_is_fail_closed_and_safety_gate_is_independent() {
         let bridge = Arc::new(FakeBridge {
             settings: Mutex::new(json!({
-                "featureFlagOverrides": {
+                "featureGates": {
                     SAND_NOTIFY_BUS_GATE: false,
                     SAND_NOTIFY_SAFETY_POLL_GATE: true
                 }

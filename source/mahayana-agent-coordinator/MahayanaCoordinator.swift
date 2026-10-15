@@ -510,7 +510,10 @@ final class MahayanaCoordinator {
     private var experimentMembershipTask: Task<Void, Never>?
     private var experimentOverridePushTask: Task<Void, Never>?
     private var experimentMembershipGeneration: UInt64 = 0
+    private var experimentFeatureGateGeneration: UInt64 = 0
     private var experimentOverrideGeneration: UInt64 = 0
+    private var experimentFeatureGatePushTask: Task<Void, Never>?
+    private var lastProjectedExperimentFeatureGates: [String: Bool]?
     private var lastProjectedExperimentOverrides: [String: Bool]?
     private var localToolApprovalScopeFence = IOSLocalToolApprovalScopeFence()
     private var localToolApprovalAccountScope: String? {
@@ -1003,7 +1006,7 @@ final class MahayanaCoordinator {
             guard let self else { return }
             await self.refreshExperiments(.poll)
         }
-        emitExperimentSnapshot(experimentService.getSnapshot())
+        handleExperimentSnapshot(experimentService.getSnapshot())
         experimentRefreshTask?.cancel()
         experimentRefreshTask = Task { @MainActor [weak self] in
             await self?.refreshExperiments(.startup)
@@ -1055,6 +1058,37 @@ final class MahayanaCoordinator {
 
     private func handleExperimentSnapshot(_ snapshot: SandExperimentSnapshot) {
         emitExperimentSnapshot(snapshot)
+
+        let featureGates = snapshot.featureGates
+        if lastProjectedExperimentFeatureGates != featureGates {
+            experimentFeatureGateGeneration = experimentFeatureGateGeneration == UInt64.max
+                ? 1
+                : experimentFeatureGateGeneration + 1
+            let generation = experimentFeatureGateGeneration
+            let expectedHostGeneration = hostSupervisor.generation
+            experimentFeatureGatePushTask?.cancel()
+            experimentFeatureGatePushTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    _ = try await self.hostSupervisor.pushHostEffectiveFeatureGates(featureGates)
+                    guard !Task.isCancelled,
+                          self.experimentFeatureGateGeneration == generation,
+                          self.hostSupervisor.generation == expectedHostGeneration
+                    else { return }
+                    self.lastProjectedExperimentFeatureGates = featureGates
+                } catch {
+                    guard !Task.isCancelled,
+                          self.experimentFeatureGateGeneration == generation,
+                          self.hostSupervisor.generation == expectedHostGeneration
+                    else { return }
+                    reportExperimentsDiagnostic(.init(
+                        kind: "host_feature_gate_push_failed",
+                        metadata: ["errorClass": errorLogTag(error)]
+                    ))
+                }
+            }
+        }
+
         guard localToolApprovalAccountScope != nil else { return }
         let overrides = snapshot.featureFlagOverrides
         guard lastProjectedExperimentOverrides != overrides else { return }
@@ -1086,6 +1120,22 @@ final class MahayanaCoordinator {
                     metadata: ["errorClass": errorLogTag(error)]
                 ))
             }
+        }
+    }
+
+    private func reprojectExperimentsAfterHostReplacement() {
+        experimentFeatureGateGeneration = experimentFeatureGateGeneration == UInt64.max
+            ? 1
+            : experimentFeatureGateGeneration + 1
+        experimentOverrideGeneration = experimentOverrideGeneration == UInt64.max
+            ? 1
+            : experimentOverrideGeneration + 1
+        experimentFeatureGatePushTask?.cancel()
+        experimentOverridePushTask?.cancel()
+        lastProjectedExperimentFeatureGates = nil
+        lastProjectedExperimentOverrides = nil
+        if let experimentService {
+            handleExperimentSnapshot(experimentService.getSnapshot())
         }
     }
 
@@ -1207,11 +1257,16 @@ final class MahayanaCoordinator {
             experimentMembershipGeneration = experimentMembershipGeneration == UInt64.max
                 ? 1
                 : experimentMembershipGeneration + 1
+            experimentFeatureGateGeneration = experimentFeatureGateGeneration == UInt64.max
+                ? 1
+                : experimentFeatureGateGeneration + 1
             experimentOverrideGeneration = experimentOverrideGeneration == UInt64.max
                 ? 1
                 : experimentOverrideGeneration + 1
             experimentMembershipTask?.cancel()
+            experimentFeatureGatePushTask?.cancel()
             experimentOverridePushTask?.cancel()
+            lastProjectedExperimentFeatureGates = nil
             lastProjectedExperimentOverrides = nil
             experimentService?.setIsAnysphereUser(false)
             experimentService?.resetFeatureFlagOverridesForAccountTransition()
@@ -1774,9 +1829,12 @@ final class MahayanaCoordinator {
         }
         if case .failed = lifecycleState {
             do {
-                _ = try hostSupervisor.recoverAfterFailure(
+                let replaced = try hostSupervisor.recoverAfterFailure(
                     observedGeneration: hostSupervisor.generation
                 )
+                if replaced {
+                    reprojectExperimentsAfterHostReplacement()
+                }
                 lifecycleState = .ready
             } catch {
                 throw CoordinatorError.unavailable
@@ -1900,9 +1958,12 @@ final class MahayanaCoordinator {
         } catch let hostError as MahayanaHostRuntime.HostError {
             if hostError.requiresRecovery {
                 do {
-                    _ = try hostSupervisor.recoverAfterFailure(
+                    let replaced = try hostSupervisor.recoverAfterFailure(
                         observedGeneration: observedHostGeneration
                     )
+                    if replaced {
+                        reprojectExperimentsAfterHostReplacement()
+                    }
                 } catch {
                     lifecycleState = .failed(error.localizedDescription)
                 }
@@ -1968,9 +2029,12 @@ final class MahayanaCoordinator {
     func sceneBecameActive() {
         if case .failed = lifecycleState {
             do {
-                _ = try hostSupervisor.recoverAfterFailure(
+                let replaced = try hostSupervisor.recoverAfterFailure(
                     observedGeneration: hostSupervisor.generation
                 )
+                if replaced {
+                    reprojectExperimentsAfterHostReplacement()
+                }
                 lifecycleState = .ready
             } catch {
                 return
@@ -2017,6 +2081,8 @@ final class MahayanaCoordinator {
         experimentRefreshTask = nil
         experimentMembershipTask?.cancel()
         experimentMembershipTask = nil
+        experimentFeatureGatePushTask?.cancel()
+        experimentFeatureGatePushTask = nil
         experimentOverridePushTask?.cancel()
         experimentOverridePushTask = nil
         if let productAnalytics {

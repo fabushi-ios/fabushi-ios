@@ -109,6 +109,22 @@ final class MahayanaLocalHostSupervisor {
     }
 
     @discardableResult
+    func pushHostEffectiveFeatureGates(
+        _ featureGates: [String: Bool]
+    ) async throws -> Bool {
+        let response = try await request(
+            method: "mobile.experiments.applyEffectiveFeatureGates",
+            params: ["featureGates": featureGates]
+        )
+        guard let object = response.value as? [String: Any],
+              object["applied"] as? Bool == true
+        else {
+            throw MahayanaHostSettingsTransportError.invalidResponse
+        }
+        return true
+    }
+
+    @discardableResult
     func pushHostFeatureFlagOverrides(
         _ overrides: [String: Bool]
     ) async throws -> MahayanaHostSettingsSnapshot {

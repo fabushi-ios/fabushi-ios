@@ -1,11 +1,12 @@
 use mahayana_app_host::{AppHostFeatureMode, HostResponse, default_app_data_dir};
 use mahayana_unified_app_host::{UnifiedAppHost, dispatch_json as dispatch_unified_json};
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_char};
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -860,14 +861,38 @@ struct MobileCrossUserBridge {
     host: MobileHostBridge,
 }
 
+#[derive(Default)]
+struct MobileExperimentProjection {
+    feature_gates: Mutex<BTreeMap<String, bool>>,
+}
+
+impl MobileExperimentProjection {
+    fn replace_feature_gates(&self, feature_gates: BTreeMap<String, bool>) {
+        *self
+            .feature_gates
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = feature_gates;
+    }
+
+    fn feature_gate(&self, name: &str) -> Option<bool> {
+        self.feature_gates
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(name)
+            .copied()
+    }
+}
+
 #[derive(Clone)]
 struct MobileCodebaseTelemetryBridge {
     host: MobileHostBridge,
+    experiments: Arc<MobileExperimentProjection>,
 }
 
 #[derive(Clone)]
 struct MobileNotifyBusBridge {
     host: MobileHostBridge,
+    experiments: Arc<MobileExperimentProjection>,
 }
 
 fn mobile_host_result(host: &MobileHostBridge, method: &str) -> Result<serde_json::Value, String> {
@@ -885,11 +910,19 @@ impl notify_bus::NotifyBusHostBridge for MobileNotifyBusBridge {
     fn request(&self, method: &str) -> Result<serde_json::Value, String> {
         mobile_host_result(&self.host, method)
     }
+
+    fn feature_gate(&self, name: &str) -> Option<bool> {
+        self.experiments.feature_gate(name)
+    }
 }
 
 impl codebase_telemetry::CodebaseTelemetryHostBridge for MobileCodebaseTelemetryBridge {
     fn request(&self, method: &str) -> Result<serde_json::Value, String> {
         mobile_host_result(&self.host, method)
+    }
+
+    fn feature_gate(&self, name: &str) -> Option<bool> {
+        self.experiments.feature_gate(name)
     }
 
     fn lookup_privacy_mode(
@@ -1121,6 +1154,7 @@ struct MobileAppHost {
     notify_bus: Option<Arc<notify_bus::MobileNotifyBusOwner>>,
     forever_box_pressure: Option<forever_box::MobileForeverBoxPressureOwner>,
     codebase_telemetry: Option<Arc<codebase_telemetry::MobileCodebaseTelemetryOwner>>,
+    experiment_projection: Arc<MobileExperimentProjection>,
 }
 
 impl MobileAppHost {
@@ -1180,9 +1214,13 @@ impl MobileAppHost {
         let call_sessions = call_session::CallSessionStore::open(&app_data_dir, 5_000)?;
         let content_search = content_search::MobileContentSearchOwner::start(app_data_dir.clone())?;
         let (host, host_thread) = MobileHostBridge::spawn(factory)?;
+        let experiment_projection = Arc::new(MobileExperimentProjection::default());
         let notify_bus = if start_cross_user {
             Some(notify_bus::MobileNotifyBusOwner::start(Arc::new(
-                MobileNotifyBusBridge { host: host.clone() },
+                MobileNotifyBusBridge {
+                    host: host.clone(),
+                    experiments: Arc::clone(&experiment_projection),
+                },
             ))?)
         } else {
             None
@@ -1212,7 +1250,10 @@ impl MobileAppHost {
         let codebase_telemetry = if start_cross_user {
             Some(codebase_telemetry::MobileCodebaseTelemetryOwner::start(
                 &app_data_dir,
-                Arc::new(MobileCodebaseTelemetryBridge { host: host.clone() }),
+                Arc::new(MobileCodebaseTelemetryBridge {
+                    host: host.clone(),
+                    experiments: Arc::clone(&experiment_projection),
+                }),
             )?)
         } else {
             None
@@ -1252,10 +1293,57 @@ impl MobileAppHost {
             notify_bus,
             forever_box_pressure,
             codebase_telemetry,
+            experiment_projection,
         })
     }
 
+    fn dispatch_experiment_projection_json(&self, input: &str) -> Option<String> {
+        let request = serde_json::from_str::<serde_json::Value>(input).ok()?;
+        if request.get("method").and_then(serde_json::Value::as_str)
+            != Some("mobile.experiments.applyEffectiveFeatureGates")
+        {
+            return None;
+        }
+        let feature_gates = request
+            .get("params")
+            .and_then(|params| params.get("featureGates"))
+            .cloned()
+            .ok_or_else(|| "featureGates is required".to_string())
+            .and_then(|value| {
+                serde_json::from_value::<BTreeMap<String, bool>>(value)
+                    .map_err(|error| format!("featureGates must be a boolean map: {error}"))
+            });
+        let output = match feature_gates {
+            Ok(feature_gates) => {
+                self.experiment_projection.replace_feature_gates(feature_gates);
+                let notify_synced = self
+                    .notify_bus
+                    .as_ref()
+                    .map(|owner| owner.sync().is_ok())
+                    .unwrap_or(true);
+                let telemetry_synced = self
+                    .codebase_telemetry
+                    .as_ref()
+                    .map(|owner| owner.refresh_runtime_dependencies().is_ok())
+                    .unwrap_or(true);
+                serde_json::json!({
+                    "ok": true,
+                    "result": {
+                        "applied": true,
+                        "notifySynced": notify_synced,
+                        "telemetrySynced": telemetry_synced,
+                    }
+                })
+            }
+            Err(error) => serde_json::json!({"ok": false, "error": error}),
+        };
+        Some(output.to_string())
+    }
+
     fn dispatch_json(&self, input: &str) -> String {
+        if let Some(output) = self.dispatch_experiment_projection_json(input) {
+            return output;
+        }
         if let Some(output) = self.dispatch_call_session_json(input) {
             return output;
         }
