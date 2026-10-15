@@ -741,9 +741,25 @@ final class RemoteComputerAgentBoxOwner: ObservableObject {
             }
         } catch {
             guard !disposed, generation == ensureGeneration else { return }
+            let ensureError = error
+            var settledError: Error = ensureError
+            do {
+                try await source.release(
+                    agentID: agentID,
+                    trigger: "ensure-unavailable"
+                )
+                demanded.remove(agentID)
+            } catch {
+                // Match Desktop settleOptionalRemoteComputerTarget: cleanup
+                // failure is authoritative and must not be silently swallowed.
+                settledError = error
+            }
+            guard !disposed, generation == ensureGeneration else { return }
             recordFailure(recordFor(agentID))
             if activeAgentID == agentID {
-                errorMessage = String(error.localizedDescription.prefix(240))
+                errorMessage = String(
+                    settledError.localizedDescription.prefix(240)
+                )
             }
         }
 
