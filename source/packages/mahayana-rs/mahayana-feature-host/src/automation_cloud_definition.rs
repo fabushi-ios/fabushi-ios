@@ -869,7 +869,7 @@ mod tests {
     }
 
     #[test]
-    fn slack_direct_message_is_not_server_schedulable() {
+    fn slack_direct_message_is_local_only_and_has_no_cloud_shadow() {
         let trigger = AutomationTrigger::Event {
             source: ListenerPlatform::Slack,
             event: "message".into(),
@@ -894,8 +894,9 @@ mod tests {
             last_run_at_ms: None,
             next_run_at_ms: None,
         };
-        let definition = automation_cloud_definition("agent-1", &automation, Some("UTC"))
-            .expect("local-only listener still has a disabled cloud shadow");
-        assert!(!definition.enabled);
+        assert!(
+            automation_cloud_definition("agent-1", &automation, Some("UTC")).is_none(),
+            "local-only listener must not create a cloud shadow"
+        );
     }
 }

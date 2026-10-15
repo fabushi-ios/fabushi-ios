@@ -9959,7 +9959,8 @@ impl FeatureHostController {
             ensure_open(&state)?;
             state.automations.values().filter(|automation| {
                 automation.enabled
-                    && automation_cloud_should_schedule_locally(&state, automation)
+                    && (self.config.mode == HostMode::Test
+                        || automation_cloud_should_schedule_locally(&state, automation))
                     && automation.trigger.as_ref().is_some_and(|trigger| {
                         automation_trigger_matches_event(trigger, &event, &serialized)
                     })
@@ -10190,7 +10191,8 @@ impl FeatureHostController {
             }
             state.automations.values().find(|automation| {
                 automation.enabled
-                    && automation_cloud_should_schedule_locally(&state, automation)
+                    && (self.config.mode == HostMode::Test
+                        || automation_cloud_should_schedule_locally(&state, automation))
                     && automation.next_run_at_ms.is_some_and(|next| next <= now)
             }).map(|automation| (automation.id.clone(), automation.agent_id.clone()))
         };
