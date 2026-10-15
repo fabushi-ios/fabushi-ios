@@ -235,6 +235,89 @@ private final class CoordinatorMcpHostPort {
         return object
     }
 
+    func syncAndPeekAgentStoreConflictNotice(
+        conversationID: String?,
+        writtenPaths: [String] = [],
+        eager: Bool = false
+    ) async throws -> [String: Any] {
+        var params: [String: Any] = [
+            "writtenPaths": writtenPaths,
+            "eager": eager,
+        ]
+        if let conversationID { params["conversationId"] = conversationID }
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.conflictNotice.syncAndPeek",
+            params: params
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store conflict sync-and-peek response is invalid.")
+        }
+        return object
+    }
+
+    func peekAgentStoreConflictNotice(
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        var params: [String: Any] = [:]
+        if let conversationID { params["conversationId"] = conversationID }
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.conflictNotice.peek",
+            params: params
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store conflict peek response is invalid.")
+        }
+        return object
+    }
+
+    func ackAgentStoreConflictNotice(
+        eventIDs: [String],
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        var params: [String: Any] = ["eventIds": eventIDs]
+        if let conversationID { params["conversationId"] = conversationID }
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.conflictNotice.ack",
+            params: params
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store conflict ack response is invalid.")
+        }
+        return object
+    }
+
+    func releaseAgentStoreConflictNotice(
+        eventIDs: [String],
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        var params: [String: Any] = ["eventIds": eventIDs]
+        if let conversationID { params["conversationId"] = conversationID }
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.conflictNotice.release",
+            params: params
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store conflict release response is invalid.")
+        }
+        return object
+    }
+
+    func noteDeferredEagerAgentStorePaths(
+        _ writtenPaths: [String],
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        var params: [String: Any] = ["writtenPaths": writtenPaths]
+        if let conversationID { params["conversationId"] = conversationID }
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.conflictNotice.noteDeferredEagerWrittenPaths",
+            params: params
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store deferred eager path response is invalid.")
+        }
+        return object
+    }
+
     func admitBackendAutomationFire(_ fire: [String: Any]) async throws -> [String: Any] {
         let response = try await hostSupervisor.request(
             method: "feature.automation.admitBackendFire",
@@ -3458,6 +3541,81 @@ final class CoordinatorMcpSurface {
             )
         }
         return result
+    }
+
+    private func withCurrentAgentStoreScope(
+        operation: String,
+        _ body: () async throws -> [String: Any]
+    ) async throws -> [String: Any] {
+        guard let scope = accountScope else {
+            throw SandMcpConfigError("Agent Store \(operation) requires an active account.")
+        }
+        let generation = routedScopeGeneration
+        let result = try await body()
+        guard scope == accountScope, generation == routedScopeGeneration else {
+            throw SandMcpConfigError(
+                "Agent Store \(operation) became stale because the account changed."
+            )
+        }
+        return result
+    }
+
+    func syncAndPeekAgentStoreConflictNoticeForCurrentScope(
+        conversationID: String?,
+        writtenPaths: [String] = [],
+        eager: Bool = false
+    ) async throws -> [String: Any] {
+        try await withCurrentAgentStoreScope(operation: "conflict sync-and-peek") {
+            try await port.syncAndPeekAgentStoreConflictNotice(
+                conversationID: conversationID,
+                writtenPaths: writtenPaths,
+                eager: eager
+            )
+        }
+    }
+
+    func peekAgentStoreConflictNoticeForCurrentScope(
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        try await withCurrentAgentStoreScope(operation: "conflict peek") {
+            try await port.peekAgentStoreConflictNotice(conversationID: conversationID)
+        }
+    }
+
+    func ackAgentStoreConflictNoticeForCurrentScope(
+        eventIDs: [String],
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        try await withCurrentAgentStoreScope(operation: "conflict ack") {
+            try await port.ackAgentStoreConflictNotice(
+                eventIDs: eventIDs,
+                conversationID: conversationID
+            )
+        }
+    }
+
+    func releaseAgentStoreConflictNoticeForCurrentScope(
+        eventIDs: [String],
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        try await withCurrentAgentStoreScope(operation: "conflict release") {
+            try await port.releaseAgentStoreConflictNotice(
+                eventIDs: eventIDs,
+                conversationID: conversationID
+            )
+        }
+    }
+
+    func noteDeferredEagerAgentStorePathsForCurrentScope(
+        _ writtenPaths: [String],
+        conversationID: String?
+    ) async throws -> [String: Any] {
+        try await withCurrentAgentStoreScope(operation: "deferred eager path note") {
+            try await port.noteDeferredEagerAgentStorePaths(
+                writtenPaths,
+                conversationID: conversationID
+            )
+        }
     }
 
     func stopAutomationRelay() {

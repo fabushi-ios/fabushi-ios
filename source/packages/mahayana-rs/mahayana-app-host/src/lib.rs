@@ -1365,6 +1365,11 @@ impl AppHost {
             "feature.agentStore.hydrateAll" => self.feature_agent_store_hydrate_all(),
             "feature.agentStore.snapshotAll" => self.feature_agent_store_snapshot_all(),
             "feature.agentStore.reconcileAll" => self.feature_agent_store_reconcile_all(),
+            "feature.agentStore.conflictNotice.syncAndPeek" => self.feature_agent_store_conflict_notice_sync_and_peek(params),
+            "feature.agentStore.conflictNotice.peek" => self.feature_agent_store_conflict_notice_peek(params),
+            "feature.agentStore.conflictNotice.ack" => self.feature_agent_store_conflict_notice_ack(params),
+            "feature.agentStore.conflictNotice.release" => self.feature_agent_store_conflict_notice_release(params),
+            "feature.agentStore.conflictNotice.noteDeferredEagerWrittenPaths" => self.feature_agent_store_conflict_notice_note_deferred_eager_written_paths(params),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1770,6 +1775,104 @@ impl AppHost {
     fn feature_agent_store_reconcile_all(&self) -> Result<Value, AppHostError> {
         self.feature
             .agent_store_reconcile_all()
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_conflict_notice_conversation<'a>(
+        params: &'a Value,
+    ) -> Result<Option<&'a str>, AppHostError> {
+        match params.get("conversationId") {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(value)) if !value.trim().is_empty() => Ok(Some(value.as_str())),
+            Some(_) => Err(AppHostError::InvalidRequest(
+                "conversationId must be a non-empty string or null".into(),
+            )),
+        }
+    }
+
+    fn feature_agent_store_conflict_notice_string_array(
+        params: &Value,
+        name: &str,
+    ) -> Result<Vec<String>, AppHostError> {
+        let Some(value) = params.get(name) else {
+            return Ok(Vec::new());
+        };
+        let array = value.as_array().ok_or_else(|| {
+            AppHostError::InvalidRequest(format!("{name} must be an array of strings"))
+        })?;
+        let mut out = Vec::with_capacity(array.len());
+        for value in array {
+            let value = value.as_str().ok_or_else(|| {
+                AppHostError::InvalidRequest(format!("{name} must contain only strings"))
+            })?;
+            out.push(value.to_string());
+        }
+        Ok(out)
+    }
+
+    fn feature_agent_store_conflict_notice_sync_and_peek(
+        &self,
+        params: Value,
+    ) -> Result<Value, AppHostError> {
+        let conversation_id = Self::feature_agent_store_conflict_notice_conversation(&params)?;
+        let written_paths =
+            Self::feature_agent_store_conflict_notice_string_array(&params, "writtenPaths")?;
+        let eager = params.get("eager").and_then(Value::as_bool).unwrap_or(false);
+        self.feature
+            .agent_store_conflict_notice_sync_and_peek(
+                conversation_id,
+                &written_paths,
+                eager,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_conflict_notice_peek(
+        &self,
+        params: Value,
+    ) -> Result<Value, AppHostError> {
+        let conversation_id = Self::feature_agent_store_conflict_notice_conversation(&params)?;
+        self.feature
+            .agent_store_conflict_notice_peek(conversation_id)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_conflict_notice_ack(
+        &self,
+        params: Value,
+    ) -> Result<Value, AppHostError> {
+        let conversation_id = Self::feature_agent_store_conflict_notice_conversation(&params)?;
+        let event_ids =
+            Self::feature_agent_store_conflict_notice_string_array(&params, "eventIds")?;
+        self.feature
+            .agent_store_conflict_notice_ack(conversation_id, &event_ids)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_conflict_notice_release(
+        &self,
+        params: Value,
+    ) -> Result<Value, AppHostError> {
+        let conversation_id = Self::feature_agent_store_conflict_notice_conversation(&params)?;
+        let event_ids =
+            Self::feature_agent_store_conflict_notice_string_array(&params, "eventIds")?;
+        self.feature
+            .agent_store_conflict_notice_release(conversation_id, &event_ids)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_conflict_notice_note_deferred_eager_written_paths(
+        &self,
+        params: Value,
+    ) -> Result<Value, AppHostError> {
+        let conversation_id = Self::feature_agent_store_conflict_notice_conversation(&params)?;
+        let written_paths =
+            Self::feature_agent_store_conflict_notice_string_array(&params, "writtenPaths")?;
+        self.feature
+            .agent_store_conflict_notice_note_deferred_eager_written_paths(
+                conversation_id,
+                &written_paths,
+            )
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 

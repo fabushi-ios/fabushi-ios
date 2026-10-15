@@ -9168,28 +9168,180 @@ impl FeatureHostController {
         ))
     }
 
-    pub fn agent_store_reconcile_all(&self) -> Result<Value, FeatureHostError> {
-        if self.config.mode != HostMode::Production {
-            return Err(FeatureHostError::ProductionUnavailable);
-        }
-        let session_scope = self.capture_agent_store_session_scope()?;
+    fn agent_store_reconcile_all_with_scope(
+        &self,
+        session_scope: &AgentStoreSessionScope,
+    ) -> Result<Value, FeatureHostError> {
         let agent_ids = self.agent_store_agent_ids()?;
         let mut results = Vec::with_capacity(agent_ids.len());
         for agent_id in agent_ids {
-            self.assert_agent_store_session_scope(&session_scope, "reconcile-all before agent")?;
-            let result = self.agent_store_reconcile_agent_with_scope(&agent_id, &session_scope)?;
-            self.assert_agent_store_session_scope(&session_scope, "reconcile-all after agent")?;
+            self.assert_agent_store_session_scope(session_scope, "reconcile-all before agent")?;
+            let result = self.agent_store_reconcile_agent_with_scope(&agent_id, session_scope)?;
+            self.assert_agent_store_session_scope(session_scope, "reconcile-all after agent")?;
             results.push(json!({
                 "agentId": agent_id,
                 "result": result,
             }));
         }
-        self.assert_agent_store_session_scope(&session_scope, "reconcile-all completion")?;
+        self.assert_agent_store_session_scope(session_scope, "reconcile-all completion")?;
         Ok(json!({
             "outcome": "reconciled",
             "agentCount": results.len(),
             "agents": results,
         }))
+    }
+
+    pub fn agent_store_reconcile_all(&self) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let session_scope = self.capture_agent_store_session_scope()?;
+        self.agent_store_reconcile_all_with_scope(&session_scope)
+    }
+
+    fn agent_store_conflict_notice_peek_with_scope(
+        &self,
+        session_scope: &AgentStoreSessionScope,
+        conversation_id: Option<&str>,
+    ) -> Result<Value, FeatureHostError> {
+        let account_root = self.agent_store_account_root(session_scope)?;
+        self.with_agent_store_session_write(session_scope, "conflict notice peek", || {
+            crate::agent_store_conflict_notice_claim_state::peek(
+                &account_root,
+                conversation_id,
+            )
+            .map_err(FeatureHostError::Contract)
+        })
+    }
+
+    pub fn agent_store_conflict_notice_peek(
+        &self,
+        conversation_id: Option<&str>,
+    ) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let session_scope = self.capture_agent_store_session_scope()?;
+        self.agent_store_conflict_notice_peek_with_scope(&session_scope, conversation_id)
+    }
+
+    pub fn agent_store_conflict_notice_ack(
+        &self,
+        conversation_id: Option<&str>,
+        event_ids: &[String],
+    ) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let session_scope = self.capture_agent_store_session_scope()?;
+        let account_root = self.agent_store_account_root(&session_scope)?;
+        self.with_agent_store_session_write(&session_scope, "conflict notice ack", || {
+            crate::agent_store_conflict_notice_claim_state::ack(
+                &account_root,
+                conversation_id,
+                event_ids,
+            )
+            .map_err(FeatureHostError::Contract)
+        })
+    }
+
+    pub fn agent_store_conflict_notice_release(
+        &self,
+        conversation_id: Option<&str>,
+        event_ids: &[String],
+    ) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let session_scope = self.capture_agent_store_session_scope()?;
+        let account_root = self.agent_store_account_root(&session_scope)?;
+        self.with_agent_store_session_write(&session_scope, "conflict notice release", || {
+            crate::agent_store_conflict_notice_claim_state::release(
+                &account_root,
+                conversation_id,
+                event_ids,
+            )
+            .map_err(FeatureHostError::Contract)
+        })
+    }
+
+    pub fn agent_store_conflict_notice_note_deferred_eager_written_paths(
+        &self,
+        conversation_id: Option<&str>,
+        written_paths: &[String],
+    ) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let session_scope = self.capture_agent_store_session_scope()?;
+        let account_root = self.agent_store_account_root(&session_scope)?;
+        self.with_agent_store_session_write(
+            &session_scope,
+            "conflict notice deferred eager paths",
+            || {
+                crate::agent_store_conflict_notice_claim_state::note_deferred_eager_written_paths(
+                    &account_root,
+                    conversation_id,
+                    written_paths,
+                )
+                .map_err(FeatureHostError::Contract)
+            },
+        )
+    }
+
+    pub fn agent_store_conflict_notice_sync_and_peek(
+        &self,
+        conversation_id: Option<&str>,
+        written_paths: &[String],
+        eager: bool,
+    ) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let session_scope = self.capture_agent_store_session_scope()?;
+        let account_root = self.agent_store_account_root(&session_scope)?;
+        if eager && !written_paths.is_empty() {
+            self.with_agent_store_session_write(
+                &session_scope,
+                "conflict notice eager path note",
+                || {
+                    crate::agent_store_conflict_notice_claim_state::note_deferred_eager_written_paths(
+                        &account_root,
+                        conversation_id,
+                        written_paths,
+                    )
+                    .map(|_| ())
+                    .map_err(FeatureHostError::Contract)
+                },
+            )?;
+        }
+
+        let sync = self.agent_store_reconcile_all_with_scope(&session_scope);
+        self.assert_agent_store_session_scope(
+            &session_scope,
+            "conflict notice sync completion",
+        )?;
+        let notice =
+            self.agent_store_conflict_notice_peek_with_scope(&session_scope, conversation_id)?;
+        match sync {
+            Ok(sync) => Ok(json!({"sync": sync, "notice": notice})),
+            Err(error) => {
+                let has_notice = notice
+                    .get("events")
+                    .and_then(Value::as_array)
+                    .map(|events| !events.is_empty())
+                    .unwrap_or(false);
+                if has_notice {
+                    Ok(json!({
+                        "sync": Value::Null,
+                        "syncError": error.to_string(),
+                        "notice": notice,
+                    }))
+                } else {
+                    Err(error)
+                }
+            }
+        }
     }
 
     fn agent_store_agent_ids(&self) -> Result<Vec<String>, FeatureHostError> {
@@ -23991,6 +24143,47 @@ mod tests {
         let after = crate::agent_store_conflict_events::read_conflict_events(&account_root)
             .expect("read after stale rejection");
         assert_eq!(after.len(), 1);
+
+        let _ = std::fs::remove_dir_all(account_root);
+    }
+
+    #[test]
+    fn agent_store_conflict_notice_claim_write_is_generation_fenced() {
+        let host = FeatureHostController::create(
+            HostConfig {
+                profile_id: format!("conflict-notice-{}", Uuid::new_v4().simple()),
+                mode: HostMode::Test,
+            },
+            SurfacePlatform::Electron,
+        )
+        .expect("create conflict notice Host");
+        let scope = host
+            .capture_agent_store_session_scope()
+            .expect("capture Agent Store session");
+        let account_root = host
+            .agent_store_account_root(&scope)
+            .expect("account root");
+
+        crate::agent_store_conflict_events::record_merge_conflicts(
+            &account_root,
+            "agent-1",
+            &["memory/state.json".to_string()],
+        )
+        .expect("seed conflict");
+        let first = host
+            .agent_store_conflict_notice_peek_with_scope(&scope, Some("conversation-a"))
+            .expect("claim conflict");
+        assert_eq!(first["events"].as_array().unwrap().len(), 1);
+
+        host.advance_account_session_generation()
+            .expect("retire conflict notice scope");
+        let stale = host
+            .agent_store_conflict_notice_peek_with_scope(&scope, Some("conversation-a"))
+            .expect_err("stale generation must not mutate notice claim state");
+        assert!(matches!(
+            stale,
+            FeatureHostError::Contract(message) if message.contains("stale/cancelled")
+        ));
 
         let _ = std::fs::remove_dir_all(account_root);
     }

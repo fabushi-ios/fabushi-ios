@@ -12,6 +12,8 @@ mod automation_cloud_proto;
 mod box_store_manifest;
 #[path = "../../../agent-store-sync/conflict-events.rs"]
 mod agent_store_conflict_events;
+#[path = "../../../agent-store-sync/conflict-notice-claim-state.rs"]
+mod agent_store_conflict_notice_claim_state;
 mod box_store_sync_state;
 mod box_store_hydration;
 #[path = "../../../../host/extensions/box-store-sync/box-store-pack.rs"]

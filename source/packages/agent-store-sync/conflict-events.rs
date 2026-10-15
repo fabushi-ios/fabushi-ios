@@ -65,7 +65,7 @@ fn ensure_safe_identity(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn ensure_safe_rel_path(rel_path: &str) -> Result<(), String> {
+pub(crate) fn ensure_safe_rel_path(rel_path: &str) -> Result<(), String> {
     if rel_path == "<path-conflict>" {
         return Ok(());
     }
@@ -128,14 +128,14 @@ fn ensure_directory_not_symlink(path: &Path) -> Result<(), String> {
     }
 }
 
-fn sync_dir(account_root: &Path) -> Result<PathBuf, String> {
+pub(crate) fn sync_dir(account_root: &Path) -> Result<PathBuf, String> {
     ensure_directory_not_symlink(account_root)?;
     let sync = account_root.join(SYNC_DIR_NAME);
     ensure_directory_not_symlink(&sync)?;
     Ok(sync)
 }
 
-fn read_optional_text(path: &Path) -> Result<Option<String>, String> {
+pub(crate) fn read_optional_text(path: &Path) -> Result<Option<String>, String> {
     ensure_regular_or_missing(path)?;
     match fs::read_to_string(path) {
         Ok(body) => Ok(Some(body)),
@@ -144,7 +144,7 @@ fn read_optional_text(path: &Path) -> Result<Option<String>, String> {
     }
 }
 
-fn atomic_write_private(path: &Path, body: &[u8]) -> Result<(), String> {
+pub(crate) fn atomic_write_private(path: &Path, body: &[u8]) -> Result<(), String> {
     ensure_regular_or_missing(path)?;
     let parent = path
         .parent()
@@ -181,7 +181,7 @@ fn atomic_write_private(path: &Path, body: &[u8]) -> Result<(), String> {
     result
 }
 
-fn remove_optional(path: &Path) -> Result<(), String> {
+pub(crate) fn remove_optional(path: &Path) -> Result<(), String> {
     ensure_regular_or_missing(path)?;
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
@@ -408,6 +408,18 @@ pub fn recover_pending(account_root: &Path) -> Result<Vec<ConflictJournalEvent>,
 pub fn read_conflict_events(account_root: &Path) -> Result<Vec<ConflictJournalEvent>, String> {
     let sync = sync_dir(account_root)?;
     parse_events(&sync.join(JOURNAL_FILE_NAME))
+}
+
+pub(crate) fn rewrite_conflict_events(
+    account_root: &Path,
+    events: &[ConflictJournalEvent],
+) -> Result<(), String> {
+    let sync = sync_dir(account_root)?;
+    let journal_path = sync.join(JOURNAL_FILE_NAME);
+    if events.is_empty() {
+        return remove_optional(&journal_path);
+    }
+    atomic_write_private(&journal_path, &serialize_events(events)?)
 }
 
 #[cfg(test)]
