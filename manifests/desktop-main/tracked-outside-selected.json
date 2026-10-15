@@ -756,9 +756,10 @@
       "type": "blob",
       "sha": "67b94ad8438b4c60b00059bdb4caeae757465d3f",
       "size": 59102,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-fdn-program-architecture-and-acceptance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Current Desktop c33a9495 FDN-001 defines the same-account device-network product contract: existing Fabushi identity/Remote Computer/Host owners, account-scoped enrollment, no second registry or permission owner, fail-closed revocation/account switching, durable requestId/reconcile semantics, native executor boundaries, and GitHub-Actions-only acceptance. iOS has parts of the canonical Coordinator/RemoteRunner/native-computer boundaries, but the full same-account network enrollment, target service, real official-MCP-to-device path, release and cross-account evidence are not closed.",
+      "notes": "Applicable architecture/security/release contract. Keep open; do not mark N/A because iOS must provide the same user capability with native/platform-appropriate networking and lifecycle semantics."
     },
     {
       "path": "docs/specs/fdn-001-account-target-availability.md",
@@ -766,9 +767,10 @@
       "type": "blob",
       "sha": "525f620a0a4f423978809f56aa69cceace296da9",
       "size": 1469,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-account-target-availability-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires a valid Fabushi login to remain logged in when optional Remote Computer target registration/heartbeat fails, while stale device credentials/target identity are cleared and later reads may retry without synthesizing capability. This is an applicable account/remote-control separation contract; iOS exact-head proof for the same failure isolation and cleanup is still required.",
+      "notes": "Applicable product identity and recovery contract; preserve fail-closed target cleanup without converting target unavailability into logout."
     },
     {
       "path": "docs/specs/fdn-001-host-network-enrollment-owner.md",
@@ -776,9 +778,10 @@
       "type": "blob",
       "sha": "d11fa87ad937a5decf7d4dd5089243a617f207bd",
       "size": 2421,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-host-network-enrollment-owner-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop Host owns durable account+device-scoped enrollment reconciliation, stable request identity, one-time AuthKey handling, outcome_unknown semantics, expiry-gated recovery, worker shutdown on account switch/logout, and secret isolation. iOS has no evidence yet of an equivalent fully wired shipping enrollment owner and real network acceptance.",
+      "notes": "Applicable Host lifecycle/security responsibility. Must integrate with existing iOS Host/Coordinator owner rather than create a second account/network authority."
     },
     {
       "path": "docs/specs/fdn-001-host-target-core-owner.md",
@@ -786,9 +789,10 @@
       "type": "blob",
       "sha": "dda84d379bff467b1a545ce4b1d8f5fa29fe53e6",
       "size": 1895,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-host-target-core-authorization-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop target execution remains subordinate to the current Fabushi account/device secret and Platform Core session/tool grant/operation/network-binding contracts; transport is not authorization and uncertain side effects are outcome_unknown without blind replay. iOS RemoteRunner/Coordinator boundaries do not yet prove this complete Core target authorization and reconciliation chain.",
+      "notes": "Applicable Host authorization, account fencing and no-replay contract."
     },
     {
       "path": "docs/specs/fdn-001-target-private-listener.md",
@@ -796,9 +800,10 @@
       "type": "blob",
       "sha": "4f7d9853451e446d6d9d6ea93eeb4ab2f8169758",
       "size": 3922,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-target-private-listener-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop private target service must reuse the single account-scoped network worker, accept only exact validated tailnet peers, inject explicit tool catalog/authorizer/native executor, recheck current network generation before side effects, and never replay uncertain operations. iOS does not yet have equivalent shipping private-listener/network evidence.",
+      "notes": "Applicable remote-control transport and authorization boundary; network reachability must not synthesize product permission."
     },
     {
       "path": "docs/specs/fdn-001-tsnet-network-worker.md",
@@ -806,9 +811,10 @@
       "type": "blob",
       "sha": "583c29c1190fd4d398ea039b71e2c4c27a705d87",
       "size": 5930,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-tsnet-network-worker-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop uses a separately packaged, Host-supervised Go tsnet worker limited to network-node lifecycle and encrypted state, with secrets over inherited stdio, no second permission/account owner, bounded shutdown, account-switch fencing and Actions-only multi-OS verification. iOS cannot copy the daemon topology directly, but must supply an equivalent native/service networking capability or explicitly satisfy the same user/recovery/security effect; current iOS evidence remains open.",
+      "notes": "Platform-adapted applicable responsibility. Do not treat the desktop Go process shape itself as required, but the account-scoped private-network capability and security/lifecycle semantics remain required."
     },
     {
       "path": "docs/specs/fdn-g11-host-browser-actions.md",
@@ -816,8 +822,10 @@
       "type": "blob",
       "sha": "a2e98139c3817e2de9943edfe18c2ff7eef5c1da",
       "size": 4227,
-      "coverage_status": "requires-current-main-review",
-      "notes": "Added by Desktop live-main c33a9495fc1e640557d65f3e2daedc1449be7fcb; requires current-main disposition review."
+      "coverage_status": "reviewed-open-gap",
+      "notes": "Applicable G11 production-path evidence contract; test-only or generic RemoteRunner dispatch is insufficient.",
+      "classification": "desktop-g11-host-browser-box-integration-contract",
+      "reason": "Desktop requires the shipping Rust SandBrowserToolBridge/ProductionBrowserToolExecutor to exercise real Shell/Write/Read operations through the production Box Connect RPC and real browser driver in Actions, preserving resource counts, safety callback, daemon auth/lifecycle and 12 real browser cases. iOS has no equivalent exact-head real browser + authenticated controlled-box integration evidence."
     },
     {
       "path": "docs/specs/fdn-g11-real-browser-actions.md",
@@ -825,9 +833,10 @@
       "type": "blob",
       "sha": "81a50029d791fc901381cb0ecf4534cbb1050f5c",
       "size": 7104,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Added on Desktop 8148bfb9; tracked outside selected roots and pending explicit build/spec disposition."
+      "classification": "desktop-g11-real-browser-security-evidence-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop real-browser acceptance proves literal shipping driver behavior against disposable Chromium, including generation fencing, same-URL target identity, iframe/download/upload boundaries, CDP privacy allowlist and BFCache history behavior. Historical Desktop evidence does not transfer to iOS; current iOS still lacks equivalent exact-head managed-browser/controlled-runtime evidence.",
+      "notes": "Applicable browser runtime/security acceptance responsibility; preserve no-secret disposable environment and no skipped cases."
     },
     {
       "path": "docs/specs/fdn-native-display-coordinate-mapping.md",
@@ -835,9 +844,10 @@
       "type": "blob",
       "sha": "4e36f1c349418c7c81332d22de9c024f59b63a5f",
       "size": 5353,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-native-display-coordinate-mapping-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop canonical computer owner requires half-open logical bounds, negative origins, checked arithmetic, unique-display reverse mapping and fail-closed overlap/out-of-range behavior, with Host/Remote Computer/UI consuming the shared mapping. iOS mahayana-computer now has equivalent pure mapping helpers and focused tests, but shipping Host consumption and final exact-head verification are still open.",
+      "notes": "Implementation exists in current iOS branch but remains not verified/closed until shipping caller and exact-head Actions evidence exist."
     },
     {
       "path": "docs/specs/fdn-native-snapshot-generation-fencing.md",
@@ -845,9 +855,10 @@
       "type": "blob",
       "sha": "89e45106aa9f2faecc44540c24b8443831521c27",
       "size": 7778,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "New tracked outside-selected file on Desktop b6a66fd2; current-main applicability/build/release review pending."
+      "classification": "desktop-native-snapshot-generation-and-remote-projection-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop requires monotonic observation generation owned by the Computer executor, stale comparison under the same execution lock before side effects, optional wire input, normal/sensitive result projection, explicit snapshot_stale mapping and no blind replay. iOS mahayana-computer now implements the atomic local generation fence, but Remote Computer/Host wire projection and exact-head verification remain missing.",
+      "notes": "Partial production implementation only; do not mark complete until Host/Remote Computer transport carries expected/returned generation and stale errors correctly."
     },
     {
       "path": "docs/specs/g11-box-browser-wire-completion.md",
@@ -855,8 +866,10 @@
       "type": "blob",
       "sha": "a75ee8323202ab18af2c91a396b1d00139bb9fa6",
       "size": 5238,
-      "coverage_status": "requires-current-main-review",
-      "notes": "Added by Desktop live-main c33a9495fc1e640557d65f3e2daedc1449be7fcb; requires current-main disposition review."
+      "coverage_status": "reviewed-open-gap",
+      "notes": "Applicable controlled-browser/Box transport security contract; generic dispatch or local browser tests are not equivalent evidence.",
+      "classification": "desktop-g11-box-wire-filesystem-and-stream-contract",
+      "reason": "Desktop closes the real Box browser path by enforcing bounded Connect envelopes, authenticated dispatch, frozen Write semantics with workspace/symlink/atomic-write safety, binary Read data handling, confined browser runtime storage and bounded Exec stream idle deadlines. iOS has no evidence that its controlled Runner path implements this exact browser-resource wire/filesystem behavior end to end."
     },
     {
       "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
