@@ -34,6 +34,32 @@ final class IOSGatewayDescriptorKeychainCache {
         self.reportFailure = reportFailure
     }
 
+    func authorizeExistingDescriptor(accountScope: String) async -> Bool {
+        do {
+            guard let raw = try await store.readSecret(Self.secretKey),
+                  let data = raw.data(using: .utf8)
+            else {
+                // No native descriptor has been persisted yet, so there is
+                // no prior device/box ownership to refuse.
+                return true
+            }
+            let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+            guard envelope.version == 1 else {
+                reportFailure("authorize-invalid-version", IOSCursorAuthError.invalidLoginResponse)
+                return false
+            }
+            // Unlike Desktop's legacy binding-file migration, the native iOS
+            // descriptor envelope has carried its stable account owner since
+            // version 1. An existing descriptor is therefore never unowned.
+            return envelope.accountScope == accountScope
+        } catch {
+            // Authorization must fail closed if durable owner evidence cannot
+            // be decoded; deleting it here would turn corruption into a claim.
+            reportFailure("authorize", error)
+            return false
+        }
+    }
+
     func read(accountScope: String) async -> IOSCursorSandBoxConnection? {
         do {
             guard let raw = try await store.readSecret(Self.secretKey),
