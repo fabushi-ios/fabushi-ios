@@ -224,6 +224,17 @@ private final class CoordinatorMcpHostPort {
         return object
     }
 
+    func reconcileAgentStore() async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.reconcileAll",
+            params: [:]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store reconcile response is invalid.")
+        }
+        return object
+    }
+
     func admitBackendAutomationFire(_ fire: [String: Any]) async throws -> [String: Any] {
         let response = try await hostSupervisor.request(
             method: "feature.automation.admitBackendFire",
@@ -2729,6 +2740,20 @@ final class CoordinatorMcpSurface {
         guard scope == accountScope, generation == routedScopeGeneration else {
             throw SandMcpConfigError(
                 "Agent Store snapshot became stale because the account changed."
+            )
+        }
+        return result
+    }
+
+    func reconcileAgentStoreForCurrentScope() async throws -> [String: Any] {
+        guard let scope = accountScope else {
+            throw SandMcpConfigError("Agent Store reconciliation requires an active account.")
+        }
+        let generation = routedScopeGeneration
+        let result = try await port.reconcileAgentStore()
+        guard scope == accountScope, generation == routedScopeGeneration else {
+            throw SandMcpConfigError(
+                "Agent Store reconciliation became stale because the account changed."
             )
         }
         return result

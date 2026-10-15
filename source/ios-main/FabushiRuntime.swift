@@ -288,7 +288,7 @@ final class FabushiRuntime {
         if main.requiresColdStartResync {
             await resyncAfterLifecycleRecovery(reason: "cold-start")
         } else if marketplace.loggedIn {
-            if await hydrateAgentStore(reason: "startup") {
+            if await reconcileAgentStore(reason: "startup") {
                 main.markResyncCompleted()
             } else {
                 main.markResyncRequired()
@@ -303,7 +303,7 @@ final class FabushiRuntime {
         if loggedIn {
             main.coordinator.startAutomationRelay()
             main.coordinator.reconcileAutomationRelay()
-            if await hydrateAgentStore(reason: "login") {
+            if await reconcileAgentStore(reason: "login") {
                 main.markResyncCompleted()
             } else {
                 main.markResyncRequired()
@@ -321,7 +321,7 @@ final class FabushiRuntime {
         switch phase {
         case .background:
             wasBackgrounded = true
-            scheduleAgentStoreSnapshot(reason: "background")
+            scheduleAgentStoreReconcile(reason: "background")
         case .active where wasBackgrounded:
             wasBackgrounded = false
             resumeTask?.cancel()
@@ -437,14 +437,14 @@ final class FabushiRuntime {
         }
     }
 
-    private func hydrateAgentStore(reason: String) async -> Bool {
+    private func reconcileAgentStore(reason: String) async -> Bool {
         guard marketplace.loggedIn else { return true }
         do {
-            _ = try await main.coordinator.hydrateAgentStoreForCurrentScope()
+            _ = try await main.coordinator.reconcileAgentStoreForCurrentScope()
             main.lifecycleReporter.report(
                 .coordinatorHandoff,
                 metadata: [
-                    "agent_store": "hydrate",
+                    "agent_store": "reconcile",
                     "reason": reason,
                     "result": "completed",
                 ]
@@ -457,7 +457,7 @@ final class FabushiRuntime {
                 .coordinatorHandoff,
                 level: .warn,
                 metadata: [
-                    "agent_store": "hydrate",
+                    "agent_store": "reconcile",
                     "reason": reason,
                     "result": "failed",
                     "error": String(error.localizedDescription.prefix(512)),
@@ -467,7 +467,7 @@ final class FabushiRuntime {
         }
     }
 
-    private func scheduleAgentStoreSnapshot(reason: String) {
+    private func scheduleAgentStoreReconcile(reason: String) {
         agentStoreSnapshotTask?.cancel()
         guard marketplace.loggedIn else {
             agentStoreSnapshotTask = nil
@@ -476,12 +476,12 @@ final class FabushiRuntime {
         agentStoreSnapshotTask = Task { [weak self] in
             guard let self else { return }
             do {
-                _ = try await self.main.coordinator.snapshotAgentStoreForCurrentScope()
+                _ = try await self.main.coordinator.reconcileAgentStoreForCurrentScope()
                 guard !Task.isCancelled else { return }
                 self.main.lifecycleReporter.report(
                     .coordinatorHandoff,
                     metadata: [
-                        "agent_store": "snapshot",
+                        "agent_store": "reconcile",
                         "reason": reason,
                         "result": "completed",
                     ]
@@ -493,7 +493,7 @@ final class FabushiRuntime {
                     .coordinatorHandoff,
                     level: .warn,
                     metadata: [
-                        "agent_store": "snapshot",
+                        "agent_store": "reconcile",
                         "reason": reason,
                         "result": "failed",
                         "error": String(error.localizedDescription.prefix(512)),
@@ -512,7 +512,7 @@ final class FabushiRuntime {
         await cloudAgentWakeWatcher.refreshNow()
         main.coordinator.reconcileAutomationRelay()
         main.coordinator.requestAutomationRelayDrain()
-        let agentStoreReady = await hydrateAgentStore(reason: reason)
+        let agentStoreReady = await reconcileAgentStore(reason: reason)
         if agentStoreReady {
             main.markResyncCompleted()
         } else {

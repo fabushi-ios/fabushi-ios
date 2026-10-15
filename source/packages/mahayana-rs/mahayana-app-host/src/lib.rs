@@ -1250,6 +1250,7 @@ impl AppHost {
             "feature.agentStore.snapshotAgent" => self.feature_agent_store_snapshot_agent(params),
             "feature.agentStore.hydrateAll" => self.feature_agent_store_hydrate_all(),
             "feature.agentStore.snapshotAll" => self.feature_agent_store_snapshot_all(),
+            "feature.agentStore.reconcileAll" => self.feature_agent_store_reconcile_all(),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1649,6 +1650,12 @@ impl AppHost {
     fn feature_agent_store_snapshot_all(&self) -> Result<Value, AppHostError> {
         self.feature
             .agent_store_snapshot_all()
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_reconcile_all(&self) -> Result<Value, AppHostError> {
+        self.feature
+            .agent_store_reconcile_all()
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 

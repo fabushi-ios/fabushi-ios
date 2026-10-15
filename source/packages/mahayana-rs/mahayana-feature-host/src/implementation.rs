@@ -8194,6 +8194,23 @@ impl FeatureHostController {
             ));
         }
 
+        let local_entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
+            .map_err(FeatureHostError::Contract)?;
+        if !local_entries.is_empty() {
+            if local_entries == manifest.entries {
+                return Ok(json!({
+                    "outcome": "noop",
+                    "reason": "local already matches remote",
+                    "files": 0,
+                    "bytes": 0,
+                    "verified": local_entries.len(),
+                }));
+            }
+            return Err(FeatureHostError::Contract(
+                "Agent Store local and remote state diverged; automatic hydrate is refused until a merge base is available".into(),
+            ));
+        }
+
         let assert_scope = || -> Result<(), FeatureHostError> {
             if self.channel_account_id()? != account_scope {
                 return Err(FeatureHostError::Contract(
@@ -8300,6 +8317,35 @@ impl FeatureHostController {
         let target_root = account_root.join(agent_id);
         let entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
+
+        let current_remote = self.agent_store_manifest_read(agent_id)?;
+        if current_remote.get("found").and_then(Value::as_bool) == Some(true) {
+            let remote_manifest = current_remote
+                .get("manifest")
+                .and_then(crate::box_store_manifest::parse_box_store_manifest)
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "Agent Store snapshot remote manifest projection is invalid".into(),
+                ))?;
+            if remote_manifest.fully_hydrated == Some(false) {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store snapshot refuses an explicitly incomplete remote manifest".into(),
+                ));
+            }
+            if remote_manifest.entries == entries {
+                return Ok(json!({
+                    "outcome": "noop",
+                    "reason": "remote already matches local",
+                    "entries": entries.len(),
+                    "uploadedBlobs": 0,
+                    "reusedBlobs": 0,
+                    "uploadedBytes": 0,
+                }));
+            }
+            return Err(FeatureHostError::Contract(
+                "Agent Store local and remote state diverged; automatic snapshot is refused until a merge base is available".into(),
+            ));
+        }
+
         let assert_scope = || -> Result<(), FeatureHostError> {
             if self.channel_account_id()? != account_scope {
                 return Err(FeatureHostError::Contract(
@@ -8403,12 +8449,36 @@ impl FeatureHostController {
         let entries_value = crate::box_store_manifest::manifest_entries_value(&entries);
         assert_scope()?;
         let writer_window_id = format!("ios-{}", Uuid::new_v4().simple());
-        let manifest = self.agent_store_manifest_reconcile(
+        let manifest = self.agent_store_manifest_write(
             agent_id,
             &entries_value,
             Some(&writer_window_id),
             Some(true),
+            None,
+            true,
         )?;
+        let manifest = if manifest.get("outcome").and_then(Value::as_str) == Some("conflict") {
+            let canonical = self.agent_store_manifest_read(agent_id)?;
+            let canonical_manifest = canonical
+                .get("manifest")
+                .and_then(crate::box_store_manifest::parse_box_store_manifest)
+                .ok_or_else(|| FeatureHostError::Contract(
+                    "Agent Store concurrent manifest creation has no valid canonical manifest".into(),
+                ))?;
+            if canonical_manifest.entries != entries || canonical_manifest.fully_hydrated == Some(false) {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store concurrent manifest creation diverged; automatic overwrite is refused".into(),
+                ));
+            }
+            json!({
+                "outcome": "unchanged",
+                "acceptedMatchingCanonical": true,
+                "etag": canonical.get("etag").cloned().unwrap_or(Value::Null),
+                "revision": canonical.get("revision").cloned().unwrap_or(Value::Null),
+            })
+        } else {
+            manifest
+        };
         assert_scope()?;
 
         Ok(json!({
@@ -8418,6 +8488,106 @@ impl FeatureHostController {
             "uploadedBlobs": uploaded,
             "reusedBlobs": reused,
             "uploadedBytes": bytes_uploaded,
+        }))
+    }
+
+    pub fn agent_store_reconcile_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        if !is_safe_memory_agent_id(agent_id) {
+            return Err(FeatureHostError::Contract("unsafe Agent Store reconcile identity".into()));
+        }
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            if !state.bots.contains_key(agent_id) {
+                return Err(FeatureHostError::Contract(format!(
+                    "unknown Agent Store reconcile owner: {agent_id}"
+                )));
+            }
+        }
+
+        let account_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store local reconcile root is unavailable".into(),
+            ))?;
+        let target_root = account_root.join(agent_id);
+        let local_exists = std::fs::symlink_metadata(&target_root).is_ok();
+        let local_entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
+            .map_err(FeatureHostError::Contract)?;
+        let remote = self.agent_store_manifest_read(agent_id)?;
+        let remote_found = remote.get("found").and_then(Value::as_bool) == Some(true);
+
+        if !remote_found {
+            if !local_exists || local_entries.is_empty() {
+                return Ok(json!({
+                    "outcome": "noop",
+                    "reason": "no local payload and no remote manifest",
+                }));
+            }
+            return self.agent_store_snapshot_agent(agent_id);
+        }
+
+        let remote_manifest = remote
+            .get("manifest")
+            .and_then(crate::box_store_manifest::parse_box_store_manifest)
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store reconcile remote manifest projection is invalid".into(),
+            ))?;
+        if remote_manifest.fully_hydrated == Some(false) {
+            return Err(FeatureHostError::Contract(
+                "Agent Store reconcile refuses an explicitly incomplete remote manifest".into(),
+            ));
+        }
+        if remote_manifest.entries == local_entries {
+            return Ok(json!({
+                "outcome": "noop",
+                "reason": "local and remote are already equivalent",
+                "entries": local_entries.len(),
+            }));
+        }
+        if !local_exists {
+            return self.agent_store_hydrate_agent(agent_id);
+        }
+
+        Err(FeatureHostError::Contract(
+            "Agent Store local and remote state diverged; automatic reconciliation is refused until a persisted merge base is available".into(),
+        ))
+    }
+
+    pub fn agent_store_reconcile_all(&self) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let account_scope = self.channel_account_id()?;
+        let agent_ids = self.agent_store_agent_ids()?;
+        let mut results = Vec::with_capacity(agent_ids.len());
+        for agent_id in agent_ids {
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store reconcile-all account scope changed".into(),
+                ));
+            }
+            let result = self.agent_store_reconcile_agent(&agent_id)?;
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store reconcile-all account scope changed".into(),
+                ));
+            }
+            results.push(json!({
+                "agentId": agent_id,
+                "result": result,
+            }));
+        }
+        Ok(json!({
+            "outcome": "reconciled",
+            "agentCount": results.len(),
+            "agents": results,
         }))
     }
 
