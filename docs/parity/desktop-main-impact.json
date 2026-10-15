@@ -1,96 +1,103 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+  "previousCommit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
   "currentCommit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
   "fullTree": "daa4cfbf6851e312e280050f81ef18915bca0c0c",
-  "directCount": 4,
+  "directCount": 0,
   "metadataCorrections": [],
   "fullReviewAccepted": false,
-  "directChanges": [
-    {
-      "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "325a593e1e2d691f413186ddd90606441ff91f70",
-      "blobSha": "1f8c795800334415b63c06669373aa66470fa074",
-      "previousSize": 45591,
-      "size": 47640
-    },
-    {
-      "path": "source/host/src/runner/tools/sand_browser_tools.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "ae6c6b8e802bf7ff4855f0625fa2d06541c40df6",
-      "blobSha": "792d30fd9db1e7c97f98386ca3f1531d91c63f58",
-      "previousSize": 36925,
-      "size": 37568
-    },
-    {
-      "path": "source/host/tests/browser_driver_source_contract.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "c943fb9e9b5ffa0126f260be92d2ba8f5b9cbdf1",
-      "blobSha": "6cd2ee271bee681fd62b469115698a4420428ee8",
-      "previousSize": 1470,
-      "size": 1524
-    },
-    {
-      "path": "source/host/tests/sand_browser_tools_contract.rs",
-      "change": "blob-changed",
-      "previousBlobSha": "93aad62fb184f1f2c2e94a4b57001c00b1780d1e",
-      "blobSha": "07ff9ce3b24c69623d1cbe0cbc01534afac09d6c",
-      "previousSize": 22056,
-      "size": 23492
-    }
-  ],
+  "directChanges": [],
   "dependencyReview": {
-    "status": "reviewed-implemented-pending-verification",
-    "reason": "Desktop 8148bfb9 browser refresh/history generation fencing and its four selected source/contract changes are now implemented through the existing iOS MobileEmbedded PlatformExecBroker -> Coordinator -> IOSProductionLocalExecutor -> account-scoped remote ExecService chain. Exact-head GitHub Actions are pending, so acceptance remains false.",
+    "status": "reviewed-checkpoint-accepted-ci-pending",
+    "reason": "The 8148bfb9 G11 selected/outside-selected delta has completed current-main responsibility review and applicable iOS production implementation. The incremental re-review fence is therefore checkpointed at 8148bfb9. Aggregate dependency/source closure and successor exact-head CI remain open.",
+    "acceptedDelta": {
+      "from": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+      "to": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "tree": "daa4cfbf6851e312e280050f81ef18915bca0c0c",
+      "selectedDirectChanges": [
+        {
+          "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "325a593e1e2d691f413186ddd90606441ff91f70",
+          "blobSha": "1f8c795800334415b63c06669373aa66470fa074",
+          "previousSize": 45591,
+          "size": 47640
+        },
+        {
+          "path": "source/host/src/runner/tools/sand_browser_tools.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "ae6c6b8e802bf7ff4855f0625fa2d06541c40df6",
+          "blobSha": "792d30fd9db1e7c97f98386ca3f1531d91c63f58",
+          "previousSize": 36925,
+          "size": 37568
+        },
+        {
+          "path": "source/host/tests/browser_driver_source_contract.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "c943fb9e9b5ffa0126f260be92d2ba8f5b9cbdf1",
+          "blobSha": "6cd2ee271bee681fd62b469115698a4420428ee8",
+          "previousSize": 1470,
+          "size": 1524
+        },
+        {
+          "path": "source/host/tests/sand_browser_tools_contract.rs",
+          "change": "blob-changed",
+          "previousBlobSha": "93aad62fb184f1f2c2e94a4b57001c00b1780d1e",
+          "blobSha": "07ff9ce3b24c69623d1cbe0cbc01534afac09d6c",
+          "previousSize": 22056,
+          "size": 23492
+        }
+      ],
+      "outsideSelectedChanges": [
+        {
+          "path": ".github/scripts/fdn-g11-real-browser.mjs",
+          "change": "added",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a86c8329e1c3095f6b13e528f07d630876d5c46d",
+          "size": 13272
+        },
+        {
+          "path": ".github/workflows/fdn-g11-real-browser.yml",
+          "change": "added",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c4d2532708e04fd8459120018950dbef86c5c48c",
+          "size": 1906
+        },
+        {
+          "path": "docs/specs/fdn-g11-real-browser-actions.md",
+          "change": "added",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "81a50029d791fc901381cb0ecf4534cbb1050f5c",
+          "size": 7104
+        }
+      ],
+      "acceptedByIosImplementationCommit": "fefbf67e46d064fb0c09a1c0c2586f7fcd314304",
+      "evidenceLedgerCommit": "9b537bbde361311c95bea4ead51dbfe7184d1c65",
+      "acceptedAt": "2026-10-15",
+      "conclusion": "Current Desktop G11 browser refresh/back/forward generation-fencing delta was read, mapped, implemented through the existing iOS Host/Coordinator/Remote Runner boundary, and moved out of the re-review fence. This is source-review checkpoint acceptance only; exact-head CI, aggregate completeness, release and migration acceptance remain open."
+    },
     "sameDirectoryReviewPaths": [
       "source/host/src/runner/tools/sand_browser_driver_source.rs",
       "source/host/src/runner/tools/sand_browser_tools.rs",
       "source/host/tests/browser_driver_source_contract.rs",
       "source/host/tests/sand_browser_tools_contract.rs",
-      "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
       "source/packages/mahayana-rs/mahayana-native-engine/src/browser_driver_source.rs",
+      "source/packages/mahayana-rs/mahayana-native-engine/src/lib.rs",
       "source/local-exec-daemon/production-executor.swift",
       "mobile/ios/FabushiTests/RunnerParityTests.swift"
     ],
-    "sharedContractReview": "reviewed-applicable-mobile-host-browser-implemented-pending-exact-head-ci",
-    "mainActiveSpecsReview": "reviewed-fdn-g11-browser-navigation-implemented-pending-exact-head-ci",
+    "sharedContractReview": "reviewed-current-main-browser-implemented-checkpointed",
+    "mainActiveSpecsReview": "reviewed-fdn-g11-browser-navigation-checkpointed",
     "newAndChangedResponsibilitiesReviewed": true
   },
-  "historyPolicy": "Desktop 371b72f1 -> b6a66fd2 exact-head rebaseline. Prior acceptance for all changed source rows is predecessor-only.",
-  "groupSummary": {
-    "source-host": {
-      "changed": 4
-    }
-  },
-  "totalTrackedChangeCount": 7,
-  "outsideSelectedChanges": [
-    {
-      "path": ".github/scripts/fdn-g11-real-browser.mjs",
-      "change": "added",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "a86c8329e1c3095f6b13e528f07d630876d5c46d",
-      "size": 13272
-    },
-    {
-      "path": ".github/workflows/fdn-g11-real-browser.yml",
-      "change": "added",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "c4d2532708e04fd8459120018950dbef86c5c48c",
-      "size": 1906
-    },
-    {
-      "path": "docs/specs/fdn-g11-real-browser-actions.md",
-      "change": "added",
-      "mode": "100644",
-      "type": "blob",
-      "sha": "81a50029d791fc901381cb0ecf4534cbb1050f5c",
-      "size": 7104
-    }
-  ],
+  "historyPolicy": "Desktop 371b72f1 -> b6a66fd2 exact-head rebaseline. Prior acceptance for all changed source rows is predecessor-only. Desktop b6a66fd2 -> 8148bfb9 incremental G11 delta accepted as a source-review checkpoint after iOS production implementation; accepted delta retained in dependencyReview.acceptedDelta. This does not promote migration/release acceptance.",
+  "groupSummary": {},
+  "totalTrackedChangeCount": 0,
+  "outsideSelectedChanges": [],
   "iosVerificationRebaseline": {
     "observedAt": "2026-10-15",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
@@ -315,7 +322,7 @@
       114688807759,
       114688866359
     ],
-    "status": "pending-successor-exact-head-ci",
+    "status": "source-review-checkpoint-advanced-exact-head-ci-pending",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -340,6 +347,8 @@
     "conclusion": "Gateway descriptor cache/store and Desktop box-host connector responsibilities are current-main-reviewed and implemented through canonical iOS owners: encrypted account-scoped descriptor fast path, typed broker failures, blocked hold/backoff, App Store backend-update requirement projection, recreate/force-recreate/migration, inference auth ownership, and in-process local-exec platform replacement. This is implemented only; exact-head CI and aggregate migration acceptance remain open.",
     "currentImplementationHead": "d85975c0e9d33d04127c402b718b69a5b4b50e2f",
     "promotion": "none",
-    "browserNavigationImplementationCommit": "fefbf67e46d064fb0c09a1c0c2586f7fcd314304"
+    "browserNavigationImplementationCommit": "fefbf67e46d064fb0c09a1c0c2586f7fcd314304",
+    "acceptedSourceReviewCheckpoint": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+    "acceptedBrowserImplementationCommit": "fefbf67e46d064fb0c09a1c0c2586f7fcd314304"
   }
 }
