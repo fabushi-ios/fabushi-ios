@@ -3,11 +3,11 @@
   "source": {
     "repository": "bhrumom/fabushi-desktop",
     "branch": "main",
-    "commit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-    "tree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
+    "commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+    "tree": "ca4777b5e3b03395da5e8f28aa2d3cfe5169113a",
     "mode": "live-main"
   },
-  "rowCount": 7951,
+  "rowCount": 7974,
   "carryForwardStatusesAreHistorical": true,
   "readiness": "main-rebaseline-snapshot-not-responsibility-closure",
   "statusPolicy": {
@@ -41,9 +41,14 @@
       "rowCount": 18
     },
     {
+      "name": "source-fabushi-network-worker",
+      "path": "docs/parity/desktop-main/source-fabushi-network-worker.json",
+      "rowCount": 6
+    },
+    {
       "name": "source-host",
       "path": "docs/parity/desktop-main/source-host.json",
-      "rowCount": 969
+      "rowCount": 982
     },
     {
       "name": "source-internal",
@@ -58,7 +63,7 @@
     {
       "name": "source-mahayana",
       "path": "docs/parity/desktop-main/source-mahayana.json",
-      "rowCount": 5330
+      "rowCount": 5332
     },
     {
       "name": "source-mime-types.d.ts",
@@ -76,14 +81,14 @@
       "rowCount": 852
     },
     {
-      "name": "source-product",
-      "path": "docs/parity/desktop-main/source-product.json",
-      "rowCount": 5
-    },
-    {
       "name": "source-packaging",
       "path": "docs/parity/desktop-main/source-packaging.json",
       "rowCount": 1
+    },
+    {
+      "name": "source-product",
+      "path": "docs/parity/desktop-main/source-product.json",
+      "rowCount": 7
     },
     {
       "name": "source-shared",
@@ -97,11 +102,11 @@
     }
   ],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-12",
+    "observedAt": "2026-10-15",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "255a243c2c2003f00e5343a33058ee7ef12bea50",
-    "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-    "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
+    "preEvidenceIosHead": "454d13a4cb72ed5f4d6197d43f5661a5059a3064",
+    "desktopCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+    "desktopTree": "ca4777b5e3b03395da5e8f28aa2d3cfe5169113a",
     "predecessorWorkflowRuns": [
       38194840503,
       38194840499,
@@ -268,9 +273,9 @@
       114688807759,
       114688866359
     ],
-    "status": "box-host-implemented-resulting-exact-head-ci-required",
+    "status": "desktop-main-rebaseline-source-review-required",
     "rowCount": 7951,
-    "currentImplementationHead": "255a243c2c2003f00e5343a33058ee7ef12bea50",
+    "currentImplementationHead": "454d13a4cb72ed5f4d6197d43f5661a5059a3064",
     "promotion": "none"
   }
 }
