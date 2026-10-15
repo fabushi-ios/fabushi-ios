@@ -41,8 +41,14 @@ final class CoordinatorAccountRuntime {
             await cleanup.prepare(previousSlot: previous, nextSlot: nextSlot)
         }
         let result = await authorize(nextSlot, previous)
-        if case .ready(let slot) = result {
+        switch result {
+        case .ready(let slot):
             activeSlot = slot
+        case .refused:
+            // Transition cleanup already removed the previous account-scoped
+            // runtime state. A refused replacement must never leave that stale
+            // slot looking active.
+            activeSlot = nil
         }
         return result
     }
