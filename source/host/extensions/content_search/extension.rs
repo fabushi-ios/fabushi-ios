@@ -213,20 +213,20 @@ fn publish_upsert_mutation(scope_id: &str, entries: &[IndexEntry]) {
     fields.insert("entries".into(), Value::Array(
         entries.iter().filter_map(|entry| serde_json::to_value(entry).ok()).collect()
     ));
-    publish_transcript_mutation(TranscriptMutation { kind: "entries-upserted".into(), fields });
+    publish_transcript_mutation(&TranscriptMutation { kind: "entries-upserted".into(), fields });
 }
 
 fn publish_delete_mutation(scope_id: &str, entry_id: &str) {
     let mut fields = Map::new();
     fields.insert("agentId".into(), Value::String(scope_id.to_owned()));
     fields.insert("entryId".into(), Value::String(entry_id.to_owned()));
-    publish_transcript_mutation(TranscriptMutation { kind: "entry-deleted".into(), fields });
+    publish_transcript_mutation(&TranscriptMutation { kind: "entry-deleted".into(), fields });
 }
 
 fn publish_clear_mutation(scope_id: &str) {
     let mut fields = Map::new();
     fields.insert("agentId".into(), Value::String(scope_id.to_owned()));
-    publish_transcript_mutation(TranscriptMutation { kind: "conversation-cleared".into(), fields });
+    publish_transcript_mutation(&TranscriptMutation { kind: "conversation-cleared".into(), fields });
 }
 
 fn normalize_messaging_message(actor_id: &str, value: &Value) -> Option<(String, IndexEntry)> {
