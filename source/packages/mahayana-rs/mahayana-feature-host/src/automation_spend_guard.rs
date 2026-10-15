@@ -627,6 +627,7 @@ impl FeatureHostController {
                     return Ok(AutomationSpendGuardAdmission::Suppress);
                 }
                 Self::emit_spend_guard_automation_changes(&mut state, &paused, "disabled");
+                self.persist_automations(&state.automations)?;
                 let already_open = !current.paused_automation_ids.is_empty();
                 let issued = if already_open {
                     None
@@ -659,7 +660,6 @@ impl FeatureHostController {
                 state.automation_spend_guard.insert(owner, next);
                 prune_pending_listener_resumes(&mut state);
                 prune_pending_automation_event_batches(&mut state);
-                self.persist_automations(&state.automations)?;
                 if let Some(run_id) = primary_run_id {
                     Self::record_dropped_event_fire(
                         &mut state,
