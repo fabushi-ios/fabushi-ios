@@ -8238,6 +8238,9 @@ impl FeatureHostController {
         self.assert_agent_store_session_scope(session_scope, "hydrate start")?;
         let account_root = self.agent_store_account_root(session_scope)?;
         let target_root = account_root.join(agent_id);
+        let assert_scope = || -> Result<(), FeatureHostError> {
+            self.assert_agent_store_session_scope(session_scope, "hydrate")
+        };
 
         let remote = self.agent_store_manifest_read_with_scope(session_scope, agent_id)?;
         if remote.get("found").and_then(Value::as_bool) != Some(true) {
@@ -8294,9 +8297,6 @@ impl FeatureHostController {
             }
         }
 
-        let assert_scope = || -> Result<(), FeatureHostError> {
-            self.assert_agent_store_session_scope(session_scope, "hydrate")
-        };
 
         let mut files = 0_u64;
         let mut bytes_written = 0_u64;
@@ -8427,8 +8427,13 @@ impl FeatureHostController {
         self.assert_agent_store_session_scope(session_scope, "snapshot start")?;
         let account_root = self.agent_store_account_root(session_scope)?;
         let target_root = account_root.join(agent_id);
+        let assert_scope = || -> Result<(), FeatureHostError> {
+            self.assert_agent_store_session_scope(session_scope, "snapshot")
+        };
+        assert_scope()?;
         let entries = crate::box_store_hydration::snapshot_local_agent_root(&target_root)
             .map_err(FeatureHostError::Contract)?;
+        assert_scope()?;
 
         let current_remote = self.agent_store_manifest_read_with_scope(session_scope, agent_id)?;
         let current_remote_found =
@@ -8493,9 +8498,6 @@ impl FeatureHostController {
             ));
         }
 
-        let assert_scope = || -> Result<(), FeatureHostError> {
-            self.assert_agent_store_session_scope(session_scope, "snapshot")
-        };
 
         let mut uploaded = 0_u64;
         let mut reused = 0_u64;
@@ -8520,14 +8522,12 @@ impl FeatureHostController {
             }
 
             assert_scope()?;
-            assert_scope()?;
             let bytes = crate::box_store_hydration::read_snapshot_file(
                 &target_root,
                 rel_path,
                 entry,
             )
             .map_err(FeatureHostError::Contract)?;
-            assert_scope()?;
             assert_scope()?;
             let blob_path = crate::box_store_hydration::blob_rel_path(sha)
                 .map_err(FeatureHostError::Contract)?;
@@ -8822,7 +8822,6 @@ impl FeatureHostController {
                             )));
                         }
 
-                        assert_scope()?;
                         assert_scope()?;
                         let bytes = crate::box_store_hydration::read_snapshot_file(
                             &target_root,
@@ -11733,16 +11732,58 @@ impl FeatureHostController {
         }
     }
 
+    fn agent_store_product_execute_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        stage: &str,
+        method: &str,
+        params: &Value,
+        mutating: bool,
+    ) -> Result<Value, FeatureHostError> {
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+        }
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        #[cfg(feature = "production")]
+        {
+            if mutating {
+                return self.with_agent_store_session_write(scope, stage, || {
+                    self.runtime()?
+                        .product_execute(method, params)
+                        .map_err(FeatureHostError::from)
+                });
+            }
+            self.assert_agent_store_session_scope(scope, stage)?;
+            let value = self
+                .runtime()?
+                .product_execute(method, params)
+                .map_err(FeatureHostError::from)?;
+            self.assert_agent_store_session_scope(scope, stage)?;
+            Ok(value)
+        }
+        #[cfg(not(feature = "production"))]
+        {
+            let _ = (scope, stage, method, params, mutating);
+            Err(FeatureHostError::ProductionUnavailable)
+        }
+    }
+
     fn agent_store_read_with_scope(
         &self,
         scope: &AgentStoreSessionScope,
         agent_id: &str,
         path: &str,
     ) -> Result<Value, FeatureHostError> {
-        self.assert_agent_store_session_scope(scope, "remote read start")?;
-        let value = self.agent_store_read(agent_id, path)?;
-        self.assert_agent_store_session_scope(scope, "remote read completion")?;
-        Ok(value)
+        self.agent_store_product_execute_with_scope(
+            scope,
+            "remote read",
+            "mahayana.agent.store.read",
+            &json!({"agentId": agent_id, "path": path}),
+            false,
+        )
     }
 
     fn agent_store_write_with_scope(
@@ -11754,15 +11795,22 @@ impl FeatureHostController {
         base_etag: Option<&str>,
         expect_absent: bool,
     ) -> Result<Value, FeatureHostError> {
-        self.with_agent_store_session_write(scope, "remote blob write", || {
-            self.agent_store_write(
-                agent_id,
-                path,
-                data_base64,
-                base_etag,
-                expect_absent,
-            )
-        })
+        let mut params = json!({
+            "agentId": agent_id,
+            "path": path,
+            "dataBase64": data_base64,
+            "expectAbsent": expect_absent,
+        });
+        if let Some(base_etag) = base_etag {
+            params["baseEtag"] = Value::String(base_etag.to_string());
+        }
+        self.agent_store_product_execute_with_scope(
+            scope,
+            "remote blob write",
+            "mahayana.agent.store.write",
+            &params,
+            true,
+        )
     }
 
     fn load_agent_store_sync_base_with_scope(
@@ -11795,10 +11843,38 @@ impl FeatureHostController {
         scope: &AgentStoreSessionScope,
         agent_id: &str,
     ) -> Result<Value, FeatureHostError> {
-        self.assert_agent_store_session_scope(scope, "manifest read start")?;
-        let value = self.agent_store_manifest_read(agent_id)?;
+        let stored = self.agent_store_read_with_scope(
+            scope,
+            agent_id,
+            crate::box_store_manifest::BOX_STORE_MANIFEST_REL_PATH,
+        )?;
+        if stored.get("found").and_then(Value::as_bool) == Some(false) {
+            self.assert_agent_store_session_scope(scope, "manifest read completion")?;
+            return Ok(json!({"found": false}));
+        }
+        let data_base64 = stored
+            .get("dataBase64")
+            .and_then(Value::as_str)
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store manifest read omitted dataBase64".into(),
+            ))?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data_base64)
+            .map_err(|_| FeatureHostError::Contract(
+                "Agent Store manifest dataBase64 is invalid".into(),
+            ))?;
+        let manifest = crate::box_store_manifest::parse_manifest_bytes(&bytes)
+            .map_err(|error| FeatureHostError::Contract(error.to_string()))?
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store manifest is present but unparseable".into(),
+            ))?;
         self.assert_agent_store_session_scope(scope, "manifest read completion")?;
-        Ok(value)
+        Ok(json!({
+            "found": true,
+            "etag": stored.get("etag").cloned().unwrap_or(Value::Null),
+            "revision": stored.get("revision").cloned().unwrap_or(Value::Null),
+            "manifest": crate::box_store_manifest::manifest_value(&manifest),
+        }))
     }
 
     fn agent_store_manifest_write_with_scope(
@@ -11811,16 +11887,24 @@ impl FeatureHostController {
         base_etag: Option<&str>,
         expect_absent: bool,
     ) -> Result<Value, FeatureHostError> {
-        self.with_agent_store_session_write(scope, "manifest write", || {
-            self.agent_store_manifest_write(
-                agent_id,
-                entries,
-                writer_window_id,
-                fully_hydrated,
-                base_etag,
-                expect_absent,
-            )
-        })
+        let entries = crate::box_store_manifest::parse_manifest_entries(entries)
+            .map_err(FeatureHostError::Contract)?;
+        let bytes = crate::box_store_manifest::serialize_manifest_v2_bytes(
+            &entries,
+            writer_window_id,
+            fully_hydrated,
+            now_millis().max(0) as u64,
+        )
+        .map_err(FeatureHostError::Contract)?;
+        let data_base64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+        self.agent_store_write_with_scope(
+            scope,
+            agent_id,
+            crate::box_store_manifest::BOX_STORE_MANIFEST_REL_PATH,
+            &data_base64,
+            base_etag,
+            expect_absent,
+        )
     }
 
 
