@@ -1130,6 +1130,11 @@ final class MahayanaCoordinator {
                   metadata["recorded_run_count"] != nil
             else { return }
             automationLifecycleTelemetryReporter(metadata)
+            // Definition lifecycle events are the native equivalent of the
+            // Desktop automations NotifyBus wake. Run-only mutations do not
+            // emit this channel, so this triggers reconciliation only when
+            // scheduling/subscription authority can actually change.
+            mcpSurface?.requestAutomationRelayDrain()
             return
         }
 

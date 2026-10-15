@@ -979,5 +979,14 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(coordinator.contains("automationCloudSync.requestSync()"))
         XCTAssertTrue(dashboard.contains("service: \"AutomationsService\""))
         XCTAssertFalse(coordinator.contains("sand-shadow:"))
+
+        let coordinatorRuntime = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/MahayanaCoordinator.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(coordinatorRuntime.contains("if channel == \"automation-lifecycle\""))
+        XCTAssertTrue(coordinatorRuntime.contains("mcpSurface?.requestAutomationRelayDrain()"))
     }
 }
