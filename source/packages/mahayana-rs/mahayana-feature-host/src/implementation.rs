@@ -4431,6 +4431,9 @@ impl FeatureHostController {
                     trigger: Some(trigger.clone()),
                     enabled,
                     created_at_ms: previous.as_ref().map_or(now, |item| item.created_at_ms),
+                    raised_notices: previous
+                        .as_ref()
+                        .map_or_else(Vec::new, |item| item.raised_notices.clone()),
                     runs: previous.as_ref().map_or_else(Vec::new, |item| item.runs.clone()),
                     last_run_at_ms: previous.as_ref().and_then(|item| item.last_run_at_ms),
                     next_run_at_ms: automation_next_run(
@@ -6752,6 +6755,10 @@ impl FeatureHostController {
                             }),
                             enabled: trigger.is_enabled,
                             created_at_ms,
+                            raised_notices: state
+                                .automations
+                                .get(&automation_id)
+                                .map_or_else(Vec::new, |automation| automation.raised_notices.clone()),
                             runs,
                             last_run_at_ms,
                             next_run_at_ms: trigger
@@ -7083,6 +7090,7 @@ impl FeatureHostController {
                         }),
                         enabled: trigger.is_enabled,
                         created_at_ms: now,
+                        raised_notices: Vec::new(),
                         runs: Vec::new(),
                         last_run_at_ms: None,
                         next_run_at_ms: trigger
@@ -14965,6 +14973,7 @@ fn event_value_for_filter(event: &EventCard, key: &str) -> Option<String> {
 fn structured_event_filters_match(
     filters: &BTreeMap<String, Value>,
     event: &EventCard,
+    ignore_user_gate: bool,
 ) -> bool {
     filters.iter().all(|(key, expected)| {
         if key == "events" {
@@ -14977,6 +14986,9 @@ fn structured_event_filters_match(
             });
         }
         if key == "actorAllowlist" || key == "userAllowlist" {
+            if ignore_user_gate {
+                return true;
+            }
             let Some(actor) = event.actor.as_deref() else { return false; };
             return expected.as_array().is_some_and(|values| {
                 values.iter().any(|value| {
@@ -15032,7 +15044,14 @@ fn automation_trigger_matches_event(
                 })
                 && filters
                     .as_ref()
-                    .is_none_or(|filters| structured_event_filters_match(filters, event))
+                    .is_none_or(|filters| {
+                        structured_event_filters_match(
+                            filters,
+                            event,
+                            *source == ListenerPlatform::Github
+                                && is_github_ci_event_kind(&event.event),
+                        )
+                    })
         }
         AutomationTrigger::Group { listeners } => listeners
             .iter()
@@ -16121,6 +16140,7 @@ fn clone_agent_automation_configs(
         automation.id = format!("routine-{now}-{}", state.sequence);
         automation.agent_id = Some(target_agent_id.to_string());
         automation.created_at_ms = now;
+        automation.raised_notices.clear();
         automation.runs.clear();
         automation.last_run_at_ms = None;
         let trigger = automation
@@ -16199,6 +16219,7 @@ mod agent_clone_durable_config_tests {
                 }),
                 enabled: true,
                 created_at_ms: 1,
+                raised_notices: Vec::new(),
                 runs: vec![AutomationRunSummary {
                     id: "old-run".into(),
                     status: AutomationRunStatus::Ok,
@@ -20330,6 +20351,7 @@ mod tests {
                     trigger: None,
                     enabled: true,
                     created_at_ms: 1,
+                    raised_notices: Vec::new(),
                     runs: Vec::new(),
                     last_run_at_ms: None,
                     next_run_at_ms: None,
@@ -21913,6 +21935,235 @@ mod tests {
         ));
     }
 
+
+    fn routine_notice_test_trigger(user_allowlist: Option<Value>) -> AutomationTrigger {
+        let mut filters = BTreeMap::from([(
+            "events".into(),
+            json!(["pr-opened", "ci-failed"]),
+        )]);
+        if let Some(user_allowlist) = user_allowlist {
+            filters.insert("userAllowlist".into(), user_allowlist);
+        }
+        AutomationTrigger::Event {
+            source: ListenerPlatform::Github,
+            event: "*".into(),
+            filter: None,
+            filters: Some(filters),
+        }
+    }
+
+    fn routine_notice_test_automation(
+        created_at_ms: i64,
+        trigger: AutomationTrigger,
+        raised_notices: Vec<String>,
+    ) -> AutomationSummary {
+        AutomationSummary {
+            id: "legacy-github".into(),
+            agent_id: None,
+            name: "Legacy GitHub".into(),
+            prompt: "Inspect the matching event.".into(),
+            schedule: "event:github".into(),
+            trigger: Some(trigger),
+            enabled: true,
+            created_at_ms,
+            raised_notices,
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        }
+    }
+
+    fn routine_notice_test_execution(notice_ids: Vec<String>) -> RoutineExecution {
+        RoutineExecution {
+            request_id: "notice-request".into(),
+            run_id: "routine-run-notice".into(),
+            automation_id: "legacy-github".into(),
+            agent_id: "mahayana-assistant".into(),
+            conversation_id: MAHAYANA_AI_CONVERSATION_ID.into(),
+            account_key: Some("account".into()),
+            epoch: 1,
+            trigger: RoutineTrigger::Event(EventCard {
+                source: ListenerPlatform::Github,
+                event: "pr-opened".into(),
+                title: "Legacy listener wake".into(),
+                summary: "A matching event arrived.".into(),
+                url: None,
+                actor: Some("alice".into()),
+                fields: None,
+                occurred_at_ms: Some(1),
+            }),
+            name: "Legacy GitHub".into(),
+            prompt: "Inspect the matching event.".into(),
+            notice_ids,
+            admitted_at_ms: 1,
+            phase: RoutinePhase::Pending,
+            operation_id: None,
+            terminal: None,
+        }
+    }
+
+    #[test]
+    fn routine_notice_contract_covers_cutoff_platform_allowlist_and_raised_once() {
+        let before = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS - 1,
+            routine_notice_test_trigger(None),
+            Vec::new(),
+        );
+        assert_eq!(
+            routine_notice_ids_to_raise(&before),
+            vec![GITHUB_LISTENER_SCOPE.to_string()]
+        );
+
+        let after = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS,
+            routine_notice_test_trigger(None),
+            Vec::new(),
+        );
+        assert!(routine_notice_ids_to_raise(&after).is_empty());
+
+        let non_github = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS - 1,
+            AutomationTrigger::Event {
+                source: ListenerPlatform::Sentry,
+                event: "issue.regressed".into(),
+                filter: None,
+                filters: None,
+            },
+            Vec::new(),
+        );
+        assert!(routine_notice_ids_to_raise(&non_github).is_empty());
+
+        let allowed = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS - 1,
+            routine_notice_test_trigger(Some(json!(["alice"]))),
+            Vec::new(),
+        );
+        assert!(routine_notice_ids_to_raise(&allowed).is_empty());
+
+        let empty_allowlist = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS - 1,
+            routine_notice_test_trigger(Some(json!([]))),
+            Vec::new(),
+        );
+        assert_eq!(
+            routine_notice_ids_to_raise(&empty_allowlist),
+            vec![GITHUB_LISTENER_SCOPE.to_string()]
+        );
+
+        let already_raised = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS - 1,
+            routine_notice_test_trigger(None),
+            vec![GITHUB_LISTENER_SCOPE.into()],
+        );
+        assert!(routine_notice_ids_to_raise(&already_raised).is_empty());
+    }
+
+    #[test]
+    fn routine_notice_first_wake_injects_scope_guidance() {
+        let automation = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS - 1,
+            routine_notice_test_trigger(None),
+            Vec::new(),
+        );
+        let notices = routine_notice_ids_to_raise(&automation);
+        let prompt = routine_prompt(&routine_notice_test_execution(notices))
+            .expect("build routine wake prompt");
+        assert!(prompt.contains("NOTICE github-listener-scope"));
+        assert!(prompt.contains("narrow userAllowlist to a confirmed GitHub login"));
+        assert!(prompt.contains("CI events are never user-gated"));
+    }
+
+    #[test]
+    fn routine_notice_marker_and_pending_wake_survive_restart_without_reraising() {
+        let root = std::env::temp_dir().join(format!(
+            "fabushi-routine-notice-store-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        let path = root.join("automations.json");
+        let mut automation = routine_notice_test_automation(
+            GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS - 1,
+            routine_notice_test_trigger(None),
+            Vec::new(),
+        );
+        let notices = routine_notice_ids_to_raise(&automation);
+        automation.raised_notices.extend(notices.clone());
+        persist_automations(
+            &path,
+            &BTreeMap::from([(automation.id.clone(), automation.clone())]),
+        )
+        .expect("persist raised notice marker");
+
+        let restored = load_automations(&path, None)
+            .remove("legacy-github")
+            .expect("restore automation");
+        assert_eq!(
+            restored.raised_notices,
+            vec![GITHUB_LISTENER_SCOPE.to_string()]
+        );
+        assert!(routine_notice_ids_to_raise(&restored).is_empty());
+
+        let pending = routine_notice_test_execution(notices);
+        let journal = serde_json::to_vec(&pending).expect("serialize pending wake");
+        let restored_pending: RoutineExecution =
+            serde_json::from_slice(&journal).expect("restore pending wake");
+        let restored_prompt = routine_prompt(&restored_pending).expect("rebuild pending prompt");
+        assert!(restored_prompt.contains("NOTICE github-listener-scope"));
+
+        std::fs::remove_dir_all(&root).expect("remove isolated routine notice store");
+    }
+
+    #[test]
+    fn github_ci_events_ignore_user_allowlist_but_human_events_do_not() {
+        let ci_trigger = AutomationTrigger::Event {
+            source: ListenerPlatform::Github,
+            event: "*".into(),
+            filter: None,
+            filters: Some(BTreeMap::from([
+                ("events".into(), json!(["ci-failed"])),
+                ("userAllowlist".into(), json!(["alice"])),
+            ])),
+        };
+        let ci_event = EventCard {
+            source: ListenerPlatform::Github,
+            event: "ci-failed".into(),
+            title: "CI failed".into(),
+            summary: "main failed".into(),
+            url: None,
+            actor: Some("not-alice".into()),
+            fields: None,
+            occurred_at_ms: Some(1),
+        };
+        let serialized = serde_json::to_string(&ci_event).expect("serialize CI event");
+        assert!(automation_trigger_matches_event(
+            &ci_trigger,
+            &ci_event,
+            &serialized
+        ));
+
+        let human_trigger = AutomationTrigger::Event {
+            source: ListenerPlatform::Github,
+            event: "*".into(),
+            filter: None,
+            filters: Some(BTreeMap::from([
+                ("events".into(), json!(["pr-opened"])),
+                ("userAllowlist".into(), json!(["alice"])),
+            ])),
+        };
+        let human_event = EventCard {
+            event: "pr-opened".into(),
+            title: "PR opened".into(),
+            summary: "human event".into(),
+            ..ci_event
+        };
+        let serialized = serde_json::to_string(&human_event).expect("serialize human event");
+        assert!(!automation_trigger_matches_event(
+            &human_trigger,
+            &human_event,
+            &serialized
+        ));
+    }
+
     #[test]
     fn event_group_automation_store_survives_reload() {
         let root = std::env::temp_dir().join(format!(
@@ -21952,6 +22203,7 @@ mod tests {
             trigger: Some(trigger),
             enabled: true,
             created_at_ms: 1,
+            raised_notices: Vec::new(),
             runs: Vec::new(),
             last_run_at_ms: None,
             next_run_at_ms: None,
@@ -21989,6 +22241,7 @@ mod tests {
                 }),
                 enabled: false,
                 created_at_ms: 1,
+                raised_notices: Vec::new(),
                 runs: vec![AutomationRunSummary {
                     id: "weekly-run-1".into(),
                     status: AutomationRunStatus::Error,
@@ -23587,6 +23840,7 @@ mod tests {
             }),
             enabled: true,
             created_at_ms: 1,
+            raised_notices: Vec::new(),
             runs: Vec::new(),
             last_run_at_ms: None,
             next_run_at_ms: None,

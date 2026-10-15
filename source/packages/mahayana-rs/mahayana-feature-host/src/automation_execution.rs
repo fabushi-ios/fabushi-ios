@@ -5,6 +5,62 @@ const ROUTINE_MAX_ACTIVE: usize = 512;
 const ROUTINE_MAX_RETAINED_TERMINALS: usize = 128;
 const ROUTINE_MAX_OPERATION_IDENTITIES: usize = 10_000;
 const ROUTINE_JOURNAL_MAX_BYTES: u64 = 8 * 1024 * 1024;
+const GITHUB_LISTENER_SCOPE: &str = "github-listener-scope";
+const GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS: i64 = 1_785_369_600_000;
+
+fn is_github_ci_event_kind(kind: &str) -> bool {
+    matches!(kind, "ci-passed" | "ci-failed")
+}
+
+fn routine_trigger_has_legacy_github_scope(trigger: &AutomationTrigger) -> bool {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => false,
+        AutomationTrigger::Event {
+            source,
+            filters,
+            ..
+        } => {
+            *source == ListenerPlatform::Github
+                && filters
+                    .as_ref()
+                    .and_then(|filters| filters.get("userAllowlist"))
+                    .and_then(Value::as_array)
+                    .is_none_or(Vec::is_empty)
+        }
+        AutomationTrigger::Group { listeners } => listeners
+            .iter()
+            .any(routine_trigger_has_legacy_github_scope),
+    }
+}
+
+fn routine_notice_ids_to_raise(automation: &AutomationSummary) -> Vec<String> {
+    if automation.created_at_ms >= GITHUB_LISTENER_SCOPE_CREATED_BEFORE_MS
+        || automation
+            .raised_notices
+            .iter()
+            .any(|notice| notice == GITHUB_LISTENER_SCOPE)
+    {
+        return Vec::new();
+    }
+    automation
+        .trigger
+        .as_ref()
+        .is_some_and(routine_trigger_has_legacy_github_scope)
+        .then(|| vec![GITHUB_LISTENER_SCOPE.to_string()])
+        .unwrap_or_default()
+}
+
+fn routine_notice_lines_for_ids(ids: &[String]) -> Vec<String> {
+    if !ids.iter().any(|id| id == GITHUB_LISTENER_SCOPE) {
+        return Vec::new();
+    }
+    vec![
+        format!(
+            "NOTICE {GITHUB_LISTENER_SCOPE} (raised once for this routine, and only here — act on it now or not at all): this routine's GitHub listener filters nobody, so it fires for everyone in the repo, the shape of a listener written before userAllowlist existed. Decide whether this event was genuinely in scope for the saved prompt; silence by design is not a wasted fire."
+        ),
+        "If this fire is clearly wasted, update the listener now: narrow userAllowlist to a confirmed GitHub login or remove event kinds the saved prompt never covered. CI events are never user-gated. Tell the user what changed, and leave it alone when the mismatch or login is uncertain.".into(),
+    ]
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "event", rename_all = "camelCase")]
@@ -37,6 +93,8 @@ struct RoutineExecution {
     trigger: RoutineTrigger,
     name: String,
     prompt: String,
+    #[serde(default)]
+    notice_ids: Vec<String>,
     admitted_at_ms: i64,
     phase: RoutinePhase,
     operation_id: Option<String>,
@@ -74,6 +132,10 @@ fn routine_prompt(execution: &RoutineExecution) -> Result<String, FeatureHostErr
     text.push_str("\n\nHonor the saved instruction's delivery rule. Use the canonical SendMessage tool for useful user-facing results. Do not expose this hidden wake. ");
     if !matches!(execution.trigger, RoutineTrigger::Manual) {
         text.push_str("For no change, nothing new, or still waiting, finish quietly without SendMessage. Notify once only for a meaningful new result or a real blocker requiring the user's attention. ");
+    }
+    for notice in routine_notice_lines_for_ids(&execution.notice_ids) {
+        text.push('\n');
+        text.push_str(&notice);
     }
     Ok(text)
 }
@@ -160,6 +222,7 @@ impl FeatureHostController {
         }
         let automation = state.automations.get(id).cloned().ok_or_else(|| FeatureHostError::Contract(format!("unknown automation: {id}")))?;
         ensure_automation_agent_scope(&automation, agent_id)?;
+        let notice_ids = routine_notice_ids_to_raise(&automation);
         let target = automation.agent_id.clone().unwrap_or_else(|| "mahayana-assistant".into());
         let conversation_id = routine_conversation(&state, &target, self.config.mode == HostMode::Test)
             .ok_or_else(|| FeatureHostError::Contract(format!("routine owner has no canonical conversation: {target}")))?;
@@ -191,10 +254,21 @@ impl FeatureHostController {
         let execution = RoutineExecution {
             request_id, run_id: run_id.clone(), automation_id: id.to_string(), agent_id: target,
             conversation_id, account_key, epoch: state.routine_epoch, trigger,
-            name: automation.name, prompt: automation.prompt, admitted_at_ms: now,
+            name: automation.name, prompt: automation.prompt, notice_ids: notice_ids.clone(), admitted_at_ms: now,
             phase: RoutinePhase::Pending, operation_id: None, terminal: None,
         };
         let _ = routine_prompt(&execution)?;
+        if !notice_ids.is_empty() {
+            let item = state.automations.get_mut(id).expect("validated automation");
+            for notice in &notice_ids {
+                if !item.raised_notices.iter().any(|raised| raised == notice) {
+                    item.raised_notices.push(notice.clone());
+                }
+            }
+            // Match Desktop's shipping ordering: persist the raised-once marker
+            // before this wake can be dispatched, so restart cannot raise it again.
+            self.persist_automations(&state.automations)?;
+        }
         let item = state.automations.get_mut(id).expect("validated automation");
         item.last_run_at_ms = Some(now);
         let saved = item.trigger.clone().unwrap_or_else(|| AutomationTrigger::Schedule { schedule: item.schedule.clone() });

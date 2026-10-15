@@ -652,15 +652,24 @@
       "desktop_owner": "Host routine/automation runtime owner",
       "desktop_visible_effect": "Durable routines execute and surface status/listener behavior consistently while the user may be away.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; canonical automation migration/runtime wake",
+      "ios_target_path": "source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs; source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs; source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs",
       "ios_language": "Rust",
-      "ios_platform_delta": "",
-      "implementation_status": "mapped",
-      "production_evidence": "Feature Host has current GitHub listener filters and persisted automation state, but current audit has not found the Desktop one-time github-listener-scope migration notice/cutoff contract.",
-      "test_evidence": "No focused equivalent notice migration test located yet.",
-      "notes": "Current-main reviewed. This compatibility/safety migration behavior remains a concrete gap and must not be marked N/A merely because iOS storage format differs.",
-      "exact_head_evidence": "pending descendant exact-head GitHub Actions",
-      "authority_review_state": "current-main-reviewed"
+      "ios_platform_delta": "iOS keeps the Desktop raised-once compatibility marker inside the existing account-scoped Feature Host automation JSON and carries the current wake's notice IDs in the existing RoutineExecution journal; no second store, scheduler, or runtime owner is introduced. GitHub CI events bypass userAllowlist gating exactly as Desktop does.",
+      "implementation_status": "implemented",
+      "production_evidence": "Shipping FeatureHostController now owns the complete notice path: AutomationSummary.raised_notices is serde-defaulted and persisted by the existing account-scoped load_automations/persist_automations owner; routine_notice_ids_to_raise enforces cutoff 1785369600000, GitHub-only legacy listener detection and raised-once semantics; admit_routine durably writes the marker before dispatch and stores this wake's notice IDs in RoutineExecution; dispatch_pending_routine -> routine_prompt injects the one-time notice/guidance into the real hidden recoverable runtime message. automation_trigger_matches_event passes a GitHub CI bypass into structured_event_filters_match so ci-passed/ci-failed are never userAllowlist gated.",
+      "test_evidence": "Focused Rust tests routine_notice_contract_covers_cutoff_platform_allowlist_and_raised_once, routine_notice_first_wake_injects_scope_guidance, routine_notice_marker_and_pending_wake_survive_restart_without_reraising, and github_ci_events_ignore_user_allowlist_but_human_events_do_not cover cutoff before/after, non-GitHub, missing/nonempty/empty userAllowlist, first wake guidance, durable marker second-wake suppression, restart restoration, and CI user-gate bypass. Exact-head GitHub Actions pending.",
+      "notes": "Current-main responsibility implemented against Desktop blob 96907676d4b22be2e046c949349264377a6a78b9 and shipping caller source/host/src/extensions/transcript/automation_run_path.rs. Promoted only from mapped to implemented; verified remains blocked on descendant exact-head CI and aggregate automation/source completeness.",
+      "exact_head_evidence": "pending descendant exact-head GitHub Actions after routine-notice production implementation",
+      "authority_review_state": "current-main-reviewed",
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2",
+      "ios_related_paths": [
+        "source/packages/mahayana-rs/mahayana-feature-host/src/automation_execution.rs",
+        "source/packages/mahayana-rs/mahayana-feature-host/src/implementation.rs",
+        "source/packages/mahayana-rs/mahayana-host-protocol/src/lib.rs"
+      ],
+      "ios_owner": "FeatureHostController canonical account-scoped automation/routine owner",
+      "ios_symbol": "AutomationSummary::raised_notices; routine_notice_ids_to_raise; routine_notice_lines_for_ids; FeatureHostController::admit_routine; routine_prompt; automation_trigger_matches_event",
+      "ios_runtime_entrypoint": "FeatureCommand::AutomationUpsert/WorkflowUpsert -> persist_automations/load_automations -> ingest_listener_event or fire_due_automation or AutomationRun -> execute_routine -> admit_routine -> dispatch_pending_routine -> routine_prompt -> Mahayana runtime start_recoverable_message"
     },
     {
       "desktop_path": "source/host/src/box/box_capabilities.rs",

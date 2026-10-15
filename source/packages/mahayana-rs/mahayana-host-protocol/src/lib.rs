@@ -2450,6 +2450,8 @@ pub struct AutomationSummary {
     pub trigger: Option<AutomationTrigger>,
     pub enabled: bool,
     pub created_at_ms: i64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub raised_notices: Vec<String>,
     #[serde(default)]
     pub runs: Vec<AutomationRunSummary>,
     pub last_run_at_ms: Option<i64>,
@@ -3637,6 +3639,7 @@ mod tests {
                 }),
                 enabled: true,
                 created_at_ms: 1,
+                raised_notices: Vec::new(),
                 runs: vec![AutomationRunSummary {
                     id: "run-1".into(),
                     status: AutomationRunStatus::Ok,
