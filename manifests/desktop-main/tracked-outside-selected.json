@@ -616,9 +616,10 @@
       "type": "blob",
       "sha": "5f140c6ff8587b4969e1611ec9030a8c5dc5a6f1",
       "size": 8883,
-      "classification": "desktop-macos-signing-notarization-contract",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-release-signing-notarization-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop script is active release code: it validates code identifiers, signs with hardened runtime/timestamps, submits/staples notarization with bounded retry only for transient Apple/network failures, and fails nonzero commands. The macOS-specific mechanism is not copied to iOS, but the iOS release replacement must preserve exact-source signing/provenance/fail-closed distribution semantics through archive/export/TestFlight/App Store evidence.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "desktop/scripts/stage-host.mjs",
@@ -656,9 +657,10 @@
       "type": "blob",
       "sha": "9bf6d4880371b60ce2becfc39f56cae6b333c34f",
       "size": 3522,
-      "classification": "desktop-electron-contract-typecheck-config",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-build-contract-typecheck-scope",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop tsconfig explicitly typechecks a broad production Electron/shared boundary including update, account, coordinator, MCP, telemetry, secrets, downloads and tests. Electron compiler mechanics are platform-specific, but the reachable production responsibilities remain covered elsewhere; iOS must provide its own Swift/Rust compile/static gates rather than inherit this config as product implementation.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "desktop/tsconfig.json",
@@ -2188,9 +2190,10 @@
       "type": "blob",
       "sha": "bb8b982864d5d44d0a4629961c6948e493488128",
       "size": 6482,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-dossier",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Telegram ShareBox row replacement requires current-query/request fencing, stable participant identity, local/remote dedupe and projection rebuild when collection/filter generations change. Desktop dossier says implementation is verification-open; iOS must preserve equivalent canonical Search freshness/dedupe and permission-before-exposure semantics in shipping owners.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/share-box-complete-read.md",
@@ -2198,9 +2201,10 @@
       "type": "blob",
       "sha": "c32da7957611bbbe935727fb0e7543e0caf2b0d0",
       "size": 35512,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-dossier",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Complete ShareBox reading decomposes recipient search/freshness, Thread destination identity, selection lifecycle, permissions, comment/forward behavior and UI state into multiple still-open responsibilities. Applicable iOS messaging/search/picker responsibilities remain open; reading the source does not close them.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/share-box-ui-build-authority-read.md",
@@ -2208,9 +2212,10 @@
       "type": "blob",
       "sha": "ac4bcc6f25701e718b69c95f2da76376f1919465",
       "size": 3335,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-ui-and-build-authority-dossier",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "ShareBox style is presentation to adapt through canonical iOS UI primitives, while td_ui.cmake establishes source/resource/dependency reachability rather than product behavior. Both remain provenance/UX inputs; iOS must independently close native picker/a11y/build/dependency evidence.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/dossiers/story-sibling-complete-read.md",
@@ -2218,9 +2223,10 @@
       "type": "blob",
       "sha": "198f2e94d712b7173ca887461077db0c9077e3bd",
       "size": 3524,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-dossier",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Story sibling source carries stale suggested-story fencing, weak-lifetime async resolution, photo/video thumbnail/stream fallback, terminal failure behavior and derived projection-cache invalidation. These are applicable media/story lifecycle responsibilities; iOS native media/story owners still require explicit mapping and exact-head evidence.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/inventory/build-time-acquisitions.json",
@@ -2305,9 +2311,10 @@
       "type": "blob",
       "sha": "58fe4c4e11bde107d80e711f68ff752b82f1e438",
       "size": 17769,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop research records build toolchain/resource provenance as part of recursive source closure. iOS need not reproduce Telegram desktop tooling, but must maintain equivalent provenance/license/build-input accounting for dependencies actually used by the iOS product and release pipeline.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/research/message-history-lifecycle.md",
@@ -2315,9 +2322,10 @@
       "type": "blob",
       "sha": "be0cc6a0167040a8967f6bc9dfccf85ec3d549d6",
       "size": 12315,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-research",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Telegram message/history research establishes optimistic local intent before settlement, stable correlation, bounded retry, ordered history windows/gaps, authoritative in-place mutation and durable scoped drafts. These are applicable iOS messaging durability/recovery responsibilities and remain open until current shipping owners/tests prove them.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/research/message-relations-and-settlement.md",
@@ -2325,9 +2333,10 @@
       "type": "blob",
       "sha": "cfe37f53d4b8128b717460cdd2a5928f89e2c1e6",
       "size": 10177,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-research",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Telegram research requires reply/quote/forward relations on canonical message IDs, edit/delete idempotency, reaction state, drafts, schedule/silent send and progress settlement without replacement transcript truths. Applicable iOS messaging responsibilities remain open.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/research/message-settlement-and-history-gap.md",
@@ -2335,9 +2344,10 @@
       "type": "blob",
       "sha": "3ebdb6f14f4f3ee032560acdc95f993c0bfb49d9",
       "size": 11734,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-tdrp-product-responsibility-research",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Telegram settlement/gap dossier requires one logical outgoing message across optimistic/ack/echo races, explicit nonce/attempt/order identities, bounded no-blind-replay recovery and one canonical ordered history owner. These are core iOS human-messaging synchronization contracts and remain open for final exact-head evidence.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/research/telegram-resources-blob-inventory.tsv",
@@ -2345,9 +2355,10 @@
       "type": "blob",
       "sha": "5da3395c5f3a18616c8f3986f22b1737a5a058dd",
       "size": 299318,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-resource-inventory-provenance",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "This file is a recursive resource blob inventory with exact paths/blob hashes/sizes. It is source-accounting evidence, not a requirement to copy Telegram assets; iOS must disposition applicable product resources/localization/licenses and may replace presentation assets under native design/brand rules.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/source-closure.md",
@@ -2355,9 +2366,10 @@
       "type": "blob",
       "sha": "d0cca80146e4f13e75fe861eed51bedf429593b0",
       "size": 9249,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Tracked outside selected roots; explicit per-file/build/dependency/legal disposition pending."
+      "classification": "desktop-source-governance-and-provenance-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "Desktop source-closure evidence explicitly says recursive gitlink discovery is not full immutable external/resource/license/behavior closure and surfaces additional capability domains. It is predecessor source-accounting evidence; iOS cannot use it as completion and still must close current Desktop selected/outside/dependency responsibilities.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "projects/telegram-desktop-rust/upstream.lock.json",
@@ -2365,9 +2377,10 @@
       "type": "blob",
       "sha": "9e10eca1e4c2ebcd743f454aa7b229f677e45c67",
       "size": 12300,
-      "classification": "unreviewed",
-      "coverage_status": "unreviewed",
-      "reason": "Changed on Desktop b6a66fd2; predecessor disposition is historical pending current-main review."
+      "classification": "desktop-upstream-authority-lock-contract",
+      "coverage_status": "reviewed-open-gap",
+      "reason": "TDRP upstream lock records exact Telegram authority, tree, recursive pins and status `baseline-identity-accepted-source-closure-open`; accepted=false on the newer upstream. It is provenance/source-governance state, not iOS implementation evidence, and reinforces that stale upstream evidence cannot be inherited.",
+      "notes": "Reviewed against Desktop c33a9495 context; classification closes only outside-selected review, not the underlying product/release/dependency responsibility."
     },
     {
       "path": "scripts/audit-tdrp-boost-archive-reachability.mjs",
