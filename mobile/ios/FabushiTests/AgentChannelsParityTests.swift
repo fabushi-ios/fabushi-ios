@@ -84,4 +84,39 @@ final class AgentChannelsParityTests: XCTestCase {
         XCTAssertEqual(CONNECTOR_MANIFESTS.map(\.platform), ["discord", "slack"])
         XCTAssertTrue(CONNECTOR_MANIFESTS.allSatisfy { $0.availability == .comingSoon })
     }
+
+    func testListenerProjectionFiltersPlatformsAndUsesSlackFallback() {
+        let view = listenerAgentChannelsView([
+            ["platform": "slack", "label": "Slack"],
+            ["platform": "github", "label": "GitHub"],
+            ["platform": "discord", "label": "Discord"],
+        ])
+        let connections = view["connections"] as? [[String: Any]]
+        XCTAssertEqual(connections?.count, 2)
+        XCTAssertEqual(
+            listenerConnectURL(platform: .slack, slackInstallURL: nil),
+            LISTENER_INTEGRATIONS_DASHBOARD_URL
+        )
+        XCTAssertEqual(
+            listenerConnectURL(
+                platform: .slack,
+                slackInstallURL: "https://slack.example/install"
+            ),
+            "https://slack.example/install"
+        )
+        XCTAssertEqual(
+            listenerConnectURL(platform: .github, slackInstallURL: "https://ignored.example"),
+            LISTENER_INTEGRATIONS_DASHBOARD_URL
+        )
+    }
+
+    func testListenerScopeDiagnosticsExplainMissingAndPrivateSlackChannels() {
+        let message = listenerScopeDiagnostic([
+            .init(kind: "bot-not-in-channel", scope: "#private"),
+            .init(kind: "not-found", scope: "#missing"),
+        ])
+        XCTAssertTrue(message.contains("Invite @Cursor to #private"))
+        XCTAssertTrue(message.contains("private channel"))
+        XCTAssertTrue(message.contains("#missing"))
+    }
 }

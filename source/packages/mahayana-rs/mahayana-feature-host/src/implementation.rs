@@ -8392,10 +8392,27 @@ impl FeatureHostController {
                 });
             }
             FeatureCommand::ListenerList { .. } => {
-                let integrations = state.listeners.values().cloned().collect();
+                let integrations = state.listeners.values().cloned().collect::<Vec<_>>();
+                let automations = state.automations.values().cloned().collect::<Vec<_>>();
+                let connect_urls = BTreeMap::from([
+                    (
+                        ListenerPlatform::Github,
+                        listener_connect_url(ListenerPlatform::Github, None),
+                    ),
+                    (
+                        ListenerPlatform::Slack,
+                        listener_connect_url(ListenerPlatform::Slack, None),
+                    ),
+                ]);
+                let projection =
+                    listener_surface_projection(&automations, &integrations, &[], &connect_urls);
                 state.events.push_back(HostEvent::ListenerListed {
                     timestamp: timestamp(),
                     integrations,
+                });
+                state.events.push_back(HostEvent::TransportEvent {
+                    channel: "listener-integrations".into(),
+                    payload: projection,
                 });
             }
             FeatureCommand::ListenerConnect { platform, .. } => {
@@ -8873,7 +8890,7 @@ impl FeatureHostController {
                     .product_execute("mahayana.listener.list", &payload)?;
                 let mut integrations: Vec<ListenerIntegrationSummary> =
                     decode_product_field(response, "integrations", "mahayana.listener.list")?;
-                let (connectors, _) = self.production_connector_snapshot()?;
+                let (connectors, live) = self.production_connector_snapshot()?;
                 for integration in &mut integrations {
                     if integration.platform == ListenerPlatform::Git {
                         continue;
@@ -8899,10 +8916,68 @@ impl FeatureHostController {
                     .filter(|integration| integration.is_connected)
                     .map(|integration| integration.platform)
                     .collect::<BTreeSet<_>>();
-                self.state()?.events.push_back(HostEvent::ListenerListed {
-                    timestamp: timestamp(),
-                    integrations,
-                });
+                let automations = self
+                    .state()?
+                    .automations
+                    .values()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let account_id = self.channel_account_id().ok();
+                let agent_ids = automations
+                    .iter()
+                    .filter(|automation| automation.enabled)
+                    .filter_map(|automation| automation.agent_id.clone())
+                    .collect::<BTreeSet<_>>();
+                let mut channels = Vec::new();
+                if let Some(account_id) = account_id.as_deref() {
+                    for agent_id in agent_ids {
+                        if let Ok(connections) =
+                            self.channel_store.list_connections(account_id, &agent_id)
+                        {
+                            for connection in connections {
+                                if let Ok(mut value) = serde_json::to_value(connection) {
+                                    if let Some(object) = value.as_object_mut() {
+                                        object.insert("agentId".into(), json!(agent_id));
+                                    }
+                                    channels.push(value);
+                                }
+                            }
+                        }
+                    }
+                }
+                let mut connect_urls = BTreeMap::new();
+                for platform in [ListenerPlatform::Github, ListenerPlatform::Slack] {
+                    let preferred = connector_for_listener_platform(platform)
+                        .and_then(|id| live.get(id))
+                        .and_then(|projection| projection.install_url.as_deref());
+                    connect_urls.insert(platform, listener_connect_url(platform, preferred));
+                }
+                let projection = listener_surface_projection(
+                    &automations,
+                    &integrations,
+                    &channels,
+                    &connect_urls,
+                );
+                {
+                    let mut state = self.state()?;
+                    for integration in &mut integrations {
+                        if let Some(error) = integration.error.as_deref() {
+                            let description =
+                                describe_listener_scope_issues(&listener_scope_issues_from_error(error));
+                            if !description.is_empty() {
+                                integration.error = Some(description);
+                            }
+                        }
+                    }
+                    state.events.push_back(HostEvent::ListenerListed {
+                        timestamp: timestamp(),
+                        integrations,
+                    });
+                    state.events.push_back(HostEvent::TransportEvent {
+                        channel: "listener-integrations".into(),
+                        payload: projection,
+                    });
+                }
                 for platform in connected_platforms {
                     self.consume_listener_connection_resumes(platform)?;
                 }
@@ -8936,6 +9011,23 @@ impl FeatureHostController {
                         "no connector exists for listener platform {platform:?}"
                     ))
                 })?;
+                if *platform == ListenerPlatform::Slack {
+                    let (_, live) = self.production_connector_snapshot()?;
+                    if !live.contains_key(connector_id) {
+                        self.state()?.events.push_back(HostEvent::ConnectorOauthRequested {
+                            timestamp: timestamp(),
+                            connector_id: connector_id.into(),
+                            authorization_url: listener_connect_url(
+                                ListenerPlatform::Slack,
+                                None,
+                            ),
+                        });
+                        return Ok(Some(CommandAccepted {
+                            request_id,
+                            operation_id: None,
+                        }));
+                    }
+                }
                 let synthetic = FeatureCommand::ConnectorConnect {
                     request_id: request_id.clone(),
                     connector_id: connector_id.into(),
@@ -15462,6 +15554,199 @@ fn listener_summary(
     }
 }
 
+const LISTENER_INTEGRATIONS_DASHBOARD_URL: &str =
+    "https://cursor.com/dashboard?tab=integrations";
+
+fn listener_platform_slug(platform: ListenerPlatform) -> &'static str {
+    match platform {
+        ListenerPlatform::Slack => "slack",
+        ListenerPlatform::Github => "github",
+        ListenerPlatform::Git => "git",
+        ListenerPlatform::Teams => "teams",
+        ListenerPlatform::Linear => "linear",
+        ListenerPlatform::Sentry => "sentry",
+        ListenerPlatform::Pagerduty => "pagerduty",
+    }
+}
+
+fn collect_listener_filter_views(
+    trigger: &AutomationTrigger,
+    output: &mut Vec<Value>,
+) {
+    match trigger {
+        AutomationTrigger::Schedule { .. } => {}
+        AutomationTrigger::Event {
+            source,
+            event,
+            filter,
+            filters,
+        } if matches!(source, ListenerPlatform::Github | ListenerPlatform::Slack) => {
+            output.push(json!({
+                "platform": listener_platform_slug(*source),
+                "event": event,
+                "filter": filter,
+                "filters": filters,
+            }));
+        }
+        AutomationTrigger::Event { .. } => {}
+        AutomationTrigger::Group { listeners } => {
+            for listener in listeners {
+                collect_listener_filter_views(listener, output);
+            }
+        }
+    }
+}
+
+fn listener_scope_issues_from_error(error: &str) -> Vec<(String, String)> {
+    fn collect(value: &Value, out: &mut Vec<(String, String)>) {
+        if let Some(items) = value.as_array() {
+            for item in items {
+                collect(item, out);
+            }
+            return;
+        }
+        let Some(object) = value.as_object() else {
+            return;
+        };
+        if let (Some(kind), Some(scope)) = (
+            object.get("kind").and_then(Value::as_str),
+            object.get("scope").and_then(Value::as_str),
+        ) {
+            if matches!(kind, "bot-not-in-channel" | "not-found") && !scope.trim().is_empty() {
+                out.push((kind.to_string(), scope.trim().to_string()));
+            }
+        }
+        if let Some(issues) = object.get("issues") {
+            collect(issues, out);
+        }
+    }
+
+    let mut issues = Vec::new();
+    if let Ok(value) = serde_json::from_str::<Value>(error) {
+        collect(&value, &mut issues);
+    }
+    if issues.is_empty() {
+        for segment in error.split([';', '\n']) {
+            let segment = segment.trim();
+            for kind in ["bot-not-in-channel", "not-found"] {
+                if let Some(rest) = segment.strip_prefix(kind) {
+                    let scope = rest.trim_start_matches([':', '=', ' ']).trim();
+                    if !scope.is_empty() {
+                        issues.push((kind.to_string(), scope.to_string()));
+                    }
+                }
+            }
+        }
+    }
+    issues
+}
+
+fn describe_listener_scope_issues(issues: &[(String, String)]) -> String {
+    let missing_bot = issues
+        .iter()
+        .filter(|(kind, _)| kind == "bot-not-in-channel")
+        .map(|(_, scope)| scope.as_str())
+        .collect::<Vec<_>>();
+    let not_found = issues
+        .iter()
+        .filter(|(kind, _)| kind == "not-found")
+        .map(|(_, scope)| scope.as_str())
+        .collect::<Vec<_>>();
+    let mut parts = Vec::new();
+    if !missing_bot.is_empty() {
+        parts.push(format!(
+            "Invite @Cursor to {} in Slack — messages there can't reach this listener until the bot joins.",
+            missing_bot.join(", ")
+        ));
+    }
+    if !not_found.is_empty() {
+        parts.push(format!(
+            "Couldn't find {} — check the name, or invite @Cursor to it first if it's a private channel.",
+            not_found.join(", ")
+        ));
+    }
+    parts.join(" ")
+}
+
+fn listener_connect_url(
+    platform: ListenerPlatform,
+    preferred: Option<&str>,
+) -> String {
+    if platform == ListenerPlatform::Slack {
+        if let Some(url) = preferred
+            .map(str::trim)
+            .filter(|url| url.starts_with("https://") && !url.is_empty())
+        {
+            return url.to_string();
+        }
+    }
+    LISTENER_INTEGRATIONS_DASHBOARD_URL.to_string()
+}
+
+fn listener_surface_projection(
+    automations: &[AutomationSummary],
+    integrations: &[ListenerIntegrationSummary],
+    channels: &[Value],
+    connect_urls: &BTreeMap<ListenerPlatform, String>,
+) -> Value {
+    let mut counts = BTreeMap::from([
+        (ListenerPlatform::Github, 0usize),
+        (ListenerPlatform::Slack, 0usize),
+    ]);
+    let mut filters = Vec::new();
+    for automation in automations.iter().filter(|automation| automation.enabled) {
+        let Some(trigger) = automation.trigger.as_ref() else {
+            continue;
+        };
+        let mut platforms = BTreeSet::new();
+        automation_trigger_listener_platforms(trigger, &mut platforms);
+        for platform in platforms {
+            if let Some(count) = counts.get_mut(&platform) {
+                *count += 1;
+            }
+        }
+        collect_listener_filter_views(trigger, &mut filters);
+    }
+
+    let manifests = [ListenerPlatform::Github, ListenerPlatform::Slack]
+        .into_iter()
+        .map(|platform| {
+            let integration = integrations.iter().find(|item| item.platform == platform);
+            let diagnostic = integration
+                .and_then(|item| item.error.as_deref())
+                .map(listener_scope_issues_from_error)
+                .map(|issues| describe_listener_scope_issues(&issues))
+                .filter(|message| !message.is_empty());
+            json!({
+                "platform": listener_platform_slug(platform),
+                "enabledListenerCount": counts.get(&platform).copied().unwrap_or(0),
+                "connected": integration.is_some_and(|item| item.is_connected),
+                "accountLabel": integration.and_then(|item| item.account_label.clone()),
+                "scopeDiagnostic": diagnostic,
+                "connectUrl": connect_urls
+                    .get(&platform)
+                    .cloned()
+                    .unwrap_or_else(|| listener_connect_url(platform, None)),
+            })
+        })
+        .collect::<Vec<_>>();
+    let connections = channels
+        .iter()
+        .filter(|channel| {
+            channel
+                .get("platform")
+                .and_then(Value::as_str)
+                .is_some_and(|platform| matches!(platform, "github" | "slack"))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    json!({
+        "manifests": manifests,
+        "filters": filters,
+        "connections": connections,
+    })
+}
+
 fn default_listeners() -> BTreeMap<ListenerPlatform, ListenerIntegrationSummary> {
     [
         listener_summary(
@@ -20350,6 +20635,118 @@ mod tests {
             subagent_type: (kind == AsyncTaskKind::Subagent).then(|| "task".into()),
             resource_id: None,
         }
+    }
+
+    #[test]
+    fn listener_projection_counts_only_enabled_github_slack_and_filters_channels() {
+        let automation = AutomationSummary {
+            id: "listener-1".into(),
+            agent_id: Some("mahayana-assistant".into()),
+            name: "Watch release".into(),
+            prompt: "Inspect".into(),
+            schedule: "event:group".into(),
+            trigger: Some(AutomationTrigger::Group {
+                listeners: vec![
+                    AutomationTrigger::Event {
+                        source: ListenerPlatform::Github,
+                        event: "ci-failed".into(),
+                        filter: None,
+                        filters: Some(BTreeMap::from([
+                            ("repo".into(), json!("owner/repo")),
+                            ("ciBranch".into(), json!("main")),
+                        ])),
+                    },
+                    AutomationTrigger::Event {
+                        source: ListenerPlatform::Slack,
+                        event: "message".into(),
+                        filter: None,
+                        filters: Some(BTreeMap::from([(
+                            "channel".into(),
+                            json!("#release"),
+                        )])),
+                    },
+                ],
+            }),
+            enabled: true,
+            created_at_ms: 1,
+            raised_notices: Vec::new(),
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: None,
+        };
+        let disabled = AutomationSummary {
+            enabled: false,
+            id: "disabled".into(),
+            ..automation.clone()
+        };
+        let integrations = vec![
+            ListenerIntegrationSummary {
+                platform: ListenerPlatform::Github,
+                display_name: "GitHub".into(),
+                blurb: String::new(),
+                is_connected: true,
+                account_label: Some("octocat".into()),
+                error: None,
+            },
+            ListenerIntegrationSummary {
+                platform: ListenerPlatform::Slack,
+                display_name: "Slack".into(),
+                blurb: String::new(),
+                is_connected: true,
+                account_label: Some("Workspace".into()),
+                error: Some(
+                    r#"{"issues":[{"kind":"bot-not-in-channel","scope":"#private"},{"kind":"not-found","scope":"#missing"}]}"#.into(),
+                ),
+            },
+        ];
+        let channels = vec![
+            json!({"platform":"slack","label":"Slack","status":"configured"}),
+            json!({"platform":"discord","label":"Discord","status":"configured"}),
+        ];
+        let projection = listener_surface_projection(
+            &[automation, disabled],
+            &integrations,
+            &channels,
+            &BTreeMap::new(),
+        );
+        assert_eq!(projection["manifests"][0]["platform"], "github");
+        assert_eq!(projection["manifests"][0]["enabledListenerCount"], 1);
+        assert_eq!(projection["manifests"][1]["platform"], "slack");
+        assert_eq!(projection["manifests"][1]["enabledListenerCount"], 1);
+        assert_eq!(projection["connections"].as_array().unwrap().len(), 1);
+        assert_eq!(projection["connections"][0]["platform"], "slack");
+        let diagnostic = projection["manifests"][1]["scopeDiagnostic"]
+            .as_str()
+            .expect("scope diagnostic");
+        assert!(diagnostic.contains("Invite @Cursor to #private"));
+        assert!(diagnostic.contains("private channel"));
+        assert_eq!(
+            projection["manifests"][1]["connectUrl"],
+            LISTENER_INTEGRATIONS_DASHBOARD_URL
+        );
+    }
+
+    #[test]
+    fn listener_list_shipping_surface_emits_manifest_projection() {
+        let controller = controller();
+        controller
+            .execute(FeatureCommand::ListenerList {
+                request_id: "listener-list-projection".into(),
+            })
+            .expect("listener list");
+        let mut projection = None;
+        while let Some(event) = controller.receive().expect("listener events") {
+            if let HostEvent::TransportEvent { channel, payload } = event {
+                if channel == "listener-integrations" {
+                    projection = Some(payload);
+                }
+            }
+        }
+        let projection = projection.expect("listener integrations projection");
+        let manifests = projection["manifests"].as_array().expect("manifests");
+        assert_eq!(manifests.len(), 2);
+        assert_eq!(manifests[0]["platform"], "github");
+        assert_eq!(manifests[1]["platform"], "slack");
     }
 
     #[test]
