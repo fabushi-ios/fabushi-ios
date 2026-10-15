@@ -22,6 +22,45 @@ fn normalize_automation_prompt(prompt: &str) -> String {
     prompt.trim().to_string()
 }
 
+fn slugify_automation_name(name: &str) -> String {
+    let mut out = String::new();
+    let mut dash = false;
+    for ch in name.trim().to_ascii_lowercase().chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+            dash = false;
+        } else if !dash && !out.is_empty() {
+            out.push('-');
+            dash = true;
+        }
+    }
+    while out.ends_with('-') {
+        out.pop();
+    }
+    if out.is_empty() {
+        "automation".into()
+    } else {
+        out
+    }
+}
+
+fn unique_automation_id(
+    automations: &BTreeMap<String, AutomationSummary>,
+    name: &str,
+) -> String {
+    let base = slugify_automation_name(name);
+    if !automations.contains_key(&base) {
+        return base;
+    }
+    for suffix in 2..1000 {
+        let candidate = format!("{base}-{suffix}");
+        if !automations.contains_key(&candidate) {
+            return candidate;
+        }
+    }
+    format!("{base}-{}", Uuid::new_v4())
+}
+
 fn clamp_automation_run_detail(detail: Option<&str>) -> Option<String> {
     let value = detail?.trim();
     (!value.is_empty()).then(|| {
@@ -192,6 +231,12 @@ mod automation_policy_tests {
             AUTOMATION_MAX_NAME_LENGTH
         );
         assert_eq!(normalize_automation_prompt("  hello  "), "hello");
+        let existing = BTreeMap::from([
+            ("daily".to_string(), routine("daily", None)),
+            ("daily-2".to_string(), routine("daily-2", None)),
+        ]);
+        assert_eq!(slugify_automation_name(" Daily !!! "), "daily");
+        assert_eq!(unique_automation_id(&existing, "Daily"), "daily-3");
         assert_eq!(
             clamp_automation_run_detail(Some(&"d".repeat(AUTOMATION_MAX_RUN_DETAIL_LENGTH + 5)))
                 .unwrap()
