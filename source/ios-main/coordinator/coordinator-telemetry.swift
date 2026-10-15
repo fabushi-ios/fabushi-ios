@@ -458,6 +458,247 @@ struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
         )
     }
 
+    private static let clientFailureResourceStates: Set<String> = ["failed", "recovered"]
+    private static let clientFailureUnhandledKinds: Set<String> = ["error", "unhandledrejection"]
+    private static let clientFailureBoundaries: Set<String> = [
+        "app", "chat_screen", "info_pane", "transcript_row", "mermaid", "other",
+    ]
+    private static let clientFailureEntrypointSurfaces: Set<String> = ["workspace", "overlay", "critical"]
+    private static let clientFailureEntrypointPhases: Set<String> = ["chunk_load", "render"]
+    private static let clientFailureQueuedCauses: Set<String> = ["SAND-E0703", "SAND-E0704", "SAND-E0705"]
+    private static let clientFailureErrnos: Set<String> = [
+        "ECONNREFUSED", "ECONNRESET", "ECONNABORTED", "ETIMEDOUT", "EPIPE", "ENETRESET",
+        "ENETDOWN", "ENETUNREACH", "EHOSTUNREACH", "EHOSTDOWN", "EAI_AGAIN", "ENOTFOUND",
+        "EADDRINUSE", "EACCES", "EPERM", "ENOENT", "ENOSPC", "EDQUOT", "EROFS", "EBUSY",
+        "EMFILE", "EIO", "E_OTHER",
+    ]
+
+    private static func projectClientFailure(
+        _ report: [String: Any]
+    ) -> IOSMainRPCTelemetryProjection? {
+        guard let kind = report["kind"] as? String else { return nil }
+        switch kind {
+        case "client_resource":
+            guard let domain = boundedClientFailureToken(report["domain"]),
+                  let operation = boundedClientFailureToken(report["operation"]),
+                  let state = report["state"] as? String,
+                  clientFailureResourceStates.contains(state),
+                  let failureCode = boundedClientFailureToken(report["failureCode"]),
+                  let boundary = boundedClientFailureToken(report["boundary"]),
+                  optionalBoundedClientFailureToken(report, key: "retryOwner"),
+                  optionalBoundedClientFailureToken(report, key: "transportKind"),
+                  optionalFinite(report, key: "failedMs")
+            else { return nil }
+            var metadata = baseMetadata(event: "sand.client_resource")
+            metadata["domain"] = domain
+            metadata["operation"] = operation
+            metadata["state"] = state
+            metadata["failure_code"] = failureCode
+            metadata["boundary"] = boundary
+            copyString(report, from: "retryOwner", to: "retry_owner", into: &metadata)
+            copyString(report, from: "transportKind", to: "transport_kind", into: &metadata)
+            if let failedMs = finiteNonnegative(report["failedMs"]) {
+                metadata["failed_ms"] = roundedString(failedMs)
+            }
+            return .init(
+                event: "sand.client_resource",
+                level: state == "failed" ? .warn : .info,
+                metadata: metadata
+            )
+
+        case "renderer_unhandled":
+            guard let handler = report["handler"] as? String,
+                  clientFailureUnhandledKinds.contains(handler),
+                  let errorClass = boundedClientFailureToken(report["errorClass"]),
+                  let occurrence = positiveInteger(report["occurrence"])
+            else { return nil }
+            var metadata = baseMetadata(event: "sand.renderer_unhandled")
+            metadata["kind"] = handler
+            metadata["error_class"] = errorClass
+            metadata["occurrence"] = String(occurrence)
+            return .init(event: "sand.renderer_unhandled", level: .error, metadata: metadata)
+
+        case "renderer_boundary_caught":
+            guard let boundary = report["boundary"] as? String,
+                  clientFailureBoundaries.contains(boundary),
+                  let errorClass = boundedClientFailureToken(report["errorClass"]),
+                  let occurrence = positiveInteger(report["occurrence"])
+            else { return nil }
+            var metadata = baseMetadata(event: "sand.renderer.boundary_caught")
+            metadata["boundary"] = boundary
+            metadata["error_class"] = errorClass
+            metadata["occurrence"] = String(occurrence)
+            return .init(event: "sand.renderer.boundary_caught", level: .warn, metadata: metadata)
+
+        case "entrypoint_error":
+            guard let entrypoint = boundedClientFailureToken(report["entrypoint"]),
+                  let surface = report["surface"] as? String,
+                  clientFailureEntrypointSurfaces.contains(surface),
+                  let phase = report["phase"] as? String,
+                  clientFailureEntrypointPhases.contains(phase),
+                  let errorClass = boundedClientFailureToken(report["errorClass"])
+            else { return nil }
+            var metadata = baseMetadata(event: "sand.entrypoint_error")
+            metadata["entrypoint"] = entrypoint
+            metadata["surface"] = surface
+            metadata["phase"] = phase
+            metadata["error_class"] = errorClass
+            return .init(event: "sand.entrypoint_error", level: .warn, metadata: metadata)
+
+        case "send_queued_flush":
+            guard let queuedMs = finiteNonnegative(report["queuedMs"]),
+                  let queueDepth = finiteNonnegative(report["queueDepth"]),
+                  let outcome = report["outcome"] as? String
+            else { return nil }
+            let cause = report["cause"] as? String
+            switch outcome {
+            case "delivered":
+                guard !report.keys.contains("cause") else { return nil }
+            case "superseded":
+                guard cause == "SAND-E0706" else { return nil }
+            case "expired":
+                guard cause == "SAND-E0707" else { return nil }
+            case "flush_failed":
+                guard let cause, clientFailureQueuedCauses.contains(cause) else { return nil }
+            default:
+                return nil
+            }
+            var metadata = baseMetadata(event: "sand.send.queued_flush")
+            metadata["outcome"] = outcome
+            metadata["queued_ms"] = roundedString(queuedMs)
+            metadata["queue_depth"] = roundedString(queueDepth)
+            if let cause { metadata["cause"] = cause }
+            let level: IOSLifecycleTelemetryLevel =
+                (outcome == "expired" || outcome == "flush_failed") ? .warn : .info
+            return .init(event: "sand.send.queued_flush", level: level, metadata: metadata)
+
+        case "client_persistence":
+            return projectClientPersistenceFailure(report)
+
+        case "connector_auth_clicked":
+            if report.keys.contains("serverName") {
+                guard let serverName = report["serverName"] as? String,
+                      serverName.count <= 256 else { return nil }
+            }
+            guard optionalBoundedClientFailureToken(report, key: "serverId") else { return nil }
+            var metadata = baseMetadata(event: "sand.connector_auth")
+            metadata["phase"] = "clicked"
+            metadata["connector"] = boundedConnectorTag(report["serverName"] as? String)
+            metadata["outcome"] = "ok"
+            metadata["surface"] = "ios"
+            copyString(report, from: "serverId", to: "server_id", into: &metadata)
+            return .init(event: "sand.connector_auth", level: .info, metadata: metadata)
+
+        default:
+            return nil
+        }
+    }
+
+    private static func projectClientPersistenceFailure(
+        _ report: [String: Any]
+    ) -> IOSMainRPCTelemetryProjection? {
+        guard let slice = report["slice"] as? String,
+              Set(SAND_CLIENT_PERSISTENCE_SLICES).contains(slice),
+              let operation = report["op"] as? String,
+              let outcome = report["outcome"] as? String,
+              optionalFinite(report, key: "bytes")
+        else { return nil }
+
+        let error = report["error"] as? [String: Any]
+        var metadata = baseMetadata(event: "sand.client_persistence")
+        metadata["op"] = operation
+        metadata["outcome"] = outcome
+        metadata["slice"] = slice
+        if let bytes = finiteNonnegative(report["bytes"]) {
+            metadata["bytes"] = roundedString(bytes)
+        }
+
+        switch operation {
+        case "writeback":
+            guard outcome == "ok",
+                  !report.keys.contains("error"),
+                  !report.keys.contains("bytes")
+            else { return nil }
+        case "load":
+            if outcome == "ok" {
+                guard !report.keys.contains("error") else { return nil }
+            } else if outcome == "corrupt" {
+                guard error?["code"] as? String == "SAND-E0700" else { return nil }
+                appendClientPersistenceErrorTags(code: "SAND-E0700", error: error, into: &metadata)
+            } else if outcome == "io_error" {
+                guard validClientPersistenceIOError(error) else { return nil }
+                appendClientPersistenceErrorTags(code: "SAND-E0701", error: error, into: &metadata)
+            } else {
+                return nil
+            }
+        case "persist":
+            if outcome == "quota" {
+                guard error?["code"] as? String == "SAND-E0702" else { return nil }
+                appendClientPersistenceErrorTags(code: "SAND-E0702", error: error, into: &metadata)
+            } else if outcome == "io_error" {
+                guard validClientPersistenceIOError(error) else { return nil }
+                appendClientPersistenceErrorTags(code: "SAND-E0701", error: error, into: &metadata)
+            } else {
+                return nil
+            }
+        default:
+            return nil
+        }
+
+        return .init(
+            event: "sand.client_persistence",
+            level: outcome == "ok" ? .info : .warn,
+            metadata: metadata
+        )
+    }
+
+    private static func validClientPersistenceIOError(_ error: [String: Any]?) -> Bool {
+        guard error?["code"] as? String == "SAND-E0701" else { return false }
+        guard let errno = error?["errno"] else { return true }
+        guard let errno = errno as? String else { return false }
+        return clientFailureErrnos.contains(errno)
+    }
+
+    private static func appendClientPersistenceErrorTags(
+        code: String,
+        error: [String: Any]?,
+        into metadata: inout [String: String]
+    ) {
+        metadata["error_code"] = code
+        metadata["error_domain"] = code == "SAND-E0001" ? "registry" : "storage"
+        metadata["error_retryable"] = String(code == "SAND-E0701")
+        if code == "SAND-E0701",
+           let errno = error?["errno"] as? String {
+            metadata["errno"] = clientFailureErrnos.contains(errno) ? errno : "E_OTHER"
+        }
+    }
+
+    private static func boundedClientFailureToken(_ raw: Any?) -> String? {
+        guard let value = raw as? String,
+              value.range(
+                of: "^[0-9A-Za-z._/:|\\-]{1,64}$",
+                options: .regularExpression
+              ) != nil
+        else { return nil }
+        return value
+    }
+
+    private static func optionalBoundedClientFailureToken(
+        _ report: [String: Any],
+        key: String
+    ) -> Bool {
+        !report.keys.contains(key) || boundedClientFailureToken(report[key]) != nil
+    }
+
+    private static func positiveInteger(_ raw: Any?) -> Int? {
+        guard let value = finiteNonnegative(raw),
+              value >= 1,
+              value.rounded(.towardZero) == value,
+              value <= Double(Int.max)
+        else { return nil }
+        return Int(value)
+    }
+
     private static func baseMetadata(event: String) -> [String: String] {
         [
             "event": event,
@@ -525,6 +766,7 @@ struct IOSMainRPCTelemetryProjection: Equatable, Sendable {
         "reportReactionAck",
         "reportRenderTtfr",
         "reportRenderStream",
+        "reportClientFailure",
     ]
 
     private static let agentLoadOutcomes: Set<String> = ["ready", "superseded", "failed"]
@@ -567,6 +809,8 @@ struct IOSMainRPCTelemetryProjection: Equatable, Sendable {
             return projectRenderTtfr(report)
         case "reportRenderStream":
             return projectRenderStream(report)
+        case "reportClientFailure":
+            return projectClientFailure(report)
         default:
             return nil
         }

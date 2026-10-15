@@ -377,6 +377,106 @@ final class CoordinatorBroadTelemetryParityTests: XCTestCase {
         ))
     }
 
+    func testClientFailureTelemetryValidatesCanonicalKinds() {
+        let resource = IOSMainRPCTelemetryProjection.project(
+            method: "reportClientFailure",
+            report: [
+                "kind": "client_resource",
+                "domain": "transcript",
+                "operation": "hydrate",
+                "state": "failed",
+                "failureCode": "SAND-E0701",
+                "boundary": "client",
+                "retryOwner": "client",
+                "transportKind": "network",
+                "failedMs": 250,
+            ]
+        )
+        XCTAssertEqual(resource?.event, "sand.client_resource")
+        XCTAssertEqual(resource?.level, .warn)
+        XCTAssertEqual(resource?.metadata["failure_code"], "SAND-E0701")
+        XCTAssertEqual(resource?.metadata["failed_ms"], "250")
+
+        let boundary = IOSMainRPCTelemetryProjection.project(
+            method: "reportClientFailure",
+            report: [
+                "kind": "renderer_boundary_caught",
+                "boundary": "chat_screen",
+                "errorClass": "TypeError",
+                "occurrence": 2,
+            ]
+        )
+        XCTAssertEqual(boundary?.event, "sand.renderer.boundary_caught")
+        XCTAssertEqual(boundary?.level, .warn)
+
+        let queued = IOSMainRPCTelemetryProjection.project(
+            method: "reportClientFailure",
+            report: [
+                "kind": "send_queued_flush",
+                "queuedMs": 1_000,
+                "queueDepth": 3,
+                "outcome": "expired",
+                "cause": "SAND-E0707",
+            ]
+        )
+        XCTAssertEqual(queued?.event, "sand.send.queued_flush")
+        XCTAssertEqual(queued?.level, .warn)
+
+        XCTAssertNil(IOSMainRPCTelemetryProjection.project(
+            method: "reportClientFailure",
+            report: [
+                "kind": "send_queued_flush",
+                "queuedMs": 1,
+                "queueDepth": 1,
+                "outcome": "delivered",
+                "cause": "SAND-E0707",
+            ]
+        ))
+    }
+
+    func testClientPersistenceAndConnectorFailureTelemetryArePrivacyBounded() {
+        let persistence = IOSMainRPCTelemetryProjection.project(
+            method: "reportClientFailure",
+            report: [
+                "kind": "client_persistence",
+                "op": "load",
+                "outcome": "io_error",
+                "slice": "composer-drafts",
+                "bytes": 42,
+                "error": ["code": "SAND-E0701", "errno": "ENOSPC"],
+            ]
+        )
+        XCTAssertEqual(persistence?.event, "sand.client_persistence")
+        XCTAssertEqual(persistence?.level, .warn)
+        XCTAssertEqual(persistence?.metadata["error_code"], "SAND-E0701")
+        XCTAssertEqual(persistence?.metadata["error_domain"], "storage")
+        XCTAssertEqual(persistence?.metadata["error_retryable"], "true")
+        XCTAssertEqual(persistence?.metadata["errno"], "ENOSPC")
+
+        let connector = IOSMainRPCTelemetryProjection.project(
+            method: "reportClientFailure",
+            report: [
+                "kind": "connector_auth_clicked",
+                "serverName": "GitHub",
+                "serverId": "server-1",
+            ]
+        )
+        XCTAssertEqual(connector?.event, "sand.connector_auth")
+        XCTAssertEqual(connector?.metadata["connector"], "github")
+        XCTAssertEqual(connector?.metadata["surface"], "ios")
+
+        XCTAssertNil(IOSMainRPCTelemetryProjection.project(
+            method: "reportClientFailure",
+            report: [
+                "kind": "client_persistence",
+                "op": "load",
+                "outcome": "io_error",
+                "slice": "unknown-slice",
+                "error": ["code": "SAND-E0701"],
+            ]
+        ))
+    }
+
     func testShippingMainRuntimeInterceptsNativeMainRPCTelemetryBeforeHost() throws {
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
