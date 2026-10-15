@@ -8144,6 +8144,131 @@ impl FeatureHostController {
         )))
     }
 
+    pub fn agent_store_hydrate_agent(
+        &self,
+        agent_id: &str,
+    ) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        if !is_safe_memory_agent_id(agent_id) {
+            return Err(FeatureHostError::Contract("unsafe Agent Store hydrate identity".into()));
+        }
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+            if !state.bots.contains_key(agent_id) {
+                return Err(FeatureHostError::Contract(format!(
+                    "unknown Agent Store hydrate owner: {agent_id}"
+                )));
+            }
+        }
+
+        let account_scope = self.channel_account_id()?;
+        let account_root = self
+            .active_account_root(self.memory_root_path.as_deref())
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store local hydrate root is unavailable".into(),
+            ))?;
+        let target_root = account_root.join(agent_id);
+
+        let remote = self.agent_store_manifest_read(agent_id)?;
+        if remote.get("found").and_then(Value::as_bool) != Some(true) {
+            return Ok(json!({
+                "outcome": "noop",
+                "reason": "remote manifest missing",
+                "files": 0,
+                "bytes": 0,
+                "verified": 0,
+            }));
+        }
+        let manifest = remote
+            .get("manifest")
+            .and_then(crate::box_store_manifest::parse_box_store_manifest)
+            .ok_or_else(|| FeatureHostError::Contract(
+                "Agent Store hydrate manifest projection is invalid".into(),
+            ))?;
+        if manifest.fully_hydrated == Some(false) {
+            return Err(FeatureHostError::Contract(
+                "Agent Store remote manifest is explicitly incomplete".into(),
+            ));
+        }
+
+        let assert_scope = || -> Result<(), FeatureHostError> {
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store hydrate account scope changed".into(),
+                ));
+            }
+            Ok(())
+        };
+
+        let mut files = 0_u64;
+        let mut bytes_written = 0_u64;
+        let mut verified = 0_u64;
+        for (rel_path, entry) in &manifest.entries {
+            assert_scope()?;
+            match entry {
+                crate::box_store_manifest::BoxStoreManifestEntry::LegacyFile { sha, .. }
+                | crate::box_store_manifest::BoxStoreManifestEntry::File { sha, .. } => {
+                    let blob_path = format!(
+                        "{}/{}",
+                        crate::box_store_hydration::BOX_STORE_BLOBS_PREFIX,
+                        sha
+                    );
+                    let blob = self.agent_store_read(agent_id, &blob_path)?;
+                    if blob.get("found").and_then(Value::as_bool) != Some(true) {
+                        return Err(FeatureHostError::Contract(format!(
+                            "Agent Store hydrate blob is missing: {sha}"
+                        )));
+                    }
+                    let data_base64 = blob
+                        .get("dataBase64")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| FeatureHostError::Contract(format!(
+                            "Agent Store hydrate blob omitted dataBase64: {sha}"
+                        )))?;
+                    let data = base64::engine::general_purpose::STANDARD
+                        .decode(data_base64)
+                        .map_err(|_| FeatureHostError::Contract(format!(
+                            "Agent Store hydrate blob is invalid base64: {sha}"
+                        )))?;
+                    assert_scope()?;
+                    let restored = crate::box_store_hydration::restore_file_atomic(
+                        &target_root,
+                        rel_path,
+                        entry,
+                        &data,
+                    )
+                    .map_err(FeatureHostError::Contract)?;
+                    files = files.saturating_add(1);
+                    bytes_written = bytes_written.saturating_add(restored);
+                    verified = verified.saturating_add(1);
+                }
+                crate::box_store_manifest::BoxStoreManifestEntry::Symlink { target } => {
+                    assert_scope()?;
+                    crate::box_store_hydration::restore_symlink_atomic(
+                        &target_root,
+                        rel_path,
+                        target,
+                    )
+                    .map_err(FeatureHostError::Contract)?;
+                    files = files.saturating_add(1);
+                    verified = verified.saturating_add(1);
+                }
+            }
+        }
+        assert_scope()?;
+        Ok(json!({
+            "outcome": "hydrated",
+            "files": files,
+            "bytes": bytes_written,
+            "verified": verified,
+            "manifestEntries": manifest.entries.len(),
+            "fullyHydrated": manifest.fully_hydrated,
+        }))
+    }
+
     /// Native settings surfaces use a direct MCP snapshot so they never drain
     /// the renderer's shared HostEvent queue while waiting for settings data.
     pub fn mcp_servers_snapshot(&self) -> Result<Vec<Value>, FeatureHostError> {
