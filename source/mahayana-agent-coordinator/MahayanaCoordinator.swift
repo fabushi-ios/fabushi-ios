@@ -1420,7 +1420,7 @@ final class MahayanaCoordinator {
     }
 
 
-    func cloudAgentTranscriptDump(bcId: String) async throws -> [String: Any]? {
+    func cloudAgentTranscriptDump(bcId: String) async throws -> IOSCloudAgentTranscriptDump? {
         guard let mcpSurface else {
             throw CoordinatorError.unavailable
         }

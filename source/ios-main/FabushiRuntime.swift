@@ -172,14 +172,10 @@ private final class IOSCloudAgentWakeWatcher {
         result: String
     ) async -> String {
         do {
-            guard let dump = try await coordinator.cloudAgentTranscriptDump(bcId: wake.workId),
-                  let path = dump["path"] as? String,
-                  let sizeBytes = dump["sizeBytes"] as? Int,
-                  let lineCount = dump["lineCount"] as? Int
-            else {
+            guard let dump = try await coordinator.cloudAgentTranscriptDump(bcId: wake.workId) else {
                 return result
             }
-            return result + "\n\nFull transcript dumped to \(path) (\(sizeBytes) bytes, \(lineCount) message lines). Read it with your shell tools; tail -n 1 \(path) gives the final assistant report."
+            return result + "\n\nFull transcript dumped to \(dump.path) (\(dump.sizeBytes) bytes, \(dump.lineCount) message lines). Read it with your shell tools; tail -n 1 \(dump.path) gives the final assistant report."
         } catch {
             // Desktop semantics are best-effort: a transcript dump failure must
             // never prevent the durable completion wake from settling.

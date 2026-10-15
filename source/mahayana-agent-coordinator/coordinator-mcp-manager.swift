@@ -2048,6 +2048,12 @@ enum IOSCloudAgentBoxImagePolicy {
 }
 
 @MainActor
+struct IOSCloudAgentTranscriptDump: Equatable, Sendable {
+    let path: String
+    let sizeBytes: Int
+    let lineCount: Int
+}
+
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
@@ -3724,7 +3730,7 @@ final class CoordinatorMcpSurface {
     }
 
 
-    func cloudAgentTranscriptDump(bcId: String) async throws -> [String: Any]? {
+    func cloudAgentTranscriptDump(bcId: String) async throws -> IOSCloudAgentTranscriptDump? {
         guard (await cursorAuth.status()).loggedIn, routedScopeToken() != nil else {
             throw IOSCursorAuthError.signInRequired
         }
@@ -3752,7 +3758,11 @@ final class CoordinatorMcpSurface {
         else {
             throw SandMcpConfigError("Cloud Agent transcript Box write did not return success.")
         }
-        return ["path": path, "sizeBytes": dump.jsonl.count, "lineCount": dump.rowCount]
+        return IOSCloudAgentTranscriptDump(
+            path: path,
+            sizeBytes: dump.jsonl.count,
+            lineCount: dump.rowCount
+        )
     }
 
     private func refreshAuthoritativePluginFacts(
