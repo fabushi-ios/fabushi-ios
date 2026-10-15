@@ -166,7 +166,7 @@ final class IOSMainRuntime {
             }
         )
         self.coordinator = coordinator
-        cursorAccountRevoker = ProductionCoordinatorAccountRevoker(
+        let cursorAccountRevoker = ProductionCoordinatorAccountRevoker(
             revoke: {
                 guard let result = await coordinator.revokeCursorAuthForAccountRefusal() else {
                     let message = "Cursor authentication service is unavailable."
@@ -183,6 +183,7 @@ final class IOSMainRuntime {
                 )
             }
         )
+        self.cursorAccountRevoker = cursorAccountRevoker
         attachmentMainRPC = try IOSAttachmentMainRPCAdapter(
             appDataDirectory: appDataDirectory,
             currentAccountScope: { coordinatorLocalHumanIdentity.value },
@@ -291,6 +292,25 @@ final class IOSMainRuntime {
         accountRuntime = CoordinatorAccountRuntime(
             cleanup: cleanup,
             authorize: { slot, previousSlot in
+                if let slot {
+                    let bindingAccepted = await coordinator.authorizeGatewayDescriptorAccount(slot)
+                    guard bindingAccepted else {
+                        let revocation = await cursorAccountRevoker.revokeRefusedAccount()
+                        reporter.report(
+                            .coordinatorHandoff,
+                            level: .warn,
+                            metadata: [
+                                "account_scope": "cursor-binding-refused",
+                                "revocation": String(revocation.kind.prefix(64)),
+                            ]
+                        )
+                        return .refused(
+                            slot: nil,
+                            reason: "Cursor gateway descriptor is bound to another account."
+                        )
+                    }
+                }
+
                 let authorization = accountAuthorizer.authorizeSettledHostSlot(
                     slot,
                     previousSlot: previousSlot
