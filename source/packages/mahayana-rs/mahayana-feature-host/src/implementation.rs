@@ -8298,6 +8298,12 @@ impl FeatureHostController {
         }
 
 
+        let packed_blobs = self.agent_store_pack_hydrate_blobs_with_scope(
+            session_scope,
+            agent_id,
+            &account_root,
+            &manifest,
+        )?;
         let mut files = 0_u64;
         let mut bytes_written = 0_u64;
         let mut verified = 0_u64;
@@ -8306,28 +8312,36 @@ impl FeatureHostController {
             match entry {
                 crate::box_store_manifest::BoxStoreManifestEntry::LegacyFile { sha, .. }
                 | crate::box_store_manifest::BoxStoreManifestEntry::File { sha, .. } => {
-                    let blob_path = format!(
-                        "{}/{}",
-                        crate::box_store_hydration::BOX_STORE_BLOBS_PREFIX,
-                        sha
-                    );
-                    let blob = self.agent_store_read_with_scope(session_scope, agent_id, &blob_path)?;
-                    if blob.get("found").and_then(Value::as_bool) != Some(true) {
-                        return Err(FeatureHostError::Contract(format!(
-                            "Agent Store hydrate blob is missing: {sha}"
-                        )));
-                    }
-                    let data_base64 = blob
-                        .get("dataBase64")
-                        .and_then(Value::as_str)
-                        .ok_or_else(|| FeatureHostError::Contract(format!(
-                            "Agent Store hydrate blob omitted dataBase64: {sha}"
-                        )))?;
-                    let data = base64::engine::general_purpose::STANDARD
-                        .decode(data_base64)
-                        .map_err(|_| FeatureHostError::Contract(format!(
-                            "Agent Store hydrate blob is invalid base64: {sha}"
-                        )))?;
+                    let data = if let Some(packed) = packed_blobs.get(sha) {
+                        packed.clone()
+                    } else {
+                        let blob_path = format!(
+                            "{}/{}",
+                            crate::box_store_hydration::BOX_STORE_BLOBS_PREFIX,
+                            sha
+                        );
+                        let blob = self.agent_store_read_with_scope(
+                            session_scope,
+                            agent_id,
+                            &blob_path,
+                        )?;
+                        if blob.get("found").and_then(Value::as_bool) != Some(true) {
+                            return Err(FeatureHostError::Contract(format!(
+                                "Agent Store hydrate blob is missing from pack and loose fallback: {sha}"
+                            )));
+                        }
+                        let data_base64 = blob
+                            .get("dataBase64")
+                            .and_then(Value::as_str)
+                            .ok_or_else(|| FeatureHostError::Contract(format!(
+                                "Agent Store hydrate blob omitted dataBase64: {sha}"
+                            )))?;
+                        base64::engine::general_purpose::STANDARD
+                            .decode(data_base64)
+                            .map_err(|_| FeatureHostError::Contract(format!(
+                                "Agent Store hydrate blob is invalid base64: {sha}"
+                            )))?
+                    };
                     assert_scope()?;
                     let restored = self.with_agent_store_session_write(
                         session_scope,
@@ -8465,20 +8479,38 @@ impl FeatureHostController {
             );
             if remote_manifest.entries == entries {
                 self.record_agent_store_sync_base_with_scope(
-                session_scope,
+                    session_scope,
                     &account_root,
                     agent_id,
                     &current_remote,
                     &remote_manifest,
                 )?;
+                let pack_summary = match self.agent_store_publish_pack_snapshot_with_scope(
+                    session_scope,
+                    agent_id,
+                    &account_root,
+                    &target_root,
+                    &entries,
+                ) {
+                    Ok(summary) => summary,
+                    Err(error) => {
+                        assert_scope()?;
+                        json!({
+                            "outcome": "degraded",
+                            "reason": format!("{error}"),
+                            "looseBlobFallback": true,
+                        })
+                    }
+                };
                 assert_scope()?;
-            return Ok(json!({
+                return Ok(json!({
                     "outcome": "noop",
                     "reason": "remote already matches local",
                     "entries": entries.len(),
                     "uploadedBlobs": 0,
                     "reusedBlobs": 0,
                     "uploadedBytes": 0,
+                    "packs": pack_summary,
                 }));
             }
             let remote_is_confirmed_base = sync_base
@@ -8591,6 +8623,24 @@ impl FeatureHostController {
             assert_scope()?;
         }
 
+        let pack_summary = match self.agent_store_publish_pack_snapshot_with_scope(
+            session_scope,
+            agent_id,
+            &account_root,
+            &target_root,
+            &entries,
+        ) {
+            Ok(summary) => summary,
+            Err(error) => {
+                assert_scope()?;
+                json!({
+                    "outcome": "degraded",
+                    "reason": format!("{error}"),
+                    "looseBlobFallback": true,
+                })
+            }
+        };
+
         let entries_value = crate::box_store_manifest::manifest_entries_value(&entries);
         assert_scope()?;
         let writer_window_id = format!("ios-{}", Uuid::new_v4().simple());
@@ -8658,6 +8708,7 @@ impl FeatureHostController {
             "uploadedBlobs": uploaded,
             "reusedBlobs": reused,
             "uploadedBytes": bytes_uploaded,
+            "packs": pack_summary,
         }))
     }
 
@@ -8741,11 +8792,29 @@ impl FeatureHostController {
                 &remote,
                 &remote_manifest,
             )?;
+            let pack_summary = match self.agent_store_publish_pack_snapshot_with_scope(
+                session_scope,
+                agent_id,
+                &account_root,
+                &target_root,
+                &local_entries,
+            ) {
+                Ok(summary) => summary,
+                Err(error) => {
+                    assert_scope()?;
+                    json!({
+                        "outcome": "degraded",
+                        "reason": format!("{error}"),
+                        "looseBlobFallback": true,
+                    })
+                }
+            };
             assert_scope()?;
             return Ok(json!({
                 "outcome": "noop",
                 "reason": "local and remote are already equivalent",
                 "entries": local_entries.len(),
+                "packs": pack_summary,
             }));
         }
 
@@ -11769,6 +11838,344 @@ impl FeatureHostController {
             let _ = (scope, stage, method, params, mutating);
             Err(FeatureHostError::ProductionUnavailable)
         }
+    }
+
+    fn agent_store_remote_bytes_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        path: &str,
+    ) -> Result<Option<(Vec<u8>, Option<String>)>, FeatureHostError> {
+        let stored = self.agent_store_read_with_scope(scope, agent_id, path)?;
+        if stored.get("found").and_then(Value::as_bool) == Some(false) {
+            return Ok(None);
+        }
+        let data_base64 = stored
+            .get("dataBase64")
+            .and_then(Value::as_str)
+            .ok_or_else(|| FeatureHostError::Contract(format!(
+                "Agent Store object omitted dataBase64: {path}"
+            )))?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data_base64)
+            .map_err(|_| FeatureHostError::Contract(format!(
+                "Agent Store object is invalid base64: {path}"
+            )))?;
+        let etag = stored
+            .get("etag")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        Ok(Some((bytes, etag)))
+    }
+
+    fn agent_store_delete_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        path: &str,
+        base_etag: &str,
+    ) -> Result<Value, FeatureHostError> {
+        self.agent_store_product_execute_with_scope(
+            scope,
+            "remote pack delete",
+            "mahayana.agent.store.delete",
+            &json!({
+                "agentId": agent_id,
+                "path": path,
+                "baseEtag": base_etag,
+            }),
+            true,
+        )
+    }
+
+    fn agent_store_put_exact_bytes_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        path: &str,
+        bytes: &[u8],
+        base_etag: Option<&str>,
+        expect_absent: bool,
+    ) -> Result<Value, FeatureHostError> {
+        if bytes.len() as u64
+            > crate::box_store_pack_runtime::IOS_AGENT_STORE_PACK_TRANSPORT_MAX_BYTES
+        {
+            return Err(FeatureHostError::Contract(format!(
+                "Agent Store pack transport object exceeds 8 MiB: {path}"
+            )));
+        }
+        if let Some((current, _)) =
+            self.agent_store_remote_bytes_with_scope(scope, agent_id, path)?
+        {
+            if current == bytes {
+                return Ok(json!({"outcome": "unchanged"}));
+            }
+            if expect_absent {
+                return Err(FeatureHostError::Contract(format!(
+                    "Agent Store content-addressed pack path already contains different bytes: {path}"
+                )));
+            }
+        }
+
+        let write = self.agent_store_write_with_scope(
+            scope,
+            agent_id,
+            path,
+            &base64::engine::general_purpose::STANDARD.encode(bytes),
+            base_etag,
+            expect_absent,
+        )?;
+        if write.get("outcome").and_then(Value::as_str) != Some("conflict") {
+            return Ok(write);
+        }
+        let Some((canonical, _)) =
+            self.agent_store_remote_bytes_with_scope(scope, agent_id, path)?
+        else {
+            return Err(FeatureHostError::Contract(format!(
+                "Agent Store pack CAS lost race without canonical object: {path}"
+            )));
+        };
+        if canonical != bytes {
+            return Err(FeatureHostError::Contract(format!(
+                "Agent Store pack CAS lost race to divergent canonical bytes: {path}"
+            )));
+        }
+        Ok(json!({"outcome": "unchanged", "acceptedMatchingCanonical": true}))
+    }
+
+    fn agent_store_pack_index_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+    ) -> Result<(Option<crate::box_store_pack::PackIndex>, Option<String>, Option<Vec<u8>>), FeatureHostError> {
+        let Some((bytes, etag)) = self.agent_store_remote_bytes_with_scope(
+            scope,
+            agent_id,
+            crate::box_store_pack::BOX_STORE_PACK_INDEX_KEY,
+        )? else {
+            return Ok((None, None, None));
+        };
+        let index = std::str::from_utf8(&bytes)
+            .ok()
+            .and_then(crate::box_store_pack::parse_pack_index);
+        Ok((index, etag, Some(bytes)))
+    }
+
+    fn agent_store_publish_pack_snapshot_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        account_root: &Path,
+        target_root: &Path,
+        entries: &BTreeMap<String, crate::box_store_manifest::BoxStoreManifestEntry>,
+    ) -> Result<Value, FeatureHostError> {
+        self.assert_agent_store_session_scope(scope, "pack snapshot start")?;
+        let (existing_index, index_etag, existing_index_bytes) =
+            self.agent_store_pack_index_with_scope(scope, agent_id)?;
+        let prepared = crate::box_store_pack_runtime::prepare_pack_snapshot(
+            account_root,
+            target_root,
+            entries,
+            existing_index.as_ref(),
+        )
+        .map_err(FeatureHostError::Contract)?;
+
+        let mut uploaded_packs = 0_u64;
+        let mut reused_packs = 0_u64;
+        let mut uploaded_pack_bytes = 0_u64;
+        for object in &prepared.objects {
+            self.assert_agent_store_session_scope(scope, "pack object upload")?;
+            let path = format!(
+                "{}/{}",
+                crate::box_store_pack::BOX_STORE_PACKS_PREFIX,
+                object.entry.id
+            );
+            let write = self.agent_store_put_exact_bytes_with_scope(
+                scope,
+                agent_id,
+                &path,
+                &object.bytes,
+                None,
+                true,
+            )?;
+            if write.get("outcome").and_then(Value::as_str) == Some("unchanged") {
+                reused_packs = reused_packs.saturating_add(1);
+            } else {
+                uploaded_packs = uploaded_packs.saturating_add(1);
+                uploaded_pack_bytes =
+                    uploaded_pack_bytes.saturating_add(object.entry.bytes);
+            }
+        }
+
+        let referenced = prepared
+            .index
+            .packs
+            .iter()
+            .map(|pack| pack.id.as_str())
+            .collect::<HashSet<_>>();
+
+        let retired_remote = self.agent_store_remote_bytes_with_scope(
+            scope,
+            agent_id,
+            crate::box_store_pack::BOX_STORE_PACK_RETIRED_KEY,
+        )?;
+        let (existing_retired, retired_etag, retired_raw) = match retired_remote {
+            Some((bytes, etag)) => {
+                let parsed = std::str::from_utf8(&bytes)
+                    .ok()
+                    .and_then(crate::box_store_pack::parse_pack_retired);
+                if parsed.is_none() && !prepared.retired_pack_ids.is_empty() {
+                    return Err(FeatureHostError::Contract(
+                        "Agent Store packs/retired.json is unreadable; refusing to overwrite while retiring packs".into(),
+                    ));
+                }
+                (parsed.unwrap_or_default(), etag, Some(bytes))
+            }
+            None => (Vec::new(), None, None),
+        };
+        let mut merged_retired = existing_retired.clone();
+        for pack_id in &prepared.retired_pack_ids {
+            if !merged_retired.contains(pack_id) {
+                merged_retired.push(pack_id.clone());
+            }
+        }
+        merged_retired.retain(|id| !referenced.contains(id.as_str()));
+        merged_retired.sort();
+        merged_retired.dedup();
+        if merged_retired != existing_retired {
+            let retired_bytes = crate::box_store_pack::serialize_pack_retired(&merged_retired)
+                .map_err(|error| FeatureHostError::Contract(error.to_string()))?
+                .into_bytes();
+            self.agent_store_put_exact_bytes_with_scope(
+                scope,
+                agent_id,
+                crate::box_store_pack::BOX_STORE_PACK_RETIRED_KEY,
+                &retired_bytes,
+                retired_etag.as_deref(),
+                retired_raw.is_none(),
+            )?;
+        }
+
+        let index_bytes =
+            crate::box_store_pack_runtime::serialize_transport_pack_index(&prepared.index)
+                .map_err(FeatureHostError::Contract)?;
+        if existing_index_bytes.as_deref() != Some(index_bytes.as_slice()) {
+            self.agent_store_put_exact_bytes_with_scope(
+                scope,
+                agent_id,
+                crate::box_store_pack::BOX_STORE_PACK_INDEX_KEY,
+                &index_bytes,
+                index_etag.as_deref(),
+                existing_index_bytes.is_none(),
+            )?;
+        }
+
+        for pack_id in &prepared.retired_pack_ids {
+            if referenced.contains(pack_id.as_str()) {
+                continue;
+            }
+            let path = format!(
+                "{}/{}",
+                crate::box_store_pack::BOX_STORE_PACKS_PREFIX,
+                pack_id
+            );
+            if let Ok(Some((_bytes, Some(etag)))) =
+                self.agent_store_remote_bytes_with_scope(scope, agent_id, &path)
+            {
+                let _ = self.agent_store_delete_with_scope(
+                    scope,
+                    agent_id,
+                    &path,
+                    &etag,
+                );
+            }
+        }
+        self.assert_agent_store_session_scope(scope, "pack snapshot completion")?;
+        Ok(json!({
+            "outcome": "packed",
+            "uploadedPacks": uploaded_packs,
+            "reusedPacks": reused_packs,
+            "uploadedPackBytes": uploaded_pack_bytes,
+            "packCount": prepared.index.packs.len(),
+            "retiredPacks": prepared.retired_pack_ids.len(),
+            "deferredMembers": prepared.deferred_members,
+        }))
+    }
+
+    fn agent_store_pack_hydrate_blobs_with_scope(
+        &self,
+        scope: &AgentStoreSessionScope,
+        agent_id: &str,
+        account_root: &Path,
+        manifest: &crate::box_store_manifest::BoxStoreManifest,
+    ) -> Result<BTreeMap<String, Vec<u8>>, FeatureHostError> {
+        let (index, _, _) = match self.agent_store_pack_index_with_scope(scope, agent_id) {
+            Ok(value) => value,
+            Err(_) => {
+                self.assert_agent_store_session_scope(scope, "pack index fallback")?;
+                return Ok(BTreeMap::new());
+            }
+        };
+        let Some(index) = index else {
+            return Ok(BTreeMap::new());
+        };
+        let wanted = manifest
+            .entries
+            .values()
+            .filter_map(|entry| match entry {
+                crate::box_store_manifest::BoxStoreManifestEntry::LegacyFile { sha, size }
+                | crate::box_store_manifest::BoxStoreManifestEntry::File { sha, size, .. } => {
+                    Some((sha.clone(), *size))
+                }
+                crate::box_store_manifest::BoxStoreManifestEntry::Symlink { .. } => None,
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut blobs = BTreeMap::<String, Vec<u8>>::new();
+
+        // The Desktop contract permits two concurrent pack downloads. The iOS
+        // product bridge is synchronous today, so requests are serialized (1 <= 2)
+        // while extraction still uses the canonical 16-worker bound.
+        for pack in &index.packs {
+            if !crate::box_store_pack_runtime::pack_is_worth_downloading(pack, &wanted) {
+                continue;
+            }
+            self.assert_agent_store_session_scope(scope, "pack download")?;
+            let path = format!(
+                "{}/{}",
+                crate::box_store_pack::BOX_STORE_PACKS_PREFIX,
+                pack.id
+            );
+            let remote = match self.agent_store_remote_bytes_with_scope(scope, agent_id, &path) {
+                Ok(value) => value,
+                Err(_) => {
+                    self.assert_agent_store_session_scope(scope, "pack download fallback")?;
+                    continue;
+                }
+            };
+            let Some((bytes, _)) = remote else {
+                continue;
+            };
+            match crate::box_store_pack_runtime::extract_transport_pack(
+                account_root,
+                pack,
+                &bytes,
+                &wanted,
+            ) {
+                Ok(extracted) => {
+                    for (sha, bytes) in extracted {
+                        blobs.entry(sha).or_insert(bytes);
+                    }
+                }
+                Err(_) => {
+                    // Pack corruption is an optimization failure only. The
+                    // canonical loose content-addressed object remains the
+                    // recovery path and is verified again by restore_file_atomic.
+                }
+            }
+        }
+        self.assert_agent_store_session_scope(scope, "pack hydrate completion")?;
+        Ok(blobs)
     }
 
     fn agent_store_read_with_scope(

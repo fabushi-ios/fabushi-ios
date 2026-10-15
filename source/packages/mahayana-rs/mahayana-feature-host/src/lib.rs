@@ -9,6 +9,11 @@ mod automation_cloud_proto;
 mod box_store_manifest;
 mod box_store_sync_state;
 mod box_store_hydration;
+#[path = "../../../../host/extensions/box-store-sync/box-store-pack.rs"]
+mod box_store_pack;
+#[path = "../../../../host/extensions/box-store-sync/box-store-pack-pipeline.rs"]
+mod box_store_pack_pipeline;
+mod box_store_pack_runtime;
 mod channel_management;
 mod client_side_tool_v2;
 mod harness;
