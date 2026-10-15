@@ -357,6 +357,33 @@ final class IOSLifecycleParityTests: XCTestCase {
         XCTAssertEqual(IOS_AGENT_STORE_ERROR_BACKOFF_NS, 30_000_000_000)
     }
 
+    func testAgentStoreReconcileResultFenceRejectsLogoutCancellationAndStaleGeneration() {
+        XCTAssertTrue(iosAgentStoreReconcileResultIsCurrent(
+            expectedGeneration: 7,
+            currentGeneration: 7,
+            loggedIn: true,
+            taskCancelled: false
+        ))
+        XCTAssertFalse(iosAgentStoreReconcileResultIsCurrent(
+            expectedGeneration: 7,
+            currentGeneration: 8,
+            loggedIn: true,
+            taskCancelled: false
+        ))
+        XCTAssertFalse(iosAgentStoreReconcileResultIsCurrent(
+            expectedGeneration: 7,
+            currentGeneration: 7,
+            loggedIn: false,
+            taskCancelled: false
+        ))
+        XCTAssertFalse(iosAgentStoreReconcileResultIsCurrent(
+            expectedGeneration: 7,
+            currentGeneration: 7,
+            loggedIn: true,
+            taskCancelled: true
+        ))
+    }
+
     func testShippingRuntimeScopesAgentStorePeriodicReconcileToActiveAccountLifecycle() throws {
         let iosRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -397,6 +424,9 @@ final class IOSLifecycleParityTests: XCTestCase {
         XCTAssertTrue(source.contains("agentStoreReconcileGeneration: UInt64 = 0"))
         XCTAssertTrue(source.contains("if let inFlight = agentStoreReconcileInFlight"))
         XCTAssertTrue(source.contains("let completed = await inFlight.value"))
+        XCTAssertTrue(source.contains("iosAgentStoreReconcileResultIsCurrent("))
+        XCTAssertTrue(source.contains("expectedGeneration: generation"))
+        XCTAssertTrue(source.contains("currentGeneration: agentStoreReconcileGeneration"))
         XCTAssertTrue(source.contains("coalesced-completed"))
         XCTAssertTrue(source.contains("coalesced-failed"))
         XCTAssertTrue(source.contains("if agentStoreReconcileGeneration == generation"))

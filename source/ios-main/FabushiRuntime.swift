@@ -8,6 +8,16 @@ private let IOS_CLOUD_AGENT_RESTART_GRACE_MS: Int64 = 3 * 60 * 1_000
 let IOS_AGENT_STORE_RECONCILE_INTERVAL_NS: UInt64 = 120_000_000_000
 let IOS_AGENT_STORE_ERROR_BACKOFF_NS: UInt64 = 30_000_000_000
 
+@inline(__always)
+func iosAgentStoreReconcileResultIsCurrent(
+    expectedGeneration: UInt64,
+    currentGeneration: UInt64,
+    loggedIn: Bool,
+    taskCancelled: Bool
+) -> Bool {
+    expectedGeneration == currentGeneration && loggedIn && !taskCancelled
+}
+
 private struct IOSPendingCloudAgentWake: Equatable {
     let agentId: String
     let workId: String
@@ -460,8 +470,14 @@ final class FabushiRuntime {
         guard marketplace.loggedIn else { return true }
 
         if let inFlight = agentStoreReconcileInFlight {
+            let generation = agentStoreReconcileGeneration
             let completed = await inFlight.value
-            guard !Task.isCancelled else { return false }
+            guard iosAgentStoreReconcileResultIsCurrent(
+                expectedGeneration: generation,
+                currentGeneration: agentStoreReconcileGeneration,
+                loggedIn: marketplace.loggedIn,
+                taskCancelled: Task.isCancelled
+            ) else { return false }
             main.lifecycleReporter.report(
                 .coordinatorHandoff,
                 level: completed ? .info : .warn,
@@ -477,9 +493,15 @@ final class FabushiRuntime {
         agentStoreReconcileGeneration &+= 1
         let generation = agentStoreReconcileGeneration
         let task = Task { [weak self] () -> Bool in
-            guard let self, self.marketplace.loggedIn else { return true }
+            guard let self, self.marketplace.loggedIn else { return false }
             do {
                 _ = try await self.main.coordinator.reconcileAgentStoreForCurrentScope()
+                guard iosAgentStoreReconcileResultIsCurrent(
+                    expectedGeneration: generation,
+                    currentGeneration: self.agentStoreReconcileGeneration,
+                    loggedIn: self.marketplace.loggedIn,
+                    taskCancelled: Task.isCancelled
+                ) else { return false }
                 self.main.lifecycleReporter.report(
                     .coordinatorHandoff,
                     metadata: [
@@ -492,6 +514,12 @@ final class FabushiRuntime {
             } catch is CancellationError {
                 return false
             } catch {
+                guard iosAgentStoreReconcileResultIsCurrent(
+                    expectedGeneration: generation,
+                    currentGeneration: self.agentStoreReconcileGeneration,
+                    loggedIn: self.marketplace.loggedIn,
+                    taskCancelled: Task.isCancelled
+                ) else { return false }
                 self.main.lifecycleReporter.report(
                     .coordinatorHandoff,
                     level: .warn,
@@ -507,10 +535,16 @@ final class FabushiRuntime {
         }
         agentStoreReconcileInFlight = task
         let completed = await task.value
+        let resultIsCurrent = iosAgentStoreReconcileResultIsCurrent(
+            expectedGeneration: generation,
+            currentGeneration: agentStoreReconcileGeneration,
+            loggedIn: marketplace.loggedIn,
+            taskCancelled: Task.isCancelled
+        )
         if agentStoreReconcileGeneration == generation {
             agentStoreReconcileInFlight = nil
         }
-        return completed
+        return completed && resultIsCurrent
     }
 
     private func scheduleAgentStoreReconcile(reason: String) {
