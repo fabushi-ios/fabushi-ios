@@ -325,6 +325,104 @@ pub fn search_media(
         .map_err(|error| map_sqlite_error("collect media search", error))
 }
 
+
+pub fn search_global_messages(
+    conn: &Connection,
+    account_keys: &[String],
+    raw_query: &str,
+) -> Result<Vec<Value>, SearchDbError> {
+    use std::collections::{BTreeSet, HashMap};
+
+    if !is_reconcile_done(conn)? {
+        return Ok(Vec::new());
+    }
+    let query = format_fts_query(raw_query);
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let accounts = account_keys
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>();
+    if accounts.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut candidates = Vec::<(String, String, i64, String, f64)>::new();
+    for account_key in accounts {
+        let prefix = format!("{account_key}\u{1f}");
+        let mut statement = conn
+            .prepare(
+                "SELECT m.agent_id, m.entry_id, m.timestamp_ms,
+                        snippet(messages_fts, 0, '', '', ' … ', ?4) AS snippet,
+                        bm25(messages_fts) AS score
+                 FROM messages_fts
+                 JOIN messages m ON m.id = messages_fts.rowid
+                 WHERE messages_fts MATCH ?1
+                   AND substr(m.agent_id, 1, length(?2)) = ?2
+                 ORDER BY score ASC, m.timestamp_ms DESC
+                 LIMIT ?3",
+            )
+            .map_err(|error| map_sqlite_error("prepare global message search", error))?;
+        let rows = statement
+            .query_map(
+                params![
+                    query,
+                    prefix,
+                    (super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS * 8) as i64,
+                    SNIPPET_CONTEXT_TOKENS
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, f64>(4)?,
+                    ))
+                },
+            )
+            .map_err(|error| map_sqlite_error("execute global message search", error))?;
+        candidates.extend(
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(|error| map_sqlite_error("collect global message search", error))?,
+        );
+    }
+
+    candidates.sort_by(|left, right| {
+        left.4
+            .partial_cmp(&right.4)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| right.2.cmp(&left.2))
+    });
+
+    let mut per_scope = HashMap::<String, usize>::new();
+    let mut results = Vec::new();
+    for (scope_id, entry_id, timestamp_ms, snippet, score) in candidates {
+        if results.len() >= super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS {
+            break;
+        }
+        let count = per_scope.entry(scope_id.clone()).or_default();
+        if *count >= super::agent_content_search::MAX_AGENT_SEARCH_RESULTS {
+            continue;
+        }
+        *count += 1;
+        results.push(json!({
+            "kind": "message",
+            "id": entry_id.clone(),
+            "entryId": entry_id,
+            "conversationId": conversation_id_from_scope(&scope_id),
+            "timestampMs": timestamp_ms,
+            "snippet": snippet,
+            "score": score.round() as i64,
+        }));
+    }
+    Ok(results)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,4 +470,54 @@ mod tests {
         assert_eq!(query.split_whitespace().count(), 8);
         assert!(format_fts_query("a\"b").contains("\"a\"\"b\"*"));
     }
+
+    #[test]
+    fn global_search_caps_each_scope_at_five_and_account_total_at_fifty() {
+        let path = temp_path();
+        let conn = open_search_index_db(&path).unwrap();
+        for scope_index in 0..12 {
+            let scope = format!("account-a\u{1f}conversation-{scope_index}");
+            for message_index in 0..6 {
+                conn.execute(
+                    "INSERT INTO messages(agent_id, entry_id, role, timestamp_ms, body)
+                     VALUES(?1, ?2, 'assistant', ?3, 'needle durable global result')",
+                    params![
+                        scope,
+                        format!("a-{scope_index}-{message_index}"),
+                        (scope_index * 10 + message_index) as i64
+                    ],
+                )
+                .unwrap();
+            }
+        }
+        for message_index in 0..6 {
+            conn.execute(
+                "INSERT INTO messages(agent_id, entry_id, role, timestamp_ms, body)
+                 VALUES(?1, ?2, 'assistant', ?3, 'needle must not leak')",
+                params![
+                    "account-b\u{1f}leak",
+                    format!("b-{message_index}"),
+                    message_index as i64
+                ],
+            )
+            .unwrap();
+        }
+        set_reconcile_done(&conn, true).unwrap();
+
+        let results = search_global_messages(&conn, &["account-a".into()], "needle").unwrap();
+        assert_eq!(results.len(), super::agent_content_search::MAX_GLOBAL_SEARCH_RESULTS);
+        assert!(results.iter().all(|row| row["conversationId"] != "leak"));
+        let mut per_conversation = std::collections::HashMap::<String, usize>::new();
+        for row in &results {
+            *per_conversation
+                .entry(row["conversationId"].as_str().unwrap().to_owned())
+                .or_default() += 1;
+        }
+        assert!(per_conversation
+            .values()
+            .all(|count| *count <= super::agent_content_search::MAX_AGENT_SEARCH_RESULTS));
+        drop(conn);
+        let _ = remove_search_index_files(&path);
+    }
+
 }

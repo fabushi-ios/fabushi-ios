@@ -1,6 +1,8 @@
 use serde_json::{Map, Value};
 
 pub const MAX_SEARCH_RESULTS: usize = 200;
+pub const MAX_AGENT_SEARCH_RESULTS: usize = 5;
+pub const MAX_GLOBAL_SEARCH_RESULTS: usize = 50;
 
 pub fn required_text(params: &Map<String, Value>, key: &str) -> Result<String, String> {
     params

@@ -2096,6 +2096,8 @@ internal struct MobileBotChat: View {
     let reconnectGeneration: Int
     let suggestionTransportConnected: Bool
     let focusPromptGeneration: Int
+    let externalSearchTargetMessageID: String?
+    let onExternalSearchTargetConsumed: (String) -> Void
     let onClose: () -> Void
     let onOpenSettings: () -> Void
     let onOpenComputer: () -> Void
@@ -2181,6 +2183,8 @@ internal struct MobileBotChat: View {
     @State private var findSearchGeneration = 0
     @State private var findSearchTask: Task<Void, Never>?
     @State private var contentSearchReconcileGeneration = 0
+    @State private var externalSearchTargetGeneration = 0
+    @State private var externalSearchScrollEntryId: String?
     @State private var forwardMessage: MobileChatMessage?
     @State private var composerFocusGeneration = 0
     @State private var durableQueueFlushing = false
@@ -2212,9 +2216,14 @@ internal struct MobileBotChat: View {
         .task(id: semanticFingerprint) { publishAppAgentSurface() }
         .task(id: "\(bot.id):\(bot.conversationId ?? "")") {
             await loadInitialConversationTail()
+            await revealExternalSearchTargetIfNeeded()
             await reconcileDurableContentSearchIndex()
             if suggestionTransportConnected { await flushDurableComposerQueue() }
             else { await restoreDurableQueuedRows() }
+        }
+        .task(id: "\(bot.id):\(model.settingsNoticeAccountKey):\(externalSearchTargetMessageID ?? "")") {
+            guard !entries.isEmpty else { return }
+            await revealExternalSearchTargetIfNeeded()
         }
         .onChange(of: suggestionTransportConnected) { _, connected in
             guard connected else { return }
@@ -2283,10 +2292,14 @@ internal struct MobileBotChat: View {
             resetTranscriptDraftUI()
             resetSecretRequestUI()
             forwardMessage = nil
+            externalSearchTargetGeneration &+= 1
+            externalSearchScrollEntryId = nil
             closeFind()
             invalidateEditorSuggestions()
         }
         .onChange(of: model.settingsNoticeAccountKey) { _, _ in
+            externalSearchTargetGeneration &+= 1
+            externalSearchScrollEntryId = nil
             invalidateGeneratedMiniAppArtifactFlow()
             resetAcknowledgementScope()
             transcriptPaginationGeneration &+= 1
@@ -2754,6 +2767,16 @@ internal struct MobileBotChat: View {
                     proxy.scrollTo(entryId, anchor: .center)
                 }
             }
+            .onChange(of: externalSearchScrollEntryId) { _, entryId in
+                guard let entryId else { return }
+                externalSearchScrollEntryId = nil
+                withAnimation(.easeOut(duration: 0.16)) {
+                    proxy.scrollTo(entryId, anchor: .center)
+                }
+                if let target = externalSearchTargetMessageID {
+                    onExternalSearchTargetConsumed(target)
+                }
+            }
         }
     }
 
@@ -2928,6 +2951,47 @@ internal struct MobileBotChat: View {
             await loadOlderConversationEntries()
             guard generation == findSearchGeneration, !Task.isCancelled else { return }
             if entries.count == previousCount { break }
+        }
+    }
+
+    @MainActor
+    private func revealExternalSearchTargetIfNeeded() async {
+        let target = externalSearchTargetMessageID?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !target.isEmpty else { return }
+
+        externalSearchTargetGeneration &+= 1
+        let generation = externalSearchTargetGeneration
+        let accountKey = model.settingsNoticeAccountKey
+        let ownedBotID = bot.id
+
+        func resolvedEntryID() -> String? {
+            entries.first(where: {
+                $0.id == target || $0.canonicalMessageId == target
+            })?.id
+        }
+
+        if let entryID = resolvedEntryID() {
+            externalSearchScrollEntryId = entryID
+            return
+        }
+
+        while !transcriptOlderExhausted {
+            let previousCount = entries.count
+            await loadOlderConversationEntries()
+            guard generation == externalSearchTargetGeneration,
+                  ownedBotID == bot.id,
+                  accountKey == model.settingsNoticeAccountKey,
+                  !Task.isCancelled
+            else { return }
+
+            if let entryID = resolvedEntryID() {
+                externalSearchScrollEntryId = entryID
+                return
+            }
+            if entries.count == previousCount || transcriptPaginationError != nil {
+                return
+            }
         }
     }
 

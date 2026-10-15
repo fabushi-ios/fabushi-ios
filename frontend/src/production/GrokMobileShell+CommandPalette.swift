@@ -90,6 +90,7 @@ extension GrokMobileShell {
             bots: [board] + bots,
             conversations: messaging.conversations,
             messagesByConversation: messaging.messagesByConversation,
+            durableMessages: commandPaletteGlobalMessages,
             actions: commandPaletteActions,
             routines: commandPaletteRoutines,
             linkMetadata: commandPaletteLinkMetadata,
@@ -170,6 +171,9 @@ extension GrokMobileShell {
         .task(id: commandPaletteComputerProviderKey) {
             await refreshCommandPaletteComputerProjection()
         }
+        .task(id: commandPaletteGlobalSearchKey) {
+            await refreshCommandPaletteGlobalSearch()
+        }
     }
 
     func commandPaletteRow(_ entry: MobileCommandPaletteEntry) -> some View {
@@ -217,8 +221,89 @@ extension GrokMobileShell {
         }
     }
 
+    var commandPaletteGlobalSearchKey: String {
+        [
+            searchOpen ? "open" : "closed",
+            mobileAccountScopeKey,
+            model.settingsNoticeAccountKey,
+            query.trimmingCharacters(in: .whitespacesAndNewlines),
+        ].joined(separator: ":")
+    }
+
+    @MainActor
+    func refreshCommandPaletteGlobalSearch() async {
+        commandPaletteGlobalSearchGeneration &+= 1
+        let generation = commandPaletteGlobalSearchGeneration
+        commandPaletteGlobalSearchTask?.cancel()
+        commandPaletteGlobalSearchTask = nil
+
+        let searchQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard searchOpen, !searchQuery.isEmpty else {
+            commandPaletteGlobalMessages = []
+            return
+        }
+        let botAccountKey = model.settingsNoticeAccountKey
+        let shellAccountScope = mobileAccountScopeKey
+        let client = DurableContentSearchClient(bridge: bridge)
+        let task = Task { @MainActor in
+            do {
+                let humanAccountKey = try await messaging.contentSearchAccountKey()
+                let results = try await client.searchGlobal(
+                    accountKeys: [botAccountKey, humanAccountKey],
+                    query: searchQuery
+                )
+                try Task.checkCancellation()
+                guard generation == commandPaletteGlobalSearchGeneration,
+                      searchOpen,
+                      query.trimmingCharacters(in: .whitespacesAndNewlines) == searchQuery,
+                      mobileAccountScopeKey == shellAccountScope,
+                      model.settingsNoticeAccountKey == botAccountKey
+                else { return }
+
+                var titles = Dictionary(
+                    uniqueKeysWithValues: messaging.conversations.map { ($0.id, $0.title) }
+                )
+                for bot in bots {
+                    if let conversationId = bot.conversationId {
+                        titles[conversationId] = bot.name
+                    }
+                }
+                commandPaletteGlobalMessages = results.map {
+                    MobileCommandPaletteMessage(
+                        conversationId: $0.conversationId,
+                        messageId: $0.entryId,
+                        conversationTitle: titles[$0.conversationId] ?? "Conversation",
+                        snippet: $0.snippet,
+                        isOutgoing: false
+                    )
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard generation == commandPaletteGlobalSearchGeneration else { return }
+                commandPaletteGlobalMessages = []
+            }
+        }
+        commandPaletteGlobalSearchTask = task
+        await task.value
+    }
+
+    @MainActor
+    func resetCommandPaletteGlobalSearchScope() {
+        commandPaletteGlobalSearchGeneration &+= 1
+        commandPaletteGlobalSearchTask?.cancel()
+        commandPaletteGlobalSearchTask = nil
+        commandPaletteGlobalMessages = []
+        commandPaletteBotMessageTargetConversationId = nil
+        commandPaletteBotMessageTargetId = nil
+    }
+
     @MainActor
     func closeCommandPalette() {
+        commandPaletteGlobalSearchGeneration &+= 1
+        commandPaletteGlobalSearchTask?.cancel()
+        commandPaletteGlobalSearchTask = nil
+        commandPaletteGlobalMessages = []
         searchOpen = false
         query = ""
         paletteTab = .all
@@ -246,7 +331,18 @@ extension GrokMobileShell {
         case .conversation(let conversation):
             openLegacyConversation(conversation.id)
         case .message(let message):
-            openLegacyConversation(message.conversationId, messageId: message.messageId)
+            if let bot = bots.first(where: {
+                $0.conversationId == message.conversationId
+            }) {
+                commandPaletteBotMessageTargetConversationId = message.conversationId
+                commandPaletteBotMessageTargetId = message.messageId
+                selectedBot = bot
+                closeCommandPalette()
+            } else {
+                commandPaletteBotMessageTargetConversationId = nil
+                commandPaletteBotMessageTargetId = nil
+                openLegacyConversation(message.conversationId, messageId: message.messageId)
+            }
         case .file(let file):
             openLegacyConversation(file.conversationId, messageId: file.messageId)
         case .link(let link):

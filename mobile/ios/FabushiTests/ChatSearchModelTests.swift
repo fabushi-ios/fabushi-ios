@@ -179,4 +179,31 @@ final class ChatSearchModelTests: XCTestCase {
         XCTAssertEqual(payload[0]["body"] as? String, "A durable transcript body")
         XCTAssertEqual(payload[0]["kind"] as? String, "message")
     }
+
+    @MainActor
+    func testDurableGlobalSearchKeepsMultipleConversationsWithoutDroppingIdentity() {
+        let results = DurableContentSearchClient.globalResults(
+            from: [
+                "results": [
+                    [
+                        "kind": "message",
+                        "entryId": "history:m1",
+                        "conversationId": "bot-conversation",
+                        "snippet": "first",
+                        "score": NSNumber(value: -4),
+                    ],
+                    [
+                        "kind": "message",
+                        "entryId": "human-m2",
+                        "conversationId": "human-conversation",
+                        "snippet": "second",
+                        "score": NSNumber(value: -3),
+                    ],
+                ],
+            ]
+        )
+        XCTAssertEqual(results.map(\.entryId), ["history:m1", "human-m2"])
+        XCTAssertEqual(results.map(\.conversationId), ["bot-conversation", "human-conversation"])
+    }
+
 }

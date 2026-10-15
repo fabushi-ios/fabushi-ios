@@ -66,6 +66,11 @@ internal struct GrokMobileShell: View {
     @State var legacyMessageID: String?
     @State var legacySection: MobileSection?
     @State var commandPaletteRoutines: [MobileCommandPaletteRoutine] = []
+    @State var commandPaletteGlobalMessages: [MobileCommandPaletteMessage] = []
+    @State var commandPaletteBotMessageTargetConversationId: String?
+    @State var commandPaletteBotMessageTargetId: String?
+    @State var commandPaletteGlobalSearchGeneration = 0
+    @State var commandPaletteGlobalSearchTask: Task<Void, Never>?
     @State var commandPaletteRoutineStatus: MobileCommandPaletteProviderStatus = .idle
     @State var commandPaletteLinkMetadata: [String: MobileCommandPaletteLinkMetadata] = [:]
     @State var commandPaletteLinkStatus: MobileCommandPaletteProviderStatus = .idle
@@ -130,6 +135,7 @@ internal struct GrokMobileShell: View {
         }
         .onChange(of: mobileAccountScopeKey) { _, _ in
             resetCommandPaletteComputerScope()
+            resetCommandPaletteGlobalSearchScope()
         }
         .onDisappear {
             commandPaletteComputerGeneration &+= 1
@@ -519,6 +525,17 @@ internal struct GrokMobileShell: View {
             reconnectGeneration: reconnectGeneration,
             suggestionTransportConnected: coordinatorConnectionSnapshot.phase == .connected,
             focusPromptGeneration: promptFocusGeneration,
+            externalSearchTargetMessageID:
+                bot.conversationId == commandPaletteBotMessageTargetConversationId
+                    ? commandPaletteBotMessageTargetId
+                    : nil,
+            onExternalSearchTargetConsumed: { consumedID in
+                guard commandPaletteBotMessageTargetId == consumedID,
+                      bot.conversationId == commandPaletteBotMessageTargetConversationId
+                else { return }
+                commandPaletteBotMessageTargetConversationId = nil
+                commandPaletteBotMessageTargetId = nil
+            },
             onClose: { clearRosterSelection() },
             onOpenSettings: {
                 self.botSettingsRoutineID = nil

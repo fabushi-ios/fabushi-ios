@@ -869,6 +869,12 @@ final class MessagingModel {
         return []
     }
 
+
+    func contentSearchAccountKey() async throws -> String {
+        try await ensureIdentity()
+        return actorId
+    }
+
     func searchConversationMessages(
         conversationId: String,
         query: String,

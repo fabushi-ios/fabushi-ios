@@ -58,6 +58,7 @@ pub enum SearchIndexJob {
     ReindexScope { scope_id: String },
     Reconcile,
     SearchMessages { scope_id: String, query: String, limit: usize },
+    SearchGlobal { account_keys: Vec<String>, query: String },
     SearchMedia { scope_id: String, query: String, limit: usize },
     Status,
 }
@@ -103,6 +104,13 @@ impl SearchIndexWriter {
             }
             SearchIndexJob::SearchMessages { scope_id, query, limit } => Ok(json!({
                 "results": search_messages(&self.index, &scope_id, &query, limit)?
+            })),
+            SearchIndexJob::SearchGlobal { account_keys, query } => Ok(json!({
+                "results": super::search_index_db::search_global_messages(
+                    &self.index,
+                    &account_keys,
+                    &query,
+                )?
             })),
             SearchIndexJob::SearchMedia { scope_id, query, limit } => Ok(json!({
                 "results": search_media(&self.index, &scope_id, &query, limit)?

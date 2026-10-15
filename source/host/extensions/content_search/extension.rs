@@ -168,6 +168,28 @@ impl MobileContentSearchOwner {
                     scope_id, query, limit: bounded_limit(params),
                 }).map_err(|error| error.to_string())
             }
+            "feature.contentSearch.searchGlobal" => {
+                let query = required_text(params, "query")?;
+                let account_keys = params
+                    .get("accountKeys")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| "accountKeys must be an array".to_string())?
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                if account_keys.is_empty() {
+                    return Err("accountKeys must include at least one account scope".into());
+                }
+                self.service
+                    .execute(SearchIndexJob::SearchGlobal {
+                        account_keys,
+                        query,
+                    })
+                    .map_err(|error| error.to_string())
+            }
             "feature.contentSearch.searchMedia" => {
                 let scope_id = scoped_params(params)?;
                 let query = params.get("query").and_then(Value::as_str).unwrap_or_default().to_owned();

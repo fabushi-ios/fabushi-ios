@@ -323,4 +323,31 @@ final class GrokMobileCommandPaletteTests: XCTestCase {
             isPinned: false
         )
     }
+
+    func testDurableGlobalMessagesReplaceLoadedMemoryForQueriedMessageResults() {
+        let conversation = conversation(id: "chat-1", title: "Loaded chat", kind: .direct)
+        let loaded = message(
+            id: "loaded",
+            conversationId: conversation.id,
+            text: "dharma loaded memory"
+        )
+        let durable = MobileCommandPaletteMessage(
+            conversationId: "bot-conversation",
+            messageId: "history:durable",
+            conversationTitle: "Research Bot",
+            snippet: "dharma durable index",
+            isOutgoing: false
+        )
+        let rows = GrokMobileCommandPaletteModel.entries(
+            bots: [],
+            conversations: [conversation],
+            messagesByConversation: [conversation.id: [loaded]],
+            durableMessages: [durable],
+            actions: [],
+            query: "dharma",
+            tab: .messages
+        )
+        XCTAssertEqual(rows.map(\.id), ["message:bot-conversation:history:durable"])
+    }
+
 }

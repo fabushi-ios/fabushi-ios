@@ -147,6 +147,49 @@ internal struct DurableContentSearchClient {
         return Self.results(from: response.value, conversationId: conversation)
     }
 
+
+    func searchGlobal(
+        accountKeys: [String],
+        query: String
+    ) async throws -> [DurableContentSearchResult] {
+        let accountKeys = Array(Set(
+            accountKeys
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )).sorted()
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accountKeys.isEmpty, !query.isEmpty else { return [] }
+        let response = try await bridge.request(
+            method: "feature.contentSearch.searchGlobal",
+            params: [
+                "accountKeys": accountKeys,
+                "query": query,
+            ]
+        )
+        return Self.globalResults(from: response.value)
+    }
+
+    nonisolated static func globalResults(from value: Any) -> [DurableContentSearchResult] {
+        guard let object = value as? [String: Any],
+              let rows = object["results"] as? [[String: Any]]
+        else { return [] }
+        return rows.compactMap { row in
+            guard row["kind"] as? String == "message",
+                  let entryId = (row["entryId"] as? String) ?? (row["id"] as? String),
+                  !entryId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let conversationId = row["conversationId"] as? String,
+                  !conversationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else { return nil }
+            return DurableContentSearchResult(
+                entryId: entryId,
+                conversationId: conversationId,
+                snippet: row["snippet"] as? String ?? "",
+                timestampMs: (row["timestampMs"] as? NSNumber)?.int64Value,
+                score: (row["score"] as? NSNumber)?.intValue ?? 0
+            )
+        }
+    }
+
     nonisolated static func indexPayload(_ entries: [ChatSearchEntry]) -> [[String: Any]] {
         entries.map {
             [
