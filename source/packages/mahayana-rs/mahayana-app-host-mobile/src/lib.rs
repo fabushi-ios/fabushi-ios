@@ -1202,6 +1202,9 @@ impl MobileAppHost {
 
         let output = self.host.dispatch_json(input);
         self.content_search.observe_host_dispatch(input, &output);
+        if let Some(owner) = self.cross_user_sharing.as_ref() {
+            let _ = owner.observe_host_dispatch(input, &output);
+        }
 
         let succeeded = serde_json::from_str::<serde_json::Value>(&output)
             .ok()
