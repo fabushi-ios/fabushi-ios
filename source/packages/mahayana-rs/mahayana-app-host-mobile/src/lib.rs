@@ -392,6 +392,10 @@ mod legacy_transcript_mirror;
 mod production_provider;
 #[path = "../../../../host/extensions/box-store-sync/files.rs"]
 mod box_store_sync_files;
+#[path = "../../../../host/extensions/box-store-sync/box-store-pack.rs"]
+mod box_store_pack;
+#[path = "../../../../host/extensions/box-store-sync/box-store-pack-pipeline.rs"]
+mod box_store_pack_pipeline;
 #[path = "../../../../host/extensions/local-exec/local-exec-failure-classifier.rs"]
 mod local_exec_failure_classifier;
 #[path = "../../../../host/extensions/transcript/sand-automation-failure.rs"]
