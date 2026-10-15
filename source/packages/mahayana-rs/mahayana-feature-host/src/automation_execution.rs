@@ -593,14 +593,28 @@ impl FeatureHostController {
             .trigger
             .clone()
             .unwrap_or_else(|| AutomationTrigger::Schedule { schedule: automation.schedule.clone() });
-        if definition_revision.is_some() {
-            // The canonical cloud-definition revision is not yet persisted by the
-            // iOS cloud-sync owner. Match Desktop's safe behavior when revision
-            // evidence is unavailable: abandon rather than execute stale work.
-            return Ok(json!({
-                "disposition": "abandon",
-                "reason": "definition_revision_unavailable",
-            }));
+        if let Some(revision) = definition_revision {
+            let user_time_zone = self.host_settings_user_timezone_direct()?;
+            match crate::automation_cloud_definition::automation_cloud_definition_revision(
+                &automation,
+                user_time_zone.as_deref(),
+            ) {
+                Some(expected) if expected == revision => {}
+                Some(_) => {
+                    return Ok(json!({
+                        "disposition": "complete",
+                        "status": "failed",
+                        "errorMessage": "Automation definition changed on the Sand box",
+                        "reason": "definition_changed",
+                    }));
+                }
+                None => {
+                    return Ok(json!({
+                        "disposition": "abandon",
+                        "reason": "definition_revision_unavailable",
+                    }));
+                }
+            }
         }
 
         if object.get("event").is_none_or(Value::is_null)
@@ -1606,21 +1620,37 @@ mod routine_execution_tests {
     }
 
     #[test]
-    fn backend_fire_definition_revision_without_cloud_revision_is_safely_abandoned() {
+    fn backend_fire_definition_revision_matches_exact_cloud_definition() {
         let fixture = Fixture::new();
         fixture.schedule("revision-daily");
-        let fire = json!({
+        fixture.host.set_routine_quiescing(true).expect("quiesce");
+        let automation = fixture.host.state().expect("state").automations["revision-daily"].clone();
+        let revision = crate::automation_cloud_definition::automation_cloud_definition_revision(
+            &automation,
+            fixture.host.host_settings_user_timezone_direct().expect("timezone").as_deref(),
+        ).expect("cloud revision");
+        let accepted = json!({
             "id": Uuid::new_v4().to_string(),
             "sandAgentId": "mahayana-assistant",
             "automationId": stable_backend_automation_id("mahayana-assistant", "revision-daily"),
             "timestampMs": 100,
             "scheduledForMs": 100,
-            "definitionRevision": "server-revision"
+            "definitionRevision": revision
         });
-        let admission = fixture.host.admit_backend_automation_fire(&fire).expect("revision admission");
-        assert_eq!(admission["disposition"], "abandon");
-        assert_eq!(admission["reason"], "definition_revision_unavailable");
-        assert!(fixture.host.state().expect("state").automations["revision-daily"].runs.is_empty());
+        let admission = fixture.host.admit_backend_automation_fire(&accepted).expect("revision admission");
+        assert_eq!(admission["disposition"], "admitted");
+
+        let changed = json!({
+            "id": Uuid::new_v4().to_string(),
+            "sandAgentId": "mahayana-assistant",
+            "automationId": stable_backend_automation_id("mahayana-assistant", "revision-daily"),
+            "timestampMs": 101,
+            "scheduledForMs": 101,
+            "definitionRevision": "stale-server-revision"
+        });
+        let rejected = fixture.host.admit_backend_automation_fire(&changed).expect("changed definition");
+        assert_eq!(rejected["disposition"], "complete");
+        assert_eq!(rejected["reason"], "definition_changed");
     }
 
     #[test]

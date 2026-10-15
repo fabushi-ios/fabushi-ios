@@ -34,6 +34,7 @@ mahayana-harness-services.workspace = true
 mahayana-host = { workspace = true, default-features = false, optional = true }
 mahayana-host-protocol.workspace = true
 mahayana-secrets.workspace = true
+prost.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
