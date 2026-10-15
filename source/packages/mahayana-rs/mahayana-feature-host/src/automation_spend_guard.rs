@@ -37,6 +37,12 @@ enum AutomationSpendGuardDecision {
     BelowThresholds,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum AutomationSpendGuardAdmission {
+    Continue(Option<String>),
+    Suppress,
+}
+
 fn automation_spend_guard_decision(
     guard: &AutomationSpendGuardAgentState,
     fires_since_viewed: usize,
@@ -190,6 +196,159 @@ fn spend_guard_fires_since_viewed(
         .count()
 }
 
+fn spend_guard_widget(paused: bool) -> TranscriptCard {
+    let (prompt, options) = if paused {
+        (
+            "I paused all your routines while you were away to avoid wasted spend. Want me to start them back up?".to_string(),
+            vec![
+                mahayana_host_protocol::WidgetChoiceOption {
+                    label: "Resume routines".into(),
+                    value: Some("spend-guard:resume".into()),
+                    description: None,
+                    style: Some("primary".into()),
+                },
+                mahayana_host_protocol::WidgetChoiceOption {
+                    label: "Keep them paused".into(),
+                    value: Some("spend-guard:stay-paused".into()),
+                    description: None,
+                    style: None,
+                },
+            ],
+        )
+    } else {
+        (
+            "You've been away for a bit — keep my routines running?".to_string(),
+            vec![
+                mahayana_host_protocol::WidgetChoiceOption {
+                    label: "Keep them running".into(),
+                    value: Some("spend-guard:keep".into()),
+                    description: None,
+                    style: Some("primary".into()),
+                },
+                mahayana_host_protocol::WidgetChoiceOption {
+                    label: "Pause them all".into(),
+                    value: Some("spend-guard:pause".into()),
+                    description: None,
+                    style: None,
+                },
+                mahayana_host_protocol::WidgetChoiceOption {
+                    label: "Keep running, don't ask again".into(),
+                    value: Some("spend-guard:never-ask".into()),
+                    description: None,
+                    style: None,
+                },
+            ],
+        )
+    };
+    TranscriptCard::Widget {
+        widget: mahayana_host_protocol::WidgetQuestion {
+            prompt,
+            help_text: None,
+            options,
+            allow_custom: false,
+            dismiss_on_move_on: false,
+        },
+        responded_value: None,
+        widget_dismissed: false,
+        widget_skipped: false,
+    }
+}
+
+fn spend_guard_preserved_unread(
+    current: &AutomationSpendGuardAgentState,
+) -> AutomationSpendGuardAgentState {
+    AutomationSpendGuardAgentState {
+        last_activity_at_ms: current.last_activity_at_ms,
+        last_viewed_at_ms: current.last_viewed_at_ms,
+        unread_count: current.unread_count,
+        ..AutomationSpendGuardAgentState::default()
+    }
+}
+
+fn spend_guard_disable_agent_automations(
+    state: &mut FeatureState,
+    agent_id: &str,
+    now_ms: i64,
+    user_time_zone: Option<&str>,
+) -> Vec<String> {
+    let before = state.automations.clone();
+    let mut paused = Vec::new();
+    for automation in state.automations.values_mut() {
+        if automation.agent_id.as_deref().unwrap_or("mahayana-assistant") != agent_id
+            || !automation.enabled
+        {
+            continue;
+        }
+        automation.enabled = false;
+        automation.next_run_at_ms = None;
+        paused.push(automation.id.clone());
+    }
+    if paused.is_empty() {
+        return paused;
+    }
+    prune_pending_listener_resumes(state);
+    prune_pending_automation_event_batches(state);
+    let after = state.automations.clone();
+    push_automation_lifecycle_diff(
+        state,
+        &before,
+        &after,
+        AutomationLifecycleSource::SpendGuard,
+        user_time_zone,
+        now_ms,
+    );
+    paused
+}
+
+fn spend_guard_resume_agent_automations(
+    state: &mut FeatureState,
+    agent_id: &str,
+    ids: &[String],
+    now_ms: i64,
+    user_time_zone: Option<&str>,
+) -> Vec<String> {
+    let before = state.automations.clone();
+    let mut resumed = Vec::new();
+    for id in ids {
+        let Some(automation) = state.automations.get_mut(id) else {
+            continue;
+        };
+        if automation.agent_id.as_deref().unwrap_or("mahayana-assistant") != agent_id
+            || automation.enabled
+        {
+            continue;
+        }
+        automation.enabled = true;
+        let trigger = automation
+            .trigger
+            .clone()
+            .unwrap_or_else(|| AutomationTrigger::Schedule {
+                schedule: automation.schedule.clone(),
+            });
+        automation.next_run_at_ms = automation_next_run(
+            &trigger,
+            &automation.schedule,
+            true,
+            now_ms,
+            user_time_zone,
+        );
+        resumed.push(id.clone());
+    }
+    if resumed.is_empty() {
+        return resumed;
+    }
+    let after = state.automations.clone();
+    push_automation_lifecycle_diff(
+        state,
+        &before,
+        &after,
+        AutomationLifecycleSource::SpendGuard,
+        user_time_zone,
+        now_ms,
+    );
+    resumed
+}
+
 impl FeatureHostController {
     fn automation_spend_guard_path(&self) -> Option<PathBuf> {
         self.active_account_root(self.automation_path.as_deref())
@@ -256,6 +415,220 @@ impl FeatureHostController {
             state.automation_spend_guard.clone()
         };
         self.persist_automation_spend_guard_state(&snapshot)
+    }
+
+    fn spend_guard_conversation_id(
+        state: &FeatureState,
+        agent_id: &str,
+    ) -> Result<String, FeatureHostError> {
+        if agent_id == "mahayana-assistant" {
+            return Ok(MAHAYANA_AI_CONVERSATION_ID.to_string());
+        }
+        state
+            .bots
+            .get(agent_id)
+            .and_then(|bot| bot.conversation_id.clone())
+            .ok_or_else(|| {
+                FeatureHostError::Contract(format!(
+                    "spend guard owner has no canonical conversation: {agent_id}"
+                ))
+            })
+    }
+
+    fn issue_automation_spend_guard_card(
+        &self,
+        state: &mut FeatureState,
+        agent_id: &str,
+        paused: bool,
+        now_ms: i64,
+    ) -> Result<String, FeatureHostError> {
+        let card = spend_guard_widget(paused);
+        let conversation_id = Self::spend_guard_conversation_id(state, agent_id)?;
+        let message_id = mahayana_core::MessageId::generated("spend-guard");
+        let entry_id = format!("{}-card-0", message_id.as_str());
+
+        #[cfg(feature = "production")]
+        if self.config.mode == HostMode::Production {
+            let encoded = serde_json::to_value(&card).map_err(|error| {
+                FeatureHostError::Contract(format!("encode spend guard card: {error}"))
+            })?;
+            let inserted = self.runtime()?.append_conversation_message(
+                ConversationId(conversation_id.clone()),
+                mahayana_core::Message {
+                    id: message_id,
+                    conversation_id: ConversationId(conversation_id),
+                    role: RuntimeMessageRole::Assistant,
+                    text: String::new(),
+                    created_at_ms: now_ms,
+                    metadata: json!({
+                        "runtime": "fabushi-feature-host",
+                        "transcriptCard": encoded,
+                    }),
+                },
+            )?;
+            if !inserted {
+                return Err(FeatureHostError::Contract(
+                    "spend guard canonical transcript append was rejected".into(),
+                ));
+            }
+        }
+
+        state.events.push_back(HostEvent::TranscriptCard {
+            timestamp: timestamp(),
+            entry_id: entry_id.clone(),
+            operation_id: None,
+            card,
+        });
+        let guard = state
+            .automation_spend_guard
+            .entry(agent_id.to_string())
+            .or_default();
+        guard.last_activity_at_ms = guard.last_activity_at_ms.max(now_ms);
+        guard.unread_count = guard.unread_count.saturating_add(1).min(100_000);
+        Ok(entry_id)
+    }
+
+    fn apply_automation_spend_guard_before_admission(
+        &self,
+        automation_id: &str,
+        agent_id: Option<&str>,
+        trigger: &RoutineTrigger,
+        primary_run_id: Option<&str>,
+        coalesced_run_ids: &[String],
+    ) -> Result<AutomationSpendGuardAdmission, FeatureHostError> {
+        if matches!(trigger, RoutineTrigger::Manual) {
+            return Ok(AutomationSpendGuardAdmission::Continue(None));
+        }
+        let user_time_zone = self.host_settings_user_timezone_direct()?;
+        let now_ms = now_millis();
+        let mut state = self.state()?;
+        let automation = state
+            .automations
+            .get(automation_id)
+            .cloned()
+            .ok_or_else(|| FeatureHostError::Contract(format!(
+                "unknown automation: {automation_id}"
+            )))?;
+        ensure_automation_agent_scope(&automation, agent_id)?;
+        let owner = automation
+            .agent_id
+            .clone()
+            .unwrap_or_else(|| "mahayana-assistant".into());
+        let current = state
+            .automation_spend_guard
+            .get(&owner)
+            .cloned()
+            .unwrap_or_default();
+        let fires_since_viewed =
+            spend_guard_fires_since_viewed(&state, &owner, current.last_viewed_at_ms);
+        let decision = automation_spend_guard_decision(&current, fires_since_viewed, now_ms);
+
+        match decision {
+            AutomationSpendGuardDecision::Nudge => {
+                let entry_id =
+                    self.issue_automation_spend_guard_card(&mut state, &owner, false, now_ms)?;
+                let after_card = state
+                    .automation_spend_guard
+                    .get(&owner)
+                    .cloned()
+                    .unwrap_or(current);
+                let mut next = spend_guard_preserved_unread(&after_card);
+                next.nudged_at_ms = Some(now_ms);
+                next.card_entry_ids = vec![entry_id];
+                state.automation_spend_guard.insert(owner, next);
+                let snapshot = state.automation_spend_guard.clone();
+                drop(state);
+                self.persist_automation_spend_guard_state(&snapshot)?;
+                Ok(AutomationSpendGuardAdmission::Continue(Some(format!(
+                    "<system_reminder>\nThe app detected that the user has been away while your routines kept firing. It has ALREADY asked whether to keep them running. There are {fires_since_viewed} routine runs since the user's last view. If the user does not answer or return within three days, the app will pause the routines automatically. Do not ask the question again yourself.\n</system_reminder>"
+                ))))
+            }
+            AutomationSpendGuardDecision::AwaitingAck => {
+                if current.card_entry_ids.is_empty() {
+                    let entry_id =
+                        self.issue_automation_spend_guard_card(&mut state, &owner, false, now_ms)?;
+                    state
+                        .automation_spend_guard
+                        .entry(owner)
+                        .or_default()
+                        .card_entry_ids = vec![entry_id];
+                    let snapshot = state.automation_spend_guard.clone();
+                    drop(state);
+                    self.persist_automation_spend_guard_state(&snapshot)?;
+                }
+                Ok(AutomationSpendGuardAdmission::Continue(None))
+            }
+            AutomationSpendGuardDecision::Pause => {
+                let paused = spend_guard_disable_agent_automations(
+                    &mut state,
+                    &owner,
+                    now_ms,
+                    user_time_zone.as_deref(),
+                );
+                if paused.is_empty() {
+                    return Ok(AutomationSpendGuardAdmission::Suppress);
+                }
+                let already_open = !current.paused_automation_ids.is_empty();
+                let issued = if already_open {
+                    None
+                } else {
+                    Some(self.issue_automation_spend_guard_card(
+                        &mut state,
+                        &owner,
+                        true,
+                        now_ms,
+                    )?)
+                };
+                let after_card = state
+                    .automation_spend_guard
+                    .get(&owner)
+                    .cloned()
+                    .unwrap_or(current.clone());
+                let mut next = spend_guard_preserved_unread(&after_card);
+                next.nudged_at_ms = current.nudged_at_ms;
+                next.card_entry_ids = current.card_entry_ids.clone();
+                if let Some(entry_id) = issued {
+                    next.card_entry_ids.push(entry_id);
+                }
+                let mut paused_ids = current
+                    .paused_automation_ids
+                    .iter()
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                paused_ids.extend(paused);
+                next.paused_automation_ids = paused_ids.into_iter().collect();
+                state.automation_spend_guard.insert(owner, next);
+                prune_pending_listener_resumes(&mut state);
+                prune_pending_automation_event_batches(&mut state);
+                self.persist_automations(&state.automations)?;
+                if let Some(run_id) = primary_run_id {
+                    Self::record_dropped_event_fire(
+                        &mut state,
+                        run_id.to_string(),
+                        automation_id,
+                        "user_away_paused",
+                    );
+                }
+                for run_id in coalesced_run_ids {
+                    Self::record_dropped_event_fire(
+                        &mut state,
+                        run_id.clone(),
+                        automation_id,
+                        "user_away_paused",
+                    );
+                }
+                let snapshot = state.automation_spend_guard.clone();
+                drop(state);
+                self.persist_automation_spend_guard_state(&snapshot)?;
+                Ok(AutomationSpendGuardAdmission::Suppress)
+            }
+            AutomationSpendGuardDecision::OptedOut
+            | AutomationSpendGuardDecision::UserActive
+            | AutomationSpendGuardDecision::Snoozed
+            | AutomationSpendGuardDecision::BelowThresholds => {
+                Ok(AutomationSpendGuardAdmission::Continue(None))
+            }
+        }
     }
 }
 

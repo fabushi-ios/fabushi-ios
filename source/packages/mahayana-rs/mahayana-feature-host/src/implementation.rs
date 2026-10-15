@@ -874,6 +874,7 @@ struct FeatureState {
     auth_user: Option<Value>,
     automations: BTreeMap<String, AutomationSummary>,
     automation_spend_guard: BTreeMap<String, AutomationSpendGuardAgentState>,
+    routine_spend_guard_reminders: BTreeMap<String, String>,
     published_plugins_by_agent: BTreeMap<String, Vec<PublishedPluginSnapshot>>,
     installed_plugin_skills_by_agent: BTreeMap<String, Vec<InstalledPluginSkillSnapshot>>,
     connectors: BTreeMap<String, ConnectorSummary>,
@@ -948,6 +949,7 @@ impl Default for FeatureState {
             auth_user: None,
             automations: BTreeMap::new(),
             automation_spend_guard: BTreeMap::new(),
+            routine_spend_guard_reminders: BTreeMap::new(),
             published_plugins_by_agent: BTreeMap::new(),
             installed_plugin_skills_by_agent: BTreeMap::new(),
             connectors: default_connectors(),
@@ -10498,6 +10500,7 @@ impl FeatureHostController {
             state.reported_dropped_event_run_ids.clear();
             state.reported_dropped_event_run_order.clear();
             state.routine_executions.clear();
+            state.routine_spend_guard_reminders.clear();
             state.routine_epoch = state.routine_epoch.wrapping_add(1).max(1);
             state.awaited_operations.clear();
             state.operation_terminals.clear();

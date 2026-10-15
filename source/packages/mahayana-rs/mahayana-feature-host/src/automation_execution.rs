@@ -390,12 +390,30 @@ impl FeatureHostController {
         if expected_account != self.routine_account_key()? || expected_epoch != self.state()?.routine_epoch {
             return Err(FeatureHostError::Contract("routine account changed before admission".into()));
         }
+        let spend_guard = self.apply_automation_spend_guard_before_admission(
+            &id,
+            agent_id.as_deref(),
+            &trigger,
+            run_id.as_deref(),
+            &coalesced_run_ids,
+        )?;
+        let spend_guard_reminder = match spend_guard {
+            AutomationSpendGuardAdmission::Suppress => {
+                return Ok(CommandAccepted { request_id, operation_id: None });
+            }
+            AutomationSpendGuardAdmission::Continue(reminder) => reminder,
+        };
         match self.admit_routine(request_id.clone(), &id, agent_id.as_deref(), trigger, run_id, coalesced_run_ids)? {
             RoutineAdmission::Suppressed(operation_id) => Ok(CommandAccepted { request_id, operation_id }),
-            RoutineAdmission::Created(run_id) => match self.dispatch_pending_routine(&run_id) {
-                Ok(operation_id) => Ok(CommandAccepted { request_id, operation_id }),
-                Err(error) => { self.record_routine_dispatch_error(&id, &run_id, &error)?; Err(error) }
-            },
+            RoutineAdmission::Created(run_id) => {
+                if let Some(reminder) = spend_guard_reminder {
+                    self.state()?.routine_spend_guard_reminders.insert(run_id.clone(), reminder);
+                }
+                match self.dispatch_pending_routine(&run_id) {
+                    Ok(operation_id) => Ok(CommandAccepted { request_id, operation_id }),
+                    Err(error) => { self.record_routine_dispatch_error(&id, &run_id, &error)?; Err(error) }
+                }
+            }
         }
     }
 
@@ -509,7 +527,9 @@ impl FeatureHostController {
 
     fn record_routine_dispatch_error(&self, id: &str, run_id: &str, error: &FeatureHostError) -> Result<(), FeatureHostError> {
         let ambiguous = {
-            let mut state = self.state()?; let run = state.routine_executions.get_mut(run_id);
+            let mut state = self.state()?;
+            state.routine_spend_guard_reminders.remove(run_id);
+            let run = state.routine_executions.get_mut(run_id);
             if let Some(run) = run.filter(|run| matches!(run.phase, RoutinePhase::Dispatching | RoutinePhase::Running)) {
                 run.phase = RoutinePhase::RecoveryRequired; self.persist_routine_executions(&state)?; true
             } else { false }
@@ -540,6 +560,15 @@ impl FeatureHostController {
             execution.clone()
         };
         let mut text = routine_prompt(&execution)?;
+        if let Some(reminder) = self
+            .state()?
+            .routine_spend_guard_reminders
+            .get(run_id)
+            .cloned()
+        {
+            text.push_str("\n\n");
+            text.push_str(&reminder);
+        }
         if self.config.mode == HostMode::Production {
             #[cfg(feature = "production")]
             {
@@ -605,6 +634,7 @@ impl FeatureHostController {
                 return Err(FeatureHostError::Contract("routine operation identity changed during dispatch".into()));
             }
             current.phase = RoutinePhase::Running;
+            state.routine_spend_guard_reminders.remove(run_id);
             state.operations.insert(operation_id.clone());
             state.operation_agents.insert(operation_id.clone(), execution.agent_id.clone());
             self.persist_routine_executions(&state)?;
@@ -642,6 +672,7 @@ impl FeatureHostController {
 
     fn finish_automation_run(&self, automation_id: &str, run_id: &str, status: AutomationRunStatus, detail: Option<String>, action: &str) -> Result<(), FeatureHostError> {
         let mut state = self.state()?;
+        state.routine_spend_guard_reminders.remove(run_id);
         let Some(execution) = state.routine_executions.get(run_id).cloned() else { return Ok(()); };
         if execution.automation_id != automation_id || execution.epoch != state.routine_epoch || execution.phase == RoutinePhase::Terminal { return Ok(()); }
         if execution.phase == RoutinePhase::RecoveryRequired && action == "interrupted" { return Ok(()); }
