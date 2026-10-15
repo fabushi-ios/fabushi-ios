@@ -878,7 +878,7 @@ struct FeatureState {
     group_runs: BTreeMap<String, GroupRunState>,
     group_operations: BTreeMap<String, GroupOperationContext>,
     listeners: BTreeMap<ListenerPlatform, ListenerIntegrationSummary>,
-    pending_listener_resumes: BTreeSet<(String, ListenerPlatform)>,
+    pending_listener_resumes: BTreeMap<(String, ListenerPlatform), PendingListenerResume>,
     update_state: UpdateState,
 }
 
@@ -948,7 +948,7 @@ impl Default for FeatureState {
             group_runs: BTreeMap::new(),
             group_operations: BTreeMap::new(),
             listeners: default_listeners(),
-            pending_listener_resumes: BTreeSet::new(),
+            pending_listener_resumes: BTreeMap::new(),
             update_state: UpdateState::UpToDate {
                 version: env!("CARGO_PKG_VERSION").into(),
             },
@@ -966,6 +966,14 @@ fn active_agent_id_for_state(state: &FeatureState) -> Option<String> {
         .values()
         .find(|bot| bot.conversation_id.as_deref() == Some(conversation_id))
         .map(|bot| bot.id.clone())
+}
+
+const LISTENER_CONNECT_WATCH_TIMEOUT_MS: i64 = 15 * 60 * 1_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingListenerResume {
+    expires_at_ms: i64,
+    is_armed: bool,
 }
 
 fn automation_listener_resume_keys(
@@ -998,7 +1006,7 @@ fn prune_pending_listener_resumes(state: &mut FeatureState) {
         .collect::<BTreeSet<_>>();
     state
         .pending_listener_resumes
-        .retain(|key| required.contains(key));
+        .retain(|key, _| required.contains(key));
 }
 
 fn take_pending_listener_resumes(
@@ -1008,8 +1016,8 @@ fn take_pending_listener_resumes(
     let mut agents = state
         .pending_listener_resumes
         .iter()
-        .filter(|(_, pending_platform)| *pending_platform == platform)
-        .map(|(agent_id, _)| agent_id.clone())
+        .filter(|((_, pending_platform), watch)| *pending_platform == platform && watch.is_armed)
+        .map(|((agent_id, _), _)| agent_id.clone())
         .collect::<Vec<_>>();
     agents.sort();
     agents.dedup();
@@ -8475,7 +8483,7 @@ impl FeatureHostController {
                 }
                 state
                     .pending_listener_resumes
-                    .retain(|(_, pending_platform)| *pending_platform != platform);
+                    .retain(|(_, pending_platform), _| *pending_platform != platform);
             }
             FeatureCommand::UpdateStatus { .. } => {
                 let update_state = state.update_state.clone();
@@ -9359,12 +9367,20 @@ impl FeatureHostController {
                 state.pending_listener_resumes.remove(&(agent_id, platform));
                 continue;
             }
-            if !state
-                .pending_listener_resumes
-                .insert((agent_id.clone(), platform))
-            {
+            let key = (agent_id.clone(), platform);
+            let expires_at_ms = now_millis().saturating_add(LISTENER_CONNECT_WATCH_TIMEOUT_MS);
+            if let Some(watch) = state.pending_listener_resumes.get_mut(&key) {
+                watch.expires_at_ms = expires_at_ms;
+                watch.is_armed = true;
                 continue;
             }
+            state.pending_listener_resumes.insert(
+                key,
+                PendingListenerResume {
+                    expires_at_ms,
+                    is_armed: true,
+                },
+            );
             state.events.push_back(HostEvent::TranscriptCard {
                 timestamp: timestamp(),
                 entry_id: format!(
@@ -9425,35 +9441,36 @@ impl FeatureHostController {
     }
 
     fn poll_pending_listener_connection_resumes(&self) -> Result<(), FeatureHostError> {
-        let pending_platforms = {
-            let state = self.state()?;
+        let now = now_millis();
+        let pending_keys = {
+            let mut state = self.state()?;
+            if state.routine_quiescing {
+                return Ok(());
+            }
             state
                 .pending_listener_resumes
-                .iter()
-                .map(|(_, platform)| *platform)
-                .collect::<BTreeSet<_>>()
+                .retain(|_, watch| watch.expires_at_ms > now);
+            state.pending_listener_resumes.keys().cloned().collect::<Vec<_>>()
         };
-        if pending_platforms.is_empty() {
+        if pending_keys.is_empty() {
             return Ok(());
         }
 
-        match self.config.mode {
+        let connection_states = match self.config.mode {
             HostMode::Test => {
-                let connected = {
-                    let state = self.state()?;
-                    pending_platforms
-                        .into_iter()
-                        .filter(|platform| {
+                let state = self.state()?;
+                pending_keys
+                    .iter()
+                    .map(|(_, platform)| {
+                        (
+                            *platform,
                             state
                                 .listeners
                                 .get(platform)
-                                .is_some_and(|integration| integration.is_connected)
-                        })
-                        .collect::<Vec<_>>()
-                };
-                for platform in connected {
-                    self.consume_listener_connection_resumes(platform)?;
-                }
+                                .is_some_and(|integration| integration.is_connected),
+                        )
+                    })
+                    .collect::<BTreeMap<_, _>>()
             }
             HostMode::Production => {
                 #[cfg(feature = "production")]
@@ -9461,29 +9478,46 @@ impl FeatureHostController {
                     let Ok((connectors, _)) = self.production_connector_snapshot() else {
                         return Ok(());
                     };
-                    let connected = pending_platforms
-                        .into_iter()
-                        .filter(|platform| {
-                            connector_for_listener_platform(*platform)
+                    pending_keys
+                        .iter()
+                        .map(|(_, platform)| {
+                            let connected = connector_for_listener_platform(*platform)
                                 .and_then(|connector_id| {
-                                    connectors
-                                        .iter()
-                                        .find(|connector| connector.id == connector_id)
+                                    connectors.iter().find(|connector| connector.id == connector_id)
                                 })
-                                .is_some_and(|connector| {
-                                    connector.status == ConnectorStatus::Connected
-                                })
+                                .is_some_and(|connector| connector.status == ConnectorStatus::Connected);
+                            (*platform, connected)
                         })
-                        .collect::<Vec<_>>();
-                    for platform in connected {
-                        self.consume_listener_connection_resumes(platform)?;
-                    }
+                        .collect::<BTreeMap<_, _>>()
                 }
                 #[cfg(not(feature = "production"))]
                 {
                     return Err(FeatureHostError::ProductionUnavailable);
                 }
             }
+        };
+
+        let mut ready = BTreeMap::<ListenerPlatform, Vec<String>>::new();
+        {
+            let mut state = self.state()?;
+            for (agent_id, platform) in pending_keys {
+                let connected = connection_states.get(&platform).copied().unwrap_or(false);
+                let key = (agent_id.clone(), platform);
+                let Some(watch) = state.pending_listener_resumes.get_mut(&key) else {
+                    continue;
+                };
+                if !connected {
+                    watch.is_armed = true;
+                    continue;
+                }
+                if watch.is_armed {
+                    ready.entry(platform).or_default().push(agent_id);
+                }
+                state.pending_listener_resumes.remove(&key);
+            }
+        }
+        for (platform, agent_ids) in ready {
+            self.dispatch_listener_connection_resumes(platform, agent_ids)?;
         }
         Ok(())
     }
