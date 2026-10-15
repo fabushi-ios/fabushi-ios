@@ -134,8 +134,6 @@ struct LegacyPluginOwnerProof {
     account_scope: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PluginGitAuthBlock {
@@ -147,6 +145,8 @@ struct PluginGitAuthBlock {
     platform: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct LegacyPluginMigrationJournal {
     schema_version: u32,
     account_scope: String,
