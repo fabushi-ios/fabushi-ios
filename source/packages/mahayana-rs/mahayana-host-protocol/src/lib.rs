@@ -2435,6 +2435,8 @@ pub struct AutomationRunSummary {
     pub detail: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub coalesced_run_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -3646,6 +3648,7 @@ mod tests {
                     started_at: 1,
                     detail: Some("Completed".into()),
                     event: None,
+                    coalesced_run_ids: Vec::new(),
                 }],
                 last_run_at_ms: None,
                 next_run_at_ms: Some(2),

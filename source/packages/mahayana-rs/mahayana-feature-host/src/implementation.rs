@@ -847,6 +847,9 @@ struct FeatureState {
     #[cfg(feature = "production")]
     memory_synthesis_next_temporal_poll_at_ms: i64,
     automation_operations: BTreeMap<String, (String, String)>,
+    automation_event_batches: BTreeMap<String, PendingAutomationEventBatch>,
+    reported_dropped_event_run_ids: BTreeSet<String>,
+    reported_dropped_event_run_order: VecDeque<String>,
     routine_executions: BTreeMap<String, RoutineExecution>,
     routine_operation_epochs: BTreeMap<String, u64>,
     routine_epoch: u64,
@@ -917,6 +920,9 @@ impl Default for FeatureState {
             #[cfg(feature = "production")]
             memory_synthesis_next_temporal_poll_at_ms: 0,
             automation_operations: BTreeMap::new(),
+            automation_event_batches: BTreeMap::new(),
+            reported_dropped_event_run_ids: BTreeSet::new(),
+            reported_dropped_event_run_order: VecDeque::new(),
             routine_executions: BTreeMap::new(),
             routine_operation_epochs: BTreeMap::new(),
             routine_epoch: 1,
@@ -1007,6 +1013,14 @@ fn prune_pending_listener_resumes(state: &mut FeatureState) {
     state
         .pending_listener_resumes
         .retain(|key, _| required.contains(key));
+}
+
+fn prune_pending_automation_event_batches(state: &mut FeatureState) {
+    state.automation_event_batches.retain(|_, batch| {
+        state.automations.get(&batch.automation_id).is_some_and(|automation| {
+            automation.enabled && automation.agent_id == batch.agent_id
+        })
+    });
 }
 
 fn take_pending_listener_resumes(
@@ -4536,6 +4550,8 @@ impl FeatureHostController {
                 self.persist_automations(&state.automations)?;
                 if !enabled {
                     prune_pending_listener_resumes(&mut state);
+                prune_pending_automation_event_batches(&mut state);
+                    prune_pending_automation_event_batches(&mut state);
                 }
                 state.events.push_back(HostEvent::AutomationChanged {
                     timestamp: timestamp(),
@@ -4563,6 +4579,7 @@ impl FeatureHostController {
                     .expect("automation checked above");
                 self.persist_automations(&state.automations)?;
                 prune_pending_listener_resumes(&mut state);
+                prune_pending_automation_event_batches(&mut state);
                 state.events.push_back(HostEvent::AutomationChanged {
                     timestamp: timestamp(),
                     action: "deleted".into(),
@@ -9609,22 +9626,19 @@ impl FeatureHostController {
         if serialized.len() > 64 * 1024 {
             return Err(FeatureHostError::Contract("listener event exceeds 64 KiB".into()));
         }
-        let matching_ids = {
+        let matching = {
             let state = self.state()?;
             ensure_open(&state)?;
             state.automations.values().filter(|automation| {
                 automation.enabled && automation.trigger.as_ref().is_some_and(|trigger| {
                     automation_trigger_matches_event(trigger, &event, &serialized)
                 })
-            }).map(|automation| automation.id.clone()).collect::<Vec<_>>()
+            }).cloned().collect::<Vec<_>>()
         };
-        for id in &matching_ids {
-            self.execute_routine(
-                format!("listener-{}", Uuid::new_v4()), id.clone(), None,
-                RoutineTrigger::Event(event.clone()),
-            )?;
+        for automation in &matching {
+            self.enqueue_automation_event_fire(automation, event.clone())?;
         }
-        Ok(matching_ids.len())
+        Ok(matching.len())
     }
 
     pub fn register_awaited_operation(&self, operation_id: &str) -> Result<(), FeatureHostError> {
@@ -9787,6 +9801,7 @@ impl FeatureHostController {
         &self,
         timeout: Duration,
     ) -> Result<Option<HostEvent>, FeatureHostError> {
+        self.flush_due_automation_event_batch()?;
         self.advance_pending_routine()?;
         self.fire_due_automation()?;
         #[cfg(feature = "production")]
@@ -10209,6 +10224,9 @@ impl FeatureHostController {
             state.memory_synthesis_active_agents.clear();
             state.memory_synthesis_next_temporal_poll_at_ms = 0;
             state.automation_operations.clear();
+            state.automation_event_batches.clear();
+            state.reported_dropped_event_run_ids.clear();
+            state.reported_dropped_event_run_order.clear();
             state.routine_executions.clear();
             state.routine_epoch = state.routine_epoch.wrapping_add(1).max(1);
             state.awaited_operations.clear();
@@ -10640,6 +10658,9 @@ impl FeatureHostController {
             state.operation_terminals.clear();
             state.pending_box_handoffs.clear();
             state.pending_listener_resumes.clear();
+            state.automation_event_batches.clear();
+            state.reported_dropped_event_run_ids.clear();
+            state.reported_dropped_event_run_order.clear();
             state.remote_computer_sessions.clear();
             state.group_runs.clear();
             state.group_operations.clear();
@@ -16616,6 +16637,7 @@ mod agent_clone_durable_config_tests {
                     started_at: 2,
                     detail: None,
                     event: None,
+                    coalesced_run_ids: Vec::new(),
                 }],
                 last_run_at_ms: Some(2),
                 next_run_at_ms: Some(3),
@@ -22760,6 +22782,13 @@ mod tests {
                 .expect("ingest listener event"),
             1
         );
+        {
+            let mut state = controller.state().expect("state");
+            for batch in state.automation_event_batches.values_mut() {
+                batch.due_at_ms = now_millis() - 1;
+            }
+        }
+        controller.flush_due_automation_event_batch().expect("flush listener batch");
         let event_events = drain(&controller);
         assert!(event_events.iter().any(|event| matches!(
             event,
@@ -22796,6 +22825,155 @@ mod tests {
                 ..
             }
         )));
+    }
+
+    #[test]
+    fn listener_event_batch_persists_primary_and_coalesced_run_ids() {
+        let controller = controller();
+        drain(&controller);
+        controller.execute(FeatureCommand::AutomationUpsert {
+            request_id: "batch-create".into(),
+            id: Some("batch-events".into()),
+            agent_id: None,
+            name: "Batch events".into(),
+            prompt: "Summarize matching events.".into(),
+            schedule: "event:sentry:issue.regressed".into(),
+            trigger: Some(AutomationTrigger::Event {
+                source: ListenerPlatform::Sentry,
+                event: "issue.regressed".into(),
+                filter: None,
+                filters: None,
+            }),
+            enabled: true,
+        }).expect("create batch automation");
+        drain(&controller);
+        let make_event = |title: &str| EventCard {
+            source: ListenerPlatform::Sentry,
+            event: "issue.regressed".into(),
+            title: title.into(),
+            summary: "Regression detected".into(),
+            url: None,
+            actor: None,
+            fields: None,
+            occurred_at_ms: Some(now_millis()),
+        };
+        controller.ingest_listener_event(make_event("one")).expect("first event");
+        controller.ingest_listener_event(make_event("two")).expect("second event");
+        {
+            let mut state = controller.state().expect("state");
+            assert_eq!(state.automation_event_batches.len(), 1);
+            assert_eq!(state.automation_event_batches.values().next().expect("batch").items.len(), 2);
+            state.automation_event_batches.values_mut().next().expect("batch").due_at_ms = now_millis() - 1;
+        }
+        controller.flush_due_automation_event_batch().expect("flush batch");
+        let state = controller.state().expect("state");
+        let run = state.automations["batch-events"].runs.last().expect("durable run");
+        assert_eq!(run.coalesced_run_ids.len(), 1);
+        assert!(run.id.starts_with("routine-run-"));
+        assert!(run.coalesced_run_ids[0].starts_with("routine-run-"));
+        assert_ne!(run.id, run.coalesced_run_ids[0]);
+        assert!(matches!(
+            state.routine_executions.get(&run.id).map(|execution| &execution.trigger),
+            Some(RoutineTrigger::EventBatch(events)) if events.len() == 2
+        ));
+    }
+
+    #[test]
+    fn listener_event_batch_overflow_is_bounded_and_drop_reporting_is_deduplicated() {
+        let controller = controller();
+        drain(&controller);
+        controller.execute(FeatureCommand::AutomationUpsert {
+            request_id: "overflow-create".into(),
+            id: Some("overflow-events".into()),
+            agent_id: None,
+            name: "Overflow events".into(),
+            prompt: "Summarize matching events.".into(),
+            schedule: "event:sentry:issue.regressed".into(),
+            trigger: Some(AutomationTrigger::Event {
+                source: ListenerPlatform::Sentry,
+                event: "issue.regressed".into(),
+                filter: None,
+                filters: None,
+            }),
+            enabled: true,
+        }).expect("create overflow automation");
+        drain(&controller);
+        for index in 0..=MAX_QUEUED_EVENT_FIRES_PER_AUTOMATION {
+            controller.ingest_listener_event(EventCard {
+                source: ListenerPlatform::Sentry,
+                event: "issue.regressed".into(),
+                title: format!("event-{index}"),
+                summary: "Regression detected".into(),
+                url: None,
+                actor: None,
+                fields: None,
+                occurred_at_ms: Some(index as i64),
+            }).expect("enqueue event");
+        }
+        let mut state = controller.state().expect("state");
+        assert_eq!(state.automation_event_batches.values().next().expect("batch").items.len(), MAX_QUEUED_EVENT_FIRES_PER_AUTOMATION);
+        assert_eq!(state.reported_dropped_event_run_ids.len(), 1);
+        let dropped = state.reported_dropped_event_run_order.front().expect("dropped id").clone();
+        let before = state.events.iter().filter(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "automation-event-fire-dropped" && payload["runId"] == dropped
+        )).count();
+        FeatureHostController::record_dropped_event_fire(&mut state, dropped, "overflow-events", "event_batch_overflow");
+        let after = state.events.iter().filter(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, .. } if channel == "automation-event-fire-dropped"
+        )).count();
+        assert_eq!(before, 1);
+        assert_eq!(after, 1);
+    }
+
+    #[test]
+    fn listener_event_batch_is_fenced_by_quiesce_and_account_epoch() {
+        let controller = controller();
+        drain(&controller);
+        controller.execute(FeatureCommand::AutomationUpsert {
+            request_id: "fence-create".into(),
+            id: Some("fenced-events".into()),
+            agent_id: None,
+            name: "Fenced events".into(),
+            prompt: "Summarize matching events.".into(),
+            schedule: "event:sentry:issue.regressed".into(),
+            trigger: Some(AutomationTrigger::Event {
+                source: ListenerPlatform::Sentry,
+                event: "issue.regressed".into(),
+                filter: None,
+                filters: None,
+            }),
+            enabled: true,
+        }).expect("create fenced automation");
+        drain(&controller);
+        controller.ingest_listener_event(EventCard {
+            source: ListenerPlatform::Sentry,
+            event: "issue.regressed".into(),
+            title: "stale".into(),
+            summary: "Regression detected".into(),
+            url: None,
+            actor: None,
+            fields: None,
+            occurred_at_ms: Some(now_millis()),
+        }).expect("enqueue event");
+        {
+            let mut state = controller.state().expect("state");
+            state.automation_event_batches.values_mut().next().expect("batch").due_at_ms = now_millis() - 1;
+        }
+        controller.set_routine_quiescing(true).expect("quiesce");
+        controller.flush_due_automation_event_batch().expect("park while quiesced");
+        assert_eq!(controller.state().expect("state").automation_event_batches.len(), 1);
+        {
+            let mut state = controller.state().expect("state");
+            state.routine_epoch = state.routine_epoch.wrapping_add(1).max(1);
+        }
+        controller.set_routine_quiescing(false).expect("resume");
+        controller.flush_due_automation_event_batch().expect("discard stale batch");
+        let state = controller.state().expect("state");
+        assert!(state.automation_event_batches.is_empty());
+        assert!(state.automations["fenced-events"].runs.is_empty());
     }
 
     #[test]
@@ -23182,6 +23360,7 @@ mod tests {
                     started_at: 2,
                     detail: Some("network".into()),
                     event: None,
+                    coalesced_run_ids: Vec::new(),
                 }],
                 last_run_at_ms: Some(2),
                 next_run_at_ms: None,
