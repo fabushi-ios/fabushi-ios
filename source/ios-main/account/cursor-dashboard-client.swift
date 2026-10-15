@@ -641,6 +641,462 @@ private enum IOSCursorDashboardProto {
         )
     }
 
+    static func startBackgroundComposerRequest(_ input: IOSCloudAgentLaunchInput) throws -> Data {
+        let bcId = input.bcId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let snapshot = input.snapshotNameOrId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let repoURL = input.repoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prompt = input.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bcId.isEmpty, !snapshot.isEmpty, !repoURL.isEmpty, !prompt.isEmpty else {
+            throw IOSCursorDashboardError(message: "Cloud agent launch requires bcId, repository and prompt.")
+        }
+
+        var userMessage = Data()
+        appendBytesField(1, Data(prompt.utf8), to: &userMessage)
+        appendBytesField(2, Data(UUID().uuidString.lowercased().utf8), to: &userMessage)
+        if !input.images.isEmpty {
+            var selectedContext = Data()
+            for image in input.images {
+                guard image.mimeType.hasPrefix("image/"), !image.data.isEmpty else {
+                    throw IOSCursorDashboardError(message: "Cloud agent image payload is invalid.")
+                }
+                var selectedImage = Data()
+                appendBytesField(8, image.data, to: &selectedImage)
+                if !image.path.isEmpty {
+                    appendBytesField(3, Data(image.path.utf8), to: &selectedImage)
+                }
+                appendBytesField(7, Data(image.mimeType.utf8), to: &selectedImage)
+                appendBytesField(1, selectedImage, to: &selectedContext)
+            }
+            appendBytesField(3, selectedContext, to: &userMessage)
+        }
+        appendVarintField(4, 1, to: &userMessage)
+
+        var userMessageAction = Data()
+        appendBytesField(1, userMessage, to: &userMessageAction)
+        appendVarintField(3, 1, to: &userMessageAction)
+        var conversationAction = Data()
+        appendBytesField(1, userMessageAction, to: &conversationAction)
+
+        var startingPoint = Data()
+        appendBytesField(1, Data(repoURL.utf8), to: &startingPoint)
+        if let startingRef = input.startingRef?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !startingRef.isEmpty {
+            appendBytesField(2, Data(startingRef.utf8), to: &startingPoint)
+        }
+        if !input.environmentRepos.isEmpty {
+            var repoConfig = Data()
+            for repo in input.environmentRepos {
+                var entry = Data()
+                appendBytesField(1, Data(repo.repoURL.utf8), to: &entry)
+                if let node = repo.scmRepoNodeId, !node.isEmpty {
+                    appendBytesField(2, Data(node.utf8), to: &entry)
+                }
+                if let enterprise = repo.gitEnterpriseUUID, !enterprise.isEmpty {
+                    appendBytesField(3, Data(enterprise.utf8), to: &entry)
+                }
+                appendBytesField(1, entry, to: &repoConfig)
+            }
+            appendBytesField(11, repoConfig, to: &startingPoint)
+        }
+        if let name = input.environmentName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty {
+            appendBytesField(12, Data(name.utf8), to: &startingPoint)
+        }
+        if let publicId = input.environmentPublicId?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !publicId.isEmpty {
+            appendBytesField(15, Data(publicId.utf8), to: &startingPoint)
+        }
+
+        var data = Data()
+        appendBytesField(1, Data(snapshot.utf8), to: &data)
+        appendBytesField(5, Data(), to: &data)
+        appendBytesField(6, Data("/workspace".utf8), to: &data)
+        appendVarintField(9, 1, to: &data)
+        appendVarintField(10, 1, to: &data)
+        appendBytesField(11, startingPoint, to: &data)
+        appendBytesField(14, Data(repoURL.utf8), to: &data)
+        appendBytesField(22, Data(bcId.utf8), to: &data)
+        appendVarintField(23, 33, to: &data)
+        appendVarintField(26, 1, to: &data)
+        if let startingRef = input.startingRef?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !startingRef.isEmpty {
+            appendBytesField(31, Data(startingRef.utf8), to: &data)
+        }
+        appendVarintField(37, 1, to: &data)
+        appendVarintField(41, 1, to: &data)
+        appendBytesField(44, conversationAction, to: &data)
+        if let title = input.title?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !title.isEmpty {
+            appendBytesField(50, Data(title.utf8), to: &data)
+        }
+        if let usePrivateWorker = input.usePrivateWorker {
+            appendVarintField(55, usePrivateWorker ? 1 : 0, to: &data)
+        }
+        if let requestedModel = try cloudAgentRequestedModel(
+            modelId: input.modelId,
+            modelParams: input.modelParams
+        ) {
+            appendBytesField(58, requestedModel, to: &data)
+        }
+        for label in input.labels {
+            var wire = Data()
+            appendBytesField(1, Data(label.key.utf8), to: &wire)
+            appendBytesField(2, Data(label.value.utf8), to: &wire)
+            appendBytesField(59, wire, to: &data)
+        }
+        if let teamId = input.teamId {
+            guard teamId >= 0 else {
+                throw IOSCursorDashboardError(message: "Cloud agent team id must be non-negative.")
+            }
+            appendVarintField(98, UInt64(teamId), to: &data)
+        }
+        return data
+    }
+
+    static func decodeStartBackgroundComposerResponse(
+        _ data: Data,
+        fallbackBcId: String
+    ) throws -> IOSCloudAgentLaunchResult {
+        var response = Reader(data)
+        var composer: Data?
+        var initialRunId: String?
+        for (field, value) in try response.readFields() {
+            switch (field, value) {
+            case (1, .bytes(let bytes)): composer = bytes
+            case (3, .bytes(let bytes)): initialRunId = nonemptyUTF8(bytes)
+            default: break
+            }
+        }
+        var bcId = fallbackBcId
+        if let composer {
+            var nested = Reader(composer)
+            for (field, value) in try nested.readFields() where field == 1 {
+                if case .bytes(let bytes) = value, let decoded = nonemptyUTF8(bytes) {
+                    bcId = decoded
+                    break
+                }
+            }
+        }
+        return .init(
+            bcId: bcId,
+            url: "https://cursor.com/agents/\(bcId)",
+            initialRunId: initialRunId
+        )
+    }
+
+    static func listBackgroundComposersRequest(limit: Int, includeArchived: Bool) -> Data {
+        var data = Data()
+        appendVarintField(1, UInt64(max(1, min(limit, Int(Int32.max)))), to: &data)
+        if includeArchived {
+            appendVarintField(10, 1, to: &data)
+        }
+        return data
+    }
+
+    static func decodeBackgroundComposerList(_ data: Data) throws -> [IOSCloudAgentSummary] {
+        var response = Reader(data)
+        var output: [IOSCloudAgentSummary] = []
+        for (field, value) in try response.readFields() where field == 1 {
+            guard case .bytes(let message) = value else { continue }
+            var nested = Reader(message)
+            var bcId = ""
+            var name = ""
+            var branchName = ""
+            var prURL = ""
+            var isArchived = false
+            var status: Int32 = 0
+            for (nestedField, nestedValue) in try nested.readFields() {
+                switch (nestedField, nestedValue) {
+                case (1, .bytes(let bytes)): bcId = String(data: bytes, encoding: .utf8) ?? ""
+                case (5, .bytes(let bytes)): name = String(data: bytes, encoding: .utf8) ?? ""
+                case (6, .bytes(let bytes)): branchName = String(data: bytes, encoding: .utf8) ?? ""
+                case (9, .varint(let raw)): isArchived = raw != 0
+                case (12, .varint(let raw)): status = Int32(truncatingIfNeeded: raw)
+                case (22, .bytes(let bytes)): prURL = String(data: bytes, encoding: .utf8) ?? ""
+                default: break
+                }
+            }
+            if !bcId.isEmpty {
+                output.append(.init(
+                    bcId: bcId,
+                    name: name,
+                    status: status,
+                    branchName: branchName,
+                    prURL: prURL,
+                    isArchived: isArchived
+                ))
+            }
+        }
+        return output
+    }
+
+    static func backgroundComposerIdRequest(_ bcId: String) throws -> Data {
+        let bcId = bcId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bcId.isEmpty else {
+            throw IOSCursorDashboardError(message: "Background composer id is required.")
+        }
+        var data = Data()
+        appendBytesField(1, Data(bcId.utf8), to: &data)
+        return data
+    }
+
+    static func followupBackgroundComposerRequest(_ input: IOSCloudAgentReplyInput) throws -> Data {
+        let bcId = input.bcId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prompt = input.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bcId.isEmpty, !prompt.isEmpty else {
+            throw IOSCursorDashboardError(message: "Cloud agent follow-up requires agent id and prompt.")
+        }
+
+        var userMessage = Data()
+        appendBytesField(1, Data(prompt.utf8), to: &userMessage)
+        appendBytesField(2, Data(UUID().uuidString.lowercased().utf8), to: &userMessage)
+        if !input.images.isEmpty {
+            var selectedContext = Data()
+            for image in input.images {
+                guard image.mimeType.hasPrefix("image/"), !image.data.isEmpty else {
+                    throw IOSCursorDashboardError(message: "Cloud agent image payload is invalid.")
+                }
+                var selectedImage = Data()
+                appendBytesField(8, image.data, to: &selectedImage)
+                if !image.path.isEmpty { appendBytesField(3, Data(image.path.utf8), to: &selectedImage) }
+                appendBytesField(7, Data(image.mimeType.utf8), to: &selectedImage)
+                appendBytesField(1, selectedImage, to: &selectedContext)
+            }
+            appendBytesField(3, selectedContext, to: &userMessage)
+        }
+        appendVarintField(4, 1, to: &userMessage)
+        var userMessageAction = Data()
+        appendBytesField(1, userMessage, to: &userMessageAction)
+        appendVarintField(3, 1, to: &userMessageAction)
+        var conversationAction = Data()
+        appendBytesField(1, userMessageAction, to: &conversationAction)
+
+        var data = Data()
+        appendBytesField(1, Data(bcId.utf8), to: &data)
+        appendVarintField(3, input.interrupt ? 1 : 0, to: &data)
+        appendVarintField(7, 33, to: &data)
+        appendBytesField(10, conversationAction, to: &data)
+        if let requestedModel = try cloudAgentRequestedModel(
+            modelId: input.modelId,
+            modelParams: input.modelParams
+        ) {
+            appendBytesField(15, requestedModel, to: &data)
+        }
+        return data
+    }
+
+    static func decodeFollowupRunId(_ data: Data) throws -> String {
+        var reader = Reader(data)
+        for (field, value) in try reader.readFields() where field == 1 {
+            if case .bytes(let bytes) = value, let runId = nonemptyUTF8(bytes) {
+                return runId
+            }
+        }
+        throw IOSCursorDashboardError(message: "Cloud agent follow-up response was missing run id.")
+    }
+
+    static func pauseBackgroundComposerRequest(_ bcId: String) throws -> Data {
+        var data = try backgroundComposerIdRequest(bcId)
+        appendVarintField(3, 33, to: &data)
+        return data
+    }
+
+    static func renameBackgroundComposerRequest(_ bcId: String, title: String) throws -> Data {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            throw IOSCursorDashboardError(message: "Cloud agent rename requires a title.")
+        }
+        var data = try backgroundComposerIdRequest(bcId)
+        appendBytesField(2, Data(title.utf8), to: &data)
+        return data
+    }
+
+    static func archiveBackgroundComposerRequest(_ bcId: String, archived: Bool) throws -> Data {
+        var data = try backgroundComposerIdRequest(bcId)
+        appendVarintField(2, archived ? 0 : 1, to: &data)
+        appendVarintField(4, 33, to: &data)
+        return data
+    }
+
+    static func decodeBackgroundComposerArtifacts(_ data: Data) throws -> [IOSCloudAgentArtifact] {
+        var reader = Reader(data)
+        var artifacts: [IOSCloudAgentArtifact] = []
+        for (field, value) in try reader.readFields() where field == 1 {
+            guard case .bytes(let message) = value else { continue }
+            var nested = Reader(message)
+            var path = ""
+            var size: UInt64 = 0
+            for (nestedField, nestedValue) in try nested.readFields() {
+                switch (nestedField, nestedValue) {
+                case (1, .bytes(let bytes)): path = String(data: bytes, encoding: .utf8) ?? ""
+                case (2, .varint(let raw)): size = raw
+                default: break
+                }
+            }
+            if !path.isEmpty { artifacts.append(.init(path: path, sizeBytes: size)) }
+        }
+        return artifacts
+    }
+
+    static func decodeBackgroundComposerConversation(_ data: Data) throws -> [Data] {
+        var reader = Reader(data)
+        return try reader.readFields().compactMap { field, value in
+            guard field == 1, case .bytes(let bytes) = value else { return nil }
+            return bytes
+        }
+    }
+
+    static func optimizedDiffRequest(_ bcId: String) throws -> Data {
+        var data = try backgroundComposerIdRequest(bcId)
+        appendVarintField(2, 1, to: &data)
+        return data
+    }
+
+    static func decodeOptimizedDiff(_ data: Data) throws -> [IOSCloudAgentFileChange] {
+        var response = Reader(data)
+        var diffMessage: Data?
+        for (field, value) in try response.readFields() where field == 1 {
+            if case .bytes(let bytes) = value { diffMessage = bytes; break }
+        }
+        guard let diffMessage else { return [] }
+        var diff = Reader(diffMessage)
+        var output: [IOSCloudAgentFileChange] = []
+        for (field, value) in try diff.readFields() where field == 1 {
+            guard case .bytes(let message) = value else { continue }
+            var file = Reader(message)
+            var from = ""
+            var to = ""
+            var added: Int32 = 0
+            var removed: Int32 = 0
+            for (nestedField, nestedValue) in try file.readFields() {
+                switch (nestedField, nestedValue) {
+                case (1, .bytes(let bytes)): from = String(data: bytes, encoding: .utf8) ?? ""
+                case (2, .bytes(let bytes)): to = String(data: bytes, encoding: .utf8) ?? ""
+                case (4, .varint(let raw)): added = Int32(truncatingIfNeeded: raw)
+                case (5, .varint(let raw)): removed = Int32(truncatingIfNeeded: raw)
+                default: break
+                }
+            }
+            let path = (to == "/dev/null" || to.isEmpty) ? from : to
+            if !path.isEmpty, path != "/dev/null", output.count < 300 {
+                output.append(.init(path: path, added: Int(added), removed: Int(removed)))
+            }
+        }
+        return output
+    }
+
+    static func getEnvironmentRequest(publicId: String) throws -> Data {
+        let publicId = publicId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !publicId.isEmpty else {
+            throw IOSCursorDashboardError(message: "Saved environment id is required.")
+        }
+        var data = Data()
+        appendBytesField(1, Data(publicId.utf8), to: &data)
+        return data
+    }
+
+    static func listEnvironmentsRequest(limit: Int) -> Data {
+        var data = Data()
+        appendVarintField(1, UInt64(max(1, min(limit, Int(Int32.max)))), to: &data)
+        appendVarintField(4, 1, to: &data)
+        return data
+    }
+
+    static func decodeSavedEnvironment(_ data: Data) throws -> IOSCloudAgentSavedEnvironment? {
+        var response = Reader(data)
+        for (field, value) in try response.readFields() where field == 1 {
+            guard case .bytes(let message) = value else { continue }
+            return try decodeSavedEnvironmentMessage(message)
+        }
+        return nil
+    }
+
+    static func decodeSavedEnvironmentList(_ data: Data) throws -> [IOSCloudAgentSavedEnvironment] {
+        var response = Reader(data)
+        var output: [IOSCloudAgentSavedEnvironment] = []
+        for (field, value) in try response.readFields() where field == 1 {
+            guard case .bytes(let message) = value else { continue }
+            output.append(try decodeSavedEnvironmentMessage(message))
+        }
+        return output
+    }
+
+    private static func decodeSavedEnvironmentMessage(_ message: Data) throws -> IOSCloudAgentSavedEnvironment {
+        var reader = Reader(message)
+        var publicId = ""
+        var name = ""
+        var repoConfig: Data?
+        for (field, value) in try reader.readFields() {
+            switch (field, value) {
+            case (2, .bytes(let bytes)): publicId = String(data: bytes, encoding: .utf8) ?? ""
+            case (3, .bytes(let bytes)): name = String(data: bytes, encoding: .utf8) ?? ""
+            case (7, .bytes(let bytes)): repoConfig = bytes
+            default: break
+            }
+        }
+        var repos: [IOSCloudAgentEnvironmentRepo] = []
+        if let repoConfig {
+            var config = Reader(repoConfig)
+            for (field, value) in try config.readFields() where field == 1 {
+                guard case .bytes(let entry) = value else { continue }
+                var repo = Reader(entry)
+                var repoURL = ""
+                var node: String?
+                var enterprise: String?
+                for (repoField, repoValue) in try repo.readFields() {
+                    switch (repoField, repoValue) {
+                    case (1, .bytes(let bytes)): repoURL = String(data: bytes, encoding: .utf8) ?? ""
+                    case (2, .bytes(let bytes)): node = nonemptyUTF8(bytes)
+                    case (3, .bytes(let bytes)): enterprise = nonemptyUTF8(bytes)
+                    default: break
+                    }
+                }
+                if !repoURL.isEmpty {
+                    repos.append(.init(repoURL: repoURL, scmRepoNodeId: node, gitEnterpriseUUID: enterprise))
+                }
+            }
+        }
+        return .init(publicId: publicId, name: name, repos: repos)
+    }
+
+    static func decodeCloudAgentsDisabledByTeamAdmin(_ data: Data) throws -> Bool {
+        var response = Reader(data)
+        var settings: Data?
+        for (field, value) in try response.readFields() where field == 7 {
+            if case .bytes(let bytes) = value { settings = bytes; break }
+        }
+        guard let settings else { return false }
+        var nested = Reader(settings)
+        for (field, value) in try nested.readFields() where field == 24 {
+            if case .varint(let raw) = value { return raw != 0 }
+        }
+        return false
+    }
+
+    private static func cloudAgentRequestedModel(
+        modelId: String?,
+        modelParams: [String: String]
+    ) throws -> Data? {
+        let modelId = modelId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if modelId.isEmpty {
+            guard modelParams.isEmpty else {
+                throw IOSCursorDashboardError(message: "'model' is required when 'model_params' are provided.")
+            }
+            return nil
+        }
+        var model = Data()
+        appendBytesField(1, Data(modelId.utf8), to: &model)
+        appendVarintField(2, 1, to: &model)
+        for key in modelParams.keys.sorted() {
+            guard let value = modelParams[key] else { continue }
+            var parameter = Data()
+            appendBytesField(1, Data(key.utf8), to: &parameter)
+            appendBytesField(2, Data(value.utf8), to: &parameter)
+            appendBytesField(3, parameter, to: &model)
+        }
+        return model
+    }
+
     private static func nonemptyUTF8(_ bytes: Data) -> String? {
         guard let value = String(data: bytes, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -940,6 +1396,82 @@ struct IOSCloudAgentComposerInfo: Equatable, Sendable {
 
     var isActive: Bool { status == 1 || status == 4 }
     var isError: Bool { status == 3 || status == 5 || permanentError != nil }
+}
+
+struct IOSCloudAgentImageInput: Equatable, Sendable {
+    let data: Data
+    let path: String
+    let mimeType: String
+}
+
+struct IOSCloudAgentWorkerLabel: Equatable, Sendable {
+    let key: String
+    let value: String
+}
+
+struct IOSCloudAgentEnvironmentRepo: Equatable, Sendable {
+    let repoURL: String
+    let scmRepoNodeId: String?
+    let gitEnterpriseUUID: String?
+}
+
+struct IOSCloudAgentSavedEnvironment: Equatable, Sendable {
+    let publicId: String
+    let name: String
+    let repos: [IOSCloudAgentEnvironmentRepo]
+}
+
+struct IOSCloudAgentLaunchInput: Equatable, Sendable {
+    let bcId: String
+    let snapshotNameOrId: String
+    let repoURL: String
+    let startingRef: String?
+    let prompt: String
+    let images: [IOSCloudAgentImageInput]
+    let title: String?
+    let usePrivateWorker: Bool?
+    let labels: [IOSCloudAgentWorkerLabel]
+    let teamId: Int32?
+    let environmentName: String?
+    let environmentPublicId: String?
+    let environmentRepos: [IOSCloudAgentEnvironmentRepo]
+    let modelId: String?
+    let modelParams: [String: String]
+}
+
+struct IOSCloudAgentReplyInput: Equatable, Sendable {
+    let bcId: String
+    let prompt: String
+    let images: [IOSCloudAgentImageInput]
+    let interrupt: Bool
+    let modelId: String?
+    let modelParams: [String: String]
+}
+
+struct IOSCloudAgentLaunchResult: Equatable, Sendable {
+    let bcId: String
+    let url: String
+    let initialRunId: String?
+}
+
+struct IOSCloudAgentSummary: Equatable, Sendable {
+    let bcId: String
+    let name: String
+    let status: Int32
+    let branchName: String
+    let prURL: String
+    let isArchived: Bool
+}
+
+struct IOSCloudAgentArtifact: Equatable, Sendable {
+    let path: String
+    let sizeBytes: UInt64
+}
+
+struct IOSCloudAgentFileChange: Equatable, Sendable {
+    let path: String
+    let added: Int
+    let removed: Int
 }
 
 struct IOSCursorTranscriptionResult: Equatable, Sendable {
@@ -1677,6 +2209,208 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
             timeoutMs: timeoutMs
         )
         return try IOSCursorDashboardProto.decodeBackgroundComposerInfo(response)
+    }
+
+    func startBackgroundComposer(
+        _ input: IOSCloudAgentLaunchInput,
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCloudAgentLaunchResult {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "StartBackgroundComposerFromSnapshot",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.startBackgroundComposerRequest(input),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeStartBackgroundComposerResponse(
+            response,
+            fallbackBcId: input.bcId
+        )
+    }
+
+    func listBackgroundComposers(
+        limit: Int = 20,
+        includeArchived: Bool = false,
+        timeoutMs: Int = 30_000
+    ) async throws -> [IOSCloudAgentSummary] {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "ListBackgroundComposers",
+            service: "BackgroundComposerService",
+            body: IOSCursorDashboardProto.listBackgroundComposersRequest(
+                limit: limit,
+                includeArchived: includeArchived
+            ),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        let values = try IOSCursorDashboardProto.decodeBackgroundComposerList(response)
+        return includeArchived ? values : values.filter { !$0.isArchived }
+    }
+
+    func addBackgroundComposerFollowup(
+        _ input: IOSCloudAgentReplyInput,
+        timeoutMs: Int = 30_000
+    ) async throws -> String {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "AddAsyncFollowupBackgroundComposer",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.followupBackgroundComposerRequest(input),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeFollowupRunId(response)
+    }
+
+    func pauseBackgroundComposer(
+        bcId: String,
+        timeoutMs: Int = 30_000
+    ) async throws {
+        try Task.checkCancellation()
+        _ = try await protoRPC(
+            "PauseBackgroundComposer",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.pauseBackgroundComposerRequest(bcId),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+    }
+
+    func renameBackgroundComposer(
+        bcId: String,
+        title: String,
+        timeoutMs: Int = 30_000
+    ) async throws {
+        try Task.checkCancellation()
+        _ = try await protoRPC(
+            "RenameBackgroundComposer",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.renameBackgroundComposerRequest(bcId, title: title),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+    }
+
+    func setBackgroundComposerArchived(
+        bcId: String,
+        archived: Bool,
+        timeoutMs: Int = 30_000
+    ) async throws {
+        try Task.checkCancellation()
+        _ = try await protoRPC(
+            "ArchiveBackgroundComposer",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.archiveBackgroundComposerRequest(
+                bcId,
+                archived: archived
+            ),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+    }
+
+    func deleteBackgroundComposer(
+        bcId: String,
+        timeoutMs: Int = 30_000
+    ) async throws {
+        try Task.checkCancellation()
+        _ = try await protoRPC(
+            "DeleteBackgroundComposer",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.backgroundComposerIdRequest(bcId),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+    }
+
+    func listBackgroundComposerArtifacts(
+        bcId: String,
+        timeoutMs: Int = 30_000
+    ) async throws -> [IOSCloudAgentArtifact] {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "ListBackgroundComposerArtifacts",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.backgroundComposerIdRequest(bcId),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeBackgroundComposerArtifacts(response)
+    }
+
+    func getBackgroundComposerConversation(
+        bcId: String,
+        timeoutMs: Int = 30_000
+    ) async throws -> [Data] {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "GetBackgroundComposerConversation",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.backgroundComposerIdRequest(bcId),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeBackgroundComposerConversation(response)
+    }
+
+    func getBackgroundComposerDiff(
+        bcId: String,
+        timeoutMs: Int = 30_000
+    ) async throws -> [IOSCloudAgentFileChange] {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "GetOptimizedDiffDetails",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.optimizedDiffRequest(bcId),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeOptimizedDiff(response)
+    }
+
+    func getCloudAgentSavedEnvironment(
+        publicId: String,
+        timeoutMs: Int = 30_000
+    ) async throws -> IOSCloudAgentSavedEnvironment? {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "GetEnvironment",
+            service: "BackgroundComposerService",
+            body: try IOSCursorDashboardProto.getEnvironmentRequest(publicId: publicId),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeSavedEnvironment(response)
+    }
+
+    func listCloudAgentSavedEnvironments(
+        limit: Int = 500,
+        timeoutMs: Int = 30_000
+    ) async throws -> [IOSCloudAgentSavedEnvironment] {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "ListEnvironments",
+            service: "BackgroundComposerService",
+            body: IOSCursorDashboardProto.listEnvironmentsRequest(limit: limit),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeSavedEnvironmentList(response)
+    }
+
+    func cloudAgentsDisabledByTeamAdmin(
+        timeoutMs: Int = 10_000
+    ) async throws -> Bool {
+        try Task.checkCancellation()
+        let response = try await protoRPC(
+            "GetTeamAdminSettingsOrEmptyIfNotInTeam",
+            body: IOSCursorDashboardProto.teamAdminSettingsRequest(),
+            timeoutMs: timeoutMs
+        )
+        try Task.checkCancellation()
+        return try IOSCursorDashboardProto.decodeCloudAgentsDisabledByTeamAdmin(response)
     }
 
     func getSandAccessStatus(
