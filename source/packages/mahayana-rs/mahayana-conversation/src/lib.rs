@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use mahayana_core::ApprovalDecision;
+use mahayana_kernel::AsyncAskQuestionCompletionRequest;
 use mahayana_core::ApprovalId;
 use mahayana_core::Conversation;
 use mahayana_core::ConversationId;
@@ -191,6 +192,16 @@ pub trait ConversationProvider: Send + Sync {
     ) -> Result<(), ConversationError>;
 
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), ConversationError>;
+    async fn complete_async_ask_question(
+        &self,
+        _request: AsyncAskQuestionCompletionRequest,
+        _events: SharedConversationEventSink,
+    ) -> Result<(), ConversationError> {
+        Err(ConversationError::Provider(
+            "conversation provider does not support async ask_question completion".into(),
+        ))
+    }
+
 
     /// Cooperatively park one already-running operation without converting it
     /// into a terminal interruption. Providers that cannot preserve an
