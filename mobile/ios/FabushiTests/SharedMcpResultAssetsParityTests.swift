@@ -8,6 +8,46 @@ private actor LogoFetchCounter {
 }
 
 final class SharedMcpResultAssetsParityTests: XCTestCase {
+    func testBackendTextOutputLocationIsTypedAndPreserved() {
+        let result = sandMcpResultFromBackend(.init(
+            caseName: "success",
+            value: .object([
+                "content": .array([
+                    .object([
+                        "type": .string("text"),
+                        "text": .string(""),
+                        "outputLocation": .object([
+                            "filePath": .string("/workspace/agent-tools/output.txt"),
+                            "sizeBytes": .number(51_200),
+                            "lineCount": .number(42),
+                        ]),
+                    ]),
+                ]),
+                "isError": .bool(false),
+            ])
+        ))
+        guard case .success(let success) = result.result,
+              case .text(let text) = success.content.first?.content
+        else {
+            return XCTFail("expected typed text output location")
+        }
+        XCTAssertEqual(text.text, "")
+        XCTAssertEqual(
+            text.outputLocation,
+            .init(
+                filePath: "/workspace/agent-tools/output.txt",
+                sizeBytes: 51_200,
+                lineCount: 42
+            )
+        )
+
+        let rebuilt = generatedMcpResultFactory.success(
+            result,
+            content: success.content
+        )
+        XCTAssertEqual(rebuilt, result)
+    }
+
     func testGeneratedResultFactoryPreservesSuccessMetadata() {
         let original = SandMcpResult(result: .success(.init(
             content: [.init(content: .text(.init(text: "old")))],

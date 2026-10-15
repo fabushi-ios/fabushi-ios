@@ -134,7 +134,41 @@ private func mcpContentItem(_ value: McpJSONValue) -> SandMcpContentItem {
     switch type {
     case "text":
         if case .string(let text) = object["text"] {
-            return .init(content: .text(.init(text: text)))
+            let outputLocation: SandMcpOutputLocation? = {
+                guard case .object(let location)? = object["outputLocation"],
+                      case .string(let filePath)? = location["filePath"],
+                      !filePath.isEmpty
+                else {
+                    return nil
+                }
+                let sizeBytes: Int64
+                if case .number(let value)? = location["sizeBytes"],
+                   value.isFinite,
+                   value >= 0,
+                   value <= Double(Int64.max) {
+                    sizeBytes = Int64(value)
+                } else {
+                    return nil
+                }
+                let lineCount: Int64
+                if case .number(let value)? = location["lineCount"],
+                   value.isFinite,
+                   value >= 0,
+                   value <= Double(Int64.max) {
+                    lineCount = Int64(value)
+                } else {
+                    return nil
+                }
+                return .init(
+                    filePath: filePath,
+                    sizeBytes: sizeBytes,
+                    lineCount: lineCount
+                )
+            }()
+            return .init(content: .text(.init(
+                text: text,
+                outputLocation: outputLocation
+            )))
         }
     case "image":
         if case .string(let data) = object["data"],

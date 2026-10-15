@@ -1,7 +1,14 @@
 import Foundation
 
+struct SandMcpOutputLocation: Equatable, Sendable {
+    let filePath: String
+    let sizeBytes: Int64
+    let lineCount: Int64
+}
+
 struct SandMcpTextContent: Equatable, Sendable {
     let text: String
+    var outputLocation: SandMcpOutputLocation? = nil
 }
 
 struct SandMcpImageContent: Equatable, Sendable {

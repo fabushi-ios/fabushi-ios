@@ -4915,10 +4915,18 @@ private func routedCoordinatorPayload(_ result: SandMcpResult) -> CoordinatorPay
         let content = success.content.map { item -> CoordinatorPayload in
             switch item.content {
             case .text(let text):
-                return .object([
+                var object: [String: CoordinatorPayload] = [
                     "type": .string("text"),
                     "text": .string(text.text),
-                ])
+                ]
+                if let location = text.outputLocation {
+                    object["outputLocation"] = .object([
+                        "filePath": .string(location.filePath),
+                        "sizeBytes": .number(Double(location.sizeBytes)),
+                        "lineCount": .number(Double(location.lineCount)),
+                    ])
+                }
+                return .object(object)
             case .image(let image):
                 return .object([
                     "type": .string("image"),
