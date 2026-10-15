@@ -203,6 +203,7 @@ final class FabushiRuntime {
     @ObservationIgnored private var resumeTask: Task<Void, Never>?
     @ObservationIgnored private var connectionRetryTask: Task<Void, Never>?
     @ObservationIgnored private var appVersionPolicyTask: Task<Void, Never>?
+    @ObservationIgnored private var agentStoreSnapshotTask: Task<Void, Never>?
     #if DEBUG
     @ObservationIgnored private var devControlsPreload: IOSDevControlsPreload?
     #endif
@@ -286,6 +287,12 @@ final class FabushiRuntime {
         deepLinkController?.markReady()
         if main.requiresColdStartResync {
             await resyncAfterLifecycleRecovery(reason: "cold-start")
+        } else if marketplace.loggedIn {
+            if await hydrateAgentStore(reason: "startup") {
+                main.markResyncCompleted()
+            } else {
+                main.markResyncRequired()
+            }
         } else {
             main.markResyncCompleted()
         }
@@ -296,6 +303,11 @@ final class FabushiRuntime {
         if loggedIn {
             main.coordinator.startAutomationRelay()
             main.coordinator.reconcileAutomationRelay()
+            if await hydrateAgentStore(reason: "login") {
+                main.markResyncCompleted()
+            } else {
+                main.markResyncRequired()
+            }
         } else {
             // Fence account-scoped relay/fire polling immediately on logout.
             // Account transition cleanup will also clear the durable scope, but
@@ -309,6 +321,7 @@ final class FabushiRuntime {
         switch phase {
         case .background:
             wasBackgrounded = true
+            scheduleAgentStoreSnapshot(reason: "background")
         case .active where wasBackgrounded:
             wasBackgrounded = false
             resumeTask?.cancel()
@@ -424,6 +437,72 @@ final class FabushiRuntime {
         }
     }
 
+    private func hydrateAgentStore(reason: String) async -> Bool {
+        guard marketplace.loggedIn else { return true }
+        do {
+            _ = try await main.coordinator.hydrateAgentStoreForCurrentScope()
+            main.lifecycleReporter.report(
+                .coordinatorHandoff,
+                metadata: [
+                    "agent_store": "hydrate",
+                    "reason": reason,
+                    "result": "completed",
+                ]
+            )
+            return true
+        } catch is CancellationError {
+            return false
+        } catch {
+            main.lifecycleReporter.report(
+                .coordinatorHandoff,
+                level: .warn,
+                metadata: [
+                    "agent_store": "hydrate",
+                    "reason": reason,
+                    "result": "failed",
+                    "error": String(error.localizedDescription.prefix(512)),
+                ]
+            )
+            return false
+        }
+    }
+
+    private func scheduleAgentStoreSnapshot(reason: String) {
+        agentStoreSnapshotTask?.cancel()
+        guard marketplace.loggedIn else {
+            agentStoreSnapshotTask = nil
+            return
+        }
+        agentStoreSnapshotTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await self.main.coordinator.snapshotAgentStoreForCurrentScope()
+                guard !Task.isCancelled else { return }
+                self.main.lifecycleReporter.report(
+                    .coordinatorHandoff,
+                    metadata: [
+                        "agent_store": "snapshot",
+                        "reason": reason,
+                        "result": "completed",
+                    ]
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                self.main.lifecycleReporter.report(
+                    .coordinatorHandoff,
+                    level: .warn,
+                    metadata: [
+                        "agent_store": "snapshot",
+                        "reason": reason,
+                        "result": "failed",
+                        "error": String(error.localizedDescription.prefix(512)),
+                    ]
+                )
+            }
+        }
+    }
+
     private func resyncAfterLifecycleRecovery(reason: String) async {
         await marketplace.refresh()
         await remoteDeviceGateway.resumeAfterBackground()
@@ -433,13 +512,19 @@ final class FabushiRuntime {
         await cloudAgentWakeWatcher.refreshNow()
         main.coordinator.reconcileAutomationRelay()
         main.coordinator.requestAutomationRelayDrain()
-        main.markResyncCompleted()
+        let agentStoreReady = await hydrateAgentStore(reason: reason)
+        if agentStoreReady {
+            main.markResyncCompleted()
+        } else {
+            main.markResyncRequired()
+        }
         reconnectGeneration &+= 1
         main.lifecycleReporter.report(
             .coordinatorHandoff,
+            level: agentStoreReady ? .info : .warn,
             metadata: [
                 "resync_reason": reason,
-                "result": "completed",
+                "result": agentStoreReady ? "completed" : "agent-store-pending",
             ]
         )
     }

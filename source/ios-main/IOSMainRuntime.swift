@@ -405,6 +405,10 @@ final class IOSMainRuntime {
         lifecycleRecovery.markResyncCompleted()
     }
 
+    func markResyncRequired() {
+        lifecycleRecovery.markResyncRequired()
+    }
+
     func protectedDataWillBecomeUnavailable() {
         lifecycleRecovery.markResyncRequired()
         lifecycleReporter.report(

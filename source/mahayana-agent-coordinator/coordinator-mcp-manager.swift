@@ -202,6 +202,28 @@ private final class CoordinatorMcpHostPort {
         )
     }
 
+    func hydrateAgentStore() async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.hydrateAll",
+            params: [:]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store hydrate response is invalid.")
+        }
+        return object
+    }
+
+    func snapshotAgentStore() async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.agentStore.snapshotAll",
+            params: [:]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Agent Store snapshot response is invalid.")
+        }
+        return object
+    }
+
     func admitBackendAutomationFire(_ fire: [String: Any]) async throws -> [String: Any] {
         let response = try await hostSupervisor.request(
             method: "feature.automation.admitBackendFire",
@@ -2682,6 +2704,34 @@ final class CoordinatorMcpSurface {
         automationRelay.requestDrain()
         automationFire.requestDrain()
         automationCloudSync.requestSync()
+    }
+
+    func hydrateAgentStoreForCurrentScope() async throws -> [String: Any] {
+        guard let scope = accountScope else {
+            throw SandMcpConfigError("Agent Store hydration requires an active account.")
+        }
+        let generation = routedScopeGeneration
+        let result = try await port.hydrateAgentStore()
+        guard scope == accountScope, generation == routedScopeGeneration else {
+            throw SandMcpConfigError(
+                "Agent Store hydration became stale because the account changed."
+            )
+        }
+        return result
+    }
+
+    func snapshotAgentStoreForCurrentScope() async throws -> [String: Any] {
+        guard let scope = accountScope else {
+            throw SandMcpConfigError("Agent Store snapshot requires an active account.")
+        }
+        let generation = routedScopeGeneration
+        let result = try await port.snapshotAgentStore()
+        guard scope == accountScope, generation == routedScopeGeneration else {
+            throw SandMcpConfigError(
+                "Agent Store snapshot became stale because the account changed."
+            )
+        }
+        return result
     }
 
     func stopAutomationRelay() {

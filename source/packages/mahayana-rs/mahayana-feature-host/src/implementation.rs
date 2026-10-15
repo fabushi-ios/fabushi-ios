@@ -8421,6 +8421,82 @@ impl FeatureHostController {
         }))
     }
 
+    fn agent_store_agent_ids(&self) -> Result<Vec<String>, FeatureHostError> {
+        let state = self.state()?;
+        ensure_open(&state)?;
+        let mut agent_ids = state
+            .bots
+            .keys()
+            .filter(|agent_id| is_safe_memory_agent_id(agent_id))
+            .cloned()
+            .collect::<Vec<_>>();
+        agent_ids.sort();
+        agent_ids.dedup();
+        Ok(agent_ids)
+    }
+
+    pub fn agent_store_hydrate_all(&self) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let account_scope = self.channel_account_id()?;
+        let agent_ids = self.agent_store_agent_ids()?;
+        let mut results = Vec::with_capacity(agent_ids.len());
+        for agent_id in agent_ids {
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store hydrate-all account scope changed".into(),
+                ));
+            }
+            let result = self.agent_store_hydrate_agent(&agent_id)?;
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store hydrate-all account scope changed".into(),
+                ));
+            }
+            results.push(json!({
+                "agentId": agent_id,
+                "result": result,
+            }));
+        }
+        Ok(json!({
+            "outcome": "hydrated",
+            "agentCount": results.len(),
+            "agents": results,
+        }))
+    }
+
+    pub fn agent_store_snapshot_all(&self) -> Result<Value, FeatureHostError> {
+        if self.config.mode != HostMode::Production {
+            return Err(FeatureHostError::ProductionUnavailable);
+        }
+        let account_scope = self.channel_account_id()?;
+        let agent_ids = self.agent_store_agent_ids()?;
+        let mut results = Vec::with_capacity(agent_ids.len());
+        for agent_id in agent_ids {
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store snapshot-all account scope changed".into(),
+                ));
+            }
+            let result = self.agent_store_snapshot_agent(&agent_id)?;
+            if self.channel_account_id()? != account_scope {
+                return Err(FeatureHostError::Contract(
+                    "Agent Store snapshot-all account scope changed".into(),
+                ));
+            }
+            results.push(json!({
+                "agentId": agent_id,
+                "result": result,
+            }));
+        }
+        Ok(json!({
+            "outcome": "snapshotted",
+            "agentCount": results.len(),
+            "agents": results,
+        }))
+    }
+
     /// Native settings surfaces use a direct MCP snapshot so they never drain
     /// the renderer's shared HostEvent queue while waiting for settings data.
     pub fn mcp_servers_snapshot(&self) -> Result<Vec<Value>, FeatureHostError> {
