@@ -1,6 +1,23 @@
 import XCTest
 @testable import Fabushi
 
+@MainActor
+private final class SentryPrivacyModeGate {
+    private var continuations: [CheckedContinuation<SandPrivacyMode?, Never>] = []
+
+    func read() async -> SandPrivacyMode? {
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    var pendingCount: Int { continuations.count }
+
+    func resumeFirst(_ mode: SandPrivacyMode?) {
+        continuations.removeFirst().resume(returning: mode)
+    }
+}
+
 final class ProductionSentryParityTests: XCTestCase {
     @MainActor
     func testDefaultFatalMetadataFailsClosedAndDoesNotEmitConversationTag() {
@@ -95,6 +112,47 @@ final class ProductionSentryParityTests: XCTestCase {
         XCTAssertNotEqual(controller.accountScopeHash, "account-b")
     }
 
+    func testDashboardPrivacyModeProjectionPreservesPolicyTier() {
+        XCTAssertEqual(IOSCursorDashboardClient.cursorPrivacyMode(from: NSNumber(value: 2)), .noTraining)
+        XCTAssertEqual(
+            IOSCursorDashboardClient.cursorPrivacyMode(from: "PRIVACY_MODE_USAGE_DATA_TRAINING_ALLOWED"),
+            .usageDataTrainingAllowed
+        )
+        XCTAssertEqual(IOSCursorDashboardClient.cursorPrivacyMode(from: "NO_STORAGE"), .noStorage)
+        XCTAssertNil(IOSCursorDashboardClient.cursorPrivacyMode(from: "unexpected"))
+    }
+
+    @MainActor
+    func testPrivacySynchronizerRejectsStaleAsyncPolicyAndFailsClosedOnLogout() async {
+        let controller = IOSProductionSentryController { _, _ in }
+        controller.rotate(accountSlot: "account-a")
+        let gate = SentryPrivacyModeGate()
+        let synchronizer = IOSProductionSentryPrivacySynchronizer(
+            controller: controller,
+            readMode: { await gate.read() }
+        )
+
+        synchronizer.refresh(loggedIn: true)
+        for _ in 0..<10 where gate.pendingCount < 1 { await Task.yield() }
+        XCTAssertEqual(gate.pendingCount, 1)
+
+        synchronizer.refresh(loggedIn: true)
+        for _ in 0..<10 where gate.pendingCount < 2 { await Task.yield() }
+        XCTAssertEqual(gate.pendingCount, 2)
+        XCTAssertEqual(controller.privacyTier, .fatalMetadata)
+
+        gate.resumeFirst(.usageDataTrainingAllowed)
+        for _ in 0..<4 { await Task.yield() }
+        XCTAssertEqual(controller.privacyTier, .fatalMetadata)
+
+        gate.resumeFirst(.noTraining)
+        for _ in 0..<10 where controller.privacyTier != .scrubbed { await Task.yield() }
+        XCTAssertEqual(controller.privacyTier, .scrubbed)
+
+        synchronizer.refresh(loggedIn: false)
+        XCTAssertEqual(controller.privacyTier, .fatalMetadata)
+    }
+
     func testShippingRuntimeRoutesConversationAndReusesLifecycleTransport() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -113,6 +171,14 @@ final class ProductionSentryParityTests: XCTestCase {
             contentsOf: root.appendingPathComponent("source/ios-main/telemetry/production-sentry.swift"),
             encoding: .utf8
         )
+        let dashboard = try String(
+            contentsOf: root.appendingPathComponent("source/ios-main/account/cursor-dashboard-client.swift"),
+            encoding: .utf8
+        )
+        let mcpSurface = try String(
+            contentsOf: root.appendingPathComponent("source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"),
+            encoding: .utf8
+        )
 
         XCTAssertTrue(registry.contains("\"reportSentryConversation\""))
         XCTAssertTrue(runtime.contains("if method == \"reportSentryConversation\""))
@@ -124,6 +190,11 @@ final class ProductionSentryParityTests: XCTestCase {
         XCTAssertTrue(sentry.contains("SandSentryPrivacyGate()"))
         XCTAssertTrue(sentry.contains("SandSentryEventIDRing(capacity: 64)"))
         XCTAssertTrue(sentry.contains("SandSentrySpoolStore()"))
+        XCTAssertTrue(sentry.contains("IOSProductionSentryPrivacySynchronizer"))
+        XCTAssertTrue(runtime.contains("coordinator.setSentryAuthObserver"))
+        XCTAssertTrue(runtime.contains("sentryPrivacySynchronizer?.refresh(loggedIn: status.loggedIn)"))
+        XCTAssertTrue(dashboard.contains("func getCursorPrivacyMode(timeoutMs: Int = 10_000) async -> SandPrivacyMode?"))
+        XCTAssertTrue(mcpSurface.contains("func currentSentryPrivacyMode() async -> SandPrivacyMode?"))
         XCTAssertFalse(sentry.contains("SentrySDK"))
         XCTAssertFalse(sentry.contains("dsn"))
     }
