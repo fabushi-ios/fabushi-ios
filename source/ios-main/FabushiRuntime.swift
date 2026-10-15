@@ -206,6 +206,8 @@ final class FabushiRuntime {
     @ObservationIgnored private var connectionRetryTask: Task<Void, Never>?
     @ObservationIgnored private var appVersionPolicyTask: Task<Void, Never>?
     @ObservationIgnored private var agentStoreReconcileTask: Task<Void, Never>?
+    @ObservationIgnored private var agentStoreReconcileInFlight: Task<Bool, Never>?
+    @ObservationIgnored private var agentStoreReconcileGeneration: UInt64 = 0
     @ObservationIgnored private var agentStorePeriodicTask: Task<Void, Never>?
     #if DEBUG
     @ObservationIgnored private var devControlsPreload: IOSDevControlsPreload?
@@ -320,6 +322,9 @@ final class FabushiRuntime {
             stopAgentStorePeriodicReconcile()
             agentStoreReconcileTask?.cancel()
             agentStoreReconcileTask = nil
+            agentStoreReconcileGeneration &+= 1
+            agentStoreReconcileInFlight?.cancel()
+            agentStoreReconcileInFlight = nil
             // Fence account-scoped relay/fire polling immediately on logout.
             // Account transition cleanup will also clear the durable scope, but
             // transport work must not remain live during that handoff window.
@@ -453,32 +458,59 @@ final class FabushiRuntime {
 
     private func reconcileAgentStore(reason: String) async -> Bool {
         guard marketplace.loggedIn else { return true }
-        do {
-            _ = try await main.coordinator.reconcileAgentStoreForCurrentScope()
+
+        if let inFlight = agentStoreReconcileInFlight {
+            let completed = await inFlight.value
+            guard !Task.isCancelled else { return false }
             main.lifecycleReporter.report(
                 .coordinatorHandoff,
+                level: completed ? .info : .warn,
                 metadata: [
                     "agent_store": "reconcile",
                     "reason": reason,
-                    "result": "completed",
+                    "result": completed ? "coalesced-completed" : "coalesced-failed",
                 ]
             )
-            return true
-        } catch is CancellationError {
-            return false
-        } catch {
-            main.lifecycleReporter.report(
-                .coordinatorHandoff,
-                level: .warn,
-                metadata: [
-                    "agent_store": "reconcile",
-                    "reason": reason,
-                    "result": "failed",
-                    "error": String(error.localizedDescription.prefix(512)),
-                ]
-            )
-            return false
+            return completed
         }
+
+        agentStoreReconcileGeneration &+= 1
+        let generation = agentStoreReconcileGeneration
+        let task = Task { [weak self] () -> Bool in
+            guard let self, self.marketplace.loggedIn else { return true }
+            do {
+                _ = try await self.main.coordinator.reconcileAgentStoreForCurrentScope()
+                self.main.lifecycleReporter.report(
+                    .coordinatorHandoff,
+                    metadata: [
+                        "agent_store": "reconcile",
+                        "reason": reason,
+                        "result": "completed",
+                    ]
+                )
+                return true
+            } catch is CancellationError {
+                return false
+            } catch {
+                self.main.lifecycleReporter.report(
+                    .coordinatorHandoff,
+                    level: .warn,
+                    metadata: [
+                        "agent_store": "reconcile",
+                        "reason": reason,
+                        "result": "failed",
+                        "error": String(error.localizedDescription.prefix(512)),
+                    ]
+                )
+                return false
+            }
+        }
+        agentStoreReconcileInFlight = task
+        let completed = await task.value
+        if agentStoreReconcileGeneration == generation {
+            agentStoreReconcileInFlight = nil
+        }
+        return completed
     }
 
     private func scheduleAgentStoreReconcile(reason: String) {

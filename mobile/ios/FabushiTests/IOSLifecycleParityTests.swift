@@ -381,6 +381,34 @@ final class IOSLifecycleParityTests: XCTestCase {
         XCTAssertTrue(source.contains("!wasBackgrounded"))
     }
 
+    func testShippingRuntimeCoalescesAgentStoreReconcileAndFencesLogout() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/FabushiRuntime.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("agentStoreReconcileInFlight: Task<Bool, Never>?"))
+        XCTAssertTrue(source.contains("agentStoreReconcileGeneration: UInt64 = 0"))
+        XCTAssertTrue(source.contains("if let inFlight = agentStoreReconcileInFlight"))
+        XCTAssertTrue(source.contains("let completed = await inFlight.value"))
+        XCTAssertTrue(source.contains("coalesced-completed"))
+        XCTAssertTrue(source.contains("coalesced-failed"))
+        XCTAssertTrue(source.contains("if agentStoreReconcileGeneration == generation"))
+        XCTAssertTrue(source.contains("agentStoreReconcileInFlight?.cancel()"))
+        XCTAssertTrue(source.contains("agentStoreReconcileInFlight = nil"))
+        XCTAssertEqual(
+            source.components(separatedBy: "reconcileAgentStoreForCurrentScope()").count - 1,
+            1,
+            "single-flight owner must keep exactly one production Host reconcile dispatch"
+        )
+    }
+
     func testProcessCrashTelemetryLimiterMatchesDesktopCapAndErrorTaxonomy() {
         var limiter = IOSProcessCrashTelemetryLimiter()
         var records: [[String: String]] = []
