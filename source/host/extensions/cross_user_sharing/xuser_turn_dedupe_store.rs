@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -23,57 +24,77 @@ impl SandXuserTurnDedupeStore {
         }
     }
 
-    pub fn mark_seen_if_new(&self, nonce: &str) -> bool {
-        if nonce.trim().is_empty() {
-            return false;
+    pub fn mark_seen_if_new(&self, nonce: &str) -> Result<bool, String> {
+        let nonce = nonce.trim();
+        if nonce.is_empty() {
+            return Ok(false);
         }
         let mut guard = self.cache.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if guard.is_none() {
-            *guard = Some(parse_dedupe_file(
-                fs::read_to_string(&self.file_path).ok().as_deref(),
-            ));
+            *guard = Some(load(&self.file_path)?);
         }
-        let map = guard.as_mut().expect("dedupe cache initialized");
+        let current = guard.as_ref().expect("dedupe cache initialized");
         let now = (self.now_ms)();
-        let before = map.len();
-        map.retain(|_, expires_at| *expires_at > now);
-        let pruned = before != map.len();
-        if map.contains_key(nonce) {
-            if pruned {
-                persist(&self.file_path, map);
+        let mut candidate = current.clone();
+        candidate.retain(|_, expires_at| *expires_at > now);
+
+        if candidate.contains_key(nonce) {
+            if &candidate != current {
+                persist(&self.file_path, &candidate)?;
+                *guard = Some(candidate);
             }
-            return false;
+            return Ok(false);
         }
-        map.insert(nonce.to_string(), now.saturating_add(self.ttl_ms));
-        persist(&self.file_path, map);
-        true
+
+        candidate.insert(nonce.to_string(), now.saturating_add(self.ttl_ms));
+        // Fail closed: only publish the in-memory admission after the durable
+        // temp-write + fsync + atomic rename has completed.
+        persist(&self.file_path, &candidate)?;
+        *guard = Some(candidate);
+        Ok(true)
     }
 }
 
-fn parse_dedupe_file(raw: Option<&str>) -> BTreeMap<String, u64> {
+fn load(path: &Path) -> Result<BTreeMap<String, u64>, String> {
+    let raw = match fs::read_to_string(path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(BTreeMap::new()),
+        Err(error) => return Err(format!("read xuser nonce store {}: {error}", path.display())),
+    };
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|error| format!("decode xuser nonce store: {error}"))?;
+    let seen = value.get("seen").and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "decode xuser nonce store: seen array is required".to_string())?;
     let mut map = BTreeMap::new();
-    let Some(raw) = raw else { return map };
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else { return map };
-    let Some(seen) = value.get("seen").and_then(serde_json::Value::as_array) else { return map };
     for item in seen {
-        let Some(nonce) = item.get("nonce").and_then(serde_json::Value::as_str).filter(|value| !value.is_empty()) else { continue };
-        let Some(expires_at_ms) = item.get("expiresAtMs").and_then(serde_json::Value::as_u64) else { continue };
+        let nonce = item.get("nonce").and_then(serde_json::Value::as_str)
+            .map(str::trim).filter(|value| !value.is_empty())
+            .ok_or_else(|| "decode xuser nonce store: nonce is required".to_string())?;
+        let expires_at_ms = item.get("expiresAtMs").and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| "decode xuser nonce store: expiresAtMs is required".to_string())?;
         map.insert(nonce.to_string(), expires_at_ms);
     }
-    map
+    Ok(map)
 }
 
-fn persist(path: &Path, map: &BTreeMap<String, u64>) {
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
+fn persist(path: &Path, map: &BTreeMap<String, u64>) -> Result<(), String> {
+    let parent = path.parent().ok_or_else(|| "xuser nonce store has no parent".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("create xuser nonce directory {}: {error}", parent.display()))?;
     let part = PathBuf::from(format!("{}.part", path.display()));
     let seen = map.iter().map(|(nonce, expires_at_ms)| {
         serde_json::json!({"nonce": nonce, "expiresAtMs": expires_at_ms})
     }).collect::<Vec<_>>();
-    if fs::write(&part, serde_json::json!({"version": 1, "seen": seen}).to_string()).is_ok() {
-        let _ = fs::rename(part, path);
-    }
+    let bytes = serde_json::to_vec(&serde_json::json!({"version":1,"seen":seen}))
+        .map_err(|error| format!("encode xuser nonce store: {error}"))?;
+    let mut file = File::create(&part)
+        .map_err(|error| format!("create xuser nonce temp {}: {error}", part.display()))?;
+    file.write_all(&bytes).and_then(|_| file.flush()).and_then(|_| file.sync_all())
+        .map_err(|error| format!("write xuser nonce temp {}: {error}", part.display()))?;
+    fs::rename(&part, path).map_err(|error| {
+        let _ = fs::remove_file(&part);
+        format!("replace xuser nonce store {}: {error}", path.display())
+    })
 }
 
 #[cfg(test)]
@@ -81,38 +102,47 @@ mod tests {
     use super::*;
     use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
 
-    fn root() -> PathBuf {
+    fn root(label: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
-            "fabushi-xuser-dedupe-{}-{}",
+            "fabushi-xuser-dedupe-{label}-{}-{}",
             std::process::id(),
             uuid::Uuid::new_v4().simple()
         ))
     }
 
     #[test]
-    fn durable_nonce_survives_restart_expires_and_fails_closed() {
-        let root = root();
+    fn durable_nonce_survives_restart_and_expires() {
+        let root = root("restart");
         let now = Arc::new(AtomicU64::new(1_000));
-        let clock = {
-            let now = Arc::clone(&now);
-            Box::new(move || now.load(Ordering::SeqCst)) as Box<dyn Fn() -> u64 + Send + Sync>
-        };
-        let store = SandXuserTurnDedupeStore::new(&root, 100, clock);
-        assert!(!store.mark_seen_if_new(""));
-        assert!(store.mark_seen_if_new("nonce-1"));
-        assert!(!store.mark_seen_if_new("nonce-1"));
-        drop(store);
-
-        let clock = {
-            let now = Arc::clone(&now);
-            Box::new(move || now.load(Ordering::SeqCst)) as Box<dyn Fn() -> u64 + Send + Sync>
-        };
-        let reopened = SandXuserTurnDedupeStore::new(&root, 100, clock);
-        assert!(!reopened.mark_seen_if_new("nonce-1"));
-        now.store(1_101, Ordering::SeqCst);
-        assert!(reopened.mark_seen_if_new("nonce-1"));
-        assert!(root.join(SAND_XUSER_TURN_DEDUPE_FILE_NAME).is_file());
+        {
+            let clock = Arc::clone(&now);
+            let store = SandXuserTurnDedupeStore::new(
+                &root, 100, Box::new(move || clock.load(Ordering::SeqCst))
+            );
+            assert_eq!(store.mark_seen_if_new("").unwrap(), false);
+            assert_eq!(store.mark_seen_if_new("nonce-1").unwrap(), true);
+            assert_eq!(store.mark_seen_if_new("nonce-1").unwrap(), false);
+        }
+        {
+            let clock = Arc::clone(&now);
+            let store = SandXuserTurnDedupeStore::new(
+                &root, 100, Box::new(move || clock.load(Ordering::SeqCst))
+            );
+            assert_eq!(store.mark_seen_if_new("nonce-1").unwrap(), false);
+            now.store(1_101, Ordering::SeqCst);
+            assert_eq!(store.mark_seen_if_new("nonce-1").unwrap(), true);
+        }
         assert!(!root.join(format!("{SAND_XUSER_TURN_DEDUPE_FILE_NAME}.part")).exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn malformed_store_fails_closed_instead_of_reexecuting_turn() {
+        let root = root("malformed");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join(SAND_XUSER_TURN_DEDUPE_FILE_NAME), "{broken").unwrap();
+        let store = SandXuserTurnDedupeStore::new(&root, 100, Box::new(|| 1));
+        assert!(store.mark_seen_if_new("nonce").is_err());
         let _ = fs::remove_dir_all(root);
     }
 }

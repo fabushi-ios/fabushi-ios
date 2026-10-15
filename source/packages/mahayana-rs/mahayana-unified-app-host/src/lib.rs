@@ -219,14 +219,20 @@ impl UnifiedAppHost {
         self.app.cross_user_remove_deleted_agent(agent_id)
     }
 
+    pub fn cross_user_leave_room(&self, room_id: &str) -> Result<Value, AppHostError> {
+        self.app.cross_user_leave_room(room_id)
+    }
+
     pub fn cross_user_run_remote_turn(
         &self,
         agent_id: &str,
+        turn_nonce: &str,
         system_prompt: &str,
         prompt: &str,
+        cancelled: &std::sync::atomic::AtomicBool,
     ) -> Result<Vec<String>, AppHostError> {
         self.app
-            .cross_user_run_remote_turn(agent_id, system_prompt, prompt)
+            .cross_user_run_remote_turn(agent_id, turn_nonce, system_prompt, prompt, cancelled)
     }
 
     pub fn human_call_remote_list(&self, limit: usize) -> Result<Value, AppHostError> {

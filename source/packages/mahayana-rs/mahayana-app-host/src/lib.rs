@@ -350,13 +350,21 @@ impl AppHost {
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
+    pub fn cross_user_leave_room(&self, room_id: &str) -> Result<Value, AppHostError> {
+        self.product
+            .sharing_leave_room(room_id, None)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
     /// Executes a remote shared-room member turn through the same FeatureHost
     /// that owns normal iOS Agent turns. No second runner or model client is created.
     pub fn cross_user_run_remote_turn(
         &self,
         agent_id: &str,
+        turn_nonce: &str,
         system_prompt: &str,
         prompt: &str,
+        cancelled: &std::sync::atomic::AtomicBool,
     ) -> Result<Vec<String>, AppHostError> {
         let agent_id = agent_id.trim();
         let prompt = prompt.trim();
@@ -374,7 +382,7 @@ impl AppHost {
             "awaitTurn": true,
             "command": {
                 "type": "chat.send",
-                "requestId": format!("xuser-remote-turn-{}", uuid::Uuid::new_v4().simple()),
+                "requestId": format!("xuser-remote-turn-{}", turn_nonce.trim()),
                 "agentId": agent_id,
                 "text": combined,
             }
@@ -391,6 +399,13 @@ impl AppHost {
 
         let started = std::time::Instant::now();
         loop {
+            if cancelled.load(std::sync::atomic::Ordering::Acquire) {
+                let _ = self.feature_cancel_await_operation(json!({"operationId": operation_id}));
+                let _ = self.feature_interrupt(json!({"operationId": operation_id}));
+                return Err(AppHostError::Operation(
+                    "remote shared-room turn was cancelled".into()
+                ));
+            }
             let terminal = self.feature_await_operation(json!({
                 "operationId": operation_id,
                 "timeoutMs": 1000,

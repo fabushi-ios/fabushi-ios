@@ -46,6 +46,12 @@ impl SandXuserRelayRuntime {
         state.backoff_until_ms = 0;
     }
 
+    pub fn reset_account(&self) {
+        let mut state = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        state.pending_ack_ids.clear();
+        state.backoff_until_ms = 0;
+    }
+
     pub fn tick(&self) -> Result<bool, String> {
         let now = (self.now_ms)();
         let pending = {

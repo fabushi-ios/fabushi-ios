@@ -576,10 +576,14 @@ enum MobileCrossUserCommand {
     State,
     Poll { ack_ids: Vec<String> },
     Send { payload: serde_json::Value },
+    LeaveRoom { room_id: String },
+    RemoveDeletedAgent { agent_id: String },
     RunRemoteTurn {
         agent_id: String,
+        turn_nonce: String,
         system_prompt: String,
         prompt: String,
+        cancelled: Arc<std::sync::atomic::AtomicBool>,
     },
 }
 
@@ -717,15 +721,25 @@ impl MobileHostBridge {
                                     MobileCrossUserCommand::Send { payload } => {
                                         host.cross_user_relay_send(&payload)
                                     }
+                                    MobileCrossUserCommand::LeaveRoom { room_id } => {
+                                        host.cross_user_leave_room(&room_id)
+                                    }
+                                    MobileCrossUserCommand::RemoveDeletedAgent { agent_id } => {
+                                        host.cross_user_remove_deleted_agent(&agent_id)
+                                    }
                                     MobileCrossUserCommand::RunRemoteTurn {
                                         agent_id,
+                                        turn_nonce,
                                         system_prompt,
                                         prompt,
+                                        cancelled,
                                     } => host
                                         .cross_user_run_remote_turn(
                                             &agent_id,
+                                            &turn_nonce,
                                             &system_prompt,
                                             &prompt,
+                                            cancelled.as_ref(),
                                         )
                                         .and_then(|messages| {
                                             serde_json::to_value(messages)
@@ -857,16 +871,32 @@ impl cross_user_sharing::CrossUserHostBridge for MobileCrossUserBridge {
         })
     }
 
+    fn leave_room(&self, room_id: &str) -> Result<serde_json::Value, String> {
+        self.host.cross_user(MobileCrossUserCommand::LeaveRoom {
+            room_id: room_id.to_string(),
+        })
+    }
+
+    fn remove_deleted_agent(&self, agent_id: &str) -> Result<serde_json::Value, String> {
+        self.host.cross_user(MobileCrossUserCommand::RemoveDeletedAgent {
+            agent_id: agent_id.to_string(),
+        })
+    }
+
     fn run_remote_turn(
         &self,
         agent_id: &str,
+        turn_nonce: &str,
         system_prompt: &str,
         prompt: &str,
+        cancelled: Arc<std::sync::atomic::AtomicBool>,
     ) -> Result<Vec<String>, String> {
         let value = self.host.cross_user(MobileCrossUserCommand::RunRemoteTurn {
             agent_id: agent_id.to_string(),
+            turn_nonce: turn_nonce.to_string(),
             system_prompt: system_prompt.to_string(),
             prompt: prompt.to_string(),
+            cancelled,
         })?;
         serde_json::from_value(value)
             .map_err(|error| format!("decode cross-user remote turn output: {error}"))
@@ -1149,8 +1179,46 @@ impl MobileAppHost {
         if let Some(output) = self.content_search.dispatch_json(input) {
             return output;
         }
+
+        let parsed = serde_json::from_str::<serde_json::Value>(input).ok();
+        let pending_leave = parsed.as_ref().and_then(|request| {
+            if request.get("method").and_then(serde_json::Value::as_str) != Some("sharing.leaveRoom") {
+                return None;
+            }
+            let params = request.get("params")?;
+            let room_id = params.get("roomId")?.as_str()?;
+            let target_auth_id = params.get("targetAuthId").and_then(serde_json::Value::as_str);
+            self.cross_user_sharing
+                .as_ref()
+                .and_then(|owner| owner.note_leave_room(room_id, target_auth_id).ok().flatten())
+        });
+
         let output = self.host.dispatch_json(input);
         self.content_search.observe_host_dispatch(input, &output);
+
+        let succeeded = serde_json::from_str::<serde_json::Value>(&output)
+            .ok()
+            .and_then(|value| value.get("ok").and_then(serde_json::Value::as_bool))
+            == Some(true);
+        if succeeded {
+            if let (Some(owner), Some(departure)) =
+                (self.cross_user_sharing.as_ref(), pending_leave.as_ref())
+            {
+                let _ = owner.settle_departure(departure);
+            }
+            if let (Some(owner), Some(request)) = (self.cross_user_sharing.as_ref(), parsed.as_ref()) {
+                if request.get("method").and_then(serde_json::Value::as_str) == Some("feature.execute")
+                {
+                    let params = request.get("params").unwrap_or(&serde_json::Value::Null);
+                    let command = params.get("command").unwrap_or(params);
+                    if command.get("type").and_then(serde_json::Value::as_str) == Some("bot.delete") {
+                        if let Some(agent_id) = command.get("id").and_then(serde_json::Value::as_str) {
+                            let _ = owner.note_agent_deleted(agent_id);
+                        }
+                    }
+                }
+            }
+        }
         output
     }
 
