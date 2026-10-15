@@ -984,6 +984,7 @@ final class CoordinatorMcpSurface {
     private let reportMigrationWatchTelemetry: @MainActor (_ phase: String, _ consecutiveFailures: Int, _ errorClass: String?) -> Void
     private let isClientPaused: @MainActor () -> Bool
     private var experimentAuthObserver: ((IOSCursorAuthStatus) -> Void)?
+    private var sentryAuthObserver: ((IOSCursorAuthStatus) -> Void)?
     private var computerMigrationWatchTask: Task<Void, Never>?
     private var computerMigrationStallTask: Task<Void, Never>?
     private var computerMigrationStallBudget = IOSComputerMigrationStallBudget()
@@ -1358,6 +1359,7 @@ final class CoordinatorMcpSurface {
     private func consumeCursorAuthStatus(_ status: IOSCursorAuthStatus) {
         localToolPermissionCeilingSynchronizer.consume(status)
         experimentAuthObserver?(status)
+        sentryAuthObserver?(status)
     }
 
     func setExperimentAuthObserver(_ observer: ((IOSCursorAuthStatus) -> Void)?) {
@@ -1367,6 +1369,21 @@ final class CoordinatorMcpSurface {
             guard let self, let observer = self.experimentAuthObserver else { return }
             observer(await self.cursorAuth.status())
         }
+    }
+
+    func setSentryAuthObserver(_ observer: ((IOSCursorAuthStatus) -> Void)?) {
+        sentryAuthObserver = observer
+        guard observer != nil else { return }
+        Task { @MainActor [weak self] in
+            guard let self, let observer = self.sentryAuthObserver else { return }
+            observer(await self.cursorAuth.status())
+        }
+    }
+
+    func currentSentryPrivacyMode() async -> SandPrivacyMode? {
+        let status = await cursorAuth.status()
+        guard status.loggedIn else { return nil }
+        return await dashboard.getCursorPrivacyMode()
     }
 
     func productAnalyticsClient() -> any ProductAnalyticsClient {
