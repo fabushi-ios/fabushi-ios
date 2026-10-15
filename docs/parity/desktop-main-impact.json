@@ -1,16 +1,441 @@
 {
   "schemaVersion": 1,
   "desktopRepository": "bhrumom/fabushi-desktop",
-  "previousCommit": "62d0c99f95d83f0c7c135a802a31c8b2fcf2cc8d",
-  "currentCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-  "fullTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
-  "directCount": 0,
-  "metadataCorrections": 0,
+  "previousCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
+  "currentCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+  "fullTree": "ca4777b5e3b03395da5e8f28aa2d3cfe5169113a",
+  "directCount": 53,
+  "metadataCorrections": [],
   "fullReviewAccepted": false,
-  "directChanges": [],
+  "directChanges": [
+    {
+      "path": "source/fabushi-network-worker/encrypted_store.go",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "3451d310c77beba93a5ec83a08e624ad0a9f36a9",
+      "previousSize": null,
+      "size": 3784
+    },
+    {
+      "path": "source/fabushi-network-worker/encrypted_store_test.go",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "b3ca5bb3c50d7049529b78677bfec131f9431cfa",
+      "previousSize": null,
+      "size": 2795
+    },
+    {
+      "path": "source/fabushi-network-worker/go.mod",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "213ab58b6bc7e272c6743830ed61cfe273347da0",
+      "previousSize": null,
+      "size": 115
+    },
+    {
+      "path": "source/fabushi-network-worker/main.go",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "744b956da6de1bbf490aebc749e04fd0fbacd4c0",
+      "previousSize": null,
+      "size": 11699
+    },
+    {
+      "path": "source/fabushi-network-worker/protocol.go",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "b7e41b1847b039cbb01f4390b41c905a72dd8cf2",
+      "previousSize": null,
+      "size": 5860
+    },
+    {
+      "path": "source/fabushi-network-worker/protocol_test.go",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "4dc4741d3c3c8d616c089c086f25e833d4e53022",
+      "previousSize": null,
+      "size": 4722
+    },
+    {
+      "path": "source/host/Cargo.toml",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "f76f22941a27eb2f8f4024ed71ff42fd2db086c9",
+      "previousSize": null,
+      "size": 1348
+    },
+    {
+      "path": "source/host/app/src/main.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "4488df58e2739e11955a885c3845b95caf318c55",
+      "previousSize": null,
+      "size": 583642
+    },
+    {
+      "path": "source/host/local-exec/local-exec-provider.ts",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "870e2ec06486602e916df3c619b6e8544f1e3911",
+      "previousSize": null,
+      "size": 26970
+    },
+    {
+      "path": "source/host/src/durable_file_policy.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "2006be99737ad30a4ea10d9eed6ed36056059823",
+      "previousSize": null,
+      "size": 798
+    },
+    {
+      "path": "source/host/src/extensions/auth/auth_service.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "e063f2d072d64559544fc1cb8a1050f5999599e3",
+      "previousSize": null,
+      "size": 17215
+    },
+    {
+      "path": "source/host/src/extensions/box_store_sync/box_store_download.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "717b031bd4d52d0a76893932433b4bec8e874684",
+      "previousSize": null,
+      "size": 58522
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/gateway_local_exec_sand_box.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "1e3f87fec9e811b31f40c4cefcf63eccf8c9e7d2",
+      "previousSize": null,
+      "size": 57028
+    },
+    {
+      "path": "source/host/src/extensions/local_exec/local_exec_bridge.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "59e2a849300e9343673199467c2301725328a004",
+      "previousSize": null,
+      "size": 25708
+    },
+    {
+      "path": "source/host/src/extensions/telemetry/pressure_cpu_profiler.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "ca35607a273d2d0019116ca0333a68fa30cf8fa2",
+      "previousSize": null,
+      "size": 29695
+    },
+    {
+      "path": "source/host/src/lib.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "a58b26c439aec69215e3f125995c8230d3d012b5",
+      "previousSize": null,
+      "size": 2768
+    },
+    {
+      "path": "source/host/src/network_enrollment_owner.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "dac2ea3dfa439570de57722c23f583b160f15af9",
+      "previousSize": null,
+      "size": 28219
+    },
+    {
+      "path": "source/host/src/network_worker_process.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "30751cc27346195887ed072bae751788a9b35b9e",
+      "previousSize": null,
+      "size": 28792
+    },
+    {
+      "path": "source/host/src/remote_computer_target.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "602493decac443fbefdf3e9af3ccda2caad2012d",
+      "previousSize": null,
+      "size": 95980
+    },
+    {
+      "path": "source/host/src/runner/host_external_machine_dependencies.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "a1033f3e104d9afa15cfd842372f8720e776ff18",
+      "previousSize": null,
+      "size": 7949
+    },
+    {
+      "path": "source/host/src/runner/sand_auto_review_summaries.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "7f19c0b0c043aa55f4c0ad6b8d6ef7514f15a6c1",
+      "previousSize": null,
+      "size": 22723
+    },
+    {
+      "path": "source/host/src/runner/sand_browser_auto_review.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "946744c08fe7dbb6de2e1685e1ef77c5e8223cb6",
+      "previousSize": null,
+      "size": 12007
+    },
+    {
+      "path": "source/host/src/runner/sand_computer_auto_review.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "2dba5a4aa62e36f9d597b49ab2d048f793f791fd",
+      "previousSize": null,
+      "size": 16343
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_browser_driver_source.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "325a593e1e2d691f413186ddd90606441ff91f70",
+      "previousSize": null,
+      "size": 45591
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_browser_tools.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "ae6c6b8e802bf7ff4855f0625fa2d06541c40df6",
+      "previousSize": null,
+      "size": 36925
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_computer_tool.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "2de35a7a5a5db90f5e53c040318b849d7fdeccef",
+      "previousSize": null,
+      "size": 27688
+    },
+    {
+      "path": "source/host/src/runner/tools/sand_external_machine_tools.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "7743901a584adeed0612aadc140ac6cfbd285ce4",
+      "previousSize": null,
+      "size": 9834
+    },
+    {
+      "path": "source/host/src/sensitive_input_challenge.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "0da331c512db4ecadd951be97a0c48fb966cacb5",
+      "previousSize": null,
+      "size": 6354
+    },
+    {
+      "path": "source/host/tests/computer_tool_projection_contract.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "ea466f28fdb74a5ff80cbc310d701e2c5ec6dd25",
+      "previousSize": null,
+      "size": 19517
+    },
+    {
+      "path": "source/host/tests/extensions_auth_service_contract.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "e6e6e4910dd968a254aa80dc47e1a26293690e68",
+      "previousSize": null,
+      "size": 10618
+    },
+    {
+      "path": "source/host/tests/external_machine_shipping_contract.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "f6a043551d600e72a466fbe915129747d4c9e63e",
+      "previousSize": null,
+      "size": 1610
+    },
+    {
+      "path": "source/host/tests/external_machine_tool_contract.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "f54d07c3d68c32bc02242457d4c65d826989ae7d",
+      "previousSize": null,
+      "size": 7543
+    },
+    {
+      "path": "source/host/tests/g10_typed_native_control_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "8847a0c399f5bef957075f88eb1bfd0dd3253784",
+      "previousSize": null,
+      "size": 4549
+    },
+    {
+      "path": "source/host/tests/gateway_local_exec_sand_box_contract.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "f882534a55b4a7b6acde610ca20bf1936a32fb4d",
+      "previousSize": null,
+      "size": 16714
+    },
+    {
+      "path": "source/host/tests/native_display_coordinate_mapping_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "bc17a4fab5b07a8c8e572329ae844fe16fb048d1",
+      "previousSize": null,
+      "size": 768
+    },
+    {
+      "path": "source/host/tests/native_display_inventory_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "875a085a9d907d2719460f9dc07634a699972ec9",
+      "previousSize": null,
+      "size": 1503
+    },
+    {
+      "path": "source/host/tests/native_snapshot_generation_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "aee03ac04c9b39835f78336c46f05f964ac3f393",
+      "previousSize": null,
+      "size": 2815
+    },
+    {
+      "path": "source/host/tests/network_enrollment_owner_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "087f3831f946f8bad4360b7cb63f29dee787de75",
+      "previousSize": null,
+      "size": 5970
+    },
+    {
+      "path": "source/host/tests/network_worker_process_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "9d9a1101949092f49e7774a2bdb718b6676abbec",
+      "previousSize": null,
+      "size": 7178
+    },
+    {
+      "path": "source/host/tests/remote_computer_target_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "139424c79bd708b18118071cf85c115bd3176336",
+      "previousSize": null,
+      "size": 9507
+    },
+    {
+      "path": "source/host/tests/remote_computer_target_native_wiring_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "507a1f33889e8e67ffa470ccf857c05b01b3ba72",
+      "previousSize": null,
+      "size": 4791
+    },
+    {
+      "path": "source/host/tests/sand_browser_tools_contract.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "93aad62fb184f1f2c2e94a4b57001c00b1780d1e",
+      "previousSize": null,
+      "size": 22056
+    },
+    {
+      "path": "source/host/tests/sensitive_input_challenge_contract.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "797f904049409ad71568d80b712b6e69ffdc89d9",
+      "previousSize": null,
+      "size": 6540
+    },
+    {
+      "path": "source/host/tests/turn_toolset_contract.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "cf33ad46e5eff0d927f52f352bb26fff5ce01e35",
+      "previousSize": null,
+      "size": 11561
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-computer/Cargo.toml",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "6c655664d3cab8620e72f039dcb0b2597b96838a",
+      "previousSize": null,
+      "size": 938
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-computer/src/lib.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "f85efcd381bbf3000b43f773c1b63fa56a50e0e5",
+      "previousSize": null,
+      "size": 85304
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-computer/src/linux_native.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "8fa237300654173f187e6cc7c9387e7148cefa14",
+      "previousSize": null,
+      "size": 2125
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-computer/src/windows_native.rs",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "d67554bcaf7b62581d031a884a0f306ad249acf8",
+      "previousSize": null,
+      "size": 13512
+    },
+    {
+      "path": "source/mahayana/mahayana-rs/mahayana-host-protocol/src/lib.rs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "0bdc09b25c9b97ca3dd42a3ba938237b8a686813",
+      "previousSize": null,
+      "size": 106782
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-adapters.ts",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "65bab0beb5878d12ca7cbc855d2d0dadee73740b",
+      "previousSize": null,
+      "size": 7480
+    },
+    {
+      "path": "source/product/fabushi/fabushi-account-service.ts",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "d81cbde8d549c2a636911fb62092fb41466b3a8e",
+      "previousSize": null,
+      "size": 22894
+    },
+    {
+      "path": "source/product/fabushi/remote-target-availability.contract.test.ts",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "6e41926cd77720cc27d5f6c2cd328a7d8d2f5459",
+      "previousSize": null,
+      "size": 1127
+    },
+    {
+      "path": "source/product/fabushi/remote-target-availability.ts",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "d1d38e55391cf447f70e5108b0cf97b73dad450d",
+      "previousSize": null,
+      "size": 296
+    }
+  ],
   "dependencyReview": {
     "status": "pending",
-    "reason": "Aggregate shared-contract review remains pending. The previously-open Coordinator reachability/DNS/transport telemetry slice is now wired into the single durable iOS lifecycle owner, and the Desktop attachment Main-RPC production edge is now implemented through an account+Agent-scoped native staging adapter backed by the existing canonical FeatureHost attachment owner. Both slices remain mapped until replacement exact-head Actions execute their focused Rust/Swift/protected evidence; unrelated shared-contract and full responsibility closure remains open. Exact-head rebaseline keeps aggregate review fail-closed: f0d2b9ec and descendant Settings/Global-Dharma owner-documentation runs are predecessor-only; installed Global Dharma local execution is the verified .fabapp -> Marketplace/Host source -> MiniAppWebMcpSurface -> active WKWebView session path, while GlobalDharmaMiniAppBridge remains explicitly online compatibility/service only. Current-main account/access.ts has now been individually re-read and its missing native runtime owner repaired, but aggregate shared-contract/dependency review and remaining responsibility groups are still open; no full-review promotion is made. Plugin GitHub-auth repair is now production-wired through canonical coordinator listAgents/createAgent/sendPrompt/getPluginSyncStatus with account/request fencing and native banner/retry UX; these rows are implemented only pending exact-head Actions and aggregate Plugins/release closure. 2026-10-13 Host correction: Swift-only plugin-auth callers were not sufficient because native AppHost initially lacked listAgents/createAgent/sendPrompt/getPluginSyncStatus and BotCreate/BotSummary did not persist purpose. Descendant Rust changes now add those canonical Host routes, durable purpose/isIntroductionSuppressed, account-scoped git-auth-blocked persistence/retry, and focused Host tests. No verified/release promotion is inferred; prior HEAD CI is predecessor-only.",
+    "reason": "Desktop b6a66fd2 rebaseline introduced/changed 53 selected source files; current-main responsibility review remains open.",
     "sameDirectoryReviewPaths": [
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0014_remote_computer_client_tokens.sql",
       "source/mahayana/mahayana-rs/mahayana-platform-worker/migrations/0016_remote_computer_session_provider.sql",
@@ -1989,41 +2414,242 @@
       }
     ]
   },
-  "historyPolicy": "92fcc2b0 -> d575b4f7 changes no selected frontend/** or source/** blob. All 7,951 selected identities remain exact; the authority/root tree and outside-selected register advance. FPM-001/OMA-001 are active requirement-only work and cannot be promoted from source review.",
-  "groupSummary": [],
-  "totalTrackedChangeCount": 3,
+  "historyPolicy": "Desktop 371b72f1 -> b6a66fd2 exact-head rebaseline. Prior acceptance for all changed source rows is predecessor-only.",
+  "groupSummary": [
+    {
+      "group": "source-fabushi-network-worker",
+      "directCount": 6
+    },
+    {
+      "group": "source-host",
+      "directCount": 38
+    },
+    {
+      "group": "source-mahayana",
+      "directCount": 5
+    },
+    {
+      "group": "source-product",
+      "directCount": 4
+    }
+  ],
+  "totalTrackedChangeCount": 79,
   "outsideSelectedChanges": [
     {
-      "path": "docs/specs/fabushi-plugins-marketplace-open-ecosystem.md",
-      "change": "added",
-      "previousBlobSha": null,
-      "blobSha": "6c039f01f3d839f48f9a990dc68e297fd00eef7a",
-      "previousSize": null,
-      "size": 35869
-    },
-    {
-      "path": "docs/specs/grok-bot-018-runtime-product-parity-recovery.md",
+      "path": ".github/workflows/desktop-chat-parity-ci.yml",
       "change": "blob-changed",
-      "previousBlobSha": "2223e63455806b5fb6faeefedf07f6eab670f361",
-      "blobSha": "312144b9c23364652102a33568ceec9467e38a5b",
-      "previousSize": 301355,
-      "size": 306056
+      "previousBlobSha": null,
+      "blobSha": "63a8cacd13eed412ed9178d816969eaab69659c6",
+      "previousSize": null,
+      "size": 7842
     },
     {
-      "path": "docs/specs/offline-first-installable-mini-app-platform.md",
+      "path": ".github/workflows/fdn-g10-native-computer.yml",
       "change": "added",
       "previousBlobSha": null,
-      "blobSha": "02c6d17f83c05d272bf8fab4c51d8fb6e16d6b71",
+      "blobSha": "9f186adcb5c2e0d19c5f36e55fa24699a03a93de",
       "previousSize": null,
-      "size": 65637
+      "size": 2534
+    },
+    {
+      "path": ".github/workflows/fdn-tsnet-worker.yml",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "4d2e9ad1025891ef8b4a1e2870cbc3f97666e8f6",
+      "previousSize": null,
+      "size": 4774
+    },
+    {
+      "path": ".github/workflows/release-macos-main.yml",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "e602f5e89059a76f79372a6212b9a886a6425e9c",
+      "previousSize": null,
+      "size": 22799
+    },
+    {
+      "path": ".github/workflows/rust-desktop-runtime.yml",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "5112570410c6c30e7d22b6eeff9780b939d97ab2",
+      "previousSize": null,
+      "size": 14085
+    },
+    {
+      "path": ".github/workflows/tdrp-revision9-authority.yml",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "658c9d1b2b88e68a6535d9c985f79d49442ad86f",
+      "previousSize": null,
+      "size": 28239
+    },
+    {
+      "path": "desktop/scripts/notarize-after-sign.cjs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "5f140c6ff8587b4969e1611ec9030a8c5dc5a6f1",
+      "previousSize": null,
+      "size": 8883
+    },
+    {
+      "path": "desktop/tsconfig.grok-electron.json",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "9bf6d4880371b60ce2becfc39f56cae6b333c34f",
+      "previousSize": null,
+      "size": 3522
+    },
+    {
+      "path": "docs/specs/fabushi-same-account-device-network.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "67b94ad8438b4c60b00059bdb4caeae757465d3f",
+      "previousSize": null,
+      "size": 59102
+    },
+    {
+      "path": "docs/specs/fdn-001-account-target-availability.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "525f620a0a4f423978809f56aa69cceace296da9",
+      "previousSize": null,
+      "size": 1469
+    },
+    {
+      "path": "docs/specs/fdn-001-host-network-enrollment-owner.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "d11fa87ad937a5decf7d4dd5089243a617f207bd",
+      "previousSize": null,
+      "size": 2421
+    },
+    {
+      "path": "docs/specs/fdn-001-host-target-core-owner.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "dda84d379bff467b1a545ce4b1d8f5fa29fe53e6",
+      "previousSize": null,
+      "size": 1895
+    },
+    {
+      "path": "docs/specs/fdn-001-target-private-listener.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "4f7d9853451e446d6d9d6ea93eeb4ab2f8169758",
+      "previousSize": null,
+      "size": 3922
+    },
+    {
+      "path": "docs/specs/fdn-001-tsnet-network-worker.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "583c29c1190fd4d398ea039b71e2c4c27a705d87",
+      "previousSize": null,
+      "size": 5930
+    },
+    {
+      "path": "docs/specs/fdn-native-display-coordinate-mapping.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "4e36f1c349418c7c81332d22de9c024f59b63a5f",
+      "previousSize": null,
+      "size": 5353
+    },
+    {
+      "path": "docs/specs/fdn-native-snapshot-generation-fencing.md",
+      "change": "added",
+      "previousBlobSha": null,
+      "blobSha": "89e45106aa9f2faecc44540c24b8443831521c27",
+      "previousSize": null,
+      "size": 7778
+    },
+    {
+      "path": "projects/grok-fabu-parity/architecture-semantic-adaptations.json",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "393689406db74fbbf19e2060e2e7f4e32869813c",
+      "previousSize": null,
+      "size": 90805
+    },
+    {
+      "path": "projects/telegram-desktop-rust/dossiers/external-url-auth-context.md",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "2f2e16381913ff9fb69a868c76b7e5fb97233192",
+      "previousSize": null,
+      "size": 5863
+    },
+    {
+      "path": "projects/telegram-desktop-rust/inventory/build-time-acquisitions.json",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "0c554d04207545a8f852ceed44f6be560594552e",
+      "previousSize": null,
+      "size": 91132
+    },
+    {
+      "path": "projects/telegram-desktop-rust/inventory/root-mutable-authorities.json",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "fadaadac2f621444a3e236f47768cd7cd893d0b8",
+      "previousSize": null,
+      "size": 23434
+    },
+    {
+      "path": "projects/telegram-desktop-rust/parity-ledger.json",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "e57aec01f543d20457a4da6c36764a531612d552",
+      "previousSize": null,
+      "size": 123546
+    },
+    {
+      "path": "projects/telegram-desktop-rust/upstream.lock.json",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "9e10eca1e4c2ebcd743f454aa7b229f677e45c67",
+      "previousSize": null,
+      "size": 12300
+    },
+    {
+      "path": "scripts/audit-tdrp-recursive-build-reachability.mjs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "7ecbf14ff058ac3a161f501fd7d525ce17b3d85c",
+      "previousSize": null,
+      "size": 14866
+    },
+    {
+      "path": "scripts/discover-tdrp-recursive-next-layer.mjs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "315983ae7894140fef7f58453ed9cb858c21a11e",
+      "previousSize": null,
+      "size": 9549
+    },
+    {
+      "path": "scripts/discover-tdrp-root-tool-authority.mjs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "668c06ef18678c8cef8128405fd9e80e756c19e7",
+      "previousSize": null,
+      "size": 8789
+    },
+    {
+      "path": "scripts/validate-tdrp-revision9-authority.mjs",
+      "change": "blob-changed",
+      "previousBlobSha": null,
+      "blobSha": "978735cff237b47fd71d321995857725b008e994",
+      "previousSize": null,
+      "size": 58759
     }
   ],
   "iosVerificationRebaseline": {
-    "observedAt": "2026-10-12",
+    "observedAt": "2026-10-15",
     "requestedCheckpoint": "66a94cd9e2d2c614aed6293254dcbb791de4a55f",
-    "preEvidenceIosHead": "f94999aa435aa57b621f66685975c4ab6aa3370d",
-    "desktopCommit": "371b72f1cd20de03dc4dff9a15ed761054968093",
-    "desktopTree": "3116c54a1e36da95189c740bdc789ad543ce2d20",
+    "preEvidenceIosHead": "d85975c0e9d33d04127c402b718b69a5b4b50e2f",
+    "desktopCommit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d",
+    "desktopTree": "ca4777b5e3b03395da5e8f28aa2d3cfe5169113a",
     "predecessorWorkflowRuns": [
       38194840503,
       38194840499,
@@ -2242,7 +2868,7 @@
       114688807759,
       114688866359
     ],
-    "status": "plugin-github-auth-rust-host-completed-resulting-exact-head-ci-required",
+    "status": "desktop-main-rebaseline-source-review-required",
     "changedIosPathsSinceRequestedCheckpoint": [
       "docs/parity/desktop-main/source-electron-main.json",
       "docs/parity/desktop-main/frontend.json",
@@ -2265,7 +2891,7 @@
       "mobile/ios/FabushiTests/CursorSandBoxLifecycleClientTests.swift"
     ],
     "conclusion": "Gateway descriptor cache/store and Desktop box-host connector responsibilities are current-main-reviewed and implemented through canonical iOS owners: encrypted account-scoped descriptor fast path, typed broker failures, blocked hold/backoff, App Store backend-update requirement projection, recreate/force-recreate/migration, inference auth ownership, and in-process local-exec platform replacement. This is implemented only; exact-head CI and aggregate migration acceptance remain open.",
-    "currentImplementationHead": "f94999aa435aa57b621f66685975c4ab6aa3370d",
+    "currentImplementationHead": "d85975c0e9d33d04127c402b718b69a5b4b50e2f",
     "promotion": "none"
   }
 }
