@@ -67,6 +67,7 @@ const CI_ACCOUNT_SESSION_MAX_BYTES: u64 = 64 * 1024;
 const CI_ACCOUNT_SESSION_MAX_BASE64_BYTES: usize = ((CI_ACCOUNT_SESSION_MAX_BYTES as usize + 2) / 3) * 4;
 const ACCESS_TOKEN_REFRESH_SKEW_SECONDS: i64 = 60;
 const MAX_DIRECT_MESSAGE_RESOURCE_BYTES: usize = 32 * 1024 * 1024;
+const MAX_AGENT_STORE_OBJECT_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1908,6 +1909,10 @@ impl MahayanaProductClient {
             "mahayana.usage.status" => serde_json::to_value(self.model_usage()?)
                 .map_err(|error| ProductError::Response(error.to_string())),
             "mahayana.platform.request" => self.platform_request(request),
+            "mahayana.agent.store.list" => self.agent_store_list(request),
+            "mahayana.agent.store.read" => self.agent_store_read(request),
+            "mahayana.agent.store.write" => self.agent_store_write(request),
+            "mahayana.agent.store.delete" => self.agent_store_delete(request),
             "mahayana.contacts.list" => self.authorized_social_get(request, "/api/social/friends", &[]),
             "mahayana.contacts.search" => {
                 let query = required_string(request, "query")?;
@@ -2654,6 +2659,109 @@ impl MahayanaProductClient {
     fn miniapp_registry(&self, request: &Value) -> Result<Value, ProductError> {
         let token = self.optional_authorization_token(request)?;
         self.get_json("/api/plugins/registry", &[], token.as_deref())
+    }
+
+    fn agent_store_list(&self, request: &Value) -> Result<Value, ProductError> {
+        let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
+        let mut query = serde_json::Map::new();
+        if let Some(prefix) = optional_string(request, "prefix")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            query.insert(
+                "prefix".into(),
+                Value::String(normalize_agent_store_rel_path(prefix)?),
+            );
+        }
+        let spec = agent_store_platform_request_spec(
+            "GET",
+            agent_id,
+            (!query.is_empty()).then_some(query),
+            None,
+        )?;
+        let response = self.platform_request(&spec)?;
+        agent_store_platform_data(response, &[200])
+    }
+
+    fn agent_store_read(&self, request: &Value) -> Result<Value, ProductError> {
+        let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
+        let path = normalize_agent_store_rel_path(required_string(request, "path")?)?;
+        let spec = agent_store_platform_request_spec(
+            "GET",
+            agent_id,
+            Some(serde_json::Map::from_iter([(
+                "path".into(),
+                Value::String(path.clone()),
+            )])),
+            None,
+        )?;
+        let response = self.platform_request(&spec)?;
+        let status = platform_response_status(&response)?;
+        if status == 404 {
+            return Ok(json!({
+                "found": false,
+                "agentId": agent_id,
+                "path": path,
+            }));
+        }
+        let mut data = agent_store_platform_data(response, &[200])?;
+        if let Some(object) = data.as_object_mut() {
+            object.insert("found".into(), Value::Bool(true));
+        }
+        Ok(data)
+    }
+
+    fn agent_store_write(&self, request: &Value) -> Result<Value, ProductError> {
+        let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
+        let path = normalize_agent_store_rel_path(required_string(request, "path")?)?;
+        let data_base64 = request
+            .get("dataBase64")
+            .and_then(Value::as_str)
+            .ok_or(ProductError::InvalidParameter("dataBase64"))?;
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(data_base64)
+            .map_err(|_| ProductError::InvalidParameter("dataBase64"))?;
+        if decoded.len() > MAX_AGENT_STORE_OBJECT_BYTES {
+            return Err(ProductError::InvalidParameter("dataBase64"));
+        }
+        let base_etag = optional_string(request, "baseEtag")
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let expect_absent = request
+            .get("expectAbsent")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if base_etag.is_some() == expect_absent {
+            return Err(ProductError::InvalidParameter("baseEtag/expectAbsent"));
+        }
+        let mut body = json!({
+            "path": path,
+            "dataBase64": data_base64,
+            "expectAbsent": expect_absent,
+        });
+        if let Some(base_etag) = base_etag {
+            body["baseEtag"] = Value::String(base_etag.to_string());
+        }
+        let spec = agent_store_platform_request_spec("PUT", agent_id, None, Some(body))?;
+        let response = self.platform_request(&spec)?;
+        agent_store_platform_data(response, &[200, 409])
+    }
+
+    fn agent_store_delete(&self, request: &Value) -> Result<Value, ProductError> {
+        let agent_id = safe_path_identifier(required_string(request, "agentId")?, "agentId")?;
+        let path = normalize_agent_store_rel_path(required_string(request, "path")?)?;
+        let base_etag = required_string(request, "baseEtag")?.trim();
+        let spec = agent_store_platform_request_spec(
+            "DELETE",
+            agent_id,
+            Some(serde_json::Map::from_iter([
+                ("path".into(), Value::String(path)),
+                ("baseEtag".into(), Value::String(base_etag.to_string())),
+            ])),
+            None,
+        )?;
+        let response = self.platform_request(&spec)?;
+        agent_store_platform_data(response, &[200, 409])
     }
 
     /// Executes one same-origin platform request with the active Rust-owned
@@ -3914,6 +4022,80 @@ fn ensure_call_event_identity(
     Ok(())
 }
 
+fn normalize_agent_store_rel_path(value: &str) -> Result<String, ProductError> {
+    let value = value.trim().replace('\\', "/");
+    if value.is_empty()
+        || value.len() > 4096
+        || value.starts_with('/')
+        || value.contains('\0')
+        || value.split('/').any(|part| part == "..")
+    {
+        return Err(ProductError::InvalidParameter("path"));
+    }
+    let parts = value
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect::<Vec<_>>();
+    if parts.is_empty() || parts.iter().any(|part| part.len() > 255) {
+        return Err(ProductError::InvalidParameter("path"));
+    }
+    Ok(parts.join("/"))
+}
+
+fn agent_store_platform_request_spec(
+    method: &str,
+    agent_id: &str,
+    query: Option<serde_json::Map<String, Value>>,
+    body: Option<Value>,
+) -> Result<Value, ProductError> {
+    if !matches!(method, "GET" | "PUT" | "DELETE") {
+        return Err(ProductError::InvalidParameter("method"));
+    }
+    let agent_id = safe_path_identifier(agent_id, "agentId")?;
+    let mut request = json!({
+        "method": method,
+        "path": format!("/v1/account/agents/{agent_id}/store"),
+        "authenticated": true,
+    });
+    if let Some(query) = query.filter(|query| !query.is_empty()) {
+        request["query"] = Value::Object(query);
+    }
+    if let Some(body) = body {
+        request["body"] = body;
+    }
+    Ok(request)
+}
+
+fn platform_response_status(response: &Value) -> Result<u16, ProductError> {
+    response
+        .get("statusCode")
+        .and_then(Value::as_u64)
+        .and_then(|status| u16::try_from(status).ok())
+        .ok_or_else(|| ProductError::Response("platform response omitted statusCode".into()))
+}
+
+fn agent_store_platform_data(
+    response: Value,
+    accepted_statuses: &[u16],
+) -> Result<Value, ProductError> {
+    let status = platform_response_status(&response)?;
+    if accepted_statuses.contains(&status) {
+        return Ok(response.get("data").cloned().unwrap_or(Value::Null));
+    }
+    let message = response
+        .get("data")
+        .and_then(Value::as_object)
+        .and_then(|data| {
+            data.get("message")
+                .or_else(|| data.get("error"))
+                .and_then(Value::as_str)
+        })
+        .or_else(|| response.get("bodyText").and_then(Value::as_str))
+        .unwrap_or("Agent Store request failed")
+        .to_string();
+    Err(ProductError::HttpStatus { status, message })
+}
+
 fn platform_control_plane_fallback_base(
     api_base_url: &str,
     path: &str,
@@ -4314,6 +4496,71 @@ pub fn redact_secrets(value: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn agent_store_path_normalization_matches_account_worker_contract() {
+        assert_eq!(
+            normalize_agent_store_rel_path(" memories\\./daily//note.md ")
+                .expect("normalized path"),
+            "memories/daily/note.md"
+        );
+        assert!(normalize_agent_store_rel_path("../secret").is_err());
+        assert!(normalize_agent_store_rel_path("/absolute").is_err());
+        assert!(normalize_agent_store_rel_path("a/../../b").is_err());
+        assert!(normalize_agent_store_rel_path("").is_err());
+    }
+
+    #[test]
+    fn agent_store_platform_spec_is_same_origin_authenticated_and_token_free() {
+        let spec = agent_store_platform_request_spec(
+            "PUT",
+            "agent-1",
+            None,
+            Some(json!({
+                "path": "memory/state.json",
+                "dataBase64": "e30=",
+                "expectAbsent": true,
+            })),
+        )
+        .expect("Agent Store request");
+        assert_eq!(spec["method"], "PUT");
+        assert_eq!(spec["path"], "/v1/account/agents/agent-1/store");
+        assert_eq!(spec["authenticated"], true);
+        assert!(spec.get("accessToken").is_none());
+        assert!(spec.get("refreshToken").is_none());
+        assert!(agent_store_platform_request_spec("POST", "agent-1", None, None).is_err());
+        assert!(agent_store_platform_request_spec("GET", "../agent", None, None).is_err());
+    }
+
+    #[test]
+    fn agent_store_platform_result_preserves_conflicts_but_rejects_other_failures() {
+        let conflict = agent_store_platform_data(
+            json!({
+                "statusCode": 409,
+                "data": {
+                    "outcome": "conflict",
+                    "conflictPath": ".conflicts/1-deadbeef/memory/state.json",
+                },
+            }),
+            &[200, 409],
+        )
+        .expect("preserved conflict");
+        assert_eq!(conflict["outcome"], "conflict");
+        assert!(conflict["conflictPath"]
+            .as_str()
+            .is_some_and(|path| path.starts_with(".conflicts/")));
+
+        let missing = agent_store_platform_data(
+            json!({
+                "statusCode": 404,
+                "data": {"error": "agent_store_object_not_found"},
+                "bodyText": "not found",
+            }),
+            &[200],
+        )
+        .expect_err("unexpected missing object");
+        assert!(matches!(missing, ProductError::HttpStatus { status: 404, .. }));
+    }
 
     #[test]
     fn redaction_removes_nested_account_tokens() {

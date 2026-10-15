@@ -1237,6 +1237,12 @@ impl AppHost {
             "feature.automation.cloudSyncPlan" => self.feature_automation_cloud_sync_plan(params),
             "feature.automation.cloudSyncCommit" => self.feature_automation_cloud_sync_commit(params),
             "feature.automation.cloudSyncMarkFailed" => self.feature_automation_cloud_sync_mark_failed(params),
+            // Trusted native Host surface. Credentials remain Rust-owned inside
+            // MahayanaProductClient and are never accepted from or returned to Swift/UI.
+            "feature.agentStore.list" => self.feature_agent_store_list(params),
+            "feature.agentStore.read" => self.feature_agent_store_read(params),
+            "feature.agentStore.write" => self.feature_agent_store_write(params),
+            "feature.agentStore.delete" => self.feature_agent_store_delete(params),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1476,6 +1482,61 @@ impl AppHost {
         self.feature
             .automation_cloud_sync_mark_failed(string_param(&params, "agentId")?)
             .map(|()| json!({"ok": true}))
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_list(&self, params: Value) -> Result<Value, AppHostError> {
+        let prefix = params
+            .get("prefix")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        self.feature
+            .agent_store_list(string_param(&params, "agentId")?, prefix)
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_read(&self, params: Value) -> Result<Value, AppHostError> {
+        self.feature
+            .agent_store_read(
+                string_param(&params, "agentId")?,
+                string_param(&params, "path")?,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_write(&self, params: Value) -> Result<Value, AppHostError> {
+        let data_base64 = params
+            .get("dataBase64")
+            .and_then(Value::as_str)
+            .ok_or_else(|| AppHostError::InvalidRequest("dataBase64 is required".into()))?;
+        let base_etag = params
+            .get("baseEtag")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let expect_absent = params
+            .get("expectAbsent")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        self.feature
+            .agent_store_write(
+                string_param(&params, "agentId")?,
+                string_param(&params, "path")?,
+                data_base64,
+                base_etag,
+                expect_absent,
+            )
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_agent_store_delete(&self, params: Value) -> Result<Value, AppHostError> {
+        self.feature
+            .agent_store_delete(
+                string_param(&params, "agentId")?,
+                string_param(&params, "path")?,
+                string_param(&params, "baseEtag")?,
+            )
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 

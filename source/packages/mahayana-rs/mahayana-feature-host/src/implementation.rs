@@ -7908,6 +7908,93 @@ impl FeatureHostController {
     }
 
 
+    fn agent_store_product_execute(
+        &self,
+        method: &str,
+        params: &Value,
+    ) -> Result<Value, FeatureHostError> {
+        {
+            let state = self.state()?;
+            ensure_open(&state)?;
+        }
+        match self.config.mode {
+            HostMode::Test => Err(FeatureHostError::ProductionUnavailable),
+            HostMode::Production => {
+                #[cfg(feature = "production")]
+                {
+                    self.require_authenticated_account()?;
+                    self.runtime()?
+                        .product_execute(method, params)
+                        .map_err(FeatureHostError::from)
+                }
+                #[cfg(not(feature = "production"))]
+                {
+                    let _ = (method, params);
+                    Err(FeatureHostError::ProductionUnavailable)
+                }
+            }
+        }
+    }
+
+    pub fn agent_store_list(
+        &self,
+        agent_id: &str,
+        prefix: Option<&str>,
+    ) -> Result<Value, FeatureHostError> {
+        let mut params = json!({"agentId": agent_id});
+        if let Some(prefix) = prefix {
+            params["prefix"] = Value::String(prefix.to_string());
+        }
+        self.agent_store_product_execute("mahayana.agent.store.list", &params)
+    }
+
+    pub fn agent_store_read(
+        &self,
+        agent_id: &str,
+        path: &str,
+    ) -> Result<Value, FeatureHostError> {
+        self.agent_store_product_execute(
+            "mahayana.agent.store.read",
+            &json!({"agentId": agent_id, "path": path}),
+        )
+    }
+
+    pub fn agent_store_write(
+        &self,
+        agent_id: &str,
+        path: &str,
+        data_base64: &str,
+        base_etag: Option<&str>,
+        expect_absent: bool,
+    ) -> Result<Value, FeatureHostError> {
+        let mut params = json!({
+            "agentId": agent_id,
+            "path": path,
+            "dataBase64": data_base64,
+            "expectAbsent": expect_absent,
+        });
+        if let Some(base_etag) = base_etag {
+            params["baseEtag"] = Value::String(base_etag.to_string());
+        }
+        self.agent_store_product_execute("mahayana.agent.store.write", &params)
+    }
+
+    pub fn agent_store_delete(
+        &self,
+        agent_id: &str,
+        path: &str,
+        base_etag: &str,
+    ) -> Result<Value, FeatureHostError> {
+        self.agent_store_product_execute(
+            "mahayana.agent.store.delete",
+            &json!({
+                "agentId": agent_id,
+                "path": path,
+                "baseEtag": base_etag,
+            }),
+        )
+    }
+
     /// Native settings surfaces use a direct MCP snapshot so they never drain
     /// the renderer's shared HostEvent queue while waiting for settings data.
     pub fn mcp_servers_snapshot(&self) -> Result<Vec<Value>, FeatureHostError> {
@@ -21765,6 +21852,37 @@ mod tests {
             subagent_type: (kind == AsyncTaskKind::Subagent).then(|| "task".into()),
             resource_id: None,
         }
+    }
+
+    #[test]
+    fn agent_store_native_methods_never_fabricate_test_mode_storage() {
+        let host = controller();
+        assert!(matches!(
+            host.agent_store_list("agent-1", None),
+            Err(FeatureHostError::ProductionUnavailable)
+        ));
+        assert!(matches!(
+            host.agent_store_read("agent-1", "memory/state.json"),
+            Err(FeatureHostError::ProductionUnavailable)
+        ));
+        assert!(matches!(
+            host.agent_store_write(
+                "agent-1",
+                "memory/state.json",
+                "e30=",
+                None,
+                true,
+            ),
+            Err(FeatureHostError::ProductionUnavailable)
+        ));
+        assert!(matches!(
+            host.agent_store_delete(
+                "agent-1",
+                "memory/state.json",
+                "sha256:deadbeef",
+            ),
+            Err(FeatureHostError::ProductionUnavailable)
+        ));
     }
 
     #[test]
