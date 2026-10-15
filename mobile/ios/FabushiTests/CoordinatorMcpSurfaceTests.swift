@@ -613,6 +613,7 @@ extension CoordinatorMcpSurfaceTests {
             "timestampMs": 10,
         ]
         let lifecycle = IOSAutomationFireLifecycle(
+            pollState: { ["isReady": true, "hasServerSchedulable": true] },
             poll: { ackRunUuids in
                 ackRequests.append(ackRunUuids)
                 pollCount += 1
@@ -654,6 +655,7 @@ extension CoordinatorMcpSurfaceTests {
         var now: Int64 = 1_000
         var polls = 0
         let lifecycle = IOSAutomationFireLifecycle(
+            pollState: { ["isReady": true, "hasServerSchedulable": true] },
             poll: { _ in
                 polls += 1
                 if polls == 1 {
@@ -682,6 +684,32 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertEqual(polls, 1)
 
         lifecycle.resume()
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(polls, 2)
+    }
+
+
+    func testAutomationFireUnschedulableDrainsOnceUntilReconcile() async {
+        var polls = 0
+        let lifecycle = IOSAutomationFireLifecycle(
+            pollState: { ["isReady": true, "hasServerSchedulable": false] },
+            poll: { _ in
+                polls += 1
+                return ["events": []]
+            },
+            complete: { _, _, _ in },
+            admit: { _ in ["disposition": "abandon"] },
+            status: { _ in ["state": "missing"] },
+            launchBackgroundTask: false
+        )
+        lifecycle.updateAccountScope("account-a")
+        lifecycle.resume()
+        await lifecycle.runOneCycleForTesting()
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(polls, 1)
+        XCTAssertTrue(lifecycle.drainedWhileUnschedulable)
+
+        lifecycle.reconcile()
         await lifecycle.runOneCycleForTesting()
         XCTAssertEqual(polls, 2)
     }

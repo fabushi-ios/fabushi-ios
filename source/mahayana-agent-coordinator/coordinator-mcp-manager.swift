@@ -224,6 +224,17 @@ private final class CoordinatorMcpHostPort {
         return object
     }
 
+    func backendAutomationFirePollState() async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.backendFirePollState",
+            params: [:]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Backend automation fire poll state response is invalid.")
+        }
+        return object
+    }
+
     func loadAccountDisplay(forceFresh: Bool) async throws -> AccountDisplayConfig {
         let snapshot = try await loadSnapshot(forceFresh: forceFresh)
         settingsStore.setMcpDisabledToolsByServerId(snapshot.disabledToolsByServerId)
@@ -1401,11 +1412,13 @@ final class IOSAutomationFireLifecycle {
         var errorMessage: String?
     }
 
+    typealias PollState = @MainActor () async throws -> [String: Any]
     typealias Poll = @MainActor ([String]) async throws -> [String: Any]
     typealias Complete = @MainActor (String, String, String?) async throws -> Void
     typealias Admit = @MainActor ([String: Any]) async throws -> [String: Any]
     typealias Status = @MainActor (String) async throws -> [String: Any]
 
+    private let pollState: PollState
     private let poll: Poll
     private let complete: Complete
     private let admit: Admit
@@ -1418,10 +1431,12 @@ final class IOSAutomationFireLifecycle {
     private(set) var suspended = true
     private(set) var backoffUntilMs: Int64 = 0
     private(set) var pollNotBeforeMs: Int64 = 0
+    private(set) var drainedWhileUnschedulable = false
     private var states: [String: DeliveryState] = [:]
     private var task: Task<Void, Never>?
 
     init(
+        pollState: @escaping PollState,
         poll: @escaping Poll,
         complete: @escaping Complete,
         admit: @escaping Admit,
@@ -1431,6 +1446,7 @@ final class IOSAutomationFireLifecycle {
         },
         launchBackgroundTask: Bool = true
     ) {
+        self.pollState = pollState
         self.poll = poll
         self.complete = complete
         self.admit = admit
@@ -1450,6 +1466,7 @@ final class IOSAutomationFireLifecycle {
         states.removeAll()
         backoffUntilMs = 0
         pollNotBeforeMs = 0
+        drainedWhileUnschedulable = false
         if !suspended { launchTask() }
     }
 
@@ -1487,6 +1504,7 @@ final class IOSAutomationFireLifecycle {
         states.removeAll()
         backoffUntilMs = 0
         pollNotBeforeMs = 0
+        drainedWhileUnschedulable = false
     }
 
     func requestDrain() {
@@ -1495,6 +1513,7 @@ final class IOSAutomationFireLifecycle {
 
     func reconcile() {
         pollNotBeforeMs = 0
+        drainedWhileUnschedulable = false
     }
 
     func runOneCycleForTesting() async {
@@ -1531,6 +1550,23 @@ final class IOSAutomationFireLifecycle {
 
         await refreshRunningAndRetryCompletions(generation: token, scope: scope)
         guard isCurrent(generation: token, scope: scope) else { return }
+
+        let hasOwedWork = !states.isEmpty
+        let pollProjection: [String: Any]
+        do {
+            pollProjection = try await pollState()
+        } catch {
+            guard isCurrent(generation: token, scope: scope) else { return }
+            backoffUntilMs = now + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS
+            return
+        }
+        guard isCurrent(generation: token, scope: scope) else { return }
+        let isReady = pollProjection["isReady"] as? Bool ?? false
+        let hasServerSchedulable = pollProjection["hasServerSchedulable"] as? Bool ?? false
+        guard isReady else { return }
+        if !hasOwedWork && !hasServerSchedulable && drainedWhileUnschedulable {
+            return
+        }
 
         let ackRunUuids = states.compactMap { key, value in
             value.phase == "reported" ? key : nil
@@ -1579,6 +1615,9 @@ final class IOSAutomationFireLifecycle {
             pollNotBeforeMs = states.isEmpty && nextPollAfter > 0
                 ? now + nextPollAfter
                 : 0
+            if !hasOwedWork {
+                drainedWhileUnschedulable = !hasServerSchedulable
+            }
         } catch {
             guard isCurrent(generation: token, scope: scope) else { return }
             backoffUntilMs = now + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS
@@ -2030,6 +2069,9 @@ final class CoordinatorMcpSurface {
             }
         )
         let automationFire = IOSAutomationFireLifecycle(
+            pollState: {
+                try await port.backendAutomationFirePollState()
+            },
             poll: { ackRunUuids in
                 try await dashboard.pollAutomationFires(ackRunUuids: ackRunUuids)
             },

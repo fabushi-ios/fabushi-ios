@@ -512,6 +512,26 @@ impl FeatureHostController {
         Ok(RoutineAdmission::Created(run_id))
     }
 
+    pub fn backend_automation_fire_poll_state(&self) -> Result<Value, FeatureHostError> {
+        let state = self.state()?;
+        ensure_open(&state)?;
+        let has_server_schedulable = state.automations.values().any(|automation| {
+            if !automation.enabled {
+                return false;
+            }
+            let trigger = automation.trigger.clone().unwrap_or_else(|| {
+                AutomationTrigger::Schedule {
+                    schedule: automation.schedule.clone(),
+                }
+            });
+            crate::automation_cloud_definition::is_server_schedulable(&trigger)
+        });
+        Ok(json!({
+            "isReady": self.config.mode == HostMode::Test || state.session_active,
+            "hasServerSchedulable": has_server_schedulable,
+        }))
+    }
+
     pub fn admit_backend_automation_fire(&self, fire: &Value) -> Result<Value, FeatureHostError> {
         let object = fire
             .as_object()

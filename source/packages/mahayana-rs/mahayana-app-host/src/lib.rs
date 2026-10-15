@@ -1232,6 +1232,7 @@ impl AppHost {
             "feature.automation.pollListenerReconnects" => self.feature_automation_poll_listener_reconnects(),
             "feature.automation.admitBackendFire" => self.feature_automation_admit_backend_fire(params),
             "feature.automation.backendFireStatus" => self.feature_automation_backend_fire_status(params),
+            "feature.automation.backendFirePollState" => self.feature_automation_backend_fire_poll_state(),
             "feature.sessionActivity" => self.feature_session_activity(params),
             "feature.approval.resolve" => self.feature_resolve_approval(params),
             "feature.interrupt" => self.feature_interrupt(params),
@@ -1434,6 +1435,12 @@ impl AppHost {
         self.feature
             .poll_listener_reconnect_watcher()
             .map(|()| json!({"ok": true}))
+            .map_err(|error| AppHostError::Operation(error.to_string()))
+    }
+
+    fn feature_automation_backend_fire_poll_state(&self) -> Result<Value, AppHostError> {
+        self.feature
+            .backend_automation_fire_poll_state()
             .map_err(|error| AppHostError::Operation(error.to_string()))
     }
 
