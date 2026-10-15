@@ -6,6 +6,12 @@ let DESKTOP_STRUCTURED_LOG_SPILL_MAX_AGE_MS: Int64 = 18 * 60 * 60 * 1_000
 let DESKTOP_STRUCTURED_LOG_SPILL_MAX_ENTRIES = 1_000
 let IOS_LIFECYCLE_TELEMETRY_SPILL_FILE_NAME = "ios-lifecycle-telemetry-spill.v1.json"
 
+private func iosLifecycleStructuredLogMessage(family: String) -> String {
+    family == IOSLifecycleTelemetryFamily.automation.rawValue
+        ? AUTOMATION_LIFECYCLE_EVENT
+        : "sand.desktop.lifecycle"
+}
+
 private struct IOSLifecycleTelemetryDiskRecord: Codable, Equatable, Sendable {
     let family: String
     let level: String
@@ -92,7 +98,7 @@ actor IOSLifecycleTelemetrySpill {
             metadata["lifecycle_family"] = record.family
             return BufferedStructuredLog(
                 level: StructuredLogLevel(rawValue: record.level) ?? .info,
-                message: "sand.desktop.lifecycle",
+                message: iosLifecycleStructuredLogMessage(family: record.family),
                 metadata: metadata,
                 timestampMs: record.timestampMs
             )
@@ -107,8 +113,10 @@ actor IOSLifecycleTelemetrySpill {
     func replaceWithStructuredLogPending(_ pending: [BufferedStructuredLog]) {
         guard accountScope != nil else { return }
         records = pending.compactMap { record in
-            guard record.message == "sand.desktop.lifecycle",
-                  let family = record.metadata["lifecycle_family"]
+            guard (record.message == "sand.desktop.lifecycle"
+                    || record.message == AUTOMATION_LIFECYCLE_EVENT),
+                  let family = record.metadata["lifecycle_family"],
+                  record.message == iosLifecycleStructuredLogMessage(family: family)
             else { return nil }
             var metadata = record.metadata
             metadata.removeValue(forKey: "lifecycle_family")
@@ -205,7 +213,7 @@ final class IOSLifecycleTelemetryDurableSink {
             guard let self, let transport = self.transport else { return }
             await transport.enqueue(
                 StructuredLogLevel(rawValue: record.level.rawValue) ?? .info,
-                message: "sand.desktop.lifecycle",
+                message: iosLifecycleStructuredLogMessage(family: record.family.rawValue),
                 metadata: record.metadata.merging(
                     ["lifecycle_family": record.family.rawValue]
                 ) { current, _ in current }

@@ -162,6 +162,9 @@ final class IOSMainRuntime {
                     metadata: projection.metadata
                 )
             },
+            automationLifecycleTelemetryReporter: { metadata in
+                reporter.report(.automation, metadata: metadata)
+            },
             backendUpdateRequirementSink: { required in
                 updateWiring.noteBackendUpdateRequirement(required)
             },

@@ -4524,6 +4524,7 @@ impl FeatureHostController {
                 let now = now_millis();
                 let user_time_zone = self.host_settings_user_timezone_direct()?;
                 let mut state = self.state()?;
+                let before_automations = state.automations.clone();
                 let requested_agent_id = match agent_id {
                     Some(agent_id) => Some(required(agent_id, "automation agent id")?),
                     None => None,
@@ -4604,6 +4605,11 @@ impl FeatureHostController {
                 };
                 state.automations.insert(id, automation.clone());
                 self.persist_automations(&state.automations)?;
+                let after_automations = state.automations.clone();
+                push_automation_lifecycle_diff(
+                    &mut state, &before_automations, &after_automations,
+                    AutomationLifecycleSource::AutomationsUi, user_time_zone.as_deref(), now,
+                );
                 state.events.push_back(HostEvent::AutomationChanged {
                     timestamp: timestamp(),
                     action: action.into(),
@@ -4624,6 +4630,7 @@ impl FeatureHostController {
             } => {
                 let user_time_zone = self.host_settings_user_timezone_direct()?;
                 let mut state = self.state()?;
+                let before_automations = state.automations.clone();
                 let automation = state.automations.get_mut(&id).ok_or_else(|| {
                     FeatureHostError::Contract(format!("unknown automation: {id}"))
                 })?;
@@ -4648,9 +4655,13 @@ impl FeatureHostController {
                 self.persist_automations(&state.automations)?;
                 if !enabled {
                     prune_pending_listener_resumes(&mut state);
-                prune_pending_automation_event_batches(&mut state);
                     prune_pending_automation_event_batches(&mut state);
                 }
+                let after_automations = state.automations.clone();
+                push_automation_lifecycle_diff(
+                    &mut state, &before_automations, &after_automations,
+                    AutomationLifecycleSource::AutomationsUi, user_time_zone.as_deref(), now_millis(),
+                );
                 state.events.push_back(HostEvent::AutomationChanged {
                     timestamp: timestamp(),
                     action: if enabled { "resumed" } else { "paused" }.into(),
@@ -4666,7 +4677,9 @@ impl FeatureHostController {
                 })
             }
             FeatureCommand::AutomationDelete { id, agent_id, .. } => {
+                let user_time_zone = self.host_settings_user_timezone_direct()?;
                 let mut state = self.state()?;
+                let before_automations = state.automations.clone();
                 let existing = state.automations.get(&id).ok_or_else(|| {
                     FeatureHostError::Contract(format!("unknown automation: {id}"))
                 })?;
@@ -4678,6 +4691,11 @@ impl FeatureHostController {
                 self.persist_automations(&state.automations)?;
                 prune_pending_listener_resumes(&mut state);
                 prune_pending_automation_event_batches(&mut state);
+                let after_automations = state.automations.clone();
+                push_automation_lifecycle_diff(
+                    &mut state, &before_automations, &after_automations,
+                    AutomationLifecycleSource::AutomationsUi, user_time_zone.as_deref(), now_millis(),
+                );
                 state.events.push_back(HostEvent::AutomationChanged {
                     timestamp: timestamp(),
                     action: "deleted".into(),
@@ -6893,6 +6911,7 @@ impl FeatureHostController {
                     let automation_id = id.clone().unwrap_or_else(|| slugify_workflow_name(&name));
                     let automation = {
                         let mut state = self.state()?;
+                        let before_automations = state.automations.clone();
                         let created_at_ms = state
                             .automations
                             .get(&automation_id)
@@ -6936,6 +6955,11 @@ impl FeatureHostController {
                             .automations
                             .insert(automation_id.clone(), automation.clone());
                         self.persist_automations(&state.automations)?;
+                        let after_automations = state.automations.clone();
+                        push_automation_lifecycle_diff(
+                            &mut state, &before_automations, &after_automations,
+                            AutomationLifecycleSource::WorkflowUi, user_time_zone.as_deref(), now,
+                        );
                         automation
                     };
                     let workflow_dir = workflow_root.join(&automation_id);
@@ -7000,6 +7024,7 @@ impl FeatureHostController {
                 }
                 let automation = {
                     let mut state = self.state()?;
+                    let before_automations = state.automations.clone();
                     if let Some(automation) = state.automations.get_mut(&id) {
                         ensure_automation_agent_scope(automation, Some(agent_id.as_str()))?;
                         automation.enabled = enabled;
@@ -7014,6 +7039,11 @@ impl FeatureHostController {
                         };
                         let automation = automation.clone();
                         self.persist_automations(&state.automations)?;
+                        let after_automations = state.automations.clone();
+                        push_automation_lifecycle_diff(
+                            &mut state, &before_automations, &after_automations,
+                            AutomationLifecycleSource::WorkflowUi, user_time_zone.as_deref(), now_millis(),
+                        );
                         Some(automation)
                     } else {
                         None
@@ -7046,12 +7076,18 @@ impl FeatureHostController {
                 }
                 let removed_automation = {
                     let mut state = self.state()?;
+                    let before_automations = state.automations.clone();
                     if let Some(existing) = state.automations.get(&id) {
                         ensure_automation_agent_scope(existing, Some(agent_id.as_str()))?;
                     }
                     let removed = state.automations.remove(&id).is_some();
                     if removed {
                         self.persist_automations(&state.automations)?;
+                        let after_automations = state.automations.clone();
+                        push_automation_lifecycle_diff(
+                            &mut state, &before_automations, &after_automations,
+                            AutomationLifecycleSource::WorkflowUi, user_time_zone.as_deref(), now_millis(),
+                        );
                     }
                     removed
                 };
@@ -10042,9 +10078,15 @@ impl FeatureHostController {
                 BTreeMap::new()
             };
             let mut state = self.state()?;
+            let before = state.automations.clone();
             state.automations = loaded;
             prune_pending_listener_resumes(&mut state);
             prune_pending_automation_event_batches(&mut state);
+            let after = state.automations.clone();
+            push_automation_lifecycle_diff(
+                &mut state, &before, &after, AutomationLifecycleSource::Agent,
+                user_time_zone.as_deref(), now,
+            );
         }
         self.state()?.events.push_back(HostEvent::TransportEvent {
             channel: "automation-store-changed".into(),
@@ -20396,6 +20438,136 @@ fn next_automation_run_with_timezone(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AutomationLifecycleSource {
+    Agent,
+    AutomationsUi,
+    WorkflowUi,
+    SpendGuard,
+}
+impl AutomationLifecycleSource {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Agent => "agent",
+            Self::AutomationsUi => "automations_ui",
+            Self::WorkflowUi => "workflow_ui",
+            Self::SpendGuard => "spend_guard",
+        }
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AutomationLifecycleAction {
+    Created,
+    Updated,
+    Enabled,
+    Disabled,
+    Deleted,
+}
+impl AutomationLifecycleAction {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Created => "created",
+            Self::Updated => "updated",
+            Self::Enabled => "enabled",
+            Self::Disabled => "disabled",
+            Self::Deleted => "deleted",
+        }
+    }
+}
+fn stable_automation_lifecycle_id(agent_id: &str, local_id: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(agent_id.as_bytes());
+    hasher.update([0]);
+    hasher.update(local_id.as_bytes());
+    let hex = format!("{:x}", hasher.finalize());
+    let variant_value = (u8::from_str_radix(&hex[16..17], 16).expect("sha256 hex") & 3) | 8;
+    format!(
+        "{}-{}-5{}-{:x}{}-{}",
+        &hex[0..8], &hex[8..12], &hex[13..16], variant_value, &hex[17..20], &hex[20..32]
+    )
+}
+fn automation_lifecycle_trigger_type(automation: &AutomationSummary) -> &'static str {
+    match automation.trigger.as_ref() {
+        Some(AutomationTrigger::Schedule { .. }) | None => "cron",
+        Some(AutomationTrigger::Event { .. }) => "event",
+        Some(AutomationTrigger::Group { .. }) => "group",
+    }
+}
+fn automation_definition_changed(before: &AutomationSummary, after: &AutomationSummary) -> bool {
+    before.agent_id != after.agent_id
+        || before.name != after.name
+        || before.prompt != after.prompt
+        || before.schedule != after.schedule
+        || before.trigger != after.trigger
+}
+fn automation_lifecycle_action(
+    before: Option<&AutomationSummary>,
+    after: Option<&AutomationSummary>,
+) -> Option<AutomationLifecycleAction> {
+    match (before, after) {
+        (None, Some(_)) => Some(AutomationLifecycleAction::Created),
+        (Some(_), None) => Some(AutomationLifecycleAction::Deleted),
+        (Some(before), Some(after)) if before.enabled != after.enabled => Some(
+            if after.enabled { AutomationLifecycleAction::Enabled } else { AutomationLifecycleAction::Disabled },
+        ),
+        (Some(before), Some(after)) if automation_definition_changed(before, after) => {
+            Some(AutomationLifecycleAction::Updated)
+        }
+        _ => None,
+    }
+}
+fn push_automation_lifecycle_projection(
+    state: &mut FeatureState,
+    automation: &AutomationSummary,
+    action: AutomationLifecycleAction,
+    source: AutomationLifecycleSource,
+    fallback_time_zone: Option<&str>,
+    observed_at_ms: i64,
+) {
+    let agent_id = automation.agent_id.as_deref().unwrap_or("mahayana-assistant");
+    let trigger_type = automation_lifecycle_trigger_type(automation);
+    let summary = (trigger_type == "cron").then(|| {
+        summarize_automation_schedule_next_7_days(&automation.schedule, fallback_time_zone, observed_at_ms)
+    });
+    let mut payload = serde_json::Map::from_iter([
+        ("conversation_id".into(), Value::String(agent_id.to_string())),
+        ("automation_id".into(), Value::String(stable_automation_lifecycle_id(agent_id, &automation.id))),
+        ("action".into(), Value::String(action.as_str().into())),
+        ("source".into(), Value::String(source.as_str().into())),
+        ("trigger_type".into(), Value::String(trigger_type.into())),
+        ("age_ms".into(), Value::String(observed_at_ms.saturating_sub(automation.created_at_ms).max(0).to_string())),
+        ("recorded_run_count".into(), Value::String(automation.runs.len().to_string())),
+    ]);
+    if let Some(summary) = summary {
+        payload.insert("scheduled_fires_next_7_days".into(), Value::String(summary.scheduled_fires_next_7_days.to_string()));
+        payload.insert("fires_on_weekend".into(), Value::String(summary.fires_on_weekend.to_string()));
+        payload.insert("fires_overnight".into(), Value::String(summary.fires_overnight.to_string()));
+    }
+    state.events.push_back(HostEvent::TransportEvent {
+        channel: "automation-lifecycle".into(),
+        payload: Value::Object(payload),
+    });
+}
+fn push_automation_lifecycle_diff(
+    state: &mut FeatureState,
+    before: &BTreeMap<String, AutomationSummary>,
+    after: &BTreeMap<String, AutomationSummary>,
+    source: AutomationLifecycleSource,
+    fallback_time_zone: Option<&str>,
+    observed_at_ms: i64,
+) {
+    let ids = before.keys().chain(after.keys()).cloned().collect::<BTreeSet<_>>();
+    for id in ids {
+        let before_item = before.get(&id);
+        let after_item = after.get(&id);
+        let Some(action) = automation_lifecycle_action(before_item, after_item) else { continue; };
+        let snapshot = after_item.or(before_item).expect("lifecycle snapshot");
+        push_automation_lifecycle_projection(
+            state, snapshot, action, source, fallback_time_zone, observed_at_ms,
+        );
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct AutomationScheduleSummary {
     scheduled_fires_next_7_days: usize,
     fires_on_weekend: bool,
@@ -23525,6 +23697,76 @@ mod tests {
         let loaded = load_automations(&path, None);
         assert_eq!(loaded.get("event-group"), Some(&automation));
         std::fs::remove_dir_all(&root).expect("remove isolated automation store");
+    }
+
+    #[test]
+    fn automation_lifecycle_projection_uses_stable_ids_sources_and_ignores_run_only_mutations() {
+        let mut state = FeatureState::default();
+        let base = AutomationSummary {
+            id: "row-74".into(),
+            agent_id: Some("agent-1".into()),
+            name: "Row 74".into(),
+            prompt: "Review".into(),
+            schedule: "0 9 * * *".into(),
+            trigger: Some(AutomationTrigger::Schedule { schedule: "0 9 * * *".into() }),
+            enabled: true,
+            created_at_ms: 1_900_000_000_000,
+            raised_notices: Vec::new(),
+            runs: Vec::new(),
+            last_run_at_ms: None,
+            next_run_at_ms: Some(1_900_000_100_000),
+        };
+        let before = BTreeMap::new();
+        let after = BTreeMap::from([(base.id.clone(), base.clone())]);
+        push_automation_lifecycle_diff(
+            &mut state, &before, &after, AutomationLifecycleSource::AutomationsUi,
+            Some("America/Los_Angeles"), 1_900_000_010_000,
+        );
+        let HostEvent::TransportEvent { channel, payload } =
+            state.events.pop_front().expect("created lifecycle")
+        else { panic!("expected transport lifecycle event"); };
+        assert_eq!(channel, "automation-lifecycle");
+        assert_eq!(payload["action"], "created");
+        assert_eq!(payload["source"], "automations_ui");
+        assert_eq!(payload["conversation_id"], "agent-1");
+        assert_eq!(payload["automation_id"], stable_automation_lifecycle_id("agent-1", "row-74"));
+        assert_eq!(payload["trigger_type"], "cron");
+        assert!(payload["scheduled_fires_next_7_days"].as_str().is_some());
+
+        let mut run_only = base.clone();
+        run_only.last_run_at_ms = Some(1_900_000_020_000);
+        run_only.next_run_at_ms = Some(1_900_000_200_000);
+        run_only.runs.push(AutomationRunSummary {
+            id: "run-only".into(),
+            status: AutomationRunStatus::Completed,
+            started_at: 1_900_000_020_000,
+            detail: Some("Completed".into()),
+            event: None,
+            coalesced_run_ids: Vec::new(),
+        });
+        push_automation_lifecycle_diff(
+            &mut state,
+            &BTreeMap::from([(base.id.clone(), base.clone())]),
+            &BTreeMap::from([(run_only.id.clone(), run_only)]),
+            AutomationLifecycleSource::Agent, None, 1_900_000_030_000,
+        );
+        assert!(state.events.is_empty(), "run-only mutation must not emit definition lifecycle");
+
+        let mut disabled = base.clone();
+        disabled.enabled = false;
+        push_automation_lifecycle_diff(
+            &mut state,
+            &BTreeMap::from([(base.id.clone(), base)]),
+            &BTreeMap::from([(disabled.id.clone(), disabled)]),
+            AutomationLifecycleSource::Agent, None, 1_900_000_040_000,
+        );
+        assert!(matches!(
+            state.events.pop_front(),
+            Some(HostEvent::TransportEvent { channel, payload })
+                if channel == "automation-lifecycle"
+                    && payload["action"] == "disabled"
+                    && payload["source"] == "agent"
+        ));
     }
 
     #[test]

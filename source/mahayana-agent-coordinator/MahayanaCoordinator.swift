@@ -502,6 +502,7 @@ final class MahayanaCoordinator {
     }()
     private let transportStageRecorder: TransportStageRecorder
     private let gatewayTelemetryReporter: CoordinatorGatewayClient.TelemetrySink
+    private let automationLifecycleTelemetryReporter: @MainActor ([String: String]) -> Void
     private var rendererEventSink: ((String, CoordinatorPayload) -> Void)?
     private var autoReviewHostSyncNeeded = true
     private var experimentSnapshotUnsubscribe: (() -> Void)?
@@ -576,12 +577,14 @@ final class MahayanaCoordinator {
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
         gatewayTelemetryReporter: @escaping CoordinatorGatewayClient.TelemetrySink = { _ in },
+        automationLifecycleTelemetryReporter: @escaping @MainActor ([String: String]) -> Void = { _ in },
         backendUpdateRequirementSink: @escaping IOSCursorDashboardClient.BackendUpdateRequirementSink = { _ in }
     ) {
         self.hostSupervisor = hostSupervisor
         self.settingsStore = settingsStore
         self.transportStageRecorder = transportStageRecorder
         self.gatewayTelemetryReporter = gatewayTelemetryReporter
+        self.automationLifecycleTelemetryReporter = automationLifecycleTelemetryReporter
         self.hostSettingsReconciler = settingsStore.map { store in
             IOSHostSettingsReconciler(
                 readLocal: { store.getHasSeenOnboarding() },
@@ -825,6 +828,7 @@ final class MahayanaCoordinator {
         mcpFailureReporter: @escaping IOSCursorLocalToolPermissionCeilingSynchronizer.ReportFailure = { _, _, _ in },
         mcpAuthTelemetryReporter: @escaping IOSAuthTelemetryRelay.Sink = { _ in },
         gatewayTelemetryReporter: @escaping CoordinatorGatewayClient.TelemetrySink = { _ in },
+        automationLifecycleTelemetryReporter: @escaping @MainActor ([String: String]) -> Void = { _ in },
         backendUpdateRequirementSink: @escaping IOSCursorDashboardClient.BackendUpdateRequirementSink = { _ in },
         experimentDiagnosticReporter: ((ExperimentDiagnostic) -> Void)? = nil
     ) throws -> MahayanaCoordinator {
@@ -853,6 +857,7 @@ final class MahayanaCoordinator {
             mcpFailureReporter: mcpFailureReporter,
             mcpAuthTelemetryReporter: mcpAuthTelemetryReporter,
             gatewayTelemetryReporter: gatewayTelemetryReporter,
+            automationLifecycleTelemetryReporter: automationLifecycleTelemetryReporter,
             backendUpdateRequirementSink: backendUpdateRequirementSink
         )
         coordinator.startExperimentRuntime()
@@ -1100,6 +1105,33 @@ final class MahayanaCoordinator {
               let channel = envelope["channel"] as? String,
               let payload = envelope["payload"]
         else { return }
+
+        if channel == "automation-lifecycle" {
+            guard let object = payload as? [String: Any] else { return }
+            let allowed = Set([
+                "conversation_id", "automation_id", "action", "source", "trigger_type",
+                "age_ms", "recorded_run_count", "scheduled_fires_next_7_days",
+                "fires_on_weekend", "fires_overnight",
+            ])
+            guard object.keys.allSatisfy(allowed.contains) else { return }
+            var metadata: [String: String] = [:]
+            for (key, raw) in object {
+                guard let value = raw as? String, !value.isEmpty, value.utf8.count <= 512 else {
+                    return
+                }
+                metadata[key] = value
+            }
+            guard metadata["conversation_id"] != nil,
+                  metadata["automation_id"] != nil,
+                  metadata["action"] != nil,
+                  metadata["source"] != nil,
+                  metadata["trigger_type"] != nil,
+                  metadata["age_ms"] != nil,
+                  metadata["recorded_run_count"] != nil
+            else { return }
+            automationLifecycleTelemetryReporter(metadata)
+            return
+        }
 
         if channel == ClientSideToolV2Transport.family {
             guard let transportEvent = ClientSideToolV2TransportEvent.fromFoundation(payload),
