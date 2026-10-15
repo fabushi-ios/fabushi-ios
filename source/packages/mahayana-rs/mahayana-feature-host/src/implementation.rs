@@ -163,6 +163,7 @@ use sha2::Digest as _;
 use sha2::Sha256;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::io::Read;
 use std::io::Seek;
