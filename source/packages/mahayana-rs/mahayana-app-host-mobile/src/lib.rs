@@ -116,6 +116,8 @@ mod package_agent_exec_subagent_queue;
 mod package_agent_exec_subagent_lifecycle_store;
 #[path = "../../../agent-store-sync/etag.rs"]
 mod package_agent_store_sync_etag;
+#[path = "../../../agent-store-sync/conflict-events.rs"]
+mod agent_store_conflict_events;
 #[path = "../../../agent-store-sync/conflict-notice-claim-state.rs"]
 mod package_agent_store_sync_conflict_notice_claim_state;
 #[path = "../../../agent-store-sync/validation.rs"]
