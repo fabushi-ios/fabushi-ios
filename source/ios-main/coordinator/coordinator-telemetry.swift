@@ -246,37 +246,203 @@ struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
         "reportResyncCompleted",
     ]
 
+    private static let agentsUnreachablePhases: Set<String> = ["entered", "retry", "recovered"]
+    private static let recoveryActions: Set<String> = ["retry", "recover", "reset", "relaunch"]
+    private static let rebuildKinds: Set<String> = ["update", "reset", "recover", "reconnecting"]
+    private static let rebuildEscalations: Set<String> = ["taking-longer", "unreachable"]
+    private static let rebuildEscalationActions: Set<String> = ["shown", "keep_waiting", "retry"]
+    private static let reconciliationReplicas: Set<String> = ["roster", "transcript"]
+    private static let replicaResyncOutcomes: Set<String> = ["covered", "superseded", "abandoned"]
+    private static let journalRestoreOutcomes: Set<String> = ["dispatched", "retired", "parked", "failed"]
+    private static let journalRestorePhases: Set<String> = [
+        "queued", "prepared", "dispatching", "accepted-awaiting-echo",
+    ]
+    private static let replicaResyncWarnDurationMilliseconds = 60_000.0
+
     static func project(method: String, report: [String: Any]) -> IOSCoordinatorBroadTelemetryProjection? {
-        guard routedMethods.contains(method) else { return nil }
-        let event: String
-        let level: IOSLifecycleTelemetryLevel
         switch method {
         case "reportAgentsUnreachable":
-            event = "agents_unreachable"
-            level = (report["phase"] as? String) == "retry" ? .info : .warn
+            return projectAgentsUnreachable(report)
         case "reportRecoveryAction":
-            event = "recovery_action"
-            level = (report["outcome"] as? String) == "failed" ? .warn : .info
+            return projectRecoveryAction(report)
         case "reportRebuildLifecycle":
-            event = "rebuild_lifecycle"
-            let phase = report["phase"] as? String
-            level = (phase == "escalation" || phase == "pending_stall") ? .warn : .info
+            return projectRebuildLifecycle(report)
         case "reportReconciliation":
-            event = "reconciliation"
-            let outcome = report["outcome"] as? String
-            level = (outcome == "failed" || outcome == "partial") ? .warn : .info
+            return projectReconciliation(report)
         case "reportResyncCompleted":
-            event = "resync_completed"
-            let failed = (report["failed"] as? NSNumber)?.intValue ?? 0
-            level = failed > 0 ? .warn : .info
+            return projectResyncCompleted(report)
         default:
             return nil
         }
+    }
 
-        var metadata: [String: String] = [
-            "event": event,
-            "platform_replacement": "ios_lifecycle_reporter",
-        ]
+    private static func projectAgentsUnreachable(
+        _ report: [String: Any]
+    ) -> IOSCoordinatorBroadTelemetryProjection? {
+        guard let phase = report["phase"] as? String,
+              agentsUnreachablePhases.contains(phase),
+              let isManual = report["isManual"] as? Bool
+        else {
+            return nil
+        }
+        let errorClass: String?
+        if report.keys.contains("errorClass") {
+            guard let value = report["errorClass"] as? String else { return nil }
+            errorClass = value
+        } else {
+            errorClass = nil
+        }
+        let msSinceLastReached: Double?
+        if report.keys.contains("msSinceLastReachedMs") {
+            guard let value = finiteNonnegative(report["msSinceLastReachedMs"]) else { return nil }
+            msSinceLastReached = value
+        } else {
+            msSinceLastReached = nil
+        }
+
+        var metadata = baseMetadata(event: "agents_unreachable")
+        metadata["phase"] = phase
+        metadata["is_manual"] = String(isManual)
+        if let errorClass { metadata["error_class"] = errorClass }
+        if let msSinceLastReached {
+            metadata["ms_since_last_reached"] = roundedString(msSinceLastReached)
+        }
+        return .init(
+            event: "agents_unreachable",
+            level: phase == "entered" ? .warn : .info,
+            metadata: metadata
+        )
+    }
+
+    private static func projectRecoveryAction(
+        _ report: [String: Any]
+    ) -> IOSCoordinatorBroadTelemetryProjection? {
+        guard let action = report["action"] as? String,
+              recoveryActions.contains(action),
+              let failureClass = report["failureClass"] as? String,
+              isBoundedFailureClass(failureClass),
+              let consecutiveIdentical = integerAtLeastOne(report["consecutiveIdentical"])
+        else {
+            return nil
+        }
+        var metadata = baseMetadata(event: "recovery_action")
+        metadata["action"] = action
+        metadata["failure_class"] = failureClass.lowercased()
+        metadata["consecutive_identical"] = String(consecutiveIdentical)
+        return .init(
+            event: "recovery_action",
+            level: consecutiveIdentical >= 3 ? .warn : .info,
+            metadata: metadata
+        )
+    }
+
+    private static func projectRebuildLifecycle(
+        _ report: [String: Any]
+    ) -> IOSCoordinatorBroadTelemetryProjection? {
+        guard let rebuildKind = report["rebuildKind"] as? String,
+              rebuildKinds.contains(rebuildKind),
+              let elapsedMs = finiteNonnegative(report["elapsedMs"]),
+              let kind = report["kind"] as? String
+        else {
+            return nil
+        }
+
+        if kind == "escalation" {
+            guard let action = report["action"] as? String,
+                  rebuildEscalationActions.contains(action),
+                  let escalation = report["escalation"] as? String,
+                  rebuildEscalations.contains(escalation)
+            else {
+                return nil
+            }
+            var metadata = baseMetadata(event: "escalation")
+            metadata["action"] = action
+            metadata["escalation"] = escalation
+            metadata["kind"] = rebuildKind
+            metadata["elapsed_ms"] = roundedString(elapsedMs)
+            return .init(
+                event: "escalation",
+                level: action == "shown" ? .warn : .info,
+                metadata: metadata
+            )
+        }
+
+        if kind == "pending_stall" {
+            guard let hasAck = report["hasAck"] as? Bool,
+                  let streamAttached = report["streamAttached"] as? Bool
+            else {
+                return nil
+            }
+            var metadata = baseMetadata(event: "pending_stall")
+            metadata["kind"] = rebuildKind
+            metadata["has_ack"] = String(hasAck)
+            metadata["stream_attached"] = String(streamAttached)
+            metadata["elapsed_ms"] = roundedString(elapsedMs)
+            return .init(event: "pending_stall", level: .warn, metadata: metadata)
+        }
+
+        return nil
+    }
+
+    private static func projectReconciliation(
+        _ report: [String: Any]
+    ) -> IOSCoordinatorBroadTelemetryProjection? {
+        guard let kind = report["kind"] as? String else { return nil }
+
+        if kind == "replica_resync" {
+            guard let replica = report["replica"] as? String,
+                  reconciliationReplicas.contains(replica),
+                  let outcome = report["outcome"] as? String,
+                  replicaResyncOutcomes.contains(outcome),
+                  let attempts = finiteNonnegative(report["attempts"]),
+                  let durationMs = finiteNonnegative(report["durationMs"]),
+                  let bufferOverflowed = report["bufferOverflowed"] as? Bool,
+                  let epochChanged = report["epochChanged"] as? Bool
+            else {
+                return nil
+            }
+            var metadata = baseMetadata(event: "replica_resync")
+            metadata["replica"] = replica
+            metadata["outcome"] = outcome
+            metadata["attempts"] = roundedString(attempts)
+            metadata["duration_ms"] = roundedString(durationMs)
+            metadata["buffer_overflowed"] = String(bufferOverflowed)
+            metadata["epoch_changed"] = String(epochChanged)
+            let level: IOSLifecycleTelemetryLevel = (
+                outcome == "abandoned" || durationMs > replicaResyncWarnDurationMilliseconds
+            ) ? .warn : .info
+            return .init(event: "replica_resync", level: level, metadata: metadata)
+        }
+
+        if kind == "send_journal_restore" {
+            guard let outcome = report["outcome"] as? String,
+                  journalRestoreOutcomes.contains(outcome),
+                  let phase = report["phase"] as? String,
+                  journalRestorePhases.contains(phase),
+                  let ageMs = finiteNonnegative(report["ageMs"]),
+                  let recordCount = finiteNonnegative(report["recordCount"])
+            else {
+                return nil
+            }
+            var metadata = baseMetadata(event: "send_journal_restore")
+            metadata["outcome"] = outcome
+            metadata["phase"] = phase
+            metadata["age_ms"] = roundedString(ageMs)
+            metadata["record_count"] = roundedString(recordCount)
+            let level: IOSLifecycleTelemetryLevel = (
+                outcome == "parked" || outcome == "failed"
+            ) ? .warn : .info
+            return .init(event: "send_journal_restore", level: level, metadata: metadata)
+        }
+
+        return nil
+    }
+
+    private static func projectResyncCompleted(
+        _ report: [String: Any]
+    ) -> IOSCoordinatorBroadTelemetryProjection? {
+        let failed = finiteNonnegative(report["failed"]) ?? 0
+        var metadata = baseMetadata(event: "resync_completed")
         var accepted = 0
         for key in report.keys.sorted() {
             guard accepted < 64, metadata[key] == nil,
@@ -285,7 +451,46 @@ struct IOSCoordinatorBroadTelemetryProjection: Equatable, Sendable {
             metadata[key] = value
             accepted += 1
         }
-        return .init(event: event, level: level, metadata: metadata)
+        return .init(
+            event: "resync_completed",
+            level: failed > 0 ? .warn : .info,
+            metadata: metadata
+        )
+    }
+
+    private static func baseMetadata(event: String) -> [String: String] {
+        [
+            "event": event,
+            "platform_replacement": "ios_lifecycle_reporter",
+        ]
+    }
+
+    private static func finiteNonnegative(_ raw: Any?) -> Double? {
+        guard !(raw is Bool), let number = raw as? NSNumber else { return nil }
+        let value = number.doubleValue
+        return value.isFinite && value >= 0 ? value : nil
+    }
+
+    private static func integerAtLeastOne(_ raw: Any?) -> Int? {
+        guard let value = finiteNonnegative(raw),
+              value >= 1,
+              value.rounded(.towardZero) == value,
+              value <= Double(Int.max)
+        else {
+            return nil
+        }
+        return Int(value)
+    }
+
+    private static func roundedString(_ value: Double) -> String {
+        String(Int(value.rounded()))
+    }
+
+    private static func isBoundedFailureClass(_ value: String) -> Bool {
+        value.range(
+            of: "^[A-Za-z0-9_]{1,64}$",
+            options: .regularExpression
+        ) != nil
     }
 
     private static func boundedScalar(_ raw: Any?) -> String? {
