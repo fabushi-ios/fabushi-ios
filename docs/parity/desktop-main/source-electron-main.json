@@ -2550,16 +2550,16 @@
       "desktop_owner": "Desktop send trace + RPC tracing + OTLP tracer backend",
       "desktop_visible_effect": "End-to-end send latency can be followed across client stages and RPC boundaries with sampled production spans.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/shared/observability/send-trace.swift",
+      "ios_target_path": "source/ios-main/telemetry/production-send-trace.swift",
       "ios_language": "Swift/Rust",
-      "ios_platform_delta": "iOS has traceparent parsing/minting, RPC trace windows and stage recording, but its package-local tracer backend does not export spans and the Rust Host send-trace sampler is explicitly AlwaysOff.",
+      "ios_platform_delta": "iOS now reuses the single account-scoped lifecycle StructuredLogTransport as its native trace export transport instead of introducing a parallel OTLP/token owner. IOSProductionSendTraceExporter consumes already-validated reportSendAck/reportRenderTtfr reports, preserves W3C parent trace context, creates child span IDs, and exports sand.send.ack, commit-attachments and rendered render-first-chunk spans with bounded attributes. The distinct Desktop gateway-command span caller has not yet been traced to an equivalent iOS shipping entrypoint, so the aggregate row remains mapped.",
       "implementation_status": "mapped",
-      "production_evidence": "Gap confirmed: send-trace.swift/rpc-tracing.swift preserve context semantics, but no shipping OTLP/exporter owner exists; Host send-trace sampler returns SamplingDecision::NotRecord.",
-      "test_evidence": "SharedRpcTracingParityTests cover context/window behavior only; production span export exact-head evidence is missing.",
-      "notes": "Context propagation is not sufficient to claim Desktop production trace parity. A single canonical exporter/sampler owner must be selected before promotion.",
-      "exact_head_evidence": "reviewed on current PR branch; exporter implementation and CI evidence missing",
+      "production_evidence": "Shipping IOSMainRuntime owns IOSProductionSendTraceExporter and invokes it only after IOSMainRPCTelemetryProjection validates the report. Span projections flow through IOSLifecycleReporter -> IOSLifecycleTelemetryDurableSink -> StructuredLogTransport, sharing the same account generation, spill, remote credential and disposal lifecycle as all production telemetry. No second URLSession/authorization/OTLP transport exists in the exporter. Remaining constituent gap: gateway-command span production caller/equivalent.",
+      "test_evidence": "ProductionSendTraceParityTests covers W3C parent trace preservation, send ack success/error status, commit-attachments timing, render-first-chunk rendered-only behavior, invalid traceparent fail-closed and canonical transport composition. SharedRpcTracingParityTests continues to cover RPC context/windows. Exact-head Actions and gateway-command constituent evidence remain pending.",
+      "notes": "PARTIAL CLOSURE: send-ack and render-first-chunk shipping spans now have a single production exporter/transport owner. Keep mapped until the Desktop gateway-command span responsibility is either mapped to a real iOS caller or justified as not applicable with replacement.",
+      "exact_head_evidence": "partial production implementation committed; gateway-command constituent and same-final-head Actions pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
     },
     {
       "desktop_path": "source/electron-main/telemetry/desktop-startup-telemetry.ts",
@@ -2886,7 +2886,7 @@
       "notes": "Production Sentry privacy/account/transport responsibility is implemented on the current PR branch. Keep unverified until same-final-head Actions and later release acceptance succeed.",
       "exact_head_evidence": "implementation committed; exact-head GitHub Actions evidence pending",
       "authority_review_state": "reviewed-current-main",
-      "desktop_review_commit": "b6a66fd2b6aa1619565e3d25015bbbf0b4b8263d"
+      "desktop_review_commit": "8148bfb9e747d446dd3d97342c3cf04a0ed407a2"
     },
     {
       "desktop_path": "source/electron-main/telemetry/telemetry-report-pipes.ts",
