@@ -14,7 +14,7 @@ use mahayana_kernel::telemetry::{
     AbortDrainOutcome, RuntimeMetricsSnapshot, RuntimeTelemetry, SessionPersistenceOperation,
 };
 use mahayana_kernel::{
-    ApprovalResolution, BackendDescriptor, Capability, CapabilitySet, EngineBackend,
+    ApprovalResolution, AsyncAskQuestionCompletionRequest, BackendDescriptor, Capability, CapabilitySet, EngineBackend,
     ExecutionPolicy, KernelError, KernelEvent, OpenSessionRequest, OperationId,
     ResumeOperationRequest, RiskLevel, RunRequest, SessionId,
     SessionSnapshot as KernelSessionSnapshot, SharedKernelEventSink, SuspendOperationRequest,
@@ -251,11 +251,6 @@ struct OperationControl {
 }
 
 #[async_trait]
-struct NullEventSink;
-impl KernelEventSink for NullEventSink {
-    fn emit(&self, _event: KernelEvent) -> Result<(), KernelError> { Ok(()) }
-}
-
 pub trait ToolDecisionGate: Send + Sync {
     async fn before_tool(
         &self,
@@ -2516,6 +2511,29 @@ impl EngineBackend for NativeEngine {
                 .insert(session_id.as_str().to_owned(), path);
         }
         Ok(session_id)
+    }
+
+    async fn complete_async_ask_question(
+        &self,
+        request: AsyncAskQuestionCompletionRequest,
+        events: SharedKernelEventSink,
+    ) -> Result<(), KernelError> {
+        let control = self.register_operation(&request.operation_id)?;
+        match self.complete_async_ask_question(
+            &request.session_id,
+            &request.operation_id,
+            &request.original_tool_call_id,
+            &request.original_args,
+            &request.result,
+            request.expected_generation,
+            &control,
+        ).await? {
+            AsyncAskQuestionCompletionOutcome::Invalid => Err(KernelError::Backend("invalid async ask_question completion".into())),
+            AsyncAskQuestionCompletionOutcome::Stale => Err(KernelError::Backend("stale async ask_question completion".into())),
+            AsyncAskQuestionCompletionOutcome::AlreadyApplied => Ok(()),
+            AsyncAskQuestionCompletionOutcome::AppliedActiveTurn => Ok(()),
+            AsyncAskQuestionCompletionOutcome::AppliedContinuation => Ok(()),
+        }
     }
 
     async fn run(
