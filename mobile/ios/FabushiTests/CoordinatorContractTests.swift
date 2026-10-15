@@ -766,6 +766,107 @@ final class CoordinatorContractTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testCoordinatorAccountRefusalClearsPreviousActiveSlot() async {
+        var events: [String] = []
+        let cleanup = ProductionAccountTransitionCleanup(
+            dependencies: .init(
+                clearAccountScope: { events.append("clear") },
+                didClearAccountScope: { previous, next in
+                    events.append("cleared:\(previous)->\(next ?? "nil")")
+                }
+            )
+        )
+        let runtime = CoordinatorAccountRuntime(
+            activeSlot: "human-1",
+            cleanup: cleanup,
+            authorize: { slot, _ in
+                events.append("authorize:\(slot ?? "nil")")
+                return .refused(slot: nil, reason: "cursor-binding-refused")
+            }
+        )
+
+        let result = await runtime.transition(to: "human-2")
+
+        XCTAssertEqual(
+            result,
+            .refused(slot: nil, reason: "cursor-binding-refused")
+        )
+        XCTAssertNil(runtime.activeSlot)
+        XCTAssertEqual(
+            events,
+            ["clear", "cleared:human-1->human-2", "authorize:human-2"]
+        )
+    }
+
+    @MainActor
+    func testInvalidHostSlotDoesNotRunForeignCursorBindingPath() async throws {
+        var nonNilAuthorizationAttempts = 0
+        let cleanup = ProductionAccountTransitionCleanup(
+            dependencies: .init(clearAccountScope: {})
+        )
+        let runtime = CoordinatorAccountRuntime(
+            activeSlot: "human-1",
+            cleanup: cleanup,
+            authorize: { slot, _ in
+                if slot != nil { nonNilAuthorizationAttempts += 1 }
+                return .ready(slot: slot)
+            }
+        )
+        let payload = try CoordinatorPayload.fromFoundation([
+            "auth": [
+                "loggedIn": true,
+                "email": "email-is-not-a-stable-host-slot@example.com",
+            ],
+        ])
+
+        let result = await runtime.observeAuthReply(
+            method: "feature.auth.status",
+            outcome: .ok(payload)
+        )
+
+        XCTAssertEqual(
+            result,
+            .refused(
+                slot: nil,
+                reason: "logged-in auth reply has no stable account slot"
+            )
+        )
+        XCTAssertEqual(
+            nonNilAuthorizationAttempts,
+            0,
+            "Rust Host invalid-slot refusal must not be reclassified as Cursor binding refusal"
+        )
+        XCTAssertNil(runtime.activeSlot)
+    }
+
+    func testShippingRuntimeSeparatesCursorBindingRefusalFromHostInvalidSlot() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let runtime = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/ios-main/IOSMainRuntime.swift"
+            ),
+            encoding: .utf8
+        )
+        let coordinator = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/MahayanaCoordinator.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(runtime.contains("if let slot {"))
+        XCTAssertTrue(runtime.contains("coordinator.authorizeGatewayDescriptorAccount(slot)"))
+        XCTAssertTrue(runtime.contains("cursorAccountRevoker.revokeRefusedAccount()"))
+        XCTAssertTrue(runtime.contains("Cursor gateway descriptor is bound to another account."))
+        XCTAssertTrue(coordinator.contains("authorizeGatewayDescriptorAccount(_ accountScope: String)"))
+    }
+
     func testCoordinatorBootstrapCodablePreservesLocalHumanIdentity() throws {
         let bootstrap = CoordinatorBootstrap(
             processConfig: .init(
