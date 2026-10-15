@@ -174,6 +174,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use uuid::Uuid;
 
+include!("automation_policy.rs");
 include!("automation_execution.rs");
 include!("automation_status_reminder.rs");
 include!("background_recovery.rs");
@@ -10689,9 +10690,11 @@ impl FeatureHostController {
             )
         };
         let (context, conversation_id, mut runtime_text) = prepared;
+        let automation_guidance =
+            self.create_automations_system_guidance(Some(&context.member_id))?;
         let automation_status_reminder = self.create_automation_status_reminder(None)?;
         runtime_text = format!(
-            "{automation_status_reminder}\n\n{runtime_text}"
+            "{automation_guidance}\n\n{automation_status_reminder}\n\n{runtime_text}"
         );
         let response = self.runtime()?.execute(RuntimeCommand::SendMessage {
             conversation_id: ConversationId(conversation_id),
@@ -13352,9 +13355,11 @@ impl FeatureHostController {
                 }
             }
         }
+        let automation_guidance =
+            self.create_automations_system_guidance(agent_id.as_deref())?;
         let automation_status_reminder = self.create_automation_status_reminder(None)?;
         runtime_text = format!(
-            "{automation_status_reminder}\n\n[Current turn]\n{runtime_text}"
+            "{automation_guidance}\n\n{automation_status_reminder}\n\n[Current turn]\n{runtime_text}"
         );
         let response = self.runtime()?.execute(RuntimeCommand::SendMessage {
             conversation_id,
