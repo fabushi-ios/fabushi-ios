@@ -51,9 +51,10 @@
       "implementation_status": "not-applicable",
       "production_evidence": "mobile/ios/Fabushi/RemoteComputerSurface.swift (native remote Computer surface and lifecycle); source/ios-preload/coordinator-port-bridge.swift and Coordinator-owned remote service calls",
       "test_evidence": "RemoteComputer focused tests plus current-head Rust Host/native MCP/runtime and protected/device Actions; service-side box daemon behavior remains owned by Desktop/backend deployment rather than the iOS binary.",
-      "notes": "Exact Desktop source/box-exec-daemon/src/lib.rs@419215b4a5cab74df928c3175f2269348fb2a9fa reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Library exports entrypoint/server only; iOS preserves applicable semantics through typed RemoteRunner without duplicating the daemon. No status promotion. Desktop live-main drift 8148bfb9 -> c33a9495 changed this exact source blob; prior implementation/CI evidence is predecessor-only until current-main responsibility/owner review closes.",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "notes": "Exact Desktop source/box-exec-daemon/src/lib.rs@419215b4a5cab74df928c3175f2269348fb2a9fa reviewed at Desktop main 3bc92400826cc4ca7ac665b467708e22261edc61. Platform disposition is about iOS binary ownership only; it does not declare the remote box service unnecessary. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Library exports entrypoint/server only; iOS preserves applicable semantics through typed RemoteRunner without duplicating the daemon. No status promotion. Desktop live-main drift 8148bfb9 -> c33a9495 changed this exact source blob; prior implementation/CI evidence is predecessor-only until current-main responsibility/owner review closes. Current-main c33a9495 re-review: the daemon remains a remote service rather than an iOS process. 4b57a824 adds canonical ExecService Write client wire/result handling and bf60b482 supplies a real CloudAgent Box-read caller through the generation-fenced RemoteRunner; prior 'no concrete caller' limitation is partially closed.",
+      "authority_review_state": "reviewed-current-main",
+      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+      "exact_head_evidence": "replacement production changes 4b57a824/bf60b482 committed; exact-head GitHub Actions pending"
     },
     {
       "desktop_path": "source/box-exec-daemon/src/main.rs",
@@ -83,27 +84,30 @@
       "ios_language": "Swift / Rust",
       "ios_platform_delta": "The Desktop loopback daemon process itself remains not applicable inside the iOS sandbox. Its applicable client-visible local-exec vocabulary is preserved by the existing Coordinator-owned RemoteRunner bridge plus the iOS-owned Rust Host canonical agent.v1 schema; no second runtime or on-device unrestricted shell daemon is introduced.",
       "implementation_status": "not-applicable",
-      "production_evidence": "source/box-exec-daemon/server.swift preserves typed box execution vocabulary. b36884be supplies shipping RemoteRunner with IOSGenerationFencedRemoteRunnerTransport through the canonical MahayanaCoordinator/Host request graph. A concrete Host/Agent caller into the box/local-exec replacement is still pending.",
-      "test_evidence": "RunnerParityTests covers typed write/redacted-read/shell-stream/stdin projection, RemoteRunner behavior, account/Host generation fencing and shipping composition. Exact-head Actions plus a real production caller remain required.",
-      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport composition is present; daemon process remains platform-inapplicable and caller-level replacement closure remains pending. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Reviewed loopback auth, workspace/terminal canonical-path confinement, symlink rejection, read/write/shell/stream/stdin/background semantics, timeout/hard-timeout, disconnect abort and MCP/environment configuration. iOS keeps the daemon platform-inapplicable while server.swift + RemoteRunner + IOSGenerationFencedRemoteRunnerTransport preserve applicable typed semantics with account/Host-generation fencing. Exact-head CI and real production caller closure remain separate; no verified promotion. Desktop live-main drift 8148bfb9 -> c33a9495 changed this exact source blob; prior implementation/CI evidence is predecessor-only until current-main responsibility/owner review closes.",
-      "authority_review_state": "requires-current-main-review",
-      "desktop_review_commit": "371b72f1cd20de03dc4dff9a15ed761054968093"
+      "production_evidence": "source/box-exec-daemon/server.swift preserves typed read/write vocabulary; IOSGenerationFencedRemoteRunnerTransport is composed by MahayanaCoordinator; IOSRemoteExecDaemonClient now encodes canonical ExecService WriteArgs (path tag1/tool_call_id tag3/file_bytes tag5) and decodes WriteResult; CloudAgent image loading is a real /workspace read caller. The daemon process/security implementation remains remote and is not duplicated into the app.",
+      "test_evidence": "RunnerParityTests covers typed write/read projection, canonical remote Write protobuf bytes/result, generation fencing and shipping composition; CursorCloudAgentInfoParityTests covers the real CloudAgent image Box-read policy. Exact-head Actions pending.",
+      "notes": "IOS-MAIN-LOCAL-EXEC-20261012: transport composition is present; daemon process remains platform-inapplicable and caller-level replacement closure remains pending. Current-main revalidation at Desktop 371b72f1: exact blob unchanged. Reviewed loopback auth, workspace/terminal canonical-path confinement, symlink rejection, read/write/shell/stream/stdin/background semantics, timeout/hard-timeout, disconnect abort and MCP/environment configuration. iOS keeps the daemon platform-inapplicable while server.swift + RemoteRunner + IOSGenerationFencedRemoteRunnerTransport preserve applicable typed semantics with account/Host-generation fencing. Exact-head CI and real production caller closure remain separate; no verified promotion. Desktop live-main drift 8148bfb9 -> c33a9495 changed this exact source blob; prior implementation/CI evidence is predecessor-only until current-main responsibility/owner review closes. Current-main c33a9495 re-review: the daemon remains a remote service rather than an iOS process. 4b57a824 adds canonical ExecService Write client wire/result handling and bf60b482 supplies a real CloudAgent Box-read caller through the generation-fenced RemoteRunner; prior 'no concrete caller' limitation is partially closed.",
+      "authority_review_state": "reviewed-current-main",
+      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb",
+      "exact_head_evidence": "replacement production changes 4b57a824/bf60b482 committed; exact-head GitHub Actions pending"
     },
     {
       "desktop_path": "source/box-exec-daemon/src/workspace_write.rs",
       "desktop_blob_sha": "e91358cb84271251a8d271ef92a200f02be41c90",
-      "desktop_responsibility": "pending-review",
+      "desktop_responsibility": "Confined atomic workspace write for the remote ExecService Write resource using openat/O_NOFOLLOW traversal, regular-file target checks, exclusive staging, fsync, atomic rename and directory sync with staging cleanup on failure.",
       "desktop_owner": "remote-runner",
-      "desktop_visible_effect": "pending-review",
-      "ios_disposition": "unreviewed",
-      "ios_target_path": "",
-      "ios_language": "",
-      "ios_platform_delta": "",
-      "implementation_status": "unreviewed",
-      "production_evidence": "",
-      "test_evidence": "",
-      "notes": "Added by Desktop live-main c33a9495fc1e640557d65f3e2daedc1449be7fcb; requires current-main responsibility/owner review before disposition.",
-      "authority_review_state": "requires-current-main-review"
+      "desktop_visible_effect": "Remote Box writes cannot escape the workspace through parent/target symlinks and replace files atomically/durably instead of exposing partial writes.",
+      "ios_disposition": "not-applicable-with-replacement",
+      "ios_target_path": "source/local-exec-daemon/production-executor.swift; source/box-exec-daemon/server.swift; source/box-exec-daemon/RemoteRunner.swift; source/mahayana-agent-coordinator/MahayanaCoordinator.swift",
+      "ios_language": "Swift / remote service",
+      "ios_platform_delta": "The secure filesystem mutation runs inside the remote Box workspace, not the iOS sandbox. iOS must not duplicate openat/renameat workspace ownership locally; it sends typed WriteArgs through the existing account/Host-generation-fenced RemoteRunner to the canonical remote ExecService, which owns workspace_write.rs semantics.",
+      "implementation_status": "not-applicable",
+      "production_evidence": "4b57a824 adds production IOSRemoteExecDaemonClient WriteArgs/WriteResult support through the existing authenticated exec-daemon descriptor and generation-fenced RemoteRunner. The remote c33a9495 Box daemon remains the authoritative confined atomic writer.",
+      "test_evidence": "RunnerParityTests testRemoteExecDaemonWriteUsesCanonicalBoxBytesAndResult plus existing generation-fence and typed Box operation tests; exact-head Actions pending.",
+      "notes": "Reviewed full c33a9495 workspace_write.rs. N/A applies only to embedding its Unix filesystem owner in the iOS binary; the user capability is preserved by the remote canonical daemon and typed/fenced iOS client replacement. Do not interpret this as bypassing atomic/symlink security semantics.",
+      "authority_review_state": "reviewed-current-main",
+      "exact_head_evidence": "4b57a8249191d43d9f2fa554fb09be3b793de358 implementation committed; exact-head GitHub Actions superseded by later bf60b482 and pending there",
+      "desktop_review_commit": "c33a9495fc1e640557d65f3e2daedc1449be7fcb"
     }
   ]
 }
