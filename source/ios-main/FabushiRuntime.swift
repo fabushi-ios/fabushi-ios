@@ -152,18 +152,38 @@ private final class IOSCloudAgentWakeWatcher {
             case 2:
                 let summary = info.summary?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let result = (summary?.isEmpty == false) ? summary! : "The Cursor agent finished."
-                if await settle(wake, status: "completed", result: result) { return }
+                if await settle(wake, status: "completed", result: await augmentWithTranscriptDump(wake, result: result)) { return }
             case 3, 5:
                 let errorText = info.permanentError?.trimmingCharacters(in: .whitespacesAndNewlines)
                     ?? info.summary?.trimmingCharacters(in: .whitespacesAndNewlines)
                 let result = (errorText?.isEmpty == false)
                     ? errorText!
                     : "The Cursor agent (\(wake.workId)) ended before finishing."
-                if await settle(wake, status: "error", result: result) { return }
+                if await settle(wake, status: "error", result: await augmentWithTranscriptDump(wake, result: result)) { return }
             default:
                 // Desktop normalizes unknown numeric statuses to Unspecified and keeps polling.
                 continue
             }
+        }
+    }
+
+    private func augmentWithTranscriptDump(
+        _ wake: IOSPendingCloudAgentWake,
+        result: String
+    ) async -> String {
+        do {
+            guard let dump = try await coordinator.cloudAgentTranscriptDump(bcId: wake.workId),
+                  let path = dump["path"] as? String,
+                  let sizeBytes = dump["sizeBytes"] as? Int,
+                  let lineCount = dump["lineCount"] as? Int
+            else {
+                return result
+            }
+            return result + "\n\nFull transcript dumped to \(path) (\(sizeBytes) bytes, \(lineCount) message lines). Read it with your shell tools; tail -n 1 \(path) gives the final assistant report."
+        } catch {
+            // Desktop semantics are best-effort: a transcript dump failure must
+            // never prevent the durable completion wake from settling.
+            return result
         }
     }
 

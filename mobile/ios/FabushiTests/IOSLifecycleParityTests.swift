@@ -497,4 +497,23 @@ final class IOSLifecycleParityTests: XCTestCase {
         XCTAssertLessThan(logout.lowerBound, relayStop.lowerBound)
     }
 
+
+    func testCloudAgentWakeCompletionBestEffortDumpsTranscriptBeforeSettlement() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/FabushiRuntime.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("augmentWithTranscriptDump(wake, result: result)"))
+        XCTAssertTrue(source.contains("coordinator.cloudAgentTranscriptDump(bcId: wake.workId)"))
+        XCTAssertTrue(source.contains("a transcript dump failure must"))
+        XCTAssertTrue(source.contains("Full transcript dumped to"))
+        XCTAssertTrue(source.contains("tail -n 1"))
+    }
+
 }

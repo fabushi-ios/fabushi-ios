@@ -1419,6 +1419,20 @@ final class MahayanaCoordinator {
         }
     }
 
+
+    func cloudAgentTranscriptDump(bcId: String) async throws -> [String: Any]? {
+        guard let mcpSurface else {
+            throw CoordinatorError.unavailable
+        }
+        do {
+            return try await mcpSurface.cloudAgentTranscriptDump(bcId: bcId)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CoordinatorError.requestFailed(error.localizedDescription)
+        }
+    }
+
     nonisolated static func isClientPauseBlockedMethod(_ method: String) -> Bool {
         switch method {
         case "forceReconnectGateway",

@@ -3723,6 +3723,38 @@ final class CoordinatorMcpSurface {
         return try await dashboard.getBackgroundComposerInfo(bcId: bcId)
     }
 
+
+    func cloudAgentTranscriptDump(bcId: String) async throws -> [String: Any]? {
+        guard (await cursorAuth.status()).loggedIn, routedScopeToken() != nil else {
+            throw IOSCursorAuthError.signInRequired
+        }
+        try Task.checkCancellation()
+        let conversation = try await dashboard.getBackgroundComposerConversation(bcId: bcId)
+        try Task.checkCancellation()
+        let dump = try MahayanaCloudAgentTrace.jsonLines(messages: conversation)
+        guard dump.rowCount > 0 else { return nil }
+
+        let path = "cloud-agent-transcripts/\(bcId).jsonl"
+        let write = try await dispatchRemoteExecution(
+            method: "local-exec.box.exec",
+            params: .object([
+                "case": .string("writeArgs"),
+                "args": .object([
+                    "path": .string(path),
+                    "fileBytes": .string(dump.jsonl.base64EncodedString()),
+                    "toolCallId": .string("cloud-agent-watch-dump:\(bcId)"),
+                ]),
+            ])
+        )
+        try Task.checkCancellation()
+        guard let object = write.foundationValue as? [String: Any],
+              object["success"] as? Bool == true
+        else {
+            throw SandMcpConfigError("Cloud Agent transcript Box write did not return success.")
+        }
+        return ["path": path, "sizeBytes": dump.jsonl.count, "lineCount": dump.rowCount]
+    }
+
     private func refreshAuthoritativePluginFacts(
         agentId: String
     ) async throws -> [[String: Any]] {
