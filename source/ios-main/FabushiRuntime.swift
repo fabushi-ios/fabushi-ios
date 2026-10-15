@@ -5,6 +5,8 @@ import SwiftUI
 private let IOS_CLOUD_AGENT_POLL_INTERVAL_NS: UInt64 = 10_000_000_000
 private let IOS_CLOUD_AGENT_MAX_WAIT_MS: Int64 = 5 * 60 * 60 * 1_000
 private let IOS_CLOUD_AGENT_RESTART_GRACE_MS: Int64 = 3 * 60 * 1_000
+let IOS_AGENT_STORE_RECONCILE_INTERVAL_NS: UInt64 = 120_000_000_000
+let IOS_AGENT_STORE_ERROR_BACKOFF_NS: UInt64 = 30_000_000_000
 
 private struct IOSPendingCloudAgentWake: Equatable {
     let agentId: String
@@ -203,7 +205,8 @@ final class FabushiRuntime {
     @ObservationIgnored private var resumeTask: Task<Void, Never>?
     @ObservationIgnored private var connectionRetryTask: Task<Void, Never>?
     @ObservationIgnored private var appVersionPolicyTask: Task<Void, Never>?
-    @ObservationIgnored private var agentStoreSnapshotTask: Task<Void, Never>?
+    @ObservationIgnored private var agentStoreReconcileTask: Task<Void, Never>?
+    @ObservationIgnored private var agentStorePeriodicTask: Task<Void, Never>?
     #if DEBUG
     @ObservationIgnored private var devControlsPreload: IOSDevControlsPreload?
     #endif
@@ -293,8 +296,10 @@ final class FabushiRuntime {
             } else {
                 main.markResyncRequired()
             }
+            startAgentStorePeriodicReconcileIfNeeded()
         } else {
             main.markResyncCompleted()
+            stopAgentStorePeriodicReconcile()
         }
     }
 
@@ -308,7 +313,13 @@ final class FabushiRuntime {
             } else {
                 main.markResyncRequired()
             }
+            if !wasBackgrounded {
+                startAgentStorePeriodicReconcileIfNeeded()
+            }
         } else {
+            stopAgentStorePeriodicReconcile()
+            agentStoreReconcileTask?.cancel()
+            agentStoreReconcileTask = nil
             // Fence account-scoped relay/fire polling immediately on logout.
             // Account transition cleanup will also clear the durable scope, but
             // transport work must not remain live during that handoff window.
@@ -321,12 +332,15 @@ final class FabushiRuntime {
         switch phase {
         case .background:
             wasBackgrounded = true
+            stopAgentStorePeriodicReconcile()
             scheduleAgentStoreReconcile(reason: "background")
         case .active where wasBackgrounded:
             wasBackgrounded = false
             resumeTask?.cancel()
             resumeTask = Task { [weak self] in
-                await self?.resyncAfterLifecycleRecovery(reason: "background-resume")
+                guard let self else { return }
+                await self.resyncAfterLifecycleRecovery(reason: "background-resume")
+                self.startAgentStorePeriodicReconcileIfNeeded()
             }
         default:
             break
@@ -468,39 +482,59 @@ final class FabushiRuntime {
     }
 
     private func scheduleAgentStoreReconcile(reason: String) {
-        agentStoreSnapshotTask?.cancel()
+        agentStoreReconcileTask?.cancel()
         guard marketplace.loggedIn else {
-            agentStoreSnapshotTask = nil
+            agentStoreReconcileTask = nil
             return
         }
-        agentStoreSnapshotTask = Task { [weak self] in
+        agentStoreReconcileTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                _ = try await self.main.coordinator.reconcileAgentStoreForCurrentScope()
-                guard !Task.isCancelled else { return }
-                self.main.lifecycleReporter.report(
-                    .coordinatorHandoff,
-                    metadata: [
-                        "agent_store": "reconcile",
-                        "reason": reason,
-                        "result": "completed",
-                    ]
-                )
-            } catch is CancellationError {
-                return
-            } catch {
-                self.main.lifecycleReporter.report(
-                    .coordinatorHandoff,
-                    level: .warn,
-                    metadata: [
-                        "agent_store": "reconcile",
-                        "reason": reason,
-                        "result": "failed",
-                        "error": String(error.localizedDescription.prefix(512)),
-                    ]
-                )
+            let completed = await self.reconcileAgentStore(reason: reason)
+            guard !Task.isCancelled else { return }
+            if completed {
+                self.main.markResyncCompleted()
+            } else {
+                self.main.markResyncRequired()
             }
         }
+    }
+
+    private func startAgentStorePeriodicReconcileIfNeeded() {
+        guard agentStorePeriodicTask == nil,
+              marketplace.loggedIn,
+              !wasBackgrounded
+        else { return }
+
+        agentStorePeriodicTask = Task { [weak self] in
+            guard let self else { return }
+            var delay = IOS_AGENT_STORE_RECONCILE_INTERVAL_NS
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: delay)
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled,
+                      self.marketplace.loggedIn,
+                      !self.wasBackgrounded
+                else { return }
+
+                let completed = await self.reconcileAgentStore(reason: "periodic")
+                guard !Task.isCancelled else { return }
+                if completed {
+                    self.main.markResyncCompleted()
+                    delay = IOS_AGENT_STORE_RECONCILE_INTERVAL_NS
+                } else {
+                    self.main.markResyncRequired()
+                    delay = IOS_AGENT_STORE_ERROR_BACKOFF_NS
+                }
+            }
+        }
+    }
+
+    private func stopAgentStorePeriodicReconcile() {
+        agentStorePeriodicTask?.cancel()
+        agentStorePeriodicTask = nil
     }
 
     private func resyncAfterLifecycleRecovery(reason: String) async {
@@ -527,5 +561,8 @@ final class FabushiRuntime {
                 "result": agentStoreReady ? "completed" : "agent-store-pending",
             ]
         )
+        if marketplace.loggedIn, !wasBackgrounded {
+            startAgentStorePeriodicReconcileIfNeeded()
+        }
     }
 }

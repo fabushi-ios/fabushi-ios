@@ -352,6 +352,35 @@ final class IOSLifecycleParityTests: XCTestCase {
     }
 
 
+    func testAgentStoreReconcileCadenceMatchesDesktopAndFailureBackoff() {
+        XCTAssertEqual(IOS_AGENT_STORE_RECONCILE_INTERVAL_NS, 120_000_000_000)
+        XCTAssertEqual(IOS_AGENT_STORE_ERROR_BACKOFF_NS, 30_000_000_000)
+    }
+
+    func testShippingRuntimeScopesAgentStorePeriodicReconcileToActiveAccountLifecycle() throws {
+        let iosRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: iosRoot
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("source/ios-main/FabushiRuntime.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("startAgentStorePeriodicReconcileIfNeeded()"))
+        XCTAssertTrue(source.contains("stopAgentStorePeriodicReconcile()"))
+        XCTAssertTrue(source.contains("reconcileAgentStore(reason: \"periodic\")"))
+        XCTAssertTrue(source.contains("delay = IOS_AGENT_STORE_ERROR_BACKOFF_NS"))
+        XCTAssertTrue(source.contains("delay = IOS_AGENT_STORE_RECONCILE_INTERVAL_NS"))
+        XCTAssertTrue(source.contains("case .background:"))
+        XCTAssertTrue(source.contains("scheduleAgentStoreReconcile(reason: \"background\")"))
+        XCTAssertTrue(source.contains("agentStorePeriodicTask?.cancel()"))
+        XCTAssertTrue(source.contains("marketplace.loggedIn"))
+        XCTAssertTrue(source.contains("!wasBackgrounded"))
+    }
+
     func testProcessCrashTelemetryLimiterMatchesDesktopCapAndErrorTaxonomy() {
         var limiter = IOSProcessCrashTelemetryLimiter()
         var records: [[String: String]] = []
