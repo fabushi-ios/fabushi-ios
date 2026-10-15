@@ -3426,8 +3426,10 @@ fn tool_capability(tool: &str) -> Capability {
         "memory_put" | "memory_get" | "memory_search" => Capability::Memory,
         "workflow_create" | "workflow_status" => Capability::Workflow,
         "subagent_run" => Capability::Subagent,
-        "web_search" | "web_fetch" | "browser_navigate" | "browser_refresh"
-        | "browser_back" | "browser_forward" => Capability::Network,
+        "web_search" | "web_fetch" => Capability::WebSearch,
+        "browser_navigate" | "browser_refresh" | "browser_back" | "browser_forward" => {
+            Capability::Network
+        }
         "process_exec" | "ExternalShell" => Capability::Process,
         "git_status" | "git_diff" => Capability::Git,
         _ => Capability::ToolProtocol,
