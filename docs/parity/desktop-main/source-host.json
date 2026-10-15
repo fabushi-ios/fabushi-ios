@@ -1011,7 +1011,7 @@
       "desktop_owner": "host",
       "desktop_visible_effect": "Cloud-agent launch/reply can safely receive attached images without exposing arbitrary host files or oversized/non-image data.",
       "ios_disposition": "ios-adapted",
-      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift; source/ios-main/account/cursor-dashboard-client.swift; source/local-exec-daemon/production-executor.swift",
+      "ios_target_path": "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift",
       "ios_language": "Swift",
       "ios_platform_delta": "iOS reuses the canonical Coordinator-owned generation-fenced RemoteRunner/exec-daemon path for /workspace Box reads, the existing SharedImageMime registry, AttachmentLimits 25 MiB ceiling, and the existing Cursor Dashboard CloudAgent image protobuf. Arbitrary https/non-file and paths outside /workspace fail closed; no second media/store/runtime owner is introduced.",
       "implementation_status": "implemented",
