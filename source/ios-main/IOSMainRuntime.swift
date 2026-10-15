@@ -53,6 +53,8 @@ final class IOSMainRuntime {
     private let userTimeZoneProjectionFence = IOSUserTimeZoneProjectionFence()
     private let updateWiring: IOSUpdateServiceWiring
     private let attachmentMainRPC: IOSAttachmentMainRPCAdapter
+    private let boxSecretsController: IOSBoxSecretsController
+    private let boxSecretsMainRPC: IOSBoxSecretsMainRPCAdapter
     let devCapability: IOSDevCapability
     private let devControlAdapter: IOSNativeDevControlAdapter
 
@@ -184,6 +186,31 @@ final class IOSMainRuntime {
             }
         )
 
+        let boxSecretsController = IOSBoxSecretsController(
+            apply: { [weak coordinator] secrets in
+                guard let coordinator else {
+                    throw MahayanaCoordinator.CoordinatorError.unavailable
+                }
+                let value = try await coordinator.request(
+                    method: "setBoxSecrets",
+                    params: ["secrets": secrets]
+                ).value
+                if let object = value as? [String: Any] {
+                    return object["isApplied"] as? Bool == true
+                }
+                return value as? Bool == true
+            },
+            reporter: { projection in
+                reporter.report(
+                    .coordinatorHandoff,
+                    level: projection.level,
+                    metadata: projection.metadata
+                )
+            }
+        )
+        self.boxSecretsController = boxSecretsController
+        boxSecretsMainRPC = IOSBoxSecretsMainRPCAdapter(controller: boxSecretsController)
+
         lifecycleTelemetrySink.configureRemoteShipping { accountSlot in
             { [weak coordinator] logs in
                 guard let coordinator else {
@@ -220,6 +247,7 @@ final class IOSMainRuntime {
                     coordinator.updateAccountSettingsScope(nil)
                 },
                 clearCoordinatorAccountState: {
+                    await boxSecretsController.departAccount()
                     await coordinator.prepareAccountTransition()
                 },
                 didClearAccountScope: { _, nextSlot in
@@ -238,6 +266,12 @@ final class IOSMainRuntime {
                 boxVisibilityTracker.noteAccountSlot(slot)
                 lifecycleTelemetrySink.rotate(accountSlot: slot)
                 coordinator.updateAccountSettingsScope(slot)
+                _ = boxSecretsController.adoptAccount(slot)
+                if slot != nil {
+                    Task { @MainActor in
+                        try? await boxSecretsController.push(trigger: "account")
+                    }
+                }
             },
             applyLocalHumanIdentity: { slot in
                 coordinatorLocalHumanIdentity.replace(with: slot)
@@ -468,6 +502,25 @@ final class IOSMainRuntime {
             )
             return .failed(.init(code: "attachment-failed", message: error.localizedDescription))
         }
+
+        do {
+            if let boxSecretsOutcome = try await boxSecretsMainRPC.route(method: method, args: args) {
+                return boxSecretsOutcome
+            }
+        } catch is CancellationError {
+            return .failed(.init(code: "coordinator-cancelled", message: "box secrets request cancelled"))
+        } catch {
+            lifecycleReporter.report(
+                .coordinatorHandoff,
+                level: .warn,
+                metadata: [
+                    "area": "box-secrets-main-rpc",
+                    "method": method,
+                    "error_type": String(reflecting: type(of: error)),
+                ]
+            )
+            return .failed(.init(code: "box-secrets-failed", message: error.localizedDescription))
+        }
         let outcome = await coordinator.dispatchTransport(
             requestId: requestId,
             method: method,
@@ -490,6 +543,10 @@ final class IOSMainRuntime {
             }
         }
         return outcome
+    }
+
+    func pushBoxSecrets(trigger: String) async throws -> Bool {
+        try await boxSecretsController.push(trigger: trigger)
     }
 
     func scenePhaseChanged(_ phase: ScenePhase) {
@@ -622,6 +679,7 @@ final class IOSMainRuntime {
         lifecycleTelemetrySink.flushRemoteNow()
         lifecycleTelemetrySink.settleLoggedOutIfNeeded()
         accountRuntime.reset()
+        _ = boxSecretsController.adoptAccount(nil)
         boxVisibilityTracker.abandonAll()
         coordinatorLocalHumanIdentity.replace(with: nil)
         boxVisibilityTracker.noteAccountSlot(nil)
