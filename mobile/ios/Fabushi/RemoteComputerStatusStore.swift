@@ -44,6 +44,9 @@ struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
     let state: String
     let vncURL: URL?
     let imageUpdateAvailable: Bool
+    /// Monotonic snapshot generation projected from the shipping Remote Computer wire.
+    /// A nil value preserves compatibility with older control planes.
+    let snapshotGeneration: UInt64?
     let diskPressure: RemoteComputerAgentBoxDiskPressureSnapshot?
     let handoff: RemoteComputerAgentBoxHandoff?
 
@@ -54,6 +57,7 @@ struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
         state: String,
         vncURL: URL?,
         imageUpdateAvailable: Bool,
+        snapshotGeneration: UInt64? = nil,
         diskPressure: RemoteComputerAgentBoxDiskPressureSnapshot? = nil,
         handoff: RemoteComputerAgentBoxHandoff? = nil
     ) {
@@ -61,6 +65,7 @@ struct RemoteComputerAgentBoxSnapshot: Equatable, Sendable {
         self.state = state
         self.vncURL = vncURL
         self.imageUpdateAvailable = imageUpdateAvailable
+        self.snapshotGeneration = snapshotGeneration
         self.diskPressure = diskPressure
         self.handoff = handoff
     }
@@ -189,6 +194,9 @@ final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
             state: state,
             vncURL: vncURL,
             imageUpdateAvailable: object["imageUpdateAvailable"] as? Bool ?? false,
+            snapshotGeneration:
+                uint64(object["snapshotGeneration"])
+                ?? uint64(object["generation"]),
             diskPressure: projectDiskPressure(object["diskPressure"]),
             handoff: projectHandoff(object["handoff"])
         )
@@ -223,6 +231,19 @@ final class IOSRemoteComputerAgentBoxSource: RemoteComputerAgentBoxSourcing {
             availableBytes: int64(object["availableBytes"]),
             totalBytes: int64(object["totalBytes"])
         )
+    }
+
+    private static func uint64(_ value: Any?) -> UInt64? {
+        if let value = value as? UInt64 { return value }
+        if let value = value as? UInt { return UInt64(value) }
+        if let value = value as? Int, value >= 0 { return UInt64(value) }
+        if let value = value as? Int64, value >= 0 { return UInt64(value) }
+        if let value = value as? NSNumber {
+            let signed = value.int64Value
+            return signed >= 0 ? UInt64(signed) : nil
+        }
+        if let value = value as? String { return UInt64(value) }
+        return nil
     }
 
     private static func int64(_ value: Any?) -> Int64? {
@@ -825,6 +846,11 @@ final class RemoteComputerAgentBoxOwner: ObservableObject {
 
     private func cacheStatus(_ status: RemoteComputerAgentBoxSnapshot) {
         let record = recordFor(status.agentID)
+        if let current = record.status?.snapshotGeneration,
+           let incoming = status.snapshotGeneration,
+           incoming < current {
+            return
+        }
         record.status = status
         record.settledReadState = nil
         if let pressure = status.diskPressure {
