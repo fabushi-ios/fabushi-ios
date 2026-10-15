@@ -21,7 +21,7 @@ final class IOSProductionSentryController {
     }
 
     func rotate(accountSlot: String?) {
-        let nextHash = accountSlot.map(iosLifecycleTelemetryAccountScope)
+        let nextHash = accountSlot.map { iosLifecycleTelemetryAccountScope($0) }
         let request = accountSync.begin(authID: nextHash)
         if request.reset {
             conversationID = nil
@@ -103,7 +103,9 @@ final class IOSProductionSentryController {
     }
 
     func accept(_ envelope: SandSentryEnvelope) {
-        guard let gated = privacyGate.handle(envelope) else { return }
+        guard privacyGate.belongsToCurrentAccount(envelope),
+              let gated = privacyGate.handle(envelope)
+        else { return }
         eventIDs.record(gated)
         spool.push(gated)
         flush()
@@ -111,9 +113,6 @@ final class IOSProductionSentryController {
 
     func flush() {
         while let envelope = spool.shift() {
-            guard privacyGate.belongsToCurrentAccount(envelope) else {
-                continue
-            }
             emit(envelope)
         }
     }
