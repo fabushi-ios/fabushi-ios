@@ -725,6 +725,17 @@ impl AgentBackend for NativeAgentBackend {
         run_result.map_err(kernel_error)
     }
 
+    async fn complete_async_ask_question(
+        &self,
+        request: mahayana_kernel::AsyncAskQuestionCompletionRequest,
+        events: SharedAgentEventSink,
+    ) -> Result<(), AgentError> {
+        self.engine
+            .complete_async_ask_question(request, events)
+            .await
+            .map_err(|error| AgentError::Backend(error.to_string()))
+    }
+
     async fn interrupt(&self, operation_id: &OperationId) -> Result<(), AgentError> {
         self.cancelled_operations
             .lock()
