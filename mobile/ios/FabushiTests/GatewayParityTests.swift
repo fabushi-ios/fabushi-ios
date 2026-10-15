@@ -699,6 +699,48 @@ final class GatewayParityTests: XCTestCase {
         XCTAssertNil(expired)
     }
 
+    func testGatewayDescriptorAccountAuthorizationRetainsOwnerAndFailsClosed() async {
+        let emptyStore = GatewayDescriptorTestStore()
+        let emptyCache = IOSGatewayDescriptorKeychainCache(store: emptyStore)
+        XCTAssertTrue(
+            await emptyCache.authorizeExistingDescriptor(accountScope: "account-a"),
+            "without a persisted native descriptor there is no prior owner to refuse"
+        )
+
+        let store = GatewayDescriptorTestStore()
+        let cache = IOSGatewayDescriptorKeychainCache(store: store)
+        let connection = IOSCursorSandBoxConnection(
+            networkToken: "n",
+            execDaemonAuthToken: "e",
+            execDaemonURL: "https://exec.example",
+            vncURL: "",
+            gatewayURL: "https://gateway.example",
+            gatewayToken: "g",
+            forkVNCBaseURL: ""
+        )
+        await cache.write(accountScope: "account-a", connection: connection)
+
+        XCTAssertTrue(await cache.authorizeExistingDescriptor(accountScope: "account-a"))
+        XCTAssertFalse(
+            await cache.authorizeExistingDescriptor(accountScope: "account-b"),
+            "a foreign Cursor account must not claim an existing native descriptor"
+        )
+        XCTAssertEqual(
+            await cache.read(accountScope: "account-a"),
+            connection,
+            "refusal must retain the original durable descriptor owner"
+        )
+
+        guard let key = store.values.keys.first else {
+            return XCTFail("descriptor cache did not persist an envelope")
+        }
+        store.values[key] = "{malformed"
+        XCTAssertFalse(
+            await cache.authorizeExistingDescriptor(accountScope: "account-a"),
+            "corrupt owner evidence must fail closed"
+        )
+    }
+
     func testGatewayDescriptorFastPathReturnsCacheWhileSingleflightRefreshes() async throws {
         let store = GatewayDescriptorTestStore()
         let cache = IOSGatewayDescriptorKeychainCache(store: store)
