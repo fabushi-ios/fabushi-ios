@@ -57,6 +57,7 @@ final class IOSMainRuntime {
     private let boxSecretsMainRPC: IOSBoxSecretsMainRPCAdapter
     private let sentryController: IOSProductionSentryController
     private let sentryPrivacySynchronizer: IOSProductionSentryPrivacySynchronizer
+    private let sendTraceExporter: IOSProductionSendTraceExporter
     let devCapability: IOSDevCapability
     private let devControlAdapter: IOSNativeDevControlAdapter
 
@@ -88,6 +89,15 @@ final class IOSMainRuntime {
         sentryController = IOSProductionSentryController(
             report: { level, metadata in
                 reporter.report(.processRecovery, level: level, metadata: metadata)
+            }
+        )
+        sendTraceExporter = IOSProductionSendTraceExporter(
+            reporter: { projection in
+                reporter.report(
+                    .rendererLifecycle,
+                    level: projection.level,
+                    metadata: projection.metadata
+                )
             }
         )
         mainThreadPressureMonitor = IOSMainThreadPressureMonitor(reporter: reporter)
@@ -506,6 +516,7 @@ final class IOSMainRuntime {
                 level: projection.level,
                 metadata: projection.metadata
             )
+            sendTraceExporter.ingest(method: method, report: report)
             return .ok(.object([:]))
         }
         if IOSCoordinatorBroadTelemetryProjection.routedMethods.contains(method) {
