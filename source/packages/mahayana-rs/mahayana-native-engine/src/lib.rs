@@ -3885,15 +3885,25 @@ mod context_compaction_tests {
         let control = OperationControl::default();
         let mut history = vec![
             json!({"role":"system","content":"pinned"}),
-            json!({"role":"user","content":"old ".repeat(800)}),
+            json!({"role":"user","content":"old-one ".repeat(800)}),
             json!({"role":"assistant","content":"a".repeat(800)}),
             json!({"role":"assistant","content":"b".repeat(800)}),
             json!({"role":"assistant","content":"c".repeat(800)}),
             json!({"role":"assistant","content":"d".repeat(800)}),
             json!({"role":"assistant","content":"e".repeat(800)}),
+            json!({"role":"user","content":"old-two ".repeat(800)}),
+            json!({"role":"assistant","content":"f".repeat(800)}),
+            json!({"role":"assistant","content":"g".repeat(800)}),
+            json!({"role":"assistant","content":"h".repeat(800)}),
+            json!({"role":"assistant","content":"i".repeat(800)}),
+            json!({"role":"assistant","content":"j".repeat(800)}),
+            json!({"role":"assistant","content":"k".repeat(800)}),
+            json!({"role":"assistant","content":"l".repeat(800)}),
             json!({"role":"user","content":"latest"}),
             json!({"type":"function_call","call_id":"call-x","name":"workspace_read"}),
             json!({"type":"function_call_output","call_id":"call-x","output":"ok"}),
+            json!({"role":"assistant","content":"tail-one"}),
+            json!({"role":"assistant","content":"tail-two"}),
         ];
         let tail = history[7..].to_vec();
 
