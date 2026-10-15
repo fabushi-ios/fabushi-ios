@@ -440,7 +440,8 @@ extension CoordinatorMcpSurfaceTests {
         XCTAssertTrue(source.contains("\"watch_exhausted\""))
         XCTAssertTrue(source.contains("\"dropped\""))
         XCTAssertTrue(source.contains("\"attached\""))
-        XCTAssertTrue(source.contains("await gatewayDescriptorCache.clear()"))
+        XCTAssertTrue(source.contains("stopComputerMigrationWatch(clearState: true)"))
+        XCTAssertFalse(source.contains("await gatewayDescriptorCache.clear()"))
         XCTAssertTrue(source.contains("await manager.reload()"))
     }
 }
@@ -501,7 +502,9 @@ extension IOSCursorAuthMainRpcCompatibilityTests {
         )
 
         XCTAssertTrue(surfaceSource.contains("cursorAuth.revokeForAccountRefusal()"))
-        XCTAssertTrue(surfaceSource.contains("await gatewayDescriptorCache.clear()"))
+        XCTAssertTrue(surfaceSource.contains("authorizeGatewayDescriptorAccount(_ accountScope: String)"))
+        XCTAssertTrue(surfaceSource.contains("authorizeExistingDescriptor(accountScope: accountScope)"))
+        XCTAssertFalse(surfaceSource.contains("await gatewayDescriptorCache.clear()"))
         XCTAssertTrue(surfaceSource.contains("await manager.reload()"))
         XCTAssertTrue(runtimeSource.contains("ProductionCoordinatorAccountRevoker("))
         XCTAssertTrue(runtimeSource.contains("coordinator.revokeCursorAuthForAccountRefusal()"))
