@@ -23399,7 +23399,13 @@ mod tests {
             HostEvent::TransportEvent { channel, payload }
                 if channel == "automation-event-fire-dropped" && payload["runId"] == dropped
         )).count();
-        FeatureHostController::record_dropped_event_fire(&mut state, dropped, "overflow-events", "event_batch_overflow");
+        FeatureHostController::record_dropped_event_fire(
+            &mut state,
+            dropped,
+            "overflow-events",
+            "event",
+            "event_batch_overflow",
+        );
         let after = state.events.iter().filter(|event| matches!(
             event,
             HostEvent::TransportEvent { channel, .. } if channel == "automation-event-fire-dropped"
