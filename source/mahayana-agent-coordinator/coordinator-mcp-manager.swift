@@ -2071,6 +2071,7 @@ struct IOSCloudAgentTranscriptDump: Equatable, Sendable {
     let lineCount: Int
 }
 
+@MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
