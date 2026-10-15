@@ -341,4 +341,45 @@ final class CursorSandBoxLifecycleClientTests: XCTestCase {
         }
     }
 
+
+    func testAutomationServiceUnaryUsesOpaqueCanonicalProtoTransport() async throws {
+        let requestBytes = Data([0x0a, 0x01, 0x61])
+        let responseBytes = Data([0x12, 0x01, 0x62])
+        let client = IOSCursorDashboardClient(
+            credentials: lifecycleCredentials(),
+            backendURL: URL(string: "https://backend.example.test")!,
+            requestExecutor: { request in
+                XCTAssertEqual(
+                    request.url?.path,
+                    "/aiserver.v1.AutomationsService/ListSandAutomations"
+                )
+                XCTAssertEqual(
+                    request.value(forHTTPHeaderField: "Content-Type"),
+                    "application/proto"
+                )
+                XCTAssertEqual(
+                    request.value(forHTTPHeaderField: "Connect-Protocol-Version"),
+                    "1"
+                )
+                XCTAssertEqual(request.httpBody, requestBytes)
+                return lifecycleResponse(request, data: responseBytes)
+            }
+        )
+        let response = try await client.automationServiceUnary(
+            method: "ListSandAutomations",
+            bodyBase64: requestBytes.base64EncodedString()
+        )
+        XCTAssertEqual(Data(base64Encoded: response), responseBytes)
+
+        do {
+            _ = try await client.automationServiceUnary(
+                method: "UnexpectedMethod",
+                bodyBase64: requestBytes.base64EncodedString()
+            )
+            XCTFail("unapproved AutomationsService methods must be rejected")
+        } catch let error as IOSCursorDashboardError {
+            XCTAssertTrue(error.message.contains("Unsupported AutomationsService method"))
+        }
+    }
+
 }

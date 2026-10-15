@@ -846,3 +846,138 @@ extension IOSCursorAuthMainRpcCompatibilityTests {
         XCTAssertTrue(runtimeSource.contains("coordinator.revokeCursorAuthForAccountRefusal()"))
     }
 }
+
+
+extension CoordinatorMcpSurfaceTests {
+    func testAutomationCloudSyncLifecycleConvergesMutationsAndReadback() async {
+        var calls = [String]()
+        var commits = 0
+        var failures = [String]()
+        let lifecycle = IOSAutomationCloudSyncLifecycle(
+            snapshot: {
+                [
+                    "agents": [[
+                        "agentId": "mahayana-assistant",
+                        "listRequestBase64": "AQ==",
+                    ]],
+                ]
+            },
+            plan: { agentId, response in
+                XCTAssertEqual(agentId, "mahayana-assistant")
+                XCTAssertEqual(response, "Ag==")
+                return [
+                    "converged": false,
+                    "mutations": [[
+                        "method": "CreateSandAutomation",
+                        "bodyBase64": "Aw==",
+                    ]],
+                ]
+            },
+            commit: { agentId, response in
+                XCTAssertEqual(agentId, "mahayana-assistant")
+                XCTAssertEqual(response, "Ag==")
+                commits += 1
+                return ["converged": true]
+            },
+            markFailed: { agentId in failures.append(agentId) },
+            unary: { method, body in
+                calls.append("\(method):\(body)")
+                if method == "ListSandAutomations" {
+                    return "Ag=="
+                }
+                return "BA=="
+            },
+            launchBackgroundTask: false
+        )
+        lifecycle.updateAccountScope("account-a")
+        lifecycle.resume()
+        await lifecycle.runOneCycleForTesting()
+
+        XCTAssertEqual(
+            calls,
+            [
+                "ListSandAutomations:AQ==",
+                "CreateSandAutomation:Aw==",
+                "ListSandAutomations:AQ==",
+            ]
+        )
+        XCTAssertEqual(commits, 1)
+        XCTAssertTrue(failures.isEmpty)
+        XCTAssertEqual(lifecycle.backoffUntilMs, 0)
+    }
+
+    func testAutomationCloudSyncLifecycleBacksOffAndMarksAgentFailed() async {
+        var now: Int64 = 20_000
+        var snapshots = 0
+        var failures = [String]()
+        let lifecycle = IOSAutomationCloudSyncLifecycle(
+            snapshot: {
+                snapshots += 1
+                return [
+                    "agents": [[
+                        "agentId": "agent-a",
+                        "listRequestBase64": "AQ==",
+                    ]],
+                ]
+            },
+            plan: { _, _ in ["converged": true] },
+            commit: { _, _ in ["converged": true] },
+            markFailed: { failures.append($0) },
+            unary: { _, _ in throw SandMcpConfigError("temporary") },
+            nowMilliseconds: { now },
+            launchBackgroundTask: false
+        )
+        lifecycle.updateAccountScope("account-a")
+        lifecycle.resume()
+
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(failures, ["agent-a"])
+        XCTAssertEqual(
+            lifecycle.backoffUntilMs,
+            now + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS
+        )
+
+        now += IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS - 1
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(snapshots, 1)
+
+        lifecycle.suspend()
+        now += 1
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(snapshots, 1)
+
+        lifecycle.resume()
+        await lifecycle.runOneCycleForTesting()
+        XCTAssertEqual(snapshots, 2)
+    }
+
+    func testAutomationCloudSyncProductionWiringKeepsDefinitionInFeatureHost() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let coordinator = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/mahayana-agent-coordinator/coordinator-mcp-manager.swift"
+            ),
+            encoding: .utf8
+        )
+        let dashboard = try String(
+            contentsOf: repositoryRoot.appendingPathComponent(
+                "source/ios-main/account/cursor-dashboard-client.swift"
+            ),
+            encoding: .utf8
+        )
+        XCTAssertTrue(coordinator.contains("feature.automation.cloudSyncSnapshot"))
+        XCTAssertTrue(coordinator.contains("feature.automation.cloudSyncPlan"))
+        XCTAssertTrue(coordinator.contains("feature.automation.cloudSyncCommit"))
+        XCTAssertTrue(coordinator.contains("feature.automation.cloudSyncMarkFailed"))
+        XCTAssertTrue(coordinator.contains("IOSAutomationCloudSyncLifecycle"))
+        XCTAssertTrue(coordinator.contains("automationCloudSync.updateAccountScope(next)"))
+        XCTAssertTrue(coordinator.contains("automationCloudSync.requestSync()"))
+        XCTAssertTrue(dashboard.contains("service: \"AutomationsService\""))
+        XCTAssertFalse(coordinator.contains("sand-shadow:"))
+    }
+}

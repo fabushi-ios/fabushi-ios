@@ -235,6 +235,58 @@ private final class CoordinatorMcpHostPort {
         return object
     }
 
+    func automationCloudSyncSnapshot() async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.cloudSyncSnapshot",
+            params: [:]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Automation cloud sync snapshot response is invalid.")
+        }
+        return object
+    }
+
+    func automationCloudSyncPlan(
+        agentId: String,
+        responseBase64: String
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.cloudSyncPlan",
+            params: [
+                "agentId": agentId,
+                "responseBase64": responseBase64,
+            ]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Automation cloud sync plan response is invalid.")
+        }
+        return object
+    }
+
+    func automationCloudSyncCommit(
+        agentId: String,
+        responseBase64: String
+    ) async throws -> [String: Any] {
+        let response = try await hostSupervisor.request(
+            method: "feature.automation.cloudSyncCommit",
+            params: [
+                "agentId": agentId,
+                "responseBase64": responseBase64,
+            ]
+        )
+        guard let object = response.value as? [String: Any] else {
+            throw SandMcpConfigError("Automation cloud sync commit response is invalid.")
+        }
+        return object
+    }
+
+    func markAutomationCloudSyncFailed(agentId: String) async throws {
+        _ = try await hostSupervisor.request(
+            method: "feature.automation.cloudSyncMarkFailed",
+            params: ["agentId": agentId]
+        )
+    }
+
     func loadAccountDisplay(forceFresh: Bool) async throws -> AccountDisplayConfig {
         let snapshot = try await loadSnapshot(forceFresh: forceFresh)
         settingsStore.setMcpDisabledToolsByServerId(snapshot.disabledToolsByServerId)
@@ -1041,6 +1093,7 @@ let IOS_AUTOMATION_LISTENER_RECONNECT_INTERVAL_NS: UInt64 = 5_000_000_000
 let IOS_AUTOMATION_RELAY_REGISTER_INTERVAL_MS: Int64 = 5 * 60_000
 let IOS_AUTOMATION_RELAY_DEGRADED_REGISTER_INTERVAL_MS: Int64 = 60_000
 let IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS: Int64 = 30_000
+let IOS_AUTOMATION_CLOUD_SYNC_INTERVAL_NS: UInt64 = 60_000_000_000
 
 struct IOSAutomationRelaySubscription: Equatable, Sendable {
     let slackChannels: [String]
@@ -1721,6 +1774,206 @@ final class IOSAutomationFireLifecycle {
 }
 
 @MainActor
+final class IOSAutomationCloudSyncLifecycle {
+    typealias Snapshot = @MainActor () async throws -> [String: Any]
+    typealias Plan = @MainActor (String, String) async throws -> [String: Any]
+    typealias Commit = @MainActor (String, String) async throws -> [String: Any]
+    typealias MarkFailed = @MainActor (String) async throws -> Void
+    typealias Unary = @MainActor (String, String) async throws -> String
+
+    private let snapshot: Snapshot
+    private let plan: Plan
+    private let commit: Commit
+    private let markFailed: MarkFailed
+    private let unary: Unary
+    private let nowMilliseconds: () -> Int64
+    private let launchBackgroundTask: Bool
+
+    private(set) var accountScope: String?
+    private(set) var generation: UInt64 = 0
+    private(set) var suspended = true
+    private(set) var backoffUntilMs: Int64 = 0
+    private var task: Task<Void, Never>?
+    private var sleepTask: Task<Void, Never>?
+    private var wakeRequested = false
+
+    init(
+        snapshot: @escaping Snapshot,
+        plan: @escaping Plan,
+        commit: @escaping Commit,
+        markFailed: @escaping MarkFailed,
+        unary: @escaping Unary,
+        nowMilliseconds: @escaping () -> Int64 = {
+            Int64(Date().timeIntervalSince1970 * 1_000)
+        },
+        launchBackgroundTask: Bool = true
+    ) {
+        self.snapshot = snapshot
+        self.plan = plan
+        self.commit = commit
+        self.markFailed = markFailed
+        self.unary = unary
+        self.nowMilliseconds = nowMilliseconds
+        self.launchBackgroundTask = launchBackgroundTask
+    }
+
+    func updateAccountScope(_ rawScope: String?) {
+        let normalized = rawScope?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let next = normalized?.isEmpty == false ? normalized : nil
+        guard next != accountScope else { return }
+        generation = generation == UInt64.max ? 1 : generation + 1
+        task?.cancel()
+        sleepTask?.cancel()
+        task = nil
+        sleepTask = nil
+        wakeRequested = false
+        accountScope = next
+        backoffUntilMs = 0
+        if !suspended { launchTask() }
+    }
+
+    func start() {
+        guard accountScope != nil else { return }
+        suspended = false
+        reconcile()
+        launchTask()
+    }
+
+    func suspend() {
+        guard !suspended else { return }
+        suspended = true
+        generation = generation == UInt64.max ? 1 : generation + 1
+        task?.cancel()
+        sleepTask?.cancel()
+        task = nil
+        sleepTask = nil
+        wakeRequested = false
+    }
+
+    func resume() {
+        guard accountScope != nil else { return }
+        if suspended {
+            suspended = false
+            generation = generation == UInt64.max ? 1 : generation + 1
+        }
+        reconcile()
+        launchTask()
+    }
+
+    func stop() {
+        suspended = true
+        generation = generation == UInt64.max ? 1 : generation + 1
+        task?.cancel()
+        sleepTask?.cancel()
+        task = nil
+        sleepTask = nil
+        wakeRequested = false
+        accountScope = nil
+        backoffUntilMs = 0
+    }
+
+    func requestSync() {
+        backoffUntilMs = 0
+        wakeRequested = true
+        sleepTask?.cancel()
+    }
+
+    func reconcile() {
+        requestSync()
+    }
+
+    func runOneCycleForTesting() async {
+        guard let scope = accountScope, !suspended else { return }
+        await runCycle(generation: generation, scope: scope)
+    }
+
+    private func launchTask() {
+        guard launchBackgroundTask, !suspended, let scope = accountScope, task == nil else {
+            return
+        }
+        let token = generation
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled && self.isCurrent(generation: token, scope: scope) {
+                self.wakeRequested = false
+                await self.runCycle(generation: token, scope: scope)
+                guard !Task.isCancelled && self.isCurrent(generation: token, scope: scope) else {
+                    return
+                }
+                if self.wakeRequested { continue }
+                let sleeper = Task<Void, Never> {
+                    try? await Task.sleep(nanoseconds: IOS_AUTOMATION_CLOUD_SYNC_INTERVAL_NS)
+                }
+                self.sleepTask = sleeper
+                await sleeper.value
+                self.sleepTask = nil
+            }
+        }
+    }
+
+    private func runCycle(generation token: UInt64, scope: String) async {
+        guard isCurrent(generation: token, scope: scope) else { return }
+        let now = nowMilliseconds()
+        guard now >= backoffUntilMs else { return }
+        do {
+            let snapshotValue = try await snapshot()
+            guard isCurrent(generation: token, scope: scope) else { return }
+            let agents = snapshotValue["agents"] as? [[String: Any]] ?? []
+            for row in agents {
+                guard isCurrent(generation: token, scope: scope) else { return }
+                guard let agentId = row["agentId"] as? String,
+                      !agentId.isEmpty,
+                      let listRequestBase64 = row["listRequestBase64"] as? String,
+                      !listRequestBase64.isEmpty
+                else {
+                    throw SandMcpConfigError("Automation cloud sync snapshot row is invalid.")
+                }
+                do {
+                    let before = try await unary("ListSandAutomations", listRequestBase64)
+                    guard isCurrent(generation: token, scope: scope) else { return }
+                    let planValue = try await plan(agentId, before)
+                    guard isCurrent(generation: token, scope: scope) else { return }
+                    if planValue["converged"] as? Bool != true {
+                        let mutations = planValue["mutations"] as? [[String: Any]] ?? []
+                        for mutation in mutations {
+                            guard let method = mutation["method"] as? String,
+                                  let bodyBase64 = mutation["bodyBase64"] as? String,
+                                  !bodyBase64.isEmpty
+                            else {
+                                throw SandMcpConfigError("Automation cloud sync mutation is invalid.")
+                            }
+                            _ = try await unary(method, bodyBase64)
+                            guard isCurrent(generation: token, scope: scope) else { return }
+                        }
+                        let after = try await unary("ListSandAutomations", listRequestBase64)
+                        guard isCurrent(generation: token, scope: scope) else { return }
+                        let committed = try await commit(agentId, after)
+                        guard isCurrent(generation: token, scope: scope) else { return }
+                        guard committed["converged"] as? Bool == true else {
+                            throw SandMcpConfigError("Automation cloud sync readback did not converge.")
+                        }
+                    }
+                } catch {
+                    if isCurrent(generation: token, scope: scope) {
+                        try? await markFailed(agentId)
+                    }
+                    throw error
+                }
+            }
+            guard isCurrent(generation: token, scope: scope) else { return }
+            backoffUntilMs = 0
+        } catch {
+            guard isCurrent(generation: token, scope: scope) else { return }
+            backoffUntilMs = nowMilliseconds() + IOS_AUTOMATION_RELAY_ERROR_BACKOFF_MS
+        }
+    }
+
+    private func isCurrent(generation token: UInt64, scope: String) -> Bool {
+        !suspended && generation == token && accountScope == scope
+    }
+}
+
+@MainActor
 final class CoordinatorMcpSurface {
     private let manager: SandMcpManager
     private let port: CoordinatorMcpHostPort
@@ -1729,6 +1982,7 @@ final class CoordinatorMcpSurface {
     private let dashboard: IOSCursorDashboardClient
     private let automationRelay: IOSAutomationRelayLifecycle
     private let automationFire: IOSAutomationFireLifecycle
+    private let automationCloudSync: IOSAutomationCloudSyncLifecycle
     private let sandAccessReader: IOSCursorSandAccessReader
     private let feedbackClient: IOSFeedbackReportClient
     private let avatarImageGenerator: CursorGenerateImageService
@@ -1824,6 +2078,7 @@ final class CoordinatorMcpSurface {
         dashboard: IOSCursorDashboardClient,
         automationRelay: IOSAutomationRelayLifecycle,
         automationFire: IOSAutomationFireLifecycle,
+        automationCloudSync: IOSAutomationCloudSyncLifecycle,
         sandAccessReader: IOSCursorSandAccessReader,
         feedbackClient: IOSFeedbackReportClient,
         avatarImageGenerator: CursorGenerateImageService,
@@ -1840,6 +2095,7 @@ final class CoordinatorMcpSurface {
         self.dashboard = dashboard
         self.automationRelay = automationRelay
         self.automationFire = automationFire
+        self.automationCloudSync = automationCloudSync
         self.sandAccessReader = sandAccessReader
         self.feedbackClient = feedbackClient
         self.avatarImageGenerator = avatarImageGenerator
@@ -2135,6 +2391,32 @@ final class CoordinatorMcpSurface {
                 try await port.backendAutomationFireStatus(runUuid)
             }
         )
+        let automationCloudSync = IOSAutomationCloudSyncLifecycle(
+            snapshot: {
+                try await port.automationCloudSyncSnapshot()
+            },
+            plan: { agentId, responseBase64 in
+                try await port.automationCloudSyncPlan(
+                    agentId: agentId,
+                    responseBase64: responseBase64
+                )
+            },
+            commit: { agentId, responseBase64 in
+                try await port.automationCloudSyncCommit(
+                    agentId: agentId,
+                    responseBase64: responseBase64
+                )
+            },
+            markFailed: { agentId in
+                try await port.markAutomationCloudSyncFailed(agentId: agentId)
+            },
+            unary: { method, bodyBase64 in
+                try await dashboard.automationServiceUnary(
+                    method: method,
+                    bodyBase64: bodyBase64
+                )
+            }
+        )
         let surface = CoordinatorMcpSurface(
             manager: manager,
             port: port,
@@ -2143,6 +2425,7 @@ final class CoordinatorMcpSurface {
             dashboard: dashboard,
             automationRelay: automationRelay,
             automationFire: automationFire,
+            automationCloudSync: automationCloudSync,
             sandAccessReader: sandAccessReader,
             feedbackClient: feedbackClient,
             avatarImageGenerator: avatarImageGenerator,
@@ -2371,16 +2654,19 @@ final class CoordinatorMcpSurface {
     func startAutomationRelay() {
         automationRelay.start()
         automationFire.start()
+        automationCloudSync.start()
     }
 
     func suspendAutomationRelay() {
         automationRelay.suspend()
         automationFire.suspend()
+        automationCloudSync.suspend()
     }
 
     func resumeAutomationRelay() {
         automationRelay.resume()
         automationFire.resume()
+        automationCloudSync.resume()
     }
 
     func reconcileAutomationRelay() {
@@ -2388,16 +2674,20 @@ final class CoordinatorMcpSurface {
         automationRelay.requestDrain()
         automationFire.reconcile()
         automationFire.requestDrain()
+        automationCloudSync.reconcile()
+        automationCloudSync.requestSync()
     }
 
     func requestAutomationRelayDrain() {
         automationRelay.requestDrain()
         automationFire.requestDrain()
+        automationCloudSync.requestSync()
     }
 
     func stopAutomationRelay() {
         automationRelay.stop(clearPendingAcks: true)
         automationFire.stop()
+        automationCloudSync.stop()
     }
 
     func experimentAccessToken(backendURL: String) async throws -> String {
@@ -2417,6 +2707,7 @@ final class CoordinatorMcpSurface {
     func prepareAccountTransition() async {
         automationRelay.stop(clearPendingAcks: true)
         automationFire.stop()
+        automationCloudSync.stop()
         stopComputerMigrationWatch(clearState: true)
         // Account-scoped in-memory/MCP state is reloaded, but the secure
         // descriptor envelope is intentionally retained as the native durable
@@ -2437,6 +2728,7 @@ final class CoordinatorMcpSurface {
         port.updateAccountScope(next)
         automationRelay.updateAccountScope(next)
         automationFire.updateAccountScope(next)
+        automationCloudSync.updateAccountScope(next)
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.consumeCursorAuthStatus(await self.cursorAuth.status())

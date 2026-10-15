@@ -1115,6 +1115,38 @@ final class IOSCursorDashboardClient: @unchecked Sendable, AccountMcpClient, Das
         )
     }
 
+    func automationServiceUnary(
+        method: String,
+        bodyBase64: String,
+        timeoutMs: Int = 30_000
+    ) async throws -> String {
+        let allowed = Set([
+            "ListSandAutomations",
+            "CreateSandAutomation",
+            "UpdateSandAutomation",
+            "DeleteSandAutomation",
+        ])
+        guard allowed.contains(method) else {
+            throw IOSCursorDashboardError(
+                message: "Unsupported AutomationsService method \(method)."
+            )
+        }
+        guard let body = Data(base64Encoded: bodyBase64) else {
+            throw IOSCursorDashboardError(
+                message: "AutomationsService request body is not valid base64."
+            )
+        }
+        try Task.checkCancellation()
+        let data = try await protoRPC(
+            method,
+            service: "AutomationsService",
+            body: body,
+            timeoutMs: min(max(1, timeoutMs), 30_000)
+        )
+        try Task.checkCancellation()
+        return data.base64EncodedString()
+    }
+
     func registerAutomationRelay(
         slackChannels: [String],
         githubRepos: [String],
