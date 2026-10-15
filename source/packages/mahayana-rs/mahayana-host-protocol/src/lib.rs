@@ -543,12 +543,18 @@ impl ComputerControlTarget {
 pub enum ComputerActionKind {
     Screenshot,
     Click,
+    #[serde(rename = "mouseDown")]
+    MouseDown,
+    #[serde(rename = "mouseUp")]
+    MouseUp,
     Move,
     Drag,
     Type,
     Key,
     Scroll,
     Wait,
+    #[serde(rename = "cursorPosition")]
+    CursorPosition,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -652,6 +658,8 @@ pub struct ComputerActionResult {
     pub origin: ComputerControlOrigin,
     pub actions_executed: usize,
     pub snapshot: ComputerSnapshot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor_position: Option<ComputerPoint>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
