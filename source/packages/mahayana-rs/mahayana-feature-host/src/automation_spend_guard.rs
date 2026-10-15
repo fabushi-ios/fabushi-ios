@@ -310,10 +310,7 @@ fn spend_guard_preserved_unread(
 fn spend_guard_disable_agent_automations(
     state: &mut FeatureState,
     agent_id: &str,
-    now_ms: i64,
-    user_time_zone: Option<&str>,
 ) -> Vec<String> {
-    let before = state.automations.clone();
     let mut paused = Vec::new();
     for automation in state.automations.values_mut() {
         if automation.agent_id.as_deref().unwrap_or("mahayana-assistant") != agent_id
@@ -325,20 +322,6 @@ fn spend_guard_disable_agent_automations(
         automation.next_run_at_ms = None;
         paused.push(automation.id.clone());
     }
-    if paused.is_empty() {
-        return paused;
-    }
-    prune_pending_listener_resumes(state);
-    prune_pending_automation_event_batches(state);
-    let after = state.automations.clone();
-    push_automation_lifecycle_diff(
-        state,
-        &before,
-        &after,
-        AutomationLifecycleSource::SpendGuard,
-        user_time_zone,
-        now_ms,
-    );
     paused
 }
 
@@ -349,7 +332,6 @@ fn spend_guard_resume_agent_automations(
     now_ms: i64,
     user_time_zone: Option<&str>,
 ) -> Vec<String> {
-    let before = state.automations.clone();
     let mut resumed = Vec::new();
     for id in ids {
         let Some(automation) = state.automations.get_mut(id) else {
@@ -376,18 +358,6 @@ fn spend_guard_resume_agent_automations(
         );
         resumed.push(id.clone());
     }
-    if resumed.is_empty() {
-        return resumed;
-    }
-    let after = state.automations.clone();
-    push_automation_lifecycle_diff(
-        state,
-        &before,
-        &after,
-        AutomationLifecycleSource::SpendGuard,
-        user_time_zone,
-        now_ms,
-    );
     resumed
 }
 
@@ -617,17 +587,24 @@ impl FeatureHostController {
                 Ok(AutomationSpendGuardAdmission::Continue(None))
             }
             AutomationSpendGuardDecision::Pause => {
-                let paused = spend_guard_disable_agent_automations(
-                    &mut state,
-                    &owner,
-                    now_ms,
-                    user_time_zone.as_deref(),
-                );
+                let before_automations = state.automations.clone();
+                let paused = spend_guard_disable_agent_automations(&mut state, &owner);
                 if paused.is_empty() {
                     return Ok(AutomationSpendGuardAdmission::Suppress);
                 }
-                Self::emit_spend_guard_automation_changes(&mut state, &paused, "disabled");
                 self.persist_automations(&state.automations)?;
+                prune_pending_listener_resumes(&mut state);
+                prune_pending_automation_event_batches(&mut state);
+                let after_automations = state.automations.clone();
+                push_automation_lifecycle_diff(
+                    &mut state,
+                    &before_automations,
+                    &after_automations,
+                    AutomationLifecycleSource::SpendGuard,
+                    user_time_zone.as_deref(),
+                    now_ms,
+                );
+                Self::emit_spend_guard_automation_changes(&mut state, &paused, "disabled");
                 let already_open = !current.paused_automation_ids.is_empty();
                 let issued = if already_open {
                     None
@@ -658,8 +635,6 @@ impl FeatureHostController {
                 paused_ids.extend(paused);
                 next.paused_automation_ids = paused_ids.into_iter().collect();
                 state.automation_spend_guard.insert(owner, next);
-                prune_pending_listener_resumes(&mut state);
-                prune_pending_automation_event_batches(&mut state);
                 if let Some(run_id) = primary_run_id {
                     Self::record_dropped_event_fire(
                         &mut state,
@@ -724,6 +699,7 @@ impl FeatureHostController {
 
         match answer {
             AutomationSpendGuardAnswer::Keep | AutomationSpendGuardAnswer::Resume => {
+                let before_automations = state.automations.clone();
                 let resumed = spend_guard_resume_agent_automations(
                     &mut state,
                     agent_id,
@@ -731,14 +707,24 @@ impl FeatureHostController {
                     now_ms,
                     user_time_zone.as_deref(),
                 );
-                Self::emit_spend_guard_automation_changes(&mut state, &resumed, "enabled");
                 if !resumed.is_empty() {
                     self.persist_automations(&state.automations)?;
+                    let after_automations = state.automations.clone();
+                    push_automation_lifecycle_diff(
+                        &mut state,
+                        &before_automations,
+                        &after_automations,
+                        AutomationLifecycleSource::SpendGuard,
+                        user_time_zone.as_deref(),
+                        now_ms,
+                    );
+                    Self::emit_spend_guard_automation_changes(&mut state, &resumed, "enabled");
                 }
                 next.snoozed_until_ms =
                     Some(now_ms.saturating_add(AUTOMATION_SPEND_GUARD_SNOOZE_MS));
             }
             AutomationSpendGuardAnswer::OptOut => {
+                let before_automations = state.automations.clone();
                 let resumed = spend_guard_resume_agent_automations(
                     &mut state,
                     agent_id,
@@ -746,9 +732,18 @@ impl FeatureHostController {
                     now_ms,
                     user_time_zone.as_deref(),
                 );
-                Self::emit_spend_guard_automation_changes(&mut state, &resumed, "enabled");
                 if !resumed.is_empty() {
                     self.persist_automations(&state.automations)?;
+                    let after_automations = state.automations.clone();
+                    push_automation_lifecycle_diff(
+                        &mut state,
+                        &before_automations,
+                        &after_automations,
+                        AutomationLifecycleSource::SpendGuard,
+                        user_time_zone.as_deref(),
+                        now_ms,
+                    );
+                    Self::emit_spend_guard_automation_changes(&mut state, &resumed, "enabled");
                 }
                 next.opted_out = true;
             }
@@ -758,19 +753,26 @@ impl FeatureHostController {
                     .iter()
                     .cloned()
                     .collect::<BTreeSet<_>>();
-                let newly_paused = spend_guard_disable_agent_automations(
-                    &mut state,
-                    agent_id,
-                    now_ms,
-                    user_time_zone.as_deref(),
-                );
-                Self::emit_spend_guard_automation_changes(
-                    &mut state,
-                    &newly_paused,
-                    "disabled",
-                );
+                let before_automations = state.automations.clone();
+                let newly_paused = spend_guard_disable_agent_automations(&mut state, agent_id);
                 if !newly_paused.is_empty() {
                     self.persist_automations(&state.automations)?;
+                    prune_pending_listener_resumes(&mut state);
+                    prune_pending_automation_event_batches(&mut state);
+                    let after_automations = state.automations.clone();
+                    push_automation_lifecycle_diff(
+                        &mut state,
+                        &before_automations,
+                        &after_automations,
+                        AutomationLifecycleSource::SpendGuard,
+                        user_time_zone.as_deref(),
+                        now_ms,
+                    );
+                    Self::emit_spend_guard_automation_changes(
+                        &mut state,
+                        &newly_paused,
+                        "disabled",
+                    );
                 }
                 paused_ids.extend(newly_paused);
                 next.paused_automation_ids = paused_ids.into_iter().collect();
@@ -919,7 +921,7 @@ mod automation_spend_guard_tests {
         state.automations.insert("guard".into(), make("guard", true));
         state.automations.insert("already-off".into(), make("already-off", false));
         let paused =
-            spend_guard_disable_agent_automations(&mut state, "mahayana-assistant", 2, Some("UTC"));
+            spend_guard_disable_agent_automations(&mut state, "mahayana-assistant");
         assert_eq!(paused, vec!["guard".to_string()]);
         assert!(!state.automations["guard"].enabled);
         assert!(!state.automations["already-off"].enabled);
@@ -933,11 +935,6 @@ mod automation_spend_guard_tests {
         assert_eq!(resumed, vec!["guard".to_string()]);
         assert!(state.automations["guard"].enabled);
         assert!(!state.automations["already-off"].enabled);
-        assert!(state.events.iter().any(|event| matches!(
-            event,
-            HostEvent::TransportEvent { channel, payload }
-                if channel == "automation-lifecycle"
-                    && payload.get("source").and_then(Value::as_str) == Some("spend_guard")
-        )));
+        assert!(state.events.is_empty(), "mutation helpers must not emit before durable commit");
     }
 }

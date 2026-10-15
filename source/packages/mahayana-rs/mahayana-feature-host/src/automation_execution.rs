@@ -1063,6 +1063,13 @@ mod routine_execution_tests {
         }).expect("scheduled guard drop identity");
         assert!(dropped.starts_with("routine-run-"));
         assert!(state.reported_dropped_event_run_ids.contains(&dropped));
+        assert!(state.events.iter().any(|event| matches!(
+            event,
+            HostEvent::TransportEvent { channel, payload }
+                if channel == "automation-lifecycle"
+                    && payload.get("source").and_then(Value::as_str) == Some("spend_guard")
+                    && payload.get("action").and_then(Value::as_str) == Some("disabled")
+        )));
     }
 
     #[test]
