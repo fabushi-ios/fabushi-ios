@@ -1118,6 +1118,10 @@ final class CoordinatorMcpSurface {
         return result
     }
 
+    func authorizeGatewayDescriptorAccount(_ accountScope: String) async -> Bool {
+        await gatewayDescriptorCache.authorizeExistingDescriptor(accountScope: accountScope)
+    }
+
     func structuredLogCredentials(
         backendURL: String,
         accountSlot: String
@@ -1135,7 +1139,9 @@ final class CoordinatorMcpSurface {
 
     func revokeCursorAuthForAccountRefusal() async -> IOSCursorAccountRefusalRevocation {
         stopComputerMigrationWatch(clearState: true)
-        await gatewayDescriptorCache.clear()
+        // Keep the durable gateway descriptor owner across refusal. Clearing
+        // it here would let a foreign account retry and claim the same native
+        // box after the first refusal.
         let result = await cursorAuth.revokeForAccountRefusal()
         await manager.reload()
         return result
@@ -1383,7 +1389,9 @@ final class CoordinatorMcpSurface {
 
     func prepareAccountTransition() async {
         stopComputerMigrationWatch(clearState: true)
-        await gatewayDescriptorCache.clear()
+        // Account-scoped in-memory/MCP state is reloaded, but the secure
+        // descriptor envelope is intentionally retained as the native durable
+        // account-binding authority.
         await manager.reload()
     }
 
